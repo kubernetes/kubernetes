@@ -13,6 +13,7 @@ go_library(
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/kubectl:go_default_library",
+        "//test/e2e/framework/resource:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
     ],

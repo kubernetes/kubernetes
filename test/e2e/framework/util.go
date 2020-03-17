@@ -52,7 +52,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -61,7 +60,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
-	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -79,7 +77,6 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -145,10 +142,6 @@ const (
 
 	// SnapshotCreateTimeout is how long for snapshot to create snapshotContent.
 	SnapshotCreateTimeout = 5 * time.Minute
-
-	// Number of objects that gc can delete in a second.
-	// GC issues 2 requestes for single delete.
-	gcThroughput = 10
 
 	// Minimal number of nodes for the cluster to be considered large.
 	largeClusterThreshold = 100
@@ -1131,139 +1124,6 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 		return false, nil
 	}
 	return true, nil
-}
-
-// ScaleResource scales resource to the given size.
-func ScaleResource(
-	clientset clientset.Interface,
-	scalesGetter scaleclient.ScalesGetter,
-	ns, name string,
-	size uint,
-	wait bool,
-	kind schema.GroupKind,
-	gvr schema.GroupVersionResource,
-) error {
-	ginkgo.By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gvr); err != nil {
-		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
-	}
-	if !wait {
-		return nil
-	}
-	return e2epod.WaitForControlledPodsRunning(clientset, ns, name, kind)
-}
-
-// DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
-func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
-	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
-
-	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			Logf("%v %s not found: %v", kind, name, err)
-			return nil
-		}
-		return err
-	}
-	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-	replicas, err := e2eresource.GetReplicasFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-
-	ps, err := testutils.NewPodStore(c, ns, selector, fields.Everything())
-	if err != nil {
-		return err
-	}
-
-	defer ps.Stop()
-	falseVar := false
-	deleteOption := metav1.DeleteOptions{OrphanDependents: &falseVar}
-	startTime := time.Now()
-	if err := testutils.DeleteResourceWithRetries(c, kind, ns, name, deleteOption); err != nil {
-		return err
-	}
-	deleteTime := time.Since(startTime)
-	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
-
-	var interval, timeout time.Duration
-	switch {
-	case replicas < 100:
-		interval = 100 * time.Millisecond
-	case replicas < 1000:
-		interval = 1 * time.Second
-	default:
-		interval = 10 * time.Second
-	}
-	if replicas < 5000 {
-		timeout = 10 * time.Minute
-	} else {
-		timeout = time.Duration(replicas/gcThroughput) * time.Second
-		// gcThroughput is pretty strict now, add a bit more to it
-		timeout = timeout + 3*time.Minute
-	}
-
-	err = waitForPodsInactive(ps, interval, timeout)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
-	}
-	terminatePodTime := time.Since(startTime) - deleteTime
-	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
-
-	// In gce, at any point, small percentage of nodes can disappear for
-	// ~10 minutes due to hostError. 20 minutes should be long enough to
-	// restart VM in that case and delete the pod.
-	err = waitForPodsGone(ps, interval, 20*time.Minute)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
-	}
-	return nil
-}
-
-// waitForPodsGone waits until there are no pods left in the PodStore.
-func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var pods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		if pods = ps.List(); len(pods) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range pods {
-			Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d pods left. E.g. %q on node %q", len(pods), pods[0].Name, pods[0].Spec.NodeName)
-	}
-	return err
-}
-
-// waitForPodsInactive waits until there are no active pods left in the PodStore.
-// This is to make a fair comparison of deletion time between DeleteRCAndPods
-// and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
-// when the pod is inactvie.
-func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var activePods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pods := ps.List()
-		activePods = controller.FilterActivePods(pods)
-		if len(activePods) != 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range activePods {
-			Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
-	}
-	return err
 }
 
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
