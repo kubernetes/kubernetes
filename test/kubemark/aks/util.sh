@@ -35,6 +35,7 @@ function authenticate-docker {
 # The difference between these two kubeconfigs is that the internal one uses
 # private master IP, which might be better suited for setting up hollow nodes.
 function create-kubemark-master {
+    set -x
     echo "Creating cluster..."
     if [ "$USE_EXISTING" != "true" ]; then
       GROUP_EXISTS=$(az group list -o tsv --query "[?name=='${KUBEMARK_RESOURCE_GROUP}'].name")
@@ -66,6 +67,7 @@ function create-kubemark-master {
 
 # This function should delete kubemark master.
 function delete-kubemark-master {
+  set -x
   echo "Deleting cluster..."
   CLUSTER_EXISTS="$(az resource list -o tsv --query "[?name=='${KUBEMARK_RESOURCE_NAME}' && resourceGroup=='${KUBEMARK_RESOURCE_GROUP}'].id")"
 

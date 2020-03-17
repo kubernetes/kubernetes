@@ -19,6 +19,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 TMP_ROOT="$(dirname "${BASH_SOURCE[@]}")/../.."
 KUBE_ROOT=$(readlink -e "${TMP_ROOT}" 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' "${TMP_ROOT}")
