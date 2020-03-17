@@ -126,7 +126,6 @@ filegroup(
         "//test/e2e/framework/node:all-srcs",
         "//test/e2e/framework/perf:all-srcs",
         "//test/e2e/framework/pod:all-srcs",
-        "//test/e2e/framework/podlogs:all-srcs",
         "//test/e2e/framework/providers/aws:all-srcs",
         "//test/e2e/framework/providers/azure:all-srcs",
         "//test/e2e/framework/providers/gce:all-srcs",
