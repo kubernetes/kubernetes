@@ -466,7 +466,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 		// is deleted.
 		return "", types.NewUncertainProgressError(err.Error())
 	}
-	return devicePath, util.persistISCSI(b)
+	return devicePath, nil
 }
 
 // persistISCSI saves iSCSI volume configuration for DetachDisk into global
