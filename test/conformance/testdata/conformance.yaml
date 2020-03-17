@@ -42,9 +42,8 @@
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy
     FallbackToLogsOnError is set [NodeConformance] [Conformance]'
-  description: 'Name: Container Runtime, TerminationMessage, from log output of succeeding
-    container Create a pod with an container. Container''s output is recorded in log
-    and container exits successfully without an error. When container is terminated,
+  description: 'Create a pod with an container. Container''s output is recorded in
+    log and container exits successfully without an error. When container is terminated,
     terminationMessage MUST have no content as container succeed. [LinuxOnly]: Cannot
     mount files in Windows Containers.'
   release: v1.15
@@ -53,9 +52,8 @@
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy
     FallbackToLogsOnError is set [NodeConformance] [Conformance]'
-  description: 'Name: Container Runtime, TerminationMessage, from file of succeeding
-    container Create a pod with an container. Container''s output is recorded in a
-    file and the container exits successfully without an error. When container is
+  description: 'Create a pod with an container. Container''s output is recorded in
+    a file and the container exits successfully without an error. When container is
     terminated, terminationMessage MUST match with the content from file. [LinuxOnly]:
     Cannot mount files in Windows Containers.'
   release: v1.15
@@ -64,23 +62,21 @@
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] from log output if TerminationMessagePolicy
     FallbackToLogsOnError is set [NodeConformance] [Conformance]'
-  description: 'Name: Container Runtime, TerminationMessage, from container''s log
-    output of failing container Create a pod with an container. Container''s output
-    is recorded in log and container exits with an error. When container is terminated,
-    termination message MUST match the expected output recorded from container''s
-    log. [LinuxOnly]: Cannot mount files in Windows Containers.'
+  description: 'Create a pod with an container. Container''s output is recorded in
+    log and container exits with an error. When container is terminated, termination
+    message MUST match the expected output recorded from container''s log. [LinuxOnly]:
+    Cannot mount files in Windows Containers.'
   release: v1.15
   file: test/e2e/common/runtime.go
 - testname: ""
   codename: '[k8s.io] Container Runtime blackbox test on terminated container should
     report termination message [LinuxOnly] if TerminationMessagePath is set as non-root
     user and at a non-default path [NodeConformance] [Conformance]'
-  description: 'Name: Container Runtime, TerminationMessagePath, non-root user and
-    non-default path Create a pod with a container to run it as a non-root user with
-    a custom TerminationMessagePath set. Pod redirects the output to the provided
-    path successfully. When the container is terminated, the termination message MUST
-    match the expected output logged in the provided custom path. [LinuxOnly]: Tagged
-    LinuxOnly due to use of ''uid'' and unable to mount files in Windows Containers.'
+  description: 'Create a pod with a container to run it as a non-root user with a
+    custom TerminationMessagePath set. Pod redirects the output to the provided path
+    successfully. When the container is terminated, the termination message MUST match
+    the expected output logged in the provided custom path. [LinuxOnly]: Tagged LinuxOnly
+    due to use of ''uid'' and unable to mount files in Windows Containers.'
   release: v1.15
   file: test/e2e/common/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
@@ -104,10 +100,9 @@
 - testname: Docker containers, with command
   codename: '[k8s.io] Docker Containers should be able to override the image''s default
     command (docker entrypoint) [NodeConformance] [Conformance]'
-  description: 'Note: when you override the entrypoint, the image''s arguments (docker
-    cmd) are ignored. Default command from the docker image entrypoint MUST NOT be
-    used when Pod specifies the container command.  Command from Pod spec MUST override
-    the command in the image.'
+  description: Default command from the docker image entrypoint MUST NOT be used when
+    Pod specifies the container command.  Command from Pod spec MUST override the
+    command in the image.
   release: v1.9
   file: test/e2e/common/docker_containers.go
 - testname: Docker containers, with command and arguments
@@ -793,22 +788,21 @@
 - testname: Garbage Collector, dependency cycle
   codename: '[sig-api-machinery] Garbage collector should not be blocked by dependency
     circle [Conformance]'
-  description: 'TODO: should be an integration test Create three pods, patch them
-    with Owner references such that pod1 has pod3, pod2 has pod1 and pod3 has pod2
-    as owner references respectively. Delete pod1 MUST delete all pods. The dependency
-    cycle MUST not block the garbage collection.'
+  description: Create three pods, patch them with Owner references such that pod1
+    has pod3, pod2 has pod1 and pod3 has pod2 as owner references respectively. Delete
+    pod1 MUST delete all pods. The dependency cycle MUST not block the garbage collection.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, multiple owners
   codename: '[sig-api-machinery] Garbage collector should not delete dependents that
     have both valid owner and owner that''s waiting for dependents to be deleted [Conformance]'
-  description: 'TODO: this should be an integration test Create a replication controller
-    RC1, with maximum allocatable Pods between 10 and 100 replicas. Create second
-    replication controller RC2 and set RC2 as owner for half of those replicas. Once
-    RC1 is created and the all Pods are created, delete RC1 with deleteOptions.PropagationPolicy
-    set to Foreground. Half of the Pods that has RC2 as owner MUST not be deleted
-    but have a deletion timestamp. Deleting the Replication Controller MUST not delete
-    Pods that are owned by multiple replication controllers.'
+  description: Create a replication controller RC1, with maximum allocatable Pods
+    between 10 and 100 replicas. Create second replication controller RC2 and set
+    RC2 as owner for half of those replicas. Once RC1 is created and the all Pods
+    are created, delete RC1 with deleteOptions.PropagationPolicy set to Foreground.
+    Half of the Pods that has RC2 as owner MUST not be deleted but have a deletion
+    timestamp. Deleting the Replication Controller MUST not delete Pods that are owned
+    by multiple replication controllers.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete deployment, propagation policy orphan
@@ -1385,10 +1379,9 @@
 - testname: Kubectl, proxy port zero
   codename: '[sig-cli] Kubectl client Proxy server should support proxy with --port
     0  [Conformance]'
-  description: 'TODO: test proxy options (static, prefix, etc) Start a proxy server
-    on port zero by running ''kubectl proxy'' with --port=0. Call the proxy server
-    by requesting api versions from unix socket. The proxy server MUST provide at
-    least one version string.'
+  description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0.
+    Call the proxy server by requesting api versions from unix socket. The proxy server
+    MUST provide at least one version string.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, replication controller
@@ -1473,13 +1466,11 @@
 - testname: Networking, intra pod http
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
     communication: http [NodeConformance] [Conformance]'
-  description: Try to hit all endpoints through a test container, retry 5 times, expect
-    exactly one unique hostname. Each of these endpoints reports its own hostname.
-    Create a hostexec pod that is capable of curl to netcat commands. Create a test
-    Pod that will act as a webserver front end exposing ports 8080 for tcp and 8081
-    for udp. The netserver service proxies are created on specified number of nodes.
-    The kubectl exec on the webserver container MUST reach a http port on the each
-    of service proxy endpoints in the cluster and the request MUST be successful.
+  description: Create a hostexec pod that is capable of curl to netcat commands. Create
+    a test Pod that will act as a webserver front end exposing ports 8080 for tcp
+    and 8081 for udp. The netserver service proxies are created on specified number
+    of nodes. The kubectl exec on the webserver container MUST reach a http port on
+    the each of service proxy endpoints in the cluster and the request MUST be successful.
     Container will execute curl command to reach the service port within specified
     max retry limit and MUST result in reporting unique hostnames.
   release: v1.9, v1.18
@@ -1540,10 +1531,8 @@
   file: test/e2e/network/proxy.go
 - testname: Proxy, logs service endpoint
   codename: '[sig-network] Proxy version v1 should proxy through a service and a pod  [Conformance]'
-  description: using the porter image to serve content, access the content (of multiple
-    pods?) from multiple (endpoints/services?) Select any node in the cluster to invoke  /logs
-    endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint
-    MUST be reachable.
+  description: Select any node in the cluster to invoke  /logs endpoint  using the
+    /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
   release: v1.9
   file: test/e2e/network/proxy.go
 - testname: Service endpoint latency, thresholds
@@ -1711,16 +1700,7 @@
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
     of pods that are allowed to run  [Conformance]'
-  description: 'This test verifies we don''t allow scheduling of pods in a way that
-    sum of resource requests of pods is greater than machines capacity. It assumes
-    that cluster add-on pods stay stable and cannot be run in parallel with any other
-    test that touches Nodes or Pods. It is so because we need to have precise control
-    on what''s running in the cluster. Test scenario: 1. Find the amount CPU resources
-    on each node. 2. Create one pod with affinity to each node that uses 70% of the
-    node CPU. 3. Wait for the pods to be scheduled. 4. Create another pod with no
-    affinity to any node that need 50% of the largest node CPU. 5. Make sure this
-    additional pod is not scheduled. Scheduling Pods MUST fail if the resource requests
-    exceed Machine capacity.'
+  description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
   release: v1.9
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduler, node selector matching
@@ -1734,10 +1714,9 @@
 - testname: Scheduler, node selector not matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
     is respected if not matching  [Conformance]'
-  description: Test Nodes does not have any label, hence it should be impossible to
-    schedule Pod with nonempty Selector set. Create a Pod with a NodeSelector set
-    to a value that does not match a node in the cluster. Since there are no nodes
-    matching the criteria the Pod MUST not be scheduled.
+  description: Create a Pod with a NodeSelector set to a value that does not match
+    a node in the cluster. Since there are no nodes matching the criteria the Pod
+    MUST not be scheduled.
   release: v1.9
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduling, HostPort and Protocol match, HostIPs different but one is
@@ -2127,11 +2106,10 @@
 - testname: Projected Volume, multiple projections
   codename: '[sig-storage] Projected combined should project all components that make
     up the projection API [Projection][NodeConformance] [Conformance]'
-  description: Test multiple projections A Pod is created with a projected volume
-    source for secrets, configMap and downwardAPI with pod name, cpu and memory limits
-    and cpu and memory requests. Pod MUST be able to read the secrets, configMap values
-    and the cpu and memory limits as well as cpu and memory requests from the mounted
-    DownwardAPIVolumeFiles.
+  description: A Pod is created with a projected volume source for secrets, configMap
+    and downwardAPI with pod name, cpu and memory limits and cpu and memory requests.
+    Pod MUST be able to read the secrets, configMap values and the cpu and memory
+    limits as well as cpu and memory requests from the mounted DownwardAPIVolumeFiles.
   release: v1.9
   file: test/e2e/common/projected_combined.go
 - testname: Projected Volume, ConfigMap, create, update and delete

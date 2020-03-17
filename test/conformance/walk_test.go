@@ -158,6 +158,14 @@ func TestCommentToConformanceData(t *testing.T) {
 			desc:     "All fields parsed and newlines and whitespace removed from description",
 			input:    "Release: v1.1\n\t\tTestname: mytest\n\t\tDescription: foo\n\t\tbar\ndone",
 			expected: &conformanceData{TestName: "mytest", Release: "v1.1", Description: "foo bar done"},
+		}, {
+			desc:     "Behaviors are read",
+			input:    "Testname: behaviors\nBehaviors:\n- should behave\n- second behavior",
+			expected: &conformanceData{TestName: "behaviors", Behaviors: []string{"should behave", "second behavior"}},
+		}, {
+			desc:     "Multiple behaviors are parsed",
+			input:    "Testname: behaviors2\nBehaviors:\n- first behavior\n- second behavior",
+			expected: &conformanceData{TestName: "behaviors2", Behaviors: []string{"first behavior", "second behavior"}},
 		},
 	}
 
