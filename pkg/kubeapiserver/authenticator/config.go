@@ -191,6 +191,12 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		tokenAuthenticators = append(tokenAuthenticators, webhookTokenAuth)
 	}
 
+	// openshift gets injected here as a separate token authenticator because we also add a special group to our oauth authorized
+	// tokens that allows us to recognize human users differently than machine users.  The openAPI is always correct because we always
+	// configuration service account tokens, so we just have to create and add another authenticator.
+	// TODO make this a webhook authenticator and remove this patch.
+	tokenAuthenticators = AddOAuthServerAuthenticatorIfNeeded(tokenAuthenticators, config.APIAudiences)
+
 	if len(tokenAuthenticators) > 0 {
 		// Union the token authenticators
 		tokenAuth := tokenunion.New(tokenAuthenticators...)
