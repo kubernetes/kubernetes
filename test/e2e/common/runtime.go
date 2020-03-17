@@ -19,6 +19,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"path"
 	"time"
 
@@ -294,7 +295,12 @@ while true; do sleep 1; done
 		}
 	}
 }`
-
+					// we might be told to use a different docker config JSON.
+					if framework.TestContext.DockerConfigFile != "" {
+						contents, err := ioutil.ReadFile(framework.TestContext.DockerConfigFile)
+						framework.ExpectNoError(err)
+						auth = string(contents)
+					}
 					secret := &v1.Secret{
 						Data: map[string][]byte{v1.DockerConfigJsonKey: []byte(auth)},
 						Type: v1.SecretTypeDockerConfigJson,

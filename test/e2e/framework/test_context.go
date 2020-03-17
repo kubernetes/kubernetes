@@ -173,6 +173,9 @@ type TestContextType struct {
 
 	// SpecSummaryOutput is the file to write ginkgo.SpecSummary objects to as tests complete. Useful for debugging and test introspection.
 	SpecSummaryOutput string
+
+	// DockerConfigFile is a file that contains credentials which can be used to pull images from certain private registries, needed for a test.
+	DockerConfigFile string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -302,6 +305,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 	flags.StringVar(&TestContext.SpecSummaryOutput, "spec-dump", "", "The file to dump all ginkgo.SpecSummary to after tests run. If empty, no objects are saved/printed.")
+	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A file that contains credentials which can be used to pull images from certain private registries, needed for a test.")
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
