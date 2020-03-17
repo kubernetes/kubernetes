@@ -166,7 +166,13 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, l.config.ClientNodeSelection, framework.PodStartTimeout)
+			podConfig := e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+				SeLinuxLabel:  e2epv.SELinuxLabel,
+				NodeSelection: l.config.ClientNodeSelection,
+			}
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -203,7 +209,13 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			l.resource.Pvc = npvc
 
 			ginkgo.By("Creating a new pod with same volume")
-			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, l.config.ClientNodeSelection, framework.PodStartTimeout)
+			podConfig = e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+				SeLinuxLabel:  e2epv.SELinuxLabel,
+				NodeSelection: l.config.ClientNodeSelection,
+			}
+			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
 				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
@@ -224,7 +236,13 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, l.config.ClientNodeSelection, framework.PodStartTimeout)
+			podConfig := e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+				SeLinuxLabel:  e2epv.SELinuxLabel,
+				NodeSelection: l.config.ClientNodeSelection,
+			}
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
