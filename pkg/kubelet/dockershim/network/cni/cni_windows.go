@@ -22,7 +22,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-
+	"net"
 	cniTypes020 "github.com/containernetworking/cni/pkg/types/020"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
@@ -67,7 +67,16 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		klog.Errorf("error while cni parsing result: %s", err)
 		return nil, err
 	}
-	return &network.PodNetworkStatus{IP: result020.IP4.IP.IP}, nil
+	 
+	var  list []net.IP;
+
+	list = append(list, result020.IP4.IP.IP)
+
+	if (result020.IP6 != nil) {
+		list = append(list, result020.IP6.IP.IP)
+	}
+
+	return &network.PodNetworkStatus{IP: result020.IP4.IP.IP, IPs: list}, nil
 }
 
 // buildDNSCapabilities builds cniDNSConfig from runtimeapi.DNSConfig.

@@ -89,11 +89,15 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 	for _, endpoint := range endpoints {
 		equal := false
 		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
-			equal = endpoint.IpConfigurations[0].IpAddress == ip
+			equal = endpoint.IpConfigurations[0].IpAddress == ip 
+
+			if (!equal && len(endpoint.IpConfigurations) > 1) {
+				equal = endpoint.IpConfigurations[1].IpAddress == ip 
+			}
 		}
 		if equal && strings.EqualFold(endpoint.HostComputeNetwork, hnsnetwork.Id) {
 			return &endpointsInfo{
-				ip:         endpoint.IpConfigurations[0].IpAddress,
+				ip:         ip,
 				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
