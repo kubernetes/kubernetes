@@ -31,12 +31,12 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"k8s.io/klog"
 
+	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -361,18 +361,18 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 }
 
 func getAppArmorOpts(profile string) ([]dockerOpt, error) {
-	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
+	if profile == "" || profile == v1.AppArmorBetaProfileRuntimeDefault {
 		// The docker applies the default profile by default.
 		return nil, nil
 	}
 
 	// Return unconfined profile explicitly
-	if profile == apparmor.ProfileNameUnconfined {
-		return []dockerOpt{{"apparmor", apparmor.ProfileNameUnconfined, ""}}, nil
+	if profile == v1.AppArmorBetaProfileNameUnconfined {
+		return []dockerOpt{{"apparmor", v1.AppArmorBetaProfileNameUnconfined, ""}}, nil
 	}
 
 	// Assume validation has already happened.
-	profileName := strings.TrimPrefix(profile, apparmor.ProfileNamePrefix)
+	profileName := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
 	return []dockerOpt{{"apparmor", profileName, ""}}, nil
 }
 

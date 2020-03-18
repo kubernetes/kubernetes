@@ -1115,16 +1115,16 @@ func TestAdmitAppArmor(t *testing.T) {
 	unconstrainedPSP := restrictivePSP()
 	defaultedPSP := restrictivePSP()
 	defaultedPSP.Annotations = map[string]string{
-		apparmor.DefaultProfileAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaDefaultProfileAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	appArmorPSP := restrictivePSP()
 	appArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	appArmorDefaultPSP := restrictivePSP()
 	appArmorDefaultPSP.Annotations = map[string]string{
-		apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
+		v1.AppArmorBetaDefaultProfileAnnotationKey:  v1.AppArmorBetaProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault + "," + v1.AppArmorBetaProfileNamePrefix + "foo",
 	}
 
 	tests := map[string]struct {
@@ -1142,18 +1142,18 @@ func TestAdmitAppArmor(t *testing.T) {
 			expectedProfile:    "",
 		},
 		"unconstrained with profile": {
-			pod:                createPodWithAppArmor(apparmor.ProfileRuntimeDefault),
+			pod:                createPodWithAppArmor(v1.AppArmorBetaProfileRuntimeDefault),
 			psp:                unconstrainedPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileRuntimeDefault,
+			expectedProfile:    v1.AppArmorBetaProfileRuntimeDefault,
 		},
 		"unconstrained with default profile": {
 			pod:                goodPod(),
 			psp:                defaultedPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileRuntimeDefault,
+			expectedProfile:    v1.AppArmorBetaProfileRuntimeDefault,
 		},
 		"AppArmor enforced with no profile": {
 			pod:                goodPod(),
@@ -1166,17 +1166,17 @@ func TestAdmitAppArmor(t *testing.T) {
 			psp:                appArmorDefaultPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileRuntimeDefault,
+			expectedProfile:    v1.AppArmorBetaProfileRuntimeDefault,
 		},
 		"AppArmor enforced with good profile": {
-			pod:                createPodWithAppArmor(apparmor.ProfileNamePrefix + "foo"),
+			pod:                createPodWithAppArmor(v1.AppArmorBetaProfileNamePrefix + "foo"),
 			psp:                appArmorDefaultPSP,
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedProfile:    apparmor.ProfileNamePrefix + "foo",
+			expectedProfile:    v1.AppArmorBetaProfileNamePrefix + "foo",
 		},
 		"AppArmor enforced with local profile": {
-			pod:                createPodWithAppArmor(apparmor.ProfileNamePrefix + "bar"),
+			pod:                createPodWithAppArmor(v1.AppArmorBetaProfileNamePrefix + "bar"),
 			psp:                appArmorPSP,
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,

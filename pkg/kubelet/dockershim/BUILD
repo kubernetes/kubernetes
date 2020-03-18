@@ -55,7 +55,6 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
-        "//pkg/security/apparmor:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -111,7 +110,7 @@ go_test(
         "//pkg/kubelet/dockershim/network/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
-        "//pkg/security/apparmor:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
@@ -123,12 +122,6 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "//staging/src/k8s.io/api/core/v1:go_default_library",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "//staging/src/k8s.io/api/core/v1:go_default_library",
-        ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/golang.org/x/sys/windows/registry:go_default_library",
         ],

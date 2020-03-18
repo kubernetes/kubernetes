@@ -22,9 +22,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/maps"
 )
 
@@ -36,29 +36,29 @@ var (
 	withoutAppArmor = map[string]string{"foo": "bar"}
 	withDefault     = map[string]string{
 		"foo": "bar",
-		apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaContainerAnnotationKeyPrefix + containerName: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	withLocal = map[string]string{
 		"foo": "bar",
-		apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "foo",
+		v1.AppArmorBetaContainerAnnotationKeyPrefix + containerName: v1.AppArmorBetaProfileNamePrefix + "foo",
 	}
 	withDisallowed = map[string]string{
 		"foo": "bar",
-		apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "bad",
+		v1.AppArmorBetaContainerAnnotationKeyPrefix + containerName: v1.AppArmorBetaProfileNamePrefix + "bad",
 	}
 
 	noAppArmor               = map[string]string{"foo": "bar"}
 	unconstrainedWithDefault = map[string]string{
-		apparmor.DefaultProfileAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaDefaultProfileAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	constrained = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," +
-			apparmor.ProfileNamePrefix + "foo",
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault + "," +
+			v1.AppArmorBetaProfileNamePrefix + "foo",
 	}
 	constrainedWithDefault = map[string]string{
-		apparmor.DefaultProfileAnnotationKey: apparmor.ProfileRuntimeDefault,
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," +
-			apparmor.ProfileNamePrefix + "foo",
+		v1.AppArmorBetaDefaultProfileAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault + "," +
+			v1.AppArmorBetaProfileNamePrefix + "foo",
 	}
 
 	container = api.Container{

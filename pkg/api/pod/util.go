@@ -19,11 +19,11 @@ package pod
 import (
 	"strings"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 // ContainerType signifies container type
@@ -363,7 +363,7 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
 		for k := range podAnnotations {
-			if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+			if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 				delete(podAnnotations, k)
 			}
 		}
@@ -590,7 +590,7 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 // appArmorInUse returns true if the pod has apparmor related information
 func appArmorInUse(podAnnotations map[string]string) bool {
 	for k := range podAnnotations {
-		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+		if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
 			return true
 		}
 	}
