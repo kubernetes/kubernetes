@@ -38,7 +38,7 @@ func TestListTimeout(t *testing.T) {
 		GroupVersion:         appsv1.SchemeGroupVersion,
 		NegotiatedSerializer: scheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get("timeout") != "21s" {
+			if req.URL.Query().Get("timeout") != "" {
 				t.Fatal(spew.Sdump(req.URL.Query()))
 			}
 			return &http.Response{StatusCode: http.StatusNotFound, Body: ioutil.NopCloser(&bytes.Buffer{})}, nil
