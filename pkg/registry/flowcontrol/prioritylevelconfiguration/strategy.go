@@ -94,7 +94,12 @@ var StatusStrategy = priorityLevelConfigurationStatusStrategy{Strategy}
 func (priorityLevelConfigurationStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPriorityLevelConfiguration := obj.(*flowcontrol.PriorityLevelConfiguration)
 	oldPriorityLevelConfiguration := old.(*flowcontrol.PriorityLevelConfiguration)
+
+	// managedFields must be preserved since it's been modified to
+	// track changed fields in the status update.
+	managedFields := newPriorityLevelConfiguration.ManagedFields
 	newPriorityLevelConfiguration.ObjectMeta = oldPriorityLevelConfiguration.ObjectMeta
+	newPriorityLevelConfiguration.ManagedFields = managedFields
 	newPriorityLevelConfiguration.Spec = oldPriorityLevelConfiguration.Spec
 }
 
