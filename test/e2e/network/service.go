@@ -935,7 +935,7 @@ var _ = SIGDescribe("Services", func() {
 		pausePods, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String()})
 		framework.ExpectNoError(err, "Error in listing pods associated with pause pod deployments")
 
-		gomega.Expect(pausePods.Items[0].Spec.NodeName).ToNot(gomega.Equal(pausePods.Items[1].Spec.NodeName))
+		framework.ExpectNotEqual(pausePods.Items[0].Spec.NodeName, pausePods.Items[1].Spec.NodeName)
 
 		serviceAddress := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 

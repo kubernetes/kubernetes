@@ -46,6 +46,15 @@ do
     fi
 done
 
+errors_expect_no_equal=()
+for file in "${all_e2e_files[@]}"
+do
+    if grep -E "Expect\(.*\)\.(NotTo|ToNot)\((gomega\.Equal|Equal)" "${file}" > /dev/null
+    then
+        errors_expect_no_equal+=( "${file}" )
+    fi
+done
+
 errors_expect_equal=()
 for file in "${all_e2e_files[@]}"
 do
@@ -78,6 +87,20 @@ if [ ${#errors_expect_error[@]} -ne 0 ]; then
     echo
     echo 'The above files need to use framework.ExpectError(err) instead of '
     echo 'Expect(err).To(HaveOccurred()) or gomega.Expect(err).To(gomega.HaveOccurred())'
+    echo
+  } >&2
+  exit 1
+fi
+
+if [ ${#errors_expect_no_equal[@]} -ne 0 ]; then
+  {
+    echo "Errors:"
+    for err in "${errors_expect_no_equal[@]}"; do
+      echo "$err"
+    done
+    echo
+    echo 'The above files need to use framework.ExpectNotEqual(foo, bar) instead of '
+    echo 'Expect(foo).NotTo(Equal(bar)) or gomega.Expect(foo).NotTo(gomega.Equal(bar))'
     echo
   } >&2
   exit 1
