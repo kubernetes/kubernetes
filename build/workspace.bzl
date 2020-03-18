@@ -38,11 +38,11 @@ _CRI_TARBALL_ARCH_SHA256 = {
     "windows-amd64": "e18150d5546d3ddf6b165bd9aec0f65c18aacf75b94fb28bb26bfc0238f07b28",
 }
 
-ETCD_VERSION = "3.4.3"
+ETCD_VERSION = "3.4.4"
 _ETCD_TARBALL_ARCH_SHA256 = {
-    "amd64": "6c642b723a86941b99753dff6c00b26d3b033209b15ee33325dc8e7f4cd68f07",
-    "arm64": "01bd849ad99693600bd59db8d0e66ac64aac1e3801900665c31bd393972e3554",
-    "ppc64le": "3f20888d6efb7f2665ebe278860eec6e8fc9555624e56c3d93f5a6b6dd90a21a",
+    "amd64": "35abe668022073dfe6239aa42fd15ded9810f7ccee281af0b9d0646dd270de47",
+    "arm64": "52444314c01f7dad7d319a7b87ea7a5a7e48af96584c48639922a4b2f32329a4",
+    "ppc64le": "b7e43e08e123d0b30c7fddc8b903c0d7c8de49e28db8c87cf5cc4a24b68a715d",
 }
 
 # Dependencies needed for a Kubernetes "release", e.g. building docker images,
