@@ -48,8 +48,10 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/util/async"
+	utilnet "k8s.io/utils/net"
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -101,6 +103,7 @@ type loadBalancerFlags struct {
 	useMUX          bool
 	preserveDIP     bool
 	sessionAffinity bool
+	isIPv6          bool
 }
 
 // internal struct for string service information
@@ -163,12 +166,16 @@ type endpointsInfo struct {
 	hns             HostNetworkService
 }
 
-//Uses mac prefix and IPv4 address to return a mac address
+//Uses mac prefix and IP address to return a mac address
 //This ensures mac addresses are unique for proper load balancing
-//Does not support IPv6 and returns a dummy mac
+//There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
+//and not sent on the wire.
 func conjureMac(macPrefix string, ip net.IP) string {
 	if ip4 := ip.To4(); ip4 != nil {
 		a, b, c, d := ip4[0], ip4[1], ip4[2], ip4[3]
+		return fmt.Sprintf("%v-%02x-%02x-%02x-%02x", macPrefix, a, b, c, d)
+	} else if ip6 := ip.To16(); ip6 != nil {
+		a, b, c, d := ip6[15], ip6[14], ip6[13], ip6[12]
 		return fmt.Sprintf("%v-%02x-%02x-%02x-%02x", macPrefix, a, b, c, d)
 	}
 	return "02-11-22-33-44-55"
@@ -502,6 +509,7 @@ type Proxier struct {
 	// with some partial data after kube-proxy restart.
 	endpointsSynced bool
 	servicesSynced  bool
+	isIPv6Mode      bool
 	initialized     int32
 	syncRunner      *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 
@@ -664,6 +672,8 @@ func NewProxier(
 		}
 	}
 
+	isIPv6 := utilnet.IsIPv6(nodeIP)
+
 	proxier := &Proxier{
 		portsMap:            make(map[localPort]closeable),
 		serviceMap:          make(proxyServiceMap),
@@ -685,6 +695,7 @@ func NewProxier(
 		hostMac:             hostMac,
 		isDSR:               isDSR,
 		supportedFeatures:   supportedFeatures,
+		isIPv6Mode:          isIPv6,
 	}
 
 	burstSyncs := 2
@@ -692,6 +703,38 @@ func NewProxier(
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	return proxier, nil
 
+}
+
+func NewDualStackProxier(
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	masqueradeBit int,
+	clusterCIDR string,
+	hostname string,
+	nodeIP [2]net.IP,
+	recorder record.EventRecorder,
+	healthzServer healthcheck.ProxierHealthUpdater,
+	config config.KubeProxyWinkernelConfiguration,
+) (proxy.Provider, error) {
+
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
+		clusterCIDR, hostname, nodeIP[0], recorder, healthzServer, config)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[0])
+	}
+
+	ipv6Proxier, err := NewProxier(syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
+		clusterCIDR, hostname, nodeIP[1], recorder, healthzServer, config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[1])
+	}
+
+	// Return a meta-proxier that dispatch calls between the two
+	// single-stack proxier instances
+	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // CleanupLeftovers removes all hns rules created by the Proxier
@@ -1275,7 +1318,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		hnsLoadBalancer, err := hns.getLoadBalancer(
 			hnsEndpoints,
-			loadBalancerFlags{isDSR: proxier.isDSR, sessionAffinity: sessionAffinityClientIP},
+			loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
 			sourceVip,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
@@ -1300,7 +1343,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				nodePortEndpoints,
-				loadBalancerFlags{localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP},
+				loadBalancerFlags{localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				"",
 				Enum(svcInfo.protocol),
@@ -1321,7 +1364,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
 				hnsEndpoints,
-				loadBalancerFlags{sessionAffinity: sessionAffinityClientIP},
+				loadBalancerFlags{sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				externalIP.ip,
 				Enum(svcInfo.protocol),
@@ -1344,7 +1387,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				lbIngressEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP},
+				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				lbIngressIP.ip,
 				Enum(svcInfo.protocol),
