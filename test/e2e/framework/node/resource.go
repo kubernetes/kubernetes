@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -404,9 +403,34 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		return false
 	}
 
-	return v1helper.TolerationsTolerateTaintsWithFilter(fakePod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
-		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
-	})
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(taints, fakePod.Spec.Tolerations)
+}
+
+func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
+	filteredTaints := []v1.Taint{}
+	for _, taint := range taints {
+		if taint.Effect == v1.TaintEffectNoExecute || taint.Effect == v1.TaintEffectNoSchedule {
+			filteredTaints = append(filteredTaints, taint)
+		}
+	}
+
+	toleratesTaint := func(taint v1.Taint) bool {
+		for _, toleration := range tolerations {
+			if toleration.ToleratesTaint(&taint) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	for _, taint := range filteredTaints {
+		if !toleratesTaint(taint) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // IsNodeSchedulable returns true if:
