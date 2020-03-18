@@ -2277,7 +2277,7 @@ message NodeProxyOptions {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
 message NodeResources {
   // Capacity represents the available resources of a node
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
@@ -2431,7 +2431,7 @@ message NodeSystemInfo {
 
   // SystemUUID reported by the node. For unique machine identification
   // MachineID is preferred. This field is specific to Red Hat hosts
-  // https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html
+  // https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
   optional string systemUUID = 2;
 
   // Boot ID reported by the node.
