@@ -17,117 +17,83 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
-	"io/ioutil"
-	"net/http"
 	"reflect"
 	"testing"
 
-	rbac "k8s.io/api/rbac/v1beta1"
+	"github.com/spf13/cobra"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
 )
 
-func TestCreateClusterRoleBinding(t *testing.T) {
-	expectBinding := &rbac.ClusterRoleBinding{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "fake-binding",
-		},
-		TypeMeta: v1.TypeMeta{
-			Kind:       "ClusterRoleBinding",
-			APIVersion: "rbac.authorization.k8s.io/v1beta1",
-		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: rbac.GroupName,
-			Kind:     "ClusterRole",
-			Name:     "fake-clusterrole",
-		},
-		Subjects: []rbac.Subject{
-			{
-				Kind:     rbac.UserKind,
-				APIGroup: "rbac.authorization.k8s.io",
-				Name:     "fake-user",
+func TestClusterRoleBindingStrategy(t *testing.T) {
+	tests := []struct {
+		Args     []string
+		SetFlags func(cmd *cobra.Command)
+		Expected *rbacv1.ClusterRoleBinding
+	}{
+		{
+			Args: []string{"fake-binding"},
+			SetFlags: func(cmd *cobra.Command) {
+				_ = cmd.Flags().Set("clusterrole", "fake-clusterrole")
+				_ = cmd.Flags().Set("user", "fake-user")
+				_ = cmd.Flags().Set("group", "fake-group")
+				_ = cmd.Flags().Set("serviceaccount", "fake-namespace:fake-account")
 			},
-			{
-				Kind:     rbac.GroupKind,
-				APIGroup: "rbac.authorization.k8s.io",
-				Name:     "fake-group",
-			},
-			{
-				Kind:      rbac.ServiceAccountKind,
-				Namespace: "fake-namespace",
-				Name:      "fake-account",
+			Expected: &rbacv1.ClusterRoleBinding{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "fake-binding",
+				},
+				TypeMeta: v1.TypeMeta{
+					Kind:       "ClusterRoleBinding",
+					APIVersion: "rbac.authorization.k8s.io/v1",
+				},
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
+					Kind:     "ClusterRole",
+					Name:     "fake-clusterrole",
+				},
+				Subjects: []rbacv1.Subject{
+					{
+						Kind:     rbacv1.UserKind,
+						APIGroup: "rbac.authorization.k8s.io",
+						Name:     "fake-user",
+					},
+					{
+						Kind:     rbacv1.GroupKind,
+						APIGroup: "rbac.authorization.k8s.io",
+						Name:     "fake-group",
+					},
+					{
+						Kind:      rbacv1.ServiceAccountKind,
+						Namespace: "fake-namespace",
+						Name:      "fake-account",
+					},
+				},
 			},
 		},
 	}
+	for i, tt := range tests {
+		t.Run(string(i), func(t *testing.T) {
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	ns := scheme.Codecs.WithoutConversion()
-
-	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	encoder := ns.EncoderForVersion(info.Serializer, groupVersion)
-	decoder := ns.DecoderToVersion(info.Serializer, groupVersion)
-
-	tf.Client = &ClusterRoleBindingRESTClient{
-		RESTClient: &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1beta1"},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == "/clusterrolebindings" && m == "POST":
-					bodyBits, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						t.Fatalf("TestCreateClusterRoleBinding error: %v", err)
-						return nil, nil
-					}
-
-					if obj, _, err := decoder.Decode(bodyBits, nil, &rbac.ClusterRoleBinding{}); err == nil {
-						if !reflect.DeepEqual(obj.(*rbac.ClusterRoleBinding), expectBinding) {
-							t.Fatalf("TestCreateClusterRoleBinding: expected:\n%#v\nsaw:\n%#v", expectBinding, obj.(*rbac.ClusterRoleBinding))
-							return nil, nil
-						}
-					} else {
-						t.Fatalf("TestCreateClusterRoleBinding error, could not decode the request body into rbac.ClusterRoleBinding object: %v", err)
-						return nil, nil
-					}
-
-					responseBinding := &rbac.ClusterRoleBinding{}
-					responseBinding.Name = "fake-binding"
-					return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
+			strategy := &ClusterRoleBindingStrategy{}
+			cmd := NewCreateSubCmd(tf, ioStreams, strategy)
+			cmd.Run = func(cmd *cobra.Command, args []string) {
+				strategy.SetName(args[0])
+				obj, err := strategy.CreateObject()
+				if err != nil {
+					t.Fatalf("unexpected error %v", err)
 				}
-			}),
-		},
+				if !reflect.DeepEqual(obj, tt.Expected) {
+					t.Fatalf("TestCreateClusterRoleBinding: expected:\n%#v\ngot:\n%#v", tt.Expected, obj)
+				}
+			}
+			tt.SetFlags(cmd)
+			cmd.Run(cmd, tt.Args)
+		})
 	}
-
-	expectedOutput := "clusterrolebinding.rbac.authorization.k8s.io/" + expectBinding.Name + "\n"
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdCreateClusterRoleBinding(tf, ioStreams)
-	cmd.Flags().Set("clusterrole", "fake-clusterrole")
-	cmd.Flags().Set("user", "fake-user")
-	cmd.Flags().Set("group", "fake-group")
-	cmd.Flags().Set("output", "name")
-	cmd.Flags().Set("serviceaccount", "fake-namespace:fake-account")
-	cmd.Run(cmd, []string{"fake-binding"})
-	if buf.String() != expectedOutput {
-		t.Errorf("TestCreateClusterRoleBinding: expected %v\n but got %v\n", expectedOutput, buf.String())
-	}
-}
-
-type ClusterRoleBindingRESTClient struct {
-	*fake.RESTClient
-}
-
-func (c *ClusterRoleBindingRESTClient) Post() *restclient.Request {
-	return c.RESTClient.Verb("POST")
 }

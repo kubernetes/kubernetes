@@ -25,8 +25,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -36,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"k8s.io/kubectl/pkg/generate"
@@ -145,7 +144,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	cmd.AddCommand(NewCmdCreateService(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateDeployment(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateClusterRole(f, ioStreams))
-	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, ioStreams))
+	cmd.AddCommand(NewCreateSubCmd(f, ioStreams, &ClusterRoleBindingStrategy{}))
 	cmd.AddCommand(NewCmdCreateRole(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateRoleBinding(f, ioStreams))
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, ioStreams))
@@ -475,4 +474,116 @@ func (o *CreateSubcommandOptions) Run() error {
 	}
 
 	return o.PrintObj(obj, o.Out)
+}
+
+func NewCreateSubCmd(f cmdutil.Factory, ioStreams genericclioptions.IOStreams, strategy SubCommandStrategy) *cobra.Command {
+	var fieldManager string
+	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
+
+	cmd := &cobra.Command{
+		DisableFlagsInUseLine: true,
+		Use:                   strategy.Use(),
+		Short:                 strategy.Short(),
+		Long:                  strategy.Long(),
+		Example:               strategy.Example(),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckFuncErr(func() error {
+				if nd, ok := strategy.(NameSetter); ok {
+					name, err := NameFromCommandArgs(cmd, args)
+					if err != nil {
+						return err
+					}
+					nd.SetName(name)
+				}
+
+				obj, err := strategy.CreateObject()
+				if err != nil {
+					return err
+				}
+
+				client, err := f.DynamicClient()
+				if err != nil {
+					return err
+				}
+
+				discoveryClient, err := f.ToDiscoveryClient()
+				if err != nil {
+					return err
+				}
+
+				dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+				if err != nil {
+					return err
+				}
+				cmdutil.PrintFlagsWithDryRunStrategy(printFlags, dryRunStrategy)
+
+				mapper, err := f.ToRESTMapper()
+				if err != nil {
+					return err
+				}
+
+				printer, err := printFlags.ToPrinter()
+				if err != nil {
+					return err
+				}
+
+				if dryRunStrategy != cmdutil.DryRunClient {
+					createOptions := metav1.CreateOptions{FieldManager: fieldManager}
+
+					gvk := obj.GroupVersionKind()
+
+					if dryRunStrategy == cmdutil.DryRunServer {
+						dryRunVerifier := resource.NewDryRunVerifier(client, discoveryClient)
+						if err := dryRunVerifier.HasSupport(gvk); err != nil {
+							return err
+						}
+						createOptions.DryRun = []string{metav1.DryRunAll}
+					}
+
+					mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+					if err != nil {
+						return err
+					}
+
+					asUnstructured := &unstructured.Unstructured{}
+					if err := scheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
+						return err
+					}
+					obj, err = client.Resource(mapping.Resource).Create(context.TODO(), asUnstructured, createOptions)
+					if err != nil {
+						return fmt.Errorf("failed to create %v: %v", strings.ToLower(gvk.Kind), err)
+					}
+				}
+
+				return printer.PrintObj(obj, ioStreams.Out)
+			})
+		},
+	}
+
+	printFlags.AddFlags(cmd)
+	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &fieldManager, "kubectl-create")
+	cmdutil.CheckErr(strategy.SetCmdFlags(cmd))
+
+	return cmd
+}
+
+type SubCommandStrategy interface {
+	CreateObject() (Object, error)
+	Use() string
+	Short() string
+	Long() string
+	Example() string
+	SetCmdFlags(cmd *cobra.Command) error
+}
+
+type NameSetter interface {
+	SetName(name string)
+}
+
+type Object interface {
+	kruntime.Object
+	GroupVersionKind() schema.GroupVersionKind
 }

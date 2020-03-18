@@ -115,6 +115,17 @@ func CheckErr(err error) {
 	checkErr(err, fatalErrHandler)
 }
 
+// CheckFuncErr prints a user friendly error to STDERR and exits with a non-zero
+// exit code. Unrecognized errors will be printed with an "error: " prefix.
+// It defers from CheckErr by accepting a callback function that eventually
+// returns an error rather than directly accepting an error.
+//
+// This method is generic to the command in use and may be used by non-Kubectl
+// commands.
+func CheckFuncErr(f func() error) {
+	CheckErr(f())
+}
+
 // CheckDiffErr prints a user friendly error to STDERR and exits with a
 // non-zero and non-one exit code. Unrecognized errors will be printed
 // with an "error: " prefix.

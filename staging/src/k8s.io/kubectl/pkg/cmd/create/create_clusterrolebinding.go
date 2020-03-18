@@ -17,87 +17,104 @@ limitations under the License.
 package create
 
 import (
-	"github.com/spf13/cobra"
+	"fmt"
+	"strings"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
+	"github.com/spf13/cobra"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-var (
-	clusterRoleBindingLong = templates.LongDesc(i18n.T(`
-		Create a ClusterRoleBinding for a particular ClusterRole.`))
-
-	clusterRoleBindingExample = templates.Examples(i18n.T(`
-		  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole
-		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`))
-)
-
-// ClusterRoleBindingOpts is returned by NewCmdCreateClusterRoleBinding
-type ClusterRoleBindingOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+type ClusterRoleBindingStrategy struct {
+	Name            string
+	ClusterRole     string
+	Users           []string
+	Groups          []string
+	ServiceAccounts []string
 }
 
-// NewCmdCreateClusterRoleBinding returns an initialized command instance of ClusterRoleBinding
-func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := &ClusterRoleBindingOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
-	}
+func (s *ClusterRoleBindingStrategy) Use() string {
+	return "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]"
+}
 
-	cmd := &cobra.Command{
-		Use:                   "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
-		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a ClusterRoleBinding for a particular ClusterRole"),
-		Long:                  clusterRoleBindingLong,
-		Example:               clusterRoleBindingExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Run())
+func (s *ClusterRoleBindingStrategy) Short() string {
+	return i18n.T("Create a ClusterRoleBinding for a particular ClusterRole")
+}
+
+func (s *ClusterRoleBindingStrategy) Long() string {
+	return templates.LongDesc(i18n.T(`Create a ClusterRoleBinding for a particular ClusterRole.`))
+}
+
+func (s *ClusterRoleBindingStrategy) Example() string {
+	return templates.Examples(i18n.T(`
+		  # Create a ClusterRoleBinding for user1, user2, and group1 using the cluster-admin ClusterRole
+		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`))
+}
+
+func (s *ClusterRoleBindingStrategy) SetCmdFlags(cmd *cobra.Command) error {
+	cmd.Flags().StringVar(&s.ClusterRole, "clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
+	_ = cmd.MarkFlagRequired("clusterrole")
+	_ = cmd.MarkFlagCustom("clusterrole", "__kubectl_get_resource_clusterrole")
+	cmd.Flags().StringArrayVar(&s.Users, "user", []string{}, "Usernames to bind to the clusterrole")
+	cmd.Flags().StringArrayVar(&s.Groups, "group", []string{}, "Groups to bind to the clusterrole")
+	cmd.Flags().StringArrayVar(&s.ServiceAccounts, "serviceaccount", []string{}, "Service accounts to bind to the clusterrole, in the format <namespace>:<name>")
+	return nil
+}
+
+func (s *ClusterRoleBindingStrategy) SetName(name string) {
+	s.Name = name
+}
+
+func (s *ClusterRoleBindingStrategy) GroupVersionKind() schema.GroupVersionKind {
+	return schema.GroupVersionKind{}
+}
+
+func (s *ClusterRoleBindingStrategy) CreateObject() (Object, error) {
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRoleBinding"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: s.Name,
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     s.ClusterRole,
 		},
 	}
 
-	o.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
-
-	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, generateversioned.ClusterRoleBindingV1GeneratorName)
-	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
-	cmd.MarkFlagCustom("clusterrole", "__kubectl_get_resource_clusterrole")
-	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the clusterrole")
-	cmd.Flags().StringArray("group", []string{}, "Groups to bind to the clusterrole")
-	cmd.Flags().StringArray("serviceaccount", []string{}, "Service accounts to bind to the clusterrole, in the format <namespace>:<name>")
-	cmdutil.AddFieldManagerFlagVar(cmd, &o.CreateSubcommandOptions.FieldManager, "kubectl-create")
-	return cmd
-}
-
-// Complete completes all the required options
-func (o *ClusterRoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
-	if err != nil {
-		return err
+	for _, user := range s.Users {
+		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbacv1.Subject{
+			Kind:     rbacv1.UserKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     user,
+		})
 	}
 
-	var generator generate.StructuredGenerator
-	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case generateversioned.ClusterRoleBindingV1GeneratorName:
-		generator = &generateversioned.ClusterRoleBindingGeneratorV1{
-			Name:            name,
-			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
-			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
-			Groups:          cmdutil.GetFlagStringArray(cmd, "group"),
-			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
+	for _, group := range s.Groups {
+		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbacv1.Subject{
+			Kind:     rbacv1.GroupKind,
+			APIGroup: rbacv1.GroupName,
+			Name:     group,
+		})
+	}
+
+	for _, sa := range s.ServiceAccounts {
+		tokens := strings.Split(sa, ":")
+		if len(tokens) != 2 || tokens[0] == "" || tokens[1] == "" {
+			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
 		}
-	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbacv1.Subject{
+			Kind:      rbacv1.ServiceAccountKind,
+			APIGroup:  "",
+			Namespace: tokens[0],
+			Name:      tokens[1],
+		})
 	}
 
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
+	return clusterRoleBinding, nil
 }
 
-// Run calls the CreateSubcommandOptions.Run in ClusterRoleBindingOpts instance
-func (o *ClusterRoleBindingOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
-}
+var _ NameSetter = &ClusterRoleBindingStrategy{}
