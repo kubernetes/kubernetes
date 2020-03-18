@@ -1,0 +1,8 @@
+{
+	"Rules": [
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/test/e2e",
+			"AllowedPrefixes": []
+		}
+	]
+}
