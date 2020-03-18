@@ -38,6 +38,10 @@ func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 	newCustomResource := newCustomResourceObject.UnstructuredContent()
 	status, ok := newCustomResource["status"]
 
+	// managedFields must be preserved since it's been modified to
+	// track changed fields in the status update.
+	managedFields := newCustomResourceObject.GetManagedFields()
+
 	// copy old object into new object
 	oldCustomResourceObject := old.(*unstructured.Unstructured)
 	// overridding the resourceVersion in metadata is safe here, we have already checked that
@@ -45,6 +49,7 @@ func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 	*newCustomResourceObject = *oldCustomResourceObject.DeepCopy()
 
 	// set status
+	newCustomResourceObject.SetManagedFields(managedFields)
 	newCustomResource = newCustomResourceObject.UnstructuredContent()
 	if ok {
 		newCustomResource["status"] = status
