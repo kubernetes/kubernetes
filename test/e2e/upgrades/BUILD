@@ -23,7 +23,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/upgrades",
     deps = [
-        "//pkg/kubelet/sysctl:go_default_library",
+        "//pkg/kubelet/events:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

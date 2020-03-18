@@ -26,6 +26,7 @@ const (
 	PreemptContainer        = "Preempting"
 	BackOffStartContainer   = "BackOff"
 	ExceededGracePeriod     = "ExceededGracePeriod"
+	SysctlForbidden         = "SysctlForbidden"
 )
 
 // Pod event reason list

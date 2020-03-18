@@ -26,8 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/kubelet/sysctl"
-
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -102,7 +101,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 	ginkgo.By("Making sure the invalid pod failed")
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
+	framework.ExpectEqual(ev.Reason, events.SysctlForbidden)
 
 	return invalidPod
 }

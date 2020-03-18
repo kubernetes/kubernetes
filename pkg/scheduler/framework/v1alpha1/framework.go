@@ -814,6 +814,39 @@ func (f *framework) WaitOnPermit(ctx context.Context, pod *v1.Pod) (status *Stat
 	return nil
 }
 
+// DefaultNormalizeScore is a Normalize Score function that can normalize the
+// scores to [0, maxPriority]. If reverse is set to true, it reverses the scores by
+// subtracting it from maxPriority.
+func DefaultNormalizeScore(maxPriority int64, reverse bool, scores NodeScoreList) *Status {
+	var maxCount int64
+	for i := range scores {
+		if scores[i].Score > maxCount {
+			maxCount = scores[i].Score
+		}
+	}
+
+	if maxCount == 0 {
+		if reverse {
+			for i := range scores {
+				scores[i].Score = maxPriority
+			}
+		}
+		return nil
+	}
+
+	for i := range scores {
+		score := scores[i].Score
+
+		score = maxPriority * score / maxCount
+		if reverse {
+			score = maxPriority - score
+		}
+
+		scores[i].Score = score
+	}
+	return nil
+}
+
 // SnapshotSharedLister returns the scheduler's SharedLister of the latest NodeInfo
 // snapshot. The snapshot is taken at the beginning of a scheduling cycle and remains
 // unchanged until a pod finishes "Reserve". There is no guarantee that the information

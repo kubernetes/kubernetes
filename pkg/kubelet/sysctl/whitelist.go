@@ -22,12 +22,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	policyvalidation "k8s.io/kubernetes/pkg/apis/policy/validation"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-)
-
-const (
-	AnnotationInvalidReason = "InvalidSysctlAnnotation"
-	ForbiddenReason         = "SysctlForbidden"
 )
 
 // patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
@@ -124,7 +120,7 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 		if err := w.validateSysctl(s.Name, hostNet, hostIPC); err != nil {
 			return lifecycle.PodAdmitResult{
 				Admit:   false,
-				Reason:  ForbiddenReason,
+				Reason:  events.SysctlForbidden,
 				Message: fmt.Sprintf("forbidden sysctl: %v", err),
 			}
 		}

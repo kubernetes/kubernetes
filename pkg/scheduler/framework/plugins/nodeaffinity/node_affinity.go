@@ -105,7 +105,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	return pluginhelper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
+	return framework.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
 }
 
 // ScoreExtensions of the Score plugin.
