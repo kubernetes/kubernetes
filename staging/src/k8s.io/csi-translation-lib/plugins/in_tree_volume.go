@@ -119,7 +119,7 @@ func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) er
 		}
 	}
 
-	zones = filteredZones.UnsortedList()
+	zones = filteredZones.List()
 	if len(zones) < 1 {
 		return errors.New("there are no valid zones to add to pv")
 	}
