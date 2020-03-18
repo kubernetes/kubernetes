@@ -66,14 +66,10 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 	if err != nil {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}
-	podList, err := c.podLister.Pods(namespace).List(selector)
-	if err != nil {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
-	}
 
-	itemsLen := len(podList)
-	if itemsLen == 0 {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
+	podList, err := c.getNonemptyPodList(namespace, selector)
+	if err != nil {
+		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get pods while getting nonempty podList: %v", err)
 	}
 
 	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
@@ -175,13 +171,9 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUtili
 // calcPlainMetricReplicas calculates the desired replicas for plain (i.e. non-utilization percentage) metrics.
 func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMetricsInfo, currentReplicas int32, targetUtilization int64, namespace string, selector labels.Selector, resource v1.ResourceName) (replicaCount int32, utilization int64, err error) {
 
-	podList, err := c.podLister.Pods(namespace).List(selector)
+	podList, err := c.getNonemptyPodList(namespace, selector)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
-	}
-
-	if len(podList) == 0 {
-		return 0, 0, fmt.Errorf("no pods returned by selector while calculating replica count")
+		return 0, 0, fmt.Errorf("unable to get pods while getting nonempty podList: %v", err)
 	}
 
 	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
@@ -293,17 +285,23 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 	return replicaCount, utilization, timestamp, nil
 }
 
-// @TODO(mattjmcnaughton) Many different functions in this module use variations
-// of this function. Make this function generic, so we don't repeat the same
-// logic in multiple places.
-func (c *ReplicaCalculator) getReadyPodsCount(namespace string, selector labels.Selector) (int64, error) {
+func (c *ReplicaCalculator) getNonemptyPodList(namespace string, selector labels.Selector) ([]*v1.Pod, error) {
 	podList, err := c.podLister.Pods(namespace).List(selector)
 	if err != nil {
-		return 0, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
+		return nil, fmt.Errorf("unable to get pods while getting podList: %v", err)
 	}
 
 	if len(podList) == 0 {
-		return 0, fmt.Errorf("no pods returned by selector while calculating replica count")
+		return nil, fmt.Errorf("no pods returned by selector while getting podList")
+	}
+
+	return podList, nil
+}
+
+func (c *ReplicaCalculator) getReadyPodsCount(namespace string, selector labels.Selector) (int64, error) {
+	podList, err := c.getNonemptyPodList(namespace, selector)
+	if err != nil {
+		return 0, err
 	}
 
 	readyPodCount := 0
