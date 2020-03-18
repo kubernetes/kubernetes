@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/role"
 )
@@ -39,6 +40,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		CreateStrategy: role.Strategy,
 		UpdateStrategy: role.Strategy,
 		DeleteStrategy: role.Strategy,
+
+		// TODO: define table converter that exposes more than name/creation timestamp?
+		TableConvertor: rest.NewDefaultTableConvertor(rbac.Resource("roles")),
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
