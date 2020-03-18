@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path"
@@ -66,6 +67,10 @@ type SecureServingOptions struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	// PermitPortSharing controls if SO_REUSEPORT is used when binding the port, which allows
+	// more than one instance to bind on the same address and port.
+	PermitPortSharing bool
 }
 
 type CertKey struct {
@@ -192,6 +197,10 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"The limit that the server gives to clients for "+
 		"the maximum number of streams in an HTTP/2 connection. "+
 		"Zero means to use golang's default.")
+
+	fs.BoolVar(&s.PermitPortSharing, "permit-port-sharing", s.PermitPortSharing,
+		"If true, SO_REUSEPORT will be used when binding the port, which allows "+
+			"more than one instance to bind on the same address and port. [default=false]")
 }
 
 // ApplyTo fills up serving information in the server configuration.
@@ -206,7 +215,14 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	if s.Listener == nil {
 		var err error
 		addr := net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
-		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr)
+
+		c := net.ListenConfig{}
+
+		if s.PermitPortSharing {
+			c.Control = permitPortReuse
+		}
+
+		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr, c)
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}
@@ -317,11 +333,12 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 	return nil
 }
 
-func CreateListener(network, addr string) (net.Listener, int, error) {
+func CreateListener(network, addr string, config net.ListenConfig) (net.Listener, int, error) {
 	if len(network) == 0 {
 		network = "tcp"
 	}
-	ln, err := net.Listen(network, addr)
+
+	ln, err := config.Listen(context.TODO(), network, addr)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to listen on %v: %v", addr, err)
 	}

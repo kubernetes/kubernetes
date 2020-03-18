@@ -65,7 +65,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 		t.Fatal(err)
 	}
 
-	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
