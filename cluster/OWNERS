@@ -5,12 +5,14 @@ reviewers:
   - justaugustus
   - Katharine
   - mikedanese
+  - cheftako
   - dims
 approvers:
   - bentheelder
   - mikedanese
   - spiffxp
   - dims
+  - cheftako
 emeritus_approvers:
   - eparis
   - roberthbailey   # 2019-03-08
