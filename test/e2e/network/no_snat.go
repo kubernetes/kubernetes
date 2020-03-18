@@ -141,9 +141,8 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		ginkgo.By("creating a test pod on each Node")
 		nodes, err := nc.List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		if len(nodes.Items) == 0 {
-			framework.ExpectNoError(fmt.Errorf("no Nodes in the cluster"))
-		}
+		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
+
 		for _, node := range nodes.Items {
 			// find the Node's internal ip address to feed to the Pod
 			inIP, err := getIP(v1.NodeInternalIP, &node)

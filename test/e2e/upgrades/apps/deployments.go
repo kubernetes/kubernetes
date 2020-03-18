@@ -79,9 +79,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
-	if len(rss) != 1 {
-		framework.ExpectNoError(fmt.Errorf("expected one replicaset, got %d", len(rss)))
-	}
+	framework.ExpectEqual(len(rss), 1, "expected one replicaset, got %d", len(rss))
 	t.oldRSUID = rss[0].UID
 
 	ginkgo.By(fmt.Sprintf("Waiting for revision of the deployment %q to become 1", deploymentName))
@@ -101,9 +99,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	rsList, err = rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss = rsList.Items
-	if len(rss) != 2 {
-		framework.ExpectNoError(fmt.Errorf("expected 2 replicaset, got %d", len(rss)))
-	}
+	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
 
 	ginkgo.By(fmt.Sprintf("Checking replicaset of deployment %q that is created before rollout survives the rollout", deploymentName))
 	switch t.oldRSUID {
@@ -144,9 +140,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	rsList, err := rsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: rsSelector.String()})
 	framework.ExpectNoError(err)
 	rss := rsList.Items
-	if len(rss) != 2 {
-		framework.ExpectNoError(fmt.Errorf("expected 2 replicaset, got %d", len(rss)))
-	}
+	framework.ExpectEqual(len(rss), 2, "expected 2 replicaset, got %d", len(rss))
 
 	switch t.oldRSUID {
 	case rss[0].UID:
