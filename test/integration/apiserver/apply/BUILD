@@ -7,6 +7,7 @@ go_test(
         "apply_crd_test.go",
         "apply_test.go",
         "main_test.go",
+        "status_test.go",
     ],
     tags = [
         "etcd",
@@ -31,6 +32,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//test/integration/etcd:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
