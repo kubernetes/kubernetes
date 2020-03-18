@@ -455,7 +455,9 @@ function dump_nodes() {
 # Sets:
 #   NON_LOGEXPORTED_NODES
 function find_non_logexported_nodes() {
-  succeeded_nodes=$(gsutil ls ${gcs_artifacts_dir}/logexported-nodes-registry) || return 1
+  local file="${gcs_artifacts_dir}/logexported-nodes-registry"
+  echo "Listing marker files ($file) for successful nodes..."
+  succeeded_nodes=$(gsutil ls "${file}") || return 1
   echo "Successfully listed marker files for successful nodes"
   NON_LOGEXPORTED_NODES=()
   for node in "${NODE_NAMES[@]}"; do
