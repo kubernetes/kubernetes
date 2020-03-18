@@ -30,6 +30,11 @@ const (
 	LabelOSStable   = "kubernetes.io/os"
 	LabelArchStable = "kubernetes.io/arch"
 
+	// LabelNodeRolePrefix is a label prefix for node roles
+	LabelNodeRolePrefix = "node-role.kubernetes.io/"
+	// NodeLabelRole specifies the role of a node
+	LabelLegacyNodeLabelRole = "kubernetes.io/role"
+
 	// LabelWindowsBuild is used on Windows nodes to specify the Windows build number starting with v1.17.0.
 	// It's in the format MajorVersion.MinorVersion.BuildNumber (for ex: 10.0.17763)
 	LabelWindowsBuild = "node.kubernetes.io/windows-build"

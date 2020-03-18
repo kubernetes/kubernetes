@@ -4850,12 +4850,12 @@ func findNodeRoles(node *corev1.Node) []string {
 	roles := sets.NewString()
 	for k, v := range node.Labels {
 		switch {
-		case strings.HasPrefix(k, LabelNodeRolePrefix):
-			if role := strings.TrimPrefix(k, LabelNodeRolePrefix); len(role) > 0 {
+		case strings.HasPrefix(k, corev1.LabelNodeRolePrefix):
+			if role := strings.TrimPrefix(k, corev1.LabelNodeRolePrefix); len(role) > 0 {
 				roles.Insert(role)
 			}
 
-		case k == NodeLabelRole && v != "":
+		case k == corev1.LabelLegacyNodeLabelRole && v != "":
 			roles.Insert(v)
 		}
 	}

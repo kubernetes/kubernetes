@@ -18,6 +18,7 @@ package describe
 
 import (
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
@@ -25,13 +26,6 @@ import (
 const (
 	// LoadBalancerWidth is the width how we describe load balancer
 	LoadBalancerWidth = 16
-
-	// LabelNodeRolePrefix is a label prefix for node roles
-	// It's copied over to here until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	LabelNodeRolePrefix = "node-role.kubernetes.io/"
-
-	// NodeLabelRole specifies the role of a node
-	NodeLabelRole = "kubernetes.io/role"
 )
 
 // DescriberFunc gives a way to display the specified RESTMapping type

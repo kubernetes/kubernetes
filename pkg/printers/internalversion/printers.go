@@ -69,13 +69,6 @@ import (
 
 const (
 	loadBalancerWidth = 16
-
-	// labelNodeRolePrefix is a label prefix for node roles
-	// It's copied over to here until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	labelNodeRolePrefix = "node-role.kubernetes.io/"
-
-	// nodeLabelRole specifies the role of a node
-	nodeLabelRole = "kubernetes.io/role"
 )
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
@@ -1544,12 +1537,12 @@ func findNodeRoles(node *api.Node) []string {
 	roles := sets.NewString()
 	for k, v := range node.Labels {
 		switch {
-		case strings.HasPrefix(k, labelNodeRolePrefix):
-			if role := strings.TrimPrefix(k, labelNodeRolePrefix); len(role) > 0 {
+		case strings.HasPrefix(k, apiv1.LabelNodeRolePrefix):
+			if role := strings.TrimPrefix(k, apiv1.LabelNodeRolePrefix); len(role) > 0 {
 				roles.Insert(role)
 			}
 
-		case k == nodeLabelRole && v != "":
+		case k == apiv1.LabelLegacyNodeLabelRole && v != "":
 			roles.Insert(v)
 		}
 	}
