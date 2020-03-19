@@ -22,15 +22,15 @@
 REGISTRY := $(if $(REGISTRY),$(REGISTRY),staging-k8s.gcr.io)
 IMAGE_TAG := $(if $(IMAGE_TAG),$(IMAGE_TAG),latest)
 
-all: dockerpush
+all: gcloudpush
 
 build:
 	docker build --pull -t $(REGISTRY)/kubemark:$(IMAGE_TAG) .
 
-dockerpush: build
+gcloudpush: build
 	docker push $(REGISTRY)/kubemark:$(IMAGE_TAG)
 
 push: build
 	docker push $(REGISTRY)/kubemark:$(IMAGE_TAG)
 
-.PHONY: all build dockerpush push
+.PHONY: all build gcloudpush push
