@@ -6,7 +6,8 @@ go 1.13
 
 require (
 	github.com/blang/semver v3.5.0+incompatible
-	github.com/google/go-cmp v0.3.0
+	github.com/google/go-cmp v0.3.1
+	github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.4.1

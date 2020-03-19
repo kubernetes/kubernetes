@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/docker/docker/pkg/term"
+	"github.com/moby/term"
 )
 
 // TerminalSize returns the current width and height of the user's terminal. If it isn't a terminal,

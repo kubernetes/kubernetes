@@ -5,10 +5,13 @@ import (
 	"io"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
 // Frame represents a program counter inside a stack frame.
+// For historical reasons if Frame is interpreted as a uintptr
+// its value represents the program counter + 1.
 type Frame uintptr
 
 // pc returns the program counter for this frame;
@@ -37,6 +40,15 @@ func (f Frame) line() int {
 	return line
 }
 
+// name returns the name of this function, if known.
+func (f Frame) name() string {
+	fn := runtime.FuncForPC(f.pc())
+	if fn == nil {
+		return "unknown"
+	}
+	return fn.Name()
+}
+
 // Format formats the frame according to the fmt.Formatter interface.
 //
 //    %s    source file
@@ -54,27 +66,31 @@ func (f Frame) Format(s fmt.State, verb rune) {
 	case 's':
 		switch {
 		case s.Flag('+'):
-			pc := f.pc()
-			fn := runtime.FuncForPC(pc)
-			if fn == nil {
-				io.WriteString(s, "unknown")
-			} else {
-				file, _ := fn.FileLine(pc)
-				fmt.Fprintf(s, "%s\n\t%s", fn.Name(), file)
-			}
+			io.WriteString(s, f.name())
+			io.WriteString(s, "\n\t")
+			io.WriteString(s, f.file())
 		default:
 			io.WriteString(s, path.Base(f.file()))
 		}
 	case 'd':
-		fmt.Fprintf(s, "%d", f.line())
+		io.WriteString(s, strconv.Itoa(f.line()))
 	case 'n':
-		name := runtime.FuncForPC(f.pc()).Name()
-		io.WriteString(s, funcname(name))
+		io.WriteString(s, funcname(f.name()))
 	case 'v':
 		f.Format(s, 's')
 		io.WriteString(s, ":")
 		f.Format(s, 'd')
 	}
+}
+
+// MarshalText formats a stacktrace Frame as a text string. The output is the
+// same as that of fmt.Sprintf("%+v", f), but without newlines or tabs.
+func (f Frame) MarshalText() ([]byte, error) {
+	name := f.name()
+	if name == "unknown" {
+		return []byte(name), nil
+	}
+	return []byte(fmt.Sprintf("%s %s:%d", name, f.file(), f.line())), nil
 }
 
 // StackTrace is stack of Frames from innermost (newest) to outermost (oldest).
@@ -94,16 +110,30 @@ func (st StackTrace) Format(s fmt.State, verb rune) {
 		switch {
 		case s.Flag('+'):
 			for _, f := range st {
-				fmt.Fprintf(s, "\n%+v", f)
+				io.WriteString(s, "\n")
+				f.Format(s, verb)
 			}
 		case s.Flag('#'):
 			fmt.Fprintf(s, "%#v", []Frame(st))
 		default:
-			fmt.Fprintf(s, "%v", []Frame(st))
+			st.formatSlice(s, verb)
 		}
 	case 's':
-		fmt.Fprintf(s, "%s", []Frame(st))
+		st.formatSlice(s, verb)
 	}
+}
+
+// formatSlice will format this StackTrace into the given buffer as a slice of
+// Frame, only valid when called with '%s' or '%v'.
+func (st StackTrace) formatSlice(s fmt.State, verb rune) {
+	io.WriteString(s, "[")
+	for i, f := range st {
+		if i > 0 {
+			io.WriteString(s, " ")
+		}
+		f.Format(s, verb)
+	}
+	io.WriteString(s, "]")
 }
 
 // stack represents a stack of program counters.
