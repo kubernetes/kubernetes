@@ -461,6 +461,9 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	}
 	orphan := false
 	switch {
+	case options.OrphanDependents == nil && options.PropagationPolicy == nil && len(initialFinalizers) == 0:
+		// if there are no deletion options, the default policy for replication controllers is orphan
+		orphan = true
 	case options.OrphanDependents != nil:
 		// if the deletion options explicitly specify whether to orphan, that controls
 		orphan = *options.OrphanDependents
