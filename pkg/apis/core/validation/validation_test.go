@@ -15272,3 +15272,88 @@ func TestValidateNodeCIDRs(t *testing.T) {
 		}
 	}
 }
+
+func makeNodeSelectorRequirement(
+	key string,
+	op core.NodeSelectorOperator,
+	values []string,
+) core.NodeSelectorRequirement {
+	return core.NodeSelectorRequirement{
+		Key:      key,
+		Operator: op,
+		Values:   values,
+	}
+}
+
+func TestValidateNodeSelectorWithAffinityValues(t *testing.T) {
+	testCases := map[string]struct {
+		expectError bool
+		rq          core.NodeSelectorRequirement
+	}{
+		// in operator
+		"op-in-with-nil-value": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpIn, nil),
+		},
+		"op-in-with-zero-value": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpIn, []string{}),
+		},
+		"op-in-with-one-value": {
+			expectError: false,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpIn, []string{"bar"}),
+		},
+		"op-in-with-multi-values": {
+			expectError: false,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpIn, []string{"bar", "baz", "qux"}),
+		},
+		// Exists operator
+		"op-exists-with-nil-value": {
+			expectError: false,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpExists, nil),
+		},
+		"op-exists-with-zero-value": {
+			expectError: false,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpExists, []string{}),
+		},
+		"op-exists-with-one-value": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpExists, []string{"bar"}),
+		},
+		"op-exists-with-multi-values": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpExists, []string{"bar", "baz", "qux"}),
+		},
+		// Gt operator
+		"op-gt-with-nil-value": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpGt, nil),
+		},
+		"op-gt-with-zero-value": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpGt, []string{}),
+		},
+		"op-gt-with-string-value": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpGt, []string{"bar"}),
+		},
+		"op-gt-with-integer-value": {
+			expectError: false,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpGt, []string{"1234"}),
+		},
+		"op-gt-with-multi-values": {
+			expectError: true,
+			rq:          makeNodeSelectorRequirement("foo", core.NodeSelectorOpGt, []string{"bar", "baz", "1234"}),
+		},
+	}
+
+	for name, testCase := range testCases {
+		errs := ValidateNodeSelectorRequirement(testCase.rq, field.NewPath("field"))
+		if len(errs) == 0 && testCase.expectError {
+			t.Errorf("Unexpected success for test case: %s", name)
+		}
+		if len(errs) > 0 && !testCase.expectError {
+			t.Errorf("Unexpected failure for test case: %s - %+v", name, errs)
+		}
+	}
+}

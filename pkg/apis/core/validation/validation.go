@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -3263,19 +3264,26 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 // ValidateNodeSelectorRequirement tests that the specified NodeSelectorRequirement fields has valid data
 func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	vals := rq.Values
 	switch rq.Operator {
 	case core.NodeSelectorOpIn, core.NodeSelectorOpNotIn:
-		if len(rq.Values) == 0 {
+		if len(vals) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
 		}
 	case core.NodeSelectorOpExists, core.NodeSelectorOpDoesNotExist:
-		if len(rq.Values) > 0 {
+		if len(vals) > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
 		}
 
 	case core.NodeSelectorOpGt, core.NodeSelectorOpLt:
-		if len(rq.Values) != 1 {
+		if len(vals) != 1 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified single value when `operator` is 'Lt' or 'Gt'"))
+		} else {
+			for i := range vals {
+				if _, err := strconv.ParseInt(vals[i], 10, 64); err != nil {
+					allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified an integer value when `operator` is 'Lt' or 'Gt'"))
+				}
+			}
 		}
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator"))
