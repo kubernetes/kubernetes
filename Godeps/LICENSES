@@ -903,7 +903,7 @@ SOFTWARE.
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2016 Microsoft Corporation
+   Copyright 2020 Microsoft Corporation
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -917,7 +917,7 @@ SOFTWARE.
    See the License for the specific language governing permissions and
    limitations under the License.
 
-= vendor/github.com/Azure/azure-sdk-for-go/LICENSE cce6fd055830ca30ff78fdf077e870d6
+= vendor/github.com/Azure/azure-sdk-for-go/LICENSE c77d8e9ae880604d853d488c416c3bcc
 ================================================================================
 
 

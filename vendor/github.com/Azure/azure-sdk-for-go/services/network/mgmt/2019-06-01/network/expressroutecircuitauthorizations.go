@@ -37,7 +37,8 @@ func NewExpressRouteCircuitAuthorizationsClient(subscriptionID string) ExpressRo
 }
 
 // NewExpressRouteCircuitAuthorizationsClientWithBaseURI creates an instance of the
-// ExpressRouteCircuitAuthorizationsClient client.
+// ExpressRouteCircuitAuthorizationsClient client using a custom endpoint.  Use this when interacting with an Azure
+// cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewExpressRouteCircuitAuthorizationsClientWithBaseURI(baseURI string, subscriptionID string) ExpressRouteCircuitAuthorizationsClient {
 	return ExpressRouteCircuitAuthorizationsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -104,9 +105,8 @@ func (client ExpressRouteCircuitAuthorizationsClient) CreateOrUpdatePreparer(ctx
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitAuthorizationsClient) CreateOrUpdateSender(req *http.Request) (future ExpressRouteCircuitAuthorizationsCreateOrUpdateFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -183,9 +183,8 @@ func (client ExpressRouteCircuitAuthorizationsClient) DeletePreparer(ctx context
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitAuthorizationsClient) DeleteSender(req *http.Request) (future ExpressRouteCircuitAuthorizationsDeleteFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -267,8 +266,7 @@ func (client ExpressRouteCircuitAuthorizationsClient) GetPreparer(ctx context.Co
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitAuthorizationsClient) GetSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -345,8 +343,7 @@ func (client ExpressRouteCircuitAuthorizationsClient) ListPreparer(ctx context.C
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client ExpressRouteCircuitAuthorizationsClient) ListSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always

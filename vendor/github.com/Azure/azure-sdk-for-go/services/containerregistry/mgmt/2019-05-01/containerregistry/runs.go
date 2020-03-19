@@ -36,7 +36,8 @@ func NewRunsClient(subscriptionID string) RunsClient {
 	return NewRunsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewRunsClientWithBaseURI creates an instance of the RunsClient client.
+// NewRunsClientWithBaseURI creates an instance of the RunsClient client using a custom endpoint.  Use this when
+// interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewRunsClientWithBaseURI(baseURI string, subscriptionID string) RunsClient {
 	return RunsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -107,9 +108,8 @@ func (client RunsClient) CancelPreparer(ctx context.Context, resourceGroupName s
 // CancelSender sends the Cancel request. The method will close the
 // http.Response Body if it receives an error.
 func (client RunsClient) CancelSender(req *http.Request) (future RunsCancelFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -201,8 +201,7 @@ func (client RunsClient) GetPreparer(ctx context.Context, resourceGroupName stri
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client RunsClient) GetSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -290,8 +289,7 @@ func (client RunsClient) GetLogSasURLPreparer(ctx context.Context, resourceGroup
 // GetLogSasURLSender sends the GetLogSasURL request. The method will close the
 // http.Response Body if it receives an error.
 func (client RunsClient) GetLogSasURLSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetLogSasURLResponder handles the response to the GetLogSasURL request. The method always
@@ -387,8 +385,7 @@ func (client RunsClient) ListPreparer(ctx context.Context, resourceGroupName str
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client RunsClient) ListSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -510,9 +507,8 @@ func (client RunsClient) UpdatePreparer(ctx context.Context, resourceGroupName s
 // UpdateSender sends the Update request. The method will close the
 // http.Response Body if it receives an error.
 func (client RunsClient) UpdateSender(req *http.Request) (future RunsUpdateFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}

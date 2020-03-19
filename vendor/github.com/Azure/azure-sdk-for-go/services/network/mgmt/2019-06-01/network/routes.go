@@ -35,7 +35,8 @@ func NewRoutesClient(subscriptionID string) RoutesClient {
 	return NewRoutesClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewRoutesClientWithBaseURI creates an instance of the RoutesClient client.
+// NewRoutesClientWithBaseURI creates an instance of the RoutesClient client using a custom endpoint.  Use this when
+// interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewRoutesClientWithBaseURI(baseURI string, subscriptionID string) RoutesClient {
 	return RoutesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -99,9 +100,8 @@ func (client RoutesClient) CreateOrUpdatePreparer(ctx context.Context, resourceG
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client RoutesClient) CreateOrUpdateSender(req *http.Request) (future RoutesCreateOrUpdateFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -178,9 +178,8 @@ func (client RoutesClient) DeletePreparer(ctx context.Context, resourceGroupName
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client RoutesClient) DeleteSender(req *http.Request) (future RoutesDeleteFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -262,8 +261,7 @@ func (client RoutesClient) GetPreparer(ctx context.Context, resourceGroupName st
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client RoutesClient) GetSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -340,8 +338,7 @@ func (client RoutesClient) ListPreparer(ctx context.Context, resourceGroupName s
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client RoutesClient) ListSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
