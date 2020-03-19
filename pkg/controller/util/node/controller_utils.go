@@ -157,6 +157,59 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
 }
 
+// RestorePodsReady updates ready status of pods which ContainerReady.Status=True, but PodReady.Status=False on
+// given node from master return true if success
+func RestorePodsReady(kubeClient clientset.Interface, node *v1.Node) error {
+	nodeName := node.Name
+	klog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
+	opts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
+	pods, err := kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(opts)
+	if err != nil {
+		return err
+	}
+
+	errMsg := []string{}
+	for _, pod := range pods.Items {
+		// Defensive check, also needed for tests.
+		if pod.Spec.NodeName != nodeName {
+			continue
+		}
+
+		var podContainersReadyStatus v1.ConditionStatus
+		var podReadyStatus v1.ConditionStatus
+
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == v1.ContainersReady {
+				podContainersReadyStatus = cond.Status
+				continue
+			}
+			if cond.Type == v1.PodReady {
+				podReadyStatus = cond.Status
+
+			}
+		}
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == v1.PodReady && podReadyStatus == v1.ConditionFalse && podContainersReadyStatus == v1.ConditionTrue {
+				cond.Status = v1.ConditionTrue
+				if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
+					break
+				}
+				klog.V(2).Infof("Updating ready status of pod %v to true", pod.Name)
+				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(&pod)
+				if err != nil {
+					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(&pod), err)
+					errMsg = append(errMsg, fmt.Sprintf("%v", err))
+				}
+				break
+			}
+		}
+	}
+	if len(errMsg) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
+}
+
 // RecordNodeEvent records a event related to a node.
 func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
 	ref := &v1.ObjectReference{

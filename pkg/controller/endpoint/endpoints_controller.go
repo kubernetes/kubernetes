@@ -405,6 +405,7 @@ func (e *EndpointController) syncService(key string) error {
 	// We call ComputeEndpointLastChangeTriggerTime here to make sure that the
 	// state of the trigger time tracker gets updated even if the sync turns out
 	// to be no-op and we don't update the endpoints object.
+	// 获取到pods和service 最早更新的时间作为endpoints.kubernetes.io/last-change-trigger-time注释值
 	endpointsLastChangeTriggerTime := e.triggerTimeTracker.
 		ComputeEndpointLastChangeTriggerTime(namespace, service, pods)
 
@@ -594,6 +595,7 @@ func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.Endpoint
 	return subsets, readyEps, notReadyEps
 }
 
+//判断pod是否应该被包含在endpoints中
 func shouldPodBeInEndpoints(pod *v1.Pod) bool {
 	switch pod.Spec.RestartPolicy {
 	case v1.RestartPolicyNever:

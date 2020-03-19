@@ -693,17 +693,21 @@ func (nc *Controller) monitorNodeHealth() error {
 	}
 
 	zoneToNodeConditions := map[string][]*v1.NodeCondition{}
+	// 遍历所有node
 	for i := range nodes {
 		var gracePeriod time.Duration
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
+
 		node := nodes[i].DeepCopy()
+
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(node)
 			if err == nil {
 				return true, nil
 			}
 			name := node.Name
+			// 查找node
 			node, err = nc.kubeClient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 			if err != nil {
 				klog.Errorf("Failed while getting a Node to retry updating node health. Probably Node %s was deleted.", name)
@@ -728,12 +732,14 @@ func (nc *Controller) monitorNodeHealth() error {
 			case v1.ConditionFalse:
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+					//如果节点存在污点effect:NoExecute, key:node.kubernetes.io/unreachable, 则删除该节点上的该污点，为该节点添加污点effect:NoExecute, key:node.kubernetes.io/not-ready
 					if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 						taintToAdd := *NotReadyTaintTemplate
 						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
 							klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
 						}
 					} else if nc.markNodeForTainting(node) {
+						//将该节点添加到nc.zoneNoExecuteTainter
 						klog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
@@ -754,12 +760,14 @@ func (nc *Controller) monitorNodeHealth() error {
 			case v1.ConditionUnknown:
 				if nc.useTaintBasedEvictions {
 					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+					//如果节点存在污点effect:NoExecute, key:node.kubernetes.io/not-ready, 则删除该节点上的该污点，为该节点添加污点effect:NoExecute, key:node.kubernetes.io/unreachable
 					if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 						taintToAdd := *UnreachableTaintTemplate
 						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
 							klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
 						}
 					} else if nc.markNodeForTainting(node) {
+						//将该节点添加到nc.zoneNoExecuteTainter
 						klog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
 							node.Name,
 							decisionTimestamp,
@@ -793,11 +801,17 @@ func (nc *Controller) monitorNodeHealth() error {
 				}
 			}
 
-			// Report node event.
+			// 当前node ReadyConditions != True 并且 上一次观察到的node ReadyConditions = True
 			if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
 				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				if err = nodeutil.MarkAllPodsNotReady(nc.kubeClient, node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
+				}
+			}
+
+			if currentReadyCondition.Status == v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
+				if err = nodeutil.RestorePodsReady(nc.kubeClient, node); err != nil {
+					utilruntime.HandleError(fmt.Errorf("Unable to Restore pods Ready on node %v: %v", node.Name, err))
 				}
 			}
 		}
@@ -851,11 +865,14 @@ func legacyIsMasterNode(nodeName string) bool {
 func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition
+	//获取当前节点Ready的状态，node是从nodeInformer.List里面拿到的node Ready状态，是kubelete上报给apiserver的当前Ready状态
 	_, currentReadyCondition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
+	//如果当前节点没有Ready的状态
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastHeartbeatTime and LastTransitionTime is set
 		// to node.CreationTimestamp to avoid handle the corner case.
+		// kubelet没有上报node状态
 		observedReadyCondition = v1.NodeCondition{
 			Type:               v1.NodeReady,
 			Status:             v1.ConditionUnknown,
@@ -863,6 +880,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 			LastTransitionTime: node.CreationTimestamp,
 		}
 		gracePeriod = nc.nodeStartupGracePeriod
+		//nc.nodeHealthMap记录最近检测到的node状态
 		if _, found := nc.nodeHealthMap[node.Name]; found {
 			nc.nodeHealthMap[node.Name].status = &node.Status
 		} else {
