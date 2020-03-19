@@ -233,7 +233,6 @@ github.com/docker/docker/api/types/time
 github.com/docker/docker/api/types/versions
 github.com/docker/docker/api/types/volume
 github.com/docker/docker/client
-github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog
 github.com/docker/docker/errdefs
 github.com/docker/docker/pkg/jsonmessage
 github.com/docker/docker/pkg/mount
