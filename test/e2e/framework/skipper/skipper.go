@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -178,7 +179,7 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 
 // SkipUnlessMultizone skips if the cluster does not have multizone.
 func SkipUnlessMultizone(c clientset.Interface) {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -189,7 +190,7 @@ func SkipUnlessMultizone(c clientset.Interface) {
 
 // SkipIfMultizone skips if the cluster has multizone.
 func SkipIfMultizone(c clientset.Interface) {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}

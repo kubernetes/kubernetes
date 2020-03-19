@@ -1710,27 +1710,6 @@ func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
 	return &ds, nil
 }
 
-// GetClusterZones returns the values of zone label collected from all nodes.
-func GetClusterZones(c clientset.Interface) (sets.String, error) {
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
-	}
-
-	// collect values of zone label from all nodes
-	zones := sets.NewString()
-	for _, node := range nodes.Items {
-		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
-			zones.Insert(zone)
-		}
-
-		if zone, found := node.Labels[v1.LabelZoneFailureDomainStable]; found {
-			zones.Insert(zone)
-		}
-	}
-	return zones, nil
-}
-
 // GetFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.
 // If the given mask is nil, then the regex will contain the default OS file modes, which are 0644 for Linux and 0775 for Windows.
 func GetFileModeRegex(filePath string, mask *int32) string {
