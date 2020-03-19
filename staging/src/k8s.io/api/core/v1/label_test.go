@@ -49,6 +49,33 @@ func TestGetNodeRoles(t *testing.T) {
 			expect: []string{"old-role"},
 		},
 		{
+			name: "legacy roles - one role",
+			labels: map[string]string{
+				"foo":                               "bar",
+				LabelLegacyNodeRolePrefix + "role1": "role1",
+			},
+			expect: []string{"role1"},
+		},
+		{
+			name: "legacy roles - two roles",
+			labels: map[string]string{
+				"foo":                               "bar",
+				LabelLegacyNodeRolePrefix + "role1": "role1",
+				LabelLegacyNodeRolePrefix + "role2": "role2",
+			},
+			expect: []string{"role1", "role2"},
+		},
+		{
+			name: "old role and legacy roles",
+			labels: map[string]string{
+				"foo":                               "bar",
+				LabelLegacyNodeLabelRole:            "old-role",
+				LabelLegacyNodeRolePrefix + "role1": "role1",
+				LabelLegacyNodeRolePrefix + "role2": "role2",
+			},
+			expect: []string{"old-role", "role1", "role2"},
+		},
+		{
 			name: "new roles - one role",
 			labels: map[string]string{
 				"foo":                         "bar",
@@ -74,6 +101,27 @@ func TestGetNodeRoles(t *testing.T) {
 				LabelNodeRolePrefix + "role2": "role2",
 			},
 			expect: []string{"old-role", "role1", "role2"},
+		},
+		{
+			name: "new roles - two roles - legacy roles",
+			labels: map[string]string{
+				"foo":                         "bar",
+				LabelNodeRolePrefix + "role1": "role1",
+				LabelNodeRolePrefix + "role2": "role2",
+				LabelLegacyNodeRolePrefix + "legacyrole1": "legacyrole1",
+			},
+			expect: []string{"role1", "role2", "legacyrole1"},
+		},
+		{
+			name: "old role and new roles and legacy nodes",
+			labels: map[string]string{
+				"foo":                                     "bar",
+				LabelLegacyNodeLabelRole:                  "old-role",
+				LabelNodeRolePrefix + "role1":             "role1",
+				LabelNodeRolePrefix + "role2":             "role2",
+				LabelLegacyNodeRolePrefix + "legacyrole1": "legacyrole1",
+			},
+			expect: []string{"legacyrole1", "old-role", "role1", "role2"},
 		},
 	}
 

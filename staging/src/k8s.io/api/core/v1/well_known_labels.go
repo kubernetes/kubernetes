@@ -31,7 +31,9 @@ const (
 	LabelArchStable = "kubernetes.io/arch"
 
 	// LabelNodeRolePrefix is a label prefix for node roles
-	LabelNodeRolePrefix = "node-role.kubernetes.io/"
+	LabelNodeRolePrefix = "role.node.kubernetes.io/"
+	// LabelLegacyNodeRolePrefix is a label prefix for node roles
+	LabelLegacyNodeRolePrefix = "node-role.kubernetes.io/"
 	// NodeLabelRole specifies the role of a node
 	LabelLegacyNodeLabelRole = "kubernetes.io/role"
 

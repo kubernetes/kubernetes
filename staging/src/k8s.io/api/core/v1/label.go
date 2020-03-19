@@ -31,6 +31,11 @@ func GetNodeRoles(labels map[string]string) []string {
 				roles.Insert(role)
 			}
 
+		case strings.HasPrefix(k, LabelLegacyNodeRolePrefix):
+			if role := strings.TrimPrefix(k, LabelLegacyNodeRolePrefix); len(role) > 0 {
+				roles.Insert(role)
+			}
+
 		case k == LabelLegacyNodeLabelRole && v != "":
 			roles.Insert(v)
 		}
