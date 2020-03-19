@@ -541,7 +541,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 
 }
 
-// OnServiceSynced is called once all the initial even handlers were
+// OnServiceSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
@@ -663,7 +663,7 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	proxier.syncProxyRules()
 }
 
-// OnNodeDelete is called whever deletion of an existing node
+// OnNodeDelete is called whenever deletion of an existing node
 // object is observed.
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	if node.Name != proxier.hostname {
