@@ -3078,7 +3078,7 @@ func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTermina
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
-		if roles := findNodeRoles(node); len(roles) > 0 {
+		if roles := corev1.GetNodeRoles(node.Labels); len(roles) > 0 {
 			w.Write(LEVEL_0, "Roles:\t%s\n", strings.Join(roles, ","))
 		} else {
 			w.Write(LEVEL_0, "Roles:\t%s\n", "<none>")
@@ -4840,26 +4840,6 @@ func backendStringer(backend *networkingv1beta1.IngressBackend) string {
 		return ""
 	}
 	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
-}
-
-// findNodeRoles returns the roles of a given node.
-// The roles are determined by looking for:
-// * a node-role.kubernetes.io/<role>="" label
-// * a kubernetes.io/role="<role>" label
-func findNodeRoles(node *corev1.Node) []string {
-	roles := sets.NewString()
-	for k, v := range node.Labels {
-		switch {
-		case strings.HasPrefix(k, corev1.LabelNodeRolePrefix):
-			if role := strings.TrimPrefix(k, corev1.LabelNodeRolePrefix); len(role) > 0 {
-				roles.Insert(role)
-			}
-
-		case k == corev1.LabelLegacyNodeLabelRole && v != "":
-			roles.Insert(v)
-		}
-	}
-	return roles.List()
 }
 
 // loadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.

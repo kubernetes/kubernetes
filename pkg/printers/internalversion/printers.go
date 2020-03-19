@@ -1484,7 +1484,7 @@ func printNode(obj *api.Node, options printers.GenerateOptions) ([]metav1.TableR
 		status = append(status, "SchedulingDisabled")
 	}
 
-	roles := strings.Join(findNodeRoles(obj), ",")
+	roles := strings.Join(apiv1.GetNodeRoles(obj.Labels), ",")
 	if len(roles) == 0 {
 		roles = "<none>"
 	}
@@ -1527,26 +1527,6 @@ func getNodeInternalIP(node *api.Node) string {
 	}
 
 	return "<none>"
-}
-
-// findNodeRoles returns the roles of a given node.
-// The roles are determined by looking for:
-// * a node-role.kubernetes.io/<role>="" label
-// * a kubernetes.io/role="<role>" label
-func findNodeRoles(node *api.Node) []string {
-	roles := sets.NewString()
-	for k, v := range node.Labels {
-		switch {
-		case strings.HasPrefix(k, apiv1.LabelNodeRolePrefix):
-			if role := strings.TrimPrefix(k, apiv1.LabelNodeRolePrefix); len(role) > 0 {
-				roles.Insert(role)
-			}
-
-		case k == apiv1.LabelLegacyNodeLabelRole && v != "":
-			roles.Insert(v)
-		}
-	}
-	return roles.List()
 }
 
 func printNodeList(list *api.NodeList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
