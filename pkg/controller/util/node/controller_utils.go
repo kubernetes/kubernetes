@@ -174,10 +174,8 @@ func RestorePodsReady(kubeClient clientset.Interface, node *v1.Node) error {
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
-
 		var podContainersReadyStatus v1.ConditionStatus
 		var podReadyStatus v1.ConditionStatus
-
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == v1.ContainersReady {
 				podContainersReadyStatus = cond.Status
