@@ -114,7 +114,7 @@ rules:
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseStarted,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 			Verb:              "watch",
 			Code:              200,
 			User:              auditTestUser,
@@ -126,7 +126,7 @@ rules:
 		}, {
 			Level:             auditinternal.LevelRequestResponse,
 			Stage:             auditinternal.StageResponseComplete,
-			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+			RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 			Verb:              "watch",
 			Code:              200,
 			User:              auditTestUser,

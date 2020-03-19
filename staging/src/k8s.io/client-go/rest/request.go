@@ -468,7 +468,8 @@ func (r *Request) URL() *url.URL {
 	}
 
 	// timeout is handled specially here.
-	if r.timeout != 0 {
+	// Do not set timeout for GET request as apiserver does not use it.
+	if r.timeout != 0 && r.verb != "GET" {
 		query.Set("timeout", r.timeout.String())
 	}
 	finalURL.RawQuery = query.Encode()

@@ -141,7 +141,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelRequest,
 				Stage:             auditinternal.StageResponseStarted,
-				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
@@ -153,7 +153,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelRequest,
 				Stage:             auditinternal.StageResponseComplete,
-				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/pods?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
@@ -268,7 +268,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelRequest,
 				Stage:             auditinternal.StageResponseStarted,
-				RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
@@ -280,7 +280,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelRequest,
 				Stage:             auditinternal.StageResponseComplete,
-				RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
@@ -401,7 +401,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelMetadata,
 				Stage:             auditinternal.StageResponseStarted,
-				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
@@ -413,7 +413,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelMetadata,
 				Stage:             auditinternal.StageResponseComplete,
-				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
@@ -533,7 +533,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelMetadata,
 				Stage:             auditinternal.StageResponseStarted,
-				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
@@ -545,7 +545,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 			}, {
 				Level:             auditinternal.LevelMetadata,
 				Stage:             auditinternal.StageResponseComplete,
-				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeout=%ds&timeoutSeconds=%d&watch=true", namespace, watchTestTimeout, watchTestTimeout),
+				RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/secrets?timeoutSeconds=%d&watch=true", namespace, watchTestTimeout),
 				Verb:              "watch",
 				Code:              200,
 				User:              auditTestUser,
