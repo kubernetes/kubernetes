@@ -93,6 +93,7 @@ package_group(
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics",
         "//staging/src/k8s.io/component-base/metrics/...",
         "//test/e2e_node",
+        "//test/integration/apiserver/flowcontrol",
         "//vendor/...",
     ],
 )
