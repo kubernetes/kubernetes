@@ -199,7 +199,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Description: Create a Pod with three containers with secrets volume sources namely a create, update and delete container. Create Container when started MUST not have secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/secret-volumes"
@@ -588,7 +588,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 }
 
 func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -636,7 +636,7 @@ func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName
 }
 
 func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
