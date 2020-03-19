@@ -29,6 +29,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 
@@ -564,6 +565,14 @@ func (fVMSSC *fakeVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Cont
 	fVMSSC.FakeStore[resourceGroupName][VMScaleSetName] = parameters
 
 	return nil
+}
+
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) CreateOrUpdateAsync(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (*azure.Future, *retry.Error) {
+	return nil, nil
+}
+
+func (fVMSSC *fakeVirtualMachineScaleSetsClient) WaitForAsyncOperationResult(ctx context.Context, future *azure.Future) (*http.Response, error) {
+	return nil, nil
 }
 
 func (fVMSSC *fakeVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err *retry.Error) {
