@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -45,7 +45,7 @@ func WaitForRunning(c clientset.Interface, numPodsRunning, numPodsReady int32, s
 			}
 			for _, p := range podList.Items {
 				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
-				isReady := podutil.IsPodReady(&p)
+				isReady := podutils.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
 				framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
 				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
@@ -88,7 +88,7 @@ func WaitForPodReady(c clientset.Interface, set *appsv1.StatefulSet, podName str
 		pods = pods2
 		for i := range pods.Items {
 			if pods.Items[i].Name == podName {
-				return podutil.IsPodReady(&pods.Items[i]), nil
+				return podutils.IsPodReady(&pods.Items[i]), nil
 			}
 		}
 		return false, nil
