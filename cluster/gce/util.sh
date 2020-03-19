@@ -3578,11 +3578,11 @@ function kube-down() {
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
   if [[ "${REMAINING_MASTER_COUNT}" -eq 1 ]]; then
+    detect-master
+    local REMAINING_REPLICA_NAME="$(get-all-replica-names)"
+    local REMAINING_REPLICA_ZONE=$(gcloud compute instances list "${REMAINING_REPLICA_NAME}" \
+      --project "${PROJECT}" --format="value(zone)")
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
-      detect-master
-      local REMAINING_REPLICA_NAME="$(get-all-replica-names)"
-      local REMAINING_REPLICA_ZONE=$(gcloud compute instances list "${REMAINING_REPLICA_NAME}" \
-        --project "${PROJECT}" --format="value(zone)")
       gcloud compute forwarding-rules delete \
         --project "${PROJECT}" \
         --region "${REGION}" \
