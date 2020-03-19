@@ -19,10 +19,12 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"math/big"
 	"net"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
+	utilnet "k8s.io/utils/net"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -187,7 +189,7 @@ func (r *Range) Release(ip net.IP) error {
 // ForEach calls the provided function for each allocated IP.
 func (r *Range) ForEach(fn func(net.IP)) {
 	r.alloc.ForEach(func(offset int) {
-		ip, _ := GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
+		ip, _ := utilnet.GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
 		fn(ip)
 	})
 }
@@ -281,13 +283,4 @@ func RangeSize(subnet *net.IPNet) int64 {
 	} else {
 		return int64(1) << uint(bits-ones)
 	}
-}
-
-// GetIndexedIP returns a net.IP that is subnet.IP + index in the contiguous IP space.
-func GetIndexedIP(subnet *net.IPNet, index int) (net.IP, error) {
-	ip := addIPOffset(bigForIP(subnet.IP), index)
-	if !subnet.Contains(ip) {
-		return nil, fmt.Errorf("can't generate IP with index %d from subnet. subnet too small. subnet: %q", index, subnet)
-	}
-	return ip, nil
 }
