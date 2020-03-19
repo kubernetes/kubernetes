@@ -110,6 +110,7 @@ type DeleteOptions struct {
 	Quiet               bool
 	WarnClusterScope    bool
 	Raw                 string
+	Foreground          bool
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -304,6 +305,9 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		policy := metav1.DeletePropagationBackground
 		if !o.Cascade {
 			policy = metav1.DeletePropagationOrphan
+		}
+		if o.Foreground {
+			policy = metav1.DeletePropagationForeground
 		}
 		options.PropagationPolicy = &policy
 

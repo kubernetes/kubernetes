@@ -43,6 +43,7 @@ type DeleteFlags struct {
 	Wait           *bool
 	Output         *string
 	Raw            *string
+	Foreground     *bool
 }
 
 func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) *DeleteOptions {
@@ -97,6 +98,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.Raw != nil {
 		options.Raw = *f.Raw
 	}
+	if f.Foreground != nil {
+		options.Foreground = *f.Foreground
+	}
 
 	return options
 }
@@ -142,6 +146,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Raw != nil {
 		cmd.Flags().StringVar(f.Raw, "raw", *f.Raw, "Raw URI to DELETE to the server.  Uses the transport specified by the kubeconfig file.")
 	}
+	if f.Foreground != nil {
+		cmd.Flags().BoolVar(f.Foreground, "foreground", *f.Foreground, "If true, use foreground deletion propagation. This ensures the object is not deleted before all dependents whose ownerReference.blockOwnerDeletion=true have been garbage collected.")
+	}
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
@@ -166,6 +173,8 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	recursive := false
 	kustomize := ""
 
+	foreground := false
+
 	return &DeleteFlags{
 		// Not using helpers.go since it provides function to add '-k' for FileNameOptions, but not FileNameFlags
 		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
@@ -184,6 +193,8 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		Wait:           &wait,
 		Output:         &output,
 		Raw:            &raw,
+
+		Foreground: &foreground,
 	}
 }
 
@@ -200,6 +211,8 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	kustomize := ""
 	recursive := false
 
+	foreground := false
+
 	return &DeleteFlags{
 		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
 
@@ -210,5 +223,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 		Force:   &force,
 		Timeout: &timeout,
 		Wait:    &wait,
+
+		Foreground: &foreground,
 	}
 }
