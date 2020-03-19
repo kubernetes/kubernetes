@@ -36,8 +36,6 @@ import (
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
-	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 
@@ -51,7 +49,6 @@ import (
 // Config contains the data on how to authenticate a request to the Kube API Server
 type Config struct {
 	Anonymous      bool
-	BasicAuthFile  string
 	BootstrapToken bool
 
 	TokenAuthFile               string
@@ -107,22 +104,6 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 			config.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)
 		authenticators = append(authenticators, authenticator.WrapAudienceAgnosticRequest(config.APIAudiences, requestHeaderAuthenticator))
-	}
-
-	// basic auth
-	if len(config.BasicAuthFile) > 0 {
-		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticators = append(authenticators, authenticator.WrapAudienceAgnosticRequest(config.APIAudiences, basicAuth))
-
-		securityDefinitions["HTTPBasic"] = &spec.SecurityScheme{
-			SecuritySchemeProps: spec.SecuritySchemeProps{
-				Type:        "basic",
-				Description: "HTTP Basic authentication",
-			},
-		}
 	}
 
 	// X509 methods
@@ -233,16 +214,6 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 func IsValidServiceAccountKeyFile(file string) bool {
 	_, err := keyutil.PublicKeysFromFile(file)
 	return err == nil
-}
-
-// newAuthenticatorFromBasicAuthFile returns an authenticator.Request or an error
-func newAuthenticatorFromBasicAuthFile(basicAuthFile string) (authenticator.Request, error) {
-	basicAuthenticator, err := passwordfile.NewCSV(basicAuthFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return basicauth.New(basicAuthenticator), nil
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Token or an error

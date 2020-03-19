@@ -37,7 +37,7 @@ import (
 // BuildHandlerChain builds a handler chain with a base handler and CompletedConfig.
 func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.AuthorizationInfo, authenticationInfo *apiserver.AuthenticationInfo) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
-	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
+	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs)
 
 	handler := apiHandler
 	if authorizationInfo != nil {

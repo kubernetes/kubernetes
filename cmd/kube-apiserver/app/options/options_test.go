@@ -276,7 +276,6 @@ func TestAddFlags(t *testing.T) {
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
 			},
-			PasswordFile:  &kubeoptions.PasswordFileAuthenticationOptions{},
 			RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
 			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
 				Lookup: true,
