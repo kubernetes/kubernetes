@@ -116,7 +116,9 @@ func PrepullImagesInParallel(kubePrepuller Prepuller, timeout time.Duration, com
 			kubePrepuller.WaitFunc(c)
 			// When the task is done, go ahead and cleanup by sending the name to the channel
 			prePulledChan <- c
+
 		}(component)
+		kubePrepuller.DeleteFunc(component)
 	}
 
 	// This call blocks until all expected messages are received from the channel or errors out if timeoutChan fires.
@@ -177,11 +179,11 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:    component,
-							Image:   image,
-							Command: []string{"/bin/sleep", "3600"},
+							Name:  component,
+							Image: image,
 						},
 					},
+
 					NodeSelector: map[string]string{
 						constants.LabelNodeRoleMaster: "",
 					},
