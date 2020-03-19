@@ -18,7 +18,6 @@ package versioned
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubectl/pkg/generate"
+	utilsnet "k8s.io/utils/net"
 )
 
 // getLabels returns map of labels.
@@ -178,14 +178,14 @@ func updatePodPorts(params map[string]string, podSpec *v1.PodSpec) (err error) {
 	port := -1
 	hostPort := -1
 	if len(params["port"]) > 0 {
-		port, err = strconv.Atoi(params["port"])
+		port, err = utilsnet.ParsePort(params["port"], true)
 		if err != nil {
 			return err
 		}
 	}
 
 	if len(params["hostport"]) > 0 {
-		hostPort, err = strconv.Atoi(params["hostport"])
+		hostPort, err = utilsnet.ParsePort(params["hostport"], true)
 		if err != nil {
 			return err
 		}
