@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -53,6 +52,14 @@ const (
 
 	// VolumeSelectorKey is the key for volume selector.
 	VolumeSelectorKey = "e2e-pv-pool"
+
+	// isDefaultStorageClassAnnotation represents a StorageClass annotation that
+	// marks a class as the default StorageClass
+	isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
+
+	// betaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
+	// TODO: remove Beta when no longer used
+	betaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 )
 
 var (
@@ -779,7 +786,7 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 	}
 	var scName string
 	for _, sc := range list.Items {
-		if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+		if isDefaultAnnotation(sc.ObjectMeta) {
 			if len(scName) != 0 {
 				return "", fmt.Errorf("Multiple default storage classes found: %q and %q", scName, sc.Name)
 			}
@@ -791,6 +798,20 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 	}
 	framework.Logf("Default storage class: %q", scName)
 	return scName, nil
+}
+
+// isDefaultAnnotation returns a boolean if the default storage class
+// annotation is set
+// TODO: remove Beta when no longer needed
+func isDefaultAnnotation(obj metav1.ObjectMeta) bool {
+	if obj.Annotations[isDefaultStorageClassAnnotation] == "true" {
+		return true
+	}
+	if obj.Annotations[betaIsDefaultStorageClassAnnotation] == "true" {
+		return true
+	}
+
+	return false
 }
 
 // SkipIfNoDefaultStorageClass skips tests if no default SC can be found.
