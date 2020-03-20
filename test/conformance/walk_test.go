@@ -147,9 +147,8 @@ func TestCommentToConformanceData(t *testing.T) {
 			desc:  "No Release or Testname leads to nil",
 			input: "Description: foo",
 		}, {
-			desc:     "Release but no Testname does not result in nil",
-			input:    "Release: v1.1\nDescription: foo",
-			expected: &conformanceData{Release: "v1.1", Description: "foo"},
+			desc:  "Release but no Testname should result in nil",
+			input: "Release: v1.1\nDescription: foo",
 		}, {
 			desc:     "Testname but no Release does not result in nil",
 			input:    "Testname: mytest\nDescription: foo",
