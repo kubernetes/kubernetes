@@ -257,12 +257,12 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference a service account", nodeName))
 	}
 	hasSecrets := false
-	podutil.VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false })
+	podutil.VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false }, podutil.AllContainers)
 	if hasSecrets {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference secrets", nodeName))
 	}
 	hasConfigMaps := false
-	podutil.VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false })
+	podutil.VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false }, podutil.AllContainers)
 	if hasConfigMaps {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference configmaps", nodeName))
 	}

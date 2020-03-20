@@ -89,13 +89,13 @@ type Visitor func(name string) (shouldContinue bool)
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
-func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
+func VisitPodSecretNames(pod *api.Pod, visitor Visitor, containerType ContainerType) bool {
 	for _, reference := range pod.Spec.ImagePullSecrets {
 		if !visitor(reference.Name) {
 			return false
 		}
 	}
-	VisitContainers(&pod.Spec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+	VisitContainers(&pod.Spec, containerType, func(c *api.Container, containerType ContainerType) bool {
 		return visitContainerSecretNames(c, visitor)
 	})
 	var source *api.VolumeSource
@@ -177,8 +177,8 @@ func visitContainerSecretNames(container *api.Container, visitor Visitor) bool {
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
-func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor) bool {
-	VisitContainers(&pod.Spec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor, containerType ContainerType) bool {
+	VisitContainers(&pod.Spec, containerType, func(c *api.Container, containerType ContainerType) bool {
 		return visitContainerConfigmapNames(c, visitor)
 	})
 	var source *api.VolumeSource
