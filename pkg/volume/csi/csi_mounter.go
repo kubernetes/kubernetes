@@ -40,7 +40,7 @@ import (
 	utilstrings "k8s.io/utils/strings"
 )
 
-//TODO (vladimirvivien) move this in a central loc later
+// TODO (vladimirvivien) move this in a central loc later
 var (
 	volDataKey = struct {
 		specVolID,
@@ -182,7 +182,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			secretRef = pvSrc.NodePublishSecretRef
 		}
 
-		//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
+		// TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 		if c.spec.PersistentVolume.Spec.AccessModes != nil {
 			accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 		}
@@ -384,15 +384,16 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
 		return false
 	}
-
-	accessModes := c.spec.PersistentVolume.Spec.AccessModes
-	if c.spec.PersistentVolume.Spec.AccessModes == nil {
-		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
-		return false
-	}
-	if !hasReadWriteOnce(accessModes) {
-		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
-		return false
+	if c.volumeLifecycleMode == storage.VolumeLifecyclePersistent {
+		accessModes := c.spec.PersistentVolume.Spec.AccessModes
+		if c.spec.PersistentVolume.Spec.AccessModes == nil {
+			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
+			return false
+		}
+		if !hasReadWriteOnce(accessModes) {
+			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
+			return false
+		}
 	}
 	return true
 }

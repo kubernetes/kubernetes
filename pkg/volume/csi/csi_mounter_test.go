@@ -29,7 +29,6 @@ import (
 	"reflect"
 
 	"github.com/stretchr/testify/assert"
-
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
@@ -925,5 +925,91 @@ func TestIsCorruptedDir(t *testing.T) {
 	for i, test := range tests {
 		isCorruptedDir := isCorruptedDir(test.dir)
 		assert.Equal(t, test.expectedResult, isCorruptedDir, "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
+func TestMounterSetUpWithInlineFSGroup(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	var modes []storage.VolumeLifecycleMode
+	modes = append(modes, storage.VolumeLifecycleEphemeral)
+	trueValue := true
+	fakeClient := fakeclient.NewSimpleClientset(
+		getTestCSIDriver(testDriver, &trueValue, &trueValue, modes),
+	)
+	plug, tmpDir := newTestPlugin(t, fakeClient)
+	defer os.RemoveAll(tmpDir)
+
+	testCases := []struct {
+		name       string
+		readOnly   bool
+		setFsGroup bool
+		fsGroup    int64
+		fsType     string
+	}{
+		{
+			name:       "not readOnly with fsgroup (should apply fsgroup)",
+			readOnly:   false,
+			setFsGroup: true,
+			fsGroup:    3000,
+			fsType:     "ext4",
+		},
+		{
+			name:       "not readOnly with no fsgroup (should not apply fsgroup)",
+			readOnly:   false,
+			setFsGroup: false,
+			fsType:     "ext4",
+		},
+		{
+			name:       "readOnly with no fsgroup (should not apply fsgroup)",
+			readOnly:   true,
+			setFsGroup: true,
+			fsGroup:    3000,
+			fsType:     "ext4",
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Logf("Running test %s", tc.name)
+
+		volName := fmt.Sprintf("test-inline-vol-%d", i)
+		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		volSrc := makeTestVol(volName, testDriver)
+		volSrc.CSI.ReadOnly = &tc.readOnly
+		volSrc.CSI.FSType = &tc.fsType
+		spec := volume.NewSpecFromVolume(volSrc)
+
+		mounter, err := plug.NewMounter(
+			spec,
+			&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
+			volume.VolumeOptions{},
+		)
+		if err != nil {
+			t.Fatalf("Failed to make a new Mounter: %v", err)
+		}
+
+		if mounter == nil {
+			t.Fatal("failed to create CSI mounter")
+		}
+
+		csiMounter := mounter.(*csiMountMgr)
+		csiMounter.csiClient = setupClient(t, true)
+
+		// Mounter.SetUp()
+		var mounterArgs volume.MounterArgs
+		if tc.setFsGroup {
+			var fsGroupPtr *int64
+			fsGroup := tc.fsGroup
+			fsGroupPtr = &fsGroup
+			mounterArgs.FsGroup = fsGroupPtr
+		}
+		if err := csiMounter.SetUp(mounterArgs); err != nil {
+			t.Fatalf("mounter.Setup failed: %v", err)
+		}
+
+		// ensure call went all the way
+		pubs := csiMounter.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+		if pubs[csiMounter.volumeID].Path != csiMounter.GetPath() {
+			t.Error("csi server may not have received NodePublishVolume call")
+		}
 	}
 }
