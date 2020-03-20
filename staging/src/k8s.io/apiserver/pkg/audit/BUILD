@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "context.go",
         "format.go",
         "metrics.go",
         "request.go",
@@ -35,6 +36,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/github.com/google/uuid:go_default_library",
