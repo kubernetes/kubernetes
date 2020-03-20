@@ -32,7 +32,7 @@ dependencies:
 
 
   - name: "golang"
-    version: 1.13.8
+    version: 1.13.9
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
