@@ -116,7 +116,8 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
-	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
+	typeName := getTypeName(out)
+	metrics.RecordEtcdRequestLatency("get", typeName, startTime)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,12 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 		return storage.NewInternalError(err.Error())
 	}
 
-	return decode(s.codec, s.versioner, data, out, kv.ModRevision)
+	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
+	if err != nil {
+		metrics.RecordDecodeError(typeName)
+		klog.V(4).Infof("Decoding %s \"%s\" failed", typeName, key)
+	}
+	return err
 }
 
 // Create implements storage.Interface.Create.
