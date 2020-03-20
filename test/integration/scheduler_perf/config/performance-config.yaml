@@ -162,7 +162,7 @@
       nodeTemplatePath: config/node-default.yaml
       labelNodePrepareStrategy:
         labelKey: "failure-domain.beta.kubernetes.io/zone"
-        labelValue: "zone1"
+        labelValues: ["zone1"]
     initPods:
     - podTemplatePath: config/pod-with-node-affinity.yaml
     podsToSchedule:
