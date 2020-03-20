@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -102,7 +103,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
-			framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 			// save the running pod
 			pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to GET scheduled pod")

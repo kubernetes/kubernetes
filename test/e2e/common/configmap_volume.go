@@ -841,7 +841,7 @@ func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podN
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
 func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath, podName string) error {
@@ -903,5 +903,5 @@ func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMount
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }

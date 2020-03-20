@@ -732,7 +732,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
-			if err := f.WaitForPodRunning(podName); err != nil {
+			if err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name); err != nil {
 				framework.Failf("Pod %v did not start running: %v", podName, err)
 			}
 
