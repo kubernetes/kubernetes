@@ -283,7 +283,7 @@ func TestPodSecrets(t *testing.T) {
 	VisitPodSecretNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
-	})
+	}, AllContainers)
 
 	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
 	excludedSecretPaths := sets.NewString(
@@ -428,7 +428,7 @@ func TestPodConfigmaps(t *testing.T) {
 	VisitPodConfigmapNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
-	})
+	}, AllContainers)
 
 	// expectedPaths holds struct paths to fields with "ConfigMap" in the name that are references to ConfigMap API objects.
 	// every path here should be represented as an example in the Pod stub above, with the ConfigMap name set to the path.
