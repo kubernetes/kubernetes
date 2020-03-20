@@ -19,25 +19,22 @@ package util
 import (
 	"io/ioutil"
 	"os"
+	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-
-	"reflect"
-	"strings"
-
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
+	utilptr "k8s.io/utils/pointer"
 )
 
 var nodeLabels = map[string]string{
@@ -341,6 +338,119 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	timeout = CalculateTimeoutForVolume(50, 30, pv)
 	if timeout != 4500 {
 		t.Errorf("Expected 4500 for timeout but got %v", timeout)
+	}
+}
+
+func TestFsUserFrom(t *testing.T) {
+	tests := []struct {
+		desc       string
+		pod        *v1.Pod
+		wantFsUser *int64
+	}{
+		{
+			desc: "no runAsUser specified",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			wantFsUser: nil,
+		},
+		{
+			desc: "some have runAsUser specified",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{},
+						},
+					},
+				},
+			},
+			wantFsUser: nil,
+		},
+		{
+			desc: "all have runAsUser specified but not the same",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(999),
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+				},
+			},
+			wantFsUser: nil,
+		},
+		{
+			desc: "all have runAsUser specified and the same",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: utilptr.Int64Ptr(1000),
+							},
+						},
+					},
+				},
+			},
+			wantFsUser: utilptr.Int64Ptr(1000),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			fsUser := FsUserFrom(test.pod)
+			if fsUser == nil && test.wantFsUser != nil {
+				t.Errorf("FsUserFrom(%v) = %v, want %d", test.pod, fsUser, *test.wantFsUser)
+			}
+			if fsUser != nil && test.wantFsUser == nil {
+				t.Errorf("FsUserFrom(%v) = %d, want %v", test.pod, *fsUser, test.wantFsUser)
+			}
+			if fsUser != nil && test.wantFsUser != nil && *fsUser != *test.wantFsUser {
+				t.Errorf("FsUserFrom(%v) = %d, want %d", test.pod, *fsUser, *test.wantFsUser)
+			}
+		})
 	}
 }
 

@@ -627,6 +627,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		// Execute mount
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
+			FsUser:              ioutil.FsUserFrom(volumeToMount.Pod),
 			FsGroup:             fsGroup,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
 			FSGroupChangePolicy: fsGroupChangePolicy,
