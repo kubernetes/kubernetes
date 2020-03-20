@@ -56,6 +56,7 @@ func TestPod(t *testing.T) {
 	}{
 		{"field_empty_case", fakeCreatePod("", "", ""), "_()"},
 		{"field_normal_case", fakeCreatePod("test-pod", metav1.NamespaceDefault, "551f5a43-9f2f-11e7-a589-fa163e148d75"), "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75)"},
+		{"nil_pod_case", nil, "<nil>"},
 	}
 
 	for _, testCase := range testCases {
@@ -87,12 +88,14 @@ func TestPodWithDeletionTimestamp(t *testing.T) {
 
 	testCases := []struct {
 		caseName               string
+		isPodNil               bool
 		isdeletionTimestampNil bool
 		deletionTimestamp      metav1.Time
 		expectedValue          string
 	}{
-		{"timestamp_is_nil_case", true, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75)"},
-		{"timestamp_is_normal_case", false, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z"},
+		{"timestamp_is_nil_case", false, true, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75)"},
+		{"timestamp_is_normal_case", false, false, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z"},
+		{"pod_is_nil_case", true, false, normalDeletionTime, "<nil>"},
 	}
 
 	for _, testCase := range testCases {
@@ -100,6 +103,9 @@ func TestPodWithDeletionTimestamp(t *testing.T) {
 
 		if testCase.isdeletionTimestampNil {
 			fakePod.SetDeletionTimestamp(nil)
+		}
+		if testCase.isPodNil {
+			fakePod = nil
 		}
 
 		realPodWithDeletionTimestamp := PodWithDeletionTimestamp(fakePod)
@@ -120,6 +126,7 @@ func TestPods(t *testing.T) {
 		{"input_empty_case", []*v1.Pod{}, ""},
 		{"input_length_one_case", []*v1.Pod{pod1}, "pod1_default(551f5a43-9f2f-11e7-a589-fa163e148d75)"},
 		{"input_length_more_than_one_case", []*v1.Pod{pod1, pod2}, "pod1_default(551f5a43-9f2f-11e7-a589-fa163e148d75), pod2_default(e84a99bf-d1f9-43c2-9fa5-044ac85f794b)"},
+		{"input_include_nil_case", []*v1.Pod{pod1, nil}, "pod1_default(551f5a43-9f2f-11e7-a589-fa163e148d75), <nil>"},
 	}
 
 	for _, testCase := range testCases {
@@ -142,6 +149,7 @@ func TestPodsWithDeletionTimestamps(t *testing.T) {
 		{"input_empty_case", []*v1.Pod{}, ""},
 		{"input_length_one_case", []*v1.Pod{pod1}, "pod1_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z"},
 		{"input_length_more_than_one_case", []*v1.Pod{pod1, pod2}, "pod1_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z, pod2_default(e84a99bf-d1f9-43c2-9fa5-044ac85f794b):DeletionTimestamp=2017-09-26T14:37:50Z"},
+		{"input_include_nil_case", []*v1.Pod{pod1, nil}, "pod1_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z, <nil>"},
 	}
 
 	for _, testCase := range testCases {
