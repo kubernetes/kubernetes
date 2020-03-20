@@ -452,7 +452,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			pod.Spec.ActiveDeadlineSeconds = &newDeadline
 		})
 
-		framework.ExpectNoError(f.WaitForPodTerminated(pod.Name, "DeadlineExceeded"))
+		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, pod.Name, "DeadlineExceeded", f.Namespace.Name))
 	})
 
 	/*
