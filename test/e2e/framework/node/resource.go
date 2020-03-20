@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -515,4 +517,27 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 		}
 	}
 	return zones, nil
+}
+
+// CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
+func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
+	nodes, err := GetBoundedReadySchedulableNodes(c, maxCount)
+	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
+	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
+	podLabels := map[string]string{
+		"app": appName + "-pod",
+	}
+	for i, node := range nodes.Items {
+		e2elog.Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
+		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   fmt.Sprintf(appName+"-pod-%v", i),
+				Labels: podLabels,
+			},
+			Spec: podSpec(node),
+		}, metav1.CreateOptions{})
+		// TODO use wrapper methods in expect.go after removing core e2e dependency on node
+		gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
+	}
+	return podLabels
 }

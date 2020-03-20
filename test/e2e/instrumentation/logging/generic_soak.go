@@ -86,7 +86,9 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	kilobyte := strings.Repeat("logs-123", 128) // 8*128=1024 = 1KB of text.
 
 	appName := "logging-soak" + podname
-	podlables := f.CreatePodsPerNodeForSimpleApp(
+	podlables := e2enode.CreatePodsPerNodeForSimpleApp(
+		f.ClientSet,
+		f.Namespace.Name,
 		appName,
 		func(n v1.Node) v1.PodSpec {
 			return v1.PodSpec{
