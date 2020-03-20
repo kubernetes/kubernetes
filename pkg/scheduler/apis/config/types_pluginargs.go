@@ -218,3 +218,13 @@ type NodeAffinityArgs struct {
 	// a specific Node (such as Daemonset Pods) might remain unschedulable.
 	AddedAffinity *v1.NodeAffinity
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourceTopologyMatchArgs holds arguments used to configure the NodeResourceTopologyMatch plugin
+type NodeResourceTopologyMatchArgs struct {
+	metav1.TypeMeta
+
+	KubeConfig string
+	MasterOverride string
+}
