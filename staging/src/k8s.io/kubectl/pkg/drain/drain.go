@@ -277,6 +277,9 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 				} else if apierrors.IsTooManyRequests(err) {
 					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after 5s): %v\n", pod.Name, pod.Namespace, err)
 					time.Sleep(5 * time.Second)
+				} else if apierrors.IsForbidden(err) {
+					// an eviction request in a deleting namespace will throw a forbidden error
+					break
 				} else {
 					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: %v", pod.Name, pod.Namespace, err)
 					return
