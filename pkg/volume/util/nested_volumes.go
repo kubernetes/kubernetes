@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
@@ -73,7 +73,7 @@ func getNestedMountpoints(name, baseDir string, pod v1.Pod) ([]string, error) {
 	}
 
 	var retErr error
-	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
 		retErr = checkContainer(c)
 		if retErr != nil {
 			return false

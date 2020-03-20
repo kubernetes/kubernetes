@@ -25,7 +25,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -79,7 +79,7 @@ func (v *validator) Validate(pod *v1.Pod) error {
 	}
 
 	var retErr error
-	podutil.VisitContainers(&pod.Spec, func(container *v1.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 		retErr = validateProfile(GetProfileName(pod, container.Name), loadedProfiles)
 		if retErr != nil {
 			return false
