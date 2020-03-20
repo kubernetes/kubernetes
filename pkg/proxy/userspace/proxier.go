@@ -346,7 +346,7 @@ func (proxier *Proxier) Sync() {
 func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
-		klog.V(2).Infof("userspace syncProxyRules took %v", time.Since(start))
+		klog.V(4).Infof("userspace syncProxyRules took %v", time.Since(start))
 	}()
 
 	// don't sync rules till we've received services and endpoints
@@ -367,7 +367,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
-	klog.V(2).Infof("userspace proxy: processing %d service events", len(changes))
+	klog.V(4).Infof("userspace proxy: processing %d service events", len(changes))
 	for _, change := range changes {
 		existingPorts := proxier.mergeService(change.current)
 		proxier.unmergeService(change.previous, existingPorts)
