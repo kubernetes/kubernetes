@@ -79,14 +79,15 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		sanitizedOptionsForLogging, source, target, fstype)
 	bindSource := source
 
-	// tell it's going to mount azure disk or azure file according to options
 	if bind, _, _, _ := MakeBindOptsSensitive(options, sensitiveOptions); bind {
-		// mount azure disk
 		bindSource = NormalizeWindowsPath(source)
 	} else {
-		if len(options) < 2 {
+		allOptions := []string{}
+		allOptions = append(allOptions, options...)
+		allOptions = append(allOptions, sensitiveOptions...)
+		if len(allOptions) < 2 {
 			klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
-				sanitizedOptionsForLogging, len(options), source, target)
+				sanitizedOptionsForLogging, len(allOptions), source, target)
 			return nil
 		}
 
@@ -99,13 +100,13 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		getSMBMountMutex.LockKey(source)
 		defer getSMBMountMutex.UnlockKey(source)
 
-		if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+		if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
 			if isSMBMappingExist(source) {
 				klog.V(2).Infof("SMB Mapping(%s) already exists, now begin to remove and remount", source)
 				if output, err := removeSMBMapping(source); err != nil {
 					return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
 				}
-				if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+				if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
 					return fmt.Errorf("New-SmbGlobalMapping remount failed: %v, output: %q", err, output)
 				}
 			} else {
