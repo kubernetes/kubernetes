@@ -31,7 +31,6 @@ go_library(
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
-        "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
