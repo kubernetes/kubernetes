@@ -8,7 +8,6 @@ go_library(
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/v1:go_default_library",
-        "//pkg/scheduler/apis/config/v1alpha1:go_default_library",
         "//pkg/scheduler/apis/config/v1alpha2:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
