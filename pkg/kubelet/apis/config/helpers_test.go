@@ -228,5 +228,6 @@ var (
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
 		"VolumePluginDir",
+		"RootDirectory",
 	)
 )

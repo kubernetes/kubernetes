@@ -84,6 +84,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.Authorization.Webhook.CacheUnauthorizedTTL == zeroDuration {
 		obj.Authorization.Webhook.CacheUnauthorizedTTL = metav1.Duration{Duration: 30 * time.Second}
 	}
+	if obj.RootDirectory == "" {
+		obj.RootDirectory = kubeletconfigv1beta1.DefaultRootDir
+	}
 	if obj.RegistryPullQPS == nil {
 		obj.RegistryPullQPS = utilpointer.Int32Ptr(5)
 	}
@@ -229,5 +232,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.VolumePluginDir == "" {
 		obj.VolumePluginDir = DefaultVolumePluginDir
+	}
+	if obj.RootDirectory == "" {
+		obj.RootDirectory = kubeletconfigv1beta1.DefaultRootDir
 	}
 }

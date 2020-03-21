@@ -43,8 +43,6 @@ import (
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
-const defaultRootDir = "/var/lib/kubelet"
-
 // KubeletFlags contains configuration flags for the Kubelet.
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
 // - its value will never, or cannot safely be changed during the lifetime of a node, or
@@ -82,10 +80,6 @@ type KubeletFlags struct {
 	// cloudConfigFile is the path to the cloud provider configuration file.
 	// +optional
 	CloudConfigFile string
-
-	// rootDirectory is the directory path to place kubelet files (volume
-	// mounts,etc).
-	RootDirectory string
 
 	// The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health.
 	// The Kubelet will create this directory if it does not already exist.
@@ -185,7 +179,6 @@ func NewKubeletFlags() *KubeletFlags {
 	return &KubeletFlags{
 		ContainerRuntimeOptions:             *NewContainerRuntimeOptions(),
 		CertDirectory:                       "/var/lib/kubelet/pki",
-		RootDirectory:                       defaultRootDir,
 		MasterServiceNamespace:              metav1.NamespaceDefault,
 		MaxContainerCount:                   -1,
 		MaxPerPodContainerCount:             1,
@@ -196,7 +189,7 @@ func NewKubeletFlags() *KubeletFlags {
 		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
 		NodeLabels:                          make(map[string]string),
 		RegisterNode:                        true,
-		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
+		SeccompProfileRoot:                  filepath.Join(v1beta1.DefaultRootDir, "seccomp"),
 		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
 		NodeStatusMaxImages:         50,
 		EnableCAdvisorJSONEndpoints: false,
@@ -346,8 +339,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Specify empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-
-	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 
 	fs.Var(&f.DynamicConfigDir, "dynamic-config-dir", "The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health. The Kubelet will create this directory if it does not already exist. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Providing this flag enables dynamic Kubelet configuration. The DynamicKubeletConfig feature gate must be enabled to pass this flag; this gate currently defaults to true because the feature is beta.")
 
@@ -522,6 +513,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Beta feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated. This flag can only be used with --container-runtime=remote.")
 	fs.Int32Var(&c.ContainerLogMaxFiles, "container-log-max-files", c.ContainerLogMaxFiles, "<Warning: Beta feature> Set the maximum number of container log files that can be present for a container. The number must be >= 2. This flag can only be used with --container-runtime=remote.")
 	fs.StringSliceVar(&c.AllowedUnsafeSysctls, "allowed-unsafe-sysctls", c.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
+
+	fs.StringVar(&c.RootDirectory, "root-dir", c.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.Int64Var(&c.MaxOpenFiles, "max-open-files", c.MaxOpenFiles, "Number of files that can be opened by Kubelet process.")

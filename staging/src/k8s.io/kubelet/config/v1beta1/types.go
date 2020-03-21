@@ -21,6 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const DefaultRootDir = "/var/lib/kubelet"
+
 // HairpinMode denotes how the kubelet should configure networking to handle
 // hairpin packets.
 type HairpinMode string
@@ -780,6 +782,11 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ProviderID string `json:"providerID,omitempty"`
+	// rootDirectory is the directory path to place kubelet files (volume
+	// mounts,etc).
+	// Default: "/var/lib/kubelet"
+	// +optional
+	RootDirectory string `json:"rootDirectory,omitempty"`
 }
 
 type KubeletAuthorizationMode string

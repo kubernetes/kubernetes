@@ -142,6 +142,9 @@ type KubeletConfiguration struct {
 	// pulls to burst to this number, while still not exceeding registryPullQPS.
 	// Only used if registryPullQPS > 0.
 	RegistryBurst int32
+	// rootDirectory is the directory path to place kubelet files (volume
+	// mounts,etc).
+	RootDirectory string
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
 	EventRecordQPS int32
