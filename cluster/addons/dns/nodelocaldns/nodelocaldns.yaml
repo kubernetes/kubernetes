@@ -121,8 +121,11 @@ spec:
       k8s-app: node-local-dns
   template:
     metadata:
-       labels:
-          k8s-app: node-local-dns
+      labels:
+        k8s-app: node-local-dns
+      annotations:
+        prometheus.io/port: "9253"
+        prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: node-local-dns
