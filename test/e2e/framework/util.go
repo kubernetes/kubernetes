@@ -50,10 +50,12 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -62,7 +64,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -281,8 +282,22 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, conditions.ServiceAccountHasSecrets)
+	_, err = watchtools.UntilWithoutRetry(ctx, w, serviceAccountHasSecrets)
 	return err
+}
+
+// serviceAccountHasSecrets returns true if the service account has at least one secret,
+// false if it does not, or an error.
+func serviceAccountHasSecrets(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *v1.ServiceAccount:
+		return len(t.Secrets) > 0, nil
+	}
+	return false, nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
