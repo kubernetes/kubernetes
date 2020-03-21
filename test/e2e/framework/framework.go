@@ -531,12 +531,6 @@ func (f *Framework) WaitForPodRunningSlow(podName string) error {
 	return e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
 }
 
-// WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
-// success or failure.
-func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
-}
-
 // ClientConfig an externally accessible method for reading the kube client config.
 func (f *Framework) ClientConfig() *rest.Config {
 	ret := rest.CopyConfig(f.clientConfig)
