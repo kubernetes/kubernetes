@@ -234,6 +234,49 @@ func (c *Client) CreateOrUpdate(ctx context.Context, resourceGroupName string, V
 	return nil
 }
 
+// CreateOrUpdateAsync sends the request to arm client and DO NOT wait for the response
+func (c *Client) CreateOrUpdateAsync(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (*azure.Future, *retry.Error) {
+	mc := metrics.NewMetricContext("vmss", "create_or_update_async", resourceGroupName, c.subscriptionID, "")
+
+	// Report errors if the client is rate limited.
+	if !c.rateLimiterWriter.TryAccept() {
+		mc.RateLimitedCount()
+		return nil, retry.GetRateLimitError(true, "VMSSCreateOrUpdateAsync")
+	}
+
+	// Report errors if the client is throttled.
+	if c.RetryAfterWriter.After(time.Now()) {
+		mc.ThrottledCount()
+		rerr := retry.GetThrottlingError("VMSSCreateOrUpdateAsync", "client throttled", c.RetryAfterWriter)
+		return nil, rerr
+	}
+
+	resourceID := armclient.GetResourceID(
+		c.subscriptionID,
+		resourceGroupName,
+		"Microsoft.Compute/virtualMachineScaleSets",
+		VMScaleSetName,
+	)
+
+	future, rerr := c.armClient.PutResourceAsync(ctx, resourceID, parameters)
+	mc.Observe(rerr.Error())
+	if rerr != nil {
+		if rerr.IsThrottled() {
+			// Update RetryAfterReader so that no more requests would be sent until RetryAfter expires.
+			c.RetryAfterWriter = rerr.RetryAfter
+		}
+
+		return nil, rerr
+	}
+
+	return future, nil
+}
+
+// WaitForAsyncOperationResult waits for the response of the request
+func (c *Client) WaitForAsyncOperationResult(ctx context.Context, future *azure.Future) (*http.Response, error) {
+	return c.armClient.WaitForAsyncOperationResult(ctx, future, "VMSSWaitForAsyncOperationResult")
+}
+
 // createOrUpdateVMSS creates or updates a VirtualMachineScaleSet.
 func (c *Client) createOrUpdateVMSS(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) *retry.Error {
 	resourceID := armclient.GetResourceID(
