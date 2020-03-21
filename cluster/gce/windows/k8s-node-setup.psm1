@@ -51,7 +51,6 @@
 #  - Document functions using proper syntax:
 #    https://technet.microsoft.com/en-us/library/hh847834(v=wps.620).aspx
 
-$INFRA_CONTAINER = 'gcr.io/gke-release/pause-win:1.1.0'
 $GCE_METADATA_SERVER = "169.254.169.254"
 # The "management" interface is used by the kubelet and by Windows pods to talk
 # to the rest of the Kubernetes cluster *without NAT*. This interface does not
@@ -249,6 +248,7 @@ function Set-EnvironmentVars {
     "KUBEPROXY_KUBECONFIG" = ${kube_env}['KUBEPROXY_KUBECONFIG_FILE']
     "LOGS_DIR" = ${kube_env}['LOGS_DIR']
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
+    "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
 
     "Path" = ${env:Path} + ";" + ${kube_env}['NODE_DIR']
     "KUBE_NETWORK" = "l2bridge".ToLower()
