@@ -1462,7 +1462,15 @@ function prepare-kube-proxy-manifest-variables {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
-    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
+    # use 'nf_conntrack' instead of 'nf_conntrack_ipv4' for linux kernel >= 4.19
+    # https://github.com/kubernetes/kubernetes/pull/70398
+    local -r kernel_version=$(uname -r | cut -d\. -f1,2)
+    local conntrack_module="nf_conntrack"
+    if [[ $(printf "${kernel_version}\n4.18\n" | sort -V | tail -1) == "4.18" ]]; then
+      conntrack_module="nf_conntrack_ipv4"
+    fi
+
+    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}
     if [[ $? -eq 0 ]];
     then
       params+=" --proxy-mode=ipvs"
