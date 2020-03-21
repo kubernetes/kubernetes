@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 
 	"github.com/onsi/ginkgo"
 
@@ -39,6 +38,12 @@ import (
 
 const (
 	podSecurityPolicyPrivileged = "e2e-test-privileged-psp"
+
+	// allowAny is the wildcard used to allow any profile.
+	allowAny = "*"
+
+	// allowedProfilesAnnotationKey specifies the allowed seccomp profiles.
+	allowedProfilesAnnotationKey = "seccomp.security.alpha.kubernetes.io/allowedProfileNames"
 )
 
 var (
@@ -52,7 +57,7 @@ func privilegedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 	return &policyv1beta1.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
-			Annotations: map[string]string{seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny},
+			Annotations: map[string]string{allowedProfilesAnnotationKey: allowAny},
 		},
 		Spec: policyv1beta1.PodSecurityPolicySpec{
 			Privileged:               true,

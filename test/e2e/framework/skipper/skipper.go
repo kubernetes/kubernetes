@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -44,6 +44,9 @@ import (
 
 // TestContext should be used by all tests to access common context data.
 var TestContext framework.TestContextType
+
+// New local storage types to support local storage capacity isolation
+var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
 
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
@@ -131,8 +134,8 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 
 // SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
 func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
+	if !utilfeature.DefaultFeatureGate.Enabled(localStorageCapacityIsolation) {
+		skipInternalf(1, "Only supported when %v feature is enabled", localStorageCapacityIsolation)
 	}
 }
 
