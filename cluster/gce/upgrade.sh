@@ -241,8 +241,7 @@ function prepare-node-upgrade() {
   echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
   setup-base-image
 
-  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
-  SANITIZED_VERSION="${KUBE_VERSION}//[\.\+]/-/g"
+  SANITIZED_VERSION="${KUBE_VERSION//[\.\+]/-}"
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
@@ -392,7 +391,6 @@ function do-node-upgrade() {
   template_name=$(get-template-name-from-version "${SANITIZED_VERSION}" "${NODE_INSTANCE_PREFIX}")
   local old_templates=()
   for group in "${INSTANCE_GROUPS[@]}"; do
-    old_templates=()
     while IFS='' read -r line; do old_templates+=("$line"); done < <(gcloud compute instance-groups managed list \
         --project="${PROJECT}" \
         --filter="name ~ '${group}' AND zone:(${ZONE})" \
