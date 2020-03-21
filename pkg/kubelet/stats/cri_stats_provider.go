@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +37,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 var (
@@ -131,16 +129,11 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		return nil, fmt.Errorf("failed to list all containers: %v", err)
 	}
 
-	// Creates pod sandbox map.
-	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
 	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
-	podSandboxes = removeTerminatedPods(podSandboxes)
-	for _, s := range podSandboxes {
-		podSandboxMap[s.Id] = s
-	}
+	podSandboxMap := removeTerminatedPods(podSandboxes)
 	// fsIDtoInfo is a map from filesystem id to its stats. This will be used
 	// as a cache to avoid querying cAdvisor for the filesystem stats with the
 	// same filesystem id many times.
@@ -154,12 +147,7 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
-	containers = removeTerminatedContainers(containers)
-	// Creates container map.
-	containerMap := make(map[string]*runtimeapi.Container)
-	for _, c := range containers {
-		containerMap[c.Id] = c
-	}
+	containerMap := removeTerminatedContainers(containers)
 
 	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
@@ -228,16 +216,11 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 		return nil, fmt.Errorf("failed to list all containers: %v", err)
 	}
 
-	// Creates pod sandbox map.
-	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
 	podSandboxes, err := p.runtimeService.ListPodSandbox(&runtimeapi.PodSandboxFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
-	podSandboxes = removeTerminatedPods(podSandboxes)
-	for _, s := range podSandboxes {
-		podSandboxMap[s.Id] = s
-	}
+	podSandboxMap := removeTerminatedPods(podSandboxes)
 
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
@@ -247,12 +230,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
-	containers = removeTerminatedContainers(containers)
-	// Creates container map.
-	containerMap := make(map[string]*runtimeapi.Container)
-	for _, c := range containers {
-		containerMap[c.Id] = c
-	}
+	containerMap := removeTerminatedContainers(containers)
 
 	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
@@ -699,66 +677,44 @@ func (p *criStatsProvider) cleanupOutdatedCaches() {
 // This is needed because:
 // 1) PodSandbox may be recreated;
 // 2) Pod may be recreated with the same name and namespace.
-func removeTerminatedPods(pods []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbox {
-	podMap := make(map[statsapi.PodReference][]*runtimeapi.PodSandbox)
-	// Sort order by create time
-	sort.Slice(pods, func(i, j int) bool {
-		return pods[i].CreatedAt < pods[j].CreatedAt
-	})
+func removeTerminatedPods(pods []*runtimeapi.PodSandbox) map[string]*runtimeapi.PodSandbox {
+	podMap := make(map[statsapi.PodReference]*runtimeapi.PodSandbox)
+	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
 	for _, pod := range pods {
+		if pod.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			podSandboxMap[pod.Id] = pod
+			continue
+		}
 		refID := statsapi.PodReference{
 			Name:      pod.GetMetadata().GetName(),
 			Namespace: pod.GetMetadata().GetNamespace(),
 			// UID is intentionally left empty.
 		}
-		podMap[refID] = append(podMap[refID], pod)
+		if existingPod, ok := podMap[refID]; ok {
+			if existingPod.CreatedAt < pod.CreatedAt {
+				podMap[refID] = pod
+			}
+		} else {
+			podMap[refID] = pod
+		}
 	}
 
-	result := make([]*runtimeapi.PodSandbox, 0)
-	for _, refs := range podMap {
-		if len(refs) == 1 {
-			result = append(result, refs[0])
-			continue
-		}
-		found := false
-		for i := 0; i < len(refs); i++ {
-			if refs[i].State == runtimeapi.PodSandboxState_SANDBOX_READY {
-				found = true
-				result = append(result, refs[i])
-			}
-		}
-		if !found {
-			result = append(result, refs[len(refs)-1])
-		}
+	for _, pod := range podMap {
+		podSandboxMap[pod.Id] = pod
 	}
-	return result
+	return podSandboxMap
 }
 
 // removeTerminatedContainers removes all terminated containers since they should
 // not be used for usage calculations.
-func removeTerminatedContainers(containers []*runtimeapi.Container) []*runtimeapi.Container {
-	containerMap := make(map[containerID][]*runtimeapi.Container)
-	// Sort order by create time
-	sort.Slice(containers, func(i, j int) bool {
-		return containers[i].CreatedAt < containers[j].CreatedAt
-	})
+func removeTerminatedContainers(containers []*runtimeapi.Container) map[string]*runtimeapi.Container {
+	containerMap := make(map[string]*runtimeapi.Container)
 	for _, container := range containers {
-		refID := containerID{
-			podRef:        buildPodRef(container.Labels),
-			containerName: kubetypes.GetContainerName(container.Labels),
-		}
-		containerMap[refID] = append(containerMap[refID], container)
-	}
-
-	result := make([]*runtimeapi.Container, 0)
-	for _, refs := range containerMap {
-		for i := 0; i < len(refs); i++ {
-			if refs[i].State == runtimeapi.ContainerState_CONTAINER_RUNNING {
-				result = append(result, refs[i])
-			}
+		if container.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
+			containerMap[container.Id] = container
 		}
 	}
-	return result
+	return containerMap
 }
 
 func (p *criStatsProvider) addCadvisorContainerStats(

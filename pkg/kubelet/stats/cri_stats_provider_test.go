@@ -174,12 +174,24 @@ func TestCRIListPodStats(t *testing.T) {
 		On("RootFsInfo").Return(rootFsInfo, nil).
 		On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil).
 		On("GetDirFsInfo", unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
-	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
+	rand.Seed(time.Now().UnixNano())
+	// the order of the sandboxes can be arbitrary
+	sandboxes := []*critest.FakePodSandbox{
 		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5,
+	}
+	rand.Shuffle(len(sandboxes), func(i, j int) {
+		sandboxes[i], sandboxes[j] = sandboxes[j], sandboxes[i]
 	})
-	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
+	fakeRuntimeService.SetFakeSandboxes(sandboxes)
+
+	// the order of the containers can be arbitrary
+	containers := []*critest.FakeContainer{
 		container0, container1, container2, container3, container4, container5, container6, container7, container8,
+	}
+	rand.Shuffle(len(containers), func(i, j int) {
+		containers[i], containers[j] = containers[j], containers[i]
 	})
+	fakeRuntimeService.SetFakeContainers(containers)
 	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
 		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8,
 	})
