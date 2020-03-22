@@ -515,11 +515,6 @@ func (f *Framework) WaitForPodTerminated(podName, reason string) error {
 	return e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
 }
 
-// WaitForPodReady waits for the pod to flip to ready in the namespace.
-func (f *Framework) WaitForPodReady(podName string) error {
-	return e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
-}
-
 // ClientConfig an externally accessible method for reading the kube client config.
 func (f *Framework) ClientConfig() *rest.Config {
 	ret := rest.CopyConfig(f.clientConfig)
