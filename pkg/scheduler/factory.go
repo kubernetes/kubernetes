@@ -104,13 +104,17 @@ type Configurator struct {
 
 	enableNonPreempting bool
 
-	profiles         []schedulerapi.KubeSchedulerProfile
-	registry         framework.Registry
-	nodeInfoSnapshot *internalcache.Snapshot
-	extenders        []schedulerapi.Extender
+	profiles          []schedulerapi.KubeSchedulerProfile
+	registry          framework.Registry
+	nodeInfoSnapshot  *internalcache.Snapshot
+	extenders         []schedulerapi.Extender
+	frameworkCapturer FrameworkCapturer
 }
 
 func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
+	if c.frameworkCapturer != nil {
+		c.frameworkCapturer(p)
+	}
 	return framework.NewFramework(
 		c.registry,
 		p.Plugins,

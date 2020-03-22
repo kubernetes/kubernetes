@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1534,62 +1535,159 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 }
 
 func TestPluginsConfigurationCompatibility(t *testing.T) {
+	defaultPlugins := map[string][]config.Plugin{
+		"QueueSortPlugin": {
+			{Name: "PrioritySort"},
+		},
+		"PreFilterPlugin": {
+			{Name: "NodeResourcesFit"},
+			{Name: "NodePorts"},
+			{Name: "InterPodAffinity"},
+			{Name: "PodTopologySpread"},
+		},
+		"FilterPlugin": {
+			{Name: "NodeUnschedulable"},
+			{Name: "NodeResourcesFit"},
+			{Name: "NodeName"},
+			{Name: "NodePorts"},
+			{Name: "NodeAffinity"},
+			{Name: "VolumeRestrictions"},
+			{Name: "TaintToleration"},
+			{Name: "EBSLimits"},
+			{Name: "GCEPDLimits"},
+			{Name: "NodeVolumeLimits"},
+			{Name: "AzureDiskLimits"},
+			{Name: "VolumeBinding"},
+			{Name: "VolumeZone"},
+			{Name: "InterPodAffinity"},
+			{Name: "PodTopologySpread"},
+		},
+		"PreScorePlugin": {
+			{Name: "InterPodAffinity"},
+			{Name: "DefaultPodTopologySpread"},
+			{Name: "TaintToleration"},
+			{Name: "PodTopologySpread"},
+		},
+		"ScorePlugin": {
+			{Name: "NodeResourcesBalancedAllocation", Weight: 1},
+			{Name: "ImageLocality", Weight: 1},
+			{Name: "InterPodAffinity", Weight: 1},
+			{Name: "NodeResourcesLeastAllocated", Weight: 1},
+			{Name: "NodeAffinity", Weight: 1},
+			{Name: "NodePreferAvoidPods", Weight: 10000},
+			{Name: "DefaultPodTopologySpread", Weight: 1},
+			{Name: "TaintToleration", Weight: 1},
+			{Name: "PodTopologySpread", Weight: 1},
+		},
+		"BindPlugin": {{Name: "DefaultBinder"}},
+	}
+
 	testcases := []struct {
-		name        string
-		plugins     config.Plugins
-		wantPlugins map[string][]config.Plugin
+		name         string
+		plugins      config.Plugins
+		wantPlugins  map[string][]config.Plugin
+		pluginConfig []config.PluginConfig
 	}{
 		{
-			name: "No plugins specified",
-			wantPlugins: map[string][]config.Plugin{
-				"QueueSortPlugin": {
-					{Name: "PrioritySort"},
+			name:        "default plugins",
+			wantPlugins: defaultPlugins,
+		},
+		{
+			name:        "default plugins with customized plugin config",
+			wantPlugins: defaultPlugins,
+			pluginConfig: []config.PluginConfig{
+				{
+					Name: "NodeResourcesFit",
+					Args: runtime.Unknown{
+						Raw: []byte(`{
+							"ignoredResources": [
+								"foo",
+								"bar"
+							]
+						}`),
+					},
 				},
-				"PreFilterPlugin": {
-					{Name: "NodeResourcesFit"},
-					{Name: "NodePorts"},
-					{Name: "InterPodAffinity"},
-					{Name: "PodTopologySpread"},
+				{
+					Name: "PodTopologySpread",
+					Args: runtime.Unknown{
+						Raw: []byte(`{
+							"defaultConstraints": [
+								{
+									"maxSkew": 1,
+									"topologyKey": "foo",
+									"whenUnsatisfiable": "DoNotSchedule"
+								},
+								{
+									"maxSkew": 10,
+									"topologyKey": "bar",
+									"whenUnsatisfiable": "ScheduleAnyway"
+								}
+							]
+						}`),
+					},
 				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeResourcesFit"},
-					{Name: "NodeName"},
-					{Name: "NodePorts"},
-					{Name: "NodeAffinity"},
-					{Name: "VolumeRestrictions"},
-					{Name: "TaintToleration"},
-					{Name: "EBSLimits"},
-					{Name: "GCEPDLimits"},
-					{Name: "NodeVolumeLimits"},
-					{Name: "AzureDiskLimits"},
-					{Name: "VolumeBinding"},
-					{Name: "VolumeZone"},
-					{Name: "InterPodAffinity"},
-					{Name: "PodTopologySpread"},
+				{
+					Name: "RequestedToCapacityRatio",
+					Args: runtime.Unknown{
+						Raw: []byte(`{
+							"shape":[
+								"Utilization": 5,
+								"Score": 5
+							],
+							"resources":[
+								"Name": "cpu",
+								"Weight": 10
+							]
+						}`),
+					},
 				},
-				"PreScorePlugin": {
-					{Name: "InterPodAffinity"},
-					{Name: "DefaultPodTopologySpread"},
-					{Name: "TaintToleration"},
-					{Name: "PodTopologySpread"},
+				{
+					Name: "InterPodAffinity",
+					Args: runtime.Unknown{
+						Raw: []byte(`{
+							"HardPodAffinityWeight": 100
+						}`),
+					},
 				},
-				"ScorePlugin": {
-					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "ImageLocality", Weight: 1},
-					{Name: "InterPodAffinity", Weight: 1},
-					{Name: "NodeResourcesLeastAllocated", Weight: 1},
-					{Name: "NodeAffinity", Weight: 1},
-					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "DefaultPodTopologySpread", Weight: 1},
-					{Name: "TaintToleration", Weight: 1},
-					{Name: "PodTopologySpread", Weight: 1},
+				{
+					Name: "NodeLabel",
+					Args: runtime.Unknown{
+						Raw: []byte(`{
+							"presentLabels": [
+								"foo",
+								"bar"
+							],
+							"absentLabels": [
+								"apple"
+							],
+							"presentLabelsPreference": [
+								"dog"
+							],
+							"absentLabelsPreference": [
+								"cat"
+							]
+						}`),
+					},
 				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
+				{
+					Name: "ServiceAffinity",
+					Args: runtime.Unknown{
+						Raw: []byte(`{
+							affinityLabels: [
+								"foo",
+								"bar"
+							],
+							antiAffinityLabelsPreference: [
+								"disk",
+								"flash"
+							]
+						}`),
+					},
+				},
 			},
 		},
 		{
-			name: "Disable some default plugins",
+			name: "disable some default plugins",
 			plugins: config.Plugins{
 				PreFilter: &config.PluginSet{
 					Disabled: []config.Plugin{
@@ -1648,7 +1746,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			},
 		},
 		{
-			name: "Reverse default plugins order with changing score weight",
+			name: "reverse default plugins order with changing score weight",
 			plugins: config.Plugins{
 				QueueSort: &config.PluginSet{
 					Enabled: []config.Plugin{
@@ -1779,6 +1877,15 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				scheduler.WithProfiles(config.KubeSchedulerProfile{
 					SchedulerName: v1.DefaultSchedulerName,
 					Plugins:       &tc.plugins,
+					PluginConfig:  tc.pluginConfig,
+				}),
+				scheduler.WithBuildFrameworkCapturer(func(p config.KubeSchedulerProfile) {
+					if p.SchedulerName != v1.DefaultSchedulerName {
+						t.Errorf("unexpected scheduler name (want %q, got %q)", v1.DefaultSchedulerName, p.SchedulerName)
+					}
+					if diff := cmp.Diff(tc.pluginConfig, p.PluginConfig); diff != "" {
+						t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
+					}
 				}),
 			)
 
@@ -1786,7 +1893,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				t.Fatalf("Error constructing: %v", err)
 			}
 
-			defProf := sched.Profiles["default-scheduler"]
+			defProf := sched.Profiles[v1.DefaultSchedulerName]
 			gotPlugins := defProf.ListPlugins()
 			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
 				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)

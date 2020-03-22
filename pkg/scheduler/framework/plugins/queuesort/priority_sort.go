@@ -45,6 +45,6 @@ func (pl *PrioritySort) Less(pInfo1, pInfo2 *framework.PodInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	return &PrioritySort{}, nil
 }
