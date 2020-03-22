@@ -133,6 +133,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		diskIopsReadWrite   string
 		diskMbpsReadWrite   string
 		diskEncryptionSetID string
+
+		maxShares int
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -179,6 +181,14 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			diskEncryptionSetID = v
 		case azure.WriteAcceleratorEnabled:
 			writeAcceleratorEnabled = v
+		case "maxshares":
+			maxShares, err = strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("parse %s failed with error: %v", v, err)
+			}
+			if maxShares < 1 {
+				return nil, fmt.Errorf("parse %s returned with invalid value: %d", v, maxShares)
+			}
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -261,6 +271,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			DiskIOPSReadWrite:   diskIopsReadWrite,
 			DiskMBpsReadWrite:   diskMbpsReadWrite,
 			DiskEncryptionSetID: diskEncryptionSetID,
+			MaxShares:           int32(maxShares),
 		}
 		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
 		if err != nil {

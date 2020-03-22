@@ -136,7 +136,7 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			return -1, rerr.Error()
 		}
 
-		if disk.ManagedBy != nil {
+		if disk.ManagedBy != nil && (disk.MaxShares == nil || *disk.MaxShares <= 1) {
 			attachErr := fmt.Sprintf(
 				"disk(%s) already attached to node(%s), could not be attached to node(%s)",
 				diskURI, *disk.ManagedBy, nodeName)

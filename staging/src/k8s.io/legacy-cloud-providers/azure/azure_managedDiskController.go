@@ -75,6 +75,8 @@ type ManagedDiskOptions struct {
 	SourceType string
 	// ResourceId of the disk encryption set to use for enabling encryption at rest.
 	DiskEncryptionSetID string
+	// The maximum number of VMs that can attach to the disk at the same time. Value greater than one indicates a disk that can be mounted on multiple VMs at the same time.
+	MaxShares int32
 }
 
 //CreateManagedDisk : create managed disk
@@ -150,6 +152,10 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 			DiskEncryptionSetID: &options.DiskEncryptionSetID,
 			Type:                compute.EncryptionAtRestWithCustomerKey,
 		}
+	}
+
+	if options.MaxShares > 1 {
+		diskProperties.MaxShares = &options.MaxShares
 	}
 
 	model := compute.Disk{
