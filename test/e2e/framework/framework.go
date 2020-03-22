@@ -515,11 +515,6 @@ func (f *Framework) WaitForPodTerminated(podName, reason string) error {
 	return e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
 }
 
-// WaitForPodNotFound waits for the pod to be completely terminated (not "Get-able").
-func (f *Framework) WaitForPodNotFound(podName string, timeout time.Duration) error {
-	return e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
-}
-
 // WaitForPodReady waits for the pod to flip to ready in the namespace.
 func (f *Framework) WaitForPodReady(podName string) error {
 	return e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)

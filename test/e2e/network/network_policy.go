@@ -718,15 +718,15 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 
 			testCanConnect(f, f.Namespace, "client-a", service, clientAAllowedPort)
-			err = f.WaitForPodNotFound("client-a", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-b", service, clientAAllowedPort)
-			err = f.WaitForPodNotFound("client-b", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-a", service, clientANotAllowedPort)
-			err = f.WaitForPodNotFound("client-a", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			const (
@@ -765,7 +765,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, f.Namespace, "client-b", service, clientBNotAllowedPort)
-			err = f.WaitForPodNotFound("client-b", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-a", service, clientBNotAllowedPort)

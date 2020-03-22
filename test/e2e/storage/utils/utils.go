@@ -307,7 +307,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
-	err = f.WaitForPodNotFound(clientPod.Name, framework.PodDeleteTimeout)
+	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, framework.PodDeleteTimeout)
 	if err != nil {
 		framework.ExpectNoError(err, "Expected pod to be not found.")
 	}
@@ -393,7 +393,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
-	err = f.WaitForPodNotFound(clientPod.Name, framework.PodDeleteTimeout)
+	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, framework.PodDeleteTimeout)
 	framework.ExpectNoError(err, "Expected pod to be not found.")
 
 	if forceDelete {
