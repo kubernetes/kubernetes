@@ -520,12 +520,6 @@ func (f *Framework) WaitForPodReady(podName string) error {
 	return e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
 }
 
-// WaitForPodRunningSlow waits for the pod to run in the namespace.
-// It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
-func (f *Framework) WaitForPodRunningSlow(podName string) error {
-	return e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
-}
-
 // ClientConfig an externally accessible method for reading the kube client config.
 func (f *Framework) ClientConfig() *rest.Config {
 	ret := rest.CopyConfig(f.clientConfig)
