@@ -1,7 +1,7 @@
 workspace(name = "io_k8s_kubernetes")
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
-load("//build:workspace_mirror.bzl", "mirror")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("//build:workspace_mirror.bzl", "export_urls", "mirror")
 
 http_archive(
     name = "bazel_toolchains",
@@ -33,7 +33,7 @@ http_archive(
 
 load("@bazel_skylib//lib:versions.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.23.0")
+versions.check(minimum_bazel_version = "0.29.1")
 
 http_archive(
     name = "io_k8s_repo_infra",
@@ -84,6 +84,16 @@ load("//build:workspace.bzl", "release_dependencies")
 
 release_dependencies()
 
-load("//build:workspace_mirror.bzl", "export_urls")
-
 export_urls("workspace_urls")
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "rules_python",
+    url = "https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz",
+    sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
+)
+
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
