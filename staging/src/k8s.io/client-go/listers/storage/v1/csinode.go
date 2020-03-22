@@ -26,10 +26,13 @@ import (
 )
 
 // CSINodeLister helps list CSINodes.
+// All objects returned here must be treated as read-only.
 type CSINodeLister interface {
 	// List lists all CSINodes in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.CSINode, err error)
 	// Get retrieves the CSINode from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.CSINode, error)
 	CSINodeListerExpansion
 }

@@ -26,10 +26,13 @@ import (
 )
 
 // AuditSinkLister helps list AuditSinks.
+// All objects returned here must be treated as read-only.
 type AuditSinkLister interface {
 	// List lists all AuditSinks in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.AuditSink, err error)
 	// Get retrieves the AuditSink from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.AuditSink, error)
 	AuditSinkListerExpansion
 }
