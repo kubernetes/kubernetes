@@ -71,18 +71,18 @@ func TestTaintBasedEvictions(t *testing.T) {
 	}
 	tolerationSeconds := []int64{200, 300, 0}
 	tests := []struct {
-		name                string
-		nodeTaints          []v1.Taint
-		nodeConditions      []v1.NodeCondition
-		pod                 *v1.Pod
-		waitForPodCondition string
+		name                        string
+		nodeTaints                  []v1.Taint
+		nodeConditions              []v1.NodeCondition
+		pod                         *v1.Pod
+		expectedWaitForPodCondition string
 	}{
 		{
-			name:                "Taint based evictions for NodeNotReady and 200 tolerationseconds",
-			nodeTaints:          []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
-			nodeConditions:      []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			pod:                 testPod,
-			waitForPodCondition: "updated with tolerationSeconds of 200",
+			name:                        "Taint based evictions for NodeNotReady and 200 tolerationseconds",
+			nodeTaints:                  []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:              []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                         testPod,
+			expectedWaitForPodCondition: "updated with tolerationSeconds of 200",
 		},
 		{
 			name:           "Taint based evictions for NodeNotReady with no pod tolerations",
@@ -96,14 +96,14 @@ func TestTaintBasedEvictions(t *testing.T) {
 					},
 				},
 			},
-			waitForPodCondition: "updated with tolerationSeconds=300",
+			expectedWaitForPodCondition: "updated with tolerationSeconds=300",
 		},
 		{
-			name:                "Taint based evictions for NodeNotReady and 0 tolerationseconds",
-			nodeTaints:          []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
-			nodeConditions:      []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			pod:                 testPod,
-			waitForPodCondition: "terminating",
+			name:                        "Taint based evictions for NodeNotReady and 0 tolerationseconds",
+			nodeTaints:                  []v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoExecute}},
+			nodeConditions:              []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			pod:                         testPod,
+			expectedWaitForPodCondition: "terminating",
 		},
 		{
 			name:           "Taint based evictions for NodeUnreachable",
@@ -281,7 +281,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			}
 
 			if test.pod != nil {
-				err = waitForPodCondition(cs, testCtx.NS.Name, test.pod.Name, test.waitForPodCondition, time.Second*15, func(pod *v1.Pod) (bool, error) {
+				err = waitForPodCondition(cs, testCtx.NS.Name, test.pod.Name, test.expectedWaitForPodCondition, time.Second*15, func(pod *v1.Pod) (bool, error) {
 					// as node is unreachable, pod0 is expected to be in Terminating status
 					// rather than getting deleted
 					if tolerationSeconds[i] == 0 {
@@ -294,7 +294,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 				}, t)
 				if err != nil {
 					pod, _ := cs.CoreV1().Pods(testCtx.NS.Name).Get(context.TODO(), test.pod.Name, metav1.GetOptions{})
-					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.waitForPodCondition, pod)
+					t.Fatalf("Error: %v, Expected test pod to be %s but it's %v", err, test.expectedWaitForPodCondition, pod)
 				}
 				testutils.CleanupPods(cs, t, []*v1.Pod{test.pod})
 			}
