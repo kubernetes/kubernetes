@@ -455,28 +455,28 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.PodInfo, error) {
 	return func(podInfo *framework.PodInfo, err error) {
 		pod := podInfo.Pod
+		_, isFitError := err.(*core.FitError)
+		resourceNotFound := apierrors.IsNotFound(err)
 		if err == core.ErrNoNodesAvailable {
 			klog.V(2).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
-		} else {
-			if _, ok := err.(*core.FitError); ok {
-				klog.V(2).Infof("Unable to schedule %v/%v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
-			} else if apierrors.IsNotFound(err) {
-				klog.V(2).Infof("Unable to schedule %v/%v: possibly due to node not found: %v; waiting", pod.Namespace, pod.Name, err)
-				if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
-					nodeName := errStatus.Status().Details.Name
-					// when node is not found, We do not remove the node right away. Trying again to get
-					// the node and if the node is still not found, then remove it from the scheduler cache.
-					_, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-					if err != nil && apierrors.IsNotFound(err) {
-						node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-						if err := schedulerCache.RemoveNode(&node); err != nil {
-							klog.V(4).Infof("Node %q is not found; failed to remove it from the cache.", node.Name)
-						}
+		} else if isFitError {
+			klog.V(2).Infof("Unable to schedule %v/%v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
+		} else if resourceNotFound {
+			klog.V(2).Infof("Unable to schedule %v/%v: possibly due to node not found: %v; waiting", pod.Namespace, pod.Name, err)
+			if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
+				nodeName := errStatus.Status().Details.Name
+				// when node is not found, We do not remove the node right away. Trying again to get
+				// the node and if the node is still not found, then remove it from the scheduler cache.
+				_, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+				if err != nil && apierrors.IsNotFound(err) {
+					node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+					if err := schedulerCache.RemoveNode(&node); err != nil {
+						klog.V(4).Infof("Node %q is not found; failed to remove it from the cache.", node.Name)
 					}
 				}
-			} else {
-				klog.Errorf("Error scheduling %v/%v: %v; retrying", pod.Namespace, pod.Name, err)
 			}
+		} else {
+			klog.Errorf("Error scheduling %v/%v: %v; retrying", pod.Namespace, pod.Name, err)
 		}
 
 		podSchedulingCycle := podQueue.SchedulingCycle()
