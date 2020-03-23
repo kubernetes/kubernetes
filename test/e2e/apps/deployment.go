@@ -44,6 +44,7 @@ import (
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -193,7 +194,7 @@ func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Deleting deployment %s", deploymentName)
-	err = framework.DeleteResourceAndWaitForGC(c, appsinternal.Kind("Deployment"), ns, deployment.Name)
+	err = e2eresource.DeleteResourceAndWaitForGC(c, appsinternal.Kind("Deployment"), ns, deployment.Name)
 	framework.ExpectNoError(err)
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
@@ -607,7 +608,7 @@ func testIterativeDeployments(f *framework.Framework) {
 				}
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
-				err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, nil)
+				err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					framework.ExpectNoError(err)
 				}
@@ -854,7 +855,7 @@ func listDeploymentReplicaSets(c clientset.Interface, ns string, label map[strin
 
 func orphanDeploymentReplicaSets(c clientset.Interface, d *appsv1.Deployment) error {
 	trueVar := true
-	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
+	deleteOptions := metav1.DeleteOptions{OrphanDependents: &trueVar}
 	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(d.UID))
 	return c.AppsV1().Deployments(d.Namespace).Delete(context.TODO(), d.Name, deleteOptions)
 }

@@ -46,6 +46,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -790,7 +791,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 			defer func() {
 				framework.Logf("deleting storage class %s", class.Name)
-				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil))
+				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, metav1.DeleteOptions{}))
 			}()
 
 			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
@@ -803,7 +804,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 			defer func() {
 				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
-				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, nil)
+				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 				}
@@ -1037,7 +1038,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
 func deleteStorageClass(c clientset.Interface, className string) {
-	err := c.StorageV1().StorageClasses().Delete(context.TODO(), className, nil)
+	err := c.StorageV1().StorageClasses().Delete(context.TODO(), className, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		framework.ExpectNoError(err)
 	}
@@ -1056,7 +1057,7 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 }
 
 func getRandomClusterZone(c clientset.Interface) string {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	framework.ExpectNoError(err)
 	framework.ExpectNotEqual(len(zones), 0)
 

@@ -41,6 +41,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		UpdateStrategy: limitrange.Strategy,
 		DeleteStrategy: limitrange.Strategy,
 		ExportStrategy: limitrange.Strategy,
+
+		// TODO: define table converter that exposes more than name/creation timestamp
+		TableConvertor: rest.NewDefaultTableConvertor(api.Resource("limitranges")),
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

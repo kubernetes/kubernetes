@@ -67,6 +67,7 @@ properties:
     x-kubernetes-list-map-keys: ["a", "b"]
     items:
       type: object
+      required: ["a", "b"]
       properties:
         a:
           type: integer
@@ -86,6 +87,7 @@ properties:
     x-kubernetes-list-map-keys: ["a", "b"]
     items:
       type: object
+      required: ["a", "b"]
       properties:
         a:
           type: integer
@@ -106,9 +108,9 @@ kind: Foo
 apiVersion: tests.example.com/v1beta1
 metadata:
   name: foo
-correct-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,c:"3"}]
+correct-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,"b":3,c:"3"}]
 correct-set: [{"a":1,"b":1},{"a":1,"b":2},{"a":1},{"a":1,"b":4}]
-invalid-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,c:"3"},{"a":1,"b":1,c:"4"}]
+invalid-map: [{"a":1,"b":1,c:"1"},{"a":1,"b":2,c:"2"},{"a":1,"b":3,c:"3"},{"a":1,"b":1,c:"4"}]
 invalid-set: [{"a":1,"b":1},{"a":1,"b":2},{"a":1},{"a":1,"b":4},{"a":1,"b":1}]
 `
 )
@@ -141,7 +143,7 @@ func TestListTypes(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(listTypeResourceInstance), &invalidInstance.Object); err != nil {
 		t.Fatal(err)
 	}
-	_, createErr := fooClient.Create(invalidInstance, metav1.CreateOptions{})
+	_, createErr := fooClient.Create(context.TODO(), invalidInstance, metav1.CreateOptions{})
 	if createErr == nil {
 		t.Fatalf("Expected validation errors, but did not get one")
 	}
@@ -168,7 +170,7 @@ func TestListTypes(t *testing.T) {
 	for _, invalid := range invalidListTypeFields {
 		unstructured.RemoveNestedField(validInstance.Object, invalid)
 	}
-	validInstance, err = fooClient.Create(validInstance, metav1.CreateOptions{})
+	validInstance, err = fooClient.Create(context.TODO(), validInstance, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -181,7 +183,7 @@ func TestListTypes(t *testing.T) {
 		l = append(l, l[0])
 		modifiedInstance.Object[valid] = l
 	}
-	_, err = fooClient.Update(modifiedInstance, metav1.UpdateOptions{})
+	_, err = fooClient.Update(context.TODO(), modifiedInstance, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatalf("Expected validation errors, but did not get one")
 	}
@@ -209,7 +211,7 @@ func TestListTypes(t *testing.T) {
 
 	t.Logf("Updating again with invalid values, eventually successfully due to ratcheting logic")
 	err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = fooClient.Update(modifiedInstance, metav1.UpdateOptions{})
+		_, err = fooClient.Update(context.TODO(), modifiedInstance, metav1.UpdateOptions{})
 		if err == nil {
 			return true, err
 		}

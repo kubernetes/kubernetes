@@ -1,5 +1,4 @@
 cluster/images/etcd/migrate
-pkg/controller/daemon
 pkg/controller/deployment
 pkg/controller/garbagecollector
 pkg/controller/nodeipam
@@ -92,10 +91,7 @@ vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
 vendor/k8s.io/component-base/metrics
-vendor/k8s.io/kubectl/pkg/cmd/certificates
-vendor/k8s.io/kubectl/pkg/cmd/config
 vendor/k8s.io/kubectl/pkg/cmd/edit
-vendor/k8s.io/kubectl/pkg/cmd/exec
 vendor/k8s.io/kubectl/pkg/cmd/get
 vendor/k8s.io/kubectl/pkg/cmd/scale
 vendor/k8s.io/kubectl/pkg/cmd/set

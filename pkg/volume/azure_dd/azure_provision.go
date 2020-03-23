@@ -29,9 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -135,6 +133,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		diskIopsReadWrite   string
 		diskMbpsReadWrite   string
 		diskEncryptionSetID string
+
+		maxShares int
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -181,6 +181,14 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			diskEncryptionSetID = v
 		case azure.WriteAcceleratorEnabled:
 			writeAcceleratorEnabled = v
+		case "maxshares":
+			maxShares, err = strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("parse %s failed with error: %v", v, err)
+			}
+			if maxShares < 1 {
+				return nil, fmt.Errorf("parse %s returned with invalid value: %d", v, maxShares)
+			}
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -263,6 +271,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			DiskIOPSReadWrite:   diskIopsReadWrite,
 			DiskMBpsReadWrite:   diskMbpsReadWrite,
 			DiskEncryptionSetID: diskEncryptionSetID,
+			MaxShares:           int32(maxShares),
 		}
 		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
 		if err != nil {
@@ -286,13 +295,10 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 	}
 
-	var volumeMode *v1.PersistentVolumeMode
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode = p.options.PVC.Spec.VolumeMode
-		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
-			// Block volumes should not have any FSType
-			fsType = ""
-		}
+	volumeMode := p.options.PVC.Spec.VolumeMode
+	if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+		// Block volumes should not have any FSType
+		fsType = ""
 	}
 
 	pv := &v1.PersistentVolume{

@@ -336,8 +336,6 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
 	var cmd string
 	if protocol == "udp" {
-		// TODO: It would be enough to pass 1s+epsilon to timeout, but unfortunately
-		// busybox timeout doesn't support non-integer values.
 		cmd = fmt.Sprintf("echo hostName | nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
 		ipPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
@@ -553,7 +551,7 @@ func (config *NetworkingTestConfig) createSessionAffinityService(selector map[st
 
 // DeleteNodePortService deletes NodePort service.
 func (config *NetworkingTestConfig) DeleteNodePortService() {
-	err := config.getServiceClient().Delete(context.TODO(), config.NodePortService.Name, nil)
+	err := config.getServiceClient().Delete(context.TODO(), config.NodePortService.Name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "error while deleting NodePortService. err:%v)", err)
 	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }
@@ -567,7 +565,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 		config.createPod(hostTestContainerPod)
 	}
 
-	framework.ExpectNoError(config.f.WaitForPodRunning(testContainerPod.Name))
+	framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(config.f.ClientSet, testContainerPod.Name, config.f.Namespace.Name))
 
 	var err error
 	config.TestContainerPod, err = config.getPodClient().Get(context.TODO(), testContainerPod.Name, metav1.GetOptions{})
@@ -576,7 +574,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 	}
 
 	if config.HostNetwork {
-		framework.ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(config.f.ClientSet, hostTestContainerPod.Name, config.f.Namespace.Name))
 		config.HostTestContainerPod, err = config.getPodClient().Get(context.TODO(), hostTestContainerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
@@ -666,7 +664,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	// wait that all of them are up
 	runningPods := make([]*v1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
-		framework.ExpectNoError(config.f.WaitForPodReady(p.Name))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(config.f.ClientSet, p.Name, config.f.Namespace.Name, framework.PodStartTimeout))
 		rp, err := config.getPodClient().Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		runningPods = append(runningPods, rp)
@@ -678,7 +676,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 // DeleteNetProxyPod deletes the first endpoint pod and waits for it being removed.
 func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	pod := config.EndpointPods[0]
-	config.getPodClient().Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+	config.getPodClient().Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
 	err := e2epod.WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)

@@ -904,8 +904,7 @@ func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
 	}
 	failedTestCases := []core.PersistentVolumeClaimSpec{
 		*testVolumeSnapshotDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
-		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "PersistentVolumeClaim", "snapshot.storage.k8s.io"),
-		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
+		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io"),
 	}
 
 	for _, tc := range successTestCases {
@@ -1475,204 +1474,168 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		oldClaim          *core.PersistentVolumeClaim
 		newClaim          *core.PersistentVolumeClaim
 		enableResize      bool
-		enableBlock       bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-update-volume-mode-block-to-block": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"valid-update-volume-mode-file-to-file": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeFile,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeFile,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-nil-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeFile,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-nil-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-block-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          invalidClaimVolumeModeNil,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-file-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          invalidClaimVolumeModeNil,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-empty-to-mode": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-mode-to-empty": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaim,
 			enableResize:      false,
-			enableBlock:       true,
-		},
-		// with the new validation changes this test should not fail
-		"noop-update-volumemode-allowed": {
-			isExpectedFailure: false,
-			oldClaim:          validClaimVolumeModeFile,
-			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-size-update-resize-disabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-size-update-resize-enabled": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
 			enableResize:      true,
-			enableBlock:       false,
 		},
 		"invalid-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          invalidSizeUpdate,
 			enableResize:      true,
-			enableBlock:       false,
 		},
 		"unbound-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          unboundSizeUpdate,
 			enableResize:      true,
-			enableBlock:       false,
 		},
 		"valid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInAnnotationAndSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInAnnotationAndSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-upgrade-storage-class-in-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          invalidClaimStorageClassInSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-downgrade-storage-class-spec-to-annotation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          validClaimStorageClass,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 	}
 
@@ -1680,7 +1643,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
@@ -4092,9 +4054,6 @@ func TestHugePagesIsolation(t *testing.T) {
 }
 
 func TestPVCVolumeMode(t *testing.T) {
-	// Enable feature BlockVolume for PVC
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
 	fake := core.PersistentVolumeMode("fake")
@@ -4125,9 +4084,6 @@ func TestPVCVolumeMode(t *testing.T) {
 }
 
 func TestPVVolumeMode(t *testing.T) {
-	// Enable feature BlockVolume for PVC
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
 	fake := core.PersistentVolumeMode("fake")
@@ -6602,6 +6558,9 @@ func TestValidatePodSpec(t *testing.T) {
 	maxUserID := int64(2147483647)
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
+	goodfsGroupChangePolicy := core.FSGroupChangeAlways
+	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
+	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
 
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
@@ -6748,6 +6707,14 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:        core.DNSClusterFirst,
 			RuntimeClassName: utilpointer.StringPtr("valid-sandbox"),
 			Overhead:         core.ResourceList{},
+		},
+		{
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				FSGroupChangePolicy: &goodfsGroupChangePolicy,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
 		},
 	}
 	for i := range successCases {
@@ -6935,6 +6902,22 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy:    core.RestartPolicyAlways,
 			DNSPolicy:        core.DNSClusterFirst,
 			RuntimeClassName: utilpointer.StringPtr("invalid/sandbox"),
+		},
+		"bad empty fsGroupchangepolicy": {
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				FSGroupChangePolicy: &badfsGroupChangePolicy2,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"bad invalid fsgroupchangepolicy": {
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				FSGroupChangePolicy: &badfsGroupChangePolicy1,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
 		},
 	}
 	for k, v := range failureCases {
@@ -8313,6 +8296,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		activeDeadlineSecondsNegative = int64(-30)
 		activeDeadlineSecondsPositive = int64(30)
 		activeDeadlineSecondsLarger   = int64(31)
+		validfsGroupChangePolicy      = core.FSGroupChangeOnRootMismatch
 
 		now    = metav1.Now()
 		grace  = int64(30)
@@ -8762,6 +8746,36 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			"spec: Forbidden: pod updates may not change fields",
 			"cpu change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Image: "foo:V1",
+						},
+					},
+					SecurityContext: &core.PodSecurityContext{
+						FSGroupChangePolicy: &validfsGroupChangePolicy,
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Image: "foo:V2",
+						},
+					},
+					SecurityContext: &core.PodSecurityContext{
+						FSGroupChangePolicy: nil,
+					},
+				},
+			},
+			"spec: Forbidden: pod updates may not change fields",
+			"fsGroupChangePolicy change",
 		},
 		{
 			core.Pod{
@@ -14907,13 +14921,17 @@ func TestAlphaVolumePVCDataSource(t *testing.T) {
 			expectedFail: true,
 		},
 		{
-			testName:     "test specifying pvc with snapshot api group should fail",
-			claimSpec:    *testDataSourceInSpec("test_snapshot", "PersistentVolumeClaim", "snapshot.storage.k8s.io"),
+			testName:     "test missing kind in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io"),
 			expectedFail: true,
 		},
 		{
-			testName:     "test invalid group name in snapshot datasource should fail",
-			claimSpec:    *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
+			testName:  "test create from valid generic custom resource source",
+			claimSpec: *testDataSourceInSpec("test_generic", "Generic", "generic.storage.k8s.io"),
+		},
+		{
+			testName:     "test invalid datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_pod", "Pod", ""),
 			expectedFail: true,
 		},
 	}

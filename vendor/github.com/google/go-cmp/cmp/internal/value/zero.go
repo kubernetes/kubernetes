@@ -4,7 +4,10 @@
 
 package value
 
-import "reflect"
+import (
+	"math"
+	"reflect"
+)
 
 // IsZero reports whether v is the zero value.
 // This does not rely on Interface and so can be used on unexported fields.
@@ -17,9 +20,9 @@ func IsZero(v reflect.Value) bool {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		return v.Uint() == 0
 	case reflect.Float32, reflect.Float64:
-		return v.Float() == 0
+		return math.Float64bits(v.Float()) == 0
 	case reflect.Complex64, reflect.Complex128:
-		return v.Complex() == 0
+		return math.Float64bits(real(v.Complex())) == 0 && math.Float64bits(imag(v.Complex())) == 0
 	case reflect.String:
 		return v.String() == ""
 	case reflect.UnsafePointer:

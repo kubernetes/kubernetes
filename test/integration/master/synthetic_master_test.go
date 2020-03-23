@@ -702,7 +702,7 @@ func TestServiceAlloc(t *testing.T) {
 	}
 
 	// Delete the first service.
-	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), svc(1).ObjectMeta.Name, nil); err != nil {
+	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), svc(1).ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 
@@ -736,7 +736,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 	iterations := 10000
 
 	for i := 0; i < nodes*6; i++ {
-		c.Nodes().Delete(context.TODO(), fmt.Sprintf("node-%d", i), nil)
+		c.Nodes().Delete(context.TODO(), fmt.Sprintf("node-%d", i), metav1.DeleteOptions{})
 		_, err := c.Nodes().Create(context.TODO(), &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("node-%d", i),

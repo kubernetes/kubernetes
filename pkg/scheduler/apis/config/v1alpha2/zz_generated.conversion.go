@@ -27,6 +27,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1alpha1 "k8s.io/component-base/config/v1alpha1"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	v1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -38,16 +39,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1alpha2.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeSchedulerConfiguration)(nil), (*v1alpha2.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration(a.(*config.KubeSchedulerConfiguration), b.(*v1alpha2.KubeSchedulerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha2.KubeSchedulerLeaderElectionConfiguration)(nil), (*config.KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha2_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(a.(*v1alpha2.KubeSchedulerLeaderElectionConfiguration), b.(*config.KubeSchedulerLeaderElectionConfiguration), scope)
 	}); err != nil {
@@ -108,43 +99,13 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.SchedulerAlgorithmSource)(nil), (*config.SchedulerAlgorithmSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(a.(*v1alpha2.SchedulerAlgorithmSource), b.(*config.SchedulerAlgorithmSource), scope)
+	if err := s.AddConversionFunc((*config.KubeSchedulerConfiguration)(nil), (*v1alpha2.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration(a.(*config.KubeSchedulerConfiguration), b.(*v1alpha2.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.SchedulerAlgorithmSource)(nil), (*v1alpha2.SchedulerAlgorithmSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_SchedulerAlgorithmSource_To_v1alpha2_SchedulerAlgorithmSource(a.(*config.SchedulerAlgorithmSource), b.(*v1alpha2.SchedulerAlgorithmSource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.SchedulerPolicyConfigMapSource)(nil), (*config.SchedulerPolicyConfigMapSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_SchedulerPolicyConfigMapSource_To_config_SchedulerPolicyConfigMapSource(a.(*v1alpha2.SchedulerPolicyConfigMapSource), b.(*config.SchedulerPolicyConfigMapSource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.SchedulerPolicyConfigMapSource)(nil), (*v1alpha2.SchedulerPolicyConfigMapSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_SchedulerPolicyConfigMapSource_To_v1alpha2_SchedulerPolicyConfigMapSource(a.(*config.SchedulerPolicyConfigMapSource), b.(*v1alpha2.SchedulerPolicyConfigMapSource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.SchedulerPolicyFileSource)(nil), (*config.SchedulerPolicyFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_SchedulerPolicyFileSource_To_config_SchedulerPolicyFileSource(a.(*v1alpha2.SchedulerPolicyFileSource), b.(*config.SchedulerPolicyFileSource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.SchedulerPolicyFileSource)(nil), (*v1alpha2.SchedulerPolicyFileSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_SchedulerPolicyFileSource_To_v1alpha2_SchedulerPolicyFileSource(a.(*config.SchedulerPolicyFileSource), b.(*v1alpha2.SchedulerPolicyFileSource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha2.SchedulerPolicySource)(nil), (*config.SchedulerPolicySource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_SchedulerPolicySource_To_config_SchedulerPolicySource(a.(*v1alpha2.SchedulerPolicySource), b.(*config.SchedulerPolicySource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.SchedulerPolicySource)(nil), (*v1alpha2.SchedulerPolicySource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_SchedulerPolicySource_To_v1alpha2_SchedulerPolicySource(a.(*config.SchedulerPolicySource), b.(*v1alpha2.SchedulerPolicySource), scope)
+	if err := s.AddConversionFunc((*v1alpha2.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1alpha2.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -152,9 +113,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1alpha2.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := Convert_v1alpha2_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
-		return err
-	}
 	if err := Convert_v1alpha2_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
@@ -196,18 +154,12 @@ func autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	} else {
 		out.Profiles = nil
 	}
+	out.Extenders = *(*[]config.Extender)(unsafe.Pointer(&in.Extenders))
 	return nil
 }
 
-// Convert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration is an autogenerated conversion function.
-func Convert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1alpha2.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s)
-}
-
 func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1alpha2.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := Convert_config_SchedulerAlgorithmSource_To_v1alpha2_SchedulerAlgorithmSource(&in.AlgorithmSource, &out.AlgorithmSource, s); err != nil {
-		return err
-	}
+	// WARNING: in.AlgorithmSource requires manual conversion: does not exist in peer-type
 	if err := Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha2_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
@@ -249,12 +201,8 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConf
 	} else {
 		out.Profiles = nil
 	}
+	out.Extenders = *(*[]configv1.Extender)(unsafe.Pointer(&in.Extenders))
 	return nil
-}
-
-// Convert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration is an autogenerated conversion function.
-func Convert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1alpha2.KubeSchedulerConfiguration, s conversion.Scope) error {
-	return autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha2_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(in *v1alpha2.KubeSchedulerLeaderElectionConfiguration, out *config.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
@@ -649,90 +597,4 @@ func autoConvert_config_Plugins_To_v1alpha2_Plugins(in *config.Plugins, out *v1a
 // Convert_config_Plugins_To_v1alpha2_Plugins is an autogenerated conversion function.
 func Convert_config_Plugins_To_v1alpha2_Plugins(in *config.Plugins, out *v1alpha2.Plugins, s conversion.Scope) error {
 	return autoConvert_config_Plugins_To_v1alpha2_Plugins(in, out, s)
-}
-
-func autoConvert_v1alpha2_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(in *v1alpha2.SchedulerAlgorithmSource, out *config.SchedulerAlgorithmSource, s conversion.Scope) error {
-	out.Policy = (*config.SchedulerPolicySource)(unsafe.Pointer(in.Policy))
-	out.Provider = (*string)(unsafe.Pointer(in.Provider))
-	return nil
-}
-
-// Convert_v1alpha2_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource is an autogenerated conversion function.
-func Convert_v1alpha2_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(in *v1alpha2.SchedulerAlgorithmSource, out *config.SchedulerAlgorithmSource, s conversion.Scope) error {
-	return autoConvert_v1alpha2_SchedulerAlgorithmSource_To_config_SchedulerAlgorithmSource(in, out, s)
-}
-
-func autoConvert_config_SchedulerAlgorithmSource_To_v1alpha2_SchedulerAlgorithmSource(in *config.SchedulerAlgorithmSource, out *v1alpha2.SchedulerAlgorithmSource, s conversion.Scope) error {
-	out.Policy = (*v1alpha2.SchedulerPolicySource)(unsafe.Pointer(in.Policy))
-	out.Provider = (*string)(unsafe.Pointer(in.Provider))
-	return nil
-}
-
-// Convert_config_SchedulerAlgorithmSource_To_v1alpha2_SchedulerAlgorithmSource is an autogenerated conversion function.
-func Convert_config_SchedulerAlgorithmSource_To_v1alpha2_SchedulerAlgorithmSource(in *config.SchedulerAlgorithmSource, out *v1alpha2.SchedulerAlgorithmSource, s conversion.Scope) error {
-	return autoConvert_config_SchedulerAlgorithmSource_To_v1alpha2_SchedulerAlgorithmSource(in, out, s)
-}
-
-func autoConvert_v1alpha2_SchedulerPolicyConfigMapSource_To_config_SchedulerPolicyConfigMapSource(in *v1alpha2.SchedulerPolicyConfigMapSource, out *config.SchedulerPolicyConfigMapSource, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Name = in.Name
-	return nil
-}
-
-// Convert_v1alpha2_SchedulerPolicyConfigMapSource_To_config_SchedulerPolicyConfigMapSource is an autogenerated conversion function.
-func Convert_v1alpha2_SchedulerPolicyConfigMapSource_To_config_SchedulerPolicyConfigMapSource(in *v1alpha2.SchedulerPolicyConfigMapSource, out *config.SchedulerPolicyConfigMapSource, s conversion.Scope) error {
-	return autoConvert_v1alpha2_SchedulerPolicyConfigMapSource_To_config_SchedulerPolicyConfigMapSource(in, out, s)
-}
-
-func autoConvert_config_SchedulerPolicyConfigMapSource_To_v1alpha2_SchedulerPolicyConfigMapSource(in *config.SchedulerPolicyConfigMapSource, out *v1alpha2.SchedulerPolicyConfigMapSource, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Name = in.Name
-	return nil
-}
-
-// Convert_config_SchedulerPolicyConfigMapSource_To_v1alpha2_SchedulerPolicyConfigMapSource is an autogenerated conversion function.
-func Convert_config_SchedulerPolicyConfigMapSource_To_v1alpha2_SchedulerPolicyConfigMapSource(in *config.SchedulerPolicyConfigMapSource, out *v1alpha2.SchedulerPolicyConfigMapSource, s conversion.Scope) error {
-	return autoConvert_config_SchedulerPolicyConfigMapSource_To_v1alpha2_SchedulerPolicyConfigMapSource(in, out, s)
-}
-
-func autoConvert_v1alpha2_SchedulerPolicyFileSource_To_config_SchedulerPolicyFileSource(in *v1alpha2.SchedulerPolicyFileSource, out *config.SchedulerPolicyFileSource, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_v1alpha2_SchedulerPolicyFileSource_To_config_SchedulerPolicyFileSource is an autogenerated conversion function.
-func Convert_v1alpha2_SchedulerPolicyFileSource_To_config_SchedulerPolicyFileSource(in *v1alpha2.SchedulerPolicyFileSource, out *config.SchedulerPolicyFileSource, s conversion.Scope) error {
-	return autoConvert_v1alpha2_SchedulerPolicyFileSource_To_config_SchedulerPolicyFileSource(in, out, s)
-}
-
-func autoConvert_config_SchedulerPolicyFileSource_To_v1alpha2_SchedulerPolicyFileSource(in *config.SchedulerPolicyFileSource, out *v1alpha2.SchedulerPolicyFileSource, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_config_SchedulerPolicyFileSource_To_v1alpha2_SchedulerPolicyFileSource is an autogenerated conversion function.
-func Convert_config_SchedulerPolicyFileSource_To_v1alpha2_SchedulerPolicyFileSource(in *config.SchedulerPolicyFileSource, out *v1alpha2.SchedulerPolicyFileSource, s conversion.Scope) error {
-	return autoConvert_config_SchedulerPolicyFileSource_To_v1alpha2_SchedulerPolicyFileSource(in, out, s)
-}
-
-func autoConvert_v1alpha2_SchedulerPolicySource_To_config_SchedulerPolicySource(in *v1alpha2.SchedulerPolicySource, out *config.SchedulerPolicySource, s conversion.Scope) error {
-	out.File = (*config.SchedulerPolicyFileSource)(unsafe.Pointer(in.File))
-	out.ConfigMap = (*config.SchedulerPolicyConfigMapSource)(unsafe.Pointer(in.ConfigMap))
-	return nil
-}
-
-// Convert_v1alpha2_SchedulerPolicySource_To_config_SchedulerPolicySource is an autogenerated conversion function.
-func Convert_v1alpha2_SchedulerPolicySource_To_config_SchedulerPolicySource(in *v1alpha2.SchedulerPolicySource, out *config.SchedulerPolicySource, s conversion.Scope) error {
-	return autoConvert_v1alpha2_SchedulerPolicySource_To_config_SchedulerPolicySource(in, out, s)
-}
-
-func autoConvert_config_SchedulerPolicySource_To_v1alpha2_SchedulerPolicySource(in *config.SchedulerPolicySource, out *v1alpha2.SchedulerPolicySource, s conversion.Scope) error {
-	out.File = (*v1alpha2.SchedulerPolicyFileSource)(unsafe.Pointer(in.File))
-	out.ConfigMap = (*v1alpha2.SchedulerPolicyConfigMapSource)(unsafe.Pointer(in.ConfigMap))
-	return nil
-}
-
-// Convert_config_SchedulerPolicySource_To_v1alpha2_SchedulerPolicySource is an autogenerated conversion function.
-func Convert_config_SchedulerPolicySource_To_v1alpha2_SchedulerPolicySource(in *config.SchedulerPolicySource, out *v1alpha2.SchedulerPolicySource, s conversion.Scope) error {
-	return autoConvert_config_SchedulerPolicySource_To_v1alpha2_SchedulerPolicySource(in, out, s)
 }

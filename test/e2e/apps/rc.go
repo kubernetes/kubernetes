@@ -46,7 +46,6 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, run basic image
 		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
 	*/
-
 	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
@@ -143,7 +142,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		err = f.WaitForPodRunning(pod.Name)
+		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			if getErr == nil {
@@ -158,9 +157,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	}
 
 	// Sanity check
-	if running != replicas {
-		framework.ExpectNoError(fmt.Errorf("unexpected number of running pods: %+v", pods.Items))
-	}
+	framework.ExpectEqual(running, replicas, "unexpected number of running pods: %+v", pods.Items)
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")

@@ -144,7 +144,7 @@ func main() {
 	if cleanup {
 		defer func() {
 			klog.Infof("Deleting namespace %s...", ns.Name)
-			if err := cs.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, nil); err != nil {
+			if err := cs.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{}); err != nil {
 				klog.Errorf("Failed to delete namespace %s: %v", ns.Name, err)
 				testSuccessFlag = false
 			}

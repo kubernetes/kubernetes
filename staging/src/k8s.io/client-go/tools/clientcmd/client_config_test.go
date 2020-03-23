@@ -180,6 +180,42 @@ func TestCAOverridesCAData(t *testing.T) {
 	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
 }
 
+func TestTLSServerName(t *testing.T) {
+	config := createValidTestConfig()
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			TLSServerName: "overridden-server-name",
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchStringArg("overridden-server-name", actualCfg.ServerName, t)
+	matchStringArg("", actualCfg.TLSClientConfig.CAFile, t)
+	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
+}
+
+func TestTLSServerNameClearsWhenServerNameSet(t *testing.T) {
+	config := createValidTestConfig()
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "http://something",
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchStringArg("", actualCfg.ServerName, t)
+}
+
 func TestMergeContext(t *testing.T) {
 	const namespace = "overridden-namespace"
 
@@ -411,6 +447,7 @@ func TestCreateClean(t *testing.T) {
 	matchStringArg("", clientConfig.APIPath, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 }
 
 func TestCreateCleanWithPrefix(t *testing.T) {
@@ -461,6 +498,7 @@ func TestCreateCleanDefault(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -477,6 +515,7 @@ func TestCreateCleanDefaultCluster(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }

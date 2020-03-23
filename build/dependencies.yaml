@@ -32,7 +32,7 @@ dependencies:
 
 
   - name: "golang"
-    version: 1.13.6
+    version: 1.13.8
     refPaths:
     - path: build/build-image/cross/Dockerfile
       match: "golang:"
@@ -46,8 +46,6 @@ dependencies:
   - name: "cni"
     version: 0.8.5
     refPaths:
-    - path: build/debian-hyperkube-base/Makefile
-      match: CNI_VERSION=
     - path: build/workspace.bzl
       match: CNI_VERSION =
     - path: cluster/gce/gci/configure.sh
@@ -59,7 +57,7 @@ dependencies:
 
 
   - name: "coredns-kube-up"
-    version: 1.6.5
+    version: 1.6.7
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns

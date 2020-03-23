@@ -92,13 +92,6 @@ func (s *navigationSteps) pop() navigationStep {
 	return navigationStep{}
 }
 
-func (s *navigationSteps) peek() navigationStep {
-	if s.moreStepsRemaining() {
-		return s.steps[s.currentStepIndex]
-	}
-	return navigationStep{}
-}
-
 func (s *navigationSteps) moreStepsRemaining() bool {
 	return len(s.steps) > s.currentStepIndex
 }

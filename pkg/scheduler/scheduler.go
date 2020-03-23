@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -45,7 +46,6 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const (
@@ -104,7 +104,7 @@ type Scheduler struct {
 	StopEverything <-chan struct{}
 
 	// VolumeBinder handles PVC/PV binding for the pod.
-	VolumeBinder *volumebinder.VolumeBinder
+	VolumeBinder scheduling.SchedulerVolumeBinder
 
 	// Disable pod preemption or not.
 	DisablePreemption bool
@@ -133,6 +133,7 @@ type schedulerOptions struct {
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry framework.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
+	extenders                  []schedulerapi.Extender
 }
 
 // Option configures a Scheduler
@@ -196,6 +197,13 @@ func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
 	}
 }
 
+// WithExtenders sets extenders for the Scheduler
+func WithExtenders(e ...schedulerapi.Extender) Option {
+	return func(o *schedulerOptions) {
+		o.extenders = e
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	profiles: []schedulerapi.KubeSchedulerProfile{
 		// Profiles' default plugins are set from the algorithm provider.
@@ -230,7 +238,7 @@ func New(client clientset.Interface,
 	}
 
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-	volumeBinder := volumebinder.NewVolumeBinder(
+	volumeBinder := scheduling.NewVolumeBinder(
 		client,
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Storage().V1().CSINodes(),
@@ -264,6 +272,7 @@ func New(client clientset.Interface,
 		profiles:                 append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
 		registry:                 registry,
 		nodeInfoSnapshot:         snapshot,
+		extenders:                options.extenders,
 	}
 
 	metrics.Register()
@@ -291,6 +300,10 @@ func New(client clientset.Interface,
 				return nil, err
 			}
 		}
+		// Set extenders on the configurator now that we've decoded the policy
+		// In this case, c.extenders should be nil since we're using a policy (and therefore not componentconfig,
+		// which would have set extenders in the above instantiation of Configurator from CC options)
+		configurator.extenders = policy.Extenders
 		sc, err := configurator.createFromConfig(*policy)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
@@ -399,7 +412,7 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 		// Make a call to update nominated node name of the pod on the API server.
 		err = sched.podPreemptor.setNominatedNodeName(preemptor, nodeName)
 		if err != nil {
-			klog.Errorf("Error in preemption process. Cannot set 'NominatedPod' on pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
+			klog.Errorf("Error in preemption process. Cannot set 'NominatedNodeName' on pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
 			sched.SchedulingQueue.DeleteNominatedPodIfExists(preemptor)
 			return "", err
 		}
@@ -422,11 +435,11 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 	// be nil when a pod with nominated node name is eligible to preempt again,
 	// but preemption logic does not find any node for it. In that case Preempt()
 	// function of generic_scheduler.go returns the pod itself for removal of
-	// the 'NominatedPod' field.
+	// the 'NominatedNodeName' field.
 	for _, p := range nominatedPodsToClear {
 		rErr := sched.podPreemptor.removeNominatedNodeName(p)
 		if rErr != nil {
-			klog.Errorf("Cannot remove 'NominatedPod' field of pod: %v", rErr)
+			klog.Errorf("Cannot remove 'NominatedNodeName' field of pod: %v", rErr)
 			// We do not return as this error is not critical.
 		}
 	}
@@ -440,7 +453,7 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 // retry scheduling.
 func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
 	klog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
-	err := sched.VolumeBinder.Binder.BindPodVolumes(assumed)
+	err := sched.VolumeBinder.BindPodVolumes(assumed)
 	if err != nil {
 		klog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
 
@@ -560,7 +573,6 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	defer cancel()
 	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, prof, state, pod)
 	if err != nil {
-		sched.recordSchedulingFailure(prof, podInfo.DeepCopy(), err, v1.PodReasonUnschedulable, err.Error())
 		// Schedule() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule
@@ -584,6 +596,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			klog.Errorf("error selecting node for pod: %v", err)
 			metrics.PodScheduleErrors.Inc()
 		}
+		sched.recordSchedulingFailure(prof, podInfo.DeepCopy(), err, v1.PodReasonUnschedulable, err.Error())
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -599,7 +612,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	// Otherwise, binding of volumes is started after the pod is assumed, but before pod binding.
 	//
 	// This function modifies 'assumedPod' if volume binding is required.
-	allBound, err := sched.VolumeBinder.Binder.AssumePodVolumes(assumedPod, scheduleResult.SuggestedHost)
+	allBound, err := sched.VolumeBinder.AssumePodVolumes(assumedPod, scheduleResult.SuggestedHost)
 	if err != nil {
 		sched.recordSchedulingFailure(prof, assumedPodInfo, err, SchedulerError,
 			fmt.Sprintf("AssumePodVolumes failed: %v", err))
@@ -774,7 +787,7 @@ func (p *podPreemptorImpl) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
 }
 
 func (p *podPreemptorImpl) deletePod(pod *v1.Pod) error {
-	return p.Client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, &metav1.DeleteOptions{})
+	return p.Client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 }
 
 func (p *podPreemptorImpl) setNominatedNodeName(pod *v1.Pod, nominatedNodeName string) error {

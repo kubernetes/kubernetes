@@ -108,15 +108,15 @@ func (c *FakeAPIServices) UpdateStatus(ctx context.Context, aPIService *v1beta1.
 }
 
 // Delete takes name of the aPIService and deletes it. Returns an error if one occurs.
-func (c *FakeAPIServices) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeAPIServices) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(apiservicesResource, name), &v1beta1.APIService{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeAPIServices) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(apiservicesResource, listOptions)
+func (c *FakeAPIServices) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(apiservicesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.APIServiceList{})
 	return err

@@ -299,7 +299,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 
 	if o.Attach && o.DryRunStrategy != cmdutil.DryRunNone {
-		return cmdutil.UsageErrorf(cmd, "--dry-run can't be used with attached containers options (--attach, --stdin, or --tty)")
+		return cmdutil.UsageErrorf(cmd, "--dry-run=[server|client] can't be used with attached containers options (--attach, --stdin, or --tty)")
 	}
 
 	if err := verifyImagePullPolicy(cmd); err != nil {

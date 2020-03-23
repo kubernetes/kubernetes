@@ -301,7 +301,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-	e2epod.SetNodeSelection(pod, node)
+	e2epod.SetNodeSelection(&pod.Spec, node)
 
 	for i, csiVolume := range csiVolumes {
 		name := fmt.Sprintf("my-volume-%d", i)

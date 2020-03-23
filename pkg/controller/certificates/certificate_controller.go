@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -192,7 +193,15 @@ func (cc *CertificateController) syncFunc(key string) error {
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
 	csr = csr.DeepCopy()
-
+	// If the `signerName` field is not set, we are talking to a pre-1.18 apiserver.
+	// As per the KEP document for the certificates API, this will be defaulted here
+	// in the controller to maintain backwards compatibility.
+	// This should be removed after a deprecation window has passed.
+	// Default here to allow handlers to assume the field is set.
+	if csr.Spec.SignerName == nil {
+		signerName := capihelper.DefaultSignerNameFromSpec(&csr.Spec)
+		csr.Spec.SignerName = &signerName
+	}
 	return cc.handler(csr)
 }
 

@@ -54,6 +54,14 @@ type containerManagerImpl struct {
 	nodeConfig NodeConfig
 }
 
+type noopWindowsResourceAllocator struct{}
+
+func (ra *noopWindowsResourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	return lifecycle.PodAdmitResult{
+		Admit: true,
+	}
+}
+
 func (cm *containerManagerImpl) Start(node *v1.Node,
 	activePods ActivePodsFunc,
 	sourcesReady config.SourcesReady,
@@ -177,8 +185,8 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return false
 }
 
-func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() topologymanager.Manager {
-	return nil
+func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+	return &noopWindowsResourceAllocator{}
 }
 
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {

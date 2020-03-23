@@ -83,9 +83,11 @@ func registerNode(registerTo, port string) {
 		return
 	}
 
+	request := fmt.Sprintf("register?host=%s", getIP(hostPort).String())
+	log.Printf("Registering to master: %s/%s", hostPort, request)
 	start := time.Now()
 	for time.Since(start) < timeout {
-		response, err := dialHTTP("register", hostPort)
+		response, err := dialHTTP(request, hostPort)
 		if err != nil {
 			log.Printf("encountered error while registering to master: %v. Retrying in 1 second.", err)
 			time.Sleep(sleep)
@@ -121,12 +123,14 @@ func startHTTPServer(port string) {
 // registerHandler will register the caller in this server's list of slaves.
 // /set requests will be propagated to slaves, if any.
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	values, err := url.Parse(r.URL.RequestURI())
 	if err != nil {
-		fmt.Fprintf(w, "userip: %q is not IP:port", r.RemoteAddr)
+		http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
-	log.Printf("GET /register, IP: %s", ip)
+
+	ip := values.Query().Get("host")
+	log.Printf("GET /register?host=%s", ip)
 
 	// send all the store to the slave as well.
 	output := make(map[string]interface{})
@@ -279,4 +283,15 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 		Timeout:   5 * time.Second,
 	}
 	return client
+}
+
+func getIP(hostPort string) net.IP {
+	conn, err := net.Dial("udp", hostPort)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP
 }

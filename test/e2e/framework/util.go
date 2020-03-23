@@ -39,8 +39,6 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"k8s.io/klog"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
@@ -57,18 +55,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
-	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/master/ports"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -79,7 +75,6 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -145,10 +140,6 @@ const (
 
 	// SnapshotCreateTimeout is how long for snapshot to create snapshotContent.
 	SnapshotCreateTimeout = 5 * time.Minute
-
-	// Number of objects that gc can delete in a second.
-	// GC issues 2 requestes for single delete.
-	gcThroughput = 10
 
 	// Minimal number of nodes for the cluster to be considered large.
 	largeClusterThreshold = 100
@@ -253,7 +244,7 @@ OUTER:
 		go func(nsName string) {
 			defer wg.Done()
 			defer ginkgo.GinkgoRecover()
-			gomega.Expect(c.CoreV1().Namespaces().Delete(context.TODO(), nsName, nil)).To(gomega.Succeed())
+			gomega.Expect(c.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})).To(gomega.Succeed())
 			Logf("namespace : %v api call to delete is complete ", nsName)
 		}(item.Name)
 	}
@@ -291,8 +282,22 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, conditions.ServiceAccountHasSecrets)
+	_, err = watchtools.UntilWithoutRetry(ctx, w, serviceAccountHasSecrets)
 	return err
+}
+
+// serviceAccountHasSecrets returns true if the service account has at least one secret,
+// false if it does not, or an error.
+func serviceAccountHasSecrets(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *v1.ServiceAccount:
+		return len(t.Secrets) > 0, nil
+	}
+	return false, nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
@@ -814,7 +819,7 @@ func (f *Framework) MatchContainerOutput(
 	createdPod := podClient.Create(pod)
 	defer func() {
 		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
+		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
 	}()
 
 	// Wait for client pod to complete.
@@ -980,7 +985,7 @@ func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
 		client = c.CoreV1().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Name(fmt.Sprintf("%v:%v", node, KubeletPort)).
 			Suffix("pods").
 			Do(context.TODO())
 
@@ -1027,43 +1032,6 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		timeout,
 		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
-}
-
-// GetPodSecretUpdateTimeout reuturns the timeout duration for updating pod secret.
-func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
-	// With SecretManager(ConfigMapManager), we may have to wait up to full sync period +
-	// TTL of secret(configmap) to elapse before the Kubelet projects the update into the
-	// volume and the container picks it up.
-	// So this timeout is based on default Kubelet sync period (1 minute) + maximum TTL for
-	// secret(configmap) that's based on cluster size + additional time as a fudge factor.
-	secretTTL, err := getNodeTTLAnnotationValue(c)
-	if err != nil {
-		Logf("Couldn't get node TTL annotation (using default value of 0): %v", err)
-	}
-	podLogTimeout := 240*time.Second + secretTTL
-	return podLogTimeout
-}
-
-func getNodeTTLAnnotationValue(c clientset.Interface) (time.Duration, error) {
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil || len(nodes.Items) == 0 {
-		return time.Duration(0), fmt.Errorf("Couldn't list any nodes to get TTL annotation: %v", err)
-	}
-	// Since TTL the kubelet is using is stored in node object, for the timeout
-	// purpose we take it from the first node (all of them should be the same).
-	node := &nodes.Items[0]
-	if node.Annotations == nil {
-		return time.Duration(0), fmt.Errorf("No annotations found on the node")
-	}
-	value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]
-	if !ok {
-		return time.Duration(0), fmt.Errorf("No TTL annotation found on the node")
-	}
-	intValue, err := strconv.Atoi(value)
-	if err != nil {
-		return time.Duration(0), fmt.Errorf("Cannot convert TTL annotation from %#v to int", *node)
-	}
-	return time.Duration(intValue) * time.Second, nil
 }
 
 // AddOrUpdateLabelOnNode adds the given label key and value to the given node or updates value.
@@ -1131,139 +1099,6 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 		return false, nil
 	}
 	return true, nil
-}
-
-// ScaleResource scales resource to the given size.
-func ScaleResource(
-	clientset clientset.Interface,
-	scalesGetter scaleclient.ScalesGetter,
-	ns, name string,
-	size uint,
-	wait bool,
-	kind schema.GroupKind,
-	gvr schema.GroupVersionResource,
-) error {
-	ginkgo.By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gvr); err != nil {
-		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
-	}
-	if !wait {
-		return nil
-	}
-	return e2epod.WaitForControlledPodsRunning(clientset, ns, name, kind)
-}
-
-// DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
-func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
-	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
-
-	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			Logf("%v %s not found: %v", kind, name, err)
-			return nil
-		}
-		return err
-	}
-	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-	replicas, err := e2eresource.GetReplicasFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-
-	ps, err := testutils.NewPodStore(c, ns, selector, fields.Everything())
-	if err != nil {
-		return err
-	}
-
-	defer ps.Stop()
-	falseVar := false
-	deleteOption := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	startTime := time.Now()
-	if err := testutils.DeleteResourceWithRetries(c, kind, ns, name, deleteOption); err != nil {
-		return err
-	}
-	deleteTime := time.Since(startTime)
-	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
-
-	var interval, timeout time.Duration
-	switch {
-	case replicas < 100:
-		interval = 100 * time.Millisecond
-	case replicas < 1000:
-		interval = 1 * time.Second
-	default:
-		interval = 10 * time.Second
-	}
-	if replicas < 5000 {
-		timeout = 10 * time.Minute
-	} else {
-		timeout = time.Duration(replicas/gcThroughput) * time.Second
-		// gcThroughput is pretty strict now, add a bit more to it
-		timeout = timeout + 3*time.Minute
-	}
-
-	err = waitForPodsInactive(ps, interval, timeout)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
-	}
-	terminatePodTime := time.Since(startTime) - deleteTime
-	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
-
-	// In gce, at any point, small percentage of nodes can disappear for
-	// ~10 minutes due to hostError. 20 minutes should be long enough to
-	// restart VM in that case and delete the pod.
-	err = waitForPodsGone(ps, interval, 20*time.Minute)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
-	}
-	return nil
-}
-
-// waitForPodsGone waits until there are no pods left in the PodStore.
-func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var pods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		if pods = ps.List(); len(pods) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range pods {
-			Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d pods left. E.g. %q on node %q", len(pods), pods[0].Name, pods[0].Spec.NodeName)
-	}
-	return err
-}
-
-// waitForPodsInactive waits until there are no active pods left in the PodStore.
-// This is to make a fair comparison of deletion time between DeleteRCAndPods
-// and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
-// when the pod is inactvie.
-func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var activePods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pods := ps.List()
-		activePods = controller.FilterActivePods(pods)
-		if len(activePods) != 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range activePods {
-			Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
-	}
-	return err
 }
 
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
@@ -1492,7 +1327,7 @@ func RestartControllerManager() error {
 
 // WaitForControllerManagerUp waits for the kube-controller-manager to be up.
 func WaitForControllerManagerUp() error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
+	cmd := "curl http://localhost:" + strconv.Itoa(InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
@@ -1687,65 +1522,6 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
-// to create/modify Nodes before running a test.
-type E2ETestNodePreparer struct {
-	client clientset.Interface
-	// Specifies how many nodes should be modified using the given strategy.
-	// Only one strategy can be applied to a single Node, so there needs to
-	// be at least <sum_of_keys> Nodes in the cluster.
-	countToStrategy       []testutils.CountToStrategy
-	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
-}
-
-// PrepareNodes prepares nodes in the cluster.
-func (p *E2ETestNodePreparer) PrepareNodes() error {
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
-	if err != nil {
-		return err
-	}
-	numTemplates := 0
-	for _, v := range p.countToStrategy {
-		numTemplates += v.Count
-	}
-	if numTemplates > len(nodes.Items) {
-		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes")
-	}
-	index := 0
-	sum := 0
-	for _, v := range p.countToStrategy {
-		sum += v.Count
-		for ; index < sum; index++ {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
-				klog.Errorf("Aborting node preparation: %v", err)
-				return err
-			}
-			p.nodeToAppliedStrategy[nodes.Items[index].Name] = v.Strategy
-		}
-	}
-	return nil
-}
-
-// CleanupNodes cleanups nodes in the cluster.
-func (p *E2ETestNodePreparer) CleanupNodes() error {
-	var encounteredError error
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
-	if err != nil {
-		return err
-	}
-	for i := range nodes.Items {
-		name := nodes.Items[i].Name
-		strategy, found := p.nodeToAppliedStrategy[name]
-		if found {
-			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
-				klog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
-				encounteredError = err
-			}
-		}
-	}
-	return encounteredError
-}
-
 // getMasterAddresses returns the externalIP, internalIP and hostname fields of the master.
 // If any of these is unavailable, it is set to "".
 func getMasterAddresses(c clientset.Interface) (string, string, string) {
@@ -1909,27 +1685,6 @@ func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
 		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
 	return &ds, nil
-}
-
-// GetClusterZones returns the values of zone label collected from all nodes.
-func GetClusterZones(c clientset.Interface) (sets.String, error) {
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
-	}
-
-	// collect values of zone label from all nodes
-	zones := sets.NewString()
-	for _, node := range nodes.Items {
-		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
-			zones.Insert(zone)
-		}
-
-		if zone, found := node.Labels[v1.LabelZoneFailureDomainStable]; found {
-			zones.Insert(zone)
-		}
-	}
-	return zones, nil
 }
 
 // GetFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.

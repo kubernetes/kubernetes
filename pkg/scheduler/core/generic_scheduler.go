@@ -36,8 +36,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/util/workqueue"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -108,7 +108,7 @@ type ScheduleAlgorithm interface {
 	// It returns the node where preemption happened, a list of preempted pods, a
 	// list of pods whose nominated node name should be removed, and error if any.
 	Preempt(context.Context, *profile.Profile, *framework.CycleState, *v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
-	// Prioritizers returns a slice of priority config. This is exposed for
+	// Extenders returns a slice of extender config. This is exposed for
 	// testing.
 	Extenders() []SchedulerExtender
 }

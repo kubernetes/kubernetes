@@ -67,19 +67,19 @@ GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/debian-base:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/debian-base:v2.0.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/debian-base-arm:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/debian-base-arm:v2.0.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/debian-base-arm64:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/debian-base-arm64:v2.0.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/debian-base-ppc64le:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/debian-base-ppc64le:v2.0.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/debian-base-s390x:v1.0.0
+    BASEIMAGE?=k8s.gcr.io/debian-base-s390x:v2.0.0
 endif
 
 build:

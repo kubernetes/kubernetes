@@ -40,6 +40,11 @@ func (m *fakeManager) Policy() Policy {
 	return NewNonePolicy()
 }
 
+func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
+	klog.Infof("[fake cpumanager] Allocate (pod: %s, container: %s", pod.Name, container.Name)
+	return nil
+}
+
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
 	klog.Infof("[fake cpumanager] AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 	return nil

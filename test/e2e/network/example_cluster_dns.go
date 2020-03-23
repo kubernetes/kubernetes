@@ -35,6 +35,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
@@ -102,7 +103,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for objects
 		for _, ns := range namespaces {
-			e2epod.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
+			e2eresource.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
 			framework.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
 		}
 		// it is not enough that pods are running because they may be set to running, but

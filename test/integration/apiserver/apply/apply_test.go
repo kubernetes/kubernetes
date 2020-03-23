@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -437,6 +438,177 @@ func TestApplyGroupsManySeparateUpdates(t *testing.T) {
 	// Expect the second entry to have the manager name "ancient-changes"
 	if actual, expected := accessor.GetManagedFields()[1].Manager, "ancient-changes"; actual != expected {
 		t.Fatalf("Expected first manager to be named %v but got %v", expected, actual)
+	}
+}
+
+// TestCreateVeryLargeObject tests that a very large object can be created without exceeding the size limit due to managedFields
+func TestCreateVeryLargeObject(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	cfg := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "large-create-test-cm",
+			Namespace: "default",
+		},
+		Data: map[string]string{},
+	}
+
+	for i := 0; i < 9999; i++ {
+		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
+		cfg.Data[unique] = "A"
+	}
+
+	// Should be able to create an object near the object size limit.
+	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), cfg, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unable to create large test configMap: %v", err)
+	}
+
+	// Applying to the same object should cause managedFields to go over the object size limit, and fail.
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace(cfg.Namespace).
+		Resource("configmaps").
+		Name(cfg.Name).
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "large-create-test-cm",
+				"namespace": "default",
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("expected to fail to update object using Apply patch, but succeeded")
+	}
+}
+
+// TestUpdateVeryLargeObject tests that a small object can be updated to be very large without exceeding the size limit due to managedFields
+func TestUpdateVeryLargeObject(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	cfg := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "large-update-test-cm",
+			Namespace: "default",
+		},
+		Data: map[string]string{"k": "v"},
+	}
+
+	// Create a small config map.
+	cfg, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), cfg, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("unable to create configMap: %v", err)
+	}
+
+	// Should be able to update a small object to be near the object size limit.
+	var updateErr error
+	pollErr := wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		updateCfg, err := client.CoreV1().ConfigMaps(cfg.Namespace).Get(context.TODO(), cfg.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		// Apply the large update, then attempt to push it to the apiserver.
+		for i := 0; i < 9999; i++ {
+			unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
+			updateCfg.Data[unique] = "A"
+		}
+
+		if _, err = client.CoreV1().ConfigMaps(cfg.Namespace).Update(context.TODO(), updateCfg, metav1.UpdateOptions{}); err == nil {
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		t.Errorf("unable to update configMap: %v", updateErr)
+	}
+
+	// Applying to the same object should cause managedFields to go over the object size limit, and fail.
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace(cfg.Namespace).
+		Resource("configmaps").
+		Name(cfg.Name).
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "large-update-test-cm",
+				"namespace": "default",
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("expected to fail to update object using Apply patch, but succeeded")
+	}
+}
+
+// TestPatchVeryLargeObject tests that a small object can be patched to be very large without exceeding the size limit due to managedFields
+func TestPatchVeryLargeObject(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	cfg := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "large-patch-test-cm",
+			Namespace: "default",
+		},
+		Data: map[string]string{"k": "v"},
+	}
+
+	// Create a small config map.
+	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), cfg, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unable to create configMap: %v", err)
+	}
+
+	patchString := `{"data":{"k":"v"`
+	for i := 0; i < 9999; i++ {
+		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
+		patchString = fmt.Sprintf("%s,%q:%q", patchString, unique, "A")
+	}
+	patchString = fmt.Sprintf("%s}}", patchString)
+
+	// Should be able to update a small object to be near the object size limit.
+	_, err := client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/api/v1").
+		Namespace(cfg.Namespace).
+		Resource("configmaps").
+		Name(cfg.Name).
+		Body([]byte(patchString)).Do(context.TODO()).Get()
+	if err != nil {
+		t.Errorf("unable to patch configMap: %v", err)
+	}
+
+	// Applying to the same object should cause managedFields to go over the object size limit, and fail.
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("large-patch-test-cm").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "large-patch-test-cm",
+				"namespace": "default",
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("expected to fail to update object using Apply patch, but succeeded")
 	}
 }
 

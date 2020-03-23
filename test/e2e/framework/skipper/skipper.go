@@ -19,12 +19,14 @@ package skipper
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
-	"github.com/onsi/ginkgo"
 	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
+
+	"github.com/onsi/ginkgo"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,17 +36,21 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 // TestContext should be used by all tests to access common context data.
 var TestContext framework.TestContextType
 
+// New local storage types to support local storage capacity isolation
+var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
+
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	framework.Logf("INFO", msg)
+	framework.Logf(msg)
 	skip(msg, caller+1)
 }
 
@@ -128,15 +134,15 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 
 // SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
 func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
+	if !utilfeature.DefaultFeatureGate.Enabled(localStorageCapacityIsolation) {
+		skipInternalf(1, "Only supported when %v feature is enabled", localStorageCapacityIsolation)
 	}
 }
 
 // SkipIfMissingResource skips if the gvr resource is missing.
 func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(metav1.ListOptions{})
+	_, err := resourceClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		// not all resources support list, so we ignore those
 		if apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
@@ -176,7 +182,7 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 
 // SkipUnlessMultizone skips if the cluster does not have multizone.
 func SkipUnlessMultizone(c clientset.Interface) {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -187,7 +193,7 @@ func SkipUnlessMultizone(c clientset.Interface) {
 
 // SkipIfMultizone skips if the cluster has multizone.
 func SkipIfMultizone(c clientset.Interface) {
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}

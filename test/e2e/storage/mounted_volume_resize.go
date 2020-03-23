@@ -122,7 +122,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		ginkgo.By("Creating a deployment with selected PVC")
 		deployment, err := e2edeploy.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
-		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, &metav1.DeleteOptions{})
+		defer c.AppsV1().Deployments(ns).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 
 		// PVC should be bound at this point
 		ginkgo.By("Checking for bound PVC")

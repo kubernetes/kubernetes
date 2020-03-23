@@ -541,7 +541,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 
 }
 
-// OnServiceSynced is called once all the initial even handlers were
+// OnServiceSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
@@ -663,7 +663,7 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	proxier.syncProxyRules()
 }
 
-// OnNodeDelete is called whever deletion of an existing node
+// OnNodeDelete is called whenever deletion of an existing node
 // object is observed.
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	if node.Name != proxier.hostname {
@@ -1070,8 +1070,13 @@ func (proxier *Proxier) syncProxyRules() {
 					"-d", utilproxy.ToCIDR(net.ParseIP(externalIP)),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 				)
-				// We have to SNAT packets to external IPs.
-				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+
+				destChain := svcXlbChain
+				// We have to SNAT packets to external IPs if externalTrafficPolicy is cluster.
+				if !(utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints()) {
+					destChain = svcChain
+					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+				}
 
 				// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
 				// nor from a local process to be forwarded to the service.
@@ -1080,11 +1085,11 @@ func (proxier *Proxier) syncProxyRules() {
 				externalTrafficOnlyArgs := append(args,
 					"-m", "physdev", "!", "--physdev-is-in",
 					"-m", "addrtype", "!", "--src-type", "LOCAL")
-				writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(svcChain))...)
+				writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(destChain))...)
 				dstLocalOnlyArgs := append(args, "-m", "addrtype", "--dst-type", "LOCAL")
 				// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
 				// This covers cases like GCE load-balancers which get added to the local routing table.
-				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
+				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(destChain))...)
 			} else {
 				// No endpoints.
 				writeLine(proxier.filterRules,

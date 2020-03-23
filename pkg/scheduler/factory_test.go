@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,11 +37,11 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -77,12 +78,6 @@ func TestCreate(t *testing.T) {
 // It combines some configurable predicate/priorities with some pre-defined ones
 func TestCreateFromConfig(t *testing.T) {
 	var configData []byte
-	var policy schedulerapi.Policy
-
-	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	factory := newConfigFactory(client, stopCh)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -103,34 +98,79 @@ func TestCreateFromConfig(t *testing.T) {
 			{"name" : "NodeAffinityPriority", "weight" : 2},
 			{"name" : "ImageLocalityPriority", "weight" : 1}		]
 	}`)
-	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
-		t.Errorf("Invalid configuration: %v", err)
+	cases := []struct {
+		name       string
+		plugins    *schedulerapi.Plugins
+		pluginCfgs []schedulerapi.PluginConfig
+		wantErr    string
+	}{
+		{
+			name: "just policy",
+		},
+		{
+			name: "policy and plugins",
+			plugins: &schedulerapi.Plugins{
+				Filter: &schedulerapi.PluginSet{
+					Disabled: []schedulerapi.Plugin{{Name: nodelabel.Name}},
+				},
+			},
+			wantErr: "using Plugins and Policy simultaneously is not supported",
+		},
+		{
+			name: "policy and plugin config",
+			pluginCfgs: []schedulerapi.PluginConfig{
+				{Name: queuesort.Name},
+			},
+			wantErr: "using PluginConfig and Policy simultaneously is not supported",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			factory := newConfigFactory(client, stopCh)
+			factory.profiles[0].Plugins = tc.plugins
+			factory.profiles[0].PluginConfig = tc.pluginCfgs
+
+			var policy schedulerapi.Policy
+			if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
+				t.Errorf("Invalid configuration: %v", err)
+			}
+
+			sched, err := factory.createFromConfig(policy)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("got err %q, want %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("createFromConfig failed: %v", err)
+			}
+			// createFromConfig is the old codepath where we only have one profile.
+			prof := sched.Profiles[testSchedulerName]
+			queueSortPls := prof.ListPlugins()["QueueSortPlugin"]
+			wantQueuePls := []schedulerapi.Plugin{{Name: queuesort.Name}}
+			if diff := cmp.Diff(wantQueuePls, queueSortPls); diff != "" {
+				t.Errorf("Unexpected QueueSort plugins (-want, +got): %s", diff)
+			}
+			bindPls := prof.ListPlugins()["BindPlugin"]
+			wantBindPls := []schedulerapi.Plugin{{Name: defaultbinder.Name}}
+			if diff := cmp.Diff(wantBindPls, bindPls); diff != "" {
+				t.Errorf("Unexpected Bind plugins (-want, +got): %s", diff)
+			}
+
+			// Verify that node label predicate/priority are converted to framework plugins.
+			wantArgs := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
+			verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, prof, &factory.profiles[0], 6, wantArgs)
+			// Verify that service affinity custom predicate/priority is converted to framework plugin.
+			wantArgs = `{"Name":"ServiceAffinity","Args":{"affinityLabels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
+			verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, prof, &factory.profiles[0], 6, wantArgs)
+			// TODO(#87703): Verify all plugin configs.
+		})
 	}
 
-	sched, err := factory.createFromConfig(policy)
-	if err != nil {
-		t.Fatalf("createFromConfig failed: %v", err)
-	}
-	// createFromConfig is the old codepath where we only have one profile.
-	prof := sched.Profiles[testSchedulerName]
-	queueSortPls := prof.ListPlugins()["QueueSortPlugin"]
-	wantQueuePls := []schedulerapi.Plugin{{Name: queuesort.Name}}
-	if diff := cmp.Diff(wantQueuePls, queueSortPls); diff != "" {
-		t.Errorf("Unexpected QueueSort plugins (-want, +got): %s", diff)
-	}
-	bindPls := prof.ListPlugins()["BindPlugin"]
-	wantBindPls := []schedulerapi.Plugin{{Name: defaultbinder.Name}}
-	if diff := cmp.Diff(wantBindPls, bindPls); diff != "" {
-		t.Errorf("Unexpected Bind plugins (-want, +got): %s", diff)
-	}
-
-	// Verify that node label predicate/priority are converted to framework plugins.
-	wantArgs := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
-	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, prof, &factory.profiles[0], 6, wantArgs)
-	// Verify that service affinity custom predicate/priority is converted to framework plugin.
-	wantArgs = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
-	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, prof, &factory.profiles[0], 6, wantArgs)
-	// TODO(#87703): Verify all plugin configs.
 }
 
 func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, prof *profile.Profile, cfg *schedulerapi.KubeSchedulerProfile, wantWeight int32, wantArgs string) {

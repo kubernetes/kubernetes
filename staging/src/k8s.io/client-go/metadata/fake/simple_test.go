@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -72,7 +73,7 @@ func TestList(t *testing.T) {
 		newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-baz"),
 		newPartialObjectMetadata("group2/version", "TheKind", "ns-foo", "name2-baz"),
 	)
-	listFirst, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).List(metav1.ListOptions{})
+	listFirst, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func (tc *patchTestCase) runner(t *testing.T) {
 	client := NewSimpleMetadataClient(scheme, tc.object)
 	resourceInterface := client.Resource(schema.GroupVersionResource{Group: testGroup, Version: testVersion, Resource: testResource}).Namespace(testNamespace)
 
-	got, recErr := resourceInterface.Patch(testName, tc.patchType, tc.patchBytes, metav1.PatchOptions{})
+	got, recErr := resourceInterface.Patch(context.TODO(), testName, tc.patchType, tc.patchBytes, metav1.PatchOptions{})
 
 	if err := tc.verifyErr(recErr); err != nil {
 		t.Error(err)

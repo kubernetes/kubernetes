@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the ConfigMap is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod.
 	*/
 	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
@@ -202,7 +202,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: The ConfigMap that is created with text data and binary data MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. ConfigMap's text data and binary data MUST be verified by reading the content from the mounted files in the Pod.
 	*/
 	framework.ConformanceIt("binary data should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in a error reading that item(file).
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/configmap-volumes"
@@ -453,7 +453,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
-		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), deleteConfigMap.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), deleteConfigMap.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete configmap %q in namespace %q", deleteConfigMap.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
@@ -594,7 +594,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		framework.ExpectNoError(err, "Failed to update config map %q in namespace %q", configMap.Name, configMap.Namespace)
 
 		// Ensure that immutable config map can be deleted.
-		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete config map %q in namespace %q", configMap.Name, configMap.Namespace)
 	})
 
@@ -795,7 +795,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int
 }
 
 func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -841,11 +841,11 @@ func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podN
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
 func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -903,5 +903,5 @@ func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMount
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }

@@ -20,7 +20,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/docker/docker/pkg/term"
+	"github.com/moby/term"
 
 	"k8s.io/kubectl/pkg/util/interrupt"
 )

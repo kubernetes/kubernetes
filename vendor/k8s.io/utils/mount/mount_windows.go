@@ -53,10 +53,20 @@ var getSMBMountMutex = keymutex.NewHashed(0)
 // Mount : mounts source to target with given options.
 // currently only supports cifs(smb), bind mount(for disk)
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
+}
+
+// MountSensitive is the same as Mount() but this method allows
+// sensitiveOptions to be passed in a separate parameter from the normal
+// mount options and ensures the sensitiveOptions are never logged. This
+// method should be used by callers that pass sensitive material (like
+// passwords) as mount options.
+func (mounter *Mounter) MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	target = NormalizeWindowsPath(target)
+	sanitizedOptionsForLogging := sanitizedOptionsForLogging(options, sensitiveOptions)
 
 	if source == "tmpfs" {
-		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, options)
+		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, sanitizedOptionsForLogging)
 		return os.MkdirAll(target, 0755)
 	}
 
@@ -66,36 +76,37 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	}
 
 	klog.V(4).Infof("mount options(%q) source:%q, target:%q, fstype:%q, begin to mount",
-		options, source, target, fstype)
+		sanitizedOptionsForLogging, source, target, fstype)
 	bindSource := source
 
-	// tell it's going to mount azure disk or azure file according to options
-	if bind, _, _ := MakeBindOpts(options); bind {
-		// mount azure disk
+	if bind, _, _, _ := MakeBindOptsSensitive(options, sensitiveOptions); bind {
 		bindSource = NormalizeWindowsPath(source)
 	} else {
-		if len(options) < 2 {
+		allOptions := []string{}
+		allOptions = append(allOptions, options...)
+		allOptions = append(allOptions, sensitiveOptions...)
+		if len(allOptions) < 2 {
 			klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
-				options, len(options), source, target)
+				sanitizedOptionsForLogging, len(allOptions), source, target)
 			return nil
 		}
 
 		// currently only cifs mount is supported
 		if strings.ToLower(fstype) != "cifs" {
-			return fmt.Errorf("only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, options)
+			return fmt.Errorf("only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, sanitizedOptionsForLogging)
 		}
 
 		// lock smb mount for the same source
 		getSMBMountMutex.LockKey(source)
 		defer getSMBMountMutex.UnlockKey(source)
 
-		if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+		if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
 			if isSMBMappingExist(source) {
 				klog.V(2).Infof("SMB Mapping(%s) already exists, now begin to remove and remount", source)
 				if output, err := removeSMBMapping(source); err != nil {
 					return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
 				}
-				if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+				if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
 					return fmt.Errorf("New-SmbGlobalMapping remount failed: %v, output: %q", err, output)
 				}
 			} else {
@@ -116,7 +127,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 // return (output, error)
 func newSMBMapping(username, password, remotepath string) (string, error) {
 	if username == "" || password == "" || remotepath == "" {
-		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remoteapth: %s)", username, password, remotepath)
+		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remoteapth: %s)", username, sensitiveOptionsRemoved, remotepath)
 	}
 
 	// use PowerShell Environment Variables to store user input string to prevent command line injection
@@ -203,7 +214,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return []string{pathname}, nil
 }
 
-func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	// Try to mount the disk
 	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, source, target)
 

@@ -88,7 +88,7 @@ func (t *grpcTunnel) serve() {
 			return
 		}
 
-		klog.Infof("[tracing] recv packet %+v", pkt)
+		klog.V(6).Infof("[tracing] recv packet, type: %s", pkt.Type)
 
 		switch pkt.Type {
 		case client.PacketType_DIAL_RSP:
@@ -165,7 +165,7 @@ func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
 			},
 		},
 	}
-	klog.Infof("[tracing] send packet %+v", req)
+	klog.V(6).Infof("[tracing] send packet, type: %s", req.Type)
 
 	err := t.stream.Send(req)
 	if err != nil {

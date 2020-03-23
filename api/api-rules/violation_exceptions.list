@@ -341,6 +341,7 @@ API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,EnvFrom
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,VolumeMounts
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,Volumes
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSIDriverList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeDriver,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeList,Items
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeSpec,Drivers
@@ -597,6 +598,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,D
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointControllerConfiguration,ConcurrentEndpointSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointControllerConfiguration,EndpointUpdatesBatchPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointSliceControllerConfiguration,ConcurrentServiceEndpointSyncs
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointSliceControllerConfiguration,EndpointUpdatesBatchPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointSliceControllerConfiguration,MaxEndpointsPerSlice
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,ConcurrentGCSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,EnableGarbageCollector

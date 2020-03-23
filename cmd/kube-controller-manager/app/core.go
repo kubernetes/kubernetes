@@ -30,12 +30,11 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	storagev1informer "k8s.io/client-go/informers/storage/v1"
-	storagev1beta1informer "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
@@ -208,7 +207,6 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
 		ctx.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
 		ctx.ComponentConfig.NodeLifecycleController.EnableTaintManager,
-		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 	)
 	if err != nil {
 		return nil, true, err
@@ -313,15 +311,12 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 	}
 
 	var (
-		csiNodeInformer   storagev1informer.CSINodeInformer
-		csiDriverInformer storagev1beta1informer.CSIDriverInformer
+		csiNodeInformer storagev1informer.CSINodeInformer
 	)
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		csiNodeInformer = ctx.InformerFactory.Storage().V1().CSINodes()
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		csiDriverInformer = ctx.InformerFactory.Storage().V1beta1().CSIDrivers()
-	}
+	csiDriverInformer := ctx.InformerFactory.Storage().V1().CSIDrivers()
 
 	plugins, err := ProbeAttachableVolumePlugins()
 	if err != nil {

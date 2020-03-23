@@ -18,14 +18,16 @@ package csi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	api "k8s.io/api/core/v1"
-	"k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -299,7 +301,7 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 	fClient := csiMapper.csiClient.(*fakeCsiDriverClient)
-	fClient.nodeClient.SetNextError(errors.New("mock final error"))
+	fClient.nodeClient.SetNextError(status.Error(codes.InvalidArgument, "mock final error"))
 
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
@@ -380,19 +382,18 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 
 func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
 
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
-	fakeDriver := &v1beta1.CSIDriver{
+	fakeDriver := &storagev1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: testDriver,
 		},
-		Spec: v1beta1.CSIDriverSpec{
+		Spec: storagev1.CSIDriverSpec{
 			AttachRequired: &attachRequired,
 		},
 	}
-	_, err := fakeClient.StorageV1beta1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
+	_, err := fakeClient.StorageV1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create a fakeDriver: %v", err)
 	}

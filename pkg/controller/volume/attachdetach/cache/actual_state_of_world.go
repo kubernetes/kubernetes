@@ -120,7 +120,7 @@ type ActualStateOfWorld interface {
 	GetAttachedVolumesPerNode() map[types.NodeName][]operationexecutor.AttachedVolume
 
 	// GetNodesForAttachedVolume returns the nodes on which the volume is attached.
-	// This function is used by reconciler for mutli-attach check.
+	// This function is used by reconciler for multi-attach check.
 	GetNodesForAttachedVolume(volumeName v1.UniqueVolumeName) []types.NodeName
 
 	// GetVolumesToReportAttached returns a map containing the set of nodes for

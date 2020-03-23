@@ -102,9 +102,10 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 // 12 true cases.
 func TestShouldPodBeInEndpoints(t *testing.T) {
 	testCases := []struct {
-		name     string
-		pod      *v1.Pod
-		expected bool
+		name            string
+		pod             *v1.Pod
+		publishNotReady bool
+		expected        bool
 	}{
 		// Pod should not be in endpoints:
 		{
@@ -159,6 +160,23 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 				},
 			},
 			expected: false,
+		},
+		{
+			name: "Terminating Pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					PodIP: "1.2.3.4",
+				},
+			},
+			publishNotReady: false,
+			expected:        false,
 		},
 		// Pod should be in endpoints:
 		{
@@ -226,11 +244,28 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "Terminating Pod with publish not ready",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					PodIP: "1.2.3.4",
+				},
+			},
+			publishNotReady: true,
+			expected:        true,
+		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			result := ShouldPodBeInEndpoints(test.pod)
+			result := ShouldPodBeInEndpoints(test.pod, test.publishNotReady)
 			if result != test.expected {
 				t.Errorf("expected: %t, got: %t", test.expected, result)
 			}

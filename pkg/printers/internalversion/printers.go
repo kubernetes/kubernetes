@@ -39,7 +39,6 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -198,6 +197,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	ingressColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Class", Type: "string", Description: "The name of the IngressClass resource that should be used for additional configuration"},
 		{Name: "Hosts", Type: "string", Description: "Hosts that incoming requests are matched against before the ingress rule"},
 		{Name: "Address", Type: "string", Description: "Address is a list containing ingress points for the load-balancer"},
 		{Name: "Ports", Type: "string", Description: "Ports of TLS configurations that open"},
@@ -205,6 +205,15 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(ingressColumnDefinitions, printIngress)
 	h.TableHandler(ingressColumnDefinitions, printIngressList)
+
+	ingressClassColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Controller", Type: "string", Description: "Controller that is responsible for handling this class"},
+		{Name: "Parameters", Type: "string", Description: "A reference to a resource with additional parameters"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(ingressClassColumnDefinitions, printIngressClass)
+	h.TableHandler(ingressClassColumnDefinitions, printIngressClassList)
 
 	statefulSetColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -397,6 +406,7 @@ func AddHandlers(h printers.PrintHandler) {
 	certificateSigningRequestColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["signerName"]},
 		{Name: "Requestor", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
 		{Name: "Condition", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestStatus{}.SwaggerDoc()["conditions"]},
 	}
@@ -497,9 +507,9 @@ func AddHandlers(h printers.PrintHandler) {
 
 	csiDriverColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "AttachRequired", Type: "boolean", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["attachRequired"]},
-		{Name: "PodInfoOnMount", Type: "boolean", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["podInfoOnMount"]},
-		{Name: "Modes", Type: "string", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["volumeLifecycleModes"]},
+		{Name: "AttachRequired", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["attachRequired"]},
+		{Name: "PodInfoOnMount", Type: "boolean", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["podInfoOnMount"]},
+		{Name: "Modes", Type: "string", Description: storagev1.CSIDriverSpec{}.SwaggerDoc()["volumeLifecycleModes"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(csiDriverColumnDefinitions, printCSIDriver)
@@ -756,7 +766,11 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 
 		// change pod status back to "Running" if there is at least one container still reporting as "Running" status
 		if reason == "Completed" && hasRunning {
-			reason = "Running"
+			if hasPodReadyCondition(pod.Status.Conditions) {
+				reason = "Running"
+			} else {
+				reason = "NotReady"
+			}
 		}
 	}
 
@@ -805,6 +819,15 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	}
 
 	return []metav1.TableRow{row}, nil
+}
+
+func hasPodReadyCondition(conditions []api.PodCondition) bool {
+	for _, condition := range conditions {
+		if condition.Type == api.PodReady && condition.Status == api.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 func printPodTemplate(obj *api.PodTemplate, options printers.GenerateOptions) ([]metav1.TableRow, error) {
@@ -1132,11 +1155,15 @@ func printIngress(obj *networking.Ingress, options printers.GenerateOptions) ([]
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
+	className := "<none>"
+	if obj.Spec.IngressClassName != nil {
+		className = *obj.Spec.IngressClassName
+	}
 	hosts := formatHosts(obj.Spec.Rules)
 	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
 	ports := formatPorts(obj.Spec.TLS)
 	createTime := translateTimestampSince(obj.CreationTimestamp)
-	row.Cells = append(row.Cells, obj.Name, hosts, address, ports, createTime)
+	row.Cells = append(row.Cells, obj.Name, className, hosts, address, ports, createTime)
 	return []metav1.TableRow{row}, nil
 }
 
@@ -1144,6 +1171,35 @@ func printIngressList(list *networking.IngressList, options printers.GenerateOpt
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printIngress(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printIngressClass(obj *networking.IngressClass, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	parameters := "<none>"
+	if obj.Spec.Parameters != nil {
+		parameters = obj.Spec.Parameters.Kind
+		if obj.Spec.Parameters.APIGroup != nil {
+			parameters = parameters + "." + *obj.Spec.Parameters.APIGroup
+		}
+		parameters = parameters + "/" + obj.Spec.Parameters.Name
+	}
+	createTime := translateTimestampSince(obj.CreationTimestamp)
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Controller, parameters, createTime)
+	return []metav1.TableRow{row}, nil
+}
+
+func printIngressClassList(list *networking.IngressClassList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printIngressClass(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
@@ -1716,7 +1772,11 @@ func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest,
 	if err != nil {
 		return nil, err
 	}
-	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp), obj.Spec.Username, status)
+	signerName := "<none>"
+	if obj.Spec.SignerName != "" {
+		signerName = obj.Spec.SignerName
+	}
+	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp), signerName, obj.Spec.Username, status)
 	return []metav1.TableRow{row}, nil
 }
 

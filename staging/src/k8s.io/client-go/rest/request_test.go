@@ -31,6 +31,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -2188,5 +2189,32 @@ func TestRequestPreflightCheck(t *testing.T) {
 				t.Errorf("%s: expects error: %v, has error: %v", verb, tt.expectsErr, hasErr)
 			}
 		})
+	}
+}
+
+func TestThrottledLogger(t *testing.T) {
+	now := time.Now()
+	clock := clock.NewFakeClock(now)
+	globalThrottledLogger.clock = clock
+
+	logMessages := 0
+	for i := 0; i < 10000; i++ {
+		var wg sync.WaitGroup
+		wg.Add(100)
+		for j := 0; j < 100; j++ {
+			go func() {
+				if _, ok := globalThrottledLogger.attemptToLog(); ok {
+					logMessages++
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		now = now.Add(1 * time.Second)
+		clock.SetTime(now)
+	}
+
+	if a, e := logMessages, 1000; a != e {
+		t.Fatalf("expected %v log messages, but got %v", e, a)
 	}
 }

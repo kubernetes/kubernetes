@@ -106,7 +106,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
 
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 
 		err = framework.CheckTestingNSDeletedExcept(cs, ns)
@@ -268,7 +267,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			}
 
 			// remove RuntimeClass
-			cs.NodeV1beta1().RuntimeClasses().Delete(context.TODO(), e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime), nil)
+			cs.NodeV1beta1().RuntimeClasses().Delete(context.TODO(), e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime), metav1.DeleteOptions{})
 		})
 
 		ginkgo.It("verify pod overhead is accounted for", func() {
@@ -836,10 +835,14 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 				},
 			},
 			Tolerations:                   conf.Tolerations,
-			NodeName:                      conf.NodeName,
 			PriorityClassName:             conf.PriorityClassName,
 			TerminationGracePeriodSeconds: &gracePeriod,
 		},
+	}
+	// TODO: setting the Pod's nodeAffinity instead of setting .spec.nodeName works around the
+	// Preemption e2e flake (#88441), but we should investigate deeper to get to the bottom of it.
+	if len(conf.NodeName) != 0 {
+		e2epod.SetNodeAffinity(&pod.Spec, conf.NodeName)
 	}
 	if conf.Resources != nil {
 		pod.Spec.Containers[0].Resources = *conf.Resources
@@ -876,7 +879,7 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	pod := runPausePod(f, conf)
 
 	ginkgo.By("Explicitly delete pod here to free the resource it takes.")
-	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	framework.ExpectNoError(err)
 
 	return pod.Spec.NodeName

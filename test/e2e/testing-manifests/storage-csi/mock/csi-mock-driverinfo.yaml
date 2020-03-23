@@ -1,4 +1,4 @@
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: mock.storage.k8s.io

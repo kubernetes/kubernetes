@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,10 +35,10 @@ import (
 	v1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
@@ -45,7 +46,7 @@ const (
 )
 
 var ShutdownTaint = &v1.Taint{
-	Key:    schedulerapi.TaintNodeShutdown,
+	Key:    cloudproviderapi.TaintNodeShutdown,
 	Effect: v1.TaintEffectNoSchedule,
 }
 
@@ -190,7 +191,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 			fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
 			"Node %s event: %s", node.Name, deleteNodeEvent)
 
-		if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, nil); err != nil {
+		if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("unable to delete node %q: %v", node.Name, err)
 		}
 	}

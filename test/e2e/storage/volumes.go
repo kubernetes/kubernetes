@@ -68,7 +68,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
-				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(context.TODO(), configMap.Name, nil)
+				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502

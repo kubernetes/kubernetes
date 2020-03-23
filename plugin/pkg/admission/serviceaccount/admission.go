@@ -216,7 +216,7 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		podutil.VisitPodSecretNames(pod, func(name string) bool {
 			hasSecrets = true
 			return false
-		})
+		}, podutil.AllContainers)
 		if hasSecrets {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
 		}

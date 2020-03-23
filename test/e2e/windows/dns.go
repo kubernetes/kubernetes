@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -55,11 +56,11 @@ var _ = SIGDescribe("DNS", func() {
 		framework.Logf("Created pod %v", testUtilsPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testUtilsPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
 		}()
-		framework.ExpectNoError(f.WaitForPodRunning(testUtilsPod.Name), "failed to wait for pod %s to be running", testUtilsPod.Name)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testUtilsPod.Name, f.Namespace.Name), "failed to wait for pod %s to be running", testUtilsPod.Name)
 
 		ginkgo.By("Verifying customized DNS option is configured on pod...")
 		cmd := []string{"ipconfig", "/all"}
@@ -102,7 +103,7 @@ func generateDNSUtilsPod() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "util",
-					Image:   imageutils.GetE2EImage(imageutils.Dnsutils),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"sleep", "10000"},
 				},
 			},

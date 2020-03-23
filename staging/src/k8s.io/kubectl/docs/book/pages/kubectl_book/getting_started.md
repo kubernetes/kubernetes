@@ -29,7 +29,7 @@ List the Kubernetes *Deployment* Resources that are in the kube-system namespace
 ```bash
 kubectl get deployments --namespace kube-system
 ```
- 
+
 ```bash
 NAME                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 event-exporter-v0.2.3    1         1         1            1           14d
@@ -51,7 +51,7 @@ Print detailed information about the kube-dns Deployment in the kube-system name
 ```bash
 kubectl describe deployment kube-dns --namespace kube-system
 ```
-   
+
 ```bash
 Name:                   kube-dns
 Namespace:              kube-system
@@ -126,7 +126,7 @@ due to the serialization process of go objects.
 
 {% sample lang="yaml" %}
 ```bash
-kubectl create deployment nginx --dry-run -o yaml --image nginx
+kubectl create deployment nginx --dry-run=client -o yaml --image nginx
 ```
 
 ```yaml
@@ -205,3 +205,21 @@ root@nginx-deployment-5c689d88bb-s7xcv:/#
 ```
 
 {% endmethod %}
+
+## Extending kubectl
+
+There is a plugin mechanism to adapt `kubectl` to your particular needs.
+
+{% method %}
+
+Show which plugins are currently available
+
+{% sample lang="yaml" %}
+
+```bash
+kubectl plugin list
+```
+
+{% endmethod %}
+
+The easiest way to discover and install plugins is via the kubernetes sub-project [krew.dev](https://github.com/kubernetes-sigs/krew/#installation).

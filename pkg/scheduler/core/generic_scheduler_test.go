@@ -37,8 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -1999,8 +1999,8 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumezone.ErrReasonConflict),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumebinding.ErrReasonNodeConflict),
-				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumebinding.ErrReasonBindConflict),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonNodeConflict)),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict)),
 			},
 			expected: map[string]bool{"machine4": true},
 		},

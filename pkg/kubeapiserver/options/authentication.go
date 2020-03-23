@@ -43,7 +43,6 @@ type BuiltInAuthenticationOptions struct {
 	BootstrapToken  *BootstrapTokenAuthenticationOptions
 	ClientCert      *genericoptions.ClientCertAuthenticationOptions
 	OIDC            *OIDCAuthenticationOptions
-	PasswordFile    *PasswordFileAuthenticationOptions
 	RequestHeader   *genericoptions.RequestHeaderAuthenticationOptions
 	ServiceAccounts *ServiceAccountAuthenticationOptions
 	TokenFile       *TokenFileAuthenticationOptions
@@ -71,10 +70,6 @@ type OIDCAuthenticationOptions struct {
 	GroupsPrefix   string
 	SigningAlgs    []string
 	RequiredClaims map[string]string
-}
-
-type PasswordFileAuthenticationOptions struct {
-	BasicAuthFile string
 }
 
 type ServiceAccountAuthenticationOptions struct {
@@ -108,7 +103,6 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithBootstrapToken().
 		WithClientCert().
 		WithOIDC().
-		WithPasswordFile().
 		WithRequestHeader().
 		WithServiceAccounts().
 		WithTokenFile().
@@ -132,11 +126,6 @@ func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOp
 
 func (s *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
 	s.OIDC = &OIDCAuthenticationOptions{}
-	return s
-}
-
-func (s *BuiltInAuthenticationOptions) WithPasswordFile() *BuiltInAuthenticationOptions {
-	s.PasswordFile = &PasswordFileAuthenticationOptions{}
 	return s
 }
 
@@ -274,13 +263,6 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Repeat this flag to specify multiple claims.")
 	}
 
-	if s.PasswordFile != nil {
-		fs.StringVar(&s.PasswordFile.BasicAuthFile, "basic-auth-file", s.PasswordFile.BasicAuthFile, ""+
-			"If set, the file that will be used to admit requests to the secure port of the API server "+
-			"via http basic authentication.")
-		fs.MarkDeprecated("basic-auth-file", "Basic authentication mode is deprecated and will be removed in a future release. It is not recommended for production environments.")
-	}
-
 	if s.RequestHeader != nil {
 		s.RequestHeader.AddFlags(fs)
 	}
@@ -377,10 +359,6 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.OIDCRequiredClaims = s.OIDC.RequiredClaims
 	}
 
-	if s.PasswordFile != nil {
-		ret.BasicAuthFile = s.PasswordFile.BasicAuthFile
-	}
-
 	if s.RequestHeader != nil {
 		var err error
 		ret.RequestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
@@ -446,8 +424,6 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 			}
 		}
 	}
-
-	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
 
 	c.Authentication.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {

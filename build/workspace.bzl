@@ -125,15 +125,6 @@ def debian_image_dependencies():
             tag = "v12.0.1",  # ignored, but kept here for documentation
         )
 
-        container_pull(
-            name = "debian-hyperkube-base-" + arch,
-            architecture = arch,
-            digest = _digest(_DEBIAN_HYPERKUBE_BASE_DIGEST, arch),
-            registry = "k8s.gcr.io",
-            repository = "debian-hyperkube-base",
-            tag = "0.12.1",  # ignored, but kept here for documentation
-        )
-
 def etcd_tarballs():
     for arch, sha in _ETCD_TARBALL_ARCH_SHA256.items():
         http_archive(

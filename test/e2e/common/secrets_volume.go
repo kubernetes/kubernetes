@@ -199,7 +199,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		Description: Create a Pod with three containers with secrets volume sources namely a create, update and delete container. Create Container when started MUST not have secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
-		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/secret-volumes"
@@ -348,7 +348,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Deleting secret %v", deleteSecret.Name))
-		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), deleteSecret.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), deleteSecret.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Updating secret %v", updateSecret.Name))
@@ -412,7 +412,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", secret.Name, secret.Namespace)
 
 		// Ensure that immutable secret can be deleted.
-		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", secret.Name, secret.Namespace)
 	})
 
@@ -588,7 +588,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 }
 
 func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -632,11 +632,11 @@ func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
 func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPath, podName string) error {
-	podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
@@ -693,5 +693,5 @@ func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPat
 	}
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return f.WaitForPodRunning(pod.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }

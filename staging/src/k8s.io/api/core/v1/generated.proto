@@ -689,7 +689,6 @@ message Container {
   repeated VolumeMount volumeMounts = 9;
 
   // volumeDevices is the list of block devices to be used by the container.
-  // This is a beta feature.
   // +patchMergeKey=devicePath
   // +patchStrategy=merge
   // +optional
@@ -1276,7 +1275,6 @@ message EphemeralContainerCommon {
   repeated VolumeMount volumeMounts = 9;
 
   // volumeDevices is the list of block devices to be used by the container.
-  // This is a beta feature.
   // +patchMergeKey=devicePath
   // +patchStrategy=merge
   // +optional
@@ -2279,7 +2277,7 @@ message NodeProxyOptions {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
 message NodeResources {
   // Capacity represents the available resources of a node
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
@@ -2433,7 +2431,7 @@ message NodeSystemInfo {
 
   // SystemUUID reported by the node. For unique machine identification
   // MachineID is preferred. This field is specific to Red Hat hosts
-  // https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html
+  // https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
   optional string systemUUID = 2;
 
   // Boot ID reported by the node.
@@ -2636,15 +2634,18 @@ message PersistentVolumeClaimSpec {
 
   // volumeMode defines what type of volume is required by the claim.
   // Value of Filesystem is implied when not included in claim spec.
-  // This is a beta feature.
   // +optional
   optional string volumeMode = 6;
 
-  // This field requires the VolumeSnapshotDataSource alpha feature gate to be
-  // enabled and currently VolumeSnapshot is the only supported data source.
-  // If the provisioner can support VolumeSnapshot data source, it will create
-  // a new volume and data will be restored to the volume at the same time.
-  // If the provisioner does not support VolumeSnapshot data source, volume will
+  // This field can be used to specify either:
+  // * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot - Beta)
+  // * An existing PVC (PersistentVolumeClaim)
+  // * An existing custom resource/object that implements data population (Alpha)
+  // In order to use VolumeSnapshot object types, the appropriate feature gate
+  // must be enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
+  // If the provisioner or an external controller can support the specified data source,
+  // it will create a new volume based on the contents of the specified data source.
+  // If the specified data source is not supported, the volume will
   // not be created and the failure will be reported as an event.
   // In the future, we plan to support more data source types and the behavior
   // of the provisioner may change.
@@ -2852,7 +2853,6 @@ message PersistentVolumeSpec {
 
   // volumeMode defines if a volume is intended to be used with a formatted filesystem
   // or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-  // This is a beta feature.
   // +optional
   optional string volumeMode = 8;
 
@@ -3278,6 +3278,15 @@ message PodSecurityContext {
   // sysctls (by the container runtime) might fail to launch.
   // +optional
   repeated Sysctl sysctls = 7;
+
+  // fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+  // before being exposed inside Pod. This field will only apply to
+  // volume types which support fsGroup based ownership(and permissions).
+  // It will have no effect on ephemeral volume types such as: secret, configmaps
+  // and emptydir.
+  // Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
+  // +optional
+  optional string fsGroupChangePolicy = 9;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -4912,7 +4921,7 @@ message Taint {
   // Required. The taint key to be applied to a node.
   optional string key = 1;
 
-  // Required. The taint value corresponding to the taint key.
+  // The taint value corresponding to the taint key.
   // +optional
   optional string value = 2;
 
@@ -5304,14 +5313,12 @@ message WeightedPodAffinityTerm {
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 message WindowsSecurityContextOptions {
   // GMSACredentialSpecName is the name of the GMSA credential spec to use.
-  // This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
   // +optional
   optional string gmsaCredentialSpecName = 1;
 
   // GMSACredentialSpec is where the GMSA admission webhook
   // (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
   // GMSA credential spec named by the GMSACredentialSpecName field.
-  // This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
   // +optional
   optional string gmsaCredentialSpec = 2;
 

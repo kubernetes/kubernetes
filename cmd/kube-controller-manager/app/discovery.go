@@ -48,6 +48,7 @@ func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Discovery().V1beta1().EndpointSlices(),
 		ctx.ComponentConfig.EndpointSliceController.MaxEndpointsPerSlice,
 		ctx.ClientBuilder.ClientOrDie("endpointslice-controller"),
+		ctx.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
 	).Run(int(ctx.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs), ctx.Stop)
 	return nil, true, nil
 }

@@ -65,7 +65,7 @@ spec:
             name: csi-data-dir
 
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.3.0-rc1
+          image: quay.io/k8scsi/hostpathplugin:v1.4.0-rc2
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"

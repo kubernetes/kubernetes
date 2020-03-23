@@ -60,7 +60,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			podServer, service = createServerPodAndService(f, f.Namespace, "server", []int{80, 81})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := f.WaitForPodReady(podServer.Name)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, framework.PodStartTimeout)
 				framework.ExpectNoError(err)
 			})
 
@@ -718,15 +718,15 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "Error creating Network Policy %v: %v", policy.ObjectMeta.Name, err)
 
 			testCanConnect(f, f.Namespace, "client-a", service, clientAAllowedPort)
-			err = f.WaitForPodNotFound("client-a", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-b", service, clientAAllowedPort)
-			err = f.WaitForPodNotFound("client-b", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-a", service, clientANotAllowedPort)
-			err = f.WaitForPodNotFound("client-a", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-a", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			const (
@@ -765,7 +765,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			defer cleanupNetworkPolicy(f, policy)
 
 			testCannotConnect(f, f.Namespace, "client-b", service, clientBNotAllowedPort)
-			err = f.WaitForPodNotFound("client-b", framework.PodDeleteTimeout)
+			e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, "client-b", f.Namespace.Name, framework.PodDeleteTimeout)
 			framework.ExpectNoError(err, "Expected pod to be not found.")
 
 			testCannotConnect(f, f.Namespace, "client-a", service, clientBNotAllowedPort)
@@ -858,7 +858,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			podClient := createNetworkClientPodWithRestartPolicy(f, f.Namespace, "client-a", service, allowedPort, v1.RestartPolicyOnFailure)
 			defer func() {
 				ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
-				if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podClient.Name, nil); err != nil {
+				if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
 					framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 				}
 			}()
@@ -1067,7 +1067,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			defer cleanupServerPodAndService(f, podServerB, serviceB)
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := f.WaitForPodReady(podServerB.Name)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, framework.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
@@ -1243,7 +1243,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			// Creating pod-b and service-b
 			podServerB, serviceB = createServerPodAndService(f, f.Namespace, "pod-b", []int{80})
 			ginkgo.By("Waiting for pod-b to be ready", func() {
-				err = f.WaitForPodReady(podServerB.Name)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServerB.Name, f.Namespace.Name, framework.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			defer cleanupServerPodAndService(f, podServerB, serviceB)
@@ -1380,7 +1380,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			// Before applying policy, communication should be successful between pod-a and pod-b
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []int{80})
 			ginkgo.By("Waiting for pod-a to be ready", func() {
-				err = f.WaitForPodReady(podA.Name)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, framework.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			ginkgo.By("Creating client pod-b which should be able to contact the server pod-a.", func() {
@@ -1390,7 +1390,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 			podB, serviceB = createServerPodAndService(f, f.Namespace, "pod-b", []int{80})
 			ginkgo.By("Waiting for pod-b to be ready", func() {
-				err = f.WaitForPodReady(podB.Name)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, f.Namespace.Name, framework.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 			ginkgo.By("Creating client pod-a which should be able to contact the server pod-b.", func() {
@@ -1472,7 +1472,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			// Creating server pod with label "pod-name": "pod-a" to deny traffic from client pod with label "pod-name": "pod-b"
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []int{80})
 			ginkgo.By("Waiting for pod-a to be ready", func() {
-				err = f.WaitForPodReady(podA.Name)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podA.Name, f.Namespace.Name, framework.PodStartTimeout)
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
@@ -1491,7 +1491,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 	podClient := createNetworkClientPod(f, ns, podName, service, targetPort)
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
-		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, nil); err != nil {
+		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
 			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
@@ -1503,7 +1503,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 	podClient := createNetworkClientPod(f, ns, podName, service, targetPort)
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
-		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, nil); err != nil {
+		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
 			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
@@ -1670,11 +1670,11 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 
 func cleanupServerPodAndService(f *framework.Framework, pod *v1.Pod, service *v1.Service) {
 	ginkgo.By("Cleaning up the server.")
-	if err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, nil); err != nil {
+	if err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
 		framework.Failf("unable to cleanup pod %v: %v", pod.Name, err)
 	}
 	ginkgo.By("Cleaning up the server's service.")
-	if err := f.ClientSet.CoreV1().Services(service.Namespace).Delete(context.TODO(), service.Name, nil); err != nil {
+	if err := f.ClientSet.CoreV1().Services(service.Namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{}); err != nil {
 		framework.Failf("unable to cleanup svc %v: %v", service.Name, err)
 	}
 }
@@ -1740,7 +1740,7 @@ func updatePodLabel(f *framework.Framework, namespace *v1.Namespace, podName str
 
 func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPolicy) {
 	ginkgo.By("Cleaning up the policy.")
-	if err := f.ClientSet.NetworkingV1().NetworkPolicies(policy.Namespace).Delete(context.TODO(), policy.Name, nil); err != nil {
+	if err := f.ClientSet.NetworkingV1().NetworkPolicies(policy.Namespace).Delete(context.TODO(), policy.Name, metav1.DeleteOptions{}); err != nil {
 		framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 	}
 }

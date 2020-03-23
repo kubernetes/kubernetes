@@ -41,11 +41,13 @@ func TestVisitContainers(t *testing.T) {
 		description string
 		haveSpec    *api.PodSpec
 		wantNames   []string
+		mask        ContainerType
 	}{
 		{
 			"empty podspec",
 			&api.PodSpec{},
 			[]string{},
+			DefaultContainers,
 		},
 		{
 			"regular containers",
@@ -56,6 +58,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"c1", "c2"},
+			DefaultContainers,
 		},
 		{
 			"init containers",
@@ -66,6 +69,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2"},
+			DefaultContainers,
 		},
 		{
 			"regular and init containers",
@@ -80,6 +84,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2"},
+			DefaultContainers,
 		},
 		{
 			"ephemeral containers",
@@ -93,6 +98,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"c1", "c2", "e1"},
+			DefaultContainers,
 		},
 		{
 			"all container types",
@@ -111,6 +117,26 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			DefaultContainers,
+		},
+		{
+			"all container types with init and regular container types chosen",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+			Containers | InitContainers,
 		},
 		{
 			"dropping fields",
@@ -129,12 +155,13 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			DefaultContainers,
 		},
 	}
 
 	for _, tc := range testCases {
 		gotNames := []string{}
-		VisitContainers(tc.haveSpec, func(c *api.Container) bool {
+		VisitContainers(tc.haveSpec, tc.mask, func(c *api.Container, containerType ContainerType) bool {
 			gotNames = append(gotNames, c.Name)
 			if c.SecurityContext != nil {
 				c.SecurityContext = nil
@@ -256,7 +283,7 @@ func TestPodSecrets(t *testing.T) {
 	VisitPodSecretNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
-	})
+	}, AllContainers)
 
 	// excludedSecretPaths holds struct paths to fields with "secret" in the name that are not actually references to secret API objects
 	excludedSecretPaths := sets.NewString(
@@ -401,7 +428,7 @@ func TestPodConfigmaps(t *testing.T) {
 	VisitPodConfigmapNames(pod, func(name string) bool {
 		extractedNames.Insert(name)
 		return true
-	})
+	}, AllContainers)
 
 	// expectedPaths holds struct paths to fields with "ConfigMap" in the name that are references to ConfigMap API objects.
 	// every path here should be represented as an example in the Pod stub above, with the ConfigMap name set to the path.
@@ -435,148 +462,131 @@ func TestPodConfigmaps(t *testing.T) {
 	}
 }
 
-func TestDropAlphaVolumeDevices(t *testing.T) {
-	podWithVolumeDevices := func() *api.Pod {
+func TestDropFSGroupFields(t *testing.T) {
+	nofsGroupPod := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyNever,
 				Containers: []api.Container{
 					{
 						Name:  "container1",
 						Image: "testimage",
-						VolumeDevices: []api.VolumeDevice{
-							{
-								Name:       "myvolume",
-								DevicePath: "/usr/test",
-							},
-						},
-					},
-				},
-				InitContainers: []api.Container{
-					{
-						Name:  "container1",
-						Image: "testimage",
-						VolumeDevices: []api.VolumeDevice{
-							{
-								Name:       "myvolume",
-								DevicePath: "/usr/test",
-							},
-						},
-					},
-				},
-				Volumes: []api.Volume{
-					{
-						Name: "myvolume",
-						VolumeSource: api.VolumeSource{
-							HostPath: &api.HostPathVolumeSource{
-								Path: "/dev/xvdc",
-							},
-						},
-					},
-				},
-			},
-		}
-	}
-	podWithoutVolumeDevices := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyNever,
-				Containers: []api.Container{
-					{
-						Name:  "container1",
-						Image: "testimage",
-					},
-				},
-				InitContainers: []api.Container{
-					{
-						Name:  "container1",
-						Image: "testimage",
-					},
-				},
-				Volumes: []api.Volume{
-					{
-						Name: "myvolume",
-						VolumeSource: api.VolumeSource{
-							HostPath: &api.HostPathVolumeSource{
-								Path: "/dev/xvdc",
-							},
-						},
 					},
 				},
 			},
 		}
 	}
 
-	podInfo := []struct {
-		description      string
-		hasVolumeDevices bool
-		pod              func() *api.Pod
+	var podFSGroup int64 = 100
+	changePolicy := api.FSGroupChangeAlways
+
+	fsGroupPod := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "container1",
+						Image: "testimage",
+					},
+				},
+				SecurityContext: &api.PodSecurityContext{
+					FSGroup:             &podFSGroup,
+					FSGroupChangePolicy: &changePolicy,
+				},
+			},
+		}
+	}
+	podInfos := []struct {
+		description                  string
+		featureEnabled               bool
+		newPodHasFSGroupChangePolicy bool
+		pod                          func() *api.Pod
+		expectPolicyInPod            bool
 	}{
 		{
-			description:      "has VolumeDevices",
-			hasVolumeDevices: true,
-			pod:              podWithVolumeDevices,
+			description:                  "oldPod.FSGroupChangePolicy=nil, feature=true, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               true,
+			pod:                          nofsGroupPod,
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            true,
 		},
 		{
-			description:      "does not have VolumeDevices",
-			hasVolumeDevices: false,
-			pod:              podWithoutVolumeDevices,
+			description:                  "oldPod=nil, feature=false, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               false,
+			pod:                          func() *api.Pod { return nil },
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            false,
 		},
 		{
-			description:      "is nil",
-			hasVolumeDevices: false,
-			pod:              func() *api.Pod { return nil },
+			description:                  "oldPod=nil, feature=true, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               true,
+			pod:                          func() *api.Pod { return nil },
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            true,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=nil, feature=false, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               false,
+			pod:                          nofsGroupPod,
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            false,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=true",
+			featureEnabled:               false,
+			pod:                          fsGroupPod,
+			newPodHasFSGroupChangePolicy: true,
+			expectPolicyInPod:            true,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=true, feature=false, newPod.FSGroupChangePolicy=false",
+			featureEnabled:               false,
+			pod:                          fsGroupPod,
+			newPodHasFSGroupChangePolicy: false,
+			expectPolicyInPod:            false,
+		},
+		{
+			description:                  "oldPod.FSGroupChangePolicy=true, feature=true, newPod.FSGroupChangePolicy=false",
+			featureEnabled:               true,
+			pod:                          fsGroupPod,
+			newPodHasFSGroupChangePolicy: false,
+			expectPolicyInPod:            false,
 		},
 	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasVolumeDevices, oldPod := oldPodInfo.hasVolumeDevices, oldPodInfo.pod()
-				newPodHasVolumeDevices, newPod := newPodInfo.hasVolumeDevices, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasVolumeDevices:
-						// new pod should not be changed if the feature is enabled, or if the old pod had VolumeDevices
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasVolumeDevices:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have VolumeDevices
-						if !reflect.DeepEqual(newPod, podWithoutVolumeDevices()) {
-							t.Errorf("new pod had VolumeDevices: %v", diff.ObjectReflectDiff(newPod, podWithoutVolumeDevices()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
+	for _, podInfo := range podInfos {
+		t.Run(podInfo.description, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, podInfo.featureEnabled)()
+			oldPod := podInfo.pod()
+			newPod := oldPod.DeepCopy()
+			if oldPod == nil && podInfo.newPodHasFSGroupChangePolicy {
+				newPod = fsGroupPod()
 			}
-		}
+
+			if oldPod != nil {
+				if podInfo.newPodHasFSGroupChangePolicy {
+					newPod.Spec.SecurityContext = &api.PodSecurityContext{
+						FSGroup:             &podFSGroup,
+						FSGroupChangePolicy: &changePolicy,
+					}
+				} else {
+					newPod.Spec.SecurityContext = &api.PodSecurityContext{}
+				}
+			}
+			DropDisabledPodFields(newPod, oldPod)
+
+			if podInfo.expectPolicyInPod {
+				secContext := newPod.Spec.SecurityContext
+				if secContext == nil || secContext.FSGroupChangePolicy == nil {
+					t.Errorf("for %s, expected fsGroupChangepolicy found none", podInfo.description)
+				}
+			} else {
+				secConext := newPod.Spec.SecurityContext
+				if secConext != nil && secConext.FSGroupChangePolicy != nil {
+					t.Errorf("for %s, unexpected fsGroupChangepolicy set", podInfo.description)
+				}
+			}
+		})
 	}
+
 }
 
 func TestDropSubPath(t *testing.T) {
@@ -1307,208 +1317,6 @@ func TestDropRunAsGroup(t *testing.T) {
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
 							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
-func TestDropGMSAFields(t *testing.T) {
-	defaultContainerSecurityContextFactory := func() *api.SecurityContext {
-		defaultProcMount := api.DefaultProcMount
-		return &api.SecurityContext{ProcMount: &defaultProcMount}
-	}
-	podWithoutWindowsOptionsFactory := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				RestartPolicy:   api.RestartPolicyNever,
-				SecurityContext: &api.PodSecurityContext{},
-				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
-				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
-			},
-		}
-	}
-
-	type podFactoryInfo struct {
-		description  string
-		hasGMSAField bool
-		// this factory should generate the input pod whose spec will be fed to dropDisabledFields
-		podFactory func() *api.Pod
-		// this factory should generate the expected pod after the GMSA fields have been dropped
-		// we can't just use podWithoutWindowsOptionsFactory as is for this, since in some cases
-		// we'll be left with a WindowsSecurityContextOptions struct with no GMSA field set, as opposed
-		// to a nil pointer in the pod generated by podWithoutWindowsOptionsFactory
-		// if this field is not set, it will default to the podFactory
-		strippedPodFactory func() *api.Pod
-	}
-	podFactoryInfos := []podFactoryInfo{
-		{
-			description:  "does not have any GMSA field set",
-			hasGMSAField: false,
-			podFactory:   podWithoutWindowsOptionsFactory,
-		},
-		{
-			description:  "has a pod-level WindowsSecurityContextOptions struct with no GMSA field set",
-			hasGMSAField: false,
-			podFactory: func() *api.Pod {
-				pod := podWithoutWindowsOptionsFactory()
-				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
-				return pod
-			},
-		},
-		{
-			description:  "has a WindowsSecurityContextOptions struct with no GMSA field set on a container",
-			hasGMSAField: false,
-			podFactory: func() *api.Pod {
-				pod := podWithoutWindowsOptionsFactory()
-				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
-				return pod
-			},
-		},
-		{
-			description:  "has a WindowsSecurityContextOptions struct with no GMSA field set on an init container",
-			hasGMSAField: false,
-			podFactory: func() *api.Pod {
-				pod := podWithoutWindowsOptionsFactory()
-				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
-				return pod
-			},
-		},
-		{
-			description:  "is nil",
-			hasGMSAField: false,
-			podFactory:   func() *api.Pod { return nil },
-		},
-	}
-
-	toPtr := func(s string) *string {
-		return &s
-	}
-	addGMSACredentialSpecName := func(windowsOptions *api.WindowsSecurityContextOptions) {
-		windowsOptions.GMSACredentialSpecName = toPtr("dummy-gmsa-cred-spec-name")
-	}
-	addGMSACredentialSpec := func(windowsOptions *api.WindowsSecurityContextOptions) {
-		windowsOptions.GMSACredentialSpec = toPtr("dummy-gmsa-cred-spec-contents")
-	}
-	addBothGMSAFields := func(windowsOptions *api.WindowsSecurityContextOptions) {
-		addGMSACredentialSpecName(windowsOptions)
-		addGMSACredentialSpec(windowsOptions)
-	}
-
-	for fieldName, windowsOptionsTransformingFunc := range map[string]func(*api.WindowsSecurityContextOptions){
-		"GMSACredentialSpecName field": addGMSACredentialSpecName,
-		"GMSACredentialSpec field":     addGMSACredentialSpec,
-		"both GMSA fields":             addBothGMSAFields,
-	} {
-		// yes, these variables are indeed needed for the closure to work
-		// properly, please do NOT remove them
-		name := fieldName
-		transformingFunc := windowsOptionsTransformingFunc
-
-		windowsOptionsWithGMSAFieldFactory := func() *api.WindowsSecurityContextOptions {
-			windowsOptions := &api.WindowsSecurityContextOptions{}
-			transformingFunc(windowsOptions)
-			return windowsOptions
-		}
-
-		podFactoryInfos = append(podFactoryInfos,
-			podFactoryInfo{
-				description:  fmt.Sprintf("has %s in Pod", name),
-				hasGMSAField: true,
-				podFactory: func() *api.Pod {
-					pod := podWithoutWindowsOptionsFactory()
-					pod.Spec.SecurityContext.WindowsOptions = windowsOptionsWithGMSAFieldFactory()
-					return pod
-				},
-				strippedPodFactory: func() *api.Pod {
-					pod := podWithoutWindowsOptionsFactory()
-					pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
-					return pod
-				},
-			},
-			podFactoryInfo{
-				description:  fmt.Sprintf("has %s in Container", name),
-				hasGMSAField: true,
-				podFactory: func() *api.Pod {
-					pod := podWithoutWindowsOptionsFactory()
-					pod.Spec.Containers[0].SecurityContext.WindowsOptions = windowsOptionsWithGMSAFieldFactory()
-					return pod
-				},
-				strippedPodFactory: func() *api.Pod {
-					pod := podWithoutWindowsOptionsFactory()
-					pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
-					return pod
-				},
-			},
-			podFactoryInfo{
-				description:  fmt.Sprintf("has %s in InitContainer", name),
-				hasGMSAField: true,
-				podFactory: func() *api.Pod {
-					pod := podWithoutWindowsOptionsFactory()
-					pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = windowsOptionsWithGMSAFieldFactory()
-					return pod
-				},
-				strippedPodFactory: func() *api.Pod {
-					pod := podWithoutWindowsOptionsFactory()
-					pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
-					return pod
-				},
-			})
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodFactoryInfo := range podFactoryInfos {
-			for _, newPodFactoryInfo := range podFactoryInfos {
-				newPodHasGMSAField, newPod := newPodFactoryInfo.hasGMSAField, newPodFactoryInfo.podFactory()
-				if newPod == nil {
-					continue
-				}
-				oldPodHasGMSAField, oldPod := oldPodFactoryInfo.hasGMSAField, oldPodFactoryInfo.podFactory()
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %s, new pod %s", enabled, oldPodFactoryInfo.description, newPodFactoryInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsGMSA, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodFactoryInfo.podFactory()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodFactoryInfo.podFactory()))
-					}
-
-					switch {
-					case enabled || oldPodHasGMSAField:
-						// new pod should not be changed if the feature is enabled, or if the old pod had any GMSA field set
-						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
-						}
-					case newPodHasGMSAField:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
-							t.Errorf("%v", oldPod)
-							t.Errorf("%v", newPod)
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have any GMSA field set
-						var expectedStrippedPod *api.Pod
-						if newPodFactoryInfo.strippedPodFactory == nil {
-							expectedStrippedPod = newPodFactoryInfo.podFactory()
-						} else {
-							expectedStrippedPod = newPodFactoryInfo.strippedPodFactory()
-						}
-
-						if !reflect.DeepEqual(newPod, expectedStrippedPod) {
-							t.Errorf("new pod had some GMSA field set: %v", diff.ObjectReflectDiff(newPod, expectedStrippedPod))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
 						}
 					}
 				})

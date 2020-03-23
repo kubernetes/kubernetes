@@ -493,3 +493,128 @@ func TestAllowsHTTP2(t *testing.T) {
 		})
 	}
 }
+
+func TestSourceIPs(t *testing.T) {
+	tests := []struct {
+		name         string
+		realIP       string
+		forwardedFor string
+		remoteAddr   string
+		expected     []string
+	}{{
+		name:     "no headers, missing remoteAddr",
+		expected: []string{},
+	}, {
+		name:       "no headers, just remoteAddr host:port",
+		remoteAddr: "1.2.3.4:555",
+		expected:   []string{"1.2.3.4"},
+	}, {
+		name:       "no headers, just remoteAddr host",
+		remoteAddr: "1.2.3.4",
+		expected:   []string{"1.2.3.4"},
+	}, {
+		name:         "empty forwarded-for chain",
+		forwardedFor: " ",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"1.2.3.4"},
+	}, {
+		name:         "invalid forwarded-for chain",
+		forwardedFor: "garbage garbage values!",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"1.2.3.4"},
+	}, {
+		name:         "partially invalid forwarded-for chain",
+		forwardedFor: "garbage garbage values!,4.5.6.7",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"4.5.6.7", "1.2.3.4"},
+	}, {
+		name:         "valid forwarded-for chain",
+		forwardedFor: "120.120.120.126,2.2.2.2,4.5.6.7",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"120.120.120.126", "2.2.2.2", "4.5.6.7", "1.2.3.4"},
+	}, {
+		name:         "valid forwarded-for chain with redundant remoteAddr",
+		forwardedFor: "2.2.2.2,1.2.3.4",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"2.2.2.2", "1.2.3.4"},
+	}, {
+		name:       "invalid Real-Ip",
+		realIP:     "garbage, just garbage!",
+		remoteAddr: "1.2.3.4",
+		expected:   []string{"1.2.3.4"},
+	}, {
+		name:         "invalid Real-Ip with forwarded-for",
+		realIP:       "garbage, just garbage!",
+		forwardedFor: "2.2.2.2",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"2.2.2.2", "1.2.3.4"},
+	}, {
+		name:       "valid Real-Ip",
+		realIP:     "2.2.2.2",
+		remoteAddr: "1.2.3.4",
+		expected:   []string{"2.2.2.2", "1.2.3.4"},
+	}, {
+		name:       "redundant Real-Ip",
+		realIP:     "1.2.3.4",
+		remoteAddr: "1.2.3.4",
+		expected:   []string{"1.2.3.4"},
+	}, {
+		name:         "valid Real-Ip with forwarded-for",
+		realIP:       "2.2.2.2",
+		forwardedFor: "120.120.120.126,4.5.6.7",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"120.120.120.126", "4.5.6.7", "2.2.2.2", "1.2.3.4"},
+	}, {
+		name:         "redundant Real-Ip with forwarded-for",
+		realIP:       "2.2.2.2",
+		forwardedFor: "120.120.120.126,2.2.2.2,4.5.6.7",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"120.120.120.126", "2.2.2.2", "4.5.6.7", "1.2.3.4"},
+	}, {
+		name:         "full redundancy",
+		realIP:       "1.2.3.4",
+		forwardedFor: "1.2.3.4",
+		remoteAddr:   "1.2.3.4",
+		expected:     []string{"1.2.3.4"},
+	}, {
+		name:         "full ipv6",
+		realIP:       "abcd:ef01:2345:6789:abcd:ef01:2345:6789",
+		forwardedFor: "aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111,0:1111:2222:3333:4444:5555:6666:7777",
+		remoteAddr:   "aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa",
+		expected: []string{
+			"aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111",
+			"0:1111:2222:3333:4444:5555:6666:7777",
+			"abcd:ef01:2345:6789:abcd:ef01:2345:6789",
+			"aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa",
+		},
+	}, {
+		name:         "mixed ipv4 ipv6",
+		forwardedFor: "aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111,1.2.3.4",
+		remoteAddr:   "0:0:0:0:0:ffff:102:304", // ipv6 equivalent to 1.2.3.4
+		expected: []string{
+			"aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111",
+			"1.2.3.4",
+		},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, _ := http.NewRequest("GET", "https://cluster.k8s.io/apis/foobars/v1/foo/bar", nil)
+			req.RemoteAddr = test.remoteAddr
+			if test.forwardedFor != "" {
+				req.Header.Set("X-Forwarded-For", test.forwardedFor)
+			}
+			if test.realIP != "" {
+				req.Header.Set("X-Real-Ip", test.realIP)
+			}
+
+			actualIPs := SourceIPs(req)
+			actual := make([]string, len(actualIPs))
+			for i, ip := range actualIPs {
+				actual[i] = ip.String()
+			}
+
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}

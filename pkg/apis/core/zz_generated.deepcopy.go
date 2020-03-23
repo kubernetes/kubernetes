@@ -3691,6 +3691,11 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.FSGroupChangePolicy != nil {
+		in, out := &in.FSGroupChangePolicy, &out.FSGroupChangePolicy
+		*out = new(PodFSGroupChangePolicy)
+		**out = **in
+	}
 	if in.Sysctls != nil {
 		in, out := &in.Sysctls, &out.Sysctls
 		*out = make([]Sysctl, len(*in))

@@ -99,30 +99,30 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			false: "RW",
 		}
 		type testT struct {
-			descr     string                // It description
-			readOnly  bool                  // true means pd is read-only
-			deleteOpt *metav1.DeleteOptions // pod delete option
+			descr     string               // It description
+			readOnly  bool                 // true means pd is read-only
+			deleteOpt metav1.DeleteOptions // pod delete option
 		}
 		tests := []testT{
 			{
 				descr:     podImmediateGrace,
 				readOnly:  false,
-				deleteOpt: metav1.NewDeleteOptions(0),
+				deleteOpt: *metav1.NewDeleteOptions(0),
 			},
 			{
 				descr:     podDefaultGrace,
 				readOnly:  false,
-				deleteOpt: &metav1.DeleteOptions{},
+				deleteOpt: metav1.DeleteOptions{},
 			},
 			{
 				descr:     podImmediateGrace,
 				readOnly:  true,
-				deleteOpt: metav1.NewDeleteOptions(0),
+				deleteOpt: *metav1.NewDeleteOptions(0),
 			},
 			{
 				descr:     podDefaultGrace,
 				readOnly:  true,
-				deleteOpt: &metav1.DeleteOptions{},
+				deleteOpt: metav1.DeleteOptions{},
 			},
 		}
 
@@ -148,10 +148,10 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					fmtPod = testPDPod([]string{diskName}, host0Name, false, 1)
 					_, err = podClient.Create(context.TODO(), fmtPod, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "Failed to create fmtPod")
-					framework.ExpectNoError(f.WaitForPodRunningSlow(fmtPod.Name))
+					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, fmtPod.Name, f.Namespace.Name))
 
 					ginkgo.By("deleting the fmtPod")
-					framework.ExpectNoError(podClient.Delete(context.TODO(), fmtPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete fmtPod")
+					framework.ExpectNoError(podClient.Delete(context.TODO(), fmtPod.Name, *metav1.NewDeleteOptions(0)), "Failed to delete fmtPod")
 					framework.Logf("deleted fmtPod %q", fmtPod.Name)
 					ginkgo.By("waiting for PD to detach")
 					framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
@@ -176,7 +176,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				ginkgo.By("creating host0Pod on node0")
 				_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host0Pod.Name, f.Namespace.Name))
 				framework.Logf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name)
 
 				var containerName, testFile, testFileContents string
@@ -200,7 +200,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				ginkgo.By("creating host1Pod on node1")
 				_, err = podClient.Create(context.TODO(), host1Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create host1Pod")
-				framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host1Pod.Name, f.Namespace.Name))
 				framework.Logf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name)
 
 				if readOnly {
@@ -269,7 +269,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					ginkgo.By("defer: cleaning up PD-RW test environment")
 					framework.Logf("defer cleanup errors can usually be ignored")
 					if host0Pod != nil {
-						podClient.Delete(context.TODO(), host0Pod.Name, metav1.NewDeleteOptions(0))
+						podClient.Delete(context.TODO(), host0Pod.Name, *metav1.NewDeleteOptions(0))
 					}
 					for _, diskName := range diskNames {
 						detachAndDeletePDs(diskName, []types.NodeName{host0Name})
@@ -282,7 +282,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					host0Pod = testPDPod(diskNames, host0Name, false /* readOnly */, numContainers)
 					_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-					framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host0Pod.Name, f.Namespace.Name))
 
 					ginkgo.By(fmt.Sprintf("writing %d file(s) via a container", numPDs))
 					containerName := "mycontainer"
@@ -305,7 +305,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					verifyPDContentsViaContainer(ns, f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 					ginkgo.By("deleting host0Pod")
-					framework.ExpectNoError(podClient.Delete(context.TODO(), host0Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
+					framework.ExpectNoError(podClient.Delete(context.TODO(), host0Pod.Name, *metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
 				}
 				ginkgo.By(fmt.Sprintf("Test completed successfully, waiting for %d PD(s) to detach from node0", numPDs))
 				for _, diskName := range diskNames {
@@ -360,7 +360,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					ginkgo.By("defer: cleaning up PD-RW test env")
 					framework.Logf("defer cleanup errors can usually be ignored")
 					ginkgo.By("defer: delete host0Pod")
-					podClient.Delete(context.TODO(), host0Pod.Name, metav1.NewDeleteOptions(0))
+					podClient.Delete(context.TODO(), host0Pod.Name, *metav1.NewDeleteOptions(0))
 					ginkgo.By("defer: detach and delete PDs")
 					detachAndDeletePDs(diskName, []types.NodeName{host0Name})
 					if disruptOp == deleteNode || disruptOp == deleteNodeObj {
@@ -385,7 +385,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				ginkgo.By("waiting for host0Pod to be running")
-				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, host0Pod.Name, f.Namespace.Name))
 
 				ginkgo.By("writing content to host0Pod")
 				testFile := "/testpd1/tracker"
@@ -417,9 +417,9 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				} else if disruptOp == deleteNodeObj {
 					ginkgo.By("deleting host0's node api object")
-					framework.ExpectNoError(nodeClient.Delete(context.TODO(), string(host0Name), metav1.NewDeleteOptions(0)), "Unable to delete host0's node object")
+					framework.ExpectNoError(nodeClient.Delete(context.TODO(), string(host0Name), *metav1.NewDeleteOptions(0)), "Unable to delete host0's node object")
 					ginkgo.By("deleting host0Pod")
-					framework.ExpectNoError(podClient.Delete(context.TODO(), host0Pod.Name, metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
+					framework.ExpectNoError(podClient.Delete(context.TODO(), host0Pod.Name, *metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
 
 				} else if disruptOp == evictPod {
 					evictTarget := &policyv1beta1.Eviction{
@@ -430,7 +430,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					}
 					ginkgo.By("evicting host0Pod")
 					err = wait.PollImmediate(framework.Poll, podEvictTimeout, func() (bool, error) {
-						if err := cs.CoreV1().Pods(ns).Evict(evictTarget); err != nil {
+						if err := cs.CoreV1().Pods(ns).Evict(context.TODO(), evictTarget); err != nil {
 							framework.Logf("Failed to evict host0Pod, ignoring error: %v", err)
 							return false, nil
 						}

@@ -97,15 +97,15 @@ func (c *FakeRuntimeClasses) Update(ctx context.Context, runtimeClass *v1alpha1.
 }
 
 // Delete takes name of the runtimeClass and deletes it. Returns an error if one occurs.
-func (c *FakeRuntimeClasses) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeRuntimeClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(runtimeclassesResource, name), &v1alpha1.RuntimeClass{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRuntimeClasses) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(runtimeclassesResource, listOptions)
+func (c *FakeRuntimeClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(runtimeclassesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.RuntimeClassList{})
 	return err

@@ -411,34 +411,50 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPortPortals 
 	}
 }
 
+// OnServiceAdd is called whenever creation of new service object
+// is observed.
 func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
 	_ = proxier.mergeService(service)
 }
 
+// OnServiceUpdate is called whenever modification of an existing
+// service object is observed.
 func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 	existingPortPortals := proxier.mergeService(service)
 	proxier.unmergeService(oldService, existingPortPortals)
 }
 
+// OnServiceDelete is called whenever deletion of an existing service
+// object is observed.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.unmergeService(service, map[ServicePortPortalName]bool{})
 }
 
+// OnServiceSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 }
 
+// OnEndpointsAdd is called whenever creation of new endpoints object
+// is observed.
 func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsAdd(endpoints)
 }
 
+// OnEndpointsUpdate is called whenever modification of an existing
+// endpoints object is observed.
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsUpdate(oldEndpoints, endpoints)
 }
 
+// OnEndpointsDelete is called whenever deletion of an existing endpoints
+// object is observed.
 func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	proxier.loadBalancer.OnEndpointsDelete(endpoints)
 }
 
+// OnEndpointsSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.loadBalancer.OnEndpointsSynced()
 }

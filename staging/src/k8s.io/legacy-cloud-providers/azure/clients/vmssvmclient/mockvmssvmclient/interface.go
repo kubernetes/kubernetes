@@ -22,7 +22,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	gomock "github.com/golang/mock/gomock"
 	retry "k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -92,4 +92,18 @@ func (m *MockInterface) Update(ctx context.Context, resourceGroupName, VMScaleSe
 func (mr *MockInterfaceMockRecorder) Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters, source interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockInterface)(nil).Update), ctx, resourceGroupName, VMScaleSetName, instanceID, parameters, source)
+}
+
+// UpdateVMs mocks base method
+func (m *MockInterface) UpdateVMs(ctx context.Context, resourceGroupName, VMScaleSetName string, instances map[string]compute.VirtualMachineScaleSetVM, source string) *retry.Error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateVMs", ctx, resourceGroupName, VMScaleSetName, instances, source)
+	ret0, _ := ret[0].(*retry.Error)
+	return ret0
+}
+
+// UpdateVMs indicates an expected call of UpdateVMs
+func (mr *MockInterfaceMockRecorder) UpdateVMs(ctx, resourceGroupName, VMScaleSetName, instances, source interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateVMs", reflect.TypeOf((*MockInterface)(nil).UpdateVMs), ctx, resourceGroupName, VMScaleSetName, instances, source)
 }

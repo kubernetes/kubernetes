@@ -29,9 +29,7 @@ const (
 	// Many tests create an endpoint per node, in large clusters, this is
 	// resource and time intensive.
 	MaxNodesForEndpointsTests = 3
-)
 
-const (
 	// KubeProxyLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
 	// to not notice a Service update, such as type=NodePort.
 	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very

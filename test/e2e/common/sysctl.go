@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 		gomega.Expect(ev).To(gomega.BeNil())
 
 		ginkgo.By("Waiting for pod completion")
-		err = f.WaitForPodNoLongerRunning(pod.Name)
+		err = e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -129,7 +129,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 		gomega.Expect(ev).To(gomega.BeNil())
 
 		ginkgo.By("Waiting for pod completion")
-		err = f.WaitForPodNoLongerRunning(pod.Name)
+		err = e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)

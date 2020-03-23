@@ -319,7 +319,6 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	if openAPIConfig != nil {
 		openAPIConfig.SecurityDefinitions = securityDefinitions
 	}
-	authenticationInfo.SupportsBasicAuth = false
 
 	return nil
 }

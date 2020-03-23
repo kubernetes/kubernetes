@@ -714,6 +714,14 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// The previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	// Default: ""
+	// +optional
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node

@@ -302,7 +302,7 @@ var _ = SIGDescribe("Addon update", func() {
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
 			framework.Logf("Cleaning up ensure exist class addon.")
-			err := f.ClientSet.CoreV1().Services(addonNsName).Delete(context.TODO(), "addon-ensure-exists-test", nil)
+			err := f.ClientSet.CoreV1().Services(addonNsName).Delete(context.TODO(), "addon-ensure-exists-test", metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		}()
 

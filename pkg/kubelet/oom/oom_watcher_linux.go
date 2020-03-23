@@ -72,7 +72,7 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
 		defer runtime.HandleCrash()
 
 		for event := range outStream {
-			if event.ContainerName == recordEventContainerName {
+			if event.VictimContainerName == recordEventContainerName {
 				klog.V(1).Infof("Got sys oom event: %v", event)
 				eventMsg := "System OOM encountered"
 				if event.ProcessName != "" && event.Pid != 0 {

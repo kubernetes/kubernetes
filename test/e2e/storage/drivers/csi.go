@@ -44,7 +44,6 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -328,9 +327,9 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		NodeName:                 node.Name,
 		PodInfo:                  m.podInfo,
 		CanAttach:                &m.attachable,
-		VolumeLifecycleModes: &[]storagev1beta1.VolumeLifecycleMode{
-			storagev1beta1.VolumeLifecyclePersistent,
-			storagev1beta1.VolumeLifecycleEphemeral,
+		VolumeLifecycleModes: &[]storagev1.VolumeLifecycleMode{
+			storagev1.VolumeLifecyclePersistent,
+			storagev1.VolumeLifecycleEphemeral,
 		},
 	}
 	cleanup, err := utils.CreateFromManifests(f, func(item interface{}) error {

@@ -48,20 +48,15 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
@@ -74,7 +69,6 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
-	"k8s.io/kubernetes/test/integration/etcd"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -349,107 +343,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 	})
 
-	ginkgo.Describe("kubectl get output", func() {
-		ginkgo.It("should contain custom columns for each resource", func() {
-			randString := rand.String(10)
-
-			ignoredResources := map[string]bool{
-				// ignored for intentionally using standard fields.
-				// This assumption is based on a lack of TableColumnDefinition
-				// in pkg/printers/internalversion/printers.go
-				"ClusterRole": true,
-				"Role":        true,
-				"LimitRange":  true,
-				"PodPreset":   true,
-
-				// ignored for being disruptive in an e2e, and getting automatically deleted by a controller
-				"Node": true,
-
-				// ignored temporarily while waiting for bug fix.
-				"CustomResourceDefinition": true,
-
-				// ignored because no test data exists.
-				// Do not add anything to this list, instead add fixtures in
-				// the test/integration/etcd package.
-				"BackendConfig":         true,
-				"ComponentStatus":       true,
-				"NodeMetrics":           true,
-				"PodMetrics":            true,
-				"VolumeSnapshotClass":   true,
-				"VolumeSnapshotContent": true,
-				"VolumeSnapshot":        true,
-			}
-
-			apiGroups, err := c.Discovery().ServerPreferredResources()
-
-			if discovery.IsGroupDiscoveryFailedError(err) {
-				discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
-				for gv := range discoveryErr.Groups {
-					if strings.Contains(gv.Group, ".") && !strings.HasSuffix(gv.Group, ".k8s.io") {
-						// tolerate discovery errors for non-k8s.io groups (like aggregated/crd groups)
-						continue
-					}
-					if gv.Group == "metrics.k8s.io" {
-						// tolerate discovery errors for known test k8s.io groups like aggregated/metrics groups
-						continue
-					}
-					// otherwise, fail
-					framework.ExpectNoError(err)
-				}
-			} else {
-				// fail immediately if this isn't a discovery error
-				framework.ExpectNoError(err)
-
-			}
-
-			testableResources := etcd.GetEtcdStorageDataForNamespace(f.Namespace.Name)
-
-			for _, group := range apiGroups {
-				// This limits the scope of this test to exclude CRDs. This
-				// assumes that CRDs will not have a .k8s.io group and will have
-				// a . in their name.
-				if !strings.Contains(group.GroupVersion, ".k8s.io") && strings.Contains(group.GroupVersion, ".") {
-					continue
-				}
-
-				for _, resource := range group.APIResources {
-					if !verbsContain(resource.Verbs, "get") || ignoredResources[resource.Kind] || strings.HasPrefix(resource.Name, "e2e-test") {
-						continue
-					}
-
-					// compute gvr
-					gv, err := schema.ParseGroupVersion(group.GroupVersion)
-					framework.ExpectNoError(err)
-					gvr := gv.WithResource(resource.Name)
-
-					// assert test data exists
-					testData := testableResources[gvr]
-					gomega.ExpectWithOffset(1, testData).ToNot(gomega.BeZero(), "No test data available for %s", gvr)
-
-					// create test resource
-					mapping := &meta.RESTMapping{
-						Resource:         gvr,
-						GroupVersionKind: gv.WithKind(resource.Kind),
-					}
-
-					if resource.Namespaced {
-						mapping.Scope = meta.RESTScopeNamespace
-					} else {
-						mapping.Scope = meta.RESTScopeRoot
-					}
-
-					client, obj, err := etcd.JSONToUnstructured(testData.Stub, f.Namespace.Name, mapping, f.DynamicClient)
-					framework.ExpectNoError(err)
-					if resource.Kind != "APIService" && resource.Kind != "CustomResourceDefinition" {
-						obj.SetName(obj.GetName() + randString)
-					}
-
-					createObjValidateOutputAndCleanup(f.Namespace.Name, client, obj, resource)
-				}
-			}
-		})
-	})
-
 	ginkgo.Describe("Simple pod", func() {
 		var podYaml string
 		ginkgo.BeforeEach(func() {
@@ -625,7 +518,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test", nil)).To(gomega.BeNil())
+			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test", metav1.DeleteOptions{})).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach without stdin")
 			runOutput = framework.NewKubectlCommand(ns, fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -634,7 +527,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-2", nil)).To(gomega.BeNil())
+			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-2", metav1.DeleteOptions{})).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
 			runOutput = framework.NewKubectlCommand(ns, nsFlag, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -660,7 +553,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			})
 			gomega.Expect(err).To(gomega.BeNil())
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-3", nil)).To(gomega.BeNil())
+			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
 
 		ginkgo.It("should contain last line of the log", func() {
@@ -2223,53 +2116,4 @@ waitLoop:
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
 	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
-}
-
-// verbsContain returns true if the provided list of verbs contain the provided
-// verb string.
-func verbsContain(verbs metav1.Verbs, str string) bool {
-	for _, v := range verbs {
-		if v == str {
-			return true
-		}
-	}
-	return false
-}
-
-// deleteObj deletes an Object with the provided client and name.
-func deleteObj(client dynamic.ResourceInterface, name string) {
-	err := client.Delete(name, &metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
-}
-
-// createObjValidateOutputAndCleanup creates an object using the provided client
-// and then verifies that the kubectl get output provides custom columns. Once
-// the test has completed, it deletes the object.
-func createObjValidateOutputAndCleanup(namespace string, client dynamic.ResourceInterface, obj *unstructured.Unstructured, resource metav1.APIResource) {
-	_, err := client.Create(obj, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	defer deleteObj(client, obj.GetName())
-
-	// get test resource
-	output := framework.RunKubectlOrDie(namespace, "get", resource.Name, "--all-namespaces")
-	if output == "" {
-		framework.Failf("No stdout from kubectl get for %s (likely need to define test resources)", resource.Name)
-	}
-
-	splitOutput := strings.SplitN(output, "\n", 2)
-	fields := strings.Fields(splitOutput[0])
-
-	defaultColumns := [][]string{
-		// namespaced, server-side
-		{"NAMESPACE", "NAME", "CREATED", "AT"},
-		// namespaced, client-side
-		{"NAMESPACE", "NAME", "AGE"},
-		// cluster-scoped, server-side
-		{"NAME", "CREATED", "AT"},
-		// cluster-scoped, client-side
-		{"NAME", "AGE"},
-	}
-	for _, defaults := range defaultColumns {
-		framework.ExpectNotEqual(fields, defaults, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
-	}
 }

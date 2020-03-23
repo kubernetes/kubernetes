@@ -97,15 +97,15 @@ func (c *FakeAuditSinks) Update(ctx context.Context, auditSink *v1alpha1.AuditSi
 }
 
 // Delete takes name of the auditSink and deletes it. Returns an error if one occurs.
-func (c *FakeAuditSinks) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeAuditSinks) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(auditsinksResource, name), &v1alpha1.AuditSink{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeAuditSinks) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(auditsinksResource, listOptions)
+func (c *FakeAuditSinks) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(auditsinksResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.AuditSinkList{})
 	return err

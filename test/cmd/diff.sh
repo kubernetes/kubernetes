@@ -29,8 +29,11 @@ run_kubectl_diff_tests() {
     # Test that it works when the live object doesn't exist
     output_message=$(! kubectl diff -f hack/testdata/pod.yaml)
     kube::test::if_has_string "${output_message}" 'test-pod'
+    # Ensure diff only dry-runs and doesn't persist change
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" ':'
 
     kubectl apply -f hack/testdata/pod.yaml
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" 'found:'
 
     # Make sure that diffing the resource right after returns nothing (0 exit code).
     kubectl diff -f hack/testdata/pod.yaml
@@ -39,6 +42,11 @@ run_kubectl_diff_tests() {
     # 1. the exit code for diff is 1 because it found a difference
     # 2. the difference contains the changed image
     output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml || test $? -eq 1)
+    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
+
+    # Test found diff with server-side apply
+    kubectl apply -f hack/testdata/pod.yaml
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml --server-side --force-conflicts || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
 
     # Test that we have a return code bigger than 1 if there is an error when diffing

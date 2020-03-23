@@ -6,10 +6,10 @@ go 1.13
 
 require (
 	cloud.google.com/go v0.38.0
-	github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.9.0
-	github.com/Azure/go-autorest/autorest/adal v0.5.0
-	github.com/Azure/go-autorest/autorest/mocks v0.2.0
+	github.com/Azure/azure-sdk-for-go v40.2.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.9.6
+	github.com/Azure/go-autorest/autorest/adal v0.8.2
+	github.com/Azure/go-autorest/autorest/mocks v0.3.0
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
@@ -35,7 +35,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200117235808-5f6fbceb4c31
+	k8s.io/utils v0.0.0-20200320200009-4a6ff033650d
 	sigs.k8s.io/yaml v1.2.0
 )
 

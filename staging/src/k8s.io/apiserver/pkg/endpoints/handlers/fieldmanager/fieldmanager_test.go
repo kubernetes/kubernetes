@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +105,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
 	f = fieldmanager.NewStripMetaManager(f)
+	f = fieldmanager.NewManagedFieldsUpdater(f)
 	f = fieldmanager.NewBuildManagerInfoManager(f, gvk.GroupVersion())
 	return TestFieldManager{
 		fieldManager: f,
@@ -730,5 +732,54 @@ func TestApplySuccessWithNoManagedFields(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
+	}
+}
+
+// Run an update and apply, and make sure that nothing has changed.
+func TestNoOpChanges(t *testing.T) {
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), &obj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	if err := f.Apply(obj, "fieldmanager_test_apply", false); err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+	before := f.liveObj.DeepCopyObject()
+	// Wait to make sure the timestamp is different
+	time.Sleep(time.Second)
+	// Applying with a different fieldmanager will create an entry..
+	if err := f.Apply(obj, "fieldmanager_test_apply_other", false); err != nil {
+		t.Fatalf("failed to update object: %v", err)
+	}
+	if reflect.DeepEqual(before, f.liveObj) {
+		t.Fatalf("Applying no-op apply with new manager didn't change object: \n%v", f.liveObj)
+	}
+	before = f.liveObj.DeepCopyObject()
+	// Wait to make sure the timestamp is different
+	time.Sleep(time.Second)
+	if err := f.Update(obj, "fieldmanager_test_update"); err != nil {
+		t.Fatalf("failed to update object: %v", err)
+	}
+	if !reflect.DeepEqual(before, f.liveObj) {
+		t.Fatalf("No-op update has changed the object:\n%v\n---\n%v", before, f.liveObj)
+	}
+	before = f.liveObj.DeepCopyObject()
+	// Wait to make sure the timestamp is different
+	time.Sleep(time.Second)
+	if err := f.Apply(obj, "fieldmanager_test_apply", true); err != nil {
+		t.Fatalf("failed to re-apply object: %v", err)
+	}
+	if !reflect.DeepEqual(before, f.liveObj) {
+		t.Fatalf("No-op apply has changed the object:\n%v\n---\n%v", before, f.liveObj)
 	}
 }

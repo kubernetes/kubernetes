@@ -21,27 +21,20 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // VolumeBinding is a plugin that binds pod volumes in scheduling.
 type VolumeBinding struct {
-	binder *volumebinder.VolumeBinder
+	binder scheduling.SchedulerVolumeBinder
 }
 
 var _ framework.FilterPlugin = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "VolumeBinding"
-
-const (
-	// ErrReasonBindConflict is used for VolumeBindingNoMatch predicate error.
-	ErrReasonBindConflict = "node(s) didn't find available persistent volumes to bind"
-	// ErrReasonNodeConflict is used for VolumeNodeAffinityConflict predicate error.
-	ErrReasonNodeConflict = "node(s) had volume node affinity conflict"
-)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeBinding) Name() string {
@@ -79,19 +72,16 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return nil
 	}
 
-	unboundSatisfied, boundSatisfied, err := pl.binder.Binder.FindPodVolumes(pod, node)
+	reasons, err := pl.binder.FindPodVolumes(pod, node)
 
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	if !boundSatisfied || !unboundSatisfied {
+	if len(reasons) > 0 {
 		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
-		if !boundSatisfied {
-			status.AppendReason(ErrReasonNodeConflict)
-		}
-		if !unboundSatisfied {
-			status.AppendReason(ErrReasonBindConflict)
+		for _, reason := range reasons {
+			status.AppendReason(string(reason))
 		}
 		return status
 	}

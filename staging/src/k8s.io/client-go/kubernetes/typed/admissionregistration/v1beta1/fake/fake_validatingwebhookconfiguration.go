@@ -97,15 +97,15 @@ func (c *FakeValidatingWebhookConfigurations) Update(ctx context.Context, valida
 }
 
 // Delete takes name of the validatingWebhookConfiguration and deletes it. Returns an error if one occurs.
-func (c *FakeValidatingWebhookConfigurations) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeValidatingWebhookConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(validatingwebhookconfigurationsResource, name), &v1beta1.ValidatingWebhookConfiguration{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeValidatingWebhookConfigurations) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(validatingwebhookconfigurationsResource, listOptions)
+func (c *FakeValidatingWebhookConfigurations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(validatingwebhookconfigurationsResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ValidatingWebhookConfigurationList{})
 	return err

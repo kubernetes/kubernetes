@@ -19,6 +19,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"path"
 	"time"
 
@@ -188,7 +189,7 @@ while true; do sleep 1; done
 
 			/*
 				Release: v1.15
-				Name: Container Runtime, TerminationMessagePath, non-root user and non-default path
+				Testname: Container Runtime, TerminationMessagePath, non-root user and non-default path
 				Description: Create a pod with a container to run it as a non-root user with a custom TerminationMessagePath set. Pod redirects the output to the provided path successfully. When the container is terminated, the termination message MUST match the expected output logged in the provided custom path.
 				[LinuxOnly]: Tagged LinuxOnly due to use of 'uid' and unable to mount files in Windows Containers.
 			*/
@@ -212,7 +213,7 @@ while true; do sleep 1; done
 
 			/*
 				Release: v1.15
-				Name: Container Runtime, TerminationMessage, from container's log output of failing container
+				Testname: Container Runtime, TerminationMessage, from container's log output of failing container
 				Description: Create a pod with an container. Container's output is recorded in log and container exits with an error. When container is terminated, termination message MUST match the expected output recorded from container's log.
 				[LinuxOnly]: Cannot mount files in Windows Containers.
 			*/
@@ -229,7 +230,7 @@ while true; do sleep 1; done
 
 			/*
 				Release: v1.15
-				Name: Container Runtime, TerminationMessage, from log output of succeeding container
+				Testname: Container Runtime, TerminationMessage, from log output of succeeding container
 				Description: Create a pod with an container. Container's output is recorded in log and container exits successfully without an error. When container is terminated, terminationMessage MUST have no content as container succeed.
 				[LinuxOnly]: Cannot mount files in Windows Containers.
 			*/
@@ -246,7 +247,7 @@ while true; do sleep 1; done
 
 			/*
 				Release: v1.15
-				Name: Container Runtime, TerminationMessage, from file of succeeding container
+				Testname: Container Runtime, TerminationMessage, from file of succeeding container
 				Description: Create a pod with an container. Container's output is recorded in a file and the container exits successfully without an error. When container is terminated, terminationMessage MUST match with the content from file.
 				[LinuxOnly]: Cannot mount files in Windows Containers.
 			*/
@@ -294,7 +295,12 @@ while true; do sleep 1; done
 		}
 	}
 }`
-
+					// we might be told to use a different docker config JSON.
+					if framework.TestContext.DockerConfigFile != "" {
+						contents, err := ioutil.ReadFile(framework.TestContext.DockerConfigFile)
+						framework.ExpectNoError(err)
+						auth = string(contents)
+					}
 					secret := &v1.Secret{
 						Data: map[string][]byte{v1.DockerConfigJsonKey: []byte(auth)},
 						Type: v1.SecretTypeDockerConfigJson,
@@ -303,7 +309,7 @@ while true; do sleep 1; done
 					ginkgo.By("create image pull secret")
 					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 					framework.ExpectNoError(err)
-					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, nil)
+					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 					container.ImagePullSecrets = []string{secret.Name}
 				}
 				// checkContainerStatus checks whether the container status matches expectation.

@@ -41,10 +41,10 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
-	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
+	"k8s.io/kubernetes/test/e2e/storage/podlogs"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -408,7 +408,7 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
 func deleteStorageClass(cs clientset.Interface, className string) error {
-	err := cs.StorageV1().StorageClasses().Delete(context.TODO(), className, nil)
+	err := cs.StorageV1().StorageClasses().Delete(context.TODO(), className, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

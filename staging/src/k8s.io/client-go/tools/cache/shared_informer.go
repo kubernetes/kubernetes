@@ -34,38 +34,38 @@ import (
 // SharedInformer provides eventually consistent linkage of its
 // clients to the authoritative state of a given collection of
 // objects.  An object is identified by its API group, kind/resource,
-// namespace, and name; the `ObjectMeta.UID` is not part of an
-// object's ID as far as this contract is concerned.  One
+// namespace (if any), and name; the `ObjectMeta.UID` is not part of
+// an object's ID as far as this contract is concerned.  One
 // SharedInformer provides linkage to objects of a particular API
 // group and kind/resource.  The linked object collection of a
-// SharedInformer may be further restricted to one namespace and/or by
-// label selector and/or field selector.
+// SharedInformer may be further restricted to one namespace (if
+// applicable) and/or by label selector and/or field selector.
 //
 // The authoritative state of an object is what apiservers provide
 // access to, and an object goes through a strict sequence of states.
-// An object state is either "absent" or present with a
-// ResourceVersion and other appropriate content.
+// An object state is either (1) present with a ResourceVersion and
+// other appropriate content or (2) "absent".
 //
-// A SharedInformer gets object states from apiservers using a
-// sequence of LIST and WATCH operations.  Through this sequence the
-// apiservers provide a sequence of "collection states" to the
-// informer, where each collection state defines the state of every
-// object of the collection.  No promise --- beyond what is implied by
-// other remarks here --- is made about how one informer's sequence of
-// collection states relates to a different informer's sequence of
-// collection states.
+// A SharedInformer maintains a local cache --- exposed by GetStore(),
+// by GetIndexer() in the case of an indexed informer, and possibly by
+// machinery involved in creating and/or accessing the informer --- of
+// the state of each relevant object.  This cache is eventually
+// consistent with the authoritative state.  This means that, unless
+// prevented by persistent communication problems, if ever a
+// particular object ID X is authoritatively associated with a state S
+// then for every SharedInformer I whose collection includes (X, S)
+// eventually either (1) I's cache associates X with S or a later
+// state of X, (2) I is stopped, or (3) the authoritative state
+// service for X terminates.  To be formally complete, we say that the
+// absent state meets any restriction by label selector or field
+// selector.
 //
-// A SharedInformer maintains a local cache, exposed by GetStore() and
-// by GetIndexer() in the case of an indexed informer, of the state of
-// each relevant object.  This cache is eventually consistent with the
-// authoritative state.  This means that, unless prevented by
-// persistent communication problems, if ever a particular object ID X
-// is authoritatively associated with a state S then for every
-// SharedInformer I whose collection includes (X, S) eventually either
-// (1) I's cache associates X with S or a later state of X, (2) I is
-// stopped, or (3) the authoritative state service for X terminates.
-// To be formally complete, we say that the absent state meets any
-// restriction by label selector or field selector.
+// For a given informer and relevant object ID X, the sequence of
+// states that appears in the informer's cache is a subsequence of the
+// states authoritatively associated with X.  That is, some states
+// might never appear in the cache but ordering among the appearing
+// states is correct.  Note, however, that there is no promise about
+// ordering between states seen for different objects.
 //
 // The local cache starts out empty, and gets populated and updated
 // during `Run()`.
@@ -91,12 +91,16 @@ import (
 // a given object, and `SplitMetaNamespaceKey(key)` to split a key
 // into its constituent parts.
 //
+// Every query against the local cache is answered entirely from one
+// snapshot of the cache's state.  Thus, the result of a `List` call
+// will not contain two entries with the same namespace and name.
+//
 // A client is identified here by a ResourceEventHandler.  For every
 // update to the SharedInformer's local cache and for every client
 // added before `Run()`, eventually either the SharedInformer is
 // stopped or the client is notified of the update.  A client added
 // after `Run()` starts gets a startup batch of notifications of
-// additions of the object existing in the cache at the time that
+// additions of the objects existing in the cache at the time that
 // client was added; also, for every update to the SharedInformer's
 // local cache after that client was added, eventually either the
 // SharedInformer is stopped or that client is notified of that
@@ -123,11 +127,6 @@ import (
 // to something else, for example through a
 // `client-go/util/workqueue`.
 //
-// Each query to an informer's local cache --- whether a single-object
-// lookup, a list operation, or a use of one of its indices --- is
-// answered entirely from one of the collection states received by
-// that informer.
-//
 // A delete notification exposes the last locally known non-absent
 // state, except that its ResourceVersion is replaced with a
 // ResourceVersion in which the object is actually absent.
@@ -137,10 +136,19 @@ type SharedInformer interface {
 	// between different handlers.
 	AddEventHandler(handler ResourceEventHandler)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
-	// shared informer using the specified resync period.  The resync
-	// operation consists of delivering to the handler an update
-	// notification for every object in the informer's local cache; it
-	// does not add any interactions with the authoritative storage.
+	// shared informer with the requested resync period; zero means
+	// this handler does not care about resyncs.  The resync operation
+	// consists of delivering to the handler an update notification
+	// for every object in the informer's local cache; it does not add
+	// any interactions with the authoritative storage.  Some
+	// informers do no resyncs at all, not even for handlers added
+	// with a non-zero resyncPeriod.  For an informer that does
+	// resyncs, and for each handler that requests resyncs, that
+	// informer develops a nominal resync period that is no shorter
+	// than the requested period but may be longer.  The actual time
+	// between any two resyncs may be longer than the nominal period
+	// because the implementation takes time to do work and there may
+	// be competing load and scheduling noise.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
@@ -168,11 +176,22 @@ type SharedIndexInformer interface {
 }
 
 // NewSharedInformer creates a new instance for the listwatcher.
-func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, resyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, exampleObject, resyncPeriod, Indexers{})
+func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformer {
+	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
+// The created informer will not do resyncs if the given
+// defaultEventHandlerResyncPeriod is zero.  Otherwise: for each
+// handler that with a non-zero requested resync period, whether added
+// before or after the informer starts, the nominal resync period is
+// the requested resync period rounded up to a multiple of the
+// informer's resync checking period.  Such an informer's resync
+// checking period is established when the informer starts running,
+// and is the maximum of (a) the minimum of the resync periods
+// requested before the informer starts and the
+// defaultEventHandlerResyncPeriod given here and (b) the constant
+// `minimumResyncPeriod` defined in this file.
 func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{

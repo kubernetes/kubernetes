@@ -6,8 +6,8 @@ go 1.13
 
 require (
 	cloud.google.com/go v0.38.0 // indirect
-	github.com/Azure/go-autorest/autorest v0.9.0
-	github.com/Azure/go-autorest/autorest/adal v0.5.0
+	github.com/Azure/go-autorest/autorest v0.9.6
+	github.com/Azure/go-autorest/autorest/adal v0.8.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/gogo/protobuf v1.3.1
@@ -17,7 +17,6 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.1.0
-	github.com/gophercloud/gophercloud v0.1.0
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 	github.com/imdario/mergo v0.3.5
 	github.com/peterbourgon/diskv v2.0.1+incompatible
@@ -31,7 +30,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200117235808-5f6fbceb4c31
+	k8s.io/utils v0.0.0-20200320200009-4a6ff033650d
 	sigs.k8s.io/yaml v1.2.0
 )
 

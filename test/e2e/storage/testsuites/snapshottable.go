@@ -42,9 +42,12 @@ const snapshotGroup = "snapshot.storage.k8s.io"
 const snapshotAPIVersion = "snapshot.storage.k8s.io/v1beta1"
 
 var (
-	snapshotGVR        = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshots"}
-	snapshotClassGVR   = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotclasses"}
-	snapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotcontents"}
+	// SnapshotGVR is GroupVersionResource for volumesnapshots
+	SnapshotGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshots"}
+	// SnapshotClassGVR is GroupVersionResource for volumesnapshotclasses
+	SnapshotClassGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotclasses"}
+	// SnapshotContentGVR is GroupVersionResource for volumesnapshotcontents
+	SnapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotcontents"}
 )
 
 type snapshottableTestSuite struct {
@@ -134,7 +137,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
-			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, nil))
+			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(context.TODO(), class.Name, metav1.DeleteOptions{}))
 		}()
 
 		ginkgo.By("creating a claim")
@@ -143,7 +146,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		defer func() {
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
-			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, nil)
+			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
@@ -167,22 +170,22 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a SnapshotClass")
-		vsc, err = dc.Resource(snapshotClassGVR).Create(vsc, metav1.CreateOptions{})
+		vsc, err = dc.Resource(SnapshotClassGVR).Create(context.TODO(), vsc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting SnapshotClass %s", vsc.GetName())
-			framework.ExpectNoError(dc.Resource(snapshotClassGVR).Delete(vsc.GetName(), nil))
+			framework.ExpectNoError(dc.Resource(SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{}))
 		}()
 
 		ginkgo.By("creating a snapshot")
 		snapshot := getSnapshot(pvc.Name, pvc.Namespace, vsc.GetName())
 
-		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
+		snapshot, err = dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Create(context.TODO(), snapshot, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 			// typically this snapshot has already been deleted
-			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
+			err = dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(context.TODO(), snapshot.GetName(), metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
 			}
@@ -192,13 +195,13 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 
 		ginkgo.By("checking the snapshot")
 		// Get new copy of the snapshot
-		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Get(snapshot.GetName(), metav1.GetOptions{})
+		snapshot, err = dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		// Get the bound snapshotContent
 		snapshotStatus := snapshot.Object["status"].(map[string]interface{})
 		snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
-		snapshotContent, err := dc.Resource(snapshotContentGVR).Get(snapshotContentName, metav1.GetOptions{})
+		snapshotContent, err := dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		snapshotContentSpec := snapshotContent.Object["spec"].(map[string]interface{})
@@ -216,7 +219,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, Poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		snapshot, err := c.Resource(snapshotGVR).Namespace(ns).Get(snapshotName, metav1.GetOptions{})
+		snapshot, err := c.Resource(SnapshotGVR).Namespace(ns).Get(context.TODO(), snapshotName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, Poll, err)
 			continue

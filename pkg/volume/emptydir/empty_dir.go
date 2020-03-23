@@ -25,7 +25,7 @@ import (
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -227,7 +227,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup)
+	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
 
 	// If setting up the quota fails, just log a message but don't actually error out.
 	// We'll use the old du mechanism in this case, at least until we support

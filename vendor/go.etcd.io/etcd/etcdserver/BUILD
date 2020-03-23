@@ -36,7 +36,6 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/go.etcd.io/bbolt:go_default_library",
         "//vendor/go.etcd.io/etcd/auth:go_default_library",
-        "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/go.etcd.io/etcd/etcdserver/api:go_default_library",
         "//vendor/go.etcd.io/etcd/etcdserver/api/membership:go_default_library",
         "//vendor/go.etcd.io/etcd/etcdserver/api/rafthttp:go_default_library",

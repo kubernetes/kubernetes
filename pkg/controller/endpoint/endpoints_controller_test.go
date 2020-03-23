@@ -1308,7 +1308,7 @@ func TestPodChanged(t *testing.T) {
 
 	/* dual stack tests */
 	// primary changes, because changing IPs is done by changing sandbox
-	// case 1: add new secondrary IP
+	// case 1: add new secondary IP
 	newPod.Status.PodIP = "1.1.3.1"
 	newPod.Status.PodIPs = []v1.PodIP{
 		{

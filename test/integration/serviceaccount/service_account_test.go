@@ -83,7 +83,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	}
 
 	// Delete service account
-	err = c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), defaultUser.Name, nil)
+	err = c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), defaultUser.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Could not delete default serviceaccount: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Delete token
-	err = c.CoreV1().Secrets(ns).Delete(context.TODO(), token1Name, nil)
+	err = c.CoreV1().Secrets(ns).Delete(context.TODO(), token1Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Could not delete token: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Delete service account
-	err = c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), name, nil)
+	err = c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	roClient := clientset.NewForConfigOrDie(&roClientConfig)
 	doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
 	doServiceAccountAPIRequests(t, roClient, otherns, true, false, false)
-	err = c.CoreV1().Secrets(myns).Delete(context.TODO(), roTokenName, nil)
+	err = c.CoreV1().Secrets(myns).Delete(context.TODO(), roTokenName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("could not delete token: %v", err)
 	}
@@ -584,7 +584,9 @@ func doServiceAccountAPIRequests(t *testing.T, c *clientset.Clientset, ns string
 			_, err := c.CoreV1().Secrets(ns).Create(context.TODO(), testSecret, metav1.CreateOptions{})
 			return err
 		},
-		func() error { return c.CoreV1().Secrets(ns).Delete(context.TODO(), testSecret.Name, nil) },
+		func() error {
+			return c.CoreV1().Secrets(ns).Delete(context.TODO(), testSecret.Name, metav1.DeleteOptions{})
+		},
 	}
 
 	for _, op := range readOps {

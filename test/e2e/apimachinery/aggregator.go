@@ -102,16 +102,16 @@ var _ = SIGDescribe("Aggregator", func() {
 
 func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
 	// delete the APIService first to avoid causing discovery errors
-	_ = aggrclient.ApiregistrationV1().APIServices().Delete(context.TODO(), "v1alpha1.wardle.example.com", nil)
+	_ = aggrclient.ApiregistrationV1().APIServices().Delete(context.TODO(), "v1alpha1.wardle.example.com", metav1.DeleteOptions{})
 
-	_ = client.AppsV1().Deployments(namespace).Delete(context.TODO(), "sample-apiserver-deployment", nil)
-	_ = client.CoreV1().Secrets(namespace).Delete(context.TODO(), "sample-apiserver-secret", nil)
-	_ = client.CoreV1().Services(namespace).Delete(context.TODO(), "sample-api", nil)
-	_ = client.CoreV1().ServiceAccounts(namespace).Delete(context.TODO(), "sample-apiserver", nil)
-	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), "wardler-auth-reader", nil)
-	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":auth-delegator", nil)
-	_ = client.RbacV1().ClusterRoles().Delete(context.TODO(), "sample-apiserver-reader", nil)
-	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":sample-apiserver-reader", nil)
+	_ = client.AppsV1().Deployments(namespace).Delete(context.TODO(), "sample-apiserver-deployment", metav1.DeleteOptions{})
+	_ = client.CoreV1().Secrets(namespace).Delete(context.TODO(), "sample-apiserver-secret", metav1.DeleteOptions{})
+	_ = client.CoreV1().Services(namespace).Delete(context.TODO(), "sample-api", metav1.DeleteOptions{})
+	_ = client.CoreV1().ServiceAccounts(namespace).Delete(context.TODO(), "sample-apiserver", metav1.DeleteOptions{})
+	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), "wardler-auth-reader", metav1.DeleteOptions{})
+	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":auth-delegator", metav1.DeleteOptions{})
+	_ = client.RbacV1().ClusterRoles().Delete(context.TODO(), "sample-apiserver-reader", metav1.DeleteOptions{})
+	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":sample-apiserver-reader", metav1.DeleteOptions{})
 }
 
 // TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
@@ -478,22 +478,22 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstruct := &unstructuredv1.Unstructured{}
 	err = unstruct.UnmarshalJSON(jsonFlunder)
 	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
-	_, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
+	_, err = dynamicClient.Create(context.TODO(), unstruct, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 
 	// kubectl get flunders
-	unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
+	unstructuredList, err := dynamicClient.List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 1 {
 		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
-	err = dynamicClient.Delete(flunderName, &metav1.DeleteOptions{})
+	err = dynamicClient.Delete(context.TODO(), flunderName, metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
 	// kubectl get flunders
-	unstructuredList, err = dynamicClient.List(metav1.ListOptions{})
+	unstructuredList, err = dynamicClient.List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 0 {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)

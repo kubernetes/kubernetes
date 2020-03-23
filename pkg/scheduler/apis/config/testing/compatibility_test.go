@@ -1532,3 +1532,265 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 		})
 	}
 }
+
+func TestPluginsConfigurationCompatibility(t *testing.T) {
+	testcases := []struct {
+		name        string
+		plugins     config.Plugins
+		wantPlugins map[string][]config.Plugin
+	}{
+		{
+			name: "No plugins specified",
+			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {
+					{Name: "PrioritySort"},
+				},
+				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
+					{Name: "InterPodAffinity"},
+					{Name: "PodTopologySpread"},
+				},
+				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
+					{Name: "NodeResourcesFit"},
+					{Name: "NodeName"},
+					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
+					{Name: "VolumeRestrictions"},
+					{Name: "TaintToleration"},
+					{Name: "EBSLimits"},
+					{Name: "GCEPDLimits"},
+					{Name: "NodeVolumeLimits"},
+					{Name: "AzureDiskLimits"},
+					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+					{Name: "PodTopologySpread"},
+				},
+				"PreScorePlugin": {
+					{Name: "InterPodAffinity"},
+					{Name: "DefaultPodTopologySpread"},
+					{Name: "TaintToleration"},
+					{Name: "PodTopologySpread"},
+				},
+				"ScorePlugin": {
+					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
+					{Name: "ImageLocality", Weight: 1},
+					{Name: "InterPodAffinity", Weight: 1},
+					{Name: "NodeResourcesLeastAllocated", Weight: 1},
+					{Name: "NodeAffinity", Weight: 1},
+					{Name: "NodePreferAvoidPods", Weight: 10000},
+					{Name: "DefaultPodTopologySpread", Weight: 1},
+					{Name: "TaintToleration", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 1},
+				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
+			},
+		},
+		{
+			name: "Disable some default plugins",
+			plugins: config.Plugins{
+				PreFilter: &config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+						{Name: "InterPodAffinity"},
+						{Name: "PodTopologySpread"},
+					},
+				},
+				Filter: &config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: "NodeUnschedulable"},
+						{Name: "NodeResourcesFit"},
+						{Name: "NodeName"},
+						{Name: "NodePorts"},
+						{Name: "NodeAffinity"},
+						{Name: "VolumeRestrictions"},
+						{Name: "TaintToleration"},
+						{Name: "EBSLimits"},
+						{Name: "GCEPDLimits"},
+						{Name: "NodeVolumeLimits"},
+						{Name: "AzureDiskLimits"},
+						{Name: "VolumeBinding"},
+						{Name: "VolumeZone"},
+						{Name: "InterPodAffinity"},
+						{Name: "PodTopologySpread"},
+					},
+				},
+				PreScore: &config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: "InterPodAffinity"},
+						{Name: "DefaultPodTopologySpread"},
+						{Name: "TaintToleration"},
+						{Name: "PodTopologySpread"},
+					},
+				},
+				Score: &config.PluginSet{
+					Disabled: []config.Plugin{
+						{Name: "NodeResourcesBalancedAllocation"},
+						{Name: "ImageLocality"},
+						{Name: "InterPodAffinity"},
+						{Name: "NodeResourcesLeastAllocated"},
+						{Name: "NodeAffinity"},
+						{Name: "NodePreferAvoidPods"},
+						{Name: "DefaultPodTopologySpread"},
+						{Name: "TaintToleration"},
+						{Name: "PodTopologySpread"},
+					},
+				},
+			},
+			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {
+					{Name: "PrioritySort"},
+				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
+			},
+		},
+		{
+			name: "Reverse default plugins order with changing score weight",
+			plugins: config.Plugins{
+				QueueSort: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: "PrioritySort"},
+					},
+					Disabled: []config.Plugin{
+						{Name: "*"},
+					},
+				},
+				PreFilter: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: "InterPodAffinity"},
+						{Name: "NodePorts"},
+						{Name: "NodeResourcesFit"},
+					},
+					Disabled: []config.Plugin{
+						{Name: "*"},
+					},
+				},
+				Filter: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: "InterPodAffinity"},
+						{Name: "VolumeZone"},
+						{Name: "VolumeBinding"},
+						{Name: "AzureDiskLimits"},
+						{Name: "NodeVolumeLimits"},
+						{Name: "GCEPDLimits"},
+						{Name: "EBSLimits"},
+						{Name: "TaintToleration"},
+						{Name: "VolumeRestrictions"},
+						{Name: "NodeAffinity"},
+						{Name: "NodePorts"},
+						{Name: "NodeName"},
+						{Name: "NodeResourcesFit"},
+						{Name: "NodeUnschedulable"},
+					},
+					Disabled: []config.Plugin{
+						{Name: "*"},
+					},
+				},
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: "TaintToleration"},
+						{Name: "DefaultPodTopologySpread"},
+						{Name: "InterPodAffinity"},
+					},
+					Disabled: []config.Plugin{
+						{Name: "*"},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: "TaintToleration", Weight: 24},
+						{Name: "DefaultPodTopologySpread", Weight: 24},
+						{Name: "NodePreferAvoidPods", Weight: 24},
+						{Name: "NodeAffinity", Weight: 24},
+						{Name: "NodeResourcesLeastAllocated", Weight: 24},
+						{Name: "InterPodAffinity", Weight: 24},
+						{Name: "ImageLocality", Weight: 24},
+						{Name: "NodeResourcesBalancedAllocation", Weight: 24},
+					},
+					Disabled: []config.Plugin{
+						{Name: "*"},
+					},
+				},
+				Bind: &config.PluginSet{
+					Enabled:  []config.Plugin{{Name: "DefaultBinder"}},
+					Disabled: []config.Plugin{{Name: "*"}},
+				},
+			},
+			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {
+					{Name: "PrioritySort"},
+				},
+				"PreFilterPlugin": {
+					{Name: "InterPodAffinity"},
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
+				},
+				"FilterPlugin": {
+					{Name: "InterPodAffinity"},
+					{Name: "VolumeZone"},
+					{Name: "VolumeBinding"},
+					{Name: "AzureDiskLimits"},
+					{Name: "NodeVolumeLimits"},
+					{Name: "GCEPDLimits"},
+					{Name: "EBSLimits"},
+					{Name: "TaintToleration"},
+					{Name: "VolumeRestrictions"},
+					{Name: "NodeAffinity"},
+					{Name: "NodePorts"},
+					{Name: "NodeName"},
+					{Name: "NodeResourcesFit"},
+					{Name: "NodeUnschedulable"},
+				},
+				"PreScorePlugin": {
+					{Name: "TaintToleration"},
+					{Name: "DefaultPodTopologySpread"},
+					{Name: "InterPodAffinity"},
+				},
+				"ScorePlugin": {
+					{Name: "TaintToleration", Weight: 24},
+					{Name: "DefaultPodTopologySpread", Weight: 24},
+					{Name: "NodePreferAvoidPods", Weight: 24},
+					{Name: "NodeAffinity", Weight: 24},
+					{Name: "NodeResourcesLeastAllocated", Weight: 24},
+					{Name: "InterPodAffinity", Weight: 24},
+					{Name: "ImageLocality", Weight: 24},
+					{Name: "NodeResourcesBalancedAllocation", Weight: 24},
+				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
+			},
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			client := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")}))
+
+			sched, err := scheduler.New(
+				client,
+				informerFactory,
+				informerFactory.Core().V1().Pods(),
+				recorderFactory,
+				make(chan struct{}),
+				scheduler.WithProfiles(config.KubeSchedulerProfile{
+					SchedulerName: v1.DefaultSchedulerName,
+					Plugins:       &tc.plugins,
+				}),
+			)
+
+			if err != nil {
+				t.Fatalf("Error constructing: %v", err)
+			}
+
+			defProf := sched.Profiles["default-scheduler"]
+			gotPlugins := defProf.ListPlugins()
+			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
+				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
+			}
+		})
+	}
+}

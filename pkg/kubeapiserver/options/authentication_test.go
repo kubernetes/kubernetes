@@ -120,9 +120,6 @@ func TestToAuthenticationConfig(t *testing.T) {
 			IssuerURL:     "testIssuerURL",
 			ClientID:      "testClientID",
 		},
-		PasswordFile: &PasswordFileAuthenticationOptions{
-			BasicAuthFile: "/testBasicAuthFile",
-		},
 		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
 			UsernameHeaders:     []string{"x-remote-user"},
 			GroupHeaders:        []string{"x-remote-group"},
@@ -144,7 +141,6 @@ func TestToAuthenticationConfig(t *testing.T) {
 	expectConfig := kubeauthenticator.Config{
 		APIAudiences:                authenticator.Audiences{"http://foo.bar.com"},
 		Anonymous:                   false,
-		BasicAuthFile:               "/testBasicAuthFile",
 		BootstrapToken:              false,
 		ClientCAContentProvider:     nil, // this is nil because you can't compare functions
 		TokenAuthFile:               "/testTokenFile",

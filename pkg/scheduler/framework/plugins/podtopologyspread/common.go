@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
 type topologyPair struct {
@@ -29,16 +30,35 @@ type topologyPair struct {
 
 // topologySpreadConstraint is an internal version for v1.TopologySpreadConstraint
 // and where the selector is parsed.
+// Fields are exported for comparison during testing.
 type topologySpreadConstraint struct {
-	maxSkew     int32
-	topologyKey string
-	selector    labels.Selector
+	MaxSkew     int32
+	TopologyKey string
+	Selector    labels.Selector
 }
 
-// nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread constraints are present in node labels.
+// defaultConstraints builds the constraints for a pod using
+// .DefaultConstraints and the selectors from the services, replication
+// controllers, replica sets and stateful sets that match the pod.
+func (pl *PodTopologySpread) defaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
+	constraints, err := filterTopologySpreadConstraints(pl.DefaultConstraints, action)
+	if err != nil || len(constraints) == 0 {
+		return nil, err
+	}
+	selector := helper.DefaultSelector(p, pl.services, pl.replicationCtrls, pl.replicaSets, pl.statefulSets)
+	if selector.Empty() {
+		return nil, nil
+	}
+	for i := range constraints {
+		constraints[i].Selector = selector
+	}
+	return constraints, nil
+}
+
+// nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread Constraints are present in node labels.
 func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []topologySpreadConstraint) bool {
 	for _, c := range constraints {
-		if _, ok := nodeLabels[c.topologyKey]; !ok {
+		if _, ok := nodeLabels[c.TopologyKey]; !ok {
 			return false
 		}
 	}
@@ -54,9 +74,9 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 				return nil, err
 			}
 			result = append(result, topologySpreadConstraint{
-				maxSkew:     c.MaxSkew,
-				topologyKey: c.TopologyKey,
-				selector:    selector,
+				MaxSkew:     c.MaxSkew,
+				TopologyKey: c.TopologyKey,
+				Selector:    selector,
 			})
 		}
 	}

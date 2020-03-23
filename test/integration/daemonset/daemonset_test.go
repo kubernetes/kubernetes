@@ -174,7 +174,7 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	}
 
 	falseVar := false
-	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	deleteOptions := metav1.DeleteOptions{OrphanDependents: &falseVar}
 	if err := cs.AppsV1().DaemonSets(ds.Namespace).Delete(context.TODO(), ds.Name, deleteOptions); err != nil {
 		t.Errorf("Failed to delete DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
 	}

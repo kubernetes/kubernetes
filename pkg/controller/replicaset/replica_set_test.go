@@ -1196,14 +1196,14 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
 	}
 	if rsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for ReplicaSet %q", oldRSKey)
+		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", oldRSKey)
 	}
 
 	if manager.queue.Len() != 0 {
 		t.Fatal("Unexpected item in the queue")
 	}
 
-	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(context.TODO(), oldRS.Name, &metav1.DeleteOptions{})
+	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(context.TODO(), oldRS.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1275,7 +1275,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
 	}
 	if rsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for ReplicaSet %q", oldRSKey)
+		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", oldRSKey)
 	}
 
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)

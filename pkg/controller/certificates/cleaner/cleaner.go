@@ -109,7 +109,7 @@ func (ccc *CSRCleanerController) handle(csr *capi.CertificateSigningRequest) err
 		return err
 	}
 	if isIssuedPastDeadline(csr) || isDeniedPastDeadline(csr) || isPendingPastDeadline(csr) || isIssuedExpired {
-		if err := ccc.csrClient.Delete(context.TODO(), csr.Name, nil); err != nil {
+		if err := ccc.csrClient.Delete(context.TODO(), csr.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("unable to delete CSR %q: %v", csr.Name, err)
 		}
 	}

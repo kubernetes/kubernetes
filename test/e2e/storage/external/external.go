@@ -84,7 +84,20 @@ type driverDefinition struct {
 		// snapshotter class with DriverInfo.Name as provisioner.
 		FromName bool
 
-		// TODO (?): load from file
+		// FromFile is used only when FromName is false.  It
+		// loads a snapshot class from the given .yaml or .json
+		// file. File names are resolved by the
+		// framework.testfiles package, which typically means
+		// that they can be absolute or relative to the test
+		// suite's --repo-root parameter.
+		//
+		// This can be used when the snapshot class is meant to have
+		// additional parameters.
+		FromFile string
+
+		// FromExistingClassName specifies the name of a pre-installed
+		// SnapshotClass that will be copied and used for the tests.
+		FromExistingClassName string
 	}
 
 	// InlineVolumes defines one or more volumes for use as inline
@@ -254,7 +267,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 	case "":
 		supported = true
 	case testpatterns.DynamicCreatedSnapshot:
-		if d.SnapshotClass.FromName {
+		if d.SnapshotClass.FromName || d.SnapshotClass.FromFile != "" || d.SnapshotClass.FromExistingClassName != "" {
 			supported = true
 		}
 	}
@@ -304,15 +317,53 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 	return testsuites.GetStorageClass(sc.Provisioner, sc.Parameters, sc.VolumeBindingMode, f.Namespace.Name, "e2e-sc")
 }
 
+func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	snapshotClass := &unstructured.Unstructured{}
+
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, snapshotClass); err != nil {
+		return nil, errors.Wrap(err, filename)
+	}
+
+	return snapshotClass, nil
+}
+
 func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
-	if !d.SnapshotClass.FromName {
+	if !d.SnapshotClass.FromName && d.SnapshotClass.FromFile == "" && d.SnapshotClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
 	}
 
+	f := config.Framework
 	snapshotter := d.DriverInfo.Name
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
-	suffix := snapshotter + "-vsc"
+	suffix := "vsc"
+
+	switch {
+	case d.SnapshotClass.FromName:
+		// Do nothing (just use empty parameters)
+	case d.SnapshotClass.FromExistingClassName != "":
+		snapshotClass, err := f.DynamicClient.Resource(testsuites.SnapshotClassGVR).Get(context.TODO(), d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
+
+		if params, ok := snapshotClass.Object["parameters"].(map[string]interface{}); ok {
+			for k, v := range params {
+				parameters[k] = v.(string)
+			}
+		}
+	case d.SnapshotClass.FromFile != "":
+		snapshotClass, err := loadSnapshotClass(d.SnapshotClass.FromFile)
+		framework.ExpectNoError(err, "load snapshot class from %s", d.SnapshotClass.FromFile)
+
+		if params, ok := snapshotClass.Object["parameters"].(map[string]interface{}); ok {
+			for k, v := range params {
+				parameters[k] = v.(string)
+			}
+		}
+	}
 
 	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }

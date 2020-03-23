@@ -76,7 +76,7 @@ type QueueSet interface {
 	// returned bool indicates whether the QueueSet was idle at the
 	// moment of the return.  Otherwise idle==false and the client
 	// must call the Wait method of the Request exactly once.
-	StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (req Request, idle bool)
+	StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (req Request, idle bool)
 }
 
 // Request represents the remainder of the handling of one request

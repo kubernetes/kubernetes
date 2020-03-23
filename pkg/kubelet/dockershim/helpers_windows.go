@@ -20,12 +20,12 @@ package dockershim
 
 import (
 	"os"
+	"runtime"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/pkg/sysinfo"
 	"k8s.io/klog"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -75,7 +75,7 @@ func (ds *dockerService) updateCreateConfig(
 				Memory:    rOpts.MemoryLimitInBytes,
 				CPUShares: rOpts.CpuShares,
 				CPUCount:  rOpts.CpuCount,
-				NanoCPUs:  rOpts.CpuMaximum * int64(sysinfo.NumCPU()) * (1e9 / 10000),
+				NanoCPUs:  rOpts.CpuMaximum * int64(runtime.NumCPU()) * (1e9 / 10000),
 			}
 		}
 

@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
 		containerName := "test-webserver"
 		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
-		f.WaitForPodReady(p.Name)
+		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
 
 		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -415,7 +415,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		ginkgo.By("deleting the pod")
-		podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(0))
+		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	}()
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)

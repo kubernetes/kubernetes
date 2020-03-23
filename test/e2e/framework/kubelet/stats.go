@@ -35,7 +35,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
@@ -222,7 +221,7 @@ func GetStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, framework.KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
 
@@ -242,7 +241,7 @@ func getNodeStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, framework.KubeletPort)).
 		Suffix("stats/summary").
 		SetHeader("Content-Type", "application/json").
 		Do(context.TODO()).Raw()
@@ -309,7 +308,7 @@ func formatResourceUsageStats(nodeName string, containerStats ResourceUsagePerCo
 
 // GetKubeletHeapStats returns stats of kubelet heap.
 func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
+	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", framework.KubeletPort)
 	if err != nil {
 		return "", err
 	}

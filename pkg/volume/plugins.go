@@ -33,15 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -336,7 +333,7 @@ type KubeletVolumeHost interface {
 	// GetInformerFactory returns the informer factory for CSIDriverLister
 	GetInformerFactory() informers.SharedInformerFactory
 	// CSIDriverLister returns the informer lister for the CSIDriver API Object
-	CSIDriverLister() storagelisters.CSIDriverLister
+	CSIDriverLister() storagelistersv1.CSIDriverLister
 	// CSIDriverSynced returns the informer synced for the CSIDriver API Object
 	CSIDriversSynced() cache.InformerSynced
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
@@ -352,7 +349,7 @@ type AttachDetachVolumeHost interface {
 	CSINodeLister() storagelistersv1.CSINodeLister
 
 	// CSIDriverLister returns the informer lister for the CSIDriver API Object
-	CSIDriverLister() storagelisters.CSIDriverLister
+	CSIDriverLister() storagelistersv1.CSIDriverLister
 
 	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
 	// to the attachDetachController
@@ -1019,10 +1016,8 @@ func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
 	kletHost, ok := pm.Host.(KubeletVolumeHost)
 	if ok {
 		// start informer for CSIDriver
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-			informerFactory := kletHost.GetInformerFactory()
-			informerFactory.Start(stopCh)
-		}
+		informerFactory := kletHost.GetInformerFactory()
+		informerFactory.Start(stopCh)
 	}
 }
 

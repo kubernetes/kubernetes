@@ -117,15 +117,7 @@ func (j *TestJig) CreateTCPServiceWithPort(tweak func(svc *v1.Service), port int
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
 func (j *TestJig) CreateTCPService(tweak func(svc *v1.Service)) (*v1.Service, error) {
-	svc := j.newServiceTemplate(v1.ProtocolTCP, 80)
-	if tweak != nil {
-		tweak(svc)
-	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
-	}
-	return j.sanityCheckService(result, svc.Spec.Type)
+	return j.CreateTCPServiceWithPort(tweak, 80)
 }
 
 // CreateUDPService creates a new UDP Service based on the j's

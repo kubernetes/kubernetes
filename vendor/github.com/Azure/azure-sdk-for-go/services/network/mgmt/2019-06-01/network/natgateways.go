@@ -35,7 +35,8 @@ func NewNatGatewaysClient(subscriptionID string) NatGatewaysClient {
 	return NewNatGatewaysClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewNatGatewaysClientWithBaseURI creates an instance of the NatGatewaysClient client.
+// NewNatGatewaysClientWithBaseURI creates an instance of the NatGatewaysClient client using a custom endpoint.  Use
+// this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewNatGatewaysClientWithBaseURI(baseURI string, subscriptionID string) NatGatewaysClient {
 	return NatGatewaysClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -97,9 +98,8 @@ func (client NatGatewaysClient) CreateOrUpdatePreparer(ctx context.Context, reso
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client NatGatewaysClient) CreateOrUpdateSender(req *http.Request) (future NatGatewaysCreateOrUpdateFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -174,9 +174,8 @@ func (client NatGatewaysClient) DeletePreparer(ctx context.Context, resourceGrou
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client NatGatewaysClient) DeleteSender(req *http.Request) (future NatGatewaysDeleteFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -260,8 +259,7 @@ func (client NatGatewaysClient) GetPreparer(ctx context.Context, resourceGroupNa
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client NatGatewaysClient) GetSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -336,8 +334,7 @@ func (client NatGatewaysClient) ListPreparer(ctx context.Context, resourceGroupN
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client NatGatewaysClient) ListSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -446,8 +443,7 @@ func (client NatGatewaysClient) ListAllPreparer(ctx context.Context) (*http.Requ
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client NatGatewaysClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always
@@ -563,8 +559,7 @@ func (client NatGatewaysClient) UpdateTagsPreparer(ctx context.Context, resource
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client NatGatewaysClient) UpdateTagsSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // UpdateTagsResponder handles the response to the UpdateTags request. The method always

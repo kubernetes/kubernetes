@@ -41,7 +41,7 @@ type NamespaceInterface interface {
 	Create(ctx context.Context, namespace *v1.Namespace, opts metav1.CreateOptions) (*v1.Namespace, error)
 	Update(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (*v1.Namespace, error)
 	UpdateStatus(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (*v1.Namespace, error)
-	Delete(ctx context.Context, name string, opts *metav1.DeleteOptions) error
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Namespace, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.NamespaceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
@@ -144,11 +144,11 @@ func (c *namespaces) UpdateStatus(ctx context.Context, namespace *v1.Namespace, 
 }
 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.
-func (c *namespaces) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
+func (c *namespaces) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("namespaces").
 		Name(name).
-		Body(options).
+		Body(&opts).
 		Do(ctx).
 		Error()
 }

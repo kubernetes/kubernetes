@@ -325,6 +325,7 @@ runTests() {
     exit 1
   fi
   kube::log::status "Checking kubectl version"
+  export KUBERNETES_MASTER=http://127.0.0.1:${API_PORT}
   kubectl version
 
   # Generate a random namespace name, based on the current time (to make
@@ -808,6 +809,14 @@ runTests() {
 
   # kubectl auth reconcile
   if kube::test::if_supports_resource "${clusterroles}" ; then
+    # dry-run command
+    kubectl auth reconcile --dry-run=client "${kube_flags[@]}" -f test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml
+    kube::test::get_object_assert 'rolebindings -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" ''
+    kube::test::get_object_assert 'roles -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" ''
+    kube::test::get_object_assert 'clusterrolebindings -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" ''
+    kube::test::get_object_assert 'clusterroles -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" ''
+
+    # command
     kubectl auth reconcile "${kube_flags[@]}" -f test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml
     kube::test::get_object_assert 'rolebindings -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-RB:'
     kube::test::get_object_assert 'roles -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-R:'

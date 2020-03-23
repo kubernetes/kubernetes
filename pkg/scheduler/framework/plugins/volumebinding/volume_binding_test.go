@@ -23,10 +23,9 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 func TestVolumeBinding(t *testing.T) {
@@ -44,7 +43,7 @@ func TestVolumeBinding(t *testing.T) {
 		name               string
 		pod                *v1.Pod
 		node               *v1.Node
-		volumeBinderConfig *volumescheduling.FakeVolumeBinderConfig
+		volumeBinderConfig *scheduling.FakeVolumeBinderConfig
 		wantStatus         *framework.Status
 	}{
 		{
@@ -57,10 +56,8 @@ func TestVolumeBinding(t *testing.T) {
 			name: "all bound",
 			pod:  &v1.Pod{Spec: volState},
 			node: &v1.Node{},
-			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				AllBound:             true,
-				FindUnboundSatsified: true,
-				FindBoundSatsified:   true,
+			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+				AllBound: true,
 			},
 			wantStatus: nil,
 		},
@@ -68,38 +65,32 @@ func TestVolumeBinding(t *testing.T) {
 			name: "unbound/no matches",
 			pod:  &v1.Pod{Spec: volState},
 			node: &v1.Node{},
-			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: false,
-				FindBoundSatsified:   true,
+			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+				FindReasons: []scheduling.ConflictReason{scheduling.ErrReasonBindConflict},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonBindConflict),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonBindConflict)),
 		},
 		{
 			name: "bound and unbound unsatisfied",
 			pod:  &v1.Pod{Spec: volState},
 			node: &v1.Node{},
-			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: false,
-				FindBoundSatsified:   false,
+			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
+				FindReasons: []scheduling.ConflictReason{scheduling.ErrReasonBindConflict, scheduling.ErrReasonNodeConflict},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeConflict,
-				ErrReasonBindConflict),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonBindConflict), string(scheduling.ErrReasonNodeConflict)),
 		},
 		{
-			name: "unbound/found matches/bind succeeds",
-			pod:  &v1.Pod{Spec: volState},
-			node: &v1.Node{},
-			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
-				FindUnboundSatsified: true,
-				FindBoundSatsified:   true,
-			},
-			wantStatus: nil,
+			name:               "unbound/found matches/bind succeeds",
+			pod:                &v1.Pod{Spec: volState},
+			node:               &v1.Node{},
+			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{},
+			wantStatus:         nil,
 		},
 		{
 			name: "predicate error",
 			pod:  &v1.Pod{Spec: volState},
 			node: &v1.Node{},
-			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
+			volumeBinderConfig: &scheduling.FakeVolumeBinderConfig{
 				FindErr: findErr,
 			},
 			wantStatus: framework.NewStatus(framework.Error, findErr.Error()),
@@ -110,7 +101,7 @@ func TestVolumeBinding(t *testing.T) {
 		t.Run(item.name, func(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(item.node)
-			fakeVolumeBinder := volumebinder.NewFakeVolumeBinder(item.volumeBinderConfig)
+			fakeVolumeBinder := scheduling.NewFakeVolumeBinder(item.volumeBinderConfig)
 			p := &VolumeBinding{
 				binder: fakeVolumeBinder,
 			}

@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -183,25 +183,23 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		csiClient := host.GetKubeClient()
-		if csiClient == nil {
-			klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
-		} else {
-			// set CSIDriverLister
-			adcHost, ok := host.(volume.AttachDetachVolumeHost)
-			if ok {
-				p.csiDriverLister = adcHost.CSIDriverLister()
-				if p.csiDriverLister == nil {
-					klog.Error(log("CSIDriverLister not found on AttachDetachVolumeHost"))
-				}
+	csiClient := host.GetKubeClient()
+	if csiClient == nil {
+		klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
+	} else {
+		// set CSIDriverLister
+		adcHost, ok := host.(volume.AttachDetachVolumeHost)
+		if ok {
+			p.csiDriverLister = adcHost.CSIDriverLister()
+			if p.csiDriverLister == nil {
+				klog.Error(log("CSIDriverLister not found on AttachDetachVolumeHost"))
 			}
-			kletHost, ok := host.(volume.KubeletVolumeHost)
-			if ok {
-				p.csiDriverLister = kletHost.CSIDriverLister()
-				if p.csiDriverLister == nil {
-					klog.Error(log("CSIDriverLister not found on KubeletVolumeHost"))
-				}
+		}
+		kletHost, ok := host.(volume.KubeletVolumeHost)
+		if ok {
+			p.csiDriverLister = kletHost.CSIDriverLister()
+			if p.csiDriverLister == nil {
+				klog.Error(log("CSIDriverLister not found on KubeletVolumeHost"))
 			}
 		}
 	}
@@ -732,10 +730,6 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 // skipAttach looks up CSIDriver object associated with driver name
 // to determine if driver requires attachment volume operation
 func (p *csiPlugin) skipAttach(driver string) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		return false, nil
-	}
-
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
 		if err := kletHost.WaitForCacheSync(); err != nil {

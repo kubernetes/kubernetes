@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "ingress.go",
+        "ingressclass.go",
         "interface.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/networking/v1beta1",

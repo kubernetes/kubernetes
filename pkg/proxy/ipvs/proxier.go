@@ -88,6 +88,8 @@ const (
 
 	// DefaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
 	DefaultDummyDevice = "kube-ipvs0"
+
+	connReuseMinSupportedKernelVersion = "4.1"
 )
 
 // iptablesJumpChain is tables of iptables chains that ipvs proxier used to install iptables or cleanup iptables.
@@ -140,6 +142,7 @@ var ipsetInfo = []struct {
 	{kubeLoopBackIPSet, utilipset.HashIPPortIP, kubeLoopBackIPSetComment},
 	{kubeClusterIPSet, utilipset.HashIPPort, kubeClusterIPSetComment},
 	{kubeExternalIPSet, utilipset.HashIPPort, kubeExternalIPSetComment},
+	{kubeExternalIPLocalSet, utilipset.HashIPPort, kubeExternalIPLocalSetComment},
 	{kubeLoadBalancerSet, utilipset.HashIPPort, kubeLoadBalancerSetComment},
 	{kubeLoadbalancerFWSet, utilipset.HashIPPort, kubeLoadbalancerFWSetComment},
 	{kubeLoadBalancerLocalSet, utilipset.HashIPPort, kubeLoadBalancerLocalSetComment},
@@ -341,6 +344,7 @@ func NewProxier(ipt utiliptables.Interface,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
 	nodePortAddresses []string,
+	kernelHandler KernelHandler,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
@@ -363,10 +367,22 @@ func NewProxier(ipt utiliptables.Interface,
 		}
 	}
 
-	// Set the connection reuse mode
-	if val, _ := sysctl.GetSysctl(sysctlConnReuse); val != 0 {
-		if err := sysctl.SetSysctl(sysctlConnReuse, 0); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlConnReuse, err)
+	kernelVersionStr, err := kernelHandler.GetKernelVersion()
+	if err != nil {
+		return nil, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+	}
+	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
+	}
+	if kernelVersion.LessThan(version.MustParseGeneric(connReuseMinSupportedKernelVersion)) {
+		klog.Errorf("can't set sysctl %s, kernel version must be at least %s", sysctlConnReuse, connReuseMinSupportedKernelVersion)
+	} else {
+		// Set the connection reuse mode
+		if val, _ := sysctl.GetSysctl(sysctlConnReuse); val != 0 {
+			if err := sysctl.SetSysctl(sysctlConnReuse, 0); err != nil {
+				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlConnReuse, err)
+			}
 		}
 	}
 
@@ -503,6 +519,7 @@ func NewDualStackProxier(
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
 	nodePortAddresses []string,
+	kernelHandler KernelHandler,
 ) (proxy.Provider, error) {
 
 	safeIpset := newSafeIpset(ipset)
@@ -512,7 +529,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
-		recorder, healthzServer, scheduler, nodePortAddresses)
+		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -521,7 +538,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
-		nil, nil, scheduler, nodePortAddresses)
+		nil, nil, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -963,7 +980,7 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	proxier.syncProxyRules()
 }
 
-// OnNodeDelete is called whever deletion of an existing node
+// OnNodeDelete is called whenever deletion of an existing node
 // object is observed.
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	if node.Name != proxier.hostname {
@@ -1236,12 +1253,21 @@ func (proxier *Proxier) syncProxyRules() {
 				Protocol: protocol,
 				SetType:  utilipset.HashIPPort,
 			}
-			// We have to SNAT packets to external IPs.
-			if valid := proxier.ipsetList[kubeExternalIPSet].validateEntry(entry); !valid {
-				klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeExternalIPSet].Name))
-				continue
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints() {
+				if valid := proxier.ipsetList[kubeExternalIPLocalSet].validateEntry(entry); !valid {
+					klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeExternalIPLocalSet].Name))
+					continue
+				}
+				proxier.ipsetList[kubeExternalIPLocalSet].activeEntries.Insert(entry.String())
+			} else {
+				// We have to SNAT packets to external IPs.
+				if valid := proxier.ipsetList[kubeExternalIPSet].validateEntry(entry); !valid {
+					klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeExternalIPSet].Name))
+					continue
+				}
+				proxier.ipsetList[kubeExternalIPSet].activeEntries.Insert(entry.String())
 			}
-			proxier.ipsetList[kubeExternalIPSet].activeEntries.Insert(entry.String())
 
 			// ipvs call
 			serv := &utilipvs.VirtualServer{
@@ -1257,7 +1283,12 @@ func (proxier *Proxier) syncProxyRules() {
 			if err := proxier.syncService(svcNameString, serv, true); err == nil {
 				activeIPVSServices[serv.String()] = true
 				activeBindAddrs[serv.Address.String()] = true
-				if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
+
+				onlyNodeLocalEndpoints := false
+				if utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) {
+					onlyNodeLocalEndpoints = svcInfo.OnlyNodeLocalEndpoints()
+				}
+				if err := proxier.syncEndpoint(svcName, onlyNodeLocalEndpoints, serv); err != nil {
 					klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 				}
 			} else {
@@ -1668,15 +1699,8 @@ func (proxier *Proxier) writeIptablesRules() {
 		}
 	}
 
-	if !proxier.ipsetList[kubeExternalIPSet].isEmpty() {
-		// Build masquerade rules for packets to external IPs.
-		args = append(args[:0],
-			"-A", string(kubeServicesChain),
-			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPSet].getComment(),
-			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
-			"dst,dst",
-		)
-		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+	// externalIPRules adds iptables rules applies to Service ExternalIPs
+	externalIPRules := func(args []string) {
 		// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
 		// nor from a local process to be forwarded to the service.
 		// This rule roughly translates to "all traffic from off-machine".
@@ -1689,6 +1713,28 @@ func (proxier *Proxier) writeIptablesRules() {
 		// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
 		// This covers cases like GCE load-balancers which get added to the local routing table.
 		writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", "ACCEPT")...)
+	}
+
+	if !proxier.ipsetList[kubeExternalIPSet].isEmpty() {
+		// Build masquerade rules for packets to external IPs.
+		args = append(args[:0],
+			"-A", string(kubeServicesChain),
+			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPSet].getComment(),
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
+			"dst,dst",
+		)
+		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+		externalIPRules(args)
+	}
+
+	if !proxier.ipsetList[kubeExternalIPLocalSet].isEmpty() {
+		args = append(args[:0],
+			"-A", string(kubeServicesChain),
+			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPLocalSet].getComment(),
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name,
+			"dst,dst",
+		)
+		externalIPRules(args)
 	}
 
 	// -A KUBE-SERVICES  -m addrtype  --dst-type LOCAL -j KUBE-NODE-PORT

@@ -74,6 +74,7 @@ go_library(
         "//test/e2e/framework/pv:go_default_library",
         "//test/e2e/framework/rc:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
+        "//test/e2e/framework/resource:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",

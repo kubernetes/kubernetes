@@ -292,7 +292,7 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, v1.FinalizerName(value))
 	}
-	namespace, err := d.nsClient.Finalize(&namespaceFinalize)
+	namespace, err := d.nsClient.Finalize(context.Background(), &namespaceFinalize, metav1.UpdateOptions{})
 	if err != nil {
 		// it was removed already, so life is good
 		if errors.IsNotFound(err) {
@@ -318,8 +318,8 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
 	// namespace itself.
 	background := metav1.DeletePropagationBackground
-	opts := &metav1.DeleteOptions{PropagationPolicy: &background}
-	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(opts, metav1.ListOptions{})
+	opts := metav1.DeleteOptions{PropagationPolicy: &background}
+	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(context.TODO(), opts, metav1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -355,7 +355,7 @@ func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResou
 		return nil, false, nil
 	}
 
-	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(metav1.ListOptions{})
+	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err == nil {
 		return partialList, true, nil
 	}
@@ -388,8 +388,8 @@ func (d *namespacedResourcesDeleter) deleteEachItem(gvr schema.GroupVersionResou
 	}
 	for _, item := range unstructuredList.Items {
 		background := metav1.DeletePropagationBackground
-		opts := &metav1.DeleteOptions{PropagationPolicy: &background}
-		if err = d.metadataClient.Resource(gvr).Namespace(namespace).Delete(item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		opts := metav1.DeleteOptions{PropagationPolicy: &background}
+		if err = d.metadataClient.Resource(gvr).Namespace(namespace).Delete(context.TODO(), item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}
@@ -561,7 +561,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 	return estimate, utilerrors.NewAggregate(errs)
 }
 
-// estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
+// estimateGracefulTermination will estimate the graceful termination required for the specific entity in the namespace
 func (d *namespacedResourcesDeleter) estimateGracefulTermination(gvr schema.GroupVersionResource, ns string, namespaceDeletedAt metav1.Time) (int64, error) {
 	groupResource := gvr.GroupResource()
 	klog.V(5).Infof("namespace controller - estimateGracefulTermination - group %s, resource: %s", groupResource.Group, groupResource.Resource)

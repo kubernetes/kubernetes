@@ -101,9 +101,6 @@ function start-kube-apiserver {
     params+=" --service-account-key-file=${SERVICEACCOUNT_CERT_PATH}"
   fi
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
-  if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
-  fi
 
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]]; then
     params+=" --request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}s"

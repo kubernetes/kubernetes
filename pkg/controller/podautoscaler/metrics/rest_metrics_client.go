@@ -162,7 +162,7 @@ func (c *customMetricsClient) GetObjectMetric(metricName string, namespace strin
 	return metricValue.Value.MilliValue(), metricValue.Timestamp.Time, nil
 }
 
-// externalMetricsClient implenets the external metrics related parts of MetricsClient,
+// externalMetricsClient implements the external metrics related parts of MetricsClient,
 // using data from the external metrics API.
 type externalMetricsClient struct {
 	client externalclient.ExternalMetricsClient

@@ -410,25 +410,52 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 	}
 }
 
-func TestRegisterDuplicatePluginWouldFail(t *testing.T) {
-	plugin := config.Plugin{Name: duplicatePluginName, Weight: 1}
-
-	pluginSet := config.PluginSet{
-		Enabled: []config.Plugin{
-			plugin,
-			plugin,
+func TestNewFrameworkErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		plugins   *config.Plugins
+		pluginCfg []config.PluginConfig
+		wantErr   string
+	}{
+		{
+			name: "duplicate plugin name",
+			plugins: &config.Plugins{
+				PreFilter: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: duplicatePluginName, Weight: 1},
+						{Name: duplicatePluginName, Weight: 1},
+					},
+				},
+			},
+			pluginCfg: []config.PluginConfig{
+				{Name: duplicatePluginName},
+			},
+			wantErr: "already registered",
+		},
+		{
+			name: "duplicate plugin config",
+			plugins: &config.Plugins{
+				PreFilter: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: duplicatePluginName, Weight: 1},
+					},
+				},
+			},
+			pluginCfg: []config.PluginConfig{
+				{Name: duplicatePluginName},
+				{Name: duplicatePluginName},
+			},
+			wantErr: "repeated config for plugin",
 		},
 	}
-	plugins := config.Plugins{}
-	plugins.PreFilter = &pluginSet
 
-	_, err := NewFramework(registry, &plugins, emptyArgs)
-	if err == nil {
-		t.Fatal("Framework initialization should fail")
-	}
-
-	if err != nil && !strings.Contains(err.Error(), "already registered") {
-		t.Fatalf("Unexpected error, got %s, expect: plugin already registered", err.Error())
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := NewFramework(registry, tc.plugins, tc.pluginCfg)
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+			}
+		})
 	}
 }
 
@@ -1696,6 +1723,41 @@ func TestWaitOnPermit(t *testing.T) {
 			if waitOnPermitStatus.Message() != tt.wantMessage {
 				t.Fatalf("Expected WaitOnPermit to return status with message %q, but got %q",
 					tt.wantMessage, waitOnPermitStatus.Message())
+			}
+		})
+	}
+}
+
+func TestListPlugins(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins *config.Plugins
+		// pluginSetCount include queue sort plugin and bind plugin.
+		pluginSetCount int
+	}{
+		{
+			name:           "Add empty plugin",
+			plugins:        &config.Plugins{},
+			pluginSetCount: 2,
+		},
+		{
+			name: "Add multiple plugins",
+			plugins: &config.Plugins{
+				Score: &config.PluginSet{Enabled: []config.Plugin{{Name: scorePlugin1}, {Name: scoreWithNormalizePlugin1}}},
+			},
+			pluginSetCount: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, emptyArgs)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			plugins := f.ListPlugins()
+			if len(plugins) != tt.pluginSetCount {
+				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
 			}
 		})
 	}

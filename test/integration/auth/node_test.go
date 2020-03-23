@@ -218,7 +218,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	deleteNode2NormalPod := func(client clientset.Interface) func() error {
 		return func() error {
 			zero := int64(0)
-			return client.CoreV1().Pods("ns").Delete(context.TODO(), "node2normalpod", &metav1.DeleteOptions{GracePeriodSeconds: &zero})
+			return client.CoreV1().Pods("ns").Delete(context.TODO(), "node2normalpod", metav1.DeleteOptions{GracePeriodSeconds: &zero})
 		}
 	}
 
@@ -240,7 +240,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	deleteNode2MirrorPod := func(client clientset.Interface) func() error {
 		return func() error {
 			zero := int64(0)
-			return client.CoreV1().Pods("ns").Delete(context.TODO(), "node2mirrorpod", &metav1.DeleteOptions{GracePeriodSeconds: &zero})
+			return client.CoreV1().Pods("ns").Delete(context.TODO(), "node2mirrorpod", metav1.DeleteOptions{GracePeriodSeconds: &zero})
 		}
 	}
 
@@ -289,13 +289,13 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	deleteNode2 := func(client clientset.Interface) func() error {
 		return func() error {
-			return client.CoreV1().Nodes().Delete(context.TODO(), "node2", nil)
+			return client.CoreV1().Nodes().Delete(context.TODO(), "node2", metav1.DeleteOptions{})
 		}
 	}
 	createNode2NormalPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
 			zero := int64(0)
-			return client.PolicyV1beta1().Evictions("ns").Evict(&policy.Eviction{
+			return client.PolicyV1beta1().Evictions("ns").Evict(context.TODO(), &policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
 					Kind:       "Eviction",
@@ -311,7 +311,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	createNode2MirrorPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
 			zero := int64(0)
-			return client.PolicyV1beta1().Evictions("ns").Evict(&policy.Eviction{
+			return client.PolicyV1beta1().Evictions("ns").Evict(context.TODO(), &policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
 					Kind:       "Eviction",
@@ -388,7 +388,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	deleteNode1Lease := func(client clientset.Interface) func() error {
 		return func() error {
-			return client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Delete(context.TODO(), "node1", &metav1.DeleteOptions{})
+			return client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Delete(context.TODO(), "node1", metav1.DeleteOptions{})
 		}
 	}
 
@@ -445,7 +445,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	deleteNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			return client.StorageV1().CSINodes().Delete(context.TODO(), "node1", &metav1.DeleteOptions{})
+			return client.StorageV1().CSINodes().Delete(context.TODO(), "node1", metav1.DeleteOptions{})
 		}
 	}
 

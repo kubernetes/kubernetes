@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -18,6 +12,7 @@ go_library(
         "serving.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
@@ -26,6 +21,10 @@ go_library(
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/alwayspullimages:go_default_library",
         "//plugin/pkg/admission/antiaffinity:go_default_library",
+        "//plugin/pkg/admission/certificates/approval:go_default_library",
+        "//plugin/pkg/admission/certificates/signing:go_default_library",
+        "//plugin/pkg/admission/certificates/subjectrestriction:go_default_library",
+        "//plugin/pkg/admission/defaultingressclass:go_default_library",
         "//plugin/pkg/admission/defaulttolerationseconds:go_default_library",
         "//plugin/pkg/admission/deny:go_default_library",
         "//plugin/pkg/admission/eventratelimit:go_default_library",
@@ -70,32 +69,15 @@ go_library(
     ],
 )
 
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [":package-srcs"],
-    tags = ["automanaged"],
-)
-
 go_test(
     name = "go_default_test",
     srcs = [
         "admission_test.go",
         "authentication_test.go",
         "authorization_test.go",
+        "plugins_test.go",
     ],
-    data = [
-        "testdata/client-expired.pem",
-        "testdata/client-valid.pem",
-        "testdata/intermediate.pem",
-        "testdata/root.pem",
-    ],
+    data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubeapiserver/authenticator:go_default_library",
@@ -107,4 +89,18 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

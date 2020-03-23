@@ -97,15 +97,15 @@ func (c *FakeFischers) Update(ctx context.Context, fischer *v1alpha1.Fischer, op
 }
 
 // Delete takes name of the fischer and deletes it. Returns an error if one occurs.
-func (c *FakeFischers) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeFischers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(fischersResource, name), &v1alpha1.Fischer{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeFischers) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(fischersResource, listOptions)
+func (c *FakeFischers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(fischersResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.FischerList{})
 	return err

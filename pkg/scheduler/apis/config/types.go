@@ -47,6 +47,8 @@ type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
 	// AlgorithmSource specifies the scheduler algorithm source.
+	// TODO(#87526): Remove AlgorithmSource from this package
+	// DEPRECATED: AlgorithmSource is removed in the v1alpha2 ComponentConfig
 	AlgorithmSource SchedulerAlgorithmSource
 
 	// LeaderElection defines the configuration of leader election client.
@@ -99,6 +101,10 @@ type KubeSchedulerConfiguration struct {
 	// scheduler name. Pods that don't specify any scheduler name are scheduled
 	// with the "default-scheduler" profile, if present here.
 	Profiles []KubeSchedulerProfile
+
+	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
+	// with the extender. These extenders are shared by all scheduler profiles.
+	Extenders []Extender
 }
 
 // KubeSchedulerProfile is a scheduling profile.

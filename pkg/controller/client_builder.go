@@ -157,7 +157,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 				if !valid {
 					klog.Warningf("secret %s contained an invalid API token for %s/%s", secret.Name, sa.Namespace, sa.Name)
 					// try to delete the secret containing the invalid token
-					if err := b.CoreClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					if err := b.CoreClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 						klog.Warningf("error deleting secret %s containing invalid API token for %s/%s: %v", secret.Name, sa.Namespace, sa.Name, err)
 					}
 					// continue watching for good tokens

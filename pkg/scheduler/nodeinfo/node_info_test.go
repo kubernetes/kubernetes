@@ -26,9 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestNewResource(t *testing.T) {
@@ -543,9 +540,6 @@ func TestNodeInfoClone(t *testing.T) {
 }
 
 func TestNodeInfoAddPod(t *testing.T) {
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	nodeName := "test-node"
 	pods := []*v1.Pod{
 		{
@@ -720,9 +714,6 @@ func TestNodeInfoAddPod(t *testing.T) {
 }
 
 func TestNodeInfoRemovePod(t *testing.T) {
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	nodeName := "test-node"
 	pods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),

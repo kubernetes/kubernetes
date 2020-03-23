@@ -62,6 +62,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -507,6 +508,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 	err = initConfigz(&s.KubeletConfiguration)
 	if err != nil {
 		klog.Errorf("unable to register KubeletConfiguration with configz, error: %v", err)
+	}
+
+	if len(s.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
 	}
 
 	// About to get clients and such, detect standaloneMode
@@ -1124,9 +1129,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 
 func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableCAdvisorJSONEndpoints, enableServer bool) {
 	// start the kubelet
-	go wait.Until(func() {
-		k.Run(podCfg.Updates())
-	}, 0, wait.NeverStop)
+	go k.Run(podCfg.Updates())
 
 	// start the kubelet server
 	if enableServer {

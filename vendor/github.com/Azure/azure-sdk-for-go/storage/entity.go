@@ -207,7 +207,7 @@ func (e *Entity) Delete(force bool, options *EntityOptions) error {
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(http.MethodDelete, uri, headers, nil, e.Table.tsc.auth)
 	if err != nil {
-		if resp.StatusCode == http.StatusPreconditionFailed {
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err
@@ -433,7 +433,7 @@ func (e *Entity) updateMerge(force bool, verb string, options *EntityOptions) er
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(verb, uri, headers, bytes.NewReader(body), e.Table.tsc.auth)
 	if err != nil {
-		if resp.StatusCode == http.StatusPreconditionFailed {
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err

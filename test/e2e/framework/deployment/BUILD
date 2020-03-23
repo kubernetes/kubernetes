@@ -10,9 +10,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/deployment",
     deps = [
-        "//pkg/controller/deployment/util:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",

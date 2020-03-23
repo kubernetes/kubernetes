@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -166,7 +167,7 @@ func TestStatusSubresource(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to create noxu instance: %v", err)
 			}
-			gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+			gottenNoxuInstance, err := noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -189,7 +190,7 @@ func TestStatusSubresource(t *testing.T) {
 
 			// UpdateStatus should not update spec.
 			// Check that .spec.num = 10 and .status.num = 20
-			updatedStatusInstance, err := noxuResourceClient.UpdateStatus(gottenNoxuInstance, metav1.UpdateOptions{})
+			updatedStatusInstance, err := noxuResourceClient.UpdateStatus(context.TODO(), gottenNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("unable to update status: %v", err)
 			}
@@ -210,7 +211,7 @@ func TestStatusSubresource(t *testing.T) {
 				t.Fatalf(".status.num: expected: %v, got: %v", int64(20), statusNum)
 			}
 
-			gottenNoxuInstance, err = noxuResourceClient.Get("foo", metav1.GetOptions{})
+			gottenNoxuInstance, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -229,7 +230,7 @@ func TestStatusSubresource(t *testing.T) {
 
 			// Update should not update status.
 			// Check that .spec.num = 40 and .status.num = 20
-			updatedInstance, err := noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
+			updatedInstance, err := noxuResourceClient.Update(context.TODO(), gottenNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("unable to update instance: %v", err)
 			}
@@ -249,7 +250,7 @@ func TestStatusSubresource(t *testing.T) {
 			if statusNum != int64(20) {
 				t.Fatalf(".status.num: expected: %v, got: %v", int64(20), statusNum)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -314,7 +315,7 @@ func TestScaleSubresource(t *testing.T) {
 			}
 
 			// set .status.labelSelector = bar
-			gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+			gottenNoxuInstance, err := noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -322,13 +323,13 @@ func TestScaleSubresource(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			_, err = noxuResourceClient.UpdateStatus(gottenNoxuInstance, metav1.UpdateOptions{})
+			_, err = noxuResourceClient.UpdateStatus(context.TODO(), gottenNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("unable to update status: %v", err)
 			}
 
 			// get the scale object
-			gottenScale, err := scaleClient.Scales("not-the-default").Get(groupResource, "foo")
+			gottenScale, err := scaleClient.Scales("not-the-default").Get(context.TODO(), groupResource, "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -349,7 +350,7 @@ func TestScaleSubresource(t *testing.T) {
 			// check that spec is updated, but status is not
 			gottenScale.Spec.Replicas = 5
 			gottenScale.Status.Selector = "baz"
-			updatedScale, err := scaleClient.Scales("not-the-default").Update(groupResource, gottenScale)
+			updatedScale, err := scaleClient.Scales("not-the-default").Update(context.TODO(), groupResource, gottenScale, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -361,7 +362,7 @@ func TestScaleSubresource(t *testing.T) {
 			}
 
 			// check that .spec.replicas = 5, but status is not updated
-			updatedNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+			updatedNoxuInstance, err := noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -382,7 +383,7 @@ func TestScaleSubresource(t *testing.T) {
 
 			// validate maximum value
 			// set .spec.replicas = math.MaxInt64
-			gottenNoxuInstance, err = noxuResourceClient.Get("foo", metav1.GetOptions{})
+			gottenNoxuInstance, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -390,11 +391,11 @@ func TestScaleSubresource(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			_, err = noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
+			_, err = noxuResourceClient.Update(context.TODO(), gottenNoxuInstance, metav1.UpdateOptions{})
 			if err == nil {
 				t.Fatalf("unexpected non-error: .spec.replicas should be less than 2147483647")
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 			if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
@@ -526,7 +527,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error setting .spec.num: %v", err)
 			}
-			createdNoxuInstance, err = noxuResourceClient.UpdateStatus(createdNoxuInstance, metav1.UpdateOptions{})
+			createdNoxuInstance, err = noxuResourceClient.UpdateStatus(context.TODO(), createdNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -536,7 +537,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error setting .status.num: %v", err)
 			}
-			_, err = noxuResourceClient.UpdateStatus(createdNoxuInstance, metav1.UpdateOptions{})
+			_, err = noxuResourceClient.UpdateStatus(context.TODO(), createdNoxuInstance, metav1.UpdateOptions{})
 			if err == nil {
 				t.Fatal("expected error, but got none")
 			}
@@ -547,7 +548,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 			if !strings.Contains(statusError.Error(), "Invalid value") {
 				t.Fatalf("expected 'Invalid value' in error, got: %v", err)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -669,7 +670,7 @@ func TestGeneration(t *testing.T) {
 			}
 
 			// .metadata.generation = 1
-			gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+			gottenNoxuInstance, err := noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -684,7 +685,7 @@ func TestGeneration(t *testing.T) {
 			}
 
 			// UpdateStatus does not increment generation
-			updatedStatusInstance, err := noxuResourceClient.UpdateStatus(gottenNoxuInstance, metav1.UpdateOptions{})
+			updatedStatusInstance, err := noxuResourceClient.UpdateStatus(context.TODO(), gottenNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("unable to update status: %v", err)
 			}
@@ -692,7 +693,7 @@ func TestGeneration(t *testing.T) {
 				t.Fatalf("updating status should not increment .metadata.generation: expected: %v, got: %v", 1, updatedStatusInstance.GetGeneration())
 			}
 
-			gottenNoxuInstance, err = noxuResourceClient.Get("foo", metav1.GetOptions{})
+			gottenNoxuInstance, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -704,14 +705,14 @@ func TestGeneration(t *testing.T) {
 			}
 
 			// Update increments generation
-			updatedInstance, err := noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
+			updatedInstance, err := noxuResourceClient.Update(context.TODO(), gottenNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("unable to update instance: %v", err)
 			}
 			if updatedInstance.GetGeneration() != 2 {
 				t.Fatalf("updating spec should increment .metadata.generation: expected: %v, got: %v", 2, updatedStatusInstance.GetGeneration())
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -764,7 +765,7 @@ func TestSubresourcePatch(t *testing.T) {
 
 			t.Logf("Patching .status.num to 999")
 			patch := []byte(`{"spec": {"num":999}, "status": {"num":999}}`)
-			patchedNoxuInstance, err := noxuResourceClient.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+			patchedNoxuInstance, err := noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -785,14 +786,14 @@ func TestSubresourcePatch(t *testing.T) {
 			// and then the updated object shows a conflicting diff, which permanently fails the patch.
 			// This gives expected stability in the patch without retrying on an known number of conflicts below in the test.
 			// See https://issue.k8s.io/42644
-			_, err = noxuResourceClient.Get("foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
+			_, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// no-op patch
 			t.Logf("Patching .status.num again to 999")
-			patchedNoxuInstance, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -803,7 +804,7 @@ func TestSubresourcePatch(t *testing.T) {
 
 			// empty patch
 			t.Logf("Applying empty patch")
-			patchedNoxuInstance, err = noxuResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}, "status")
+			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}, "status")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -815,7 +816,7 @@ func TestSubresourcePatch(t *testing.T) {
 
 			t.Logf("Patching .spec.replicas to 7")
 			patch = []byte(`{"spec": {"replicas":7}, "status": {"replicas":7}}`)
-			patchedNoxuInstance, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{}, "scale")
+			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "scale")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -836,13 +837,13 @@ func TestSubresourcePatch(t *testing.T) {
 			// and then the updated object shows a conflicting diff, which permanently fails the patch.
 			// This gives expected stability in the patch without retrying on an known number of conflicts below in the test.
 			// See https://issue.k8s.io/42644
-			_, err = noxuResourceClient.Get("foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
+			_, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// Scale.Spec.Replicas = 7 but Scale.Status.Replicas should remain 0
-			gottenScale, err := scaleClient.Scales("not-the-default").Get(groupResource, "foo")
+			gottenScale, err := scaleClient.Scales("not-the-default").Get(context.TODO(), groupResource, "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -855,7 +856,7 @@ func TestSubresourcePatch(t *testing.T) {
 
 			// no-op patch
 			t.Logf("Patching .spec.replicas again to 7")
-			patchedNoxuInstance, err = noxuResourceClient.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{}, "scale")
+			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "scale")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -866,7 +867,7 @@ func TestSubresourcePatch(t *testing.T) {
 
 			// empty patch
 			t.Logf("Applying empty patch")
-			patchedNoxuInstance, err = noxuResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}, "scale")
+			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}, "scale")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -876,16 +877,16 @@ func TestSubresourcePatch(t *testing.T) {
 			expectString(t, patchedNoxuInstance.UnstructuredContent(), rv, "metadata", "resourceVersion")
 
 			// make sure strategic merge patch is not supported for both status and scale
-			_, err = noxuResourceClient.Patch("foo", types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "status")
+			_, err = noxuResourceClient.Patch(context.TODO(), "foo", types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "status")
 			if err == nil {
 				t.Fatalf("unexpected non-error: strategic merge patch is not supported for custom resources")
 			}
 
-			_, err = noxuResourceClient.Patch("foo", types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "scale")
+			_, err = noxuResourceClient.Patch(context.TODO(), "foo", types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "scale")
 			if err == nil {
 				t.Fatalf("unexpected non-error: strategic merge patch is not supported for custom resources")
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)

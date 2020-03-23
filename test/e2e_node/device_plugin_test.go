@@ -205,7 +205,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			deleteOptions := metav1.DeleteOptions{
 				GracePeriodSeconds: &gp,
 			}
-			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), dp.Name, &deleteOptions)
+			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), dp.Name, deleteOptions)
 			framework.ExpectNoError(err)
 			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 			_, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), dp.Name, getOptions)
@@ -237,7 +237,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal(devID2)))
 
 			ginkgo.By("By deleting the pods and waiting for container removal")
-			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), dp.Name, &deleteOptions)
+			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), dp.Name, deleteOptions)
 			framework.ExpectNoError(err)
 			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
@@ -269,7 +269,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 30*time.Second, framework.Poll).Should(gomega.Equal(devsLen))
 
 			ginkgo.By("by deleting the pods and waiting for container removal")
-			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), dp.Name, &deleteOptions)
+			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), dp.Name, deleteOptions)
 			framework.ExpectNoError(err)
 			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
@@ -281,8 +281,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
 
 			// Cleanup
-			f.PodClient().DeleteSync(pod1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(pod2.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(pod1.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(pod2.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 		})
 	})
 }

@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
@@ -136,7 +136,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
+func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeout time.Duration) {
 	namespace := c.f.Namespace.Name
 	err := c.Delete(context.TODO(), name, options)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -262,5 +262,5 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	ExpectNoError(err)
-	return podutil.IsPodReady(pod)
+	return podutils.IsPodReady(pod)
 }

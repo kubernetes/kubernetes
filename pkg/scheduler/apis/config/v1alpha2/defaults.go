@@ -46,18 +46,6 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 		obj.Profiles[0].SchedulerName = pointer.StringPtr(api.DefaultSchedulerName)
 	}
 
-	if obj.AlgorithmSource.Policy == nil &&
-		(obj.AlgorithmSource.Provider == nil || len(*obj.AlgorithmSource.Provider) == 0) {
-		val := v1alpha2.SchedulerDefaultProviderName
-		obj.AlgorithmSource.Provider = &val
-	}
-
-	if policy := obj.AlgorithmSource.Policy; policy != nil {
-		if policy.ConfigMap != nil && len(policy.ConfigMap.Namespace) == 0 {
-			obj.AlgorithmSource.Policy.ConfigMap.Namespace = api.NamespaceSystem
-		}
-	}
-
 	// For Healthz and Metrics bind addresses, we want to check:
 	// 1. If the value is nil, default to 0.0.0.0 and default scheduler port
 	// 2. If there is a value set, attempt to split it. If it's just a port (ie, ":1234"), default to 0.0.0.0 with that port

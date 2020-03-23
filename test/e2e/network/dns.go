@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
@@ -143,7 +144,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		regularServiceName := "test-service-2"
@@ -154,7 +155,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, metav1.DeleteOptions{})
 		}()
 
 		// All the names we need to be able to resolve.
@@ -198,7 +199,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		regularServiceName := "test-service-2"
@@ -208,7 +209,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), regularService.Name, metav1.DeleteOptions{})
 		}()
 
 		// All the names we need to be able to resolve.
@@ -256,7 +257,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -298,7 +299,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test headless service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), headlessService.Name, metav1.DeleteOptions{})
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -337,7 +338,7 @@ var _ = SIGDescribe("DNS", func() {
 		defer func() {
 			ginkgo.By("deleting the test externalName service")
 			defer ginkgo.GinkgoRecover()
-			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, metav1.DeleteOptions{})
 		}()
 		hostFQDN := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		wheezyProbeCmd, wheezyFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
@@ -419,11 +420,11 @@ var _ = SIGDescribe("DNS", func() {
 		framework.Logf("Created pod %v", testAgnhostPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testAgnhostPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testAgnhostPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testAgnhostPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("ginkgo.Failed to delete pod %s: %v", testAgnhostPod.Name, err)
 			}
 		}()
-		err = f.WaitForPodReady(testAgnhostPod.Name)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
 
 		runCommand := func(arg string) string {
@@ -460,19 +461,29 @@ var _ = SIGDescribe("DNS", func() {
 		testSearchPath := "resolv.conf.local"
 		testDNSNameFull := fmt.Sprintf("%s.%s", testDNSNameShort, testSearchPath)
 
-		testServerPod := generateDNSServerPod(map[string]string{
+		corednsConfig := generateCoreDNSConfigmap(f.Namespace.Name, map[string]string{
 			testDNSNameFull: testInjectedIP,
 		})
-		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod, metav1.CreateOptions{})
+		corednsConfig, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), corednsConfig, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "unable to create test configMap %s", corednsConfig.Name)
+
+		defer func() {
+			framework.Logf("Deleting configmap %s...", corednsConfig.Name)
+			err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), corednsConfig.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "Failed to delete configmap %s: %v", corednsConfig.Name)
+		}()
+
+		testServerPod := generateCoreDNSServerPod(corednsConfig)
+		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testServerPod.Name)
 		framework.Logf("Created pod %v", testServerPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testServerPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testServerPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("ginkgo.Failed to delete pod %s: %v", testServerPod.Name, err)
 			}
 		}()
-		err = f.WaitForPodRunning(testServerPod.Name)
+		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testServerPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testServerPod.Name)
 
 		// Retrieve server pod IP.
@@ -500,11 +511,11 @@ var _ = SIGDescribe("DNS", func() {
 		framework.Logf("Created pod %v", testUtilsPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testUtilsPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("ginkgo.Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
 		}()
-		err = f.WaitForPodRunning(testUtilsPod.Name)
+		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testUtilsPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testUtilsPod.Name)
 
 		ginkgo.By("Verifying customized DNS option is configured on pod...")
@@ -528,7 +539,7 @@ var _ = SIGDescribe("DNS", func() {
 		// This verifies both:
 		// - Custom search path is appended.
 		// - DNS query is sent to the specified server.
-		cmd = []string{"/usr/bin/dig", "+short", "+search", testDNSNameShort}
+		cmd = []string{"dig", "+short", "+search", testDNSNameShort}
 		digFunc := func() (bool, error) {
 			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
 				Command:       cmd,
