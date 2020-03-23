@@ -175,6 +175,42 @@
     numInitPods: [5000]
     numPodsToSchedule: 1000
 - template:
+    desc: TopologySpreading
+    nodes:
+      nodeTemplatePath: config/node-default.yaml
+      labelNodePrepareStrategy:
+        labelKey: "topology.kubernetes.io/zone"
+        labelValues: ["moon-1", "moon-2", "moon-3"]
+    initPods:
+    - podTemplatePath: config/pod-default.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-topology-spreading.yaml
+  params:
+  - numNodes: 500
+    numInitPods: [1000]
+    numPodsToSchedule: 1000
+  - numNodes: 5000
+    numInitPods: [5000]
+    numPodsToSchedule: 2000
+- template:
+    desc: PreferredTopologySpreading
+    nodes:
+      nodeTemplatePath: config/node-default.yaml
+      labelNodePrepareStrategy:
+        labelKey: "topology.kubernetes.io/zone"
+        labelValues: ["moon-1", "moon-2", "moon-3"]
+    initPods:
+    - podTemplatePath: config/pod-default.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-preferred-topology-spreading.yaml
+  params:
+  - numNodes: 500
+    numInitPods: [1000]
+    numPodsToSchedule: 1000
+  - numNodes: 5000
+    numInitPods: [5000]
+    numPodsToSchedule: 2000
+- template:
     desc: MixedSchedulingBasePod
     initPods:
     - podTemplatePath: config/pod-default.yaml
