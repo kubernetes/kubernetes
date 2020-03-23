@@ -1,16 +1,26 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
   - bowei
+  - cjcullen
   - gmarek
-  - jszczepkowski
   - vishh
   - mwielgus
   - MaciekPytel
   - jingax10
+  - yujuhong
+  - mtaufen
+  - sig-scalability-reviewers
 approvers:
   - bowei
+  - cjcullen
   - gmarek
-  - jszczepkowski
   - vishh
   - mwielgus
   - MaciekPytel
   - jingax10
+  - yujuhong
+  - mtaufen
+  - sig-scalability-approvers
+emeritus_approvers:
+  - jszczepkowski

@@ -27,7 +27,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a node.
+// NodeMetrics sets resource usage metrics of a node.
 type NodeMetrics struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -47,7 +47,7 @@ type NodeMetrics struct {
 type NodeMetricsList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of node metrics.
@@ -59,7 +59,7 @@ type NodeMetricsList struct {
 // +genclient:readonly
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a pod.
+// PodMetrics sets resource usage metrics of a pod.
 type PodMetrics struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -79,14 +79,14 @@ type PodMetrics struct {
 type PodMetricsList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of pod metrics.
 	Items []PodMetrics `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// resource usage metrics of a container.
+// ContainerMetrics sets resource usage metrics of a container.
 type ContainerMetrics struct {
 	// Container name corresponding to the one from pod.spec.containers.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`

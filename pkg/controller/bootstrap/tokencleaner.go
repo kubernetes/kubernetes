@@ -17,11 +17,11 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -32,9 +32,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // TokenCleanerOptions contains options for the TokenCleaner
@@ -81,7 +83,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 	}
 
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -113,10 +115,10 @@ func (tc *TokenCleaner) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
 
-	glog.Infof("Starting token cleaner controller")
-	defer glog.Infof("Shutting down token cleaner controller")
+	klog.Infof("Starting token cleaner controller")
+	defer klog.Infof("Shutting down token cleaner controller")
 
-	if !controller.WaitForCacheSync("token_cleaner", stopCh, tc.secretSynced) {
+	if !cache.WaitForNamedCacheSync("token_cleaner", stopCh, tc.secretSynced) {
 		return
 	}
 
@@ -161,7 +163,7 @@ func (tc *TokenCleaner) processNextWorkItem() bool {
 func (tc *TokenCleaner) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -171,7 +173,7 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 
 	ret, err := tc.secretLister.Secrets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		glog.V(3).Infof("secret has been deleted: %v", key)
+		klog.V(3).Infof("secret has been deleted: %v", key)
 		return nil
 	}
 
@@ -187,17 +189,25 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 
 func (tc *TokenCleaner) evalSecret(o interface{}) {
 	secret := o.(*v1.Secret)
-	if isSecretExpired(secret) {
-		glog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
-		var options *metav1.DeleteOptions
+	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
+	if alreadyExpired {
+		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
+		var options metav1.DeleteOptions
 		if len(secret.UID) > 0 {
-			options = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &secret.UID}}
+			options.Preconditions = &metav1.Preconditions{UID: &secret.UID}
 		}
-		err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(secret.Name, options)
+		err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, options)
 		// NotFound isn't a real error (it's already been deleted)
 		// Conflict isn't a real error (the UID precondition failed)
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-			glog.V(3).Infof("Error deleting Secret: %v", err)
+			klog.V(3).Infof("Error deleting Secret: %v", err)
 		}
+	} else if ttl > 0 {
+		key, err := controller.KeyFunc(o)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		tc.queue.AddAfter(key, ttl)
 	}
 }

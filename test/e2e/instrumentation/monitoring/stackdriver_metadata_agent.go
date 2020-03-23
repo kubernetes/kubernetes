@@ -17,52 +17,54 @@ limitations under the License.
 package monitoring
 
 import (
-	"time"
-
-	"golang.org/x/oauth2/google"
-	clientset "k8s.io/client-go/kubernetes"
-
 	"context"
 	"encoding/json"
 	"fmt"
-	. "github.com/onsi/ginkgo"
 	"io/ioutil"
+	"reflect"
+	"time"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
-	"reflect"
+
+	"github.com/onsi/ginkgo"
+	"golang.org/x/oauth2/google"
 )
 
 const (
 	// Time to wait after a pod creation for it's metadata to be exported
 	metadataWaitTime = 120 * time.Second
 
-	// Scope for Stackdriver Metadata API
+	// MonitoringScope is the scope for Stackdriver Metadata API
 	MonitoringScope = "https://www.googleapis.com/auth/monitoring"
 )
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 	var kubeClient clientset.Interface
 
-	It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func() {
+	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func() {
 		kubeClient = f.ClientSet
 		testAgent(f, kubeClient)
 	})
 })
 
 func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 	resourceType := "k8s_container"
 	uniqueContainerName := fmt.Sprintf("test-container-%v", time.Now().Unix())
 	endpoint := fmt.Sprintf(
 		"https://stackdriver.googleapis.com/v1beta2/projects/%v/resourceMetadata?filter=resource.type%%3D%v+AND+resource.label.container_name%%3D%v",
-		projectId,
+		projectID,
 		resourceType,
 		uniqueContainerName)
 
@@ -72,10 +74,10 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 	}
 
 	// Create test pod with unique name.
-	framework.CreateExecPodOrFail(kubeClient, f.Namespace.Name, uniqueContainerName, func(pod *v1.Pod) {
+	_ = e2epod.CreateExecPodOrFail(kubeClient, f.Namespace.Name, uniqueContainerName, func(pod *v1.Pod) {
 		pod.Spec.Containers[0].Name = uniqueContainerName
 	})
-	defer kubeClient.CoreV1().Pods(f.Namespace.Name).Delete(uniqueContainerName, &metav1.DeleteOptions{})
+	defer kubeClient.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), uniqueContainerName, metav1.DeleteOptions{})
 
 	// Wait a short amount of time for Metadata Agent to be created and metadata to be exported
 	time.Sleep(metadataWaitTime)
@@ -101,10 +103,12 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 	}
 }
 
+// Metadata has the information fetched from Stackdriver metadata API.
 type Metadata struct {
 	Results []map[string]interface{}
 }
 
+// Resource contains the resource type and labels from Stackdriver metadata API.
 type Resource struct {
 	resourceType   string
 	resourceLabels map[string]string
@@ -135,7 +139,7 @@ func verifyPodExists(response []byte, containerName string) (bool, error) {
 }
 
 func parseResource(resource interface{}) (*Resource, error) {
-	var labels map[string]string = map[string]string{}
+	labels := map[string]string{}
 	resourceMap, ok := resource.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("Resource entry is of type %s, expected map[string]interface{}", reflect.TypeOf(resource))

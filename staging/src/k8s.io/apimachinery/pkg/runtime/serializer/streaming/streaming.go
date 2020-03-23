@@ -64,7 +64,7 @@ func NewDecoder(r io.ReadCloser, d runtime.Decoder) Decoder {
 		reader:   r,
 		decoder:  d,
 		buf:      make([]byte, 1024),
-		maxBytes: 1024 * 1024,
+		maxBytes: 16 * 1024 * 1024,
 	}
 }
 

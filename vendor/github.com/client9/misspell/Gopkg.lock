@@ -3,13 +3,22 @@
 
 [[projects]]
   name = "github.com/gobwas/glob"
-  packages = [".","compiler","match","syntax","syntax/ast","syntax/lexer","util/runes","util/strings"]
-  revision = "bea32b9cd2d6f55753d94a28e959b13f0244797a"
-  version = "v0.2.2"
+  packages = [
+    ".",
+    "compiler",
+    "match",
+    "syntax",
+    "syntax/ast",
+    "syntax/lexer",
+    "util/runes",
+    "util/strings"
+  ]
+  revision = "5ccd90ef52e1e632236f7326478d4faa74f99438"
+  version = "v0.2.3"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e481c81c87260652d25840e1d95d6e530331c095d64d84422a166f37ae0a77d3"
+  inputs-digest = "087ea4c49358ea8258ad9edfe514cd5ce9975c889c258e5ec7b5d2b720aae113"
   solver-name = "gps-cdcl"
   solver-version = 1

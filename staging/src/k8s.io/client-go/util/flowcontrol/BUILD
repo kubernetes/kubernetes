@@ -26,8 +26,8 @@ go_library(
     importpath = "k8s.io/client-go/util/flowcontrol",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-        "//staging/src/k8s.io/client-go/util/integer:go_default_library",
         "//vendor/golang.org/x/time/rate:go_default_library",
+        "//vendor/k8s.io/utils/integer:go_default_library",
     ],
 )
 

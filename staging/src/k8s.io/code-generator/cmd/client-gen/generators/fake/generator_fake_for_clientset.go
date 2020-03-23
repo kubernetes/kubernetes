@@ -102,10 +102,6 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		}
 
 		sw.Do(clientsetInterfaceImplTemplate, m)
-		// don't generated the default method if generating internalversion clientset
-		if group.IsDefaultVersion && group.Version != "" {
-			sw.Do(clientsetInterfaceDefaultVersionImpl, m)
-		}
 	}
 
 	return sw.Error()
@@ -125,7 +121,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	cs := &Clientset{}
+	cs := &Clientset{tracker: o}
 	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
@@ -147,10 +143,15 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 type Clientset struct {
 	testing.Fake
 	discovery *fakediscovery.FakeDiscovery
+	tracker testing.ObjectTracker
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.discovery
+}
+
+func (c *Clientset) Tracker() testing.ObjectTracker {
+	return c.tracker
 }
 `
 
@@ -161,13 +162,6 @@ var _ clientset.Interface = &Clientset{}
 var clientsetInterfaceImplTemplate = `
 // $.GroupGoName$$.Version$ retrieves the $.GroupGoName$$.Version$Client
 func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
-	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
-}
-`
-
-var clientsetInterfaceDefaultVersionImpl = `
-// $.GroupGoName$ retrieves the $.GroupGoName$$.Version$Client
-func (c *Clientset) $.GroupGoName$() $.PackageAlias$.$.GroupGoName$$.Version$Interface {
 	return &fake$.PackageAlias$.Fake$.GroupGoName$$.Version${Fake: &c.Fake}
 }
 `

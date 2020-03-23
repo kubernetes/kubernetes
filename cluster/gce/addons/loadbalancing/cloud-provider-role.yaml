@@ -33,6 +33,13 @@ rules:
   - create
   - patch
   - update
+- apiGroups:
+  - ""
+  resources:
+  - services/status
+  verbs:
+  - patch
+  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

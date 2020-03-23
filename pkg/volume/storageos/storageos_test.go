@@ -17,17 +17,20 @@ limitations under the License.
 package storageos
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/utils/exec/testing"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -39,7 +42,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/storageos")
 	if err != nil {
@@ -63,7 +66,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/storageos")
 	if err != nil {
@@ -75,13 +78,14 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 type fakePDManager struct {
-	api           apiImplementer
-	attachCalled  bool
-	detachCalled  bool
-	mountCalled   bool
-	unmountCalled bool
-	createCalled  bool
-	deleteCalled  bool
+	api                apiImplementer
+	attachCalled       bool
+	attachDeviceCalled bool
+	detachCalled       bool
+	mountCalled        bool
+	unmountCalled      bool
+	createCalled       bool
+	deleteCalled       bool
 }
 
 func (fake *fakePDManager) NewAPI(apiCfg *storageosAPIConfig) error {
@@ -106,6 +110,11 @@ func (fake *fakePDManager) CreateVolume(p *storageosProvisioner) (*storageosVolu
 func (fake *fakePDManager) AttachVolume(b *storageosMounter) (string, error) {
 	fake.attachCalled = true
 	return "", nil
+}
+
+func (fake *fakePDManager) AttachDevice(b *storageosMounter, dir string) error {
+	fake.attachDeviceCalled = true
+	return nil
 }
 
 func (fake *fakePDManager) DetachVolume(b *storageosUnmounter, loopDevice string) error {
@@ -142,7 +151,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/storageos")
 	if err != nil {
@@ -165,7 +174,7 @@ func TestPlugin(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	client.Core().Secrets("default").Create(&v1.Secret{
+	client.CoreV1().Secrets("default").Create(context.TODO(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: "default",
@@ -175,9 +184,9 @@ func TestPlugin(t *testing.T) {
 			"apiUsername": []byte("storageos"),
 			"apiPassword": []byte("storageos"),
 			"apiAddr":     []byte("tcp://localhost:5705"),
-		}})
+		}}, metav1.CreateOptions{})
 
-	plug.(*storageosPlugin).host = volumetest.NewFakeVolumeHost(tmpDir, client, nil)
+	plug.(*storageosPlugin).host = volumetest.NewFakeVolumeHost(t, tmpDir, client, nil)
 
 	// Test Mounter
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid"), Namespace: "default"}}
@@ -188,7 +197,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Couldn't get secret from %v/%v", pod.Namespace, secretName)
 	}
 
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, apiCfg, fakeManager, &mount.FakeMounter{}, mount.NewFakeExec(nil))
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, apiCfg, fakeManager, mount.NewFakeMounter(nil), &testingexec.FakeExec{})
 	if err != nil {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	}
@@ -196,13 +205,13 @@ func TestPlugin(t *testing.T) {
 		t.Fatalf("Got a nil Mounter")
 	}
 
-	expectedPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~storageos/vol1-pvname.ns1.vol1")
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~storageos/vol1-pvname.ns1.vol1")
 	volPath := mounter.GetPath()
 	if volPath != expectedPath {
 		t.Errorf("Expected path: '%s' got: '%s'", expectedPath, volPath)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volPath); err != nil {
@@ -213,6 +222,9 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
+	if !fakeManager.attachDeviceCalled {
+		t.Errorf("AttachDevice not called")
+	}
 	if !fakeManager.attachCalled {
 		t.Errorf("Attach not called")
 	}
@@ -222,7 +234,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Unmounter
 	fakeManager = &fakePDManager{}
-	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1-pvname", types.UID("poduid"), fakeManager, &mount.FakeMounter{}, mount.NewFakeExec(nil))
+	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1-pvname", types.UID("poduid"), fakeManager, mount.NewFakeMounter(nil), &testingexec.FakeExec{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -259,8 +271,9 @@ func TestPlugin(t *testing.T) {
 		// PVName: "test-volume-name",
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 		Parameters: map[string]string{
-			"VolumeNamespace": "test-volume-namespace",
-			"adminSecretName": secretName,
+			"VolumeNamespace":      "test-volume-namespace",
+			"adminSecretName":      secretName,
+			"adminsecretnamespace": "default",
 		},
 		MountOptions: mountOptions,
 	}
@@ -353,7 +366,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	client := fake.NewSimpleClientset(pv, claim)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(storageosPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
@@ -362,7 +375,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	fakeManager := &fakePDManager{}
 	fakeConfig := &fakeConfig{}
 	apiCfg := fakeConfig.GetAPIConfig()
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, &mount.FakeMounter{}, mount.NewFakeExec(nil))
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, mount.NewFakeMounter(nil), &testingexec.FakeExec{})
 	if err != nil {
 		t.Fatalf("error creating a new internal mounter:%v", err)
 	}

@@ -439,8 +439,18 @@ func (a ActionImpl) GetSubresource() string {
 	return a.Subresource
 }
 func (a ActionImpl) Matches(verb, resource string) bool {
-	return strings.ToLower(verb) == strings.ToLower(a.Verb) &&
-		strings.ToLower(resource) == strings.ToLower(a.Resource.Resource)
+	// Stay backwards compatible.
+	if !strings.Contains(resource, "/") {
+		return strings.EqualFold(verb, a.Verb) &&
+			strings.EqualFold(resource, a.Resource.Resource)
+	}
+
+	parts := strings.SplitN(resource, "/", 2)
+	topresource, subresource := parts[0], parts[1]
+
+	return strings.EqualFold(verb, a.Verb) &&
+		strings.EqualFold(topresource, a.Resource.Resource) &&
+		strings.EqualFold(subresource, a.Subresource)
 }
 func (a ActionImpl) DeepCopy() Action {
 	ret := a

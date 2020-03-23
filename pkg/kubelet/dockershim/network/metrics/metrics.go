@@ -20,14 +20,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
 	// NetworkPluginOperationsKey is the key for operation count metrics.
 	NetworkPluginOperationsKey = "network_plugin_operations"
 	// NetworkPluginOperationsLatencyKey is the key for the operation latency metrics.
-	NetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_microseconds"
+	NetworkPluginOperationsLatencyKey = "network_plugin_operations_duration_seconds"
 
 	// Keep the "kubelet" subsystem for backward compatibility.
 	kubeletSubsystem = "kubelet"
@@ -36,11 +37,13 @@ const (
 var (
 	// NetworkPluginOperationsLatency collects operation latency numbers by operation
 	// type.
-	NetworkPluginOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: kubeletSubsystem,
-			Name:      NetworkPluginOperationsLatencyKey,
-			Help:      "Latency in microseconds of network plugin operations. Broken down by operation type.",
+	NetworkPluginOperationsLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      kubeletSubsystem,
+			Name:           NetworkPluginOperationsLatencyKey,
+			Help:           "Latency in seconds of network plugin operations. Broken down by operation type.",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
 	)
@@ -51,11 +54,11 @@ var registerMetrics sync.Once
 // Register all metrics.
 func Register() {
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(NetworkPluginOperationsLatency)
+		legacyregistry.MustRegister(NetworkPluginOperationsLatency)
 	})
 }
 
-// SinceInMicroseconds gets the time since the specified start in microseconds.
-func SinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+// SinceInSeconds gets the time since the specified start in seconds.
+func SinceInSeconds(start time.Time) float64 {
+	return time.Since(start).Seconds()
 }

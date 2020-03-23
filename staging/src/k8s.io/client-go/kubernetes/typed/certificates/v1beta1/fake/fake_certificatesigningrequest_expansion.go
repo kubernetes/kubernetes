@@ -17,11 +17,14 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	certificates "k8s.io/api/certificates/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	core "k8s.io/client-go/testing"
 )
 
-func (c *FakeCertificateSigningRequests) UpdateApproval(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
+func (c *FakeCertificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequest *certificates.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "approval", certificateSigningRequest), &certificates.CertificateSigningRequest{})
 	if obj == nil {

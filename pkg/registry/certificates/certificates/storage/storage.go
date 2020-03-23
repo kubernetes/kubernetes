@@ -31,13 +31,13 @@ import (
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 )
 
-// REST implements a RESTStorage for CertificateSigningRequest
+// REST implements a RESTStorage for CertificateSigningRequest.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a registry which will store CertificateSigningRequest in the given helper
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST) {
+// NewREST returns a registry which will store CertificateSigningRequest in the given helper.
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
 		NewListFunc:              func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
@@ -48,11 +48,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 		DeleteStrategy: csrregistry.Strategy,
 		ExportStrategy: csrregistry.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: csrregistry.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, nil, err
 	}
 
 	// Subresources use the same store and creation strategy, which only
@@ -64,7 +64,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 	approvalStore := *store
 	approvalStore.UpdateStrategy = csrregistry.ApprovalStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}, &ApprovalREST{store: &approvalStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, &ApprovalREST{store: &approvalStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -80,6 +80,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CertificateSigningRequest object.
 func (r *StatusREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
@@ -103,6 +104,7 @@ type ApprovalREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CertificateSigningRequest object.
 func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }

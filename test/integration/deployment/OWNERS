@@ -1,9 +1,8 @@
-reviewers:
-  - janetkuo
-  - kargakis
-  - tnozicka
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-  - janetkuo
-  - kargakis
+- sig-apps-approvers
+reviewers:
+- sig-apps-reviewers
 labels:
 - sig/apps

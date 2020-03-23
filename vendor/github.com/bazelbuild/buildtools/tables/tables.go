@@ -97,6 +97,11 @@ var LabelBlacklist = map[string]bool{
 	"package_group.includes": true,
 }
 
+// By default, edit.types.IsList consults lang.TypeOf to determine if an arg is a list.
+// You may override this using IsListArg. Specifying a name here overrides any value
+// in lang.TypeOf.
+var IsListArg = map[string]bool{}
+
 // IsSortableListArg: a named argument to a rule call is considered to be a sortable list
 // if the name is one of these names. There is a separate blacklist for
 // rule-specific exceptions.
@@ -194,16 +199,96 @@ var NamePriority = map[string]int{
 	"implementation": 5,
 	"implements":     6,
 	"alwayslink":     7,
+	// default condition in a dictionary literal passed to select should be
+	// the last one by convention.
+	"//conditions:default": 50,
 }
 
 var StripLabelLeadingSlashes = false
 
 var ShortenAbsoluteLabelsToRelative = false
 
+// AndroidNativeRules lists all Android rules that are being migrated from Native to Starlark.
+var AndroidNativeRules = []string{
+	"aar_import",
+	"android_binary",
+	"android_device",
+	"android_instrumentation_test",
+	"android_library",
+	"android_local_test",
+	"android_ndk_respository",
+	"android_sdk_repository",
+}
+
+// AndroidLoadPath is the load path for the Starlark Android Rules.
+var AndroidLoadPath = "@rules_android//android:rules.bzl"
+
+// CcNativeRules lists all C++ rules that are being migrated from Native to Starlark.
+var CcNativeRules = []string{
+	"cc_binary",
+	"cc_test",
+	"cc_library",
+	"cc_import",
+	"cc_proto_library",
+	"fdo_prefetch_hints",
+	"fdo_profile",
+	"cc_toolchain",
+	"cc_toolchain_suite",
+	"objc_library",
+	"objc_import",
+}
+
+// CcLoadPath is the load path for the Starlark C++ Rules.
+var CcLoadPath = "@rules_cc//cc:defs.bzl"
+
+// JavaNativeRules lists all Java rules that are being migrated from Native to Starlark.
+var JavaNativeRules = []string{
+	"java_binary",
+	"java_import",
+	"java_library",
+	"java_lite_proto_library",
+	"java_proto_library",
+	"java_test",
+	"java_package_configuration",
+	"java_plugin",
+	"java_runtime",
+	"java_toolchain",
+}
+
+// JavaLoadPath is the load path for the Starlark Java Rules.
+var JavaLoadPath = "@rules_java//java:defs.bzl"
+
+// PyNativeRules lists all Python rules that are being migrated from Native to Starlark.
+var PyNativeRules = []string{
+	"py_library",
+	"py_binary",
+	"py_test",
+	"py_runtime",
+}
+
+// PyLoadPath is the load path for the Starlark Python Rules.
+var PyLoadPath = "@rules_python//python:defs.bzl"
+
+// ProtoNativeRules lists all Proto rules that are being migrated from Native to Starlark.
+var ProtoNativeRules = []string{
+	"proto_lang_toolchain",
+	"proto_library",
+}
+
+// ProtoNativeSymbols lists all Proto symbols that are being migrated from Native to Starlark.
+var ProtoNativeSymbols = []string{
+	"ProtoInfo",
+	"proto_common",
+}
+
+// ProtoLoadPath is the load path for the Starlark Proto Rules.
+var ProtoLoadPath = "@rules_proto//proto:defs.bzl"
+
 // OverrideTables allows a user of the build package to override the special-case rules. The user-provided tables replace the built-in tables.
-func OverrideTables(labelArg, blacklist, sortableListArg, sortBlacklist, sortWhitelist map[string]bool, namePriority map[string]int, stripLabelLeadingSlashes, shortenAbsoluteLabelsToRelative bool) {
+func OverrideTables(labelArg, blacklist, listArg, sortableListArg, sortBlacklist, sortWhitelist map[string]bool, namePriority map[string]int, stripLabelLeadingSlashes, shortenAbsoluteLabelsToRelative bool) {
 	IsLabelArg = labelArg
 	LabelBlacklist = blacklist
+	IsListArg = listArg
 	IsSortableListArg = sortableListArg
 	SortableBlacklist = sortBlacklist
 	SortableWhitelist = sortWhitelist
@@ -213,12 +298,15 @@ func OverrideTables(labelArg, blacklist, sortableListArg, sortBlacklist, sortWhi
 }
 
 // MergeTables allows a user of the build package to override the special-case rules. The user-provided tables are merged into the built-in tables.
-func MergeTables(labelArg, blacklist, sortableListArg, sortBlacklist, sortWhitelist map[string]bool, namePriority map[string]int, stripLabelLeadingSlashes, shortenAbsoluteLabelsToRelative bool) {
+func MergeTables(labelArg, blacklist, listArg, sortableListArg, sortBlacklist, sortWhitelist map[string]bool, namePriority map[string]int, stripLabelLeadingSlashes, shortenAbsoluteLabelsToRelative bool) {
 	for k, v := range labelArg {
 		IsLabelArg[k] = v
 	}
 	for k, v := range blacklist {
 		LabelBlacklist[k] = v
+	}
+	for k, v := range listArg {
+		IsListArg[k] = v
 	}
 	for k, v := range sortableListArg {
 		IsSortableListArg[k] = v

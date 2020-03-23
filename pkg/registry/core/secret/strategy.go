@@ -29,9 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for Secret objects
@@ -53,6 +55,8 @@ func (strategy) NamespaceScoped() bool {
 }
 
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	secret := obj.(*api.Secret)
+	dropDisabledFields(secret, nil)
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -67,10 +71,23 @@ func (strategy) AllowCreateOnUpdate() bool {
 }
 
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newSecret := obj.(*api.Secret)
+	oldSecret := old.(*api.Secret)
+	dropDisabledFields(newSecret, oldSecret)
 }
 
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
+}
+
+func isImmutableInUse(secret *api.Secret) bool {
+	return secret != nil && secret.Immutable != nil
+}
+
+func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImmutableEphemeralVolumes) && !isImmutableInUse(oldSecret) {
+		secret.Immutable = nil
+	}
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {
@@ -98,15 +115,15 @@ func (s strategy) Export(ctx context.Context, obj runtime.Object, exact bool) er
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	secret, ok := obj.(*api.Secret)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a secret")
+		return nil, nil, fmt.Errorf("not a secret")
 	}
-	return labels.Set(secret.Labels), SelectableFields(secret), secret.Initializers != nil, nil
+	return labels.Set(secret.Labels), SelectableFields(secret), nil
 }
 
-// Matcher returns a generic matcher for a given label and field selector.
+// Matcher returns a selection predicate for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
 	return pkgstorage.SelectionPredicate{
 		Label:       label,
@@ -116,10 +133,9 @@ func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionP
 	}
 }
 
-func SecretNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
-	secret := obj.(*api.Secret)
-	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: secret.ObjectMeta.Name}
-	return []pkgstorage.MatchValue{result}
+// NameTriggerFunc returns value metadata.namespace of given object.
+func NameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Secret).ObjectMeta.Name
 }
 
 // SelectableFields returns a field set that can be used for filter selection

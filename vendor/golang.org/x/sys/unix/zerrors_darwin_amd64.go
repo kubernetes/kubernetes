@@ -49,6 +49,86 @@ const (
 	AF_UNSPEC                         = 0x0
 	AF_UTUN                           = 0x26
 	ALTWERASE                         = 0x200
+	ATTR_BIT_MAP_COUNT                = 0x5
+	ATTR_CMN_ACCESSMASK               = 0x20000
+	ATTR_CMN_ACCTIME                  = 0x1000
+	ATTR_CMN_ADDEDTIME                = 0x10000000
+	ATTR_CMN_BKUPTIME                 = 0x2000
+	ATTR_CMN_CHGTIME                  = 0x800
+	ATTR_CMN_CRTIME                   = 0x200
+	ATTR_CMN_DATA_PROTECT_FLAGS       = 0x40000000
+	ATTR_CMN_DEVID                    = 0x2
+	ATTR_CMN_DOCUMENT_ID              = 0x100000
+	ATTR_CMN_ERROR                    = 0x20000000
+	ATTR_CMN_EXTENDED_SECURITY        = 0x400000
+	ATTR_CMN_FILEID                   = 0x2000000
+	ATTR_CMN_FLAGS                    = 0x40000
+	ATTR_CMN_FNDRINFO                 = 0x4000
+	ATTR_CMN_FSID                     = 0x4
+	ATTR_CMN_FULLPATH                 = 0x8000000
+	ATTR_CMN_GEN_COUNT                = 0x80000
+	ATTR_CMN_GRPID                    = 0x10000
+	ATTR_CMN_GRPUUID                  = 0x1000000
+	ATTR_CMN_MODTIME                  = 0x400
+	ATTR_CMN_NAME                     = 0x1
+	ATTR_CMN_NAMEDATTRCOUNT           = 0x80000
+	ATTR_CMN_NAMEDATTRLIST            = 0x100000
+	ATTR_CMN_OBJID                    = 0x20
+	ATTR_CMN_OBJPERMANENTID           = 0x40
+	ATTR_CMN_OBJTAG                   = 0x10
+	ATTR_CMN_OBJTYPE                  = 0x8
+	ATTR_CMN_OWNERID                  = 0x8000
+	ATTR_CMN_PARENTID                 = 0x4000000
+	ATTR_CMN_PAROBJID                 = 0x80
+	ATTR_CMN_RETURNED_ATTRS           = 0x80000000
+	ATTR_CMN_SCRIPT                   = 0x100
+	ATTR_CMN_SETMASK                  = 0x41c7ff00
+	ATTR_CMN_USERACCESS               = 0x200000
+	ATTR_CMN_UUID                     = 0x800000
+	ATTR_CMN_VALIDMASK                = 0xffffffff
+	ATTR_CMN_VOLSETMASK               = 0x6700
+	ATTR_FILE_ALLOCSIZE               = 0x4
+	ATTR_FILE_CLUMPSIZE               = 0x10
+	ATTR_FILE_DATAALLOCSIZE           = 0x400
+	ATTR_FILE_DATAEXTENTS             = 0x800
+	ATTR_FILE_DATALENGTH              = 0x200
+	ATTR_FILE_DEVTYPE                 = 0x20
+	ATTR_FILE_FILETYPE                = 0x40
+	ATTR_FILE_FORKCOUNT               = 0x80
+	ATTR_FILE_FORKLIST                = 0x100
+	ATTR_FILE_IOBLOCKSIZE             = 0x8
+	ATTR_FILE_LINKCOUNT               = 0x1
+	ATTR_FILE_RSRCALLOCSIZE           = 0x2000
+	ATTR_FILE_RSRCEXTENTS             = 0x4000
+	ATTR_FILE_RSRCLENGTH              = 0x1000
+	ATTR_FILE_SETMASK                 = 0x20
+	ATTR_FILE_TOTALSIZE               = 0x2
+	ATTR_FILE_VALIDMASK               = 0x37ff
+	ATTR_VOL_ALLOCATIONCLUMP          = 0x40
+	ATTR_VOL_ATTRIBUTES               = 0x40000000
+	ATTR_VOL_CAPABILITIES             = 0x20000
+	ATTR_VOL_DIRCOUNT                 = 0x400
+	ATTR_VOL_ENCODINGSUSED            = 0x10000
+	ATTR_VOL_FILECOUNT                = 0x200
+	ATTR_VOL_FSTYPE                   = 0x1
+	ATTR_VOL_INFO                     = 0x80000000
+	ATTR_VOL_IOBLOCKSIZE              = 0x80
+	ATTR_VOL_MAXOBJCOUNT              = 0x800
+	ATTR_VOL_MINALLOCATION            = 0x20
+	ATTR_VOL_MOUNTEDDEVICE            = 0x8000
+	ATTR_VOL_MOUNTFLAGS               = 0x4000
+	ATTR_VOL_MOUNTPOINT               = 0x1000
+	ATTR_VOL_NAME                     = 0x2000
+	ATTR_VOL_OBJCOUNT                 = 0x100
+	ATTR_VOL_QUOTA_SIZE               = 0x10000000
+	ATTR_VOL_RESERVED_SIZE            = 0x20000000
+	ATTR_VOL_SETMASK                  = 0x80002000
+	ATTR_VOL_SIGNATURE                = 0x2
+	ATTR_VOL_SIZE                     = 0x4
+	ATTR_VOL_SPACEAVAIL               = 0x10
+	ATTR_VOL_SPACEFREE                = 0x8
+	ATTR_VOL_UUID                     = 0x40000
+	ATTR_VOL_VALIDMASK                = 0xf007ffff
 	B0                                = 0x0
 	B110                              = 0x6e
 	B115200                           = 0x1c200
@@ -169,6 +249,8 @@ const (
 	CSTOP                             = 0x13
 	CSTOPB                            = 0x400
 	CSUSP                             = 0x1a
+	CTL_HW                            = 0x6
+	CTL_KERN                          = 0x1
 	CTL_MAXNAME                       = 0xc
 	CTL_NET                           = 0x4
 	DLT_A429                          = 0xb8
@@ -390,6 +472,11 @@ const (
 	FF1                               = 0x4000
 	FFDLY                             = 0x4000
 	FLUSHO                            = 0x800000
+	FSOPT_ATTR_CMN_EXTENDED           = 0x20
+	FSOPT_NOFOLLOW                    = 0x1
+	FSOPT_NOINMEMUPDATE               = 0x2
+	FSOPT_PACK_INVAL_ATTRS            = 0x8
+	FSOPT_REPORT_FULLSIZE             = 0x4
 	F_ADDFILESIGS                     = 0x3d
 	F_ADDFILESIGS_FOR_DYLD_SIM        = 0x53
 	F_ADDFILESIGS_RETURN              = 0x61
@@ -425,6 +512,7 @@ const (
 	F_PATHPKG_CHECK                   = 0x34
 	F_PEOFPOSMODE                     = 0x3
 	F_PREALLOCATE                     = 0x2a
+	F_PUNCHHOLE                       = 0x63
 	F_RDADVISE                        = 0x2c
 	F_RDAHEAD                         = 0x2d
 	F_RDLCK                           = 0x1
@@ -441,10 +529,12 @@ const (
 	F_SINGLE_WRITER                   = 0x4c
 	F_THAW_FS                         = 0x36
 	F_TRANSCODEKEY                    = 0x4b
+	F_TRIM_ACTIVE_FILE                = 0x64
 	F_UNLCK                           = 0x2
 	F_VOLPOSMODE                      = 0x4
 	F_WRLCK                           = 0x3
 	HUPCL                             = 0x4000
+	HW_MACHINE                        = 0x1
 	ICANON                            = 0x100
 	ICMP6_FILTER                      = 0x12
 	ICRNL                             = 0x100
@@ -681,6 +771,7 @@ const (
 	IPV6_FAITH                        = 0x1d
 	IPV6_FLOWINFO_MASK                = 0xffffff0f
 	IPV6_FLOWLABEL_MASK               = 0xffff0f00
+	IPV6_FLOW_ECN_MASK                = 0x300
 	IPV6_FRAGTTL                      = 0x3c
 	IPV6_FW_ADD                       = 0x1e
 	IPV6_FW_DEL                       = 0x1f
@@ -771,6 +862,7 @@ const (
 	IP_RECVOPTS                       = 0x5
 	IP_RECVPKTINFO                    = 0x1a
 	IP_RECVRETOPTS                    = 0x6
+	IP_RECVTOS                        = 0x1b
 	IP_RECVTTL                        = 0x18
 	IP_RETOPTS                        = 0x8
 	IP_RF                             = 0x8000
@@ -789,6 +881,10 @@ const (
 	IXANY                             = 0x800
 	IXOFF                             = 0x400
 	IXON                              = 0x200
+	KERN_HOSTNAME                     = 0xa
+	KERN_OSRELEASE                    = 0x2
+	KERN_OSTYPE                       = 0x1
+	KERN_VERSION                      = 0x4
 	LOCK_EX                           = 0x2
 	LOCK_NB                           = 0x4
 	LOCK_SH                           = 0x1
@@ -1377,6 +1473,12 @@ const (
 	WORDSIZE                          = 0x40
 	WSTOPPED                          = 0x8
 	WUNTRACED                         = 0x2
+	XATTR_CREATE                      = 0x2
+	XATTR_NODEFAULT                   = 0x10
+	XATTR_NOFOLLOW                    = 0x1
+	XATTR_NOSECURITY                  = 0x8
+	XATTR_REPLACE                     = 0x4
+	XATTR_SHOWCOMPRESSION             = 0x20
 )
 
 // Errors
@@ -1528,146 +1630,154 @@ const (
 )
 
 // Error table
-var errors = [...]string{
-	1:   "operation not permitted",
-	2:   "no such file or directory",
-	3:   "no such process",
-	4:   "interrupted system call",
-	5:   "input/output error",
-	6:   "device not configured",
-	7:   "argument list too long",
-	8:   "exec format error",
-	9:   "bad file descriptor",
-	10:  "no child processes",
-	11:  "resource deadlock avoided",
-	12:  "cannot allocate memory",
-	13:  "permission denied",
-	14:  "bad address",
-	15:  "block device required",
-	16:  "resource busy",
-	17:  "file exists",
-	18:  "cross-device link",
-	19:  "operation not supported by device",
-	20:  "not a directory",
-	21:  "is a directory",
-	22:  "invalid argument",
-	23:  "too many open files in system",
-	24:  "too many open files",
-	25:  "inappropriate ioctl for device",
-	26:  "text file busy",
-	27:  "file too large",
-	28:  "no space left on device",
-	29:  "illegal seek",
-	30:  "read-only file system",
-	31:  "too many links",
-	32:  "broken pipe",
-	33:  "numerical argument out of domain",
-	34:  "result too large",
-	35:  "resource temporarily unavailable",
-	36:  "operation now in progress",
-	37:  "operation already in progress",
-	38:  "socket operation on non-socket",
-	39:  "destination address required",
-	40:  "message too long",
-	41:  "protocol wrong type for socket",
-	42:  "protocol not available",
-	43:  "protocol not supported",
-	44:  "socket type not supported",
-	45:  "operation not supported",
-	46:  "protocol family not supported",
-	47:  "address family not supported by protocol family",
-	48:  "address already in use",
-	49:  "can't assign requested address",
-	50:  "network is down",
-	51:  "network is unreachable",
-	52:  "network dropped connection on reset",
-	53:  "software caused connection abort",
-	54:  "connection reset by peer",
-	55:  "no buffer space available",
-	56:  "socket is already connected",
-	57:  "socket is not connected",
-	58:  "can't send after socket shutdown",
-	59:  "too many references: can't splice",
-	60:  "operation timed out",
-	61:  "connection refused",
-	62:  "too many levels of symbolic links",
-	63:  "file name too long",
-	64:  "host is down",
-	65:  "no route to host",
-	66:  "directory not empty",
-	67:  "too many processes",
-	68:  "too many users",
-	69:  "disc quota exceeded",
-	70:  "stale NFS file handle",
-	71:  "too many levels of remote in path",
-	72:  "RPC struct is bad",
-	73:  "RPC version wrong",
-	74:  "RPC prog. not avail",
-	75:  "program version wrong",
-	76:  "bad procedure for program",
-	77:  "no locks available",
-	78:  "function not implemented",
-	79:  "inappropriate file type or format",
-	80:  "authentication error",
-	81:  "need authenticator",
-	82:  "device power is off",
-	83:  "device error",
-	84:  "value too large to be stored in data type",
-	85:  "bad executable (or shared library)",
-	86:  "bad CPU type in executable",
-	87:  "shared library version mismatch",
-	88:  "malformed Mach-o file",
-	89:  "operation canceled",
-	90:  "identifier removed",
-	91:  "no message of desired type",
-	92:  "illegal byte sequence",
-	93:  "attribute not found",
-	94:  "bad message",
-	95:  "EMULTIHOP (Reserved)",
-	96:  "no message available on STREAM",
-	97:  "ENOLINK (Reserved)",
-	98:  "no STREAM resources",
-	99:  "not a STREAM",
-	100: "protocol error",
-	101: "STREAM ioctl timeout",
-	102: "operation not supported on socket",
-	103: "policy not found",
-	104: "state not recoverable",
-	105: "previous owner died",
-	106: "interface output queue is full",
+var errorList = [...]struct {
+	num  syscall.Errno
+	name string
+	desc string
+}{
+	{1, "EPERM", "operation not permitted"},
+	{2, "ENOENT", "no such file or directory"},
+	{3, "ESRCH", "no such process"},
+	{4, "EINTR", "interrupted system call"},
+	{5, "EIO", "input/output error"},
+	{6, "ENXIO", "device not configured"},
+	{7, "E2BIG", "argument list too long"},
+	{8, "ENOEXEC", "exec format error"},
+	{9, "EBADF", "bad file descriptor"},
+	{10, "ECHILD", "no child processes"},
+	{11, "EDEADLK", "resource deadlock avoided"},
+	{12, "ENOMEM", "cannot allocate memory"},
+	{13, "EACCES", "permission denied"},
+	{14, "EFAULT", "bad address"},
+	{15, "ENOTBLK", "block device required"},
+	{16, "EBUSY", "resource busy"},
+	{17, "EEXIST", "file exists"},
+	{18, "EXDEV", "cross-device link"},
+	{19, "ENODEV", "operation not supported by device"},
+	{20, "ENOTDIR", "not a directory"},
+	{21, "EISDIR", "is a directory"},
+	{22, "EINVAL", "invalid argument"},
+	{23, "ENFILE", "too many open files in system"},
+	{24, "EMFILE", "too many open files"},
+	{25, "ENOTTY", "inappropriate ioctl for device"},
+	{26, "ETXTBSY", "text file busy"},
+	{27, "EFBIG", "file too large"},
+	{28, "ENOSPC", "no space left on device"},
+	{29, "ESPIPE", "illegal seek"},
+	{30, "EROFS", "read-only file system"},
+	{31, "EMLINK", "too many links"},
+	{32, "EPIPE", "broken pipe"},
+	{33, "EDOM", "numerical argument out of domain"},
+	{34, "ERANGE", "result too large"},
+	{35, "EAGAIN", "resource temporarily unavailable"},
+	{36, "EINPROGRESS", "operation now in progress"},
+	{37, "EALREADY", "operation already in progress"},
+	{38, "ENOTSOCK", "socket operation on non-socket"},
+	{39, "EDESTADDRREQ", "destination address required"},
+	{40, "EMSGSIZE", "message too long"},
+	{41, "EPROTOTYPE", "protocol wrong type for socket"},
+	{42, "ENOPROTOOPT", "protocol not available"},
+	{43, "EPROTONOSUPPORT", "protocol not supported"},
+	{44, "ESOCKTNOSUPPORT", "socket type not supported"},
+	{45, "ENOTSUP", "operation not supported"},
+	{46, "EPFNOSUPPORT", "protocol family not supported"},
+	{47, "EAFNOSUPPORT", "address family not supported by protocol family"},
+	{48, "EADDRINUSE", "address already in use"},
+	{49, "EADDRNOTAVAIL", "can't assign requested address"},
+	{50, "ENETDOWN", "network is down"},
+	{51, "ENETUNREACH", "network is unreachable"},
+	{52, "ENETRESET", "network dropped connection on reset"},
+	{53, "ECONNABORTED", "software caused connection abort"},
+	{54, "ECONNRESET", "connection reset by peer"},
+	{55, "ENOBUFS", "no buffer space available"},
+	{56, "EISCONN", "socket is already connected"},
+	{57, "ENOTCONN", "socket is not connected"},
+	{58, "ESHUTDOWN", "can't send after socket shutdown"},
+	{59, "ETOOMANYREFS", "too many references: can't splice"},
+	{60, "ETIMEDOUT", "operation timed out"},
+	{61, "ECONNREFUSED", "connection refused"},
+	{62, "ELOOP", "too many levels of symbolic links"},
+	{63, "ENAMETOOLONG", "file name too long"},
+	{64, "EHOSTDOWN", "host is down"},
+	{65, "EHOSTUNREACH", "no route to host"},
+	{66, "ENOTEMPTY", "directory not empty"},
+	{67, "EPROCLIM", "too many processes"},
+	{68, "EUSERS", "too many users"},
+	{69, "EDQUOT", "disc quota exceeded"},
+	{70, "ESTALE", "stale NFS file handle"},
+	{71, "EREMOTE", "too many levels of remote in path"},
+	{72, "EBADRPC", "RPC struct is bad"},
+	{73, "ERPCMISMATCH", "RPC version wrong"},
+	{74, "EPROGUNAVAIL", "RPC prog. not avail"},
+	{75, "EPROGMISMATCH", "program version wrong"},
+	{76, "EPROCUNAVAIL", "bad procedure for program"},
+	{77, "ENOLCK", "no locks available"},
+	{78, "ENOSYS", "function not implemented"},
+	{79, "EFTYPE", "inappropriate file type or format"},
+	{80, "EAUTH", "authentication error"},
+	{81, "ENEEDAUTH", "need authenticator"},
+	{82, "EPWROFF", "device power is off"},
+	{83, "EDEVERR", "device error"},
+	{84, "EOVERFLOW", "value too large to be stored in data type"},
+	{85, "EBADEXEC", "bad executable (or shared library)"},
+	{86, "EBADARCH", "bad CPU type in executable"},
+	{87, "ESHLIBVERS", "shared library version mismatch"},
+	{88, "EBADMACHO", "malformed Mach-o file"},
+	{89, "ECANCELED", "operation canceled"},
+	{90, "EIDRM", "identifier removed"},
+	{91, "ENOMSG", "no message of desired type"},
+	{92, "EILSEQ", "illegal byte sequence"},
+	{93, "ENOATTR", "attribute not found"},
+	{94, "EBADMSG", "bad message"},
+	{95, "EMULTIHOP", "EMULTIHOP (Reserved)"},
+	{96, "ENODATA", "no message available on STREAM"},
+	{97, "ENOLINK", "ENOLINK (Reserved)"},
+	{98, "ENOSR", "no STREAM resources"},
+	{99, "ENOSTR", "not a STREAM"},
+	{100, "EPROTO", "protocol error"},
+	{101, "ETIME", "STREAM ioctl timeout"},
+	{102, "EOPNOTSUPP", "operation not supported on socket"},
+	{103, "ENOPOLICY", "policy not found"},
+	{104, "ENOTRECOVERABLE", "state not recoverable"},
+	{105, "EOWNERDEAD", "previous owner died"},
+	{106, "EQFULL", "interface output queue is full"},
 }
 
 // Signal table
-var signals = [...]string{
-	1:  "hangup",
-	2:  "interrupt",
-	3:  "quit",
-	4:  "illegal instruction",
-	5:  "trace/BPT trap",
-	6:  "abort trap",
-	7:  "EMT trap",
-	8:  "floating point exception",
-	9:  "killed",
-	10: "bus error",
-	11: "segmentation fault",
-	12: "bad system call",
-	13: "broken pipe",
-	14: "alarm clock",
-	15: "terminated",
-	16: "urgent I/O condition",
-	17: "suspended (signal)",
-	18: "suspended",
-	19: "continued",
-	20: "child exited",
-	21: "stopped (tty input)",
-	22: "stopped (tty output)",
-	23: "I/O possible",
-	24: "cputime limit exceeded",
-	25: "filesize limit exceeded",
-	26: "virtual timer expired",
-	27: "profiling timer expired",
-	28: "window size changes",
-	29: "information request",
-	30: "user defined signal 1",
-	31: "user defined signal 2",
+var signalList = [...]struct {
+	num  syscall.Signal
+	name string
+	desc string
+}{
+	{1, "SIGHUP", "hangup"},
+	{2, "SIGINT", "interrupt"},
+	{3, "SIGQUIT", "quit"},
+	{4, "SIGILL", "illegal instruction"},
+	{5, "SIGTRAP", "trace/BPT trap"},
+	{6, "SIGABRT", "abort trap"},
+	{7, "SIGEMT", "EMT trap"},
+	{8, "SIGFPE", "floating point exception"},
+	{9, "SIGKILL", "killed"},
+	{10, "SIGBUS", "bus error"},
+	{11, "SIGSEGV", "segmentation fault"},
+	{12, "SIGSYS", "bad system call"},
+	{13, "SIGPIPE", "broken pipe"},
+	{14, "SIGALRM", "alarm clock"},
+	{15, "SIGTERM", "terminated"},
+	{16, "SIGURG", "urgent I/O condition"},
+	{17, "SIGSTOP", "suspended (signal)"},
+	{18, "SIGTSTP", "suspended"},
+	{19, "SIGCONT", "continued"},
+	{20, "SIGCHLD", "child exited"},
+	{21, "SIGTTIN", "stopped (tty input)"},
+	{22, "SIGTTOU", "stopped (tty output)"},
+	{23, "SIGIO", "I/O possible"},
+	{24, "SIGXCPU", "cputime limit exceeded"},
+	{25, "SIGXFSZ", "filesize limit exceeded"},
+	{26, "SIGVTALRM", "virtual timer expired"},
+	{27, "SIGPROF", "profiling timer expired"},
+	{28, "SIGWINCH", "window size changes"},
+	{29, "SIGINFO", "information request"},
+	{30, "SIGUSR1", "user defined signal 1"},
+	{31, "SIGUSR2", "user defined signal 2"},
 }

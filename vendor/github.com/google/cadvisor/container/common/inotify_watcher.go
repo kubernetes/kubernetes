@@ -17,7 +17,7 @@ package common
 import (
 	"sync"
 
-	"golang.org/x/exp/inotify"
+	inotify "k8s.io/utils/inotify"
 )
 
 // Watcher for container-related inotify events in the cgroup hierarchy.
@@ -55,7 +55,7 @@ func (iw *InotifyWatcher) AddWatch(containerName, dir string) (bool, error) {
 
 	// Register an inotify notification.
 	if !cgroupsWatched[dir] {
-		err := iw.watcher.AddWatch(dir, inotify.IN_CREATE|inotify.IN_DELETE|inotify.IN_MOVE)
+		err := iw.watcher.AddWatch(dir, inotify.InCreate|inotify.InDelete|inotify.InMove)
 		if err != nil {
 			return alreadyWatched, err
 		}
@@ -78,7 +78,7 @@ func (iw *InotifyWatcher) RemoveWatch(containerName, dir string) (bool, error) {
 	iw.lock.Lock()
 	defer iw.lock.Unlock()
 
-	// If we don't have a watch registed for this, just return.
+	// If we don't have a watch registered for this, just return.
 	cgroupsWatched, ok := iw.containersWatched[containerName]
 	if !ok {
 		return false, nil

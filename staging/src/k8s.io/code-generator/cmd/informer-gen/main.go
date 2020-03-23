@@ -20,16 +20,17 @@ import (
 	"flag"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"k8s.io/code-generator/cmd/informer-gen/generators"
 	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
+	"k8s.io/klog"
 
 	generatorargs "k8s.io/code-generator/cmd/informer-gen/args"
 )
 
 func main() {
+	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
@@ -47,16 +48,16 @@ func main() {
 	pflag.Parse()
 
 	if err := generatorargs.Validate(genericArgs); err != nil {
-		glog.Fatalf("Error: %v", err)
+		klog.Fatalf("Error: %v", err)
 	}
 
 	// Run it.
 	if err := genericArgs.Execute(
-		generators.NameSystems(),
+		generators.NameSystems(util.PluralExceptionListToMapOrDie(customArgs.PluralExceptions)),
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {
-		glog.Fatalf("Error: %v", err)
+		klog.Fatalf("Error: %v", err)
 	}
-	glog.V(2).Info("Completed successfully.")
+	klog.V(2).Info("Completed successfully.")
 }

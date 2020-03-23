@@ -17,10 +17,11 @@ limitations under the License.
 package deny
 
 import (
+	"context"
 	"errors"
 	"io"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apiserver/pkg/admission"
 )
@@ -42,12 +43,12 @@ var _ admission.MutationInterface = alwaysDeny{}
 var _ admission.ValidationInterface = alwaysDeny{}
 
 // Admit makes an admission decision based on the request attributes.
-func (alwaysDeny) Admit(a admission.Attributes) (err error) {
+func (alwaysDeny) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("admission control is denying all modifications"))
 }
 
 // Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
-func (alwaysDeny) Validate(a admission.Attributes) (err error) {
+func (alwaysDeny) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("admission control is denying all modifications"))
 }
 
@@ -60,7 +61,7 @@ func (alwaysDeny) Handles(operation admission.Operation) bool {
 // NewAlwaysDeny creates an always deny admission handler
 func NewAlwaysDeny() admission.Interface {
 	// DEPRECATED: AlwaysDeny denys all admission request, it is no use.
-	glog.Warningf("%s admission controller is deprecated. "+
+	klog.Warningf("%s admission controller is deprecated. "+
 		"Please remove this controller from your configuration files and scripts.", PluginName)
 	return new(alwaysDeny)
 }

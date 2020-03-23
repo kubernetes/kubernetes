@@ -19,10 +19,11 @@ package vsphere
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/gcfg.v1"
 	"io"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"os"
+
+	"gopkg.in/gcfg.v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -97,7 +98,10 @@ func GetVSphereInstances() (map[string]*VSphere, error) {
 
 func getConfig() (*ConfigFile, error) {
 	if confFileLocation == "" {
-		return nil, fmt.Errorf("Env variable 'VSPHERE_CONF_FILE' is not set.")
+		if framework.TestContext.CloudConfig.ConfigFile == "" {
+			return nil, fmt.Errorf("env variable 'VSPHERE_CONF_FILE' is not set, and no config-file specified")
+		}
+		confFileLocation = framework.TestContext.CloudConfig.ConfigFile
 	}
 	confFile, err := os.Open(confFileLocation)
 	if err != nil {
@@ -147,7 +151,7 @@ func populateInstanceMap(cfg *ConfigFile) (map[string]*VSphere, error) {
 			vcConfig.Password = cfg.Global.Password
 		}
 		if vcConfig.Username == "" {
-			msg := fmt.Sprintf("vcConfig.User is empty for vc %s!", vcServer)
+			msg := fmt.Sprintf("vcConfig.Username is empty for vc %s!", vcServer)
 			framework.Logf(msg)
 			return nil, errors.New(msg)
 		}

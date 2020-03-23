@@ -22,7 +22,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/args"
@@ -46,7 +46,7 @@ func DefaultNameSystem() string {
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
+		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	packages := generator.Packages{}
@@ -54,27 +54,27 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		pkg := context.Universe.Package(inputDir)
 		internal, err := isInternal(pkg)
 		if err != nil {
-			glog.V(5).Infof("skipping the generation of %s file, due to err %v", arguments.OutputFileBaseName, err)
+			klog.V(5).Infof("skipping the generation of %s file, due to err %v", arguments.OutputFileBaseName, err)
 			continue
 		}
 		if internal {
-			glog.V(5).Infof("skipping the generation of %s file because %s package contains internal types, note that internal types don't have \"json\" tags", arguments.OutputFileBaseName, pkg.Name)
+			klog.V(5).Infof("skipping the generation of %s file because %s package contains internal types, note that internal types don't have \"json\" tags", arguments.OutputFileBaseName, pkg.Name)
 			continue
 		}
 		registerFileName := "register.go"
 		searchPath := path.Join(args.DefaultSourceTree(), inputDir, registerFileName)
 		if _, err := os.Stat(path.Join(searchPath)); err == nil {
-			glog.V(5).Infof("skipping the generation of %s file because %s already exists in the path %s", arguments.OutputFileBaseName, registerFileName, searchPath)
+			klog.V(5).Infof("skipping the generation of %s file because %s already exists in the path %s", arguments.OutputFileBaseName, registerFileName, searchPath)
 			continue
 		} else if err != nil && !os.IsNotExist(err) {
-			glog.Fatalf("an error %v has occurred while checking if %s exists", err, registerFileName)
+			klog.Fatalf("an error %v has occurred while checking if %s exists", err, registerFileName)
 		}
 
 		gv := clientgentypes.GroupVersion{}
 		{
 			pathParts := strings.Split(pkg.Path, "/")
 			if len(pathParts) < 2 {
-				glog.Errorf("the path of the package must contain the group name and the version, path = %s", pkg.Path)
+				klog.Errorf("the path of the package must contain the group name and the version, path = %s", pkg.Path)
 				continue
 			}
 			gv.Group = clientgentypes.Group(pathParts[len(pathParts)-2])
@@ -84,14 +84,14 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// extract the fully qualified API group name from it and overwrite the group inferred from the package path
 			if override := types.ExtractCommentTags("+", pkg.DocComments)["groupName"]; override != nil {
 				groupName := override[0]
-				glog.V(5).Infof("overriding the group name with = %s", groupName)
+				klog.V(5).Infof("overriding the group name with = %s", groupName)
 				gv.Group = clientgentypes.Group(groupName)
 			}
 		}
 
 		typesToRegister := []*types.Type{}
 		for _, t := range pkg.Types {
-			glog.V(5).Infof("considering type = %s", t.Name.String())
+			klog.V(5).Infof("considering type = %s", t.Name.String())
 			for _, typeMember := range t.Members {
 				if typeMember.Name == "TypeMeta" && typeMember.Embedded == true {
 					typesToRegister = append(typesToRegister, t)

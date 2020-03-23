@@ -19,9 +19,9 @@ package util
 import (
 	"time"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"golang.org/x/oauth2"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/legacy-cloud-providers/gce"
 )
 
 const (
@@ -52,9 +52,9 @@ func (*mockTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-// NewMockGCECloud returns a handle to a GCECloud instance that is
+// NewMockGCECloud returns a handle to a Cloud instance that is
 // served by a mock http server
-func NewMockGCECloud(cloud cloud.Cloud) (*gce.GCECloud, error) {
+func NewMockGCECloud(cloud cloud.Cloud) (*gce.Cloud, error) {
 	config := &gce.CloudConfig{
 		ProjectID:          TestProjectID,
 		NetworkProjectID:   TestNetworkProjectID,

@@ -19,8 +19,9 @@ package bootstrappolicy
 import (
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	capi "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -32,12 +33,12 @@ const saRolePrefix = "system:controller:"
 
 func addControllerRole(controllerRoles *[]rbacv1.ClusterRole, controllerRoleBindings *[]rbacv1.ClusterRoleBinding, role rbacv1.ClusterRole) {
 	if !strings.HasPrefix(role.Name, saRolePrefix) {
-		glog.Fatalf(`role %q must start with %q`, role.Name, saRolePrefix)
+		klog.Fatalf(`role %q must start with %q`, role.Name, saRolePrefix)
 	}
 
 	for _, existingRole := range *controllerRoles {
 		if role.Name == existingRole.Name {
-			glog.Fatalf("role %q was already registered", role.Name)
+			klog.Fatalf("role %q was already registered", role.Name)
 		}
 	}
 
@@ -50,7 +51,7 @@ func addControllerRole(controllerRoles *[]rbacv1.ClusterRole, controllerRoleBind
 }
 
 func eventsRule() rbacv1.PolicyRule {
-	return rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie()
+	return rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie()
 }
 
 func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) {
@@ -68,14 +69,13 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 				rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				eventsRule(),
+				rbacv1helpers.NewRule("get", "create", "delete", "list", "watch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
 			},
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "create", "delete", "list", "watch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie())
-			if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-				role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie())
-			}
+		role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie())
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
 		}
 
 		return role
@@ -84,9 +84,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "clusterrole-aggregation-controller"},
 		Rules: []rbacv1.PolicyRule{
-			// this controller must have full permissions to allow it to mutate any role in any way
-			rbacv1helpers.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
-			rbacv1helpers.NewRule("*").URLs("*").RuleOrDie(),
+			// this controller must have full permissions on clusterroles to allow it to mutate them in any way
+			rbacv1helpers.NewRule("escalate", "get", "list", "watch", "update", "patch").Groups(rbacGroup).Resources("clusterroles").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
@@ -135,6 +134,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(policyGroup).Resources("poddisruptionbudgets/status").RuleOrDie(),
+			rbacv1helpers.NewRule("get").Groups("*").Resources("*/scale").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -147,6 +147,17 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpointslice-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services", "pods", "nodes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
@@ -227,7 +238,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 
 			// glusterfs
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "create", "delete").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "create", "update", "delete").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "create", "delete").Groups(legacyGroup).Resources("services").RuleOrDie(),
 			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 			// openstack
 			rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
@@ -242,7 +254,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
@@ -294,7 +306,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "service-controller"},
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services").RuleOrDie(),
-			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("services/status").RuleOrDie(),
+			rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("services/status").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			eventsRule(),
 		},
@@ -324,6 +336,13 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(certificatesGroup).Resources("certificatesigningrequests/status", "certificatesigningrequests/approval").RuleOrDie(),
+			rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientKubeletSignerName).RuleOrDie(),
+			rbacv1helpers.NewRule("sign").Groups(certificatesGroup).Resources("signers").Names(
+				capi.LegacyUnknownSignerName,
+				capi.KubeAPIServerClientSignerName,
+				capi.KubeAPIServerClientKubeletSignerName,
+				capi.KubeletServingSignerName,
+			).RuleOrDie(),
 			rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 			eventsRule(),
 		},
@@ -348,6 +367,16 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ttl-after-finished-controller"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(batchGroup).Resources("jobs").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "root-ca-cert-publisher"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("create", "update").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
 				eventsRule(),
 			},
 		})

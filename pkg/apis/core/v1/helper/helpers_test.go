@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,6 +113,73 @@ func TestHugePageSizeFromResourceName(t *testing.T) {
 	}
 }
 
+func TestHugePageSizeFromMedium(t *testing.T) {
+	testCases := []struct {
+		description string
+		medium      v1.StorageMedium
+		expectVal   resource.Quantity
+		expectErr   bool
+	}{
+		{
+			description: "Invalid hugepages medium",
+			medium:      "Memory",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Invalid hugepages medium",
+			medium:      "Memory",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Invalid: HugePages without size",
+			medium:      "HugePages",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Invalid: HugePages without size",
+			medium:      "HugePages",
+			expectVal:   resource.Quantity{},
+			expectErr:   true,
+		},
+		{
+			description: "Valid: HugePages-1Gi",
+			medium:      "HugePages-1Gi",
+			expectVal:   resource.MustParse("1Gi"),
+			expectErr:   false,
+		},
+		{
+			description: "Valid: HugePages-2Mi",
+			medium:      "HugePages-2Mi",
+			expectVal:   resource.MustParse("2Mi"),
+			expectErr:   false,
+		},
+		{
+			description: "Valid: HugePages-64Ki",
+			medium:      "HugePages-64Ki",
+			expectVal:   resource.MustParse("64Ki"),
+			expectErr:   false,
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+			v, err := HugePageSizeFromMedium(tc.medium)
+			if err == nil && tc.expectErr {
+				t.Errorf("[%v]expected error but got none.", i)
+			}
+			if err != nil && !tc.expectErr {
+				t.Errorf("[%v]did not expect error but got: %v", i, err)
+			}
+			if v != tc.expectVal {
+				t.Errorf("Got %v but expected %v", v, tc.expectVal)
+			}
+		})
+	}
+}
+
 func TestIsOvercommitAllowed(t *testing.T) {
 	testCases := []struct {
 		resourceName v1.ResourceName
@@ -144,63 +211,6 @@ func TestIsOvercommitAllowed(t *testing.T) {
 				t.Errorf("Got %v but expected %v", v, tc.expectVal)
 			}
 		})
-	}
-}
-
-func TestAddToNodeAddresses(t *testing.T) {
-	testCases := []struct {
-		existing []v1.NodeAddress
-		toAdd    []v1.NodeAddress
-		expected []v1.NodeAddress
-	}{
-		{
-			existing: []v1.NodeAddress{},
-			toAdd:    []v1.NodeAddress{},
-			expected: []v1.NodeAddress{},
-		},
-		{
-			existing: []v1.NodeAddress{},
-			toAdd: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-			expected: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-		},
-		{
-			existing: []v1.NodeAddress{},
-			toAdd: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-			},
-			expected: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-			},
-		},
-		{
-			existing: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-			},
-			toAdd: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-			expected: []v1.NodeAddress{
-				{Type: v1.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeHostName, Address: "localhost"},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !apiequality.Semantic.DeepEqual(tc.expected, tc.existing) {
-			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
-		}
 	}
 }
 
@@ -813,7 +823,7 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 
 // TestMatchNodeSelectorTermsStateless ensures MatchNodeSelectorTerms()
 // is invoked in a "stateless" manner, i.e. nodeSelectorTerms should NOT
-// be deeply modifed after invoking
+// be deeply modified after invoking
 func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 	type args struct {
 		nodeSelectorTerms []v1.NodeSelectorTerm
@@ -1452,6 +1462,50 @@ func TestNodeSelectorRequirementKeyExistsInNodeSelectorTerms(t *testing.T) {
 		keyExists := NodeSelectorRequirementKeysExistInNodeSelectorTerms(test.reqs, test.terms)
 		if test.exists != keyExists {
 			t.Errorf("test %s failed. Expected %v but got %v", test.name, test.exists, keyExists)
+		}
+	}
+}
+
+func TestHugePageUnitSizeFromByteSize(t *testing.T) {
+	tests := []struct {
+		size     int64
+		expected string
+		wantErr  bool
+	}{
+		{
+			size:     1024,
+			expected: "1KB",
+			wantErr:  false,
+		},
+		{
+			size:     33554432,
+			expected: "32MB",
+			wantErr:  false,
+		},
+		{
+			size:     3221225472,
+			expected: "3GB",
+			wantErr:  false,
+		},
+		{
+			size:     1024 * 1024 * 1023 * 3,
+			expected: "3069MB",
+			wantErr:  true,
+		},
+	}
+	for _, test := range tests {
+		size := test.size
+		result, err := HugePageUnitSizeFromByteSize(size)
+		if err != nil {
+			if test.wantErr {
+				t.Logf("HugePageUnitSizeFromByteSize() expected error = %v", err)
+			} else {
+				t.Errorf("HugePageUnitSizeFromByteSize() error = %v, wantErr %v", err, test.wantErr)
+			}
+			continue
+		}
+		if test.expected != result {
+			t.Errorf("HugePageUnitSizeFromByteSize() expected %v but got %v", test.expected, result)
 		}
 	}
 }

@@ -23,71 +23,85 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
-// Fake cAdvisor implementation.
+// Fake cadvisor.Interface implementation.
 type Fake struct {
 	NodeName string
 }
 
 const (
-	FakeNumCores           = 1
-	FakeMemoryCapacity     = 4026531840
-	FakeKernelVersion      = "3.16.0-0.bpo.4-amd64"
-	FakeContainerOsVersion = "Debian GNU/Linux 7 (wheezy)"
-	FakeDockerVersion      = "1.5.0"
+	// FakeKernelVersion is a fake kernel version for testing.
+	FakeKernelVersion = "3.16.0-0.bpo.4-amd64"
+	// FakeContainerOSVersion is a fake OS version for testing.
+	FakeContainerOSVersion = "Debian GNU/Linux 7 (wheezy)"
+
+	fakeNumCores       = 1
+	fakeMemoryCapacity = 4026531840
+	fakeDockerVersion  = "1.13.1"
 )
 
 var _ cadvisor.Interface = new(Fake)
 
+// Start is a fake implementation of Interface.Start.
 func (c *Fake) Start() error {
 	return nil
 }
 
+// ContainerInfo is a fake implementation of Interface.ContainerInfo.
 func (c *Fake) ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	return new(cadvisorapi.ContainerInfo), nil
 }
 
+// ContainerInfoV2 is a fake implementation of Interface.ContainerInfoV2.
 func (c *Fake) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return map[string]cadvisorapiv2.ContainerInfo{}, nil
 }
 
+// SubcontainerInfo is a fake implementation of Interface.SubcontainerInfo.
 func (c *Fake) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 
+// DockerContainer is a fake implementation of Interface.DockerContainer.
 func (c *Fake) DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error) {
 	return cadvisorapi.ContainerInfo{}, nil
 }
 
+// MachineInfo is a fake implementation of Interface.MachineInfo.
 func (c *Fake) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 	// Simulate a machine with 1 core and 3.75GB of memory.
 	// We set it to non-zero values to make non-zero-capacity machines in Kubemark.
 	return &cadvisorapi.MachineInfo{
-		NumCores:       FakeNumCores,
+		NumCores:       fakeNumCores,
 		InstanceID:     cadvisorapi.InstanceID(c.NodeName),
-		MemoryCapacity: FakeMemoryCapacity,
+		MemoryCapacity: fakeMemoryCapacity,
 	}, nil
 }
 
+// VersionInfo is a fake implementation of Interface.VersionInfo.
 func (c *Fake) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return &cadvisorapi.VersionInfo{
 		KernelVersion:      FakeKernelVersion,
-		ContainerOsVersion: FakeContainerOsVersion,
-		DockerVersion:      FakeDockerVersion,
+		ContainerOsVersion: FakeContainerOSVersion,
+		DockerVersion:      fakeDockerVersion,
 	}, nil
 }
 
+// ImagesFsInfo is a fake implementation of Interface.ImagesFsInfo.
 func (c *Fake) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 
+// RootFsInfo is a fake implementation of Interface.RootFsInfo.
 func (c *Fake) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 
+// WatchEvents is a fake implementation of Interface.WatchEvents.
 func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return new(events.EventChannel), nil
 }
 
+// GetDirFsInfo is a fake implementation of Interface.GetDirFsInfo.
 func (c *Fake) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }

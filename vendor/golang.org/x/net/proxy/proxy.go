@@ -4,7 +4,7 @@
 
 // Package proxy provides support for a variety of protocols to proxy network
 // data.
-package proxy
+package proxy // import "golang.org/x/net/proxy"
 
 import (
 	"errors"
@@ -15,6 +15,7 @@ import (
 )
 
 // A Dialer is a means to establish a connection.
+// Custom dialers should also implement ContextDialer.
 type Dialer interface {
 	// Dial connects to the given address via the proxy.
 	Dial(network, addr string) (c net.Conn, err error)
@@ -25,21 +26,30 @@ type Auth struct {
 	User, Password string
 }
 
-// FromEnvironment returns the dialer specified by the proxy related variables in
-// the environment.
+// FromEnvironment returns the dialer specified by the proxy-related
+// variables in the environment and makes underlying connections
+// directly.
 func FromEnvironment() Dialer {
+	return FromEnvironmentUsing(Direct)
+}
+
+// FromEnvironmentUsing returns the dialer specify by the proxy-related
+// variables in the environment and makes underlying connections
+// using the provided forwarding Dialer (for instance, a *net.Dialer
+// with desired configuration).
+func FromEnvironmentUsing(forward Dialer) Dialer {
 	allProxy := allProxyEnv.Get()
 	if len(allProxy) == 0 {
-		return Direct
+		return forward
 	}
 
 	proxyURL, err := url.Parse(allProxy)
 	if err != nil {
-		return Direct
+		return forward
 	}
-	proxy, err := FromURL(proxyURL, Direct)
+	proxy, err := FromURL(proxyURL, forward)
 	if err != nil {
-		return Direct
+		return forward
 	}
 
 	noProxy := noProxyEnv.Get()
@@ -47,7 +57,7 @@ func FromEnvironment() Dialer {
 		return proxy
 	}
 
-	perHost := NewPerHost(proxy, Direct)
+	perHost := NewPerHost(proxy, forward)
 	perHost.AddFromString(noProxy)
 	return perHost
 }
@@ -79,8 +89,13 @@ func FromURL(u *url.URL, forward Dialer) (Dialer, error) {
 	}
 
 	switch u.Scheme {
-	case "socks5":
-		return SOCKS5("tcp", u.Host, auth, forward)
+	case "socks5", "socks5h":
+		addr := u.Hostname()
+		port := u.Port()
+		if port == "" {
+			port = "1080"
+		}
+		return SOCKS5("tcp", net.JoinHostPort(addr, port), auth, forward)
 	}
 
 	// If the scheme doesn't match any of the built-in schemes, see if it

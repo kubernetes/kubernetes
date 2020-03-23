@@ -44,10 +44,6 @@ func (c *FakeAppsV1beta2) ReplicaSets(namespace string) v1beta2.ReplicaSetInterf
 	return &FakeReplicaSets{c, namespace}
 }
 
-func (c *FakeAppsV1beta2) Scales(namespace string) v1beta2.ScaleInterface {
-	return &FakeScales{c, namespace}
-}
-
 func (c *FakeAppsV1beta2) StatefulSets(namespace string) v1beta2.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
 }

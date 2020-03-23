@@ -15,7 +15,6 @@ go_library(
         "doc.go",
         "generated_expansion.go",
         "replicaset.go",
-        "scale.go",
         "statefulset.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta2",
@@ -23,7 +22,6 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",

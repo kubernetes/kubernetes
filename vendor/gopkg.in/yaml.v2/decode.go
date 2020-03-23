@@ -229,6 +229,10 @@ type decoder struct {
 	mapType reflect.Type
 	terrors []string
 	strict  bool
+
+	decodeCount int
+	aliasCount  int
+	aliasDepth  int
 }
 
 var (
@@ -314,7 +318,43 @@ func (d *decoder) prepare(n *node, out reflect.Value) (newout reflect.Value, unm
 	return out, false, false
 }
 
+const (
+	// 400,000 decode operations is ~500kb of dense object declarations, or
+	// ~5kb of dense object declarations with 10000% alias expansion
+	alias_ratio_range_low = 400000
+
+	// 4,000,000 decode operations is ~5MB of dense object declarations, or
+	// ~4.5MB of dense object declarations with 10% alias expansion
+	alias_ratio_range_high = 4000000
+
+	// alias_ratio_range is the range over which we scale allowed alias ratios
+	alias_ratio_range = float64(alias_ratio_range_high - alias_ratio_range_low)
+)
+
+func allowedAliasRatio(decodeCount int) float64 {
+	switch {
+	case decodeCount <= alias_ratio_range_low:
+		// allow 99% to come from alias expansion for small-to-medium documents
+		return 0.99
+	case decodeCount >= alias_ratio_range_high:
+		// allow 10% to come from alias expansion for very large documents
+		return 0.10
+	default:
+		// scale smoothly from 99% down to 10% over the range.
+		// this maps to 396,000 - 400,000 allowed alias-driven decodes over the range.
+		// 400,000 decode operations is ~100MB of allocations in worst-case scenarios (single-item maps).
+		return 0.99 - 0.89*(float64(decodeCount-alias_ratio_range_low)/alias_ratio_range)
+	}
+}
+
 func (d *decoder) unmarshal(n *node, out reflect.Value) (good bool) {
+	d.decodeCount++
+	if d.aliasDepth > 0 {
+		d.aliasCount++
+	}
+	if d.aliasCount > 100 && d.decodeCount > 1000 && float64(d.aliasCount)/float64(d.decodeCount) > allowedAliasRatio(d.decodeCount) {
+		failf("document contains excessive aliasing")
+	}
 	switch n.kind {
 	case documentNode:
 		return d.document(n, out)
@@ -353,7 +393,9 @@ func (d *decoder) alias(n *node, out reflect.Value) (good bool) {
 		failf("anchor '%s' value contains itself", n.value)
 	}
 	d.aliases[n] = true
+	d.aliasDepth++
 	good = d.unmarshal(n.alias, out)
+	d.aliasDepth--
 	delete(d.aliases, n)
 	return good
 }
@@ -746,8 +788,7 @@ func (d *decoder) merge(n *node, out reflect.Value) {
 	case mappingNode:
 		d.unmarshal(n, out)
 	case aliasNode:
-		an, ok := d.doc.anchors[n.value]
-		if ok && an.kind != mappingNode {
+		if n.alias != nil && n.alias.kind != mappingNode {
 			failWantMap()
 		}
 		d.unmarshal(n, out)
@@ -756,8 +797,7 @@ func (d *decoder) merge(n *node, out reflect.Value) {
 		for i := len(n.children) - 1; i >= 0; i-- {
 			ni := n.children[i]
 			if ni.kind == aliasNode {
-				an, ok := d.doc.anchors[ni.value]
-				if ok && an.kind != mappingNode {
+				if ni.alias != nil && ni.alias.kind != mappingNode {
 					failWantMap()
 				}
 			} else if ni.kind != mappingNode {

@@ -22,6 +22,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 )
 
+// LimitRangerActions is an interface defining actions to be carried over ranges to identify and manipulate their limits
 type LimitRangerActions interface {
 	// MutateLimit is a pluggable function to set limits on the object.
 	MutateLimit(limitRange *corev1.LimitRange, kind string, obj runtime.Object) error

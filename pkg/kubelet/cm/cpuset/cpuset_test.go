@@ -170,6 +170,28 @@ func TestCPUSetIsSubsetOf(t *testing.T) {
 	}
 }
 
+func TestCPUSetUnionAll(t *testing.T) {
+	testCases := []struct {
+		s1       CPUSet
+		s2       CPUSet
+		s3       CPUSet
+		expected CPUSet
+	}{
+		{NewCPUSet(), NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(4, 5), NewCPUSet(1, 2, 3, 4, 5)},
+		{NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(), NewCPUSet(4), NewCPUSet(1, 2, 3, 4, 5)},
+		{NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(1, 5), NewCPUSet(1, 2, 3, 4, 5)},
+	}
+	for _, c := range testCases {
+		s := []CPUSet{}
+		s = append(s, c.s2)
+		s = append(s, c.s3)
+		result := c.s1.UnionAll(s)
+		if !result.Equals(c.expected) {
+			t.Fatalf("expected the union of s1 and s2 to be [%v] (got [%v]), s1: [%v], s2: [%v]", c.expected, result, c.s1, c.s2)
+		}
+	}
+}
+
 func TestCPUSetUnion(t *testing.T) {
 	testCases := []struct {
 		s1       CPUSet

@@ -3,6 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "cabundle_transport.go",
+        "cabundle_transport_1_5.go",
+        "cabundle_transport_1_6.go",
+        "credentials.go",
         "doc.go",
         "env_config.go",
         "session.go",
@@ -17,12 +21,14 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/client:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/corehandlers:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/credentials/processcreds:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/stscreds:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/csm:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/defaults:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/endpoints:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
-        "//vendor/github.com/go-ini/ini:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/ini:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/shareddefaults:go_default_library",
     ],
 )
 

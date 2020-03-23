@@ -17,20 +17,24 @@ limitations under the License.
 package azure
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 )
+
+type configMode int
 
 const (
 	azureTokenKey = "azureTokenKey"
@@ -45,11 +49,15 @@ const (
 	cfgExpiresOn    = "expires-on"
 	cfgEnvironment  = "environment"
 	cfgApiserverID  = "apiserver-id"
+	cfgConfigMode   = "config-mode"
+
+	configModeDefault       configMode = 0
+	configModeOmitSPNPrefix configMode = 1
 )
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("azure", newAzureAuthProvider); err != nil {
-		glog.Fatalf("Failed to register azure auth plugin: %v", err)
+		klog.Fatalf("Failed to register azure auth plugin: %v", err)
 	}
 }
 
@@ -77,17 +85,37 @@ func (c *azureTokenCache) setToken(tokenKey string, token *azureToken) {
 }
 
 func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	var ts tokenSource
+	var (
+		ts          tokenSource
+		environment azure.Environment
+		err         error
+		mode        configMode
+	)
 
-	environment, err := azure.EnvironmentFromName(cfg[cfgEnvironment])
+	environment, err = azure.EnvironmentFromName(cfg[cfgEnvironment])
 	if err != nil {
 		environment = azure.PublicCloud
 	}
-	ts, err = newAzureTokenSourceDeviceCode(environment, cfg[cfgClientID], cfg[cfgTenantID], cfg[cfgApiserverID])
+
+	mode = configModeDefault
+	if cfg[cfgConfigMode] != "" {
+		configModeInt, err := strconv.Atoi(cfg[cfgConfigMode])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s, error: %s", cfgConfigMode, err)
+		}
+		mode = configMode(configModeInt)
+		switch mode {
+		case configModeOmitSPNPrefix:
+		case configModeDefault:
+		default:
+			return nil, fmt.Errorf("%s:%s is not a valid mode", cfgConfigMode, cfg[cfgConfigMode])
+		}
+	}
+	ts, err = newAzureTokenSourceDeviceCode(environment, cfg[cfgClientID], cfg[cfgTenantID], cfg[cfgApiserverID], mode)
 	if err != nil {
 		return nil, fmt.Errorf("creating a new azure token source for device code authentication: %v", err)
 	}
-	cacheSource := newAzureTokenSource(ts, cache, cfg, persister)
+	cacheSource := newAzureTokenSource(ts, cache, cfg, mode, persister)
 
 	return &azureAuthProvider{
 		tokenSource: cacheSource,
@@ -123,7 +151,7 @@ func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 	token, err := r.tokenSource.Token()
 	if err != nil {
-		glog.Errorf("Failed to acquire a token: %v", err)
+		klog.Errorf("Failed to acquire a token: %v", err)
 		return nil, fmt.Errorf("acquiring a token for authorization header: %v", err)
 	}
 
@@ -144,6 +172,7 @@ func (r *azureRoundTripper) WrappedRoundTripper() http.RoundTripper { return r.r
 
 type azureToken struct {
 	token       adal.Token
+	environment string
 	clientID    string
 	tenantID    string
 	apiserverID string
@@ -154,19 +183,21 @@ type tokenSource interface {
 }
 
 type azureTokenSource struct {
-	source    tokenSource
-	cache     *azureTokenCache
-	lock      sync.Mutex
-	cfg       map[string]string
-	persister restclient.AuthProviderConfigPersister
+	source     tokenSource
+	cache      *azureTokenCache
+	lock       sync.Mutex
+	configMode configMode
+	cfg        map[string]string
+	persister  restclient.AuthProviderConfigPersister
 }
 
-func newAzureTokenSource(source tokenSource, cache *azureTokenCache, cfg map[string]string, persister restclient.AuthProviderConfigPersister) tokenSource {
+func newAzureTokenSource(source tokenSource, cache *azureTokenCache, cfg map[string]string, configMode configMode, persister restclient.AuthProviderConfigPersister) tokenSource {
 	return &azureTokenSource{
-		source:    source,
-		cache:     cache,
-		cfg:       cfg,
-		persister: persister,
+		source:     source,
+		cache:      cache,
+		cfg:        cfg,
+		persister:  persister,
+		configMode: configMode,
 	}
 }
 
@@ -218,6 +249,10 @@ func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 	if refreshToken == "" {
 		return nil, fmt.Errorf("no refresh token in cfg: %s", cfgRefreshToken)
 	}
+	environment := ts.cfg[cfgEnvironment]
+	if environment == "" {
+		return nil, fmt.Errorf("no environment in cfg: %s", cfgEnvironment)
+	}
 	clientID := ts.cfg[cfgClientID]
 	if clientID == "" {
 		return nil, fmt.Errorf("no client ID in cfg: %s", cfgClientID)
@@ -226,9 +261,9 @@ func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 	if tenantID == "" {
 		return nil, fmt.Errorf("no tenant ID in cfg: %s", cfgTenantID)
 	}
-	apiserverID := ts.cfg[cfgApiserverID]
-	if apiserverID == "" {
-		return nil, fmt.Errorf("no apiserver ID in cfg: %s", apiserverID)
+	resourceID := ts.cfg[cfgApiserverID]
+	if resourceID == "" {
+		return nil, fmt.Errorf("no apiserver ID in cfg: %s", cfgApiserverID)
 	}
 	expiresIn := ts.cfg[cfgExpiresIn]
 	if expiresIn == "" {
@@ -238,20 +273,24 @@ func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 	if expiresOn == "" {
 		return nil, fmt.Errorf("no expiresOn in cfg: %s", cfgExpiresOn)
 	}
+	if ts.configMode == configModeDefault {
+		resourceID = fmt.Sprintf("spn:%s", resourceID)
+	}
 
 	return &azureToken{
 		token: adal.Token{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
-			ExpiresIn:    expiresIn,
-			ExpiresOn:    expiresOn,
-			NotBefore:    expiresOn,
-			Resource:     fmt.Sprintf("spn:%s", apiserverID),
+			ExpiresIn:    json.Number(expiresIn),
+			ExpiresOn:    json.Number(expiresOn),
+			NotBefore:    json.Number(expiresOn),
+			Resource:     resourceID,
 			Type:         tokenType,
 		},
+		environment: environment,
 		clientID:    clientID,
 		tenantID:    tenantID,
-		apiserverID: apiserverID,
+		apiserverID: resourceID,
 	}, nil
 }
 
@@ -259,11 +298,13 @@ func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 	newCfg := make(map[string]string)
 	newCfg[cfgAccessToken] = token.token.AccessToken
 	newCfg[cfgRefreshToken] = token.token.RefreshToken
+	newCfg[cfgEnvironment] = token.environment
 	newCfg[cfgClientID] = token.clientID
 	newCfg[cfgTenantID] = token.tenantID
 	newCfg[cfgApiserverID] = token.apiserverID
-	newCfg[cfgExpiresIn] = token.token.ExpiresIn
-	newCfg[cfgExpiresOn] = token.token.ExpiresOn
+	newCfg[cfgExpiresIn] = string(token.token.ExpiresIn)
+	newCfg[cfgExpiresOn] = string(token.token.ExpiresOn)
+	newCfg[cfgConfigMode] = strconv.Itoa(int(ts.configMode))
 
 	err := ts.persister.Persist(newCfg)
 	if err != nil {
@@ -274,9 +315,22 @@ func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 }
 
 func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error) {
-	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, token.tenantID)
+	env, err := azure.EnvironmentFromName(token.environment)
 	if err != nil {
-		return nil, fmt.Errorf("building the OAuth configuration for token refresh: %v", err)
+		return nil, err
+	}
+
+	var oauthConfig *adal.OAuthConfig
+	if ts.configMode == configModeOmitSPNPrefix {
+		oauthConfig, err = adal.NewOAuthConfigWithAPIVersion(env.ActiveDirectoryEndpoint, token.tenantID, nil)
+		if err != nil {
+			return nil, fmt.Errorf("building the OAuth configuration without api-version for token refresh: %v", err)
+		}
+	} else {
+		oauthConfig, err = adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, token.tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("building the OAuth configuration for token refresh: %v", err)
+		}
 	}
 
 	callback := func(t adal.Token) error {
@@ -298,6 +352,7 @@ func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error)
 
 	return &azureToken{
 		token:       spt.Token(),
+		environment: token.environment,
 		clientID:    token.clientID,
 		tenantID:    token.tenantID,
 		apiserverID: token.apiserverID,
@@ -309,9 +364,10 @@ type azureTokenSourceDeviceCode struct {
 	clientID    string
 	tenantID    string
 	apiserverID string
+	configMode  configMode
 }
 
-func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID string, tenantID string, apiserverID string) (tokenSource, error) {
+func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID string, tenantID string, apiserverID string, configMode configMode) (tokenSource, error) {
 	if clientID == "" {
 		return nil, errors.New("client-id is empty")
 	}
@@ -326,13 +382,25 @@ func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID strin
 		clientID:    clientID,
 		tenantID:    tenantID,
 		apiserverID: apiserverID,
+		configMode:  configMode,
 	}, nil
 }
 
 func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
-	oauthConfig, err := adal.NewOAuthConfig(ts.environment.ActiveDirectoryEndpoint, ts.tenantID)
-	if err != nil {
-		return nil, fmt.Errorf("building the OAuth configuration for device code authentication: %v", err)
+	var (
+		oauthConfig *adal.OAuthConfig
+		err         error
+	)
+	if ts.configMode == configModeOmitSPNPrefix {
+		oauthConfig, err = adal.NewOAuthConfigWithAPIVersion(ts.environment.ActiveDirectoryEndpoint, ts.tenantID, nil)
+		if err != nil {
+			return nil, fmt.Errorf("building the OAuth configuration without api-version for device code authentication: %v", err)
+		}
+	} else {
+		oauthConfig, err = adal.NewOAuthConfig(ts.environment.ActiveDirectoryEndpoint, ts.tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("building the OAuth configuration for device code authentication: %v", err)
+		}
 	}
 	client := &autorest.Client{}
 	deviceCode, err := adal.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.apiserverID)
@@ -352,6 +420,7 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 
 	return &azureToken{
 		token:       *token,
+		environment: ts.environment.Name,
 		clientID:    ts.clientID,
 		tenantID:    ts.tenantID,
 		apiserverID: ts.apiserverID,

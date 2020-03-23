@@ -108,6 +108,7 @@ func lookupClusterImageSources() (string, string, error) {
 	return masterImg, nodeImg, nil
 }
 
+// LogClusterImageSources writes out cluster image sources.
 func LogClusterImageSources() {
 	masterImg, nodeImg, err := lookupClusterImageSources()
 	if err != nil {
@@ -127,82 +128,4 @@ func LogClusterImageSources() {
 	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
 		Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
-}
-
-func CreateManagedInstanceGroup(size int64, zone, template string) error {
-	// TODO(verult): make this hit the compute API directly instead of
-	// shelling out to gcloud.
-	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-		"create",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", zone),
-		TestContext.CloudConfig.NodeInstanceGroup,
-		fmt.Sprintf("--size=%d", size),
-		fmt.Sprintf("--template=%s", template))
-	if err != nil {
-		return fmt.Errorf("gcloud compute instance-groups managed create call failed with err: %v", err)
-	}
-	return nil
-}
-
-func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
-	// TODO(verult): make this hit the compute API directly instead of
-	// shelling out to gcloud. Use InstanceGroupManager to get Instance Template name.
-
-	stdout, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-		"list",
-		fmt.Sprintf("--filter=name:%s", TestContext.CloudConfig.NodeInstanceGroup),
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zones=%s", zone),
-	)
-
-	if err != nil {
-		return "", fmt.Errorf("gcloud compute instance-groups managed list call failed with err: %v", err)
-	}
-
-	templateName, err := parseInstanceTemplateName(stdout)
-	if err != nil {
-		return "", fmt.Errorf("error parsing gcloud output: %v", err)
-	}
-	return templateName, nil
-}
-
-func DeleteManagedInstanceGroup(zone string) error {
-	// TODO(verult): make this hit the compute API directly instead of
-	// shelling out to gcloud.
-	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-		"delete",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", zone),
-		TestContext.CloudConfig.NodeInstanceGroup)
-	if err != nil {
-		return fmt.Errorf("gcloud compute instance-groups managed delete call failed with err: %v", err)
-	}
-	return nil
-}
-
-func parseInstanceTemplateName(gcloudOutput string) (string, error) {
-	const templateNameField = "INSTANCE_TEMPLATE"
-
-	lines := strings.Split(gcloudOutput, "\n")
-	if len(lines) <= 1 { // Empty output or only contains column names
-		return "", fmt.Errorf("the list is empty")
-	}
-
-	// Otherwise, there should be exactly 1 entry, i.e. 2 lines
-	fieldNames := strings.Fields(lines[0])
-	instanceTemplateColumn := 0
-	for instanceTemplateColumn < len(fieldNames) &&
-		fieldNames[instanceTemplateColumn] != templateNameField {
-		instanceTemplateColumn++
-	}
-
-	if instanceTemplateColumn == len(fieldNames) {
-		return "", fmt.Errorf("the list does not contain instance template information")
-	}
-
-	fields := strings.Fields(lines[1])
-	instanceTemplateName := fields[instanceTemplateColumn]
-
-	return instanceTemplateName, nil
 }

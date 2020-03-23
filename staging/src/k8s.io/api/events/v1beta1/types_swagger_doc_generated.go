@@ -51,7 +51,7 @@ func (Event) SwaggerDoc() map[string]string {
 
 var map_EventList = map[string]string{
 	"":         "EventList is a list of Event objects.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is a list of schema objects.",
 }
 
@@ -63,7 +63,7 @@ var map_EventSeries = map[string]string{
 	"":                 "EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.",
 	"count":            "Number of occurrences in this series up to the last heartbeat time",
 	"lastObservedTime": "Time when last Event from the series was seen before last heartbeat.",
-	"state":            "Information whether this series is ongoing or finished.",
+	"state":            "Information whether this series is ongoing or finished. Deprecated. Planned removal for 1.18",
 }
 
 func (EventSeries) SwaggerDoc() map[string]string {

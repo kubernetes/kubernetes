@@ -27,20 +27,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 )
 
-var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
+var testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
 
 const archiveName = "e2e_node_test.tar.gz"
 
+// CreateTestArchive creates the archive package for the node e2e test.
 func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
-	glog.V(2).Infof("Building archive...")
+	klog.V(2).Infof("Building archive...")
 	tardir, err := ioutil.TempDir("", "node-e2e-archive")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temporary directory %v.", err)
+		return "", fmt.Errorf("failed to create temporary directory %v", err)
 	}
 	defer os.RemoveAll(tardir)
 
@@ -58,18 +59,18 @@ func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get working directory %v.", err)
+		return "", fmt.Errorf("failed to get working directory %v", err)
 	}
 	return filepath.Join(dir, archiveName), nil
 }
 
-// Returns the command output, whether the exit was ok, and any errors
+// RunRemote returns the command output, whether the exit was ok, and any errors
 // TODO(random-liu): junitFilePrefix is not prefix actually, the file name is junit-junitFilePrefix.xml. Change the variable name.
-func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFilePrefix string, testArgs string, ginkgoArgs string, systemSpecName string) (string, bool, error) {
+func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFilePrefix string, testArgs string, ginkgoArgs string, systemSpecName string, extraEnvs string) (string, bool, error) {
 	// Create the temp staging directory
-	glog.V(2).Infof("Staging test binaries on %q", host)
+	klog.V(2).Infof("Staging test binaries on %q", host)
 	workspace := newWorkspaceDir()
-	// Do not sudo here, so that we can use scp to copy test archive to the directdory.
+	// Do not sudo here, so that we can use scp to copy test archive to the directory.
 	if output, err := SSHNoSudo(host, "mkdir", workspace); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to create workspace directory %q on host %q: %v output: %q", workspace, host, err, output)
@@ -78,13 +79,13 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 		defer func() {
 			output, err := SSH(host, "rm", "-rf", workspace)
 			if err != nil {
-				glog.Errorf("failed to cleanup workspace %q on host %q: %v.  Output:\n%s", workspace, host, err, output)
+				klog.Errorf("failed to cleanup workspace %q on host %q: %v.  Output:\n%s", workspace, host, err, output)
 			}
 		}()
 	}
 
 	// Copy the archive to the staging directory
-	if output, err := runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), workspace)); err != nil {
+	if output, err := runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIP(host), workspace)); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to copy test archive: %v, output: %q", err, output)
 	}
@@ -94,7 +95,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 		fmt.Sprintf("cd %s", workspace),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 	)
-	glog.V(2).Infof("Extracting tar on %q", host)
+	klog.V(2).Infof("Extracting tar on %q", host)
 	// Do not use sudo here, because `sudo tar -x` will recover the file ownership inside the tar ball, but
 	// we want the extracted files to be owned by the current user.
 	if output, err := SSHNoSudo(host, "sh", "-c", cmd); err != nil {
@@ -109,8 +110,8 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 		return "", false, fmt.Errorf("failed to create test result directory %q on host %q: %v output: %q", resultDir, host, err, output)
 	}
 
-	glog.V(2).Infof("Running test on %q", host)
-	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, *testTimeoutSeconds)
+	klog.V(2).Infof("Running test on %q", host)
+	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, *testTimeout)
 
 	aggErrs := []error{}
 	// Do not log the output here, let the caller deal with the test output.
@@ -119,7 +120,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 		collectSystemLog(host)
 	}
 
-	glog.V(2).Infof("Copying test artifacts from %q", host)
+	klog.V(2).Infof("Copying test artifacts from %q", host)
 	scpErr := getTestArtifacts(host, workspace)
 	if scpErr != nil {
 		aggErrs = append(aggErrs, scpErr)
@@ -136,14 +137,14 @@ const (
 )
 
 func getTimestamp() string {
-	return fmt.Sprintf(time.Now().Format(timestampFormat))
+	return fmt.Sprint(time.Now().Format(timestampFormat))
 }
 
 func newWorkspaceDir() string {
 	return filepath.Join("/tmp", workspaceDirPrefix+getTimestamp())
 }
 
-// Parses the workspace directory name and gets the timestamp part of it.
+// GetTimestampFromWorkspaceDir parses the workspace directory name and gets the timestamp part of it.
 // This can later be used to name other artifacts (such as the
 // kubelet-${instance}.service systemd transient service used to launch
 // Kubelet) so that they can be matched to each other.
@@ -163,18 +164,18 @@ func getTestArtifacts(host, testDir string) error {
 		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
 	}
 	// Copy logs to artifacts/hostname
-	if _, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIp(host), testDir), logPath); err != nil {
+	if _, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIP(host), testDir), logPath); err != nil {
 		return err
 	}
 	// Copy json files (if any) to artifacts.
 	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/*.json", testDir)); err == nil {
-		if _, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
+		if _, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
 			return err
 		}
 	}
 	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/junit*", testDir)); err == nil {
 		// Copy junit (if any) to the top of artifacts
-		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
+		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
 			return err
 		}
 	}
@@ -194,17 +195,17 @@ func collectSystemLog(host string) {
 		logPath  = fmt.Sprintf("/tmp/%s-%s", getTimestamp(), logName)
 		destPath = fmt.Sprintf("%s/%s-%s", *resultsDir, host, logName)
 	)
-	glog.V(2).Infof("Test failed unexpectedly. Attempting to retrieving system logs (only works for nodes with journald)")
+	klog.V(2).Infof("Test failed unexpectedly. Attempting to retrieving system logs (only works for nodes with journald)")
 	// Try getting the system logs from journald and store it to a file.
 	// Don't reuse the original test directory on the remote host because
 	// it could've be been removed if the node was rebooted.
 	if output, err := SSH(host, "sh", "-c", fmt.Sprintf("'journalctl --system --all > %s'", logPath)); err == nil {
-		glog.V(2).Infof("Got the system logs from journald; copying it back...")
-		if output, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIp(host), logPath), destPath); err != nil {
-			glog.V(2).Infof("Failed to copy the log: err: %v, output: %q", err, output)
+		klog.V(2).Infof("Got the system logs from journald; copying it back...")
+		if output, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIP(host), logPath), destPath); err != nil {
+			klog.V(2).Infof("Failed to copy the log: err: %v, output: %q", err, output)
 		}
 	} else {
-		glog.V(2).Infof("Failed to run journactl (normal if it doesn't exist on the node): %v, output: %q", err, output)
+		klog.V(2).Infof("Failed to run journactl (normal if it doesn't exist on the node): %v, output: %q", err, output)
 	}
 }
 

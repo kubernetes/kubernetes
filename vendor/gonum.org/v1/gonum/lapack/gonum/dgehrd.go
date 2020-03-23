@@ -11,13 +11,13 @@ import (
 )
 
 // Dgehrd reduces a block of a real n×n general matrix A to upper Hessenberg
-// form H by an orthogonal similarity transformation Q^T * A * Q = H.
+// form H by an orthogonal similarity transformation Qᵀ * A * Q = H.
 //
 // The matrix Q is represented as a product of (ihi-ilo) elementary
 // reflectors
 //  Q = H_{ilo} H_{ilo+1} ... H_{ihi-1}.
 // Each H_i has the form
-//  H_i = I - tau[i] * v * v^T
+//  H_i = I - tau[i] * v * vᵀ
 // where v is a real vector with v[0:i+1] = 0, v[i+1] = 1 and v[ihi+1:n] = 0.
 // v[i+2:ihi+1] is stored on exit in A[i+2:ihi+1,i].
 //
@@ -67,20 +67,24 @@ import (
 // Dgehrd is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgehrd(n, ilo, ihi int, a []float64, lda int, tau, work []float64, lwork int) {
 	switch {
+	case n < 0:
+		panic(nLT0)
 	case ilo < 0 || max(0, n-1) < ilo:
 		panic(badIlo)
 	case ihi < min(ilo, n-1) || n <= ihi:
 		panic(badIhi)
+	case lda < max(1, n):
+		panic(badLdA)
 	case lwork < max(1, n) && lwork != -1:
-		panic(badWork)
+		panic(badLWork)
 	case len(work) < lwork:
 		panic(shortWork)
 	}
-	if lwork != -1 {
-		checkMatrix(n, n, a, lda)
-		if len(tau) != n-1 && n > 0 {
-			panic(badTau)
-		}
+
+	// Quick return if possible.
+	if n == 0 {
+		work[0] = 1
+		return
 	}
 
 	const (
@@ -94,6 +98,13 @@ func (impl Implementation) Dgehrd(n, ilo, ihi int, a []float64, lda int, tau, wo
 	if lwork == -1 {
 		work[0] = float64(lwkopt)
 		return
+	}
+
+	if len(a) < (n-1)*lda+n {
+		panic(shortA)
+	}
+	if len(tau) != n-1 {
+		panic(badLenTau)
 	}
 
 	// Set tau[:ilo] and tau[ihi:] to zero.
@@ -147,12 +158,12 @@ func (impl Implementation) Dgehrd(n, ilo, ihi int, a []float64, lda int, tau, wo
 			ib := min(nb, ihi-i)
 
 			// Reduce columns [i:i+ib] to Hessenberg form, returning the
-			// matrices V and T of the block reflector H = I - V*T*V^T
+			// matrices V and T of the block reflector H = I - V*T*Vᵀ
 			// which performs the reduction, and also the matrix Y = A*V*T.
 			impl.Dlahr2(ihi+1, i+1, ib, a[i:], lda, tau[i:], work[iwt:], ldt, work, ldwork)
 
 			// Apply the block reflector H to A[:ihi+1,i+ib:ihi+1] from the
-			// right, computing  A := A - Y * V^T. V[i+ib,i+ib-1] must be set
+			// right, computing  A := A - Y * Vᵀ. V[i+ib,i+ib-1] must be set
 			// to 1.
 			ei := a[(i+ib)*lda+i+ib-1]
 			a[(i+ib)*lda+i+ib-1] = 1

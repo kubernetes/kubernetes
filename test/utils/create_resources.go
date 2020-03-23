@@ -19,13 +19,17 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
+	storage "k8s.io/api/storage/v1"
+
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -52,12 +56,12 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 
 func IsRetryableAPIError(err error) bool {
 	// These errors may indicate a transient error that we can retry in tests.
-	if apierrs.IsInternalError(err) || apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) ||
-		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
+	if apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) ||
+		apierrors.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
 		return true
 	}
 	// If the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
-	if _, shouldRetry := apierrs.SuggestsClientDelay(err); shouldRetry {
+	if _, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
 		return true
 	}
 	return false
@@ -68,8 +72,8 @@ func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) 
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().Pods(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -85,8 +89,8 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().ReplicationControllers(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -97,13 +101,13 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *extensions.ReplicaSet) error {
+func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *apps.ReplicaSet) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().ReplicaSets(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -114,13 +118,13 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *e
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *extensions.Deployment) error {
+func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *apps.Deployment) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().Deployments(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.AppsV1().Deployments(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -131,13 +135,13 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *e
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *extensions.DaemonSet) error {
+func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *apps.DaemonSet) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.ExtensionsV1beta1().DaemonSets(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.AppsV1().DaemonSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -153,8 +157,8 @@ func CreateJobWithRetries(c clientset.Interface, namespace string, obj *batch.Jo
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.BatchV1().Jobs(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.BatchV1().Jobs(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -170,8 +174,8 @@ func CreateSecretWithRetries(c clientset.Interface, namespace string, obj *v1.Se
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().Secrets(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.CoreV1().Secrets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -187,8 +191,8 @@ func CreateConfigMapWithRetries(c clientset.Interface, namespace string, obj *v1
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().ConfigMaps(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.CoreV1().ConfigMaps(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -204,8 +208,25 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().Services(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.CoreV1().Services(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
+			return true, nil
+		}
+		if IsRetryableAPIError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+	}
+	return RetryWithExponentialBackOff(createFunc)
+}
+
+func CreateStorageClassWithRetries(c clientset.Interface, obj *storage.StorageClass) error {
+	if obj == nil {
+		return fmt.Errorf("Object provided to create is empty")
+	}
+	createFunc := func() (bool, error) {
+		_, err := c.StorageV1().StorageClasses().Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {
@@ -221,8 +242,42 @@ func CreateResourceQuotaWithRetries(c clientset.Interface, namespace string, obj
 		return fmt.Errorf("Object provided to create is empty")
 	}
 	createFunc := func() (bool, error) {
-		_, err := c.CoreV1().ResourceQuotas(namespace).Create(obj)
-		if err == nil || apierrs.IsAlreadyExists(err) {
+		_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
+			return true, nil
+		}
+		if IsRetryableAPIError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+	}
+	return RetryWithExponentialBackOff(createFunc)
+}
+
+func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.PersistentVolume) error {
+	if obj == nil {
+		return fmt.Errorf("Object provided to create is empty")
+	}
+	createFunc := func() (bool, error) {
+		_, err := c.CoreV1().PersistentVolumes().Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
+			return true, nil
+		}
+		if IsRetryableAPIError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+	}
+	return RetryWithExponentialBackOff(createFunc)
+}
+
+func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace string, obj *v1.PersistentVolumeClaim) error {
+	if obj == nil {
+		return fmt.Errorf("Object provided to create is empty")
+	}
+	createFunc := func() (bool, error) {
+		_, err := c.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {

@@ -7,13 +7,15 @@
 // func servicemain(argc uint32, argv **uint16)
 TEXT ·servicemain(SB),7,$0
 	MOVL	CX, ·sArgc(SB)
-	MOVL	DX, ·sArgv(SB)
+	MOVQ	DX, ·sArgv(SB)
 
 	SUBQ	$32, SP		// stack for the first 4 syscall params
 
 	MOVQ	·sName(SB), CX
 	MOVQ	$·servicectlhandler(SB), DX
 	// BUG(pastarmovj): Figure out a way to pass in context in R8.
+	// Set context to 123456 to test issue #25660.
+	MOVQ	$123456, R8
 	MOVQ	·cRegisterServiceCtrlHandlerExW(SB), AX
 	CALL	AX
 	CMPQ	AX, $0

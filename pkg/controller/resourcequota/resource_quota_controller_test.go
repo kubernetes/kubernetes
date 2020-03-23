@@ -18,18 +18,24 @@ package resourcequota
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
@@ -78,12 +84,29 @@ func newGenericLister(groupResource schema.GroupResource, items []runtime.Object
 	return cache.NewGenericLister(store, groupResource)
 }
 
+func newErrorLister() cache.GenericLister {
+	return errorLister{}
+}
+
+type errorLister struct {
+}
+
+func (errorLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	return nil, fmt.Errorf("error listing")
+}
+func (errorLister) Get(name string) (runtime.Object, error) {
+	return nil, fmt.Errorf("error getting")
+}
+func (errorLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
+	return errorLister{}
+}
+
 type quotaController struct {
 	*ResourceQuotaController
 	stop chan struct{}
 }
 
-func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister quota.ListerForResourceFunc) quotaController {
+func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister quota.ListerForResourceFunc, discoveryFunc NamespacedResourcesFunc) quotaController {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaConfiguration := install.NewQuotaConfigurationForControllers(lister)
 	alwaysStarted := make(chan struct{})
@@ -94,16 +117,17 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
-		DiscoveryFunc:             mockDiscoveryFunc,
+		DiscoveryFunc:             discoveryFunc,
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 		InformersStarted:          alwaysStarted,
+		InformerFactory:           informerFactory,
 	}
 	qc, err := NewResourceQuotaController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	go informerFactory.Start(stop)
+	informerFactory.Start(stop)
 	return quotaController{qc, stop}
 }
 
@@ -199,9 +223,11 @@ func newTestPodsWithPriorityClasses() []runtime.Object {
 func TestSyncResourceQuota(t *testing.T) {
 	testCases := map[string]struct {
 		gvr               schema.GroupVersionResource
+		errorGVR          schema.GroupVersionResource
 		items             []runtime.Object
 		quota             v1.ResourceQuota
 		status            v1.ResourceQuotaStatus
+		expectedError     string
 		expectedActionSet sets.String
 	}{
 		"non-matching-best-effort-scoped-quota": {
@@ -693,18 +719,75 @@ func TestSyncResourceQuota(t *testing.T) {
 			expectedActionSet: sets.NewString(),
 			items:             []runtime.Object{},
 		},
+		"quota-missing-status-with-calculation-error": {
+			errorGVR: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourcePods: resource.MustParse("1"),
+					},
+				},
+				Status: v1.ResourceQuotaStatus{},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourcePods: resource.MustParse("1"),
+				},
+			},
+			expectedError:     "error listing",
+			expectedActionSet: sets.NewString("update-resourcequotas-status"),
+			items:             []runtime.Object{},
+		},
+		"quota-missing-status-with-partial-calculation-error": {
+			gvr:      v1.SchemeGroupVersion.WithResource("configmaps"),
+			errorGVR: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourcePods:       resource.MustParse("1"),
+						v1.ResourceConfigMaps: resource.MustParse("1"),
+					},
+				},
+				Status: v1.ResourceQuotaStatus{},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourcePods:       resource.MustParse("1"),
+					v1.ResourceConfigMaps: resource.MustParse("1"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceConfigMaps: resource.MustParse("0"),
+				},
+			},
+			expectedError:     "error listing",
+			expectedActionSet: sets.NewString("update-resourcequotas-status"),
+			items:             []runtime.Object{},
+		},
 	}
 
 	for testName, testCase := range testCases {
 		kubeClient := fake.NewSimpleClientset(&testCase.quota)
 		listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
-			testCase.gvr: newGenericLister(testCase.gvr.GroupResource(), testCase.items),
+			testCase.gvr:      newGenericLister(testCase.gvr.GroupResource(), testCase.items),
+			testCase.errorGVR: newErrorLister(),
 		}
-		qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig))
+		qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
 		defer close(qc.stop)
 
 		if err := qc.syncResourceQuota(&testCase.quota); err != nil {
-			t.Fatalf("test: %s, unexpected error: %v", testName, err)
+			if len(testCase.expectedError) == 0 || !strings.Contains(err.Error(), testCase.expectedError) {
+				t.Fatalf("test: %s, unexpected error: %v", testName, err)
+			}
+		} else if len(testCase.expectedError) > 0 {
+			t.Fatalf("test: %s, expected error %q, got none", testName, testCase.expectedError)
 		}
 
 		actionSet := sets.NewString()
@@ -715,8 +798,17 @@ func TestSyncResourceQuota(t *testing.T) {
 			t.Errorf("test: %s,\nExpected actions:\n%v\n but got:\n%v\nDifference:\n%v", testName, testCase.expectedActionSet, actionSet, testCase.expectedActionSet.Difference(actionSet))
 		}
 
-		lastActionIndex := len(kubeClient.Actions()) - 1
-		usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*v1.ResourceQuota)
+		var usage *v1.ResourceQuota
+		actions := kubeClient.Actions()
+		for i := len(actions) - 1; i >= 0; i-- {
+			if updateAction, ok := actions[i].(core.UpdateAction); ok {
+				usage = updateAction.GetObject().(*v1.ResourceQuota)
+				break
+			}
+		}
+		if usage == nil {
+			t.Errorf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
+		}
 
 		// ensure usage is as expected
 		if len(usage.Status.Hard) != len(testCase.status.Hard) {
@@ -751,7 +843,7 @@ func TestAddQuota(t *testing.T) {
 		gvr: newGenericLister(gvr.GroupResource(), newTestPods()),
 	}
 
-	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig))
+	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
 	defer close(qc.stop)
 
 	testCases := []struct {
@@ -907,5 +999,254 @@ func TestAddQuota(t *testing.T) {
 			key, _ := qc.queue.Get()
 			qc.queue.Done(key)
 		}
+	}
+}
+
+// TestDiscoverySync ensures that a discovery client error
+// will not cause the quota controller to block infinitely.
+func TestDiscoverySync(t *testing.T) {
+	serverResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"create", "delete", "list", "watch"}},
+			},
+		},
+	}
+	unsyncableServerResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"create", "delete", "list", "watch"}},
+				{Name: "secrets", Namespaced: true, Kind: "Secret", Verbs: metav1.Verbs{"create", "delete", "list", "watch"}},
+			},
+		},
+	}
+	fakeDiscoveryClient := &fakeServerResources{
+		PreferredResources: serverResources,
+		Error:              nil,
+		Lock:               sync.Mutex{},
+		InterfaceUsedCount: 0,
+	}
+
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/pods": {
+				200,
+				[]byte("{}"),
+			},
+			"GET" + "/api/v1/secrets": {
+				404,
+				[]byte("{}"),
+			},
+		},
+	}
+
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+	clientConfig.ContentConfig.NegotiatedSerializer = nil
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pods := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	secrets := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
+	listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
+		pods:    newGenericLister(pods.GroupResource(), []runtime.Object{}),
+		secrets: newGenericLister(secrets.GroupResource(), []runtime.Object{}),
+	}
+	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), fakeDiscoveryClient.ServerPreferredNamespacedResources)
+	defer close(qc.stop)
+
+	stopSync := make(chan struct{})
+	defer close(stopSync)
+	// The pseudo-code of Sync():
+	// Sync(client, period, stopCh):
+	//    wait.Until() loops with `period` until the `stopCh` is closed :
+	//       GetQuotableResources()
+	//       resyncMonitors()
+	//       cache.WaitForNamedCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
+	//
+	// Setting the period to 200ms allows the WaitForCacheSync() to check
+	// for cache sync ~2 times in every wait.Until() loop.
+	//
+	// The 1s sleep in the test allows GetQuotableResources and
+	// resyncMonitors to run ~5 times to ensure the changes to the
+	// fakeDiscoveryClient are picked up.
+	go qc.Sync(fakeDiscoveryClient.ServerPreferredNamespacedResources, 200*time.Millisecond, stopSync)
+
+	// Wait until the sync discovers the initial resources
+	time.Sleep(1 * time.Second)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected quotacontroller.Sync to be running but it is blocked: %v", err)
+	}
+
+	// Simulate the discovery client returning an error
+	fakeDiscoveryClient.setPreferredResources(nil)
+	fakeDiscoveryClient.setError(fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
+
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+
+	// Remove the error from being returned and see if the quota sync is still working
+	fakeDiscoveryClient.setPreferredResources(serverResources)
+	fakeDiscoveryClient.setError(nil)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected quotacontroller.Sync to still be running but it is blocked: %v", err)
+	}
+
+	// Simulate the discovery client returning a resource the restmapper can resolve, but will not sync caches
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources)
+	fakeDiscoveryClient.setError(nil)
+
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+
+	// Put the resources back to normal and ensure quota sync recovers
+	fakeDiscoveryClient.setPreferredResources(serverResources)
+	fakeDiscoveryClient.setError(nil)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected quotacontroller.Sync to still be running but it is blocked: %v", err)
+	}
+}
+
+// testServerAndClientConfig returns a server that listens and a config that can reference it
+func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request)) (*httptest.Server, *rest.Config) {
+	srv := httptest.NewServer(http.HandlerFunc(handler))
+	config := &rest.Config{
+		Host: srv.URL,
+	}
+	return srv, config
+}
+
+func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *sync.RWMutex) error {
+	before := fakeDiscoveryClient.getInterfaceUsedCount()
+	t := 1 * time.Second
+	time.Sleep(t)
+	after := fakeDiscoveryClient.getInterfaceUsedCount()
+	if before == after {
+		return fmt.Errorf("discoveryClient.ServerPreferredResources() called %d times over %v", after-before, t)
+	}
+
+	workerLockAcquired := make(chan struct{})
+	go func() {
+		workerLock.Lock()
+		workerLock.Unlock()
+		close(workerLockAcquired)
+	}()
+	select {
+	case <-workerLockAcquired:
+		return nil
+	case <-time.After(t):
+		return fmt.Errorf("workerLock blocked for at least %v", t)
+	}
+}
+
+type fakeServerResources struct {
+	PreferredResources []*metav1.APIResourceList
+	Error              error
+	Lock               sync.Mutex
+	InterfaceUsedCount int
+}
+
+func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (_ *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (f *fakeServerResources) setPreferredResources(resources []*metav1.APIResourceList) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.PreferredResources = resources
+}
+
+func (f *fakeServerResources) setError(err error) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.Error = err
+}
+
+func (f *fakeServerResources) getInterfaceUsedCount() int {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	return f.InterfaceUsedCount
+}
+
+func (f *fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	f.Lock.Lock()
+	defer f.Lock.Unlock()
+	f.InterfaceUsedCount++
+	return f.PreferredResources, f.Error
+}
+
+// fakeAction records information about requests to aid in testing.
+type fakeAction struct {
+	method string
+	path   string
+	query  string
+}
+
+// String returns method=path to aid in testing
+func (f *fakeAction) String() string {
+	return strings.Join([]string{f.method, f.path}, "=")
+}
+
+type FakeResponse struct {
+	statusCode int
+	content    []byte
+}
+
+// fakeActionHandler holds a list of fakeActions received
+type fakeActionHandler struct {
+	// statusCode and content returned by this handler for different method + path.
+	response map[string]FakeResponse
+
+	lock    sync.Mutex
+	actions []fakeAction
+}
+
+// ServeHTTP logs the action that occurred and always returns the associated status code
+func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	func() {
+		f.lock.Lock()
+		defer f.lock.Unlock()
+
+		f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path, query: request.URL.RawQuery})
+		fakeResponse, ok := f.response[request.Method+request.URL.Path]
+		if !ok {
+			fakeResponse.statusCode = 200
+			fakeResponse.content = []byte("{\"kind\": \"List\"}")
+		}
+		response.Header().Set("Content-Type", "application/json")
+		response.WriteHeader(fakeResponse.statusCode)
+		response.Write(fakeResponse.content)
+	}()
+
+	// This is to allow the fakeActionHandler to simulate a watch being opened
+	if strings.Contains(request.URL.RawQuery, "watch=true") {
+		hijacker, ok := response.(http.Hijacker)
+		if !ok {
+			return
+		}
+		connection, _, err := hijacker.Hijack()
+		if err != nil {
+			return
+		}
+		defer connection.Close()
+		time.Sleep(30 * time.Second)
 	}
 }

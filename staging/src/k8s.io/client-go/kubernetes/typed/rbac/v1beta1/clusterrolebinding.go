@@ -19,6 +19,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+	"time"
+
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -35,14 +38,14 @@ type ClusterRoleBindingsGetter interface {
 
 // ClusterRoleBindingInterface has methods to work with ClusterRoleBinding resources.
 type ClusterRoleBindingInterface interface {
-	Create(*v1beta1.ClusterRoleBinding) (*v1beta1.ClusterRoleBinding, error)
-	Update(*v1beta1.ClusterRoleBinding) (*v1beta1.ClusterRoleBinding, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta1.ClusterRoleBinding, error)
-	List(opts v1.ListOptions) (*v1beta1.ClusterRoleBindingList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error)
+	Create(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.CreateOptions) (*v1beta1.ClusterRoleBinding, error)
+	Update(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.UpdateOptions) (*v1beta1.ClusterRoleBinding, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ClusterRoleBinding, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ClusterRoleBindingList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error)
 	ClusterRoleBindingExpansion
 }
 
@@ -59,89 +62,107 @@ func newClusterRoleBindings(c *RbacV1beta1Client) *clusterRoleBindings {
 }
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
-func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
-func (c *clusterRoleBindings) List(opts v1.ListOptions) (result *v1beta1.ClusterRoleBindingList, err error) {
+func (c *clusterRoleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ClusterRoleBindingList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1beta1.ClusterRoleBindingList{}
 	err = c.client.Get().
 		Resource("clusterrolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
+		Timeout(timeout).
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clusterRoleBindings.
-func (c *clusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *clusterRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Resource("clusterrolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
+		Timeout(timeout).
+		Watch(ctx)
 }
 
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
-func (c *clusterRoleBindings) Create(clusterRoleBinding *v1beta1.ClusterRoleBinding) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Create(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.CreateOptions) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Post().
 		Resource("clusterrolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterRoleBinding).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a clusterRoleBinding and updates it. Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
-func (c *clusterRoleBindings) Update(clusterRoleBinding *v1beta1.ClusterRoleBinding) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Update(ctx context.Context, clusterRoleBinding *v1beta1.ClusterRoleBinding, opts v1.UpdateOptions) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Put().
 		Resource("clusterrolebindings").
 		Name(clusterRoleBinding.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterRoleBinding).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the clusterRoleBinding and deletes it. Returns an error if one occurs.
-func (c *clusterRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
+func (c *clusterRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusterrolebindings").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *clusterRoleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	var timeout time.Duration
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Resource("clusterrolebindings").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
-		Body(options).
-		Do().
+		VersionedParams(&listOpts, scheme.ParameterCodec).
+		Timeout(timeout).
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
-func (c *clusterRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error) {
+func (c *clusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ClusterRoleBinding, err error) {
 	result = &v1beta1.ClusterRoleBinding{}
 	err = c.client.Patch(pt).
 		Resource("clusterrolebindings").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

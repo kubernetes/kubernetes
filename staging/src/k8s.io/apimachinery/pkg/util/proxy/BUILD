@@ -41,10 +41,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/third_party/forked/golang/netutil:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/mxk/go-flowrate/flowrate:go_default_library",
         "//vendor/golang.org/x/net/html:go_default_library",
         "//vendor/golang.org/x/net/html/atom:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

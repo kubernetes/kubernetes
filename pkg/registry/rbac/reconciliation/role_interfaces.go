@@ -17,9 +17,8 @@ limitations under the License.
 package reconciliation
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"context"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -82,7 +81,7 @@ type RoleModifier struct {
 }
 
 func (c RoleModifier) Get(namespace, name string) (RuleOwner, error) {
-	ret, err := c.Client.Roles(namespace).Get(name, metav1.GetOptions{})
+	ret, err := c.Client.Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -90,12 +89,11 @@ func (c RoleModifier) Get(namespace, name string) (RuleOwner, error) {
 }
 
 func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: in.GetNamespace()}}
-	if _, err := c.NamespaceClient.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := tryEnsureNamespace(c.NamespaceClient, in.GetNamespace()); err != nil {
 		return nil, err
 	}
 
-	ret, err := c.Client.Roles(in.GetNamespace()).Create(in.(RoleRuleOwner).Role)
+	ret, err := c.Client.Roles(in.GetNamespace()).Create(context.TODO(), in.(RoleRuleOwner).Role, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +101,7 @@ func (c RoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 }
 
 func (c RoleModifier) Update(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Roles(in.GetNamespace()).Update(in.(RoleRuleOwner).Role)
+	ret, err := c.Client.Roles(in.GetNamespace()).Update(context.TODO(), in.(RoleRuleOwner).Role, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

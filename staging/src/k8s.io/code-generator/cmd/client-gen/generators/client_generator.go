@@ -27,19 +27,17 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/code-generator/cmd/client-gen/path"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	codegennamer "k8s.io/code-generator/pkg/namer"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // NameSystems returns the name system used by the generators in this package.
-func NameSystems() namer.NameSystems {
-	pluralExceptions := map[string]string{
-		"Endpoints": "Endpoints",
-	}
+func NameSystems(pluralExceptions map[string]string) namer.NameSystems {
 	lowercaseNamer := namer.NewAllLowercasePluralNamer(pluralExceptions)
 
 	publicNamer := &ExceptionNamer{
@@ -101,7 +99,7 @@ func NameSystems() namer.NameSystems {
 		"publicPlural":       publicPluralNamer,
 		"privatePlural":      privatePluralNamer,
 		"allLowercasePlural": lowercaseNamer,
-		"resource":           NewTagOverrideNamer("resourceName", lowercaseNamer),
+		"resource":           codegennamer.NewTagOverrideNamer("resourceName", lowercaseNamer),
 	}
 }
 
@@ -318,12 +316,12 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
+		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	customArgs, ok := arguments.CustomArgs.(*clientgenargs.CustomArgs)
 	if !ok {
-		glog.Fatalf("cannot convert arguments.CustomArgs to clientgenargs.CustomArgs")
+		klog.Fatalf("cannot convert arguments.CustomArgs to clientgenargs.CustomArgs")
 	}
 	includedTypesOverrides := customArgs.IncludedTypesOverrides
 
@@ -399,28 +397,4 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	return generator.Packages(packageList)
-}
-
-// tagOverrideNamer is a namer which pulls names from a given tag, if specified,
-// and otherwise falls back to a different namer.
-type tagOverrideNamer struct {
-	tagName  string
-	fallback namer.Namer
-}
-
-func (n *tagOverrideNamer) Name(t *types.Type) string {
-	if nameOverride := extractTag(n.tagName, append(t.SecondClosestCommentLines, t.CommentLines...)); nameOverride != "" {
-		return nameOverride
-	}
-
-	return n.fallback.Name(t)
-}
-
-// NewTagOverrideNamer creates a namer.Namer which uses the contents of the given tag as
-// the name, or falls back to another Namer if the tag is not present.
-func NewTagOverrideNamer(tagName string, fallback namer.Namer) namer.Namer {
-	return &tagOverrideNamer{
-		tagName:  tagName,
-		fallback: fallback,
-	}
 }

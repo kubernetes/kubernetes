@@ -1,3 +1,4 @@
+// +build !providerless
 // +build windows
 
 /*
@@ -24,25 +25,25 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 )
 
-func scsiHostRescan(io ioHandler, exec mount.Exec) {
+func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	cmd := "Update-HostStorageCache"
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
-		glog.Errorf("Update-HostStorageCache failed in scsiHostRescan, error: %v, output: %q", err, string(output))
+		klog.Errorf("Update-HostStorageCache failed in scsiHostRescan, error: %v, output: %q", err, string(output))
 	}
 }
 
 // search Windows disk number by LUN
-func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error) {
+func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (string, error) {
 	cmd := `Get-Disk | select number, location | ConvertTo-Json`
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
-		glog.Errorf("Get-Disk failed in findDiskByLun, error: %v, output: %q", err, string(output))
+		klog.Errorf("Get-Disk failed in findDiskByLun, error: %v, output: %q", err, string(output))
 		return "", err
 	}
 
@@ -52,7 +53,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 
 	var data []map[string]interface{}
 	if err = json.Unmarshal(output, &data); err != nil {
-		glog.Errorf("Get-Disk output is not a json array, output: %q", string(output))
+		klog.Errorf("Get-Disk output is not a json array, output: %q", string(output))
 		return "", err
 	}
 
@@ -66,27 +67,27 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 				arr := strings.Split(location, " ")
 				arrLen := len(arr)
 				if arrLen < 3 {
-					glog.Warningf("unexpected json structure from Get-Disk, location: %q", jsonLocation)
+					klog.Warningf("unexpected json structure from Get-Disk, location: %q", jsonLocation)
 					continue
 				}
 
-				glog.V(4).Infof("found a disk, locatin: %q, lun: %q", location, arr[arrLen-1])
+				klog.V(4).Infof("found a disk, location: %q, lun: %q", location, arr[arrLen-1])
 				//last element of location field is LUN number, e.g.
 				//		"location":  "Integrated : Adapter 3 : Port 0 : Target 0 : LUN 1"
 				l, err := strconv.Atoi(arr[arrLen-1])
 				if err != nil {
-					glog.Warningf("cannot parse element from data structure, location: %q, element: %q", location, arr[arrLen-1])
+					klog.Warningf("cannot parse element from data structure, location: %q, element: %q", location, arr[arrLen-1])
 					continue
 				}
 
 				if l == lun {
-					glog.V(4).Infof("found a disk and lun, locatin: %q, lun: %d", location, lun)
+					klog.V(4).Infof("found a disk and lun, location: %q, lun: %d", location, lun)
 					if d, ok := v["number"]; ok {
 						if diskNum, ok := d.(float64); ok {
-							glog.V(2).Infof("azureDisk Mount: got disk number(%d) by LUN(%d)", int(diskNum), lun)
-							return strconv.Itoa(int(diskNum)), nil
+							klog.V(2).Infof("azureDisk Mount: got disk number(%d) by LUN(%d)", int(diskNum), lun)
+							return fmt.Sprintf(winDiskNumFormat, int(diskNum)), nil
 						}
-						glog.Warningf("LUN(%d) found, but could not get disk number(%q), location: %q", lun, d, location)
+						klog.Warningf("LUN(%d) found, but could not get disk number(%q), location: %q", lun, d, location)
 					}
 					return "", fmt.Errorf("LUN(%d) found, but could not get disk number, location: %q", lun, location)
 				}
@@ -97,9 +98,9 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 	return "", nil
 }
 
-func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
+func formatIfNotFormatted(disk string, fstype string, exec utilexec.Interface) {
 	if err := mount.ValidateDiskNumber(disk); err != nil {
-		glog.Errorf("azureDisk Mount: formatIfNotFormatted failed, err: %v\n", err)
+		klog.Errorf("azureDisk Mount: formatIfNotFormatted failed, err: %v\n", err)
 		return
 	}
 
@@ -109,10 +110,10 @@ func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
 	}
 	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru", disk)
 	cmd += fmt.Sprintf(" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", fstype)
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
-		glog.Errorf("azureDisk Mount: Get-Disk failed, error: %v, output: %q", err, string(output))
+		klog.Errorf("azureDisk Mount: Get-Disk failed, error: %v, output: %q", err, string(output))
 	} else {
-		glog.Infof("azureDisk Mount: Disk successfully formatted, disk: %q, fstype: %q\n", disk, fstype)
+		klog.Infof("azureDisk Mount: Disk successfully formatted, disk: %q, fstype: %q\n", disk, fstype)
 	}
 }

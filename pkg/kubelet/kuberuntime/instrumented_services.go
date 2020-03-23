@@ -19,8 +19,8 @@ package kuberuntime
 import (
 	"time"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -49,7 +49,7 @@ func newInstrumentedImageManagerService(service internalapi.ImageManagerService)
 // recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
 	metrics.RuntimeOperations.WithLabelValues(operation).Inc()
-	metrics.RuntimeOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
+	metrics.RuntimeOperationsDuration.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
 }
 
 // recordError records error for metric if an error occurred.
@@ -132,7 +132,7 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runti
 }
 
 func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
-	const operation = "container_status"
+	const operation = "update_container"
 	defer recordOperation(operation, time.Now())
 
 	err := in.service.UpdateContainerResources(containerID, resources)
@@ -178,10 +178,15 @@ func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*run
 
 func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	const operation = "run_podsandbox"
-	defer recordOperation(operation, time.Now())
+	startTime := time.Now()
+	defer recordOperation(operation, startTime)
+	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(metrics.SinceInSeconds(startTime))
 
 	out, err := in.service.RunPodSandbox(config, runtimeHandler)
 	recordError(operation, err)
+	if err != nil {
+		metrics.RunPodSandboxErrors.WithLabelValues(runtimeHandler).Inc()
+	}
 	return out, err
 }
 
@@ -275,11 +280,11 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
+func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 
-	imageRef, err := in.service.PullImage(image, auth)
+	imageRef, err := in.service.PullImage(image, auth, podSandboxConfig)
 	recordError(operation, err)
 	return imageRef, err
 }

@@ -11,14 +11,17 @@ import (
 	"runtime/debug"
 	"strconv"
 
+	"github.com/cyphar/filepath-securejoin"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/configs/validate"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	"github.com/opencontainers/runc/libcontainer/mount"
 	"github.com/opencontainers/runc/libcontainer/utils"
+	"github.com/pkg/errors"
 
 	"golang.org/x/sys/unix"
 )
@@ -50,19 +53,45 @@ func InitArgs(args ...string) func(*LinuxFactory) error {
 // SystemdCgroups is an options func to configure a LinuxFactory to return
 // containers that use systemd to create and manage cgroups.
 func SystemdCgroups(l *LinuxFactory) error {
-	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
-		return &systemd.Manager{
-			Cgroups: config,
-			Paths:   paths,
+	systemdCgroupsManager, err := systemd.NewSystemdCgroupsManager()
+	if err != nil {
+		return err
+	}
+	l.NewCgroupsManager = systemdCgroupsManager
+	return nil
+}
+
+func getUnifiedPath(paths map[string]string) string {
+	unifiedPath := ""
+	for k, v := range paths {
+		if unifiedPath == "" {
+			unifiedPath = v
+		} else if v != unifiedPath {
+			panic(errors.Errorf("expected %q path to be unified path %q, got %q", k, unifiedPath, v))
 		}
+	}
+	// can be empty
+	return unifiedPath
+}
+
+func cgroupfs2(l *LinuxFactory, rootless bool) error {
+	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
+		m, err := fs2.NewManager(config, getUnifiedPath(paths), rootless)
+		if err != nil {
+			panic(err)
+		}
+		return m
 	}
 	return nil
 }
 
-// Cgroupfs is an options func to configure a LinuxFactory to return
-// containers that use the native cgroups filesystem implementation to
-// create and manage cgroups.
+// Cgroupfs is an options func to configure a LinuxFactory to return containers
+// that use the native cgroups filesystem implementation to create and manage
+// cgroups.
 func Cgroupfs(l *LinuxFactory) error {
+	if cgroups.IsCgroup2UnifiedMode() {
+		return cgroupfs2(l, false)
+	}
 	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
 		return &fs.Manager{
 			Cgroups: config,
@@ -72,9 +101,29 @@ func Cgroupfs(l *LinuxFactory) error {
 	return nil
 }
 
+// RootlessCgroupfs is an options func to configure a LinuxFactory to return
+// containers that use the native cgroups filesystem implementation to create
+// and manage cgroups. The difference between RootlessCgroupfs and Cgroupfs is
+// that RootlessCgroupfs can transparently handle permission errors that occur
+// during rootless container (including euid=0 in userns) setup (while still allowing cgroup usage if
+// they've been set up properly).
+func RootlessCgroupfs(l *LinuxFactory) error {
+	if cgroups.IsCgroup2UnifiedMode() {
+		return cgroupfs2(l, true)
+	}
+	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
+		return &fs.Manager{
+			Cgroups:  config,
+			Rootless: true,
+			Paths:    paths,
+		}
+	}
+	return nil
+}
+
 // IntelRdtfs is an options func to configure a LinuxFactory to return
 // containers that use the Intel RDT "resource control" filesystem to
-// create and manage Intel Xeon platform shared resources (e.g., L3 cache).
+// create and manage Intel RDT resources (e.g., L3 cache, memory bandwidth).
 func IntelRdtFs(l *LinuxFactory) error {
 	l.NewIntelRdtManager = func(config *configs.Config, id string, path string) intelrdt.Manager {
 		return &intelrdt.IntelRdtManager{
@@ -178,7 +227,10 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 	if err := l.Validator.Validate(config); err != nil {
 		return nil, newGenericError(err, ConfigInvalid)
 	}
-	containerRoot := filepath.Join(l.Root, id)
+	containerRoot, err := securejoin.SecureJoin(l.Root, id)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := os.Stat(containerRoot); err == nil {
 		return nil, newGenericError(fmt.Errorf("container with id exists: %v", id), IdInUse)
 	} else if !os.IsNotExist(err) {
@@ -201,7 +253,7 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 		newgidmapPath: l.NewgidmapPath,
 		cgroupManager: l.NewCgroupsManager(config.Cgroups, nil),
 	}
-	if intelrdt.IsEnabled() {
+	if intelrdt.IsCatEnabled() || intelrdt.IsMbaEnabled() {
 		c.intelRdtManager = l.NewIntelRdtManager(config, id, "")
 	}
 	c.state = &stoppedState{c: c}
@@ -212,7 +264,14 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 	if l.Root == "" {
 		return nil, newGenericError(fmt.Errorf("invalid root"), ConfigInvalid)
 	}
-	containerRoot := filepath.Join(l.Root, id)
+	//when load, we need to check id is valid or not.
+	if err := l.validateID(id); err != nil {
+		return nil, err
+	}
+	containerRoot, err := securejoin.SecureJoin(l.Root, id)
+	if err != nil {
+		return nil, err
+	}
 	state, err := l.loadState(containerRoot, id)
 	if err != nil {
 		return nil, err
@@ -240,7 +299,7 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 	if err := c.refreshState(); err != nil {
 		return nil, err
 	}
-	if intelrdt.IsEnabled() {
+	if intelrdt.IsCatEnabled() || intelrdt.IsMbaEnabled() {
 		c.intelRdtManager = l.NewIntelRdtManager(&state.Config, id, state.IntelRdtPath)
 	}
 	return c, nil
@@ -322,7 +381,11 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 }
 
 func (l *LinuxFactory) loadState(root, id string) (*State, error) {
-	f, err := os.Open(filepath.Join(root, stateFilename))
+	stateFilePath, err := securejoin.SecureJoin(root, stateFilename)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(stateFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, newGenericError(fmt.Errorf("container %q does not exist", id), ContainerNotExists)
@@ -338,7 +401,7 @@ func (l *LinuxFactory) loadState(root, id string) (*State, error) {
 }
 
 func (l *LinuxFactory) validateID(id string) error {
-	if !idRegex.MatchString(id) {
+	if !idRegex.MatchString(id) || string(os.PathSeparator)+id != utils.CleanPath(string(os.PathSeparator)+id) {
 		return newGenericError(fmt.Errorf("invalid id format: %v", id), InvalidIdFormat)
 	}
 

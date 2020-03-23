@@ -3,9 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "idna.go",
+        "idna10.0.0.go",
+        "idna9.0.0.go",
         "punycode.go",
-        "tables.go",
+        "tables10.0.0.go",
+        "tables11.0.0.go",
+        "tables9.0.0.go",
         "trie.go",
         "trieval.go",
     ],
@@ -14,6 +17,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/text/secure/bidirule:go_default_library",
+        "//vendor/golang.org/x/text/unicode/bidi:go_default_library",
         "//vendor/golang.org/x/text/unicode/norm:go_default_library",
     ],
 )

@@ -14,12 +14,12 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/git_repo",
     deps = [
-        "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 

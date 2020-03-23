@@ -26,8 +26,6 @@ import (
 	mangen "github.com/cpuguy83/go-md2man/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/server"
-	ccmapp "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -63,7 +61,7 @@ func main() {
 	switch module {
 	case "kube-apiserver":
 		// generate manpage for kube-apiserver
-		apiserver := apiservapp.NewAPIServerCommand(server.SetupSignalHandler())
+		apiserver := apiservapp.NewAPIServerCommand()
 		genMarkdown(apiserver, "", outDir)
 		for _, c := range apiserver.Commands() {
 			genMarkdown(c, "kube-apiserver", outDir)
@@ -74,13 +72,6 @@ func main() {
 		genMarkdown(controllermanager, "", outDir)
 		for _, c := range controllermanager.Commands() {
 			genMarkdown(c, "kube-controller-manager", outDir)
-		}
-	case "cloud-controller-manager":
-		//generate manpage for cloud-controller-manager
-		controllermanager := ccmapp.NewCloudControllerManagerCommand()
-		genMarkdown(controllermanager, "", outDir)
-		for _, c := range controllermanager.Commands() {
-			genMarkdown(c, "cloud-controller-manager", outDir)
 		}
 	case "kube-proxy":
 		// generate manpage for kube-proxy
@@ -98,7 +89,7 @@ func main() {
 		}
 	case "kubelet":
 		// generate manpage for kubelet
-		kubelet := kubeletapp.NewKubeletCommand(server.SetupSignalHandler())
+		kubelet := kubeletapp.NewKubeletCommand()
 		genMarkdown(kubelet, "", outDir)
 		for _, c := range kubelet.Commands() {
 			genMarkdown(c, "kubelet", outDir)

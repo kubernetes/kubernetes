@@ -8,29 +8,41 @@ import "gonum.org/v1/gonum/blas"
 
 // Dgebd2 reduces an m×n matrix A to upper or lower bidiagonal form by an orthogonal
 // transformation.
-//  Q^T * A * P = B
+//  Qᵀ * A * P = B
 // if m >= n, B is upper diagonal, otherwise B is lower bidiagonal.
 // d is the diagonal, len = min(m,n)
 // e is the off-diagonal len = min(m,n)-1
 //
 // Dgebd2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgebd2(m, n int, a []float64, lda int, d, e, tauQ, tauP, work []float64) {
-	checkMatrix(m, n, a, lda)
-	if len(d) < min(m, n) {
-		panic(badD)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if len(e) < min(m, n)-1 {
-		panic(badE)
+
+	// Quick return if possible.
+	minmn := min(m, n)
+	if minmn == 0 {
+		return
 	}
-	if len(tauQ) < min(m, n) {
-		panic(badTauQ)
+
+	switch {
+	case len(d) < minmn:
+		panic(shortD)
+	case len(e) < minmn-1:
+		panic(shortE)
+	case len(tauQ) < minmn:
+		panic(shortTauQ)
+	case len(tauP) < minmn:
+		panic(shortTauP)
+	case len(work) < max(m, n):
+		panic(shortWork)
 	}
-	if len(tauP) < min(m, n) {
-		panic(badTauP)
-	}
-	if len(work) < max(m, n) {
-		panic(badWork)
-	}
+
 	if m >= n {
 		for i := 0; i < n; i++ {
 			a[i*lda+i], tauQ[i] = impl.Dlarfg(m-i, a[i*lda+i], a[min(i+1, m-1)*lda+i:], lda)

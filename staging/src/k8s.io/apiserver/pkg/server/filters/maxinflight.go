@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -45,9 +45,9 @@ const (
 var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Server Error: %#v", r.RequestURI)
-	glog.Errorf(err.Error())
+	errorMsg := fmt.Sprintf("Internal Server Error: %#v", r.RequestURI)
+	http.Error(w, errorMsg, http.StatusInternalServerError)
+	klog.Errorf(err.Error())
 }
 
 // requestWatermark is used to trak maximal usage of inflight requests.
@@ -160,12 +160,6 @@ func WithMaxInFlightLimit(
 				handler.ServeHTTP(w, r)
 
 			default:
-				// We need to split this data between buckets used for throttling.
-				if isMutatingRequest {
-					metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
-				} else {
-					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
-				}
 				// at this point we're about to return a 429, BUT not all actors should be rate limited.  A system:master is so powerful
 				// that they should always get an answer.  It's a super-admin or a loopback connection.
 				if currUser, ok := apirequest.UserFrom(ctx); ok {
@@ -176,7 +170,13 @@ func WithMaxInFlightLimit(
 						}
 					}
 				}
-				metrics.Record(r, requestInfo, "", http.StatusTooManyRequests, 0, 0)
+				// We need to split this data between buckets used for throttling.
+				if isMutatingRequest {
+					metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
+				} else {
+					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
+				}
+				metrics.RecordRequestTermination(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
 				tooManyRequests(r, w)
 			}
 		}

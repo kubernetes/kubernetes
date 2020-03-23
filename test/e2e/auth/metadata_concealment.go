@@ -17,27 +17,28 @@ limitations under the License.
 package auth
 
 import (
-	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 	imageutil "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = SIGDescribe("Metadata Concealment", func() {
 	f := framework.NewDefaultFramework("metadata-concealment")
 
-	It("should run a check-metadata-concealment job to completion", func() {
-		framework.SkipUnlessProviderIs("gce")
-		By("Creating a job")
-		job := &batch.Job{
+	ginkgo.It("should run a check-metadata-concealment job to completion", func() {
+		e2eskipper.SkipUnlessProviderIs("gce")
+		ginkgo.By("Creating a job")
+		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "check-metadata-concealment",
 			},
-			Spec: batch.JobSpec{
+			Spec: batchv1.JobSpec{
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "check-metadata-concealment",
@@ -54,11 +55,11 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 				},
 			},
 		}
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred(), "failed to create job (%s:%s)", f.Namespace.Name, job.Name)
+		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job (%s:%s)", f.Namespace.Name, job.Name)
 
-		By("Ensuring job reaches completions")
-		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, int32(1))
-		Expect(err).NotTo(HaveOccurred(), "failed to ensure job completion (%s:%s)", f.Namespace.Name, job.Name)
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, int32(1))
+		framework.ExpectNoError(err, "failed to ensure job completion (%s:%s)", f.Namespace.Name, job.Name)
 	})
 })

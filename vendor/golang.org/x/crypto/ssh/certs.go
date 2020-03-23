@@ -17,12 +17,14 @@ import (
 // These constants from [PROTOCOL.certkeys] represent the algorithm names
 // for certificate types supported by this package.
 const (
-	CertAlgoRSAv01      = "ssh-rsa-cert-v01@openssh.com"
-	CertAlgoDSAv01      = "ssh-dss-cert-v01@openssh.com"
-	CertAlgoECDSA256v01 = "ecdsa-sha2-nistp256-cert-v01@openssh.com"
-	CertAlgoECDSA384v01 = "ecdsa-sha2-nistp384-cert-v01@openssh.com"
-	CertAlgoECDSA521v01 = "ecdsa-sha2-nistp521-cert-v01@openssh.com"
-	CertAlgoED25519v01  = "ssh-ed25519-cert-v01@openssh.com"
+	CertAlgoRSAv01        = "ssh-rsa-cert-v01@openssh.com"
+	CertAlgoDSAv01        = "ssh-dss-cert-v01@openssh.com"
+	CertAlgoECDSA256v01   = "ecdsa-sha2-nistp256-cert-v01@openssh.com"
+	CertAlgoECDSA384v01   = "ecdsa-sha2-nistp384-cert-v01@openssh.com"
+	CertAlgoECDSA521v01   = "ecdsa-sha2-nistp521-cert-v01@openssh.com"
+	CertAlgoSKECDSA256v01 = "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+	CertAlgoED25519v01    = "ssh-ed25519-cert-v01@openssh.com"
+	CertAlgoSKED25519v01  = "sk-ssh-ed25519-cert-v01@openssh.com"
 )
 
 // Certificate types distinguish between host and user
@@ -37,6 +39,7 @@ const (
 type Signature struct {
 	Format string
 	Blob   []byte
+	Rest   []byte `ssh:"rest"`
 }
 
 // CertTimeInfinity can be used for OpenSSHCertV01.ValidBefore to indicate that
@@ -222,6 +225,11 @@ type openSSHCertSigner struct {
 	signer Signer
 }
 
+type algorithmOpenSSHCertSigner struct {
+	*openSSHCertSigner
+	algorithmSigner AlgorithmSigner
+}
+
 // NewCertSigner returns a Signer that signs with the given Certificate, whose
 // private key is held by signer. It returns an error if the public key in cert
 // doesn't match the key used by signer.
@@ -230,7 +238,12 @@ func NewCertSigner(cert *Certificate, signer Signer) (Signer, error) {
 		return nil, errors.New("ssh: signer and cert have different public key")
 	}
 
-	return &openSSHCertSigner{cert, signer}, nil
+	if algorithmSigner, ok := signer.(AlgorithmSigner); ok {
+		return &algorithmOpenSSHCertSigner{
+			&openSSHCertSigner{cert, signer}, algorithmSigner}, nil
+	} else {
+		return &openSSHCertSigner{cert, signer}, nil
+	}
 }
 
 func (s *openSSHCertSigner) Sign(rand io.Reader, data []byte) (*Signature, error) {
@@ -239,6 +252,10 @@ func (s *openSSHCertSigner) Sign(rand io.Reader, data []byte) (*Signature, error
 
 func (s *openSSHCertSigner) PublicKey() PublicKey {
 	return s.pub
+}
+
+func (s *algorithmOpenSSHCertSigner) SignWithAlgorithm(rand io.Reader, data []byte, algorithm string) (*Signature, error) {
+	return s.algorithmSigner.SignWithAlgorithm(rand, data, algorithm)
 }
 
 const sourceAddressCriticalOption = "source-address"
@@ -415,12 +432,14 @@ func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 }
 
 var certAlgoNames = map[string]string{
-	KeyAlgoRSA:      CertAlgoRSAv01,
-	KeyAlgoDSA:      CertAlgoDSAv01,
-	KeyAlgoECDSA256: CertAlgoECDSA256v01,
-	KeyAlgoECDSA384: CertAlgoECDSA384v01,
-	KeyAlgoECDSA521: CertAlgoECDSA521v01,
-	KeyAlgoED25519:  CertAlgoED25519v01,
+	KeyAlgoRSA:        CertAlgoRSAv01,
+	KeyAlgoDSA:        CertAlgoDSAv01,
+	KeyAlgoECDSA256:   CertAlgoECDSA256v01,
+	KeyAlgoECDSA384:   CertAlgoECDSA384v01,
+	KeyAlgoECDSA521:   CertAlgoECDSA521v01,
+	KeyAlgoSKECDSA256: CertAlgoSKECDSA256v01,
+	KeyAlgoED25519:    CertAlgoED25519v01,
+	KeyAlgoSKED25519:  CertAlgoSKED25519v01,
 }
 
 // certToPrivAlgo returns the underlying algorithm for a certificate algorithm.
@@ -502,6 +521,12 @@ func parseSignatureBody(in []byte) (out *Signature, rest []byte, ok bool) {
 
 	if out.Blob, in, ok = parseString(in); !ok {
 		return
+	}
+
+	switch out.Format {
+	case KeyAlgoSKECDSA256, CertAlgoSKECDSA256v01, KeyAlgoSKED25519, CertAlgoSKED25519v01:
+		out.Rest = in
+		return out, nil, ok
 	}
 
 	return out, in, ok

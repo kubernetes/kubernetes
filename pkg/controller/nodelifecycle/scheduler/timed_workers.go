@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // WorkArgs keeps arguments that will be passed to the function executed by the worker.
@@ -107,12 +107,12 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs)
 // AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
 func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
-	glog.V(4).Infof("Adding TimedWorkerQueue item %v at %v to be fired at %v", key, createdAt, fireAt)
+	klog.V(4).Infof("Adding TimedWorkerQueue item %v at %v to be fired at %v", key, createdAt, fireAt)
 
 	q.Lock()
 	defer q.Unlock()
 	if _, exists := q.workers[key]; exists {
-		glog.Warningf("Trying to add already existing work for %+v. Skipping.", args)
+		klog.Warningf("Trying to add already existing work for %+v. Skipping.", args)
 		return
 	}
 	worker := CreateWorker(args, createdAt, fireAt, q.getWrappedWorkerFunc(key))
@@ -126,7 +126,7 @@ func (q *TimedWorkerQueue) CancelWork(key string) bool {
 	worker, found := q.workers[key]
 	result := false
 	if found {
-		glog.V(4).Infof("Cancelling TimedWorkerQueue item %v at %v", key, time.Now())
+		klog.V(4).Infof("Cancelling TimedWorkerQueue item %v at %v", key, time.Now())
 		if worker != nil {
 			result = true
 			worker.Cancel()
@@ -137,7 +137,7 @@ func (q *TimedWorkerQueue) CancelWork(key string) bool {
 }
 
 // GetWorkerUnsafe returns a TimedWorker corresponding to the given key.
-// Unsafe method - workers have attached goroutines which can fire afater this function is called.
+// Unsafe method - workers have attached goroutines which can fire after this function is called.
 func (q *TimedWorkerQueue) GetWorkerUnsafe(key string) *TimedWorker {
 	q.Lock()
 	defer q.Unlock()

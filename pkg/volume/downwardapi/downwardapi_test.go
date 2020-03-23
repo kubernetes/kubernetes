@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -47,7 +47,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, emptydir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(t, tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -253,7 +253,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 
 	volumePath := mounter.GetPath()
 
-	err = mounter.SetUp(nil)
+	err = mounter.SetUp(volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -314,7 +314,7 @@ type stepName struct {
 func (step stepName) getName() string { return step.name }
 
 func doVerifyLinesInFile(t *testing.T, volumePath, filename string, expected string) {
-	data, err := ioutil.ReadFile(path.Join(volumePath, filename))
+	data, err := ioutil.ReadFile(filepath.Join(volumePath, filename))
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -350,7 +350,7 @@ type verifyMode struct {
 }
 
 func (step verifyMode) run(test *downwardAPITest) {
-	fileInfo, err := os.Stat(path.Join(test.volumePath, step.name))
+	fileInfo, err := os.Stat(filepath.Join(test.volumePath, step.name))
 	if err != nil {
 		test.t.Errorf(err.Error())
 		return
@@ -374,18 +374,18 @@ func (step reSetUp) run(test *downwardAPITest) {
 		test.pod.ObjectMeta.Labels = step.newLabels
 	}
 
-	currentTarget, err := os.Readlink(path.Join(test.volumePath, downwardAPIDir))
+	currentTarget, err := os.Readlink(filepath.Join(test.volumePath, downwardAPIDir))
 	if err != nil {
 		test.t.Errorf("labels file should be a link... %s\n", err.Error())
 	}
 
 	// now re-run Setup
-	if err = test.mounter.SetUp(nil); err != nil {
+	if err = test.mounter.SetUp(volume.MounterArgs{}); err != nil {
 		test.t.Errorf("Failed to re-setup volume: %v", err)
 	}
 
 	// get the link of the link
-	currentTarget2, err := os.Readlink(path.Join(test.volumePath, downwardAPIDir))
+	currentTarget2, err := os.Readlink(filepath.Join(test.volumePath, downwardAPIDir))
 	if err != nil {
 		test.t.Errorf(".current should be a link... %s\n", err.Error())
 	}

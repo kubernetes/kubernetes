@@ -17,16 +17,16 @@ limitations under the License.
 package resize
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	storagev1listers "k8s.io/client-go/listers/storage/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	pvlister "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 const (
@@ -44,13 +44,12 @@ func Register(plugins *admission.Plugins) {
 
 var _ admission.Interface = &persistentVolumeClaimResize{}
 var _ admission.ValidationInterface = &persistentVolumeClaimResize{}
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&persistentVolumeClaimResize{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&persistentVolumeClaimResize{})
 
 type persistentVolumeClaimResize struct {
 	*admission.Handler
 
-	pvLister pvlister.PersistentVolumeLister
-	scLister storagelisters.StorageClassLister
+	scLister storagev1listers.StorageClassLister
 }
 
 func newPlugin() *persistentVolumeClaimResize {
@@ -59,28 +58,21 @@ func newPlugin() *persistentVolumeClaimResize {
 	}
 }
 
-func (pvcr *persistentVolumeClaimResize) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	pvcInformer := f.Core().InternalVersion().PersistentVolumes()
-	pvcr.pvLister = pvcInformer.Lister()
-	scInformer := f.Storage().InternalVersion().StorageClasses()
+func (pvcr *persistentVolumeClaimResize) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	scInformer := f.Storage().V1().StorageClasses()
 	pvcr.scLister = scInformer.Lister()
-	pvcr.SetReadyFunc(func() bool {
-		return pvcInformer.Informer().HasSynced() && scInformer.Informer().HasSynced()
-	})
+	pvcr.SetReadyFunc(scInformer.Informer().HasSynced)
 }
 
 // ValidateInitialization ensures lister is set.
 func (pvcr *persistentVolumeClaimResize) ValidateInitialization() error {
-	if pvcr.pvLister == nil {
-		return fmt.Errorf("missing persistent volume lister")
-	}
 	if pvcr.scLister == nil {
 		return fmt.Errorf("missing storageclass lister")
 	}
 	return nil
 }
 
-func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error {
+func (pvcr *persistentVolumeClaimResize) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}

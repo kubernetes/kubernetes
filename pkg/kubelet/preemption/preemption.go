@@ -20,23 +20,22 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
 
 const message = "Preempted in order to admit critical pod"
 
-// CriticalPodAdmissionFailureHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
+// CriticalPodAdmissionHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
 // If the ONLY admission failures are due to insufficient resources, then CriticalPodAdmissionHandler evicts pods
 // so that the critical pod can be admitted.  For evictions, the CriticalPodAdmissionHandler evicts a set of pods that
 // frees up the required resource requests.  The set of pods is designed to minimize impact, and is prioritized according to the ordering:
@@ -61,16 +60,16 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []lifecycle.PredicateFailureReason) ([]lifecycle.PredicateFailureReason, error) {
 	if !kubetypes.IsCriticalPod(admitPod) {
-		return false, failureReasons, nil
+		return failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
 	// Instead of rejecting, we free up resources to admit it, if no other reasons for rejection exist.
-	nonResourceReasons := []algorithm.PredicateFailureReason{}
+	nonResourceReasons := []lifecycle.PredicateFailureReason{}
 	resourceReasons := []*admissionRequirement{}
 	for _, reason := range failureReasons {
-		if r, ok := reason.(*predicates.InsufficientResourceError); ok {
+		if r, ok := reason.(*lifecycle.InsufficientResourceError); ok {
 			resourceReasons = append(resourceReasons, &admissionRequirement{
 				resourceName: r.ResourceName,
 				quantity:     r.GetInsufficientAmount(),
@@ -81,11 +80,11 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, f
 	}
 	if len(nonResourceReasons) > 0 {
 		// Return only reasons that are not resource related, since critical pods cannot fail admission for resource reasons.
-		return false, nonResourceReasons, nil
+		return nonResourceReasons, nil
 	}
 	err := c.evictPodsToFreeRequests(admitPod, admissionRequirementList(resourceReasons))
 	// if no error is returned, preemption succeeded and the pod is safe to admit.
-	return err == nil, nil, err
+	return nil, err
 }
 
 // evictPodsToFreeRequests takes a list of insufficient resources, and attempts to free them by evicting pods
@@ -96,7 +95,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
-	glog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
+	klog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
 	for _, pod := range podsToPreempt {
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
@@ -108,9 +107,16 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := c.killPodFunc(pod, status, nil)
 		if err != nil {
-			return fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			klog.Warningf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.
+			continue
 		}
-		glog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
+		if len(insufficientResources) > 0 {
+			metrics.Preemptions.WithLabelValues(insufficientResources[0].resourceName.String()).Inc()
+		} else {
+			metrics.Preemptions.WithLabelValues("").Inc()
+		}
+		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
 	}
 	return nil
 }
@@ -125,21 +131,21 @@ func getPodsToPreempt(pod *v1.Pod, pods []*v1.Pod, requirements admissionRequire
 		return nil, fmt.Errorf("no set of running pods found to reclaim resources: %v", unableToMeetRequirements.toString())
 	}
 	// find the guaranteed pods we would need to evict if we already evicted ALL burstable and besteffort pods.
-	guarateedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(append(bestEffortPods, burstablePods...)...))
+	guaranteedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(append(bestEffortPods, burstablePods...)...))
 	if err != nil {
 		return nil, err
 	}
 	// Find the burstable pods we would need to evict if we already evicted ALL besteffort pods, and the required guaranteed pods.
-	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(append(bestEffortPods, guarateedToEvict...)...))
+	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(append(bestEffortPods, guaranteedToEvict...)...))
 	if err != nil {
 		return nil, err
 	}
 	// Find the besteffort pods we would need to evict if we already evicted the required guaranteed and burstable pods.
-	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(append(burstableToEvict, guarateedToEvict...)...))
+	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(append(burstableToEvict, guaranteedToEvict...)...))
 	if err != nil {
 		return nil, err
 	}
-	return append(append(bestEffortToEvict, burstableToEvict...), guarateedToEvict...), nil
+	return append(append(bestEffortToEvict, burstableToEvict...), guaranteedToEvict...), nil
 }
 
 // getPodsToPreemptByDistance finds the pods that have pod requests >= admission requirements.
@@ -190,10 +196,9 @@ func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 	dist := float64(0)
 	for _, req := range a {
 		remainingRequest := float64(req.quantity - resource.GetResourceRequest(pod, req.resourceName))
-		if remainingRequest < 0 {
-			remainingRequest = 0
+		if remainingRequest > 0 {
+			dist += math.Pow(remainingRequest/float64(req.quantity), 2)
 		}
-		dist += math.Pow(remainingRequest/float64(req.quantity), 2)
 	}
 	return dist
 }
@@ -206,6 +211,9 @@ func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirement
 		newQuantity := req.quantity
 		for _, pod := range pods {
 			newQuantity -= resource.GetResourceRequest(pod, req.resourceName)
+			if newQuantity <= 0 {
+				break
+			}
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{

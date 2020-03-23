@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package blas64 provides a simple interface to the float64 BLAS API.
-package blas64
+package blas64 // import "gonum.org/v1/gonum/blas/blas64"

@@ -16,17 +16,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from file or a directory of files.
 package config
 
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func (s *sourceFile) startWatch() {
-	glog.Errorf("Watching source file is unsupported in this build")
+	klog.Errorf("Watching source file is unsupported in this build")
 }
 
 func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {

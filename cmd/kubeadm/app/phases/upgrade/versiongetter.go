@@ -17,15 +17,16 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
-	"io"
+	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // VersionGetter defines an interface for fetching different versions.
@@ -44,14 +45,12 @@ type VersionGetter interface {
 // KubeVersionGetter handles the version-fetching mechanism from external sources
 type KubeVersionGetter struct {
 	client clientset.Interface
-	w      io.Writer
 }
 
 // NewKubeVersionGetter returns a new instance of KubeVersionGetter
-func NewKubeVersionGetter(client clientset.Interface, writer io.Writer) VersionGetter {
+func NewKubeVersionGetter(client clientset.Interface) VersionGetter {
 	return &KubeVersionGetter{
 		client: client,
-		w:      writer,
 	}
 }
 
@@ -59,13 +58,12 @@ func NewKubeVersionGetter(client clientset.Interface, writer io.Writer) VersionG
 func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, error) {
 	clusterVersionInfo, err := g.client.Discovery().ServerVersion()
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't fetch cluster version from the API Server: %v", err)
+		return "", nil, errors.Wrap(err, "Couldn't fetch cluster version from the API Server")
 	}
-	fmt.Fprintf(g.w, "[upgrade/versions] Cluster version: %s\n", clusterVersionInfo.String())
 
 	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't parse cluster version: %v", err)
+		return "", nil, errors.Wrap(err, "Couldn't parse cluster version")
 	}
 	return clusterVersionInfo.String(), clusterVersion, nil
 }
@@ -73,11 +71,10 @@ func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 // KubeadmVersion gets kubeadm version
 func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, error) {
 	kubeadmVersionInfo := version.Get()
-	fmt.Fprintf(g.w, "[upgrade/versions] kubeadm version: %s\n", kubeadmVersionInfo.String())
 
 	kubeadmVersion, err := versionutil.ParseSemantic(kubeadmVersionInfo.String())
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't parse kubeadm version: %v", err)
+		return "", nil, errors.Wrap(err, "Couldn't parse kubeadm version")
 	}
 	return kubeadmVersionInfo.String(), kubeadmVersion, nil
 }
@@ -86,25 +83,21 @@ func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, erro
 func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
 	versionStr, err := kubeadmutil.KubernetesReleaseVersion(ciVersionLabel)
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't fetch latest %s from the internet: %v", description, err)
-	}
-
-	if description != "" {
-		fmt.Fprintf(g.w, "[upgrade/versions] Latest %s: %s\n", description, versionStr)
+		return "", nil, errors.Wrapf(err, "Couldn't fetch latest %s from the internet", description)
 	}
 
 	ver, err := versionutil.ParseSemantic(versionStr)
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't parse latest %s: %v", description, err)
+		return "", nil, errors.Wrapf(err, "Couldn't parse latest %s", description)
 	}
 	return versionStr, ver, nil
 }
 
 // KubeletVersions gets the versions of the kubelets in the cluster
 func (g *KubeVersionGetter) KubeletVersions() (map[string]uint16, error) {
-	nodes, err := g.client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := g.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("couldn't list all nodes in cluster")
+		return nil, errors.New("couldn't list all nodes in cluster")
 	}
 	return computeKubeletVersions(nodes.Items), nil
 }
@@ -141,11 +134,15 @@ func NewOfflineVersionGetter(versionGetter VersionGetter, version string) Versio
 // VersionFromCILabel will return the version that was passed into the struct
 func (o *OfflineVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
 	if o.version == "" {
-		return o.VersionGetter.VersionFromCILabel(ciVersionLabel, description)
+		versionStr, version, err := o.VersionGetter.VersionFromCILabel(ciVersionLabel, description)
+		if err == nil {
+			fmt.Printf("[upgrade/versions] Latest %s: %s\n", description, versionStr)
+		}
+		return versionStr, version, err
 	}
 	ver, err := versionutil.ParseSemantic(o.version)
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't parse version %s: %v", description, err)
+		return "", nil, errors.Wrapf(err, "Couldn't parse version %s", description)
 	}
 	return o.version, ver, nil
 }

@@ -7,10 +7,10 @@ go_library(
     importpath = "google.golang.org/api/logging/v2beta1",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",
         "//vendor/google.golang.org/api/gensupport:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
+        "//vendor/google.golang.org/api/option:go_default_library",
+        "//vendor/google.golang.org/api/transport/http:go_default_library",
     ],
 )
 

@@ -37,7 +37,6 @@ type Parser struct {
 	Name  string
 	Root  *ListNode
 	input string
-	cur   *ListNode
 	pos   int
 	start int
 	width int
@@ -46,7 +45,7 @@ type Parser struct {
 var (
 	ErrSyntax        = errors.New("invalid syntax")
 	dictKeyRex       = regexp.MustCompile(`^'([^']*)'$`)
-	sliceOperatorRex = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
+	sliceOperatorRex = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:-?[\d]*)?$`)
 )
 
 // Parse parsed the given text and return a node Parser.
@@ -186,8 +185,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 func (p *Parser) parseRightDelim(cur *ListNode) error {
 	p.pos += len(rightDelim)
 	p.consumeText()
-	cur = p.Root
-	return p.parseText(cur)
+	return p.parseText(p.Root)
 }
 
 // parseIdentifier scans build-in keywords, like "range" "end"
@@ -231,7 +229,7 @@ func (p *Parser) parseRecursive(cur *ListNode) error {
 func (p *Parser) parseNumber(cur *ListNode) error {
 	r := p.peek()
 	if r == '+' || r == '-' {
-		r = p.next()
+		p.next()
 	}
 	for {
 		r = p.next()
@@ -325,6 +323,7 @@ Loop:
 			if i == 1 {
 				params[i].Known = true
 				params[i].Value = params[0].Value + 1
+				params[i].Derived = true
 			} else {
 				params[i].Known = false
 				params[i].Value = 0

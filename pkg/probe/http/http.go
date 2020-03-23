@@ -18,29 +18,44 @@ package http
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/version"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	utilio "k8s.io/utils/io"
+)
+
+const (
+	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
 // New creates Prober that will skip TLS verification while probing.
-func New() Prober {
+// followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
+//   If disabled, redirects to other hosts will trigger a warning result.
+func New(followNonLocalRedirects bool) Prober {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
-	return NewWithTLSConfig(tlsConfig)
+	return NewWithTLSConfig(tlsConfig, followNonLocalRedirects)
 }
 
 // NewWithTLSConfig takes tls config as parameter.
-func NewWithTLSConfig(config *tls.Config) Prober {
-	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: config, DisableKeepAlives: true})
-	return httpProber{transport}
+// followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
+//   If disabled, redirects to other hosts will trigger a warning result.
+func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
+	// We do not want the probe use node's local proxy set.
+	transport := utilnet.SetTransportDefaults(
+		&http.Transport{
+			TLSClientConfig:   config,
+			DisableKeepAlives: true,
+			Proxy:             http.ProxyURL(nil),
+		})
+	return httpProber{transport, followNonLocalRedirects}
 }
 
 // Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
@@ -49,12 +64,18 @@ type Prober interface {
 }
 
 type httpProber struct {
-	transport *http.Transport
+	transport               *http.Transport
+	followNonLocalRedirects bool
 }
 
 // Probe returns a ProbeRunner capable of running an HTTP check.
 func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
-	return DoHTTPProbe(url, headers, &http.Client{Timeout: timeout, Transport: pr.transport})
+	client := &http.Client{
+		Timeout:       timeout,
+		Transport:     pr.transport,
+		CheckRedirect: redirectChecker(pr.followNonLocalRedirects),
+	}
+	return DoHTTPProbe(url, headers, client)
 }
 
 // GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
@@ -90,15 +111,40 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 		return probe.Failure, err.Error(), nil
 	}
 	defer res.Body.Close()
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
 	if err != nil {
-		return probe.Failure, "", err
+		if err == utilio.ErrLimitReached {
+			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
+		} else {
+			return probe.Failure, "", err
+		}
 	}
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		glog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
+			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
+			return probe.Warning, body, nil
+		}
+		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
 		return probe.Success, body, nil
 	}
-	glog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
+	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
 	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
+}
+
+func redirectChecker(followNonLocalRedirects bool) func(*http.Request, []*http.Request) error {
+	if followNonLocalRedirects {
+		return nil // Use the default http client checker.
+	}
+
+	return func(req *http.Request, via []*http.Request) error {
+		if req.URL.Hostname() != via[0].URL.Hostname() {
+			return http.ErrUseLastResponse
+		}
+		// Default behavior: stop after 10 redirects.
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
 }

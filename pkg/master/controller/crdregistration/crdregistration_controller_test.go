@@ -20,18 +20,18 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 func TestHandleVersionUpdate(t *testing.T) {
 	tests := []struct {
 		name         string
-		startingCRDs []*apiextensions.CustomResourceDefinition
+		startingCRDs []*apiextensionsv1.CustomResourceDefinition
 		version      schema.GroupVersion
 
 		expectedAdded   []*apiregistration.APIService
@@ -39,13 +39,13 @@ func TestHandleVersionUpdate(t *testing.T) {
 	}{
 		{
 			name: "simple add crd",
-			startingCRDs: []*apiextensions.CustomResourceDefinition{
+			startingCRDs: []*apiextensionsv1.CustomResourceDefinition{
 				{
-					Spec: apiextensions.CustomResourceDefinitionSpec{
+					Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 						Group: "group.com",
 						// Version field is deprecated and crd registration won't rely on it at all.
 						// defaulting route will fill up Versions field if user only provided version field.
-						Versions: []apiextensions.CustomResourceDefinitionVersion{
+						Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 							{
 								Name:    "v1",
 								Served:  true,
@@ -71,11 +71,11 @@ func TestHandleVersionUpdate(t *testing.T) {
 		},
 		{
 			name: "simple remove crd",
-			startingCRDs: []*apiextensions.CustomResourceDefinition{
+			startingCRDs: []*apiextensionsv1.CustomResourceDefinition{
 				{
-					Spec: apiextensions.CustomResourceDefinitionSpec{
+					Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 						Group: "group.com",
-						Versions: []apiextensions.CustomResourceDefinitionVersion{
+						Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 							{
 								Name:    "v1",
 								Served:  true,

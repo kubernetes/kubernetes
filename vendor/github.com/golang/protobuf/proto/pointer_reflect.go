@@ -79,10 +79,13 @@ func toPointer(i *Message) pointer {
 
 // toAddrPointer converts an interface to a pointer that points to
 // the interface data.
-func toAddrPointer(i *interface{}, isptr bool) pointer {
+func toAddrPointer(i *interface{}, isptr, deref bool) pointer {
 	v := reflect.ValueOf(*i)
 	u := reflect.New(v.Type())
 	u.Elem().Set(v)
+	if deref {
+		u = u.Elem()
+	}
 	return pointer{v: u}
 }
 

@@ -9,7 +9,6 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/spf13/cast",
     importpath = "github.com/spf13/cast",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/spf13/jwalterweatherman:go_default_library"],
 )
 
 filegroup(

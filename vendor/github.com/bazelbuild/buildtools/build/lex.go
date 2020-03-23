@@ -20,30 +20,163 @@ package build
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
 
-// Parse parses the input data and returns the corresponding parse tree.
+// FileType represents a type of a file (default (for .bzl files), BUILD, or WORKSPACE).
+// Certain formatting or refactoring rules can be applied to several file types, so they support
+// bitwise operations: `type1 | type2` can represent a scope (e.g. BUILD and WORKSPACE files) and
+// `scope & fileType` can be used to check whether a file type belongs to a scope.
+type FileType int
+
+const (
+	// TypeDefault represents general Starlark files
+	TypeDefault FileType = 1 << iota
+	// TypeBuild represents BUILD files
+	TypeBuild
+	// TypeWorkspace represents WORKSPACE files
+	TypeWorkspace
+	// TypeBzl represents .bzl files
+	TypeBzl
+)
+
+func (t FileType) String() string {
+	switch t {
+	case TypeDefault:
+		return "default"
+	case TypeBuild:
+		return "BUILD"
+	case TypeWorkspace:
+		return "WORKSPACE"
+	case TypeBzl:
+		return ".bzl"
+	}
+	return "unknown"
+}
+
+// ParseBuild parses a file, marks it as a BUILD file and returns the corresponding parse tree.
 //
 // The filename is used only for generating error messages.
-func Parse(filename string, data []byte) (*File, error) {
+func ParseBuild(filename string, data []byte) (*File, error) {
 	in := newInput(filename, data)
-	return in.parse()
+	f, err := in.parse()
+	if f != nil {
+		f.Type = TypeBuild
+	}
+	return f, err
+}
+
+// ParseWorkspace parses a file, marks it as a WORKSPACE file and returns the corresponding parse tree.
+//
+// The filename is used only for generating error messages.
+func ParseWorkspace(filename string, data []byte) (*File, error) {
+	in := newInput(filename, data)
+	f, err := in.parse()
+	if f != nil {
+		f.Type = TypeWorkspace
+	}
+	return f, err
+}
+
+// ParseBzl parses a file, marks it as a .bzl file and returns the corresponding parse tree.
+//
+// The filename is used only for generating error messages.
+func ParseBzl(filename string, data []byte) (*File, error) {
+	in := newInput(filename, data)
+	f, err := in.parse()
+	if f != nil {
+		f.Type = TypeBzl
+	}
+	return f, err
+}
+
+// ParseDefault parses a file, marks it as a generic Starlark file and returns the corresponding parse tree.
+//
+// The filename is used only for generating error messages.
+func ParseDefault(filename string, data []byte) (*File, error) {
+	in := newInput(filename, data)
+	f, err := in.parse()
+	if f != nil {
+		f.Type = TypeDefault
+	}
+	return f, err
+}
+
+func getFileType(filename string) FileType {
+	if filename == "" { // stdin
+		return TypeDefault
+	}
+	basename := strings.ToLower(filepath.Base(filename))
+	if strings.HasSuffix(basename, ".oss") {
+		basename = basename[:len(basename)-4]
+	}
+	ext := filepath.Ext(basename)
+	switch ext {
+	case ".bzl":
+		return TypeBzl
+	case ".sky":
+		return TypeDefault
+	}
+	base := basename[:len(basename)-len(ext)]
+	switch {
+	case ext == ".build" || base == "build" || strings.HasPrefix(base, "build."):
+		return TypeBuild
+	case ext == ".workspace" || base == "workspace" || strings.HasPrefix(base, "workspace."):
+		return TypeWorkspace
+	}
+	return TypeDefault
+}
+
+// Parse parses the input data and returns the corresponding parse tree.
+//
+// Uses the filename to detect the formatting type (build, workspace, or default) and calls
+// ParseBuild, ParseWorkspace, or ParseDefault correspondingly.
+func Parse(filename string, data []byte) (*File, error) {
+	switch getFileType(filename) {
+	case TypeBuild:
+		return ParseBuild(filename, data)
+	case TypeWorkspace:
+		return ParseWorkspace(filename, data)
+	case TypeBzl:
+		return ParseBzl(filename, data)
+	}
+	return ParseDefault(filename, data)
+}
+
+// ParseError contains information about the error encountered during parsing.
+type ParseError struct {
+	Message  string
+	Filename string
+	Pos      Position
+}
+
+// Error returns a string representation of the parse error.
+func (e ParseError) Error() string {
+	filename := e.Filename
+	if filename == "" {
+		filename = "<stdin>"
+	}
+	return fmt.Sprintf("%s:%d:%d: %v", filename, e.Pos.Line, e.Pos.LineRune, e.Message)
 }
 
 // An input represents a single input file being parsed.
 type input struct {
 	// Lexing state.
-	filename  string    // name of input file, for errors
-	complete  []byte    // entire input
-	remaining []byte    // remaining input
-	token     []byte    // token being scanned
-	lastToken string    // most recently returned token, for error messages
-	pos       Position  // current input position
-	comments  []Comment // accumulated comments
-	endRule   int       // position of end of current rule
-	depth     int       // nesting of [ ] { } ( )
+	filename       string    // name of input file, for errors
+	complete       []byte    // entire input
+	remaining      []byte    // remaining input
+	token          []byte    // token being scanned
+	lastToken      string    // most recently returned token, for error messages
+	pos            Position  // current input position
+	lineComments   []Comment // accumulated line comments
+	suffixComments []Comment // accumulated suffix comments
+	depth          int       // nesting of [ ] { } ( )
+	cleanLine      bool      // true if the current line only contains whitespace before the current position
+	indent         int       // current line indentation in spaces
+	indents        []int     // stack of indentation levels in spaces
 
 	// Parser state.
 	file       *File // returned top-level syntax tree
@@ -55,12 +188,23 @@ type input struct {
 }
 
 func newInput(filename string, data []byte) *input {
+	// The syntax requires that each simple statement ends with '\n', however it's optional at EOF.
+	// If `data` doesn't end with '\n' we add it here to keep parser simple.
+	// It shouldn't affect neither the parsed tree nor its formatting.
+	data = append(data, '\n')
+
 	return &input{
 		filename:  filename,
 		complete:  data,
 		remaining: data,
 		pos:       Position{Line: 1, LineRune: 1, Byte: 0},
+		cleanLine: true,
+		indents:   []int{0},
 	}
+}
+
+func (in *input) currentIndent() int {
+	return in.indents[len(in.indents)-1]
 }
 
 // parse parses the input file.
@@ -74,7 +218,7 @@ func (in *input) parse() (f *File, err error) {
 			if e == in.parseError {
 				err = in.parseError
 			} else {
-				err = fmt.Errorf("%s:%d:%d: internal error: %v", in.filename, in.pos.Line, in.pos.LineRune, e)
+				err = ParseError{Message: fmt.Sprintf("internal error: %v", e), Filename: in.filename, Pos: in.pos}
 			}
 		}
 	}()
@@ -99,7 +243,7 @@ func (in *input) Error(s string) {
 	if s == "syntax error" && in.lastToken != "" {
 		s += " near " + in.lastToken
 	}
-	in.parseError = fmt.Errorf("%s:%d:%d: %v", in.filename, in.pos.Line, in.pos.LineRune, s)
+	in.parseError = ParseError{Message: s, Filename: in.filename, Pos: in.pos}
 	panic(in.parseError)
 }
 
@@ -169,45 +313,24 @@ func (in *input) Lex(val *yySymType) int {
 	// Skip past spaces, stopping at non-space or EOF.
 	countNL := 0 // number of newlines we've skipped past
 	for !in.eof() {
-		// The parser does not track indentation, because for the most part
-		// BUILD expressions don't care about how they are indented.
-		// However, we do need to be able to distinguish
-		//
-		//	x = y[0]
-		//
-		// from the occasional
-		//
-		//	x = y
-		//	[0]
-		//
-		// To handle this one case, when we reach the beginning of a
-		// top-level BUILD expression, we scan forward to see where
-		// it should end and record the number of input bytes remaining
-		// at that endpoint. When we reach that point in the input, we
-		// insert an implicit semicolon to force the two expressions
-		// to stay separate.
-		//
-		if in.endRule != 0 && len(in.remaining) == in.endRule {
-			in.endRule = 0
-			in.lastToken = "implicit ;"
-			val.tok = ";"
-			return ';'
-		}
-
 		// Skip over spaces. Count newlines so we can give the parser
 		// information about where top-level blank lines are,
 		// for top-level comment assignment.
 		c := in.peekRune()
 		if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
-			if c == '\n' && in.endRule == 0 {
-				// Not in a rule. Tell parser about top-level blank line.
-				in.startToken(val)
-				in.readRune()
-				in.endToken(val)
-				return '\n'
-			}
 			if c == '\n' {
+				in.indent = 0
+				in.cleanLine = true
+				if in.depth == 0 {
+					// Not in a statememt. Tell parser about top-level blank line.
+					in.startToken(val)
+					in.readRune()
+					in.endToken(val)
+					return '\n'
+				}
 				countNL++
+			} else if c == ' ' && in.cleanLine {
+				in.indent++
 			}
 			in.readRune()
 			continue
@@ -215,26 +338,38 @@ func (in *input) Lex(val *yySymType) int {
 
 		// Comment runs to end of line.
 		if c == '#' {
+			// If a line contains just a comment its indentation level doesn't matter.
+			// Reset it to zero.
+			in.indent = 0
+			isLineComment := in.cleanLine
+			in.cleanLine = true
+
 			// Is this comment the only thing on its line?
 			// Find the last \n before this # and see if it's all
 			// spaces from there to here.
 			// If it's a suffix comment but the last non-space symbol before
-			// it is one of (, [, or {, treat it as a line comment that should be
+			// it is one of (, [, or {, or it's a suffix comment to "):"
+			// (e.g. trailing closing bracket or a function definition),
+			// treat it as a line comment that should be
 			// put inside the corresponding block.
 			i := bytes.LastIndex(in.complete[:in.pos.Byte], []byte("\n"))
 			prefix := bytes.TrimSpace(in.complete[i+1 : in.pos.Byte])
+			prefix = bytes.Replace(prefix, []byte{' '}, []byte{}, -1)
 			isSuffix := true
 			if len(prefix) == 0 ||
+				(len(prefix) == 2 && prefix[0] == ')' && prefix[1] == ':') ||
 				prefix[len(prefix)-1] == '[' ||
 				prefix[len(prefix)-1] == '(' ||
 				prefix[len(prefix)-1] == '{' {
 				isSuffix = false
 			}
 
-			// Consume comment.
+			// Consume comment without the \n it ends with.
 			in.startToken(val)
-			for len(in.remaining) > 0 && in.readRune() != '\n' {
+			for len(in.remaining) > 0 && in.peekRune() != '\n' {
+				in.readRune()
 			}
+
 			in.endToken(val)
 
 			val.tok = strings.TrimRight(val.tok, "\n")
@@ -243,28 +378,68 @@ func (in *input) Lex(val *yySymType) int {
 			// If we are at top level (not in a rule), hand the comment to
 			// the parser as a _COMMENT token. The grammar is written
 			// to handle top-level comments itself.
-			if in.endRule == 0 {
-				// Not in a rule. Tell parser about top-level comment.
+			if in.depth == 0 && isLineComment {
+				// Not in a statement. Tell parser about top-level comment.
 				return _COMMENT
 			}
 
 			// Otherwise, save comment for later attachment to syntax tree.
 			if countNL > 1 {
-				in.comments = append(in.comments, Comment{val.pos, "", false})
+				in.lineComments = append(in.lineComments, Comment{val.pos, ""})
 			}
-			in.comments = append(in.comments, Comment{val.pos, val.tok, isSuffix})
-			countNL = 1
+			if isSuffix {
+				in.suffixComments = append(in.suffixComments, Comment{val.pos, val.tok})
+			} else {
+				in.lineComments = append(in.lineComments, Comment{val.pos, val.tok})
+			}
+			countNL = 0
 			continue
 		}
 
 		if c == '\\' && len(in.remaining) >= 2 && in.remaining[1] == '\n' {
-			// We can ignore a trailing \ at end of line.
+			// We can ignore a trailing \ at end of line together with the \n.
+			in.readRune()
 			in.readRune()
 			continue
 		}
 
 		// Found non-space non-comment.
 		break
+	}
+
+	// Check for changes in indentation
+	// Skip if we're inside a statement, or if there were non-space
+	// characters before in the current line.
+	if in.depth == 0 && in.cleanLine {
+		if in.indent > in.currentIndent() {
+			// A new indentation block starts
+			in.indents = append(in.indents, in.indent)
+			in.lastToken = "indent"
+			in.cleanLine = false
+			return _INDENT
+		} else if in.indent < in.currentIndent() {
+			// An indentation block ends
+			in.indents = in.indents[:len(in.indents)-1]
+
+			// It's a syntax error if the current line indentation level in now greater than
+			// currentIndent(), should be either equal (a parent block continues) or still less
+			// (need to unindent more).
+			if in.indent > in.currentIndent() {
+				in.pos = val.pos
+				in.Error("unexpected indentation")
+			}
+			in.lastToken = "unindent"
+			return _UNINDENT
+		}
+	}
+
+	in.cleanLine = false
+
+	// If the file ends with an indented block, return the corresponding amounts of unindents.
+	if in.eof() && in.currentIndent() > 0 {
+		in.indents = in.indents[:len(in.indents)-1]
+		in.lastToken = "unindent"
+		return _UNINDENT
 	}
 
 	// Found the beginning of the next token.
@@ -275,18 +450,6 @@ func (in *input) Lex(val *yySymType) int {
 	if in.eof() {
 		in.lastToken = "EOF"
 		return _EOF
-	}
-
-	// If endRule is 0, we need to recompute where the end
-	// of the next rule (Python expression) is, so that we can
-	// generate a virtual end-of-rule semicolon (see above).
-	if in.endRule == 0 {
-		in.endRule = len(in.skipPython(in.remaining))
-		if in.endRule == 0 {
-			// skipPython got confused.
-			// No more virtual semicolons.
-			in.endRule = -1
-		}
 	}
 
 	// Punctuation tokens.
@@ -301,12 +464,41 @@ func (in *input) Lex(val *yySymType) int {
 		in.readRune()
 		return c
 
-	case '.', '-', '%', ':', ';', ',', '/', '*': // single-char tokens
+	case '.', ':', ';', ',': // single-char tokens
 		in.readRune()
 		return c
 
-	case '<', '>', '=', '!', '+': // possibly followed by =
+	case '<', '>', '=', '!', '+', '-', '*', '/', '%', '|', '&', '~', '^': // possibly followed by =
 		in.readRune()
+
+		if c == '~' {
+			// unary bitwise not, shouldn't be followed by anything
+			return c
+		}
+
+		if c == '*' && in.peekRune() == '*' {
+			// double asterisk
+			in.readRune()
+			return _STAR_STAR
+		}
+
+		if c == in.peekRune() {
+			switch c {
+			case '/':
+				// integer division
+				in.readRune()
+				c = _INT_DIV
+			case '<':
+				// left shift
+				in.readRune()
+				c = _BIT_LSH
+			case '>':
+				// right shift
+				in.readRune()
+				c = _BIT_RSH
+			}
+		}
+
 		if in.peekRune() == '=' {
 			in.readRune()
 			switch c {
@@ -318,8 +510,8 @@ func (in *input) Lex(val *yySymType) int {
 				return _EQ
 			case '!':
 				return _NE
-			case '+':
-				return _ADDEQ
+			default:
+				return _AUGM
 			}
 		}
 		return c
@@ -381,7 +573,7 @@ func (in *input) Lex(val *yySymType) int {
 			}
 		}
 		in.endToken(val)
-		s, triple, err := unquote(val.tok)
+		s, triple, err := Unquote(val.tok)
 		if err != nil {
 			in.Error(fmt.Sprint(err))
 		}
@@ -393,17 +585,6 @@ func (in *input) Lex(val *yySymType) int {
 	// Checked all punctuation. Must be identifier token.
 	if c := in.peekRune(); !isIdent(c) {
 		in.Error(fmt.Sprintf("unexpected input character %#q", c))
-	}
-
-	// Look for raw Python block (class, def, if, etc at beginning of line) and pass through.
-	if in.depth == 0 && in.pos.LineRune == 1 && hasPythonPrefix(in.remaining) {
-		// Find end of Python block and advance input beyond it.
-		// Have to loop calling readRune in order to maintain line number info.
-		rest := in.skipPython(in.remaining)
-		for len(in.remaining) > len(rest) {
-			in.readRune()
-		}
-		return _PYTHON
 	}
 
 	// Scan over alphanumeric identifier.
@@ -421,7 +602,17 @@ func (in *input) Lex(val *yySymType) int {
 	if k := keywordToken[val.tok]; k != 0 {
 		return k
 	}
-
+	switch val.tok {
+	case "pass":
+		return _PASS
+	case "break":
+		return _BREAK
+	case "continue":
+		return _CONTINUE
+	}
+	if len(val.tok) > 0 && val.tok[0] >= '0' && val.tok[0] <= '9' {
+		return _NUMBER
+	}
 	return _IDENT
 }
 
@@ -442,157 +633,15 @@ var keywordToken = map[string]int{
 	"for":    _FOR,
 	"if":     _IF,
 	"else":   _ELSE,
+	"elif":   _ELIF,
 	"in":     _IN,
 	"is":     _IS,
 	"lambda": _LAMBDA,
+	"load":   _LOAD,
 	"not":    _NOT,
 	"or":     _OR,
-}
-
-// Python scanning.
-// About 1% of BUILD files embed arbitrary Python into the file.
-// We do not attempt to parse it. Instead, we lex just enough to scan
-// beyond it, treating the Python block as an unintepreted blob.
-
-// hasPythonPrefix reports whether p begins with a keyword that would
-// introduce an uninterpreted Python block.
-func hasPythonPrefix(p []byte) bool {
-	for _, pre := range prefixes {
-		if hasPrefixSpace(p, pre) {
-			return true
-		}
-	}
-	return false
-}
-
-// These keywords introduce uninterpreted Python blocks.
-var prefixes = []string{
-	"assert",
-	"class",
-	"def",
-	"del",
-	"for",
-	"if",
-	"try",
-}
-
-// hasPrefixSpace reports whether p begins with pre followed by a space or colon.
-func hasPrefixSpace(p []byte, pre string) bool {
-	if len(p) <= len(pre) || p[len(pre)] != ' ' && p[len(pre)] != '\t' && p[len(pre)] != ':' {
-		return false
-	}
-	for i := range pre {
-		if p[i] != pre[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func isBlankOrComment(b []byte) bool {
-	for _, c := range b {
-		if c == '#' || c == '\n' {
-			return true
-		}
-		if c != ' ' && c != '\t' && c != '\r' {
-			return false
-		}
-	}
-	return true
-}
-
-// hasPythonContinuation reports whether p begins with a keyword that
-// continues an uninterpreted Python block.
-func hasPythonContinuation(p []byte) bool {
-	for _, pre := range continuations {
-		if hasPrefixSpace(p, pre) {
-			return true
-		}
-	}
-	return false
-}
-
-// These keywords continue uninterpreted Python blocks.
-var continuations = []string{
-	"except",
-	"else",
-}
-
-// skipPython returns the data remaining after the uninterpreted
-// Python block beginning at p. It does not advance the input position.
-// (The only reason for the input receiver is to be able to call in.Error.)
-func (in *input) skipPython(p []byte) []byte {
-	quote := byte(0)     // if non-zero, the kind of quote we're in
-	tripleQuote := false // if true, the quote is a triple quote
-	depth := 0           // nesting depth for ( ) [ ] { }
-	var rest []byte      // data after the Python block
-
-	// Scan over input one byte at a time until we find
-	// an unindented, non-blank, non-comment line
-	// outside quoted strings and brackets.
-	for i := 0; i < len(p); i++ {
-		c := p[i]
-		if quote != 0 && c == quote && !tripleQuote {
-			quote = 0
-			continue
-		}
-		if quote != 0 && c == quote && tripleQuote && i+2 < len(p) && p[i+1] == quote && p[i+2] == quote {
-			i += 2
-			quote = 0
-			tripleQuote = false
-			continue
-		}
-		if quote != 0 {
-			if c == '\\' {
-				i++ // skip escaped char
-			}
-			continue
-		}
-		if c == '\'' || c == '"' {
-			if i+2 < len(p) && p[i+1] == c && p[i+2] == c {
-				quote = c
-				tripleQuote = true
-				i += 2
-				continue
-			}
-			quote = c
-			continue
-		}
-
-		if depth == 0 && i > 0 && p[i-1] == '\n' && (i < 2 || p[i-2] != '\\') {
-			// Possible stopping point. Save the earliest one we find.
-			if rest == nil {
-				rest = p[i:]
-			}
-
-			if !isBlankOrComment(p[i:]) {
-				if !hasPythonContinuation(p[i:]) && c != ' ' && c != '\t' {
-					// Yes, stop here.
-					break
-				}
-				// Not a stopping point after all.
-				rest = nil
-			}
-		}
-
-		switch c {
-		case '#':
-			// Skip comment.
-			for i < len(p) && p[i] != '\n' {
-				i++
-			}
-
-		case '(', '[', '{':
-			depth++
-
-		case ')', ']', '}':
-			depth--
-		}
-	}
-	if quote != 0 {
-		in.Error("EOF scanning Python quoted string")
-	}
-	return rest
+	"def":    _DEF,
+	"return": _RETURN,
 }
 
 // Comment assignment.
@@ -628,11 +677,20 @@ func (in *input) order(v Expr) {
 			in.order(x)
 		}
 		in.order(&v.End)
-	case *PythonBlock:
-		// nothing
+	case *LoadStmt:
+		in.order(v.Module)
+		for i := range v.From {
+			in.order(v.To[i])
+			in.order(v.From[i])
+		}
+		in.order(&v.Rparen)
 	case *LiteralExpr:
 		// nothing
 	case *StringExpr:
+		// nothing
+	case *Ident:
+		// nothing
+	case *BranchStmt:
 		// nothing
 	case *DotExpr:
 		in.order(v.X)
@@ -641,9 +699,9 @@ func (in *input) order(v Expr) {
 			in.order(x)
 		}
 		in.order(&v.End)
-	case *ListForExpr:
-		in.order(v.X)
-		for _, c := range v.For {
+	case *Comprehension:
+		in.order(v.Body)
+		for _, c := range v.Clauses {
 			in.order(c)
 		}
 		in.order(&v.End)
@@ -652,16 +710,9 @@ func (in *input) order(v Expr) {
 			in.order(x)
 		}
 		in.order(&v.End)
-	case *ForClauseWithIfClausesOpt:
-		in.order(v.For)
-		for _, c := range v.Ifs {
-			in.order(c)
-		}
 	case *ForClause:
-		for _, name := range v.Var {
-			in.order(name)
-		}
-		in.order(v.Expr)
+		in.order(v.Vars)
+		in.order(v.X)
 	case *IfClause:
 		in.order(v.Cond)
 	case *KeyValueExpr:
@@ -676,12 +727,17 @@ func (in *input) order(v Expr) {
 		for _, x := range v.List {
 			in.order(x)
 		}
-		in.order(&v.End)
+		if !v.NoBrackets {
+			in.order(&v.End)
+		}
 	case *UnaryExpr:
 		in.order(v.X)
 	case *BinaryExpr:
 		in.order(v.X)
 		in.order(v.Y)
+	case *AssignExpr:
+		in.order(v.LHS)
+		in.order(v.RHS)
 	case *ConditionalExpr:
 		in.order(v.Then)
 		in.order(v.Test)
@@ -691,16 +747,47 @@ func (in *input) order(v Expr) {
 		in.order(&v.End)
 	case *SliceExpr:
 		in.order(v.X)
-		in.order(v.Y)
-		in.order(v.Z)
+		in.order(v.From)
+		in.order(v.To)
+		in.order(v.Step)
 	case *IndexExpr:
 		in.order(v.X)
 		in.order(v.Y)
 	case *LambdaExpr:
-		for _, name := range v.Var {
-			in.order(name)
+		for _, param := range v.Params {
+			in.order(param)
 		}
-		in.order(v.Expr)
+		for _, expr := range v.Body {
+			in.order(expr)
+		}
+	case *ReturnStmt:
+		if v.Result != nil {
+			in.order(v.Result)
+		}
+	case *DefStmt:
+		for _, x := range v.Params {
+			in.order(x)
+		}
+		for _, x := range v.Body {
+			in.order(x)
+		}
+	case *ForStmt:
+		in.order(v.Vars)
+		in.order(v.X)
+		for _, x := range v.Body {
+			in.order(x)
+		}
+	case *IfStmt:
+		in.order(v.Cond)
+		for _, s := range v.True {
+			in.order(s)
+		}
+		if len(v.False) > 0 {
+			in.order(&v.ElsePos)
+		}
+		for _, s := range v.False {
+			in.order(s)
+		}
 	}
 	if v != nil {
 		in.post = append(in.post, v)
@@ -711,37 +798,19 @@ func (in *input) order(v Expr) {
 func (in *input) assignComments() {
 	// Generate preorder and postorder lists.
 	in.order(in.file)
+	in.assignSuffixComments()
+	in.assignLineComments()
+}
 
-	// Split into whole-line comments and suffix comments.
-	var line, suffix []Comment
-	for _, com := range in.comments {
-		if com.Suffix {
-			suffix = append(suffix, com)
-		} else {
-			line = append(line, com)
-		}
-	}
-
-	// Assign line comments to syntax immediately following.
-	for _, x := range in.pre {
-		start, _ := x.Span()
-		xcom := x.Comment()
-		for len(line) > 0 && start.Byte >= line[0].Start.Byte {
-			xcom.Before = append(xcom.Before, line[0])
-			line = line[1:]
-		}
-	}
-
-	// Remaining line comments go at end of file.
-	in.file.After = append(in.file.After, line...)
-
+func (in *input) assignSuffixComments() {
 	// Assign suffix comments to syntax immediately before.
+	suffix := in.suffixComments
 	for i := len(in.post) - 1; i >= 0; i-- {
 		x := in.post[i]
 
-		// Do not assign suffix comments to file
+		// Do not assign suffix comments to file or to block statements
 		switch x.(type) {
-		case *File:
+		case *File, *DefStmt, *IfStmt, *ForStmt, *CommentBlock:
 			continue
 		}
 
@@ -762,6 +831,27 @@ func (in *input) assignComments() {
 
 	// Remaining suffix comments go at beginning of file.
 	in.file.Before = append(in.file.Before, suffix...)
+}
+
+func (in *input) assignLineComments() {
+	// Assign line comments to syntax immediately following.
+	line := in.lineComments
+	for _, x := range in.pre {
+		start, _ := x.Span()
+		xcom := x.Comment()
+		for len(line) > 0 && start.Byte >= line[0].Start.Byte {
+			xcom.Before = append(xcom.Before, line[0])
+			line = line[1:]
+		}
+		// Line comments can be sorted in a wrong order because they get assigned from different
+		// parts of the lexer and the parser. Restore the original order.
+		sort.SliceStable(xcom.Before, func(i, j int) bool {
+			return xcom.Before[i].Start.Byte < xcom.Before[j].Start.Byte
+		})
+	}
+
+	// Remaining line comments go at end of file.
+	in.file.After = append(in.file.After, line...)
 }
 
 // reverseComments reverses the []Comment list.

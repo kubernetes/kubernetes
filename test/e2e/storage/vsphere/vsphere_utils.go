@@ -24,24 +24,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	vim25types "github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -52,8 +54,8 @@ const (
 	storageclass2  = "sc-vsan"
 	storageclass3  = "sc-spbm"
 	storageclass4  = "sc-user-specified-ds"
-	DummyDiskName  = "kube-dummyDisk.vmdk"
-	ProviderPrefix = "vsphere://"
+	dummyDiskName  = "kube-dummyDisk.vmdk"
+	providerPrefix = "vsphere://"
 )
 
 // volumeState represents the state of a volume.
@@ -67,12 +69,10 @@ const (
 // Wait until vsphere volumes are detached from the list of nodes or time out after 5 minutes
 func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 	var (
-		err            error
-		disksAttached  = true
 		detachTimeout  = 5 * time.Minute
 		detachPollTime = 10 * time.Second
 	)
-	err = wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
+	waitErr := wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
 		attachedResult, err := disksAreAttached(nodeVolumes)
 		if err != nil {
 			return false, err
@@ -80,20 +80,19 @@ func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 		for nodeName, nodeVolumes := range attachedResult {
 			for volumePath, attached := range nodeVolumes {
 				if attached {
-					framework.Logf("Waiting for volumes %q to detach from %q.", volumePath, string(nodeName))
+					framework.Logf("Volume %q is still attached to %q.", volumePath, string(nodeName))
 					return false, nil
 				}
 			}
 		}
-		disksAttached = false
 		framework.Logf("Volume are successfully detached from all the nodes: %+v", nodeVolumes)
 		return true, nil
 	})
-	if err != nil {
-		return err
-	}
-	if disksAttached {
-		return fmt.Errorf("Gave up waiting for volumes to detach after %v", detachTimeout)
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return fmt.Errorf("volumes have not detached after %v: %v", detachTimeout, waitErr)
+		}
+		return fmt.Errorf("error waiting for volumes to detach: %v", waitErr)
 	}
 	return nil
 }
@@ -101,8 +100,6 @@ func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 // Wait until vsphere vmdk moves to expected state on the given node, or time out after 6 minutes
 func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState volumeState) error {
 	var (
-		err          error
-		diskAttached bool
 		currentState volumeState
 		timeout      = 6 * time.Minute
 		pollTime     = 10 * time.Second
@@ -118,8 +115,8 @@ func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState 
 		volumeStateDetached: "detached from",
 	}
 
-	err = wait.Poll(pollTime, timeout, func() (bool, error) {
-		diskAttached, err = diskIsAttached(volumePath, nodeName)
+	waitErr := wait.Poll(pollTime, timeout, func() (bool, error) {
+		diskAttached, err := diskIsAttached(volumePath, nodeName)
 		if err != nil {
 			return true, err
 		}
@@ -132,14 +129,13 @@ func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState 
 		framework.Logf("Waiting for Volume %q to be %s %q.", volumePath, attachedStateMsg[expectedState], nodeName)
 		return false, nil
 	})
-	if err != nil {
-		return err
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return fmt.Errorf("volume %q is not %s %q after %v: %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout, waitErr)
+		}
+		return fmt.Errorf("error waiting for volume %q to be %s %q: %v", volumePath, attachedStateMsg[expectedState], nodeName, waitErr)
 	}
-
-	if currentState != expectedState {
-		err = fmt.Errorf("Gave up waiting for Volume %q to be %s %q after %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout)
-	}
-	return err
+	return nil
 }
 
 // Wait until vsphere vmdk is attached from the given node or time out after 6 minutes
@@ -154,12 +150,7 @@ func waitForVSphereDiskToDetach(volumePath string, nodeName string) error {
 
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
 func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy, labels map[string]string) *v1.PersistentVolume {
-	var (
-		pvConfig framework.PersistentVolumeConfig
-		pv       *v1.PersistentVolume
-		claimRef *v1.ObjectReference
-	)
-	pvConfig = framework.PersistentVolumeConfig{
+	return e2epv.MakePersistentVolume(e2epv.PersistentVolumeConfig{
 		NamePrefix: "vspherepv-",
 		PVSource: v1.PersistentVolumeSource{
 			VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
@@ -167,32 +158,13 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 				FSType:     "ext4",
 			},
 		},
-		Prebind: nil,
-	}
-
-	pv = &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: pvConfig.NamePrefix,
-			Annotations: map[string]string{
-				util.VolumeGidAnnotationKey: "777",
-			},
+		ReclaimPolicy: persistentVolumeReclaimPolicy,
+		Capacity:      "2Gi",
+		AccessModes: []v1.PersistentVolumeAccessMode{
+			v1.ReadWriteOnce,
 		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: persistentVolumeReclaimPolicy,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
-			},
-			PersistentVolumeSource: pvConfig.PVSource,
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			ClaimRef: claimRef,
-		},
-	}
-	if labels != nil {
-		pv.Labels = labels
-	}
-	return pv
+		Labels: labels,
+	})
 }
 
 // function to get vsphere persistent volume spec with given selector labels.
@@ -235,10 +207,10 @@ func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolu
 	framework.Logf("Successfully verified content of the volume")
 }
 
-func getVSphereStorageClassSpec(name string, scParameters map[string]string) *storage.StorageClass {
-	var sc *storage.StorageClass
+func getVSphereStorageClassSpec(name string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) *storagev1.StorageClass {
+	var sc *storagev1.StorageClass
 
-	sc = &storage.StorageClass{
+	sc = &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -250,10 +222,25 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string) *st
 	if scParameters != nil {
 		sc.Parameters = scParameters
 	}
+	if zones != nil {
+		term := v1.TopologySelectorTerm{
+			MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+				{
+					Key:    v1.LabelZoneFailureDomain,
+					Values: zones,
+				},
+			},
+		}
+		sc.AllowedTopologies = append(sc.AllowedTopologies, term)
+	}
+	if volumeBindingMode != "" {
+		mode := storagev1.VolumeBindingMode(string(volumeBindingMode))
+		sc.VolumeBindingMode = &mode
+	}
 	return sc
 }
 
-func getVSphereClaimSpecWithStorageClass(ns string, diskSize string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
+func getVSphereClaimSpecWithStorageClass(ns string, diskSize string, storageclass *storagev1.StorageClass) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
@@ -371,15 +358,15 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 
 func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
-		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
+		_, err := framework.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
+		framework.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
 	}
 }
 
 func createEmptyFilesOnVSphereVolume(namespace string, podName string, filePaths []string) {
 	for _, filePath := range filePaths {
 		err := framework.CreateEmptyFileOnPod(namespace, podName, filePath)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 }
 
@@ -390,21 +377,54 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 	for index, pv := range persistentvolumes {
 		// Verify disks are attached to the node
 		isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
 		// Verify Volumes are accessible
 		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
+	}
+}
+
+// verify volumes are created on one of the specified zones
+func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, nodeName string, zones []string) {
+	for _, pv := range persistentvolumes {
+		volumePath := pv.Spec.VsphereVolume.VolumePath
+		// Extract datastoreName from the volume path in the pv spec
+		// For example : "vsanDatastore" is extracted from "[vsanDatastore] 25d8b159-948c-4b73-e499-02001ad1b044/volume.vmdk"
+		datastorePathObj, _ := getDatastorePathObjFromVMDiskPath(volumePath)
+		datastoreName := datastorePathObj.Datastore
+		nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// Get the datastore object reference from the datastore name
+		datastoreRef, err := nodeInfo.VSphere.GetDatastoreRefFromName(ctx, nodeInfo.DataCenterRef, datastoreName)
+		if err != nil {
+			framework.ExpectNoError(err)
+		}
+		// Find common datastores among the specified zones
+		var datastoreCountMap = make(map[string]int)
+		numZones := len(zones)
+		var commonDatastores []string
+		for _, zone := range zones {
+			datastoreInZone := TestContext.NodeMapper.GetDatastoresInZone(nodeInfo.VSphere.Config.Hostname, zone)
+			for _, datastore := range datastoreInZone {
+				datastoreCountMap[datastore] = datastoreCountMap[datastore] + 1
+				if datastoreCountMap[datastore] == numZones {
+					commonDatastores = append(commonDatastores, datastore)
+				}
+			}
+		}
+		gomega.Expect(commonDatastores).To(gomega.ContainElement(datastoreRef.Value), "PV was created in an unsupported zone.")
 	}
 }
 
 // Get vSphere Volume Path from PVC
 func getvSphereVolumePathFromClaim(client clientset.Interface, namespace string, claimName string) string {
-	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
 	return pv.Spec.VsphereVolume.VolumePath
 }
 
@@ -426,7 +446,7 @@ func getCanonicalVolumePath(ctx context.Context, dc *object.Datacenter, volumePa
 	dsFolder := dsPath[0]
 	// Get the datastore folder ID if datastore or folder doesn't exist in datastoreFolderIDMap
 	if !isValidUUID(dsFolder) {
-		dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + DummyDiskName
+		dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + dummyDiskName
 		// Querying a non-existent dummy disk on the datastore folder.
 		// It would fail and return an folder ID in the error message.
 		_, err := getVirtualDiskPage83Data(ctx, dc, dummyDiskVolPath)
@@ -478,7 +498,7 @@ func getVirtualDiskPage83Data(ctx context.Context, dc *object.Datacenter, diskPa
 	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc)
 
 	if err != nil {
-		glog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
+		klog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
 		return "", err
 	}
 	diskUUID = formatVirtualDiskUUID(diskUUID)
@@ -526,9 +546,8 @@ func getVirtualDeviceByPath(ctx context.Context, vm *object.VirtualMachine, disk
 				if matchVirtualDiskAndVolPath(backing.FileName, diskPath) {
 					framework.Logf("Found VirtualDisk backing with filename %q for diskPath %q", backing.FileName, diskPath)
 					return device, nil
-				} else {
-					framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 				}
+				framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 			}
 		}
 	}
@@ -584,8 +603,8 @@ func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
 
 	var nodeVM mo.VirtualMachine
 	err := vmObject.Properties(ctx, vmObject.Reference(), []string{"config.files"}, &nodeVM)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(nodeVM.Config).NotTo(BeNil())
+	framework.ExpectNoError(err)
+	gomega.Expect(nodeVM.Config).NotTo(gomega.BeNil())
 
 	vmxPath = nodeVM.Config.Files.VmPathName
 	framework.Logf("vmx file path is %s", vmxPath)
@@ -596,8 +615,8 @@ func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
 func verifyReadyNodeCount(client clientset.Interface, expectedNodes int) bool {
 	numNodes := 0
 	for i := 0; i < 36; i++ {
-		nodeList := framework.GetReadySchedulableNodesOrDie(client)
-		Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+		nodeList, err := e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 
 		numNodes = len(nodeList.Items)
 		if numNodes == expectedNodes {
@@ -616,9 +635,9 @@ func poweroffNodeVM(nodeName string, vm *object.VirtualMachine) {
 	framework.Logf("Powering off node VM %s", nodeName)
 
 	_, err := vm.PowerOff(ctx)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	err = vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOff)
-	Expect(err).NotTo(HaveOccurred(), "Unable to power off the node")
+	framework.ExpectNoError(err, "Unable to power off the node")
 }
 
 // poweron nodeVM and confirm the poweron state
@@ -630,7 +649,7 @@ func poweronNodeVM(nodeName string, vm *object.VirtualMachine) {
 
 	vm.PowerOn(ctx)
 	err := vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOn)
-	Expect(err).NotTo(HaveOccurred(), "Unable to power on the node")
+	framework.ExpectNoError(err, "Unable to power on the node")
 }
 
 // unregister a nodeVM from VC
@@ -642,7 +661,7 @@ func unregisterNodeVM(nodeName string, vm *object.VirtualMachine) {
 
 	framework.Logf("Unregistering node VM %s", nodeName)
 	err := vm.Unregister(ctx)
-	Expect(err).NotTo(HaveOccurred(), "Unable to unregister the node")
+	framework.ExpectNoError(err, "Unable to unregister the node")
 }
 
 // register a nodeVM into a VC
@@ -656,16 +675,16 @@ func registerNodeVM(nodeName, workingDir, vmxFilePath string, rpool *object.Reso
 	finder := find.NewFinder(nodeInfo.VSphere.Client.Client, false)
 
 	vmFolder, err := finder.FolderOrDefault(ctx, workingDir)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	registerTask, err := vmFolder.RegisterVM(ctx, vmxFilePath, nodeName, false, rpool, host)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	err = registerTask.Wait(ctx)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	vmPath := filepath.Join(workingDir, nodeName)
 	vm, err := finder.VirtualMachine(ctx, vmPath)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	poweronNodeVM(nodeName, vm)
 }
@@ -725,13 +744,13 @@ func diskIsAttached(volPath string, nodeName string) (bool, error) {
 // getUUIDFromProviderID strips ProviderPrefix - "vsphere://" from the providerID
 // this gives the VM UUID which can be used to find Node VM from vCenter
 func getUUIDFromProviderID(providerID string) string {
-	return strings.TrimPrefix(providerID, ProviderPrefix)
+	return strings.TrimPrefix(providerID, providerPrefix)
 }
 
-// GetAllReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
+// GetReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos() []*NodeInfo {
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err)
 	var nodesInfo []*NodeInfo
 	for _, node := range nodeList.Items {
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node.Name)
@@ -747,7 +766,7 @@ func GetReadySchedulableNodeInfos() []*NodeInfo {
 // and it's associated NodeInfo object is returned.
 func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 	nodesInfo := GetReadySchedulableNodeInfos()
-	Expect(nodesInfo).NotTo(BeEmpty())
+	gomega.Expect(nodesInfo).NotTo(gomega.BeEmpty())
 	return nodesInfo[rand.Int()%len(nodesInfo)]
 }
 
@@ -756,9 +775,9 @@ func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 func invokeVCenterServiceControl(command, service, host string) error {
 	sshCmd := fmt.Sprintf("service-control --%s %s", command, service)
 	framework.Logf("Invoking command %v on vCenter host %v", sshCmd, host)
-	result, err := framework.SSH(sshCmd, host, framework.TestContext.Provider)
+	result, err := e2essh.SSH(sshCmd, host, framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
-		framework.LogSSHResult(result)
+		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't execute command: %s on vCenter host: %v", sshCmd, err)
 	}
 	return nil
@@ -768,8 +787,8 @@ func invokeVCenterServiceControl(command, service, host string) error {
 // Node, else fails.
 func expectVolumeToBeAttached(nodeName, volumePath string) {
 	isAttached, err := diskIsAttached(volumePath, nodeName)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk: %s is not attached with the node", volumePath))
 }
 
 // expectVolumesToBeAttached checks if the given Volumes are attached to the
@@ -778,7 +797,7 @@ func expectVolumesToBeAttached(pods []*v1.Pod, volumePaths []string) {
 	for i, pod := range pods {
 		nodeName := pod.Spec.NodeName
 		volumePath := volumePaths[i]
-		By(fmt.Sprintf("Verifying that volume %v is attached to node %v", volumePath, nodeName))
+		ginkgo.By(fmt.Sprintf("Verifying that volume %v is attached to node %v", volumePath, nodeName))
 		expectVolumeToBeAttached(nodeName, volumePath)
 	}
 }
@@ -789,14 +808,14 @@ func expectFilesToBeAccessible(namespace string, pods []*v1.Pod, filePaths []str
 	for i, pod := range pods {
 		podName := pod.Name
 		filePath := filePaths[i]
-		By(fmt.Sprintf("Verifying that file %v is accessible on pod %v", filePath, podName))
+		ginkgo.By(fmt.Sprintf("Verifying that file %v is accessible on pod %v", filePath, podName))
 		verifyFilesExistOnVSphereVolume(namespace, podName, filePath)
 	}
 }
 
 // writeContentToPodFile writes the given content to the specified file.
 func writeContentToPodFile(namespace, podName, filePath, content string) error {
-	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+	_, err := framework.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo '%s' > %s", content, filePath))
 	return err
 }
@@ -804,9 +823,9 @@ func writeContentToPodFile(namespace, podName, filePath, content string) error {
 // expectFileContentToMatch checks if a given file contains the specified
 // content, else fails.
 func expectFileContentToMatch(namespace, podName, filePath, content string) {
-	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+	_, err := framework.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("grep '%s' %s", content, filePath))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
+	framework.ExpectNoError(err, fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
 }
 
 // expectFileContentsToMatch checks if the given contents match the ones present
@@ -815,7 +834,7 @@ func expectFileContentsToMatch(namespace string, pods []*v1.Pod, filePaths []str
 	for i, pod := range pods {
 		podName := pod.Name
 		filePath := filePaths[i]
-		By(fmt.Sprintf("Matching file content for %v on pod %v", filePath, podName))
+		ginkgo.By(fmt.Sprintf("Matching file content for %v on pod %v", filePath, podName))
 		expectFileContentToMatch(namespace, podName, filePath, contents[i])
 	}
 }

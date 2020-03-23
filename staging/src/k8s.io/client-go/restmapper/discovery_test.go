@@ -17,9 +17,11 @@ limitations under the License.
 package restmapper
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -283,10 +285,146 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	assert.Equal(cdc.invalidateCalls, 2, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
 }
 
+func TestGetAPIGroupResources(t *testing.T) {
+	type Test struct {
+		name string
+
+		discovery DiscoveryInterface
+
+		expected      []*APIGroupResources
+		expectedError error
+	}
+
+	for _, test := range []Test{
+		{"nil", &fakeFailingDiscovery{nil, nil, nil, nil}, nil, nil},
+		{"normal",
+			&fakeFailingDiscovery{
+				[]metav1.APIGroup{aGroup, bGroup}, nil,
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, nil,
+			},
+			[]*APIGroupResources{
+				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
+				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
+			}, nil,
+		},
+		{"groups failed, but has fallback with a only",
+			&fakeFailingDiscovery{
+				[]metav1.APIGroup{aGroup}, fmt.Errorf("error fetching groups"),
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, nil,
+			},
+			[]*APIGroupResources{
+				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
+			}, nil,
+		},
+		{"groups failed, but has no fallback",
+			&fakeFailingDiscovery{
+				nil, fmt.Errorf("error fetching groups"),
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, nil,
+			},
+			nil, fmt.Errorf("error fetching groups"),
+		},
+		{"a failed, but has fallback",
+			&fakeFailingDiscovery{
+				[]metav1.APIGroup{aGroup, bGroup}, nil,
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, map[string]error{"a/v1": fmt.Errorf("a failed")},
+			},
+			[]*APIGroupResources{
+				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
+				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
+			}, nil, // TODO: do we want this?
+		},
+		{"a failed, but has no fallback",
+			&fakeFailingDiscovery{
+				[]metav1.APIGroup{aGroup, bGroup}, nil,
+				map[string]*metav1.APIResourceList{"b/v1": &bResources}, map[string]error{"a/v1": fmt.Errorf("a failed")},
+			},
+			[]*APIGroupResources{
+				{aGroup, map[string][]metav1.APIResource{}},
+				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
+			}, nil, // TODO: do we want this?
+		},
+		{"a and b failed, but have fallbacks",
+			&fakeFailingDiscovery{
+				[]metav1.APIGroup{aGroup, bGroup}, nil,
+				map[string]*metav1.APIResourceList{"a/v1": &aResources, "b/v1": &bResources}, // TODO: both fallbacks are ignored
+				map[string]error{"a/v1": fmt.Errorf("a failed"), "b/v1": fmt.Errorf("b failed")},
+			},
+			[]*APIGroupResources{
+				{aGroup, map[string][]metav1.APIResource{"v1": {aFoo}}},
+				{bGroup, map[string][]metav1.APIResource{"v1": {bBar}}},
+			}, nil, // TODO: do we want this?
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := GetAPIGroupResources(test.discovery)
+			if err == nil && test.expectedError != nil {
+				t.Fatalf("expected error %q, but got none", test.expectedError)
+			} else if err != nil && test.expectedError == nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(test.expected, got) {
+				t.Errorf("unexpected result:\nexpected = %s\ngot = %s", spew.Sdump(test.expected), spew.Sdump(got))
+			}
+		})
+	}
+
+}
+
+var _ DiscoveryInterface = &fakeFailingDiscovery{}
+
+type fakeFailingDiscovery struct {
+	groups    []metav1.APIGroup
+	groupsErr error
+
+	resourcesForGroupVersion    map[string]*metav1.APIResourceList
+	resourcesForGroupVersionErr map[string]error
+}
+
+func (*fakeFailingDiscovery) RESTClient() restclient.Interface {
+	return nil
+}
+
+func (d *fakeFailingDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
+	if d.groups == nil && d.groupsErr != nil {
+		return nil, d.groupsErr
+	}
+	return &metav1.APIGroupList{Groups: d.groups}, d.groupsErr
+}
+
+func (d *fakeFailingDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return ServerGroupsAndResources(d)
+}
+func (d *fakeFailingDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	if rs, found := d.resourcesForGroupVersion[groupVersion]; found {
+		return rs, d.resourcesForGroupVersionErr[groupVersion]
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (d *fakeFailingDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
+	return ServerResources(d)
+}
+
+func (d *fakeFailingDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return ServerPreferredResources(d)
+}
+
+func (d *fakeFailingDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	return ServerPreferredNamespacedResources(d)
+}
+
+func (*fakeFailingDiscovery) ServerVersion() (*version.Info, error) {
+	return &version.Info{}, nil
+}
+
+func (*fakeFailingDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
+	panic("implement me")
+}
+
 type fakeCachedDiscoveryInterface struct {
 	invalidateCalls int
 	fresh           bool
-	enabledA        bool
+	enabledGroupA   bool
 }
 
 var _ CachedDiscoveryInterface = &fakeCachedDiscoveryInterface{}
@@ -298,7 +436,7 @@ func (c *fakeCachedDiscoveryInterface) Fresh() bool {
 func (c *fakeCachedDiscoveryInterface) Invalidate() {
 	c.invalidateCalls = c.invalidateCalls + 1
 	c.fresh = true
-	c.enabledA = true
+	c.enabledGroupA = true
 }
 
 func (c *fakeCachedDiscoveryInterface) RESTClient() restclient.Interface {
@@ -306,55 +444,33 @@ func (c *fakeCachedDiscoveryInterface) RESTClient() restclient.Interface {
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerGroups() (*metav1.APIGroupList, error) {
-	if c.enabledA {
+	if c.enabledGroupA {
 		return &metav1.APIGroupList{
-			Groups: []metav1.APIGroup{
-				{
-					Name: "a",
-					Versions: []metav1.GroupVersionForDiscovery{
-						{
-							GroupVersion: "a/v1",
-							Version:      "v1",
-						},
-					},
-					PreferredVersion: metav1.GroupVersionForDiscovery{
-						GroupVersion: "a/v1",
-						Version:      "v1",
-					},
-				},
-			},
+			Groups: []metav1.APIGroup{aGroup},
 		}, nil
 	}
 	return &metav1.APIGroupList{}, nil
 }
 
+func (c *fakeCachedDiscoveryInterface) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return ServerGroupsAndResources(c)
+}
+
 func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	if c.enabledA && groupVersion == "a/v1" {
-		return &metav1.APIResourceList{
-			GroupVersion: "a/v1",
-			APIResources: []metav1.APIResource{
-				{
-					Name:       "foo",
-					Kind:       "Foo",
-					Namespaced: false,
-				},
-			},
-		}, nil
+	if c.enabledGroupA && groupVersion == "a/v1" {
+		return &aResources, nil
 	}
 
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
+// Deprecated: use ServerGroupsAndResources instead.
 func (c *fakeCachedDiscoveryInterface) ServerResources() ([]*metav1.APIResourceList, error) {
-	if c.enabledA {
-		av1, _ := c.ServerResourcesForGroupVersion("a/v1")
-		return []*metav1.APIResourceList{av1}, nil
-	}
-	return []*metav1.APIResourceList{}, nil
+	return ServerResources(c)
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	if c.enabledA {
+	if c.enabledGroupA {
 		return []*metav1.APIResourceList{
 			{
 				GroupVersion: "a/v1",
@@ -382,3 +498,50 @@ func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
 func (c *fakeCachedDiscoveryInterface) OpenAPISchema() (*openapi_v2.Document, error) {
 	return &openapi_v2.Document{}, nil
 }
+
+var (
+	aGroup = metav1.APIGroup{
+		Name: "a",
+		Versions: []metav1.GroupVersionForDiscovery{
+			{
+				GroupVersion: "a/v1",
+				Version:      "v1",
+			},
+		},
+		PreferredVersion: metav1.GroupVersionForDiscovery{
+			GroupVersion: "a/v1",
+			Version:      "v1",
+		},
+	}
+	bGroup = metav1.APIGroup{
+		Name: "b",
+		Versions: []metav1.GroupVersionForDiscovery{
+			{
+				GroupVersion: "b/v1",
+				Version:      "v1",
+			},
+		},
+		PreferredVersion: metav1.GroupVersionForDiscovery{
+			GroupVersion: "b/v1",
+			Version:      "v1",
+		},
+	}
+	aResources = metav1.APIResourceList{
+		GroupVersion: "a/v1",
+		APIResources: []metav1.APIResource{aFoo},
+	}
+	aFoo = metav1.APIResource{
+		Name:       "foo",
+		Kind:       "Foo",
+		Namespaced: false,
+	}
+	bResources = metav1.APIResourceList{
+		GroupVersion: "b/v1",
+		APIResources: []metav1.APIResource{bBar},
+	}
+	bBar = metav1.APIResource{
+		Name:       "bar",
+		Kind:       "Bar",
+		Namespaced: true,
+	}
+)

@@ -41,6 +41,10 @@ type MemorySpec struct {
 	SwapLimit uint64 `json:"swap_limit,omitempty"`
 }
 
+type ProcessSpec struct {
+	Limit uint64 `json:"limit,omitempty"`
+}
+
 type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
@@ -57,6 +61,9 @@ type ContainerSpec struct {
 	Memory    MemorySpec `json:"memory,omitempty"`
 
 	HasNetwork bool `json:"has_network"`
+
+	HasProcesses bool        `json:"has_processes"`
+	Processes    ProcessSpec `json:"processes,omitempty"`
 
 	HasFilesystem bool `json:"has_filesystem"`
 
@@ -102,11 +109,11 @@ type ContainerInfoRequest struct {
 	NumStats int `json:"num_stats,omitempty"`
 
 	// Start time for which to query information.
-	// If ommitted, the beginning of time is assumed.
+	// If omitted, the beginning of time is assumed.
 	Start time.Time `json:"start,omitempty"`
 
 	// End time for which to query information.
-	// If ommitted, current time is assumed.
+	// If omitted, current time is assumed.
 	End time.Time `json:"end,omitempty"`
 }
 
@@ -557,6 +564,23 @@ type AcceleratorStats struct {
 	DutyCycle uint64 `json:"duty_cycle"`
 }
 
+type ProcessStats struct {
+	// Number of processes
+	ProcessCount uint64 `json:"process_count"`
+
+	// Number of open file descriptors
+	FdCount uint64 `json:"fd_count"`
+
+	// Number of sockets
+	SocketCount uint64 `json:"socket_count"`
+
+	// Number of threads currently in container
+	ThreadsCurrent uint64 `json:"threads_current,omitempty"`
+
+	// Maxium number of threads allowed in container
+	ThreadsMax uint64 `json:"threads_max,omitempty"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time    `json:"timestamp"`
@@ -573,6 +597,9 @@ type ContainerStats struct {
 
 	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
 	Accelerators []AcceleratorStats `json:"accelerators,omitempty"`
+
+	// ProcessStats for Containers
+	Processes ProcessStats `json:"processes,omitempty"`
 
 	// Custom metrics from all collectors
 	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`
@@ -617,6 +644,9 @@ func (a *ContainerStats) StatsEq(b *ContainerStats) bool {
 		return false
 	}
 	if !reflect.DeepEqual(a.Network, b.Network) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Processes, b.Processes) {
 		return false
 	}
 	if !reflect.DeepEqual(a.Filesystem, b.Filesystem) {

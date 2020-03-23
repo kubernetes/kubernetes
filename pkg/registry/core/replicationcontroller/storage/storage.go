@@ -48,14 +48,17 @@ type ControllerStorage struct {
 	Scale      *ScaleREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) ControllerStorage {
-	controllerREST, statusREST := NewREST(optsGetter)
+func NewStorage(optsGetter generic.RESTOptionsGetter) (ControllerStorage, error) {
+	controllerREST, statusREST, err := NewREST(optsGetter)
+	if err != nil {
+		return ControllerStorage{}, err
+	}
 
 	return ControllerStorage{
 		Controller: controllerREST,
 		Status:     statusREST,
 		Scale:      &ScaleREST{store: controllerREST.Store},
-	}
+	}, nil
 }
 
 type REST struct {
@@ -63,7 +66,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.ReplicationController{} },
 		NewListFunc:              func() runtime.Object { return &api.ReplicationControllerList{} },
@@ -74,17 +77,17 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: replicationcontroller.Strategy,
 		DeleteStrategy: replicationcontroller.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicationcontroller.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = replicationcontroller.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -183,12 +186,36 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	rc.Spec.Replicas = scale.Spec.Replicas
 	rc.ResourceVersion = scale.ResourceVersion
-	obj, _, err = r.store.Update(ctx, rc.Name, rest.DefaultUpdatedObjectInfo(rc), createValidation, updateValidation, false, options)
+	obj, _, err = r.store.Update(
+		ctx,
+		rc.Name,
+		rest.DefaultUpdatedObjectInfo(rc),
+		toScaleCreateValidation(createValidation),
+		toScaleUpdateValidation(updateValidation),
+		false,
+		options,
+	)
 	if err != nil {
 		return nil, false, err
 	}
 	rc = obj.(*api.ReplicationController)
 	return scaleFromRC(rc), false, nil
+}
+
+func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
+	return func(ctx context.Context, obj runtime.Object) error {
+		return f(ctx, scaleFromRC(obj.(*api.ReplicationController)))
+	}
+}
+
+func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		return f(
+			ctx,
+			scaleFromRC(obj.(*api.ReplicationController)),
+			scaleFromRC(old.(*api.ReplicationController)),
+		)
+	}
 }
 
 // scaleFromRC returns a scale subresource for a replication controller.

@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
@@ -48,18 +48,18 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError("10.0.0.1/32, ")
 	checkError("10.0.0.1")
 
-	checkOK := func(v string) netsets.IPNet {
+	checkOK := func(v string) utilnet.IPNetSet {
 		annotations := make(map[string]string)
 		annotations[api.AnnotationLoadBalancerSourceRangesKey] = v
 		svc := api.Service{}
 		svc.Annotations = annotations
-		cidrs, err := GetLoadBalancerSourceRanges(&svc)
+		_, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
 		svc = api.Service{}
 		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
-		cidrs, err = GetLoadBalancerSourceRanges(&svc)
+		cidrs, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
@@ -112,7 +112,7 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 
 func TestAllowAll(t *testing.T) {
 	checkAllowAll := func(allowAll bool, cidrs ...string) {
-		ipnets, err := netsets.ParseIPNets(cidrs...)
+		ipnets, err := utilnet.ParseIPNets(cidrs...)
 		if err != nil {
 			t.Errorf("Unexpected error parsing cidrs: %v", cidrs)
 		}

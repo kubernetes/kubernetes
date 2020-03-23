@@ -22,28 +22,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+KUBE_HACK_ROOT=$(dirname "${BASH_SOURCE[0]}")
 
-kube::golang::setup_env
+echo "WARNING: hack/generate-docs.sh is an alias for hack/update-generated-docs.sh"
+echo "and will be removed in a future version."
 
-BINS=(
-	cmd/gendocs
-	cmd/genkubedocs
-	cmd/genman
-	cmd/genyaml
-)
-make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
-
-kube::util::ensure-temp-dir
-
-kube::util::gen-docs "${KUBE_TEMP}"
-
-# remove all of the old docs
-kube::util::remove-gen-docs
-
-# copy fresh docs into the repo.
-# the shopt is so that we get docs/.generated_docs from the glob.
-shopt -s dotglob
-cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
-shopt -u dotglob
+"${KUBE_HACK_ROOT}"/update-generated-docs.sh

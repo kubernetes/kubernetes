@@ -49,6 +49,7 @@ func TestDialURL(t *testing.T) {
 		TLSConfig   *tls.Config
 		Dial        utilnet.DialFunc
 		ExpectError string
+		ExpectProto string
 	}{
 		"insecure": {
 			TLSConfig: &tls.Config{InsecureSkipVerify: true},
@@ -90,13 +91,28 @@ func TestDialURL(t *testing.T) {
 			TLSConfig: &tls.Config{InsecureSkipVerify: false, RootCAs: roots, ServerName: "example.com"},
 			Dial:      d.DialContext,
 		},
+		"ensure we use http2 if specified": {
+			TLSConfig:   &tls.Config{InsecureSkipVerify: false, RootCAs: roots, ServerName: "example.com", NextProtos: []string{"http2"}},
+			Dial:        d.DialContext,
+			ExpectProto: "http2",
+		},
+		"ensure we use http/1.1 if unspecified": {
+			TLSConfig:   &tls.Config{InsecureSkipVerify: false, RootCAs: roots, ServerName: "example.com"},
+			Dial:        d.DialContext,
+			ExpectProto: "http/1.1",
+		},
+		"ensure we use http/1.1 if available": {
+			TLSConfig:   &tls.Config{InsecureSkipVerify: false, RootCAs: roots, ServerName: "example.com", NextProtos: []string{"http2", "http/1.1"}},
+			Dial:        d.DialContext,
+			ExpectProto: "http/1.1",
+		},
 	}
 
 	for k, tc := range testcases {
 		func() {
 			ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {}))
 			defer ts.Close()
-			ts.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+			ts.TLS = &tls.Config{Certificates: []tls.Certificate{cert}, NextProtos: []string{"http2", "http/1.1"}}
 			ts.StartTLS()
 
 			// Make a copy of the config
@@ -127,7 +143,7 @@ func TestDialURL(t *testing.T) {
 			u, _ := url.Parse(ts.URL)
 			_, p, _ := net.SplitHostPort(u.Host)
 			u.Host = net.JoinHostPort("127.0.0.1", p)
-			conn, err := DialURL(context.Background(), u, transport)
+			conn, err := dialURL(context.Background(), u, transport)
 
 			// Make sure dialing doesn't mutate the transport's TLSConfig
 			if !reflect.DeepEqual(tc.TLSConfig, tlsConfigCopy) {
@@ -143,6 +159,14 @@ func TestDialURL(t *testing.T) {
 				}
 				return
 			}
+
+			tlsConn := conn.(*tls.Conn)
+			if tc.ExpectProto != "" {
+				if tlsConn.ConnectionState().NegotiatedProtocol != tc.ExpectProto {
+					t.Errorf("%s: expected proto %s, got %s", k, tc.ExpectProto, tlsConn.ConnectionState().NegotiatedProtocol)
+				}
+			}
+
 			conn.Close()
 			if tc.ExpectError != "" {
 				t.Errorf("%s: expected error %q, got none", k, tc.ExpectError)
@@ -153,26 +177,53 @@ func TestDialURL(t *testing.T) {
 }
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
-//     go run generate_cert.go  --rsa-bits 512 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//     go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
-MIIBjzCCATmgAwIBAgIRAKpi2WmTcFrVjxrl5n5YDUEwDQYJKoZIhvcNAQELBQAw
+MIIDGTCCAgGgAwIBAgIRAKfNl1LEAt7nFPYvHBnpv2swDQYJKoZIhvcNAQELBQAw
 EjEQMA4GA1UEChMHQWNtZSBDbzAgFw03MDAxMDEwMDAwMDBaGA8yMDg0MDEyOTE2
-MDAwMFowEjEQMA4GA1UEChMHQWNtZSBDbzBcMA0GCSqGSIb3DQEBAQUAA0sAMEgC
-QQC9fEbRszP3t14Gr4oahV7zFObBI4TfA5i7YnlMXeLinb7MnvT4bkfOJzE6zktn
-59zP7UiHs3l4YOuqrjiwM413AgMBAAGjaDBmMA4GA1UdDwEB/wQEAwICpDATBgNV
-HSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MC4GA1UdEQQnMCWCC2V4
-YW1wbGUuY29thwR/AAABhxAAAAAAAAAAAAAAAAAAAAABMA0GCSqGSIb3DQEBCwUA
-A0EAUsVE6KMnza/ZbodLlyeMzdo7EM/5nb5ywyOxgIOCf0OOLHsPS9ueGLQX9HEG
-//yjTXuhNcUugExIjM/AIwAZPQ==
+MDAwMFowEjEQMA4GA1UEChMHQWNtZSBDbzCCASIwDQYJKoZIhvcNAQEBBQADggEP
+ADCCAQoCggEBAKww39FwmV5lDIbAUIAuSYYVtZke6bca1oyq19ZrRL0uavwPXSJm
++Qxt4RKUQhzYhZ/alJp8iRfu/Z+Yv9Beez89dQB9V8YnHj/AX4Jph9lJ2aawWMI6
+AqPLdIzKLQVVvPw+UVKH9x8yy08H/23AIFGyK4Dbht+KZJeUbJQFiGlRFJim8atx
+KA3C9NzCHw6hyhP46jguLl65rcxLMSzcTz97ToG0MP66YEUbsA/YzFTKDwht7ESH
+nRMBnQ4wZfWpvAiXMr3XJGOa3NYJy1A+WkWyrfZO7guwsZ4L6dGqnlPpzA5QkKYx
+H9Z5K1bUaYEi0Yi2ug7Jkvd1HE179nkF7t0CAwEAAaNoMGYwDgYDVR0PAQH/BAQD
+AgKkMBMGA1UdJQQMMAoGCCsGAQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wLgYDVR0R
+BCcwJYILZXhhbXBsZS5jb22HBH8AAAGHEAAAAAAAAAAAAAAAAAAAAAEwDQYJKoZI
+hvcNAQELBQADggEBAAKSQToD1iLujFhQwaLnPVRV6r4nEFVXCxXYtQNEX1DVSKSj
+JYbBGJnL50oc0N4Ar+Spqofm+THkiTQJUzptPtnYIzNpKYdE6+bPwqURWzFEI2OF
+ks3fYZ4ZdbMbmJRo1qPJO34emm4KrOl9aoV0qwp2QyTvHgLroU3icKoe4e7+p4KK
+02Rt3qczHvCKoUnw6m07Ql0n9e7Ncpujcs2A8PaQ1iPX+BVOmvjTVT8y5NSRDzwL
+a2wur8BSZ5E8SVzzvNZJlLSi6BbObQUjALHkjVYm11dWv/BY8jHdt+iFhbNBRASx
+ENuih3pX1Poki1qRYOtB/vAS99E1ORj9zJlUlzo=
 -----END CERTIFICATE-----`)
 
 // localhostKey is the private key for localhostCert.
 var localhostKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
-MIIBOwIBAAJBAL18RtGzM/e3XgavihqFXvMU5sEjhN8DmLtieUxd4uKdvsye9Phu
-R84nMTrOS2fn3M/tSIezeXhg66quOLAzjXcCAwEAAQJBAKcRxH9wuglYLBdI/0OT
-BLzfWPZCEw1vZmMR2FF1Fm8nkNOVDPleeVGTWoOEcYYlQbpTmkGSxJ6ya+hqRi6x
-goECIQDx3+X49fwpL6B5qpJIJMyZBSCuMhH4B7JevhGGFENi3wIhAMiNJN5Q3UkL
-IuSvv03kaPR5XVQ99/UeEetUgGvBcABpAiBJSBzVITIVCGkGc7d+RCf49KTCIklv
-bGWObufAR8Ni4QIgWpILjW8dkGg8GOUZ0zaNA6Nvt6TIv2UWGJ4v5PoV98kCIQDx
-rIiZs5QbKdycsv9gQJzwQAogC8o04X3Zz3dsoX+h4A==
------END RSA PRIVATE KEY-----`)
+MIIEogIBAAKCAQEArDDf0XCZXmUMhsBQgC5JhhW1mR7ptxrWjKrX1mtEvS5q/A9d
+Imb5DG3hEpRCHNiFn9qUmnyJF+79n5i/0F57Pz11AH1XxiceP8BfgmmH2UnZprBY
+wjoCo8t0jMotBVW8/D5RUof3HzLLTwf/bcAgUbIrgNuG34pkl5RslAWIaVEUmKbx
+q3EoDcL03MIfDqHKE/jqOC4uXrmtzEsxLNxPP3tOgbQw/rpgRRuwD9jMVMoPCG3s
+RIedEwGdDjBl9am8CJcyvdckY5rc1gnLUD5aRbKt9k7uC7Cxngvp0aqeU+nMDlCQ
+pjEf1nkrVtRpgSLRiLa6DsmS93UcTXv2eQXu3QIDAQABAoIBACAYnB+2FWB7BXK4
+tkiuWBYeRdNc58OxxPxDfCgDprR8yoRheMLI3vNqJ+IGsKwf0AiT/c8uF3/WlIAD
+QP3eHqsTEZQdyRaug/zuJt9wPFpMYb2ocWMC3Ssa6Ya0yN+Ns8Rw+UehAHdYSH1a
+yEn03hFcXK+QO/u/GDEJAZQ108+NdznT4ql59tt791d97meNlMVJwkwVf/NqtDqi
+UNx6BvSj5+6MoWjU8hqrYv9pkzP386QRsl70tVH+0LZd5XUZsSyof/IdV1EmfGUR
+5les8tsd+fuo3LaPObksJu+GBwvEStmQPjZjiBUzw0Sx8VYTJfZr7gl2h4mmk/AJ
+F5P+fSECgYEAzwDcJCuYPA8nzVB+ZOM+Wl+3uUKG/Xn8Yx8uWtWU7o9qsJmasLqO
+sLtz1zadPtYOBXsb4H5PisNPuosVEqnthjRwmPhIA3tK/X3UzhnriACCrKpg3Ix0
+uJG2vqpdaPXYxmyTQfI8YSp5X0gTg3R4xQqmbGMyAQg+1NzcGAf+qQ8CgYEA1PKX
+vkxzJuSPsfQYr34fnZRuogANNGUaWCTYMhH6sK8qrJu5RXmEemaraqT/esUUu1fl
+cTAxRqUb8ysexA+RKR848hFkrvAR5M1t6xK2hPuSec1Lm9HNfHoFB7Pa5t7APoJ9
+8NkjNzI0mL9YqYcfJpzfFrxtzfLwlm6B3irS8VMCgYBg3skmUBRcvsbkiO+tLL7I
+MhTbKGvdgNGAXV4m+d5JSWonHKrMW3Fc+Uv7gb5SYn+LRxJDmziD+mR8KowBAO57
+qFys6TtiDbeJKvKERJL5QSvlu5G6hCw3F1GKplUyQiJgsPy0lrR00BieYy9mjAHc
+S+CXxk/nNcGZgYWp5UviNwKBgC7t46kpmfsJRe222LXcOsV0j8kd78sLOPoR7J9k
+PPYxNFtj2jnIZPzAoahYAoGg60e6QDNopoNmIbm+WAJnV9tTKS6XzLOM7rSY3U+A
+CT9XXdl/99i4LOvwzCj9ZxGYJ4/fHDg28j7YzqSXDsgVojTVP4j4L87CamkMo4w9
+rc1HAoGARE2WActS2PF75jRXCjj4SjB/3vOJVGKxrJdoo2HPzY0psTmdJJULOGYZ
+MU1KC4EDzhSfM3juBbEhaZx9NFZOHVp2hxZpg77B5cQXGH6HIiZ20jCNjdcioHl9
+HeVeFG/9rJG0NcQe3pIm9f0EY5JCbzr0fa2tTPV3N9jGHc0sFtI=
+-----END RSA PRIVATE KEY-----
+`)

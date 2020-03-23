@@ -33,6 +33,9 @@ import (
 )
 
 type crioContainerHandler struct {
+	client crioClient
+	name   string
+
 	machineInfoFactory info.MachineInfoFactory
 
 	// Absolute path to the cgroup hierarchies of this container.
@@ -68,6 +71,9 @@ type crioContainerHandler struct {
 	reference info.ContainerReference
 
 	libcontainerHandler *containerlibcontainer.Handler
+	cgroupManager       *cgroupfs.Manager
+	rootFs              string
+	pidKnown            bool
 }
 
 var _ container.ContainerHandler = &crioContainerHandler{}
@@ -86,10 +92,7 @@ func newCrioContainerHandler(
 	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
-	for key, val := range cgroupSubsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
-	}
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager := &cgroupfs.Manager{
@@ -106,10 +109,19 @@ func newCrioContainerHandler(
 	}
 
 	id := ContainerNameToCrioId(name)
+	pidKnown := true
 
 	cInfo, err := client.ContainerInfo(id)
 	if err != nil {
 		return nil, err
+	}
+	if cInfo.Pid == 0 {
+		// If pid is not known yet, network related stats can not be retrieved by the
+		// libcontainer handler GetStats().  In this case, the crio handler GetStats()
+		// will reattempt to get the pid and, if now known, will construct the libcontainer
+		// handler.  This libcontainer handler is then cached and reused without additional
+		// calls to crio.
+		pidKnown = false
 	}
 
 	// passed to fs handler below ...
@@ -145,6 +157,8 @@ func newCrioContainerHandler(
 
 	// TODO: extract object mother method
 	handler := &crioContainerHandler{
+		client:              client,
+		name:                name,
 		machineInfoFactory:  machineInfoFactory,
 		cgroupPaths:         cgroupPaths,
 		storageDriver:       storageDriver,
@@ -155,6 +169,9 @@ func newCrioContainerHandler(
 		includedMetrics:     includedMetrics,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
+		cgroupManager:       cgroupManager,
+		rootFs:              rootFs,
+		pidKnown:            pidKnown,
 	}
 
 	handler.image = cInfo.Image
@@ -176,7 +193,7 @@ func newCrioContainerHandler(
 	}
 	// TODO for env vars we wanted to show from container.Config.Env from whitelist
 	//for _, exposedEnv := range metadataEnvs {
-	//glog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
+	//klog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
 	//}
 
 	return handler, nil
@@ -266,8 +283,27 @@ func (self *crioContainerHandler) getFsStats(stats *info.ContainerStats) error {
 	return nil
 }
 
+func (self *crioContainerHandler) getLibcontainerHandler() *containerlibcontainer.Handler {
+	if self.pidKnown {
+		return self.libcontainerHandler
+	}
+
+	id := ContainerNameToCrioId(self.name)
+
+	cInfo, err := self.client.ContainerInfo(id)
+	if err != nil || cInfo.Pid == 0 {
+		return self.libcontainerHandler
+	}
+
+	self.pidKnown = true
+	self.libcontainerHandler = containerlibcontainer.NewHandler(self.cgroupManager, self.rootFs, cInfo.Pid, self.includedMetrics)
+
+	return self.libcontainerHandler
+}
+
 func (self *crioContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := self.libcontainerHandler.GetStats()
+	libcontainerHandler := self.getLibcontainerHandler()
+	stats, err := libcontainerHandler.GetStats()
 	if err != nil {
 		return stats, err
 	}

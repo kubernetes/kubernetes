@@ -24,7 +24,7 @@ func (m *Dense) Solve(a, b Matrix) error {
 	if ar != br {
 		panic(ErrShape)
 	}
-	m.reuseAs(ac, bc)
+	m.reuseAsNonZeroed(ac, bc)
 
 	// TODO(btracey): Add special cases for SymDense, etc.
 	aU, aTrans := untranspose(a)
@@ -91,15 +91,15 @@ func (m *Dense) Solve(a, b Matrix) error {
 		}
 		var lu LU
 		lu.Factorize(a)
-		return lu.Solve(m, false, b)
+		return lu.SolveTo(m, false, b)
 	case ar > ac:
 		var qr QR
 		qr.Factorize(a)
-		return qr.Solve(m, false, b)
+		return qr.SolveTo(m, false, b)
 	default:
 		var lq LQ
 		lq.Factorize(a)
-		return lq.Solve(m, false, b)
+		return lq.SolveTo(m, false, b)
 	}
 }
 
@@ -121,20 +121,20 @@ func (v *VecDense) SolveVec(a Matrix, b Vector) error {
 		if v != b {
 			v.checkOverlap(bmat)
 		}
-		v.reuseAs(c)
+		v.reuseAsNonZeroed(c)
 		m := v.asDense()
 		// We conditionally create bm as m when b and v are identical
 		// to prevent the overlap detection code from identifying m
 		// and bm as overlapping but not identical.
 		bm := m
 		if v != b {
-			b := VecDense{mat: bmat, n: b.Len()}
+			b := VecDense{mat: bmat}
 			bm = b.asDense()
 		}
 		return m.Solve(a, bm)
 	}
 
-	v.reuseAs(c)
+	v.reuseAsNonZeroed(c)
 	m := v.asDense()
 	return m.Solve(a, b)
 }

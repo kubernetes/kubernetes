@@ -14,16 +14,16 @@ import (
 // Dggsvp3 computes orthogonal matrices U, V and Q such that
 //
 //                  n-k-l  k    l
-//  U^T*A*Q =    k [ 0    A12  A13 ] if m-k-l >= 0;
+//  Uᵀ*A*Q =     k [ 0    A12  A13 ] if m-k-l >= 0;
 //               l [ 0     0   A23 ]
 //           m-k-l [ 0     0    0  ]
 //
 //                  n-k-l  k    l
-//  U^T*A*Q =    k [ 0    A12  A13 ] if m-k-l < 0;
+//  Uᵀ*A*Q =     k [ 0    A12  A13 ] if m-k-l < 0;
 //             m-k [ 0     0   A23 ]
 //
 //                  n-k-l  k    l
-//  V^T*B*Q =    l [ 0     0   B13 ]
+//  Vᵀ*B*Q =     l [ 0     0   B13 ]
 //             p-l [ 0     0    0  ]
 //
 // where the k×k matrix A12 and l×l matrix B13 are non-singular
@@ -31,7 +31,7 @@ import (
 // otherwise A23 is (m-k)×l upper trapezoidal.
 //
 // Dggsvp3 returns k and l, the dimensions of the sub-blocks. k+l
-// is the effective numerical rank of the (m+p)×n matrix [ A^T B^T ]^T.
+// is the effective numerical rank of the (m+p)×n matrix [ Aᵀ Bᵀ ]ᵀ.
 //
 // jobU, jobV and jobQ are options for computing the orthogonal matrices. The behavior
 // is as follows
@@ -54,43 +54,38 @@ import (
 //
 // Dggsvp3 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int, a []float64, lda int, b []float64, ldb int, tola, tolb float64, u []float64, ldu int, v []float64, ldv int, q []float64, ldq int, iwork []int, tau, work []float64, lwork int) (k, l int) {
-	const forward = true
-
-	checkMatrix(m, n, a, lda)
-	checkMatrix(p, n, b, ldb)
-
 	wantu := jobU == lapack.GSVDU
-	if !wantu && jobU != lapack.GSVDNone {
-		panic(badGSVDJob + "U")
-	}
-	if jobU != lapack.GSVDNone {
-		checkMatrix(m, m, u, ldu)
-	}
-
 	wantv := jobV == lapack.GSVDV
-	if !wantv && jobV != lapack.GSVDNone {
-		panic(badGSVDJob + "V")
-	}
-	if jobV != lapack.GSVDNone {
-		checkMatrix(p, p, v, ldv)
-	}
-
 	wantq := jobQ == lapack.GSVDQ
-	if !wantq && jobQ != lapack.GSVDNone {
+	switch {
+	case !wantu && jobU != lapack.GSVDNone:
+		panic(badGSVDJob + "U")
+	case !wantv && jobV != lapack.GSVDNone:
+		panic(badGSVDJob + "V")
+	case !wantq && jobQ != lapack.GSVDNone:
 		panic(badGSVDJob + "Q")
-	}
-	if jobQ != lapack.GSVDNone {
-		checkMatrix(n, n, q, ldq)
-	}
-
-	if len(iwork) != n {
-		panic(badWork)
-	}
-	if lwork != -1 && lwork < 1 {
-		panic(badWork)
-	}
-	if len(work) < max(1, lwork) {
-		panic(badWork)
+	case m < 0:
+		panic(mLT0)
+	case p < 0:
+		panic(pLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldb < max(1, n):
+		panic(badLdB)
+	case ldu < 1, wantu && ldu < m:
+		panic(badLdU)
+	case ldv < 1, wantv && ldv < p:
+		panic(badLdV)
+	case ldq < 1, wantq && ldq < n:
+		panic(badLdQ)
+	case len(iwork) != n:
+		panic(shortWork)
+	case lwork < 1 && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
 
 	var lwkopt int
@@ -112,12 +107,25 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		return 0, 0
 	}
 
-	// tau check must come after lwkopt query since
-	// the Dggsvd3 call for lwkopt query may have
-	// lwork == -1, and tau is provided by work.
-	if len(tau) < n {
-		panic(badTau)
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(b) < (p-1)*ldb+n:
+		panic(shortB)
+	case wantu && len(u) < (m-1)*ldu+m:
+		panic(shortU)
+	case wantv && len(v) < (p-1)*ldv+p:
+		panic(shortV)
+	case wantq && len(q) < (n-1)*ldq+n:
+		panic(shortQ)
+	case len(tau) < n:
+		// tau check must come after lwkopt query since
+		// the Dggsvd3 call for lwkopt query may have
+		// lwork == -1, and tau is provided by work.
+		panic(shortTau)
 	}
+
+	const forward = true
 
 	// QR with column pivoting of B: B*P = V*[ S11 S12 ].
 	//                                       [  0   0  ]
@@ -166,11 +174,11 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		// RQ factorization of [ S11 S12 ]: [ S11 S12 ] = [ 0 S12 ]*Z.
 		impl.Dgerq2(l, n, b, ldb, tau, work)
 
-		// Update A := A*Z^T.
+		// Update A := A*Zᵀ.
 		impl.Dormr2(blas.Right, blas.Trans, m, n, l, b, ldb, tau, a, lda, work)
 
 		if wantq {
-			// Update Q := Q*Z^T.
+			// Update Q := Q*Zᵀ.
 			impl.Dormr2(blas.Right, blas.Trans, n, n, l, b, ldb, tau, q, ldq, work)
 		}
 
@@ -189,7 +197,7 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 	//
 	// then the following does the complete QR decomposition of A11:
 	//
-	//          A11 = U*[  0  T12 ]*P1^T.
+	//          A11 = U*[  0  T12 ]*P1ᵀ.
 	//                  [  0   0  ]
 	for i := range iwork[:n-l] {
 		iwork[i] = 0
@@ -203,7 +211,7 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		}
 	}
 
-	// Update A12 := U^T*A12, where A12 = A[0:m, n-l:n].
+	// Update A12 := Uᵀ*A12, where A12 = A[0:m, n-l:n].
 	impl.Dorm2r(blas.Left, blas.Trans, m, l, min(m, n-l), a, lda, tau, a[n-l:], lda, work)
 
 	if wantu {
@@ -237,7 +245,7 @@ func (impl Implementation) Dggsvp3(jobU, jobV, jobQ lapack.GSVDJob, m, p, n int,
 		impl.Dgerq2(k, n-l, a, lda, tau, work)
 
 		if wantq {
-			// Update Q[0:n, 0:n-l] := Q[0:n, 0:n-l]*Z1^T.
+			// Update Q[0:n, 0:n-l] := Q[0:n, 0:n-l]*Z1ᵀ.
 			impl.Dorm2r(blas.Right, blas.Trans, n, n-l, k, a, lda, tau, q, ldq, work)
 		}
 

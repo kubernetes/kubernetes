@@ -16,8 +16,10 @@
 package machine
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,15 +32,16 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"golang.org/x/sys/unix"
 )
 
 var (
-	cpuRegExp  = regexp.MustCompile(`^processor\s*:\s*([0-9]+)$`)
-	coreRegExp = regexp.MustCompile(`^core id\s*:\s*([0-9]+)$`)
-	nodeRegExp = regexp.MustCompile(`^physical id\s*:\s*([0-9]+)$`)
+	cpuRegExp     = regexp.MustCompile(`^processor\s*:\s*([0-9]+)$`)
+	coreRegExp    = regexp.MustCompile(`^core id\s*:\s*([0-9]+)$`)
+	nodeRegExp    = regexp.MustCompile(`^physical id\s*:\s*([0-9]+)$`)
+	nodeBusRegExp = regexp.MustCompile(`^node([0-9]+)$`)
 	// Power systems have a different format so cater for both
 	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
@@ -46,6 +49,8 @@ var (
 )
 
 const maxFreqFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+const cpuBusPath = "/sys/bus/cpu/devices/"
+const nodePath = "/sys/devices/system/node"
 
 // GetClockSpeed returns the CPU clock speed, given a []byte formatted as the /proc/cpuinfo file.
 func GetClockSpeed(procInfo []byte) (uint64, error) {
@@ -127,6 +132,108 @@ func parseCapacity(b []byte, r *regexp.Regexp) (uint64, error) {
 	return m * 1024, err
 }
 
+/* Look for sysfs cpu path containing core_id */
+/* Such as: sys/bus/cpu/devices/cpu0/topology/core_id */
+func getCoreIdFromCpuBus(cpuBusPath string, threadId int) (int, error) {
+	path := filepath.Join(cpuBusPath, fmt.Sprintf("cpu%d/topology", threadId))
+	file := filepath.Join(path, "core_id")
+
+	num, err := ioutil.ReadFile(file)
+	if err != nil {
+		return threadId, err
+	}
+
+	coreId, err := strconv.ParseInt(string(bytes.TrimSpace(num)), 10, 32)
+	if err != nil {
+		return threadId, err
+	}
+
+	if coreId < 0 {
+		// report threadId if found coreId < 0
+		coreId = int64(threadId)
+	}
+
+	return int(coreId), nil
+}
+
+/* Look for sysfs cpu path containing node id */
+/* Such as: /sys/bus/cpu/devices/cpu0/node%d */
+func getNodeIdFromCpuBus(cpuBusPath string, threadId int) (int, error) {
+	path := filepath.Join(cpuBusPath, fmt.Sprintf("cpu%d", threadId))
+
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return 0, err
+	}
+
+	nodeId := 0
+	for _, file := range files {
+		filename := file.Name()
+
+		isNode, error := regexp.MatchString("^node([0-9]+)$", filename)
+		if error != nil {
+			continue
+		}
+		if !isNode {
+			continue
+		}
+
+		ok, val, _ := extractValue(filename, nodeBusRegExp)
+		if err != nil {
+			continue
+		}
+		if ok {
+			if val < 0 {
+				continue
+			}
+			nodeId = val
+		}
+	}
+
+	return nodeId, nil
+}
+
+// GetHugePagesInfo returns information about pre-allocated huge pages
+// hugepagesDirectory should be top directory of hugepages
+// Such as: /sys/kernel/mm/hugepages/
+func GetHugePagesInfo(hugepagesDirectory string) ([]info.HugePagesInfo, error) {
+	var hugePagesInfo []info.HugePagesInfo
+	files, err := ioutil.ReadDir(hugepagesDirectory)
+	if err != nil {
+		// treat as non-fatal since kernels and machine can be
+		// configured to disable hugepage support
+		return hugePagesInfo, nil
+	}
+	for _, st := range files {
+		nameArray := strings.Split(st.Name(), "-")
+		pageSizeArray := strings.Split(nameArray[1], "kB")
+		pageSize, err := strconv.ParseUint(string(pageSizeArray[0]), 10, 64)
+		if err != nil {
+			return hugePagesInfo, err
+		}
+
+		numFile := hugepagesDirectory + st.Name() + "/nr_hugepages"
+		val, err := ioutil.ReadFile(numFile)
+		if err != nil {
+			return hugePagesInfo, err
+		}
+		var numPages uint64
+		// we use sscanf as the file as a new-line that trips up ParseUint
+		// it returns the number of tokens successfully parsed, so if
+		// n != 1, it means we were unable to parse a number from the file
+		n, err := fmt.Sscanf(string(val), "%d", &numPages)
+		if err != nil || n != 1 {
+			return hugePagesInfo, fmt.Errorf("could not parse file %v contents %q", numFile, string(val))
+		}
+
+		hugePagesInfo = append(hugePagesInfo, info.HugePagesInfo{
+			NumPages: numPages,
+			PageSize: pageSize,
+		})
+	}
+	return hugePagesInfo, nil
+}
+
 func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 	nodes := []info.Node{}
 
@@ -161,8 +268,36 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 				lastNode = -1
 			}
 			lastThread = thread
+
+			/* On Arm platform, no 'core id' and 'physical id' in '/proc/cpuinfo'. */
+			/* So we search sysfs cpu path directly. */
+			/* This method can also be used on other platforms, such as x86, ppc64le... */
+			/* /sys/bus/cpu/devices/cpu%d contains the information of 'core_id' & 'node_id'. */
+			/* Such as: /sys/bus/cpu/devices/cpu0/topology/core_id */
+			/* Such as:  /sys/bus/cpu/devices/cpu0/node0 */
+			if isAArch64() {
+				val, err = getCoreIdFromCpuBus(cpuBusPath, lastThread)
+				if err != nil {
+					// Report thread id if no NUMA
+					val = lastThread
+				}
+				lastCore = val
+
+				val, err = getNodeIdFromCpuBus(cpuBusPath, lastThread)
+				if err != nil {
+					// Report node 0 if no NUMA
+					val = 0
+				}
+				lastNode = val
+			}
 			continue
 		}
+
+		if isAArch64() {
+			/* On Arm platform, no 'core id' and 'physical id' in '/proc/cpuinfo'. */
+			continue
+		}
+
 		ok, val, err = extractValue(line, coreRegExp)
 		if err != nil {
 			return nil, -1, fmt.Errorf("could not parse core info from %q: %v", line, err)
@@ -171,6 +306,7 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 			lastCore = val
 			continue
 		}
+
 		ok, val, err = extractValue(line, nodeRegExp)
 		if err != nil {
 			return nil, -1, fmt.Errorf("could not parse node info from %q: %v", line, err)
@@ -180,6 +316,7 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 			continue
 		}
 	}
+
 	nodeIdx, err := addNode(&nodes, lastNode)
 	if err != nil {
 		return nil, -1, fmt.Errorf("failed to add node %d: %v", lastNode, err)
@@ -191,7 +328,7 @@ func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 	for idx, node := range nodes {
 		caches, err := sysinfo.GetCacheInfo(sysFs, node.Cores[0].Threads[0])
 		if err != nil {
-			glog.Errorf("failed to get cache information for node %d: %v", node.Id, err)
+			klog.Errorf("failed to get cache information for node %d: %v", node.Id, err)
 			continue
 		}
 		numThreadsPerCore := len(node.Cores[0].Threads)
@@ -258,6 +395,15 @@ func addNode(nodes *[]info.Node, id int) (int, error) {
 			}
 			node.Memory = uint64(m)
 		}
+		// Look for per-node hugepages info using node id
+		// Such as: /sys/devices/system/node/node%d/hugepages
+		hugepagesDirectory := fmt.Sprintf("%s/node%d/hugepages/", nodePath, id)
+		hugePagesInfo, err := GetHugePagesInfo(hugepagesDirectory)
+		if err != nil {
+			return -1, err
+		}
+		node.HugePages = hugePagesInfo
+
 		*nodes = append(*nodes, node)
 		idx = len(*nodes) - 1
 	}

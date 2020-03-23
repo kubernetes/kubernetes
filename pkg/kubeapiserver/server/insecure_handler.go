@@ -24,20 +24,24 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 )
 
-// DeprecatedInsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
-// You shouldn't be using this.  It makes sig-auth sad.
-// DeprecatedInsecureServingInfo *ServingInfo
-
 // BuildInsecureHandlerChain sets up the server to listen to http. Should be removed.
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := apiHandler
+	// Temporarily disable APIPriorityAndFairness during development
+	// so that /debug/pprof works even while this feature is totally
+	// hosed
+	if c.FlowControl != nil && false {
+		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl)
+	} else {
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
+	}
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	handler = genericapifilters.WithAuthentication(handler, server.InsecureSuperuser{}, nil, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c))
+	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler

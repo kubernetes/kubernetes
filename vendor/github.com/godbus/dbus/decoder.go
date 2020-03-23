@@ -191,7 +191,14 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		length := dec.decode("u", depth).(uint32)
 		v := reflect.MakeSlice(reflect.SliceOf(typeFor(s[1:])), 0, int(length))
 		// Even for empty arrays, the correct padding must be included
-		dec.align(alignment(typeFor(s[1:])))
+		align := alignment(typeFor(s[1:]))
+		if len(s) > 1 && s[1] == '(' {
+			//Special case for arrays of structs
+			//structs decode as a slice of interface{} values
+			//but the dbus alignment does not match this
+			align = 8
+		}
+		dec.align(align)
 		spos := dec.pos
 		for dec.pos < spos+int(length) {
 			ev := dec.decode(s[1:], depth+1)

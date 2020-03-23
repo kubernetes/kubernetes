@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // Specified a policy for garbage collecting containers.
@@ -82,6 +82,6 @@ func (cgc *realContainerGC) GarbageCollect() error {
 }
 
 func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
-	glog.Infof("attempting to delete unused containers")
+	klog.Infof("attempting to delete unused containers")
 	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }

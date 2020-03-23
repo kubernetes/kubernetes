@@ -6,7 +6,6 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: elasticsearch-logging
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 kind: ClusterRole
@@ -15,7 +14,6 @@ metadata:
   name: elasticsearch-logging
   labels:
     k8s-app: elasticsearch-logging
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
 - apiGroups:
@@ -34,7 +32,6 @@ metadata:
   name: elasticsearch-logging
   labels:
     k8s-app: elasticsearch-logging
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 subjects:
 - kind: ServiceAccount
@@ -54,8 +51,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: elasticsearch-logging
-    version: v6.3.0
-    kubernetes.io/cluster-service: "true"
+    version: v7.4.2
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   serviceName: elasticsearch-logging
@@ -63,24 +59,26 @@ spec:
   selector:
     matchLabels:
       k8s-app: elasticsearch-logging
-      version: v6.3.0
+      version: v7.4.2
   template:
     metadata:
       labels:
         k8s-app: elasticsearch-logging
-        version: v6.3.0
-        kubernetes.io/cluster-service: "true"
+        version: v7.4.2
     spec:
       serviceAccountName: elasticsearch-logging
       containers:
-      - image: k8s.gcr.io/elasticsearch:v6.3.0
+      - image: quay.io/fluentd_elasticsearch/elasticsearch:v7.4.2
         name: elasticsearch-logging
+        imagePullPolicy: Always
         resources:
           # need more cpu upon initialization, therefore burstable class
           limits:
             cpu: 1000m
+            memory: 3Gi
           requests:
             cpu: 100m
+            memory: 3Gi
         ports:
         - containerPort: 9200
           name: db
@@ -88,6 +86,16 @@ spec:
         - containerPort: 9300
           name: transport
           protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: transport
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: transport
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
         volumeMounts:
         - name: elasticsearch-logging
           mountPath: /data

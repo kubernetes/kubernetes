@@ -17,15 +17,16 @@ limitations under the License.
 package scale
 
 import (
+	"context"
 	"encoding/json"
 	"path"
 	"strings"
 	"testing"
 
-	_ "github.com/coreos/etcd/etcdserver/api/v3rpc" // Force package logger init.
 	"github.com/coreos/pkg/capnslog"
+	_ "go.etcd.io/etcd/etcdserver/api/v3rpc" // Force package logger init.
 
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,11 +35,6 @@ import (
 	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
-
-type subresourceTest struct {
-	resource schema.GroupVersionResource
-	kind     schema.GroupVersionKind
-}
 
 func makeGVR(group, version, resource string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
@@ -52,27 +48,19 @@ func TestMain(m *testing.M) {
 }
 
 func TestScaleSubresources(t *testing.T) {
-	clientSet, tearDown := setup(t)
+	clientSet, tearDown := setupWithOptions(t, nil, []string{
+		"--runtime-config",
+		"api/all=true",
+	})
 	defer tearDown()
 
-	resourceLists, err := clientSet.Discovery().ServerResources()
+	_, resourceLists, err := clientSet.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedScaleSubresources := map[schema.GroupVersionResource]schema.GroupVersionKind{
 		makeGVR("", "v1", "replicationcontrollers/scale"): makeGVK("autoscaling", "v1", "Scale"),
-
-		makeGVR("extensions", "v1beta1", "deployments/scale"):            makeGVK("extensions", "v1beta1", "Scale"),
-		makeGVR("extensions", "v1beta1", "replicationcontrollers/scale"): makeGVK("extensions", "v1beta1", "Scale"),
-		makeGVR("extensions", "v1beta1", "replicasets/scale"):            makeGVK("extensions", "v1beta1", "Scale"),
-
-		makeGVR("apps", "v1beta1", "deployments/scale"):  makeGVK("apps", "v1beta1", "Scale"),
-		makeGVR("apps", "v1beta1", "statefulsets/scale"): makeGVK("apps", "v1beta1", "Scale"),
-
-		makeGVR("apps", "v1beta2", "deployments/scale"):  makeGVK("apps", "v1beta2", "Scale"),
-		makeGVR("apps", "v1beta2", "replicasets/scale"):  makeGVK("apps", "v1beta2", "Scale"),
-		makeGVR("apps", "v1beta2", "statefulsets/scale"): makeGVK("apps", "v1beta2", "Scale"),
 
 		makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
@@ -133,16 +121,16 @@ func TestScaleSubresources(t *testing.T) {
 	}
 
 	// Create objects required to exercise scale subresources
-	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(rcStub); err != nil {
+	if _, err := clientSet.CoreV1().ReplicationControllers("default").Create(context.TODO(), rcStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().ReplicaSets("default").Create(rsStub); err != nil {
+	if _, err := clientSet.AppsV1().ReplicaSets("default").Create(context.TODO(), rsStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().Deployments("default").Create(deploymentStub); err != nil {
+	if _, err := clientSet.AppsV1().Deployments("default").Create(context.TODO(), deploymentStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.AppsV1beta2().StatefulSets("default").Create(ssStub); err != nil {
+	if _, err := clientSet.AppsV1().StatefulSets("default").Create(context.TODO(), ssStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,7 +146,7 @@ func TestScaleSubresources(t *testing.T) {
 		urlPath := path.Join(prefix, gvr.Group, gvr.Version, "namespaces", "default", resourceParts[0], "test", resourceParts[1])
 		obj := &unstructured.Unstructured{}
 
-		getData, err := clientSet.CoreV1().RESTClient().Get().AbsPath(urlPath).DoRaw()
+		getData, err := clientSet.CoreV1().RESTClient().Get().AbsPath(urlPath).DoRaw(context.TODO())
 		if err != nil {
 			t.Errorf("error fetching %s: %v", urlPath, err)
 			continue
@@ -175,7 +163,7 @@ func TestScaleSubresources(t *testing.T) {
 			continue
 		}
 
-		updateData, err := clientSet.CoreV1().RESTClient().Put().AbsPath(urlPath).Body(getData).DoRaw()
+		updateData, err := clientSet.CoreV1().RESTClient().Put().AbsPath(urlPath).Body(getData).DoRaw(context.TODO())
 		if err != nil {
 			t.Errorf("error putting to %s: %v", urlPath, err)
 			t.Log(string(getData))
@@ -198,31 +186,31 @@ var (
 		Spec:       corev1.ReplicationControllerSpec{Selector: podStub.Labels, Replicas: &replicas, Template: &podStub},
 	}
 
-	rsStub = &appsv1beta2.ReplicaSet{
+	rsStub = &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 
-	deploymentStub = &appsv1beta2.Deployment{
+	deploymentStub = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 
-	ssStub = &appsv1beta2.StatefulSet{
+	ssStub = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       appsv1beta2.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+		Spec:       appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 )
 
-func setup(t *testing.T) (client kubernetes.Interface, tearDown func()) {
-	result := apitesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+func setupWithOptions(t *testing.T, instanceOptions *apitesting.TestServerInstanceOptions, flags []string) (client kubernetes.Interface, tearDown func()) {
+	result := apitesting.StartTestServerOrDie(t, instanceOptions, flags, framework.SharedEtcd())
 
 	// TODO: Disable logging here until we resolve teardown issues which result in
 	// massive log spam. Another path forward would be to refactor
 	// StartTestServerOrDie to work with the etcd instance already started by the
 	// integration test scripts.
 	// See https://github.com/kubernetes/kubernetes/issues/49489.
-	repo, err := capnslog.GetRepoLogger("github.com/coreos/etcd")
+	repo, err := capnslog.GetRepoLogger("go.etcd.io/etcd")
 	if err != nil {
 		t.Fatalf("couldn't configure logging: %v", err)
 	}

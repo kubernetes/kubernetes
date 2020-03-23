@@ -12,7 +12,7 @@ import (
 
 // Dlaqr04 computes the eigenvalues of a block of an n×n upper Hessenberg matrix
 // H, and optionally the matrices T and Z from the Schur decomposition
-//  H = Z T Z^T
+//  H = Z T Zᵀ
 // where T is an upper quasi-triangular matrix (the Schur form), and Z is the
 // orthogonal matrix of Schur vectors.
 //
@@ -24,8 +24,8 @@ import (
 // Z[iloz:ihiz+1,ilo:ihi+1], otherwise Z will not be referenced.
 //
 // ilo and ihi determine the block of H on which Dlaqr04 operates. It must hold that
-//  0 <= ilo <= ihi < n,     if n > 0,
-//  ilo == 0 and ihi == -1,  if n == 0,
+//  0 <= ilo <= ihi < n     if n > 0,
+//  ilo == 0 and ihi == -1  if n == 0,
 // and the block must be isolated, that is,
 //  ilo == 0   or H[ilo,ilo-1] == 0,
 //  ihi == n-1 or H[ihi+1,ihi] == 0,
@@ -39,8 +39,8 @@ import (
 // otherwise Dlaqr04 will panic.
 //
 // work must have length at least lwork and lwork must be
-//  lwork >= 1,  if n <= 11,
-//  lwork >= n,  if n > 11,
+//  lwork >= 1  if n <= 11,
+//  lwork >= n  if n > 11,
 // otherwise Dlaqr04 will panic. lwork as large as 6*n may be required for
 // optimal performance. On return, work[0] will contain the optimal value of
 // lwork.
@@ -123,46 +123,32 @@ func (impl Implementation) Dlaqr04(wantt, wantz bool, n, ilo, ihi int, h []float
 	)
 
 	switch {
+	case n < 0:
+		panic(nLT0)
 	case ilo < 0 || max(0, n-1) < ilo:
 		panic(badIlo)
 	case ihi < min(ilo, n-1) || n <= ihi:
 		panic(badIhi)
-	case lwork < 1 && n <= ntiny && lwork != -1:
-		panic(badWork)
+	case ldh < max(1, n):
+		panic(badLdH)
+	case wantz && (iloz < 0 || ilo < iloz):
+		panic(badIloz)
+	case wantz && (ihiz < ihi || n <= ihiz):
+		panic(badIhiz)
+	case ldz < 1, wantz && ldz < n:
+		panic(badLdZ)
+	case lwork < 1 && lwork != -1:
+		panic(badLWork)
 	// TODO(vladimir-ch): Enable if and when we figure out what the minimum
 	// necessary lwork value is. Dlaqr04 says that the minimum is n which
 	// clashes with Dlaqr23's opinion about optimal work when nw <= 2
 	// (independent of n).
 	// case lwork < n && n > ntiny && lwork != -1:
-	// 	panic(badWork)
-	case len(work) < lwork:
+	// 	panic(badLWork)
+	case len(work) < max(1, lwork):
 		panic(shortWork)
 	case recur < 0:
-		panic("lapack: recur is negative")
-	}
-	if wantz {
-		if iloz < 0 || ilo < iloz {
-			panic("lapack: invalid value of iloz")
-		}
-		if ihiz < ihi || n <= ihiz {
-			panic("lapack: invalid value of ihiz")
-		}
-	}
-	if lwork != -1 {
-		checkMatrix(n, n, h, ldh)
-		if wantz {
-			checkMatrix(n, n, z, ldz)
-		}
-		switch {
-		case ilo > 0 && h[ilo*ldh+ilo-1] != 0:
-			panic("lapack: block not isolated")
-		case ihi+1 < n && h[(ihi+1)*ldh+ihi] != 0:
-			panic("lapack: block not isolated")
-		case len(wr) != ihi+1:
-			panic("lapack: bad length of wr")
-		case len(wi) != ihi+1:
-			panic("lapack: bad length of wi")
-		}
+		panic(recurLT0)
 	}
 
 	// Quick return.
@@ -171,10 +157,27 @@ func (impl Implementation) Dlaqr04(wantt, wantz bool, n, ilo, ihi int, h []float
 		return 0
 	}
 
+	if lwork != -1 {
+		switch {
+		case len(h) < (n-1)*ldh+n:
+			panic(shortH)
+		case len(wr) != ihi+1:
+			panic(badLenWr)
+		case len(wi) != ihi+1:
+			panic(badLenWi)
+		case wantz && len(z) < (n-1)*ldz+n:
+			panic(shortZ)
+		case ilo > 0 && h[ilo*ldh+ilo-1] != 0:
+			panic(notIsolated)
+		case ihi+1 < n && h[(ihi+1)*ldh+ihi] != 0:
+			panic(notIsolated)
+		}
+	}
+
 	if n <= ntiny {
 		// Tiny matrices must use Dlahqr.
-		work[0] = 1
 		if lwork == -1 {
+			work[0] = 1
 			return 0
 		}
 		return impl.Dlahqr(wantt, wantz, n, ilo, ihi, h, ldh, wr, wi, iloz, ihiz, z, ldz)
@@ -217,8 +220,8 @@ func (impl Implementation) Dlaqr04(wantt, wantz bool, n, ilo, ihi int, h []float
 	nsr = max(2, nsr&^1)
 
 	// Workspace query call to Dlaqr23.
-	impl.Dlaqr23(wantt, wantz, n, ilo, ihi, nwr+1, nil, 0, iloz, ihiz, nil, 0,
-		nil, nil, nil, 0, n, nil, 0, n, nil, 0, work, -1, recur)
+	impl.Dlaqr23(wantt, wantz, n, ilo, ihi, nwr+1, h, ldh, iloz, ihiz, z, ldz,
+		wr, wi, h, ldh, n, h, ldh, n, h, ldh, work, -1, recur)
 	// Optimal workspace is max(Dlaqr5, Dlaqr23).
 	lwkopt := max(3*nsr/2, int(work[0]))
 	// Quick return in case of workspace query.
@@ -381,7 +384,7 @@ func (impl Implementation) Dlaqr04(wantt, wantz bool, n, ilo, ihi int, h []float
 						wr[ks:ks+ns], wi[ks:ks+ns], 0, 0, nil, 0, work, lwork, recur-1)
 				} else {
 					ks += impl.Dlahqr(false, false, ns, 0, ns-1, h[kt*ldh:], ldh,
-						wr[ks:ks+ns], wi[ks:ks+ns], 0, 0, nil, 0)
+						wr[ks:ks+ns], wi[ks:ks+ns], 0, 0, nil, 1)
 				}
 				// In case of a rare QR failure use eigenvalues
 				// of the trailing 2×2 principal submatrix.
@@ -440,7 +443,7 @@ func (impl Implementation) Dlaqr04(wantt, wantz bool, n, ilo, ihi int, h []float
 			}
 		}
 
-		// Use up to ns of the the smallest magnitude shifts. If there
+		// Use up to ns of the smallest magnitude shifts. If there
 		// aren't ns shifts available, then use them all, possibly
 		// dropping one to make the number of shifts even.
 		ns = min(ns, kbot-ks+1) &^ 1

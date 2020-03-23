@@ -1,8 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
-  - stevekuznetsov 
+  - stevekuznetsov
   - deads2k
-  - sttts 
+  - sttts
 approvers:
-  - stevekuznetsov 
+  - stevekuznetsov
   - deads2k
-  - sttts 
+  - sttts

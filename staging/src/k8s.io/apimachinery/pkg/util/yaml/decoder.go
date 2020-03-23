@@ -26,8 +26,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 )
 
 // ToJSON converts a single YAML document into a JSON document
@@ -217,11 +217,9 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	if d.decoder == nil {
 		buffer, origData, isJSON := GuessJSONStream(d.r, d.bufferSize)
 		if isJSON {
-			glog.V(4).Infof("decoding stream as JSON")
 			d.decoder = json.NewDecoder(buffer)
 			d.rawData = origData
 		} else {
-			glog.V(4).Infof("decoding stream as YAML")
 			d.decoder = NewYAMLToJSONDecoder(buffer)
 		}
 	}
@@ -230,7 +228,7 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 		if syntax, ok := err.(*json.SyntaxError); ok {
 			data, readErr := ioutil.ReadAll(jsonDecoder.Buffered())
 			if readErr != nil {
-				glog.V(4).Infof("reading stream failed: %v", readErr)
+				klog.V(4).Infof("reading stream failed: %v", readErr)
 			}
 			js := string(data)
 

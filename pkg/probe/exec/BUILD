@@ -11,8 +11,9 @@ go_library(
     srcs = ["exec.go"],
     importpath = "k8s.io/kubernetes/pkg/probe/exec",
     deps = [
+        "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/probe:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

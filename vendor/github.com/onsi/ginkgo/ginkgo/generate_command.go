@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -34,10 +36,10 @@ func BuildGenerateCommand() *Command {
 var specText = `package {{.Package}}
 
 import (
-	{{if .DotImportPackage}}. "{{.PackageImportPath}}"{{end}}
-
 	{{if .IncludeImports}}. "github.com/onsi/ginkgo"{{end}}
 	{{if .IncludeImports}}. "github.com/onsi/gomega"{{end}}
+
+	{{if .DotImportPackage}}. "{{.PackageImportPath}}"{{end}}
 )
 
 var _ = Describe("{{.Subject}}", func() {
@@ -45,15 +47,15 @@ var _ = Describe("{{.Subject}}", func() {
 })
 `
 
-var agoutiSpecText = `package {{.Package}}_test
+var agoutiSpecText = `package {{.Package}}
 
 import (
-	{{if .DotImportPackage}}. "{{.PackageImportPath}}"{{end}}
-
 	{{if .IncludeImports}}. "github.com/onsi/ginkgo"{{end}}
 	{{if .IncludeImports}}. "github.com/onsi/gomega"{{end}}
-	. "github.com/sclevine/agouti/matchers"
 	"github.com/sclevine/agouti"
+	. "github.com/sclevine/agouti/matchers"
+
+	{{if .DotImportPackage}}. "{{.PackageImportPath}}"{{end}}
 )
 
 var _ = Describe("{{.Subject}}", func() {
@@ -108,10 +110,8 @@ func generateSpec(args []string, agouti, noDot, internal bool) {
 func generateSpecForSubject(subject string, agouti, noDot, internal bool) error {
 	packageName, specFilePrefix, formattedName := getPackageAndFormattedName()
 	if subject != "" {
-		subject = strings.Split(subject, ".go")[0]
-		subject = strings.Split(subject, "_test")[0]
-		specFilePrefix = subject
-		formattedName = prettifyPackageName(subject)
+		specFilePrefix = formatSubject(subject)
+		formattedName = prettifyPackageName(specFilePrefix)
 	}
 
 	data := specData{
@@ -152,11 +152,98 @@ func generateSpecForSubject(subject string, agouti, noDot, internal bool) error 
 	return nil
 }
 
+func formatSubject(name string) string {
+	name = strings.Replace(name, "-", "_", -1)
+	name = strings.Replace(name, " ", "_", -1)
+	name = strings.Split(name, ".go")[0]
+	name = strings.Split(name, "_test")[0]
+	return name
+}
+
+// moduleName returns module name from go.mod from given module root directory
+func moduleName(modRoot string) string {
+	modFile, err := os.Open(filepath.Join(modRoot, "go.mod"))
+	if err != nil {
+		return ""
+	}
+
+	mod := make([]byte, 128)
+	_, err = modFile.Read(mod)
+	if err != nil {
+		return ""
+	}
+
+	slashSlash := []byte("//")
+	moduleStr := []byte("module")
+
+	for len(mod) > 0 {
+		line := mod
+		mod = nil
+		if i := bytes.IndexByte(line, '\n'); i >= 0 {
+			line, mod = line[:i], line[i+1:]
+		}
+		if i := bytes.Index(line, slashSlash); i >= 0 {
+			line = line[:i]
+		}
+		line = bytes.TrimSpace(line)
+		if !bytes.HasPrefix(line, moduleStr) {
+			continue
+		}
+		line = line[len(moduleStr):]
+		n := len(line)
+		line = bytes.TrimSpace(line)
+		if len(line) == n || len(line) == 0 {
+			continue
+		}
+
+		if line[0] == '"' || line[0] == '`' {
+			p, err := strconv.Unquote(string(line))
+			if err != nil {
+				return "" // malformed quoted string or multiline module path
+			}
+			return p
+		}
+
+		return string(line)
+	}
+
+	return "" // missing module path
+}
+
+func findModuleRoot(dir string) (root string) {
+	dir = filepath.Clean(dir)
+
+	// Look for enclosing go.mod.
+	for {
+		if fi, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil && !fi.IsDir() {
+			return dir
+		}
+		d := filepath.Dir(dir)
+		if d == dir {
+			break
+		}
+		dir = d
+	}
+	return ""
+}
+
 func getPackageImportPath() string {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		panic(err.Error())
 	}
+
+	// Try go.mod file first
+	modRoot := findModuleRoot(workingDir)
+	if modRoot != "" {
+		modName := moduleName(modRoot)
+		if modName != "" {
+			cd := strings.Replace(workingDir, modRoot, "", -1)
+			return modName + cd
+		}
+	}
+
+	// Fallback to GOPATH structure
 	sep := string(filepath.Separator)
 	paths := strings.Split(workingDir, sep+"src"+sep)
 	if len(paths) == 1 {

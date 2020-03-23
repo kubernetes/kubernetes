@@ -17,6 +17,7 @@ limitations under the License.
 package banflunder
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -26,8 +27,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
-	listers "k8s.io/sample-apiserver/pkg/client/listers/wardle/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/generated/informers/externalversions"
+	listers "k8s.io/sample-apiserver/pkg/generated/listers/wardle/v1alpha1"
 )
 
 // Register registers a plugin
@@ -47,7 +48,7 @@ var _ = wardleinitializer.WantsInternalWardleInformerFactory(&DisallowFlunder{})
 // Admit ensures that the object in-flight is of kind Flunder.
 // In addition checks that the Name is not on the banned list.
 // The list is stored in Fischers API objects.
-func (d *DisallowFlunder) Admit(a admission.Attributes) error {
+func (d *DisallowFlunder) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	// we are only interested in flunders
 	if a.GetKind().GroupKind() != wardle.Kind("Flunder") {
 		return nil
@@ -85,11 +86,11 @@ func (d *DisallowFlunder) Admit(a admission.Attributes) error {
 // SetInternalWardleInformerFactory gets Lister from SharedInformerFactory.
 // The lister knows how to lists Fischers.
 func (d *DisallowFlunder) SetInternalWardleInformerFactory(f informers.SharedInformerFactory) {
-	d.lister = f.Wardle().InternalVersion().Fischers().Lister()
-	d.SetReadyFunc(f.Wardle().InternalVersion().Fischers().Informer().HasSynced)
+	d.lister = f.Wardle().V1alpha1().Fischers().Lister()
+	d.SetReadyFunc(f.Wardle().V1alpha1().Fischers().Informer().HasSynced)
 }
 
-// ValidaValidateInitializationte checks whether the plugin was correctly initialized.
+// ValidateInitialization checks whether the plugin was correctly initialized.
 func (d *DisallowFlunder) ValidateInitialization() error {
 	if d.lister == nil {
 		return fmt.Errorf("missing fischer lister")

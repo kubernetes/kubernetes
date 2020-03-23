@@ -22,9 +22,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
@@ -32,14 +32,14 @@ import (
 func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
 	info, err := ds.client.Info()
 	if err != nil {
-		glog.Errorf("Failed to get docker info: %v", err)
+		klog.Errorf("Failed to get docker info: %v", err)
 		return nil, err
 	}
 
 	statsClient := &winstats.StatsClient{}
 	fsinfo, err := statsClient.GetDirFsInfo(info.DockerRootDir)
 	if err != nil {
-		glog.Errorf("Failed to get dir fsInfo for %q: %v", info.DockerRootDir, err)
+		klog.Errorf("Failed to get dir fsInfo for %q: %v", info.DockerRootDir, err)
 		return nil, err
 	}
 

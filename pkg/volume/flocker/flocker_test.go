@@ -21,15 +21,15 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume"
-	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
 	flockerapi "github.com/clusterhq/flocker-go"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 const pluginName = "kubernetes.io/flocker"
@@ -127,7 +127,7 @@ func newInitializedVolumePlugMgr(t *testing.T) (*volume.VolumePluginMgr, string)
 	plugMgr := &volume.VolumePluginMgr{}
 	dir, err := utiltesting.MkTmpdir("flocker")
 	assert.NoError(t, err)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(dir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, dir, nil, nil))
 	return plugMgr, dir
 }
 
@@ -138,7 +138,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/flocker")
 	if err != nil {
@@ -153,7 +153,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 	fakeManager := &fakeFlockerUtil{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := mount.NewFakeMounter(nil)
 	mounter, err := plug.(*flockerPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -302,62 +302,3 @@ func TestIsReadOnly(t *testing.T) {
 	b := &flockerVolumeMounter{readOnly: true}
 	assert.True(t, b.GetAttributes().ReadOnly)
 }
-
-type mockFlockerClient struct {
-	datasetID, primaryUUID, path string
-	datasetState                 *flockerapi.DatasetState
-}
-
-func newMockFlockerClient(mockDatasetID, mockPrimaryUUID, mockPath string) *mockFlockerClient {
-	return &mockFlockerClient{
-		datasetID:   mockDatasetID,
-		primaryUUID: mockPrimaryUUID,
-		path:        mockPath,
-		datasetState: &flockerapi.DatasetState{
-			Path:      mockPath,
-			DatasetID: mockDatasetID,
-			Primary:   mockPrimaryUUID,
-		},
-	}
-}
-
-func (m mockFlockerClient) CreateDataset(metaName string) (*flockerapi.DatasetState, error) {
-	return m.datasetState, nil
-}
-func (m mockFlockerClient) GetDatasetState(datasetID string) (*flockerapi.DatasetState, error) {
-	return m.datasetState, nil
-}
-func (m mockFlockerClient) GetDatasetID(metaName string) (string, error) {
-	return m.datasetID, nil
-}
-func (m mockFlockerClient) GetPrimaryUUID() (string, error) {
-	return m.primaryUUID, nil
-}
-func (m mockFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerapi.DatasetState, error) {
-	return m.datasetState, nil
-}
-
-/*
-TODO: re-enable after refactor
-func TestSetUpAtInternal(t *testing.T) {
-	const dir = "dir"
-	mockPath := "expected-to-be-set-properly" // package var
-	expectedPath := mockPath
-
-	assert := assert.New(t)
-
-	plugMgr, rootDir := newInitializedVolumePlugMgr(t)
-	if rootDir != "" {
-		defer os.RemoveAll(rootDir)
-	}
-	plug, err := plugMgr.FindPluginByName(flockerPluginName)
-	assert.NoError(err)
-
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	b := flockerVolumeMounter{flockerVolume: &flockerVolume{pod: pod, plugin: plug.(*flockerPlugin)}}
-	b.client = newMockFlockerClient("dataset-id", "primary-uid", mockPath)
-
-	assert.NoError(b.SetUpAt(dir, nil))
-	assert.Equal(expectedPath, b.flocker.path)
-}
-*/

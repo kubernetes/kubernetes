@@ -2,7 +2,9 @@ package gophercloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -71,26 +73,44 @@ type ProviderClient struct {
 	// authentication functions for different Identity service versions.
 	ReauthFunc func() error
 
+	// Throwaway determines whether if this client is a throw-away client. It's a copy of user's provider client
+	// with the token and reauth func zeroed. Such client can be used to perform reauthorization.
+	Throwaway bool
+
+	// Context is the context passed to the HTTP request.
+	Context context.Context
+
+	// mut is a mutex for the client. It protects read and write access to client attributes such as getting
+	// and setting the TokenID.
 	mut *sync.RWMutex
 
+	// reauthmut is a mutex for reauthentication it attempts to ensure that only one reauthentication
+	// attempt happens at one time.
 	reauthmut *reauthlock
+
+	authResult AuthResult
 }
 
+// reauthlock represents a set of attributes used to help in the reauthentication process.
 type reauthlock struct {
 	sync.RWMutex
-	reauthing bool
+	reauthing    bool
+	reauthingErr error
+	done         *sync.Cond
 }
 
 // AuthenticatedHeaders returns a map of HTTP headers that are common for all
-// authenticated service requests.
+// authenticated service requests. Blocks if Reauthenticate is in progress.
 func (client *ProviderClient) AuthenticatedHeaders() (m map[string]string) {
+	if client.IsThrowaway() {
+		return
+	}
 	if client.reauthmut != nil {
-		client.reauthmut.RLock()
-		if client.reauthmut.reauthing {
-			client.reauthmut.RUnlock()
-			return
+		client.reauthmut.Lock()
+		for client.reauthmut.reauthing {
+			client.reauthmut.done.Wait()
 		}
-		client.reauthmut.RUnlock()
+		client.reauthmut.Unlock()
 	}
 	t := client.Token()
 	if t == "" {
@@ -106,6 +126,20 @@ func (client *ProviderClient) UseTokenLock() {
 	client.reauthmut = new(reauthlock)
 }
 
+// GetAuthResult returns the result from the request that was used to obtain a
+// provider client's Keystone token.
+//
+// The result is nil when authentication has not yet taken place, when the token
+// was set manually with SetToken(), or when a ReauthFunc was used that does not
+// record the AuthResult.
+func (client *ProviderClient) GetAuthResult() AuthResult {
+	if client.mut != nil {
+		client.mut.RLock()
+		defer client.mut.RUnlock()
+	}
+	return client.authResult
+}
+
 // Token safely reads the value of the auth token from the ProviderClient. Applications should
 // call this method to access the token instead of the TokenID field
 func (client *ProviderClient) Token() string {
@@ -117,33 +151,102 @@ func (client *ProviderClient) Token() string {
 }
 
 // SetToken safely sets the value of the auth token in the ProviderClient. Applications may
-// use this method in a custom ReauthFunc
+// use this method in a custom ReauthFunc.
+//
+// WARNING: This function is deprecated. Use SetTokenAndAuthResult() instead.
 func (client *ProviderClient) SetToken(t string) {
 	if client.mut != nil {
 		client.mut.Lock()
 		defer client.mut.Unlock()
 	}
 	client.TokenID = t
+	client.authResult = nil
 }
 
-//Reauthenticate calls client.ReauthFunc in a thread-safe way. If this is
-//called because of a 401 response, the caller may pass the previous token. In
-//this case, the reauthentication can be skipped if another thread has already
-//reauthenticated in the meantime. If no previous token is known, an empty
-//string should be passed instead to force unconditional reauthentication.
+// SetTokenAndAuthResult safely sets the value of the auth token in the
+// ProviderClient and also records the AuthResult that was returned from the
+// token creation request. Applications may call this in a custom ReauthFunc.
+func (client *ProviderClient) SetTokenAndAuthResult(r AuthResult) error {
+	tokenID := ""
+	var err error
+	if r != nil {
+		tokenID, err = r.ExtractTokenID()
+		if err != nil {
+			return err
+		}
+	}
+
+	if client.mut != nil {
+		client.mut.Lock()
+		defer client.mut.Unlock()
+	}
+	client.TokenID = tokenID
+	client.authResult = r
+	return nil
+}
+
+// CopyTokenFrom safely copies the token from another ProviderClient into the
+// this one.
+func (client *ProviderClient) CopyTokenFrom(other *ProviderClient) {
+	if client.mut != nil {
+		client.mut.Lock()
+		defer client.mut.Unlock()
+	}
+	if other.mut != nil && other.mut != client.mut {
+		other.mut.RLock()
+		defer other.mut.RUnlock()
+	}
+	client.TokenID = other.TokenID
+	client.authResult = other.authResult
+}
+
+// IsThrowaway safely reads the value of the client Throwaway field.
+func (client *ProviderClient) IsThrowaway() bool {
+	if client.reauthmut != nil {
+		client.reauthmut.RLock()
+		defer client.reauthmut.RUnlock()
+	}
+	return client.Throwaway
+}
+
+// SetThrowaway safely sets the value of the client Throwaway field.
+func (client *ProviderClient) SetThrowaway(v bool) {
+	if client.reauthmut != nil {
+		client.reauthmut.Lock()
+		defer client.reauthmut.Unlock()
+	}
+	client.Throwaway = v
+}
+
+// Reauthenticate calls client.ReauthFunc in a thread-safe way. If this is
+// called because of a 401 response, the caller may pass the previous token. In
+// this case, the reauthentication can be skipped if another thread has already
+// reauthenticated in the meantime. If no previous token is known, an empty
+// string should be passed instead to force unconditional reauthentication.
 func (client *ProviderClient) Reauthenticate(previousToken string) (err error) {
 	if client.ReauthFunc == nil {
 		return nil
 	}
 
-	if client.mut == nil {
+	if client.reauthmut == nil {
 		return client.ReauthFunc()
 	}
-	client.mut.Lock()
-	defer client.mut.Unlock()
+
+	client.reauthmut.Lock()
+	if client.reauthmut.reauthing {
+		for !client.reauthmut.reauthing {
+			client.reauthmut.done.Wait()
+		}
+		err = client.reauthmut.reauthingErr
+		client.reauthmut.Unlock()
+		return err
+	}
+	client.reauthmut.Unlock()
 
 	client.reauthmut.Lock()
 	client.reauthmut.reauthing = true
+	client.reauthmut.done = sync.NewCond(client.reauthmut)
+	client.reauthmut.reauthingErr = nil
 	client.reauthmut.Unlock()
 
 	if previousToken == "" || client.TokenID == previousToken {
@@ -152,6 +255,8 @@ func (client *ProviderClient) Reauthenticate(previousToken string) (err error) {
 
 	client.reauthmut.Lock()
 	client.reauthmut.reauthing = false
+	client.reauthmut.reauthingErr = err
+	client.reauthmut.done.Broadcast()
 	client.reauthmut.Unlock()
 	return
 }
@@ -192,7 +297,7 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 	// io.ReadSeeker as-is. Default the content-type to application/json.
 	if options.JSONBody != nil {
 		if options.RawBody != nil {
-			panic("Please provide only one of JSONBody or RawBody to gophercloud.Request().")
+			return nil, errors.New("please provide only one of JSONBody or RawBody to gophercloud.Request()")
 		}
 
 		rendered, err := json.Marshal(options.JSONBody)
@@ -212,6 +317,9 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
+	}
+	if client.Context != nil {
+		req = req.WithContext(client.Context)
 	}
 
 	// Populate the request headers. Apply options.MoreHeaders last, to give the caller the chance to
@@ -251,13 +359,14 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 	}
 
 	// Allow default OkCodes if none explicitly set
-	if options.OkCodes == nil {
-		options.OkCodes = defaultOkCodes(method)
+	okc := options.OkCodes
+	if okc == nil {
+		okc = defaultOkCodes(method)
 	}
 
 	// Validate the HTTP response status.
 	var ok bool
-	for _, code := range options.OkCodes {
+	for _, code := range okc {
 		if resp.StatusCode == code {
 			ok = true
 			break
@@ -334,6 +443,11 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 			if error408er, ok := errType.(Err408er); ok {
 				err = error408er.Error408(respErr)
 			}
+		case http.StatusConflict:
+			err = ErrDefault409{respErr}
+			if error409er, ok := errType.(Err409er); ok {
+				err = error409er.Error409(respErr)
+			}
 		case 429:
 			err = ErrDefault429{respErr}
 			if error429er, ok := errType.(Err429er); ok {
@@ -378,7 +492,7 @@ func defaultOkCodes(method string) []int {
 	case method == "PUT":
 		return []int{201, 202}
 	case method == "PATCH":
-		return []int{200, 204}
+		return []int{200, 202, 204}
 	case method == "DELETE":
 		return []int{202, 204}
 	}

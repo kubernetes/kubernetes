@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx0-deployment
@@ -6,6 +6,9 @@ metadata:
     app: nginx0-deployment
 spec:
   replicas: 2
+  selector:
+    matchLabels:
+      app: nginx0
   template:
     metadata:
       labels:

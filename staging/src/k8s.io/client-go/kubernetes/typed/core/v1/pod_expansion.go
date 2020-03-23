@@ -17,26 +17,29 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 )
 
 // The PodExpansion interface allows manually adding extra methods to the PodInterface.
 type PodExpansion interface {
-	Bind(binding *v1.Binding) error
-	Evict(eviction *policy.Eviction) error
+	Bind(ctx context.Context, binding *v1.Binding, opts metav1.CreateOptions) error
+	Evict(ctx context.Context, eviction *policy.Eviction) error
 	GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request
 }
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
-func (c *pods) Bind(binding *v1.Binding) error {
-	return c.client.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
+func (c *pods) Bind(ctx context.Context, binding *v1.Binding, opts metav1.CreateOptions) error {
+	return c.client.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).VersionedParams(&opts, scheme.ParameterCodec).SubResource("binding").Body(binding).Do(ctx).Error()
 }
 
-func (c *pods) Evict(eviction *policy.Eviction) error {
-	return c.client.Post().Namespace(c.ns).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do().Error()
+func (c *pods) Evict(ctx context.Context, eviction *policy.Eviction) error {
+	return c.client.Post().Namespace(c.ns).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
 }
 
 // Get constructs a request for getting the logs for a pod

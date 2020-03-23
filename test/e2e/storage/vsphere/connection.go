@@ -22,10 +22,10 @@ import (
 	neturl "net/url"
 	"sync"
 
-	"github.com/golang/glog"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
+	"k8s.io/klog"
 )
 
 const (
@@ -46,7 +46,7 @@ func Connect(ctx context.Context, vs *VSphere) error {
 	if vs.Client == nil {
 		vs.Client, err = NewClient(ctx, vs)
 		if err != nil {
-			glog.Errorf("Failed to create govmomi client. err: %+v", err)
+			klog.Errorf("Failed to create govmomi client. err: %+v", err)
 			return err
 		}
 		return nil
@@ -54,17 +54,17 @@ func Connect(ctx context.Context, vs *VSphere) error {
 	manager := session.NewManager(vs.Client.Client)
 	userSession, err := manager.UserSession(ctx)
 	if err != nil {
-		glog.Errorf("Error while obtaining user session. err: %+v", err)
+		klog.Errorf("Error while obtaining user session. err: %+v", err)
 		return err
 	}
 	if userSession != nil {
 		return nil
 	}
-	glog.Warningf("Creating new client session since the existing session is not valid or not authenticated")
+	klog.Warningf("Creating new client session since the existing session is not valid or not authenticated")
 	vs.Client.Logout(ctx)
 	vs.Client, err = NewClient(ctx, vs)
 	if err != nil {
-		glog.Errorf("Failed to create govmomi client. err: %+v", err)
+		klog.Errorf("Failed to create govmomi client. err: %+v", err)
 		return err
 	}
 	return nil
@@ -74,13 +74,13 @@ func Connect(ctx context.Context, vs *VSphere) error {
 func NewClient(ctx context.Context, vs *VSphere) (*govmomi.Client, error) {
 	url, err := neturl.Parse(fmt.Sprintf("https://%s:%s/sdk", vs.Config.Hostname, vs.Config.Port))
 	if err != nil {
-		glog.Errorf("Failed to parse URL: %s. err: %+v", url, err)
+		klog.Errorf("Failed to parse URL: %s. err: %+v", url, err)
 		return nil, err
 	}
 	url.User = neturl.UserPassword(vs.Config.Username, vs.Config.Password)
 	client, err := govmomi.NewClient(ctx, url, true)
 	if err != nil {
-		glog.Errorf("Failed to create new client. err: %+v", err)
+		klog.Errorf("Failed to create new client. err: %+v", err)
 		return nil, err
 	}
 	if vs.Config.RoundTripperCount == 0 {

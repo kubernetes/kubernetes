@@ -1,45 +1,37 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - lavalamp
 - mikedanese
+- sttts
 reviewers:
-- '249043822'
 - a-robinson
 - brendandburns
 - caesarxuchao
+- cheftako
 - cjcullen
-- dalanlan
 - david-mcmahon
 - davidopp
-- ddysher
 - deads2k
 - derekwaynecarr
 - eparis
 - erictune
 - errordeveloper
 - feiskyer
-- fgrzadkowski
-- ghodss
-- girishkalele
 - gmarek
-- goltermann
 - humblec
 - ingvagabund
 - janetkuo
 - jayunit100
-- jbeda
-- jdef
 - jlowdermilk
 - johscheuer
 - jsafrane
-- jszczepkowski
 - justinsb
 - lavalamp
 - liggitt
 - luxas
 - madhusudancs
-- markturansky
-- mfanjie
 - mikedanese
 - mml
 - mqliang
@@ -50,7 +42,6 @@ reviewers:
 - pmorie
 - quinton-hoole
 - resouer
-- roberthbailey
 - rootfs
 - rrati
 - saad-ali
@@ -59,6 +50,7 @@ reviewers:
 - smarterclayton
 - soltysh
 - spiffxp
+- stewart-yu
 - sttts
 - thockin
 - timothysc

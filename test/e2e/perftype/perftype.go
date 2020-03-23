@@ -25,7 +25,7 @@ package perftype
 // DataItem is the data point.
 type DataItem struct {
 	// Data is a map from bucket to real data point (e.g. "Perc90" -> 23.5). Notice
-	// that all data items with the same label conbination should have the same buckets.
+	// that all data items with the same label combination should have the same buckets.
 	Data map[string]float64 `json:"data"`
 	// Unit is the data unit. Notice that all data items with the same label combination
 	// should have the same unit.

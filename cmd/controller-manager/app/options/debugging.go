@@ -19,13 +19,22 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // DebuggingOptions holds the Debugging options.
 type DebuggingOptions struct {
-	EnableProfiling           bool
-	EnableContentionProfiling bool
+	*componentbaseconfig.DebuggingConfiguration
+}
+
+// RecommendedDebuggingOptions returns the currently recommended debugging options.  These are subject to change
+// between releases as we add options and decide which features should be exposed or not by default.
+func RecommendedDebuggingOptions() *DebuggingOptions {
+	return &DebuggingOptions{
+		DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
+			EnableProfiling: true, // profile debugging is cheap to have exposed and standard on kube binaries
+		},
+	}
 }
 
 // AddFlags adds flags related to debugging for controller manager to the specified FlagSet.
@@ -41,7 +50,7 @@ func (o *DebuggingOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up Debugging config with options.
-func (o *DebuggingOptions) ApplyTo(cfg *apiserverconfig.DebuggingConfiguration) error {
+func (o *DebuggingOptions) ApplyTo(cfg *componentbaseconfig.DebuggingConfiguration) error {
 	if o == nil {
 		return nil
 	}

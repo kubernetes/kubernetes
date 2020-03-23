@@ -17,35 +17,35 @@ limitations under the License.
 package streaming
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
-func ErrorStreamingDisabled(method string) error {
-	return status.Errorf(codes.NotFound, fmt.Sprintf("streaming method %s disabled", method))
+// NewErrorStreamingDisabled creates an error for disabled streaming method.
+func NewErrorStreamingDisabled(method string) error {
+	return grpcstatus.Errorf(codes.NotFound, "streaming method %s disabled", method)
 }
 
-// The error returned when the maximum number of in-flight requests is exceeded.
-func ErrorTooManyInFlight() error {
-	return status.Errorf(codes.ResourceExhausted, "maximum number of in-flight requests exceeded")
+// NewErrorTooManyInFlight creates an error for exceeding the maximum number of in-flight requests.
+func NewErrorTooManyInFlight() error {
+	return grpcstatus.Error(codes.ResourceExhausted, "maximum number of in-flight requests exceeded")
 }
 
-// Translates a CRI streaming error into an appropriate HTTP response.
+// WriteError translates a CRI streaming error into an appropriate HTTP response.
 func WriteError(err error, w http.ResponseWriter) error {
+	s, _ := grpcstatus.FromError(err)
 	var status int
-	switch grpc.Code(err) {
+	switch s.Code() {
 	case codes.NotFound:
 		status = http.StatusNotFound
 	case codes.ResourceExhausted:
 		// We only expect to hit this if there is a DoS, so we just wait the full TTL.
-		// If this is ever hit in steady-state operations, consider increasing the MaxInFlight requests,
+		// If this is ever hit in steady-state operations, consider increasing the maxInFlight requests,
 		// or plumbing through the time to next expiration.
-		w.Header().Set("Retry-After", strconv.Itoa(int(CacheTTL.Seconds())))
+		w.Header().Set("Retry-After", strconv.Itoa(int(cacheTTL.Seconds())))
 		status = http.StatusTooManyRequests
 	default:
 		status = http.StatusInternalServerError

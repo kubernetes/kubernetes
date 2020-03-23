@@ -19,6 +19,7 @@ package configmap
 // This file tests use of the configMap API resource.
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -56,7 +57,7 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 		},
 	}
 
-	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(&cfg); err != nil {
+	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), &cfg, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unable to create test configMap: %v", err)
 	}
 	defer deleteConfigMapOrErrorf(t, client, cfg.Namespace, cfg.Name)
@@ -111,14 +112,14 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 	}
 
 	pod.ObjectMeta.Name = "uses-configmap"
-	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 }
 
 func deleteConfigMapOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.CoreV1().ConfigMaps(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete ConfigMap %v: %v", name, err)
 	}
 }

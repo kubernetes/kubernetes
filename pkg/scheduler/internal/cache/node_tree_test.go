@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 var allNodes = []*v1.Node{
@@ -37,7 +36,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-1",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion: "region-1",
+				v1.LabelZoneRegion: "region-1",
 			},
 		},
 	},
@@ -46,7 +45,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-2",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -55,8 +54,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-3",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -65,8 +64,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-4",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -75,8 +74,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-5",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-3",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-3",
 			},
 		},
 	},
@@ -85,8 +84,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-6",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -95,8 +94,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-7",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -105,29 +104,52 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-8",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
-	}}
+	},
+	// Node 9: a node with zone + region label and the deprecated zone + region label
+	{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-9",
+			Labels: map[string]string{
+				v1.LabelZoneRegionStable:        "region-2",
+				v1.LabelZoneFailureDomainStable: "zone-2",
+				v1.LabelZoneRegion:              "region-2",
+				v1.LabelZoneFailureDomain:       "zone-2",
+			},
+		},
+	},
+	// Node 10: a node with only the deprecated zone + region labels
+	{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-10",
+			Labels: map[string]string{
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-3",
+			},
+		},
+	},
+}
 
-func verifyNodeTree(t *testing.T, nt *NodeTree, expectedTree map[string]*nodeArray) {
+func verifyNodeTree(t *testing.T, nt *nodeTree, expectedTree map[string]*nodeArray) {
 	expectedNumNodes := int(0)
 	for _, na := range expectedTree {
 		expectedNumNodes += len(na.nodes)
 	}
-	if nt.NumNodes != expectedNumNodes {
-		t.Errorf("unexpected NodeTree.numNodes. Expected: %v, Got: %v", expectedNumNodes, nt.NumNodes)
+	if numNodes := nt.numNodes; numNodes != expectedNumNodes {
+		t.Errorf("unexpected nodeTree.numNodes. Expected: %v, Got: %v", expectedNumNodes, numNodes)
 	}
 	if !reflect.DeepEqual(nt.tree, expectedTree) {
 		t.Errorf("The node tree is not the same as expected. Expected: %v, Got: %v", expectedTree, nt.tree)
 	}
 	if len(nt.zones) != len(expectedTree) {
-		t.Errorf("Number of zones in NodeTree.zones is not expected. Expected: %v, Got: %v", len(expectedTree), len(nt.zones))
+		t.Errorf("Number of zones in nodeTree.zones is not expected. Expected: %v, Got: %v", len(expectedTree), len(nt.zones))
 	}
 	for _, z := range nt.zones {
 		if _, ok := expectedTree[z]; !ok {
-			t.Errorf("zone %v is not expected to exist in NodeTree.zones", z)
+			t.Errorf("zone %v is not expected to exist in nodeTree.zones", z)
 		}
 	}
 }
@@ -165,13 +187,21 @@ func TestNodeTree_AddNode(t *testing.T) {
 				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
 			},
 		},
+		{
+			name:       "nodes also using deprecated zone/region label",
+			nodesToAdd: allNodes[9:],
+			expectedTree: map[string]*nodeArray{
+				"region-2:\x00:zone-2": {[]string{"node-9"}, 0},
+				"region-2:\x00:zone-3": {[]string{"node-10"}, 0},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nt := newNodeTree(nil)
 			for _, n := range test.nodesToAdd {
-				nt.AddNode(n)
+				nt.addNode(n)
 			}
 			verifyNodeTree(t, nt, test.expectedTree)
 		})
@@ -228,7 +258,7 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nt := newNodeTree(test.existingNodes)
 			for _, n := range test.nodesToRemove {
-				err := nt.RemoveNode(n)
+				err := nt.removeNode(n)
 				if test.expectError == (err == nil) {
 					t.Errorf("unexpected returned error value: %v", err)
 				}
@@ -252,8 +282,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
@@ -272,8 +302,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
@@ -288,8 +318,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-new",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
@@ -313,7 +343,7 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 			if oldNode == nil {
 				oldNode = &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nonexisting-node"}}
 			}
-			nt.UpdateNode(oldNode, test.nodeToUpdate)
+			nt.updateNode(oldNode, test.nodeToUpdate)
 			verifyNodeTree(t, nt, test.expectedTree)
 		})
 	}
@@ -358,7 +388,7 @@ func TestNodeTree_Next(t *testing.T) {
 
 			var output []string
 			for i := 0; i < test.numRuns; i++ {
-				output = append(output, nt.Next())
+				output = append(output, nt.next())
 			}
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)
@@ -401,7 +431,7 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 			nodesToAdd:     append(allNodes[4:9], allNodes[3]),
 			nodesToRemove:  nil,
 			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "add", "next", "next", "next"},
-			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-3", "node-8", "node-4"},
+			expectedOutput: []string{"node-4", "node-6", "node-7", "node-8", "node-3", "node-4", "node-6"},
 		},
 		{
 			name:           "remove zone and add new to ensure exhausted is reset correctly",
@@ -424,18 +454,18 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 					if addIndex >= len(test.nodesToAdd) {
 						t.Error("more add operations than nodesToAdd")
 					} else {
-						nt.AddNode(test.nodesToAdd[addIndex])
+						nt.addNode(test.nodesToAdd[addIndex])
 						addIndex++
 					}
 				case "remove":
 					if removeIndex >= len(test.nodesToRemove) {
 						t.Error("more remove operations than nodesToRemove")
 					} else {
-						nt.RemoveNode(test.nodesToRemove[removeIndex])
+						nt.removeNode(test.nodesToRemove[removeIndex])
 						removeIndex++
 					}
 				case "next":
-					output = append(output, nt.Next())
+					output = append(output, nt.next())
 				default:
 					t.Errorf("unknow operation: %v", op)
 				}

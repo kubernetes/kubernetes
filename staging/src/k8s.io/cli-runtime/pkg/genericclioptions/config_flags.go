@@ -17,16 +17,19 @@ limitations under the License.
 package genericclioptions
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
+	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
@@ -39,6 +42,7 @@ const (
 	flagContext          = "context"
 	flagNamespace        = "namespace"
 	flagAPIServer        = "server"
+	flagTLSServerName    = "tls-server-name"
 	flagInsecure         = "insecure-skip-tls-verify"
 	flagCertFile         = "client-certificate"
 	flagKeyFile          = "client-key"
@@ -52,7 +56,17 @@ const (
 	flagHTTPCacheDir     = "cache-dir"
 )
 
-var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+var (
+	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+
+	ErrEmptyConfig = errors.New(`Missing or incomplete configuration info.  Please point to an existing, complete config file:
+
+  1. Via the command-line flag --kubeconfig
+  2. Via the KUBECONFIG environment variable
+  3. In your home directory as ~/.kube/config
+
+To view or setup config directly use the 'config' command.`)
+)
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
@@ -82,6 +96,7 @@ type ConfigFlags struct {
 	Context          *string
 	Namespace        *string
 	APIServer        *string
+	TLSServerName    *string
 	Insecure         *bool
 	CertFile         *string
 	KeyFile          *string
@@ -92,6 +107,13 @@ type ConfigFlags struct {
 	Username         *string
 	Password         *string
 	Timeout          *string
+
+	clientConfig clientcmd.ClientConfig
+	lock         sync.Mutex
+	// If set to true, will use persistent client config and
+	// propagate the config to the places that need it, rather than
+	// loading the config multiple times
+	usePersistentConfig bool
 }
 
 // ToRESTConfig implements RESTClientGetter.
@@ -99,13 +121,25 @@ type ConfigFlags struct {
 // to a .kubeconfig file, loading rules, and config flag overrides.
 // Expects the AddFlags method to have been called.
 func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
-	return f.ToRawKubeConfigLoader().ClientConfig()
+	config, err := f.ToRawKubeConfigLoader().ClientConfig()
+	// replace client-go's ErrEmptyConfig error with our custom, more verbose version
+	if clientcmd.IsEmptyConfig(err) {
+		return nil, ErrEmptyConfig
+	}
+	return config, err
 }
 
 // ToRawKubeConfigLoader binds config flag values to config overrides
 // Returns an interactive clientConfig if the password flag is enabled,
 // or a non-interactive clientConfig otherwise.
 func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+	if f.usePersistentConfig {
+		return f.toRawKubePersistentConfigLoader()
+	}
+	return f.toRawKubeConfigLoader()
+}
+
+func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	// use the standard defaults for this client command
 	// DEPRECATED: remove and replace with something more accurate
@@ -144,6 +178,9 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	if f.APIServer != nil {
 		overrides.ClusterInfo.Server = *f.APIServer
 	}
+	if f.TLSServerName != nil {
+		overrides.ClusterInfo.TLSServerName = *f.TLSServerName
+	}
 	if f.CAFile != nil {
 		overrides.ClusterInfo.CertificateAuthority = *f.CAFile
 	}
@@ -181,6 +218,19 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return clientConfig
 }
 
+// toRawKubePersistentConfigLoader binds config flag values to config overrides
+// Returns a persistent clientConfig for propagation.
+func (f *ConfigFlags) toRawKubePersistentConfigLoader() clientcmd.ClientConfig {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.clientConfig == nil {
+		f.clientConfig = f.toRawKubeConfigLoader()
+	}
+
+	return f.clientConfig
+}
+
 // ToDiscoveryClient implements RESTClientGetter.
 // Expects the AddFlags method to have been called.
 // Returns a CachedDiscoveryInterface using a computed RESTConfig.
@@ -203,7 +253,7 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	}
 
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
-	return discovery.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
+	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
 // ToRESTMapper returns a mapper.
@@ -265,6 +315,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.APIServer != nil {
 		flags.StringVarP(f.APIServer, flagAPIServer, "s", *f.APIServer, "The address and port of the Kubernetes API server")
 	}
+	if f.TLSServerName != nil {
+		flags.StringVar(f.TLSServerName, flagTLSServerName, *f.TLSServerName, "Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used")
+	}
 	if f.Insecure != nil {
 		flags.BoolVar(f.Insecure, flagInsecure, *f.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure")
 	}
@@ -285,7 +338,7 @@ func (f *ConfigFlags) WithDeprecatedPasswordFlag() *ConfigFlags {
 }
 
 // NewConfigFlags returns ConfigFlags with default values set
-func NewConfigFlags() *ConfigFlags {
+func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
 	insecure := false
 
@@ -300,12 +353,15 @@ func NewConfigFlags() *ConfigFlags {
 		Context:          stringptr(""),
 		Namespace:        stringptr(""),
 		APIServer:        stringptr(""),
+		TLSServerName:    stringptr(""),
 		CertFile:         stringptr(""),
 		KeyFile:          stringptr(""),
 		CAFile:           stringptr(""),
 		BearerToken:      stringptr(""),
 		Impersonate:      stringptr(""),
 		ImpersonateGroup: &impersonateGroup,
+
+		usePersistentConfig: usePersistentConfig,
 	}
 }
 

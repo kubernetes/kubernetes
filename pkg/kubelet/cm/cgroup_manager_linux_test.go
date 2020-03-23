@@ -20,8 +20,33 @@ package cm
 
 import (
 	"path"
+	"reflect"
 	"testing"
 )
+
+// TestNewCgroupName tests confirms that #68416 is fixed
+func TestNewCgroupName(t *testing.T) {
+	a := ParseCgroupfsToCgroupName("/a/")
+	ab := NewCgroupName(a, "b")
+
+	expectedAB := CgroupName([]string{"a", "", "b"})
+	if !reflect.DeepEqual(ab, expectedAB) {
+		t.Errorf("Expected %d%+v; got %d%+v", len(expectedAB), expectedAB, len(ab), ab)
+	}
+
+	abc := NewCgroupName(ab, "c")
+
+	expectedABC := CgroupName([]string{"a", "", "b", "c"})
+	if !reflect.DeepEqual(abc, expectedABC) {
+		t.Errorf("Expected %d%+v; got %d%+v", len(expectedABC), expectedABC, len(abc), abc)
+	}
+
+	_ = NewCgroupName(ab, "d")
+
+	if !reflect.DeepEqual(abc, expectedABC) {
+		t.Errorf("Expected %d%+v; got %d%+v", len(expectedABC), expectedABC, len(abc), abc)
+	}
+}
 
 func TestCgroupNameToSystemdBasename(t *testing.T) {
 	testCases := []struct {
@@ -117,6 +142,28 @@ func TestCgroupNameToCgroupfs(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		if actual := testCase.input.ToCgroupfs(); actual != testCase.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+	}
+}
+
+func TestParseSystemdToCgroupName(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected CgroupName
+	}{
+		{
+			input:    "/test",
+			expected: []string{"test"},
+		},
+		{
+			input:    "/test.slice",
+			expected: []string{"test"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		if actual := ParseSystemdToCgroupName(testCase.input); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}

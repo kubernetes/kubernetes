@@ -27,20 +27,21 @@ import (
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
-	VolDir                    = "kubevols"
-	DefaultDiskCapacityKB     = 2097152
-	DefaultDiskFormat         = "thin"
-	DefaultSCSIControllerType = "lsiLogic"
-	VirtualMachineType        = "VirtualMachine"
+	volDir                    = "kubevols"
+	defaultDiskCapacityKB     = 2097152
+	defaultDiskFormat         = "thin"
+	defaultSCSIControllerType = "lsiLogic"
+	virtualMachineType        = "VirtualMachine"
 )
 
-// Represents a vSphere instance where one or more kubernetes nodes are running.
+// VSphere represents a vSphere instance where one or more kubernetes nodes are running.
 type VSphere struct {
 	Config *Config
 	Client *govmomi.Client
@@ -62,7 +63,7 @@ func (vs *VSphere) GetDatacenter(ctx context.Context, datacenterPath string) (*o
 	return finder.Datacenter(ctx, datacenterPath)
 }
 
-// GetDatacenter returns the DataCenter Object for the given datacenterPath
+// GetDatacenterFromObjectReference returns the DataCenter Object for the given datacenter reference
 func (vs *VSphere) GetDatacenterFromObjectReference(ctx context.Context, dc object.Reference) *object.Datacenter {
 	Connect(ctx, vs)
 	return object.NewDatacenter(vs.Client.Client, dc.Reference())
@@ -75,13 +76,40 @@ func (vs *VSphere) GetAllDatacenter(ctx context.Context) ([]*object.Datacenter, 
 	return finder.DatacenterList(ctx, "*")
 }
 
-// GetVMByUUID gets the VM object Reference from the given vmUUID
+// GetVMByUUID returns the VM object Reference from the given vmUUID
 func (vs *VSphere) GetVMByUUID(ctx context.Context, vmUUID string, dc object.Reference) (object.Reference, error) {
 	Connect(ctx, vs)
 	datacenter := vs.GetDatacenterFromObjectReference(ctx, dc)
 	s := object.NewSearchIndex(vs.Client.Client)
 	vmUUID = strings.ToLower(strings.TrimSpace(vmUUID))
 	return s.FindByUuid(ctx, datacenter, vmUUID, true, nil)
+}
+
+// GetHostFromVMReference returns host object reference of the host on which the specified VM resides
+func (vs *VSphere) GetHostFromVMReference(ctx context.Context, vm types.ManagedObjectReference) types.ManagedObjectReference {
+	Connect(ctx, vs)
+	var vmMo mo.VirtualMachine
+	vs.Client.RetrieveOne(ctx, vm, []string{"summary.runtime.host"}, &vmMo)
+	host := *vmMo.Summary.Runtime.Host
+	return host
+}
+
+// GetDatastoresMountedOnHost returns the datastore references of all the datastores mounted on the specified host
+func (vs *VSphere) GetDatastoresMountedOnHost(ctx context.Context, host types.ManagedObjectReference) []types.ManagedObjectReference {
+	Connect(ctx, vs)
+	var hostMo mo.HostSystem
+	vs.Client.RetrieveOne(ctx, host, []string{"datastore"}, &hostMo)
+	return hostMo.Datastore
+}
+
+// GetDatastoreRefFromName returns the datastore reference of the specified datastore
+func (vs *VSphere) GetDatastoreRefFromName(ctx context.Context, dc object.Reference, datastoreName string) (types.ManagedObjectReference, error) {
+	Connect(ctx, vs)
+	datacenter := object.NewDatacenter(vs.Client.Client, dc.Reference())
+	finder := find.NewFinder(vs.Client.Client, false)
+	finder.SetDatacenter(datacenter)
+	datastore, err := finder.Datastore(ctx, datastoreName)
+	return datastore.Reference(), err
 }
 
 // GetFolderByPath gets the Folder Object Reference from the given folder path
@@ -99,7 +127,7 @@ func (vs *VSphere) GetFolderByPath(ctx context.Context, dc object.Reference, fol
 	return vmFolder.Reference(), nil
 }
 
-// CreateVolume creates a vsphere volume using given volume paramemters specified in VolumeOptions.
+// CreateVolume creates a vsphere volume using given volume parameters specified in VolumeOptions.
 // If volume is created successfully the canonical disk path is returned else error is returned.
 func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef types.ManagedObjectReference) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -120,7 +148,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef type
 	if err != nil {
 		return "", fmt.Errorf("Failed while searching for datastore: %s. err: %+v", volumeOptions.Datastore, err)
 	}
-	directoryPath := filepath.Clean(ds.Path(VolDir)) + "/"
+	directoryPath := filepath.Clean(ds.Path(volDir)) + "/"
 	fileManager := object.NewFileManager(ds.Client())
 	err = fileManager.MakeDirectory(ctx, directoryPath, datacenter, false)
 	if err != nil {
@@ -209,7 +237,7 @@ func (vs *VSphere) IsVMPresent(vmName string, dataCenterRef types.ManagedObjectR
 		return
 	}
 	for _, vmFoldersChild := range vmFoldersChildren {
-		if vmFoldersChild.Reference().Type == VirtualMachineType {
+		if vmFoldersChild.Reference().Type == virtualMachineType {
 			if object.NewVirtualMachine(vs.Client.Client, vmFoldersChild.Reference()).Name() == vmName {
 				return true, nil
 			}
@@ -227,15 +255,15 @@ func (vs *VSphere) initVolumeOptions(volumeOptions *VolumeOptions) {
 		volumeOptions.Datastore = vs.Config.DefaultDatastore
 	}
 	if volumeOptions.CapacityKB == 0 {
-		volumeOptions.CapacityKB = DefaultDiskCapacityKB
+		volumeOptions.CapacityKB = defaultDiskCapacityKB
 	}
 	if volumeOptions.Name == "" {
 		volumeOptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
 	if volumeOptions.DiskFormat == "" {
-		volumeOptions.DiskFormat = DefaultDiskFormat
+		volumeOptions.DiskFormat = defaultDiskFormat
 	}
 	if volumeOptions.SCSIControllerType == "" {
-		volumeOptions.SCSIControllerType = DefaultSCSIControllerType
+		volumeOptions.SCSIControllerType = defaultSCSIControllerType
 	}
 }

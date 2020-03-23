@@ -17,9 +17,8 @@ limitations under the License.
 package reconciliation
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"context"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -84,7 +83,7 @@ type RoleBindingClientAdapter struct {
 }
 
 func (c RoleBindingClientAdapter) Get(namespace, name string) (RoleBinding, error) {
-	ret, err := c.Client.RoleBindings(namespace).Get(name, metav1.GetOptions{})
+	ret, err := c.Client.RoleBindings(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -92,12 +91,11 @@ func (c RoleBindingClientAdapter) Get(namespace, name string) (RoleBinding, erro
 }
 
 func (c RoleBindingClientAdapter) Create(in RoleBinding) (RoleBinding, error) {
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: in.GetNamespace()}}
-	if _, err := c.NamespaceClient.Create(ns); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := tryEnsureNamespace(c.NamespaceClient, in.GetNamespace()); err != nil {
 		return nil, err
 	}
 
-	ret, err := c.Client.RoleBindings(in.GetNamespace()).Create(in.(RoleBindingAdapter).RoleBinding)
+	ret, err := c.Client.RoleBindings(in.GetNamespace()).Create(context.TODO(), in.(RoleBindingAdapter).RoleBinding, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +103,7 @@ func (c RoleBindingClientAdapter) Create(in RoleBinding) (RoleBinding, error) {
 }
 
 func (c RoleBindingClientAdapter) Update(in RoleBinding) (RoleBinding, error) {
-	ret, err := c.Client.RoleBindings(in.GetNamespace()).Update(in.(RoleBindingAdapter).RoleBinding)
+	ret, err := c.Client.RoleBindings(in.GetNamespace()).Update(context.TODO(), in.(RoleBindingAdapter).RoleBinding, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -114,5 +112,5 @@ func (c RoleBindingClientAdapter) Update(in RoleBinding) (RoleBinding, error) {
 }
 
 func (c RoleBindingClientAdapter) Delete(namespace, name string, uid types.UID) error {
-	return c.Client.RoleBindings(namespace).Delete(name, &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}})
+	return c.Client.RoleBindings(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}})
 }

@@ -53,9 +53,9 @@ func (a *APIServer) Start() error {
 	if err != nil {
 		return err
 	}
-	o.ServiceClusterIPRange = *ipnet
+	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true
-	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
@@ -90,6 +90,7 @@ func (a *APIServer) Stop() error {
 
 const apiserverName = "apiserver"
 
+// Name returns the name of APIServer.
 func (a *APIServer) Name() string {
 	return apiserverName
 }

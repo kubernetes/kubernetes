@@ -17,10 +17,12 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -31,7 +33,7 @@ type FakeHandler struct {
 	validate, validateCalled bool
 }
 
-func (h *FakeHandler) Admit(a Attributes) (err error) {
+func (h *FakeHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) (err error) {
 	h.admitCalled = true
 	if h.admit {
 		return nil
@@ -39,7 +41,7 @@ func (h *FakeHandler) Admit(a Attributes) (err error) {
 	return fmt.Errorf("Don't admit")
 }
 
-func (h *FakeHandler) Validate(a Attributes) (err error) {
+func (h *FakeHandler) Validate(ctx context.Context, a Attributes, o ObjectInterfaces) (err error) {
 	h.validateCalled = true
 	if h.validate {
 		return nil
@@ -63,6 +65,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		name      string
 		ns        string
 		operation Operation
+		options   runtime.Object
 		chain     chainAdmissionHandler
 		accept    bool
 		calls     map[string]bool
@@ -71,6 +74,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "all accept",
 			ns:        sysns,
 			operation: Create,
+			options:   &metav1.CreateOptions{},
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", true, Delete, Create),
@@ -83,6 +87,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "ignore handler",
 			ns:        otherns,
 			operation: Create,
+			options:   &metav1.CreateOptions{},
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
@@ -95,6 +100,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "ignore all",
 			ns:        sysns,
 			operation: Connect,
+			options:   nil,
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
@@ -107,6 +113,7 @@ func TestAdmitAndValidate(t *testing.T) {
 			name:      "reject one",
 			ns:        otherns,
 			operation: Delete,
+			options:   &metav1.DeleteOptions{},
 			chain: []Interface{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
@@ -119,7 +126,7 @@ func TestAdmitAndValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
+		err := test.chain.Admit(context.TODO(), NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		accepted := (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of admit call: %v", accepted)
@@ -140,7 +147,7 @@ func TestAdmitAndValidate(t *testing.T) {
 		}
 
 		// call validate and check that admit was not called at all
-		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil))
+		err = test.chain.Validate(context.TODO(), NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		accepted = (err == nil)
 		if accepted != test.accept {
 			t.Errorf("unexpected result of validate call: %v\n", accepted)

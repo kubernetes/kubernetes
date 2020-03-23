@@ -17,18 +17,14 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -57,56 +53,6 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	}
 }
 
-func Test_deprecatedAlias(t *testing.T) {
-	var correctCommandCalled bool
-	makeCobraCommand := func() *cobra.Command {
-		cobraCmd := new(cobra.Command)
-		cobraCmd.Use = "print five lines"
-		cobraCmd.Run = func(*cobra.Command, []string) {
-			correctCommandCalled = true
-		}
-		return cobraCmd
-	}
-
-	original := makeCobraCommand()
-	alias := deprecatedAlias("echo", makeCobraCommand())
-
-	if len(alias.Deprecated) == 0 {
-		t.Error("deprecatedAlias should always have a non-empty .Deprecated")
-	}
-	if !strings.Contains(alias.Deprecated, "print") {
-		t.Error("deprecatedAlias should give the name of the new function in its .Deprecated field")
-	}
-	if !alias.Hidden {
-		t.Error("deprecatedAlias should never have .Hidden == false (deprecated aliases should be hidden)")
-	}
-
-	if alias.Name() != "echo" {
-		t.Errorf("deprecatedAlias has name %q, expected %q",
-			alias.Name(), "echo")
-	}
-	if original.Name() != "print" {
-		t.Errorf("original command has name %q, expected %q",
-			original.Name(), "print")
-	}
-
-	buffer := new(bytes.Buffer)
-	alias.SetOutput(buffer)
-	alias.Execute()
-	str := buffer.String()
-	if !strings.Contains(str, "deprecated") || !strings.Contains(str, "print") {
-		t.Errorf("deprecation warning %q does not include enough information", str)
-	}
-
-	// It would be nice to test to see that original.Run == alias.Run
-	// Unfortunately Golang does not allow comparing functions. I could do
-	// this with reflect, but that's technically invoking undefined
-	// behavior. Best we can do is make sure that the function is called.
-	if !correctCommandCalled {
-		t.Errorf("original function doesn't appear to have been called by alias")
-	}
-}
-
 func TestKubectlCommandHandlesPlugins(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -125,7 +71,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			name:             "test that a plugin executable is found based on command args",
 			args:             []string{"kubectl", "foo", "--bar"},
 			expectPlugin:     "plugin/testdata/kubectl-foo",
-			expectPluginArgs: []string{"foo", "--bar"},
+			expectPluginArgs: []string{"--bar"},
 		},
 		{
 			name: "test that a plugin does not execute over an existing command by the same name",
@@ -154,11 +100,11 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			}
 
 			if pluginsHandler.executedPlugin != test.expectPlugin {
-				t.Fatalf("unexpected plugin execution: expedcted %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+				t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
 			}
 
 			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {
-				t.Fatalf("unexpected plugin execution args: expedcted %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+				t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
 			}
 		})
 	}
@@ -175,32 +121,35 @@ type testPluginHandler struct {
 	err error
 }
 
-func (h *testPluginHandler) Lookup(filename string) (string, error) {
+func (h *testPluginHandler) Lookup(filename string) (string, bool) {
+	// append supported plugin prefix to the filename
+	filename = fmt.Sprintf("%s-%s", "kubectl", filename)
+
 	dir, err := os.Stat(h.pluginsDirectory)
 	if err != nil {
 		h.err = err
-		return "", err
+		return "", false
 	}
 
 	if !dir.IsDir() {
 		h.err = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
-		return "", h.err
+		return "", false
 	}
 
 	plugins, err := ioutil.ReadDir(h.pluginsDirectory)
 	if err != nil {
 		h.err = err
-		return "", err
+		return "", false
 	}
 
 	for _, p := range plugins {
 		if p.Name() == filename {
-			return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), nil
+			return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), true
 		}
 	}
 
 	h.err = fmt.Errorf("unable to find a plugin executable %q", filename)
-	return "", h.err
+	return "", false
 }
 
 func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string) error {

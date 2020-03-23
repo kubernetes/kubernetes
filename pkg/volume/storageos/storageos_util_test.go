@@ -19,18 +19,17 @@ package storageos
 import (
 	"fmt"
 	"os"
+	"testing"
 
 	storageostypes "github.com/storageos/go-api/types"
-	"k8s.io/api/core/v1"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
-	"testing"
 )
 
-var testApiSecretName = "storageos-api"
 var testVolName = "storageos-test-vol"
 var testPVName = "storageos-test-pv"
 var testNamespace = "storageos-test-namespace"
@@ -108,8 +107,8 @@ func (f fakeAPI) VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error {
 func (f fakeAPI) VolumeDelete(opts storageostypes.DeleteOptions) error {
 	return nil
 }
-func (f fakeAPI) Controller(ref string) (*storageostypes.Controller, error) {
-	return &storageostypes.Controller{}, nil
+func (f fakeAPI) Node(ref string) (*storageostypes.Node, error) {
+	return &storageostypes.Node{}, nil
 }
 
 func TestCreateVolume(t *testing.T) {
@@ -120,7 +119,7 @@ func TestCreateVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/storageos")
 
 	// Use real util with stubbed api
@@ -210,7 +209,7 @@ func TestAttachVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/storageos")
 
 	// Use real util with stubbed api
@@ -222,7 +221,7 @@ func TestAttachVolume(t *testing.T) {
 			volName:      testVolName,
 			volNamespace: testNamespace,
 			manager:      util,
-			mounter:      &mount.FakeMounter{},
+			mounter:      mount.NewFakeMounter(nil),
 			plugin:       plug.(*storageosPlugin),
 		},
 		deviceDir: tmpDir,

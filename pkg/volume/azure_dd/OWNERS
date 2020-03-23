@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - andyzhangx
 - brendandburns
@@ -7,6 +9,7 @@ approvers:
 - rootfs
 reviewers:
 - andyzhangx
+- aramase
 - brendandburns
 - feiskyer
 - jingxu97
@@ -14,5 +17,6 @@ reviewers:
 - msau42
 - karataliu
 - khenidak
+- ritazh
 - rootfs
 - saad-ali

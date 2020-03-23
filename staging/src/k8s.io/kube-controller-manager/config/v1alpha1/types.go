@@ -17,9 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 )
 
 // PersistentVolumeRecyclerConfiguration contains elements describing persistent volume plugins.
@@ -103,12 +102,18 @@ type KubeControllerManagerConfiguration struct {
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController DeploymentControllerConfiguration
+	// StatefulSetControllerConfiguration holds configuration for
+	// StatefulSetController related features.
+	StatefulSetController StatefulSetControllerConfiguration
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
 	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
 	EndpointController EndpointControllerConfiguration
+	// EndpointSliceControllerConfiguration holds configuration for
+	// EndpointSliceController related features.
+	EndpointSliceController EndpointSliceControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -161,11 +166,11 @@ type GenericControllerManagerConfiguration struct {
 	MinResyncPeriod metav1.Duration
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfigv1alpha1.ClientConnectionConfiguration
+	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration
 	// How long to wait between starting controller managers
 	ControllerStartInterval metav1.Duration
 	// leaderElection defines the configuration of leader election client.
-	LeaderElection apiserverconfigv1alpha1.LeaderElectionConfiguration
+	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration
 	// Controllers is the list of controllers to enable or disable
 	// '*' means "all enabled by default controllers"
 	// 'foo' means "enable 'foo'"
@@ -173,7 +178,7 @@ type GenericControllerManagerConfiguration struct {
 	// first item for a particular name wins
 	Controllers []string
 	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfigv1alpha1.DebuggingConfiguration
+	Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
 }
 
 // KubeCloudSharedConfiguration contains elements shared by both kube-controller manager
@@ -261,6 +266,14 @@ type DeploymentControllerConfiguration struct {
 	DeploymentControllerSyncPeriod metav1.Duration
 }
 
+// StatefulSetControllerConfiguration contains elements describing StatefulSetController.
+type StatefulSetControllerConfiguration struct {
+	// concurrentStatefulSetSyncs is the number of statefulset objects that are
+	// allowed to sync concurrently. Larger number = more responsive statefulsets,
+	// but more CPU (and network) load.
+	ConcurrentStatefulSetSyncs int32
+}
+
 // DeprecatedControllerConfiguration contains elements be deprecated.
 type DeprecatedControllerConfiguration struct {
 	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
@@ -280,6 +293,30 @@ type EndpointControllerConfiguration struct {
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
 	ConcurrentEndpointSyncs int32
+
+	// EndpointUpdatesBatchPeriod describes the length of endpoint updates batching period.
+	// Processing of pod changes will be delayed by this duration to join them with potential
+	// upcoming updates and reduce the overall number of endpoints updates.
+	EndpointUpdatesBatchPeriod metav1.Duration
+}
+
+// EndpointSliceControllerConfiguration contains elements describing
+// EndpointSliceController.
+type EndpointSliceControllerConfiguration struct {
+	// concurrentServiceEndpointSyncs is the number of service endpoint syncing
+	// operations that will be done concurrently. Larger number = faster
+	// endpoint slice updating, but more CPU (and network) load.
+	ConcurrentServiceEndpointSyncs int32
+
+	// maxEndpointsPerSlice is the maximum number of endpoints that will be
+	// added to an EndpointSlice. More endpoints per slice will result in fewer
+	// and larger endpoint slices, but larger resources.
+	MaxEndpointsPerSlice int32
+
+	// EndpointUpdatesBatchPeriod describes the length of endpoint updates batching period.
+	// Processing of pod changes will be delayed by this duration to join them with potential
+	// upcoming updates and reduce the overall number of endpoints updates.
+	EndpointUpdatesBatchPeriod metav1.Duration
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
@@ -346,8 +383,14 @@ type NamespaceControllerConfiguration struct {
 type NodeIPAMControllerConfiguration struct {
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
+	// secondaryServiceCIDR is CIDR Range for Services in cluster. This is used in dual stack clusters. SecondaryServiceCIDR must be of different IP family than ServiceCIDR
+	SecondaryServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
+	// NodeCIDRMaskSizeIPv4 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv4 int32
+	// NodeCIDRMaskSizeIPv6 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv6 int32
 }
 
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.

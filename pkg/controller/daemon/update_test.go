@@ -22,6 +22,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -293,7 +294,11 @@ func TestGetUnavailableNumbers(t *testing.T) {
 
 	for _, c := range cases {
 		c.Manager.dsStore.Add(c.ds)
-		maxUnavailable, numUnavailable, err := c.Manager.getUnavailableNumbers(c.ds, c.nodeToPods)
+		nodeList, err := c.Manager.nodeLister.List(labels.Everything())
+		if err != nil {
+			t.Fatalf("error listing nodes: %v", err)
+		}
+		maxUnavailable, numUnavailable, err := c.Manager.getUnavailableNumbers(c.ds, nodeList, c.nodeToPods)
 		if err != nil && c.Err != nil {
 			if c.Err != err {
 				t.Errorf("Test case: %s. Expected error: %v but got: %v", c.name, c.Err, err)

@@ -10,10 +10,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"time"
 
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2/hpack"
-	"golang.org/x/net/lex/httplex"
 )
 
 // writeFramer is implemented by any type that is used to write frames.
@@ -90,11 +89,7 @@ type writeGoAway struct {
 
 func (p *writeGoAway) writeFrame(ctx writeContext) error {
 	err := ctx.Framer().WriteGoAway(p.maxStreamID, p.code, nil)
-	if p.code != 0 {
-		ctx.Flush() // ignore error: we're hanging up on them anyway
-		time.Sleep(50 * time.Millisecond)
-		ctx.CloseConn()
-	}
+	ctx.Flush() // ignore error: we're hanging up on them anyway
 	return err
 }
 
@@ -204,7 +199,7 @@ func (w *writeResHeaders) staysWithinBuffer(max int) bool {
 	// TODO: this is a common one. It'd be nice to return true
 	// here and get into the fast path if we could be clever and
 	// calculate the size fast enough, or at least a conservative
-	// uppper bound that usually fires. (Maybe if w.h and
+	// upper bound that usually fires. (Maybe if w.h and
 	// w.trailers are nil, so we don't need to enumerate it.)
 	// Otherwise I'm afraid that just calculating the length to
 	// answer this question would be slower than the ~2µs benefit.
@@ -334,7 +329,7 @@ func (wu writeWindowUpdate) writeFrame(ctx writeContext) error {
 }
 
 // encodeHeaders encodes an http.Header. If keys is not nil, then (k, h[k])
-// is encoded only only if k is in keys.
+// is encoded only if k is in keys.
 func encodeHeaders(enc *hpack.Encoder, h http.Header, keys []string) {
 	if keys == nil {
 		sorter := sorterPool.Get().(*sorter)
@@ -355,7 +350,7 @@ func encodeHeaders(enc *hpack.Encoder, h http.Header, keys []string) {
 		}
 		isTE := k == "transfer-encoding"
 		for _, v := range vv {
-			if !httplex.ValidHeaderFieldValue(v) {
+			if !httpguts.ValidHeaderFieldValue(v) {
 				// TODO: return an error? golang.org/issue/14048
 				// For now just omit it.
 				continue

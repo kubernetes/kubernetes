@@ -19,14 +19,19 @@ package flexvolume
 import (
 	"testing"
 
+	"k8s.io/utils/mount"
+
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/test/utils/harness"
 )
 
-func TestTearDownAt(t *testing.T) {
-	mounter := &mount.FakeMounter{}
+func TestTearDownAt(tt *testing.T) {
+	t := harness.For(tt)
+	defer t.Close()
 
-	plugin, rootDir := testPlugin()
+	mounter := mount.NewFakeMounter(nil)
+
+	plugin, rootDir := testPlugin(t)
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), unmountCmd,
 			rootDir+"/mount-dir"),

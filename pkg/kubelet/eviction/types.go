@@ -40,7 +40,7 @@ const (
 
 // Config holds information about how eviction is configured.
 type Config struct {
-	// PressureTransitionPeriod is duration the kubelet has to wait before transititioning out of a pressure condition.
+	// PressureTransitionPeriod is duration the kubelet has to wait before transitioning out of a pressure condition.
 	PressureTransitionPeriod time.Duration
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	MaxPodGracePeriodSeconds int64
@@ -93,6 +93,10 @@ type ContainerGC interface {
 // status - the desired status to associate with the pod (i.e. why its killed)
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
 type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
+
+// MirrorPodFunc returns the mirror pod for the given static pod and
+// whether it was known to the pod manager.
+type MirrorPodFunc func(*v1.Pod) (*v1.Pod, bool)
 
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
 type ActivePodsFunc func() []*v1.Pod

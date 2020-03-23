@@ -1,1 +1,4 @@
 secrets.yml
+vendor
+Godeps
+.idea

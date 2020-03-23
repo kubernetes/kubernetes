@@ -1,0 +1,56 @@
+meta:
+  project: gotesttools
+
+mount=source:
+  bind: .
+  path: /go/src/gotest.tools
+
+mount=depsources:
+ bind: ./.depsources
+ path: /go/pkg/dep/sources
+
+image=builder:
+  image: gotesttools-dev
+  context: dobifiles/
+  dockerfile: Dockerfile
+  args:
+    GOLANG_VERSION: '{env.GOLANG_VERSION:}' 
+
+image=linter:
+  image: gotesttools-lint
+  context: dobifiles/
+  dockerfile: Dockerfile.lint
+
+job=shell:
+  use: builder
+  mounts: [source, depsources]
+  interactive: true
+  command: sh
+
+job=watch:
+  use: builder
+  mounts: [source]
+  interactive: true
+  command: |
+      filewatcher -x vendor gotestsum -- -test.timeout 10s
+  env:
+    - 'GOTESTSUM_FORMAT=short-verbose'
+    - 'GOTESTTOOLS_DEBUG={env.GOTESTTOOLS_DEBUG:}'
+
+job=test-unit:
+  use: builder
+  mounts: [source]
+  interactive: true
+  command: scripts/test-unit
+
+job=deps:
+  use: builder
+  mounts: [source, depsources]
+  command: dep ensure
+
+job=lint:
+  use: linter
+  mounts: [source]
+
+alias=test:
+  tasks: [test-unit]

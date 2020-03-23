@@ -17,8 +17,10 @@ limitations under the License.
 package negotiation
 
 import (
+	"mime"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +41,23 @@ type fakeNegotiater struct {
 func (n *fakeNegotiater) SupportedMediaTypes() []runtime.SerializerInfo {
 	var out []runtime.SerializerInfo
 	for _, s := range n.types {
-		info := runtime.SerializerInfo{Serializer: n.serializer, MediaType: s, EncodesAsText: true}
+		mediaType, _, err := mime.ParseMediaType(s)
+		if err != nil {
+			panic(err)
+		}
+		parts := strings.SplitN(mediaType, "/", 2)
+		if len(parts) == 1 {
+			// this is an error on the server side
+			parts = append(parts, "")
+		}
+
+		info := runtime.SerializerInfo{
+			Serializer:       n.serializer,
+			MediaType:        s,
+			MediaTypeType:    parts[0],
+			MediaTypeSubType: parts[1],
+			EncodesAsText:    true,
+		}
 		for _, t := range n.streamTypes {
 			if t == s {
 				info.StreamSerializer = &runtime.StreamSerializerInfo{
@@ -231,7 +249,7 @@ func TestNegotiate(t *testing.T) {
 			req = &http.Request{Header: http.Header{}}
 			req.Header.Set("Accept", test.accept)
 		}
-		s, err := NegotiateOutputSerializer(req, test.ns)
+		_, s, err := NegotiateOutputMediaType(req, test.ns, DefaultEndpointRestrictions)
 		switch {
 		case err == nil && test.errFn != nil:
 			t.Errorf("%d: failed: expected error", i)
@@ -259,6 +277,33 @@ func TestNegotiate(t *testing.T) {
 		}
 		if s.Serializer != test.serializer {
 			t.Errorf("%d: unexpected %s %s", i, test.serializer, s.Serializer)
+		}
+	}
+}
+
+func fakeSerializerInfoSlice() []runtime.SerializerInfo {
+	result := make([]runtime.SerializerInfo, 2)
+	result[0] = runtime.SerializerInfo{
+		MediaType:        "application/json",
+		MediaTypeType:    "application",
+		MediaTypeSubType: "json",
+	}
+	result[1] = runtime.SerializerInfo{
+		MediaType:        "application/vnd.kubernetes.protobuf",
+		MediaTypeType:    "application",
+		MediaTypeSubType: "vnd.kubernetes.protobuf",
+	}
+	return result
+}
+
+func BenchmarkNegotiateMediaTypeOptions(b *testing.B) {
+	accepted := fakeSerializerInfoSlice()
+	header := "application/vnd.kubernetes.protobuf,*/*"
+
+	for i := 0; i < b.N; i++ {
+		options, _ := NegotiateMediaTypeOptions(header, accepted, DefaultEndpointRestrictions)
+		if options.Accepted != accepted[1] {
+			b.Errorf("Unexpected result")
 		}
 	}
 }

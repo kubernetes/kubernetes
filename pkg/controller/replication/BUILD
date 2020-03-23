@@ -16,12 +16,13 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/replication",
     deps = [
+        "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/v1:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
+        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -38,7 +39,7 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -58,6 +59,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/replication/config:all-srcs",
+    ],
     tags = ["automanaged"],
 )

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 )
@@ -31,12 +32,12 @@ func (s *CpusetGroup) Apply(d *cgroupData) error {
 
 func (s *CpusetGroup) Set(path string, cgroup *configs.Cgroup) error {
 	if cgroup.Resources.CpusetCpus != "" {
-		if err := writeFile(path, "cpuset.cpus", cgroup.Resources.CpusetCpus); err != nil {
+		if err := fscommon.WriteFile(path, "cpuset.cpus", cgroup.Resources.CpusetCpus); err != nil {
 			return err
 		}
 	}
 	if cgroup.Resources.CpusetMems != "" {
-		if err := writeFile(path, "cpuset.mems", cgroup.Resources.CpusetMems); err != nil {
+		if err := fscommon.WriteFile(path, "cpuset.mems", cgroup.Resources.CpusetMems); err != nil {
 			return err
 		}
 	}
@@ -77,18 +78,14 @@ func (s *CpusetGroup) ApplyDir(dir string, cgroup *configs.Cgroup, pid int) erro
 	// The logic is, if user specified cpuset configs, use these
 	// specified configs, otherwise, inherit from parent. This makes
 	// cpuset configs work correctly with 'cpuset.cpu_exclusive', and
-	// keep backward compatbility.
+	// keep backward compatibility.
 	if err := s.ensureCpusAndMems(dir, cgroup); err != nil {
 		return err
 	}
 
 	// because we are not using d.join we need to place the pid into the procs file
 	// unlike the other subsystems
-	if err := cgroups.WriteCgroupProc(dir, pid); err != nil {
-		return err
-	}
-
-	return nil
+	return cgroups.WriteCgroupProc(dir, pid)
 }
 
 func (s *CpusetGroup) getSubsystemSettings(parent string) (cpus []byte, mems []byte, err error) {
@@ -139,12 +136,12 @@ func (s *CpusetGroup) copyIfNeeded(current, parent string) error {
 	}
 
 	if s.isEmpty(currentCpus) {
-		if err := writeFile(current, "cpuset.cpus", string(parentCpus)); err != nil {
+		if err := fscommon.WriteFile(current, "cpuset.cpus", string(parentCpus)); err != nil {
 			return err
 		}
 	}
 	if s.isEmpty(currentMems) {
-		if err := writeFile(current, "cpuset.mems", string(parentMems)); err != nil {
+		if err := fscommon.WriteFile(current, "cpuset.mems", string(parentMems)); err != nil {
 			return err
 		}
 	}

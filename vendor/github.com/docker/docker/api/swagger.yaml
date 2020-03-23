@@ -19,10 +19,10 @@ produces:
 consumes:
   - "application/json"
   - "text/plain"
-basePath: "/v1.38"
+basePath: "/v1.40"
 info:
   title: "Docker Engine API"
-  version: "1.38"
+  version: "1.40"
   x-logo:
     url: "https://docs.docker.com/images/logo-docker-main.png"
   description: |
@@ -49,8 +49,8 @@ info:
     the URL is not supported by the daemon, a HTTP `400 Bad Request` error message
     is returned.
 
-    If you omit the version-prefix, the current version of the API (v1.38) is used.
-    For example, calling `/info` is the same as calling `/v1.38/info`. Using the
+    If you omit the version-prefix, the current version of the API (v1.40) is used.
+    For example, calling `/info` is the same as calling `/v1.40/info`. Using the
     API without a version-prefix is deprecated and will be removed in a future release.
 
     Engine releases in the near future should support this version of the API,
@@ -210,6 +210,43 @@ definitions:
       PathInContainer: "/dev/deviceName"
       CgroupPermissions: "mrw"
 
+  DeviceRequest:
+    type: "object"
+    description: "A request for devices to be sent to device drivers"
+    properties:
+      Driver:
+        type: "string"
+        example: "nvidia"
+      Count:
+        type: "integer"
+        example: -1
+      DeviceIDs:
+        type: "array"
+        items:
+          type: "string"
+        example:
+          - "0"
+          - "1"
+          - "GPU-fef8089b-4820-abfc-e83e-94318197576e"
+      Capabilities:
+        description: |
+          A list of capabilities; an OR list of AND lists of capabilities.
+        type: "array"
+        items:
+          type: "array"
+          items:
+            type: "string"
+        example:
+          # gpu AND nvidia AND compute
+          - ["gpu", "nvidia", "compute"]
+      Options:
+        description: |
+          Driver-specific options, specified as a key/value pairs. These options
+          are passed directly to the driver.
+        type: "object"
+        additionalProperties:
+          type: "string"
+
   ThrottleDevice:
     type: "object"
     properties:
@@ -238,11 +275,13 @@ definitions:
           - `bind` Mounts a file or directory from the host into the container. Must exist prior to creating the container.
           - `volume` Creates a volume with the given name and options (or uses a pre-existing volume with the same name and options). These are **not** removed when the container is removed.
           - `tmpfs` Create a tmpfs with the given options. The mount source cannot be specified for tmpfs.
+          - `npipe` Mounts a named pipe from the host into the container. Must exist prior to creating the container.
         type: "string"
         enum:
           - "bind"
           - "volume"
           - "tmpfs"
+          - "npipe"
       ReadOnly:
         description: "Whether the mount should be read-only."
         type: "boolean"
@@ -263,6 +302,10 @@ definitions:
               - "rshared"
               - "slave"
               - "rslave"
+          NonRecursive:
+            description: "Disable recursive bind mount."
+            type: "boolean"
+            default: false
       VolumeOptions:
         description: "Optional configuration for the `volume` type."
         type: "object"
@@ -415,12 +458,22 @@ definitions:
         items:
           type: "string"
           example: "c 13:* rwm"
+      DeviceRequests:
+        description: "a list of requests for devices to be sent to device drivers"
+        type: "array"
+        items:
+          $ref: "#/definitions/DeviceRequest"
       DiskQuota:
         description: "Disk limit (in bytes)."
         type: "integer"
         format: "int64"
       KernelMemory:
         description: "Kernel memory limit in bytes."
+        type: "integer"
+        format: "int64"
+        example: 209715200
+      KernelMemoryTCP:
+        description: "Hard limit for kernel TCP buffer memory (in bytes)."
         type: "integer"
         format: "int64"
       MemoryReservation:
@@ -449,9 +502,11 @@ definitions:
         type: "boolean"
         x-nullable: true
       PidsLimit:
-        description: "Tune a container's pids limit. Set -1 for unlimited."
+        description: |
+          Tune a container's PIDs limit. Set `0` or `-1` for unlimited, or `null` to not change.
         type: "integer"
         format: "int64"
+        x-nullable: true
       Ulimits:
         description: |
           A list of resource limits to set in the container. For example: `{"Name": "nofile", "Soft": 1024, "Hard": 2048}`"
@@ -634,14 +689,22 @@ definitions:
               $ref: "#/definitions/Mount"
 
           # Applicable to UNIX platforms
+          Capabilities:
+            type: "array"
+            description: |
+              A list of kernel capabilities to be available for container (this overrides the default set).
+
+              Conflicts with options 'CapAdd' and 'CapDrop'"
+            items:
+              type: "string"
           CapAdd:
             type: "array"
-            description: "A list of kernel capabilities to add to the container."
+            description: "A list of kernel capabilities to add to the container. Conflicts with option 'Capabilities'"
             items:
               type: "string"
           CapDrop:
             type: "array"
-            description: "A list of kernel capabilities to drop from the container."
+            description: "A list of kernel capabilities to drop from the container. Conflicts with option 'Capabilities'"
             items:
               type: "string"
           Dns:
@@ -1473,11 +1536,9 @@ definitions:
             type: "string"
       Options:
         description: "Driver-specific options, specified as a map."
-        type: "array"
-        items:
-          type: "object"
-          additionalProperties:
-            type: "string"
+        type: "object"
+        additionalProperties:
+          type: "string"
 
   NetworkContainer:
     type: "object"
@@ -1512,6 +1573,31 @@ definitions:
         $ref: "#/definitions/ProgressDetail"
       aux:
         $ref: "#/definitions/ImageID"
+
+  BuildCache:
+    type: "object"
+    properties:
+      ID:
+        type: "string"
+      Parent:
+        type: "string"
+      Type:
+        type: "string"
+      Description:
+        type: "string"
+      InUse:
+        type: "boolean"
+      Shared:
+        type: "boolean"
+      Size:
+        type: "integer"
+      CreatedAt:
+        type: "integer"
+      LastUsedAt:
+        type: "integer"
+        x-nullable: true
+      UsageCount:
+        type: "integer"
 
   ImageID:
     type: "object"
@@ -2434,6 +2520,31 @@ definitions:
         description: "Whether there is currently a root CA rotation in progress for the swarm"
         type: "boolean"
         example: false
+      DataPathPort:
+        description: |
+          DataPathPort specifies the data path port number for data traffic.
+          Acceptable port range is 1024 to 49151.
+          If no port is set or is set to 0, the default port (4789) is used.
+        type: "integer"
+        format: "uint32"
+        default: 4789
+        example: 4789
+      DefaultAddrPool:
+        description: |
+          Default Address Pool specifies default subnet pools for global scope networks.
+        type: "array"
+        items:
+          type: "string"
+          format: "CIDR"
+          example: ["10.10.0.0/16", "20.20.0.0/16"]
+      SubnetSize:
+        description: |
+          SubnetSize specifies the subnet size of the networks created from the default subnet pool
+        type: "integer"
+        format: "uint32"
+        maximum: 29
+        default: 24
+        example: 24
 
   JoinTokens:
     description: |
@@ -2556,8 +2667,20 @@ definitions:
                 type: "object"
                 description: "CredentialSpec for managed service account (Windows only)"
                 properties:
+                  Config:
+                    type: "string"
+                    example: "0bt9dmxjvjiqermk6xrop3ekq"
+                    description: |
+                      Load credential spec from a Swarm Config with the given ID.
+                      The specified config must also be present in the Configs field with the Runtime property set.
+
+                      <p><br /></p>
+
+
+                      > **Note**: `CredentialSpec.File`, `CredentialSpec.Registry`, and `CredentialSpec.Config` are mutually exclusive.
                   File:
                     type: "string"
+                    example: "spec.json"
                     description: |
                       Load credential spec from this file. The file is read by the daemon, and must be present in the
                       `CredentialSpecs` subdirectory in the docker data directory, which defaults to
@@ -2567,7 +2690,7 @@ definitions:
 
                       <p><br /></p>
 
-                      > **Note**: `CredentialSpec.File` and `CredentialSpec.Registry` are mutually exclusive.
+                      > **Note**: `CredentialSpec.File`, `CredentialSpec.Registry`, and `CredentialSpec.Config` are mutually exclusive.
                   Registry:
                     type: "string"
                     description: |
@@ -2579,7 +2702,7 @@ definitions:
                       <p><br /></p>
 
 
-                      > **Note**: `CredentialSpec.File` and `CredentialSpec.Registry` are mutually exclusive.
+                      > **Note**: `CredentialSpec.File`, `CredentialSpec.Registry`, and `CredentialSpec.Config` are mutually exclusive.
               SELinuxContext:
                 type: "object"
                 description: "SELinux labels of the container"
@@ -2690,7 +2813,12 @@ definitions:
               type: "object"
               properties:
                 File:
-                  description: "File represents a specific target that is backed by a file."
+                  description: |
+                    File represents a specific target that is backed by a file.
+
+                    <p><br /><p>
+
+                    > **Note**: `Configs.File` and `Configs.Runtime` are mutually exclusive
                   type: "object"
                   properties:
                     Name:
@@ -2706,6 +2834,14 @@ definitions:
                       description: "Mode represents the FileMode of the file."
                       type: "integer"
                       format: "uint32"
+                Runtime:
+                  description: |
+                    Runtime represents a target that is not mounted into the container but is used by the task
+
+                    <p><br /><p>
+
+                    > **Note**: `Configs.File` and `Configs.Runtime` are mutually exclusive
+                  type: "object"
                 ConfigID:
                   description: "ConfigID represents the ID of the specific config that we're referencing."
                   type: "string"
@@ -2725,6 +2861,18 @@ definitions:
             description: "Run an init inside the container that forwards signals and reaps processes. This field is omitted if empty, and the default (as configured on the daemon) is used."
             type: "boolean"
             x-nullable: true
+          Sysctls:
+            description: |
+              Set kernel namedspaced parameters (sysctls) in the container.
+              The Sysctls option on services accepts the same sysctls as the
+              are supported on containers. Note that while the same sysctls are
+              supported, no guarantees or checks are made about their
+              suitability for a clustered environment, and it's up to the user
+              to determine whether a given sysctl will work properly in a
+              Service.
+            type: "object"
+            additionalProperties:
+              type: "string"
       NetworkAttachmentSpec:
         description: |
           Read-only spec type for non-swarm containers attached to swarm overlay
@@ -2805,6 +2953,11 @@ definitions:
                   SpreadDescriptor: "node.labels.datacenter"
               - Spread:
                   SpreadDescriptor: "node.labels.rack"
+          MaxReplicas:
+            description: "Maximum number of replicas for per node (default value is 0, which is unlimited)"
+            type: "integer"
+            format: "int64"
+            default: 0
           Platforms:
             description: |
               Platforms stores all the platforms that the service's image can
@@ -3605,6 +3758,10 @@ definitions:
           See [cpuset(7)](https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt)
         type: "boolean"
         example: true
+      PidsLimit:
+        description: "Indicates if the host kernel has PID limit support enabled."
+        type: "boolean"
+        example: true
       OomKillDisable:
         description: "Indicates if OOM killer disable is supported on the host."
         type: "boolean"
@@ -3722,18 +3879,22 @@ definitions:
         description: |
           HTTP-proxy configured for the daemon. This value is obtained from the
           [`HTTP_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html) environment variable.
+          Credentials ([user info component](https://tools.ietf.org/html/rfc3986#section-3.2.1)) in the proxy URL
+          are masked in the API response.
 
           Containers do not automatically inherit this configuration.
         type: "string"
-        example: "http://user:pass@proxy.corp.example.com:8080"
+        example: "http://xxxxx:xxxxx@proxy.corp.example.com:8080"
       HttpsProxy:
         description: |
           HTTPS-proxy configured for the daemon. This value is obtained from the
           [`HTTPS_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html) environment variable.
+          Credentials ([user info component](https://tools.ietf.org/html/rfc3986#section-3.2.1)) in the proxy URL
+          are masked in the API response.
 
           Containers do not automatically inherit this configuration.
         type: "string"
-        example: "https://user:pass@proxy.corp.example.com:4443"
+        example: "https://xxxxx:xxxxx@proxy.corp.example.com:4443"
       NoProxy:
         description: |
           Comma-separated list of domain extensions for which no proxy should be
@@ -3823,10 +3984,10 @@ definitions:
           $ref: "#/definitions/Runtime"
         default:
           runc:
-            path: "docker-runc"
+            path: "runc"
         example:
           runc:
-            path: "docker-runc"
+            path: "runc"
           runc-master:
             path: "/go/bin/runc"
           custom:
@@ -3896,6 +4057,27 @@ definitions:
           - "name=seccomp,profile=default"
           - "name=selinux"
           - "name=userns"
+      ProductLicense:
+        description: |
+          Reports a summary of the product license on the daemon.
+
+          If a commercial license has been applied to the daemon, information
+          such as number of nodes, and expiration are included.
+        type: "string"
+        example: "Community Engine"
+      Warnings:
+        description: |
+          List of warnings / informational messages about missing features, or
+          issues related to the daemon configuration.
+
+          These messages can be printed by the client as information to the user.
+        type: "array"
+        items:
+          type: "string"
+        example:
+          - "WARNING: No memory limit support"
+          - "WARNING: bridge-nf-call-iptables is disabled"
+          - "WARNING: bridge-nf-call-ip6tables is disabled"
 
 
   # PluginsInfo is a temp struct holding Plugins name
@@ -4516,7 +4698,7 @@ paths:
                 OomKillDisable: false
                 OomScoreAdj: 500
                 PidMode: ""
-                PidsLimit: -1
+                PidsLimit: 0
                 PortBindings:
                   22/tcp:
                     - HostPort: "11022"
@@ -5922,7 +6104,7 @@ paths:
           headers:
             X-Docker-Container-Path-Stat:
               type: "string"
-              description: "TODO"
+              description: "A base64 - encoded JSON object with some filesystem header information about the path"
         400:
           description: "Bad parameter"
           schema:
@@ -6319,6 +6501,11 @@ paths:
           description: "Target build stage"
           type: "string"
           default: ""
+        - name: "outputs"
+          in: "query"
+          description: "BuildKit output configuration"
+          type: "string"
+          default: ""
       responses:
         200:
           description: "no error"
@@ -6337,6 +6524,29 @@ paths:
       produces:
         - "application/json"
       operationId: "BuildPrune"
+      parameters:
+        - name: "keep-storage"
+          in: "query"
+          description: "Amount of disk space in bytes to keep for cache"
+          type: "integer"
+          format: "int64"
+        - name: "all"
+          in: "query"
+          type: "boolean"
+          description: "Remove all types of build cache"
+        - name: "filters"
+          in: "query"
+          type: "string"
+          description: |
+            A JSON encoded value of the filters (a `map[string][]string`) to process on the list of build cache objects. Available filters:
+            - `until=<duration>`: duration relative to daemon's time, during which build cache was not used, in Go's duration format (e.g., '24h')
+            - `id=<id>`
+            - `parent=<id>`
+            - `type=<string>`
+            - `description=<string>`
+            - `inuse`
+            - `shared`
+            - `private`
       responses:
         200:
           description: "No error"
@@ -6344,6 +6554,11 @@ paths:
             type: "object"
             title: "BuildPruneResponse"
             properties:
+              CachesDeleted:
+                type: "array"
+                items:
+                  description: "ID of build cache object"
+                  type: "string"
               SpaceReclaimed:
                 description: "Disk space reclaimed in bytes"
                 type: "integer"
@@ -6972,9 +7187,57 @@ paths:
             API-Version:
               type: "string"
               description: "Max API Version the server supports"
+            BuildKit-Version:
+              type: "string"
+              description: "Default version of docker image builder"
             Docker-Experimental:
               type: "boolean"
               description: "If the server is running with experimental mode enabled"
+            Cache-Control:
+              type: "string"
+              default: "no-cache, no-store, must-revalidate"
+            Pragma:
+              type: "string"
+              default: "no-cache"
+        500:
+          description: "server error"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+          headers:
+            Cache-Control:
+              type: "string"
+              default: "no-cache, no-store, must-revalidate"
+            Pragma:
+              type: "string"
+              default: "no-cache"
+      tags: ["System"]
+    head:
+      summary: "Ping"
+      description: "This is a dummy endpoint you can use to test if the server is accessible."
+      operationId: "SystemPingHead"
+      produces: ["text/plain"]
+      responses:
+        200:
+          description: "no error"
+          schema:
+            type: "string"
+            example: "(empty)"
+          headers:
+            API-Version:
+              type: "string"
+              description: "Max API Version the server supports"
+            BuildKit-Version:
+              type: "string"
+              description: "Default version of docker image builder"
+            Docker-Experimental:
+              type: "boolean"
+              description: "If the server is running with experimental mode enabled"
+            Cache-Control:
+              type: "string"
+              default: "no-cache, no-store, must-revalidate"
+            Pragma:
+              type: "string"
+              default: "no-cache"
         500:
           description: "server error"
           schema:
@@ -7175,6 +7438,10 @@ paths:
                 type: "array"
                 items:
                   $ref: "#/definitions/Volume"
+              BuildCache:
+                type: "array"
+                items:
+                  $ref: "#/definitions/BuildCache"
             example:
               LayersSize: 1092588
               Images:
@@ -7589,6 +7856,7 @@ paths:
           schema:
             type: "object"
             title: "VolumeListResponse"
+            description: "Volume list response"
             required: [Volumes, Warnings]
             properties:
               Volumes:
@@ -7665,6 +7933,8 @@ paths:
           description: "Volume configuration"
           schema:
             type: "object"
+            description: "Volume configuration"
+            title: "VolumeConfig"
             properties:
               Name:
                 description: "The new volume's name. If not specified, Docker generates a name."
@@ -7865,6 +8135,10 @@ paths:
           description: |
             JSON encoded value of the filters (a `map[string][]string`) to process on the networks list. Available filters:
 
+            - `dangling=<boolean>` When set to `true` (or `1`), returns all
+               networks that are not in use by a container. When set to `false`
+               (or `0`), only networks that are in use by one or more
+               containers are returned.
             - `driver=<driver-name>` Matches a network's driver.
             - `id=<network-id>` Matches all or part of a network ID.
             - `label=<key>` or `label=<key>=<value>` of a network label.
@@ -8582,6 +8856,7 @@ paths:
             - `label=<engine label>`
             - `membership=`(`accepted`|`pending`)`
             - `name=<node name>`
+            - `node.label=<node label>`
             - `role=`(`manager`|`worker`)`
           type: "string"
       tags: ["Node"]
@@ -8754,14 +9029,36 @@ paths:
                   nodes in order to reach the containers running on this node. Using this parameter it is possible to
                   separate the container data traffic from the management traffic of the cluster.
                 type: "string"
+              DataPathPort:
+                description: |
+                  DataPathPort specifies the data path port number for data traffic.
+                  Acceptable port range is 1024 to 49151.
+                  if no port is set or is set to 0, default port 4789 will be used.
+                type: "integer"
+                format: "uint32"
+              DefaultAddrPool:
+                description: |
+                  Default Address Pool specifies default subnet pools for global scope networks.
+                type: "array"
+                items:
+                  type: "string"
+                  example: ["10.10.0.0/16", "20.20.0.0/16"]
               ForceNewCluster:
                 description: "Force creation of a new swarm."
                 type: "boolean"
+              SubnetSize:
+                description: |
+                  SubnetSize specifies the subnet size of the networks created from the default subnet pool
+                type: "integer"
+                format: "uint32"
               Spec:
                 $ref: "#/definitions/SwarmSpec"
             example:
               ListenAddr: "0.0.0.0:2377"
               AdvertiseAddr: "192.168.1.1:2377"
+              DataPathPort: 4789
+              DefaultAddrPool: ["10.10.0.0/8", "20.20.0.0/8"]
+              SubnetSize: 24
               ForceNewCluster: false
               Spec:
                 Orchestration: {}
@@ -9243,7 +9540,10 @@ paths:
 
         - name: "version"
           in: "query"
-          description: "The version number of the service object being updated. This is required to avoid conflicting writes."
+          description: "The version number of the service object being updated.
+          This is required to avoid conflicting writes.
+          This version number should be the value as currently set on the service *before* the update.
+          You can find the current version by calling `GET /services/{id}`"
           required: true
           type: "integer"
         - name: "registryAuthFrom"
@@ -9602,6 +9902,7 @@ paths:
           description: "Only return this number of log lines from the end of the logs. Specify as an integer or `all` to output all log lines."
           type: "string"
           default: "all"
+      tags: ["Task"]
   /secrets:
     get:
       summary: "List secrets"

@@ -83,12 +83,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This file was generated using openssl by the gencerts.sh script
+// and holds raw certificates for the imagepolicy webhook tests.
+
+//lint:file-ignore U1000 Ignore all unused code, it's generated
+
+package imagepolicy
 EOF
 
-echo "// This file was generated using openssl by the gencerts.sh script" >> $outfile
-echo "// and holds raw certificates for the imagepolicy webhook tests." >> $outfile
-echo "" >> $outfile
-echo "package imagepolicy" >> $outfile
 for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clientCert; do
 	data=$(cat ${file}.pem)
 	echo "" >> $outfile
@@ -96,7 +98,7 @@ for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clien
 done
 
 # Clean up after we're done.
-rm *.pem
-rm *.csr
-rm *.srl
-rm *.conf
+rm ./*.pem
+rm ./*.csr
+rm ./*.srl
+rm ./*.conf

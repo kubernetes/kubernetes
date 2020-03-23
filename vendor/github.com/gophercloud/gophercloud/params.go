@@ -120,6 +120,22 @@ func BuildRequestBody(opts interface{}, parent string) (map[string]interface{}, 
 				continue
 			}
 
+			if v.Kind() == reflect.Slice || (v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Slice) {
+				sliceValue := v
+				if sliceValue.Kind() == reflect.Ptr {
+					sliceValue = sliceValue.Elem()
+				}
+
+				for i := 0; i < sliceValue.Len(); i++ {
+					element := sliceValue.Index(i)
+					if element.Kind() == reflect.Struct || (element.Kind() == reflect.Ptr && element.Elem().Kind() == reflect.Struct) {
+						_, err := BuildRequestBody(element.Interface(), "")
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
 			if v.Kind() == reflect.Struct || (v.Kind() == reflect.Ptr && v.Elem().Kind() == reflect.Struct) {
 				if zero {
 					//fmt.Printf("value before change: %+v\n", optsValue.Field(i))
@@ -363,9 +379,8 @@ func BuildQueryString(opts interface{}) (*url.URL, error) {
 						}
 					}
 				} else {
-					// Otherwise, the field is not set.
-					if len(tags) == 2 && tags[1] == "required" {
-						// And the field is required. Return an error.
+					// if the field has a 'required' tag, it can't have a zero-value
+					if requiredTag := f.Tag.Get("required"); requiredTag == "true" {
 						return &url.URL{}, fmt.Errorf("Required query parameter [%s] not set.", f.Name)
 					}
 				}
@@ -439,10 +454,9 @@ func BuildHeaders(opts interface{}) (map[string]string, error) {
 						optsMap[tags[0]] = strconv.FormatBool(v.Bool())
 					}
 				} else {
-					// Otherwise, the field is not set.
-					if len(tags) == 2 && tags[1] == "required" {
-						// And the field is required. Return an error.
-						return optsMap, fmt.Errorf("Required header not set.")
+					// if the field has a 'required' tag, it can't have a zero-value
+					if requiredTag := f.Tag.Get("required"); requiredTag == "true" {
+						return optsMap, fmt.Errorf("Required header [%s] not set.", f.Name)
 					}
 				}
 			}

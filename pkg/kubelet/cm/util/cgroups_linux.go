@@ -23,6 +23,7 @@ import (
 	libcontainerutils "github.com/opencontainers/runc/libcontainer/utils"
 )
 
+// GetPids gets pids of the desired cgroup
 // Forked from opencontainers/runc/libcontainer/cgroup/fs.Manager.GetPids()
 func GetPids(cgroupPath string) ([]int, error) {
 	dir, err := getCgroupPath(cgroupPath)
@@ -37,7 +38,7 @@ func GetPids(cgroupPath string) ([]int, error) {
 func getCgroupPath(cgroupPath string) (string, error) {
 	cgroupPath = libcontainerutils.CleanPath(cgroupPath)
 
-	mnt, root, err := libcontainercgroups.FindCgroupMountpointAndRoot("devices")
+	mnt, root, err := libcontainercgroups.FindCgroupMountpointAndRoot(cgroupPath, "devices")
 	// If we didn't mount the subsystem, there is no point we make the path.
 	if err != nil {
 		return "", err

@@ -10,8 +10,8 @@ go_library(
     importpath = "k8s.io/gengo/parser",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

@@ -21,10 +21,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::util::require-jq
 kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
@@ -32,8 +33,8 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 function cleanup()
 {
     if [[ -n ${APISERVER_PID-} ]]; then
-      kill ${APISERVER_PID} 1>&2 2>/dev/null
-      wait ${APISERVER_PID} || true
+      kill "${APISERVER_PID}" 1>&2 2>/dev/null
+      wait "${APISERVER_PID}" || true
     fi
     unset APISERVER_PID
 
@@ -55,7 +56,7 @@ API_LOGFILE=${API_LOGFILE:-/tmp/openapi-api-server.log}
 
 kube::etcd::start
 
-echo "dummy_token,admin,admin" > $TMP_DIR/tokenauth.csv
+echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
@@ -67,7 +68,9 @@ kube::log::status "Starting kube-apiserver"
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
   --runtime-config="api/all=true" \
-  --token-auth-file=$TMP_DIR/tokenauth.csv \
+  --token-auth-file="${TMP_DIR}/tokenauth.csv" \
+  --service-account-issuer="https://kubernetes.devault.svc/" \
+  --service-account-signing-key-file="${KUBE_ROOT}/staging/src/k8s.io/client-go/util/cert/testdata/dontUseThisKey.pem" \
   --logtostderr \
   --v=2 \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
@@ -76,14 +79,14 @@ APISERVER_PID=$!
 if ! kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
   kube::log::error "Here are the last 10 lines from kube-apiserver (${API_LOGFILE})"
   kube::log::error "=== BEGIN OF LOG ==="
-  tail -10 "${API_LOGFILE}" || :
+  tail -10 "${API_LOGFILE}" >&2 || :
   kube::log::error "=== END OF LOG ==="
   exit 1
 fi
 
-kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/swagger.json" > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 

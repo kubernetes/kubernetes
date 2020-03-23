@@ -132,7 +132,7 @@ func (m *VirtualDiskManager) MoveVirtualDiskTask(req *types.MoveVirtualDisk_Task
 				SourceDatacenter:      req.SourceDatacenter,
 				DestinationName:       dest[i],
 				DestinationDatacenter: req.DestDatacenter,
-				Force: req.Force,
+				Force:                 req.Force,
 			})
 
 			if err != nil {
@@ -168,7 +168,7 @@ func (m *VirtualDiskManager) CopyVirtualDiskTask(req *types.CopyVirtualDisk_Task
 				SourceDatacenter:      req.SourceDatacenter,
 				DestinationName:       dest[i],
 				DestinationDatacenter: req.DestDatacenter,
-				Force: req.Force,
+				Force:                 req.Force,
 			})
 
 			if err != nil {

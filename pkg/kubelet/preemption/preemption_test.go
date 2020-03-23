@@ -23,15 +23,12 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
-	critical              = "critical"
 	clusterCritical       = "cluster-critical"
 	nodeCritical          = "node-critical"
 	bestEffort            = "bestEffort"
@@ -44,11 +41,12 @@ const (
 )
 
 type fakePodKiller struct {
-	killedPods []*v1.Pod
+	killedPods          []*v1.Pod
+	errDuringPodKilling bool
 }
 
-func newFakePodKiller() *fakePodKiller {
-	return &fakePodKiller{killedPods: []*v1.Pod{}}
+func newFakePodKiller(errPodKilling bool) *fakePodKiller {
+	return &fakePodKiller{killedPods: []*v1.Pod{}, errDuringPodKilling: errPodKilling}
 }
 
 func (f *fakePodKiller) clear() {
@@ -60,6 +58,10 @@ func (f *fakePodKiller) getKilledPods() []*v1.Pod {
 }
 
 func (f *fakePodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+	if f.errDuringPodKilling {
+		f.killedPods = []*v1.Pod{}
+		return fmt.Errorf("problem killing pod %v", pod)
+	}
 	f.killedPods = append(f.killedPods, pod)
 	return nil
 }
@@ -88,10 +90,7 @@ func getTestCriticalPodAdmissionHandler(podProvider *fakePodProvider, podKiller 
 	}
 }
 
-func TestEvictPodsToFreeRequests(t *testing.T) {
-	if err := utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=true"); err != nil {
-		t.Errorf("failed to set ExperimentalCriticalPodAnnotation to true: %v", err)
-	}
+func TestEvictPodsToFreeRequestsWithError(t *testing.T) {
 	type testRun struct {
 		testName              string
 		inputPods             []*v1.Pod
@@ -100,13 +99,51 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 		expectedOutput        []*v1.Pod
 	}
 	podProvider := newFakePodProvider()
-	podKiller := newFakePodKiller()
+	podKiller := newFakePodKiller(true)
+	criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
+	allPods := getTestPods()
+	runs := []testRun{
+		{
+			testName: "multiple pods eviction error",
+			inputPods: []*v1.Pod{
+				allPods[clusterCritical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
+				allPods[guaranteed], allPods[highRequestGuaranteed]},
+			insufficientResources: getAdmissionRequirementList(0, 550, 0),
+			expectErr:             false,
+			expectedOutput:        nil,
+		},
+	}
+	for _, r := range runs {
+		podProvider.setPods(r.inputPods)
+		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[clusterCritical], r.insufficientResources)
+		outputPods := podKiller.getKilledPods()
+		if !r.expectErr && outErr != nil {
+			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
+		} else if r.expectErr && outErr == nil {
+			t.Errorf("evictPodsToFreeRequests expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
+		} else if !podListEqual(r.expectedOutput, outputPods) {
+			t.Errorf("evictPodsToFreeRequests expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
+		}
+		podKiller.clear()
+	}
+}
+
+func TestEvictPodsToFreeRequests(t *testing.T) {
+	type testRun struct {
+		testName              string
+		inputPods             []*v1.Pod
+		insufficientResources admissionRequirementList
+		expectErr             bool
+		expectedOutput        []*v1.Pod
+	}
+	podProvider := newFakePodProvider()
+	podKiller := newFakePodKiller(false)
 	criticalPodAdmissionHandler := getTestCriticalPodAdmissionHandler(podProvider, podKiller)
 	allPods := getTestPods()
 	runs := []testRun{
 		{
 			testName:              "critical pods cannot be preempted",
-			inputPods:             []*v1.Pod{allPods[critical]},
+			inputPods:             []*v1.Pod{allPods[clusterCritical]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             true,
 			expectedOutput:        nil,
@@ -121,7 +158,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 		{
 			testName: "multiple pods evicted",
 			inputPods: []*v1.Pod{
-				allPods[critical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
+				allPods[clusterCritical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
 				allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,
@@ -130,7 +167,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 	}
 	for _, r := range runs {
 		podProvider.setPods(r.inputPods)
-		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[critical], r.insufficientResources)
+		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[clusterCritical], r.insufficientResources)
 		outputPods := podKiller.getKilledPods()
 		if !r.expectErr && outErr != nil {
 			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
@@ -150,7 +187,7 @@ func BenchmarkGetPodsToPreempt(t *testing.B) {
 		inputPods = append(inputPods, allPods[tinyBurstable])
 	}
 	for n := 0; n < t.N; n++ {
-		getPodsToPreempt(nil, inputPods, admissionRequirementList([]*admissionRequirement{
+		getPodsToPreempt(allPods[bestEffort], inputPods, admissionRequirementList([]*admissionRequirement{
 			{
 				resourceName: v1.ResourceCPU,
 				quantity:     parseCPUToInt64("110m"),
@@ -171,7 +208,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 	runs := []testRun{
 		{
 			testName:              "no requirements",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 0, 0),
 			expectErr:             false,
@@ -179,7 +216,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "no pods",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             true,
@@ -187,7 +224,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "equal pods and resources requirements",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(100, 100, 1),
 			expectErr:             false,
@@ -195,7 +232,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "higher requirements than pod requests",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(200, 200, 2),
 			expectErr:             true,
@@ -203,7 +240,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose between bestEffort and burstable",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[burstable], allPods[bestEffort]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             false,
@@ -211,7 +248,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose between burstable and guaranteed",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[burstable], allPods[guaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             false,
@@ -219,7 +256,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose lower request burstable if it meets requirements",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[highRequestBurstable], allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(100, 100, 0),
 			expectErr:             false,
@@ -227,7 +264,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose higher request burstable if lower does not meet requirements",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable]},
 			insufficientResources: getAdmissionRequirementList(150, 150, 0),
 			expectErr:             false,
@@ -235,7 +272,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "multiple pods required",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(350, 350, 0),
 			expectErr:             false,
@@ -243,7 +280,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "evict guaranteed when we have to, and dont evict the extra burstable",
-			preemptor:             allPods[critical],
+			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,
@@ -378,12 +415,6 @@ func getTestPods() map[string]*v1.Pod {
 			},
 		}),
 		bestEffort: getPodWithResources(bestEffort, v1.ResourceRequirements{}),
-		critical: getPodWithResources(critical, v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100Mi"),
-			},
-		}),
 		clusterCritical: getPodWithResources(clusterCritical, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("100m"),
@@ -429,9 +460,6 @@ func getTestPods() map[string]*v1.Pod {
 			},
 		}),
 	}
-	allPods[critical].Namespace = kubeapi.NamespaceSystem
-	allPods[critical].Annotations[kubetypes.CriticalPodAnnotationKey] = ""
-
 	allPods[clusterCritical].Namespace = kubeapi.NamespaceSystem
 	allPods[clusterCritical].Spec.PriorityClassName = scheduling.SystemClusterCritical
 	clusterPriority := scheduling.SystemCriticalPriority

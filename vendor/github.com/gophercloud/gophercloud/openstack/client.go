@@ -2,10 +2,7 @@ package openstack
 
 import (
 	"fmt"
-	"net/url"
 	"reflect"
-	"regexp"
-	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	tokens2 "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens"
@@ -38,19 +35,9 @@ A basic example of using this would be:
 	client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{})
 */
 func NewClient(endpoint string) (*gophercloud.ProviderClient, error) {
-	u, err := url.Parse(endpoint)
+	base, err := utils.BaseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
-	}
-
-	u.RawQuery, u.Fragment = "", ""
-
-	var base string
-	versionRe := regexp.MustCompile("v[0-9.]+/?")
-	if version := versionRe.FindString(u.Path); version != "" {
-		base = strings.Replace(u.String(), version, "", -1)
-	} else {
-		base = u.String()
 	}
 
 	endpoint = gophercloud.NormalizeURL(endpoint)
@@ -148,7 +135,7 @@ func v2auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 
 	result := tokens2.Create(v2Client, v2Opts)
 
-	token, err := result.ExtractToken()
+	err = client.SetTokenAndAuthResult(result)
 	if err != nil {
 		return err
 	}
@@ -163,8 +150,9 @@ func v2auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 		// with the token and reauth func zeroed out. combined with setting `AllowReauth` to `false`,
 		// this should retry authentication only once
 		tac := *client
+		tac.SetThrowaway(true)
 		tac.ReauthFunc = nil
-		tac.TokenID = ""
+		tac.SetTokenAndAuthResult(nil)
 		tao := options
 		tao.AllowReauth = false
 		client.ReauthFunc = func() error {
@@ -172,11 +160,10 @@ func v2auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 			if err != nil {
 				return err
 			}
-			client.TokenID = tac.TokenID
+			client.CopyTokenFrom(&tac)
 			return nil
 		}
 	}
-	client.TokenID = token.ID
 	client.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
 		return V2EndpointURL(catalog, opts)
 	}
@@ -202,7 +189,7 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, opts tokens3.Au
 
 	result := tokens3.Create(v3Client, opts)
 
-	token, err := result.ExtractToken()
+	err = client.SetTokenAndAuthResult(result)
 	if err != nil {
 		return err
 	}
@@ -212,15 +199,14 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, opts tokens3.Au
 		return err
 	}
 
-	client.TokenID = token.ID
-
 	if opts.CanReauth() {
 		// here we're creating a throw-away client (tac). it's a copy of the user's provider client, but
 		// with the token and reauth func zeroed out. combined with setting `AllowReauth` to `false`,
 		// this should retry authentication only once
 		tac := *client
+		tac.SetThrowaway(true)
 		tac.ReauthFunc = nil
-		tac.TokenID = ""
+		tac.SetTokenAndAuthResult(nil)
 		var tao tokens3.AuthOptionsBuilder
 		switch ot := opts.(type) {
 		case *gophercloud.AuthOptions:
@@ -239,7 +225,7 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, opts tokens3.Au
 			if err != nil {
 				return err
 			}
-			client.TokenID = tac.TokenID
+			client.CopyTokenFrom(&tac)
 			return nil
 		}
 	}
@@ -287,10 +273,16 @@ func NewIdentityV3(client *gophercloud.ProviderClient, eo gophercloud.EndpointOp
 
 	// Ensure endpoint still has a suffix of v3.
 	// This is because EndpointLocator might have found a versionless
-	// endpoint and requests will fail unless targeted at /v3.
-	if !strings.HasSuffix(endpoint, "v3/") {
-		endpoint = endpoint + "v3/"
+	// endpoint or the published endpoint is still /v2.0. In both
+	// cases, we need to fix the endpoint to point to /v3.
+	base, err := utils.BaseEndpoint(endpoint)
+	if err != nil {
+		return nil, err
 	}
+
+	base = gophercloud.NormalizeURL(base)
+
+	endpoint = base + "v3/"
 
 	return &gophercloud.ServiceClient{
 		ProviderClient: client,
@@ -310,6 +302,18 @@ func initClientOpts(client *gophercloud.ProviderClient, eo gophercloud.EndpointO
 	sc.Endpoint = url
 	sc.Type = clientType
 	return sc, nil
+}
+
+// NewBareMetalV1 creates a ServiceClient that may be used with the v1
+// bare metal package.
+func NewBareMetalV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	return initClientOpts(client, eo, "baremetal")
+}
+
+// NewBareMetalIntrospectionV1 creates a ServiceClient that may be used with the v1
+// bare metal introspection package.
+func NewBareMetalIntrospectionV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	return initClientOpts(client, eo, "baremetal-inspector")
 }
 
 // NewObjectStorageV1 creates a ServiceClient that may be used with the v1
@@ -399,4 +403,36 @@ func NewLoadBalancerV2(client *gophercloud.ProviderClient, eo gophercloud.Endpoi
 // package.
 func NewClusteringV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "clustering")
+}
+
+// NewMessagingV2 creates a ServiceClient that may be used with the v2 messaging
+// service.
+func NewMessagingV2(client *gophercloud.ProviderClient, clientID string, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	sc, err := initClientOpts(client, eo, "messaging")
+	sc.MoreHeaders = map[string]string{"Client-ID": clientID}
+	return sc, err
+}
+
+// NewContainerV1 creates a ServiceClient that may be used with v1 container package
+func NewContainerV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	return initClientOpts(client, eo, "container")
+}
+
+// NewKeyManagerV1 creates a ServiceClient that may be used with the v1 key
+// manager service.
+func NewKeyManagerV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	sc, err := initClientOpts(client, eo, "key-manager")
+	sc.ResourceBase = sc.Endpoint + "v1/"
+	return sc, err
+}
+
+// NewContainerInfraV1 creates a ServiceClient that may be used with the v1 container infra management
+// package.
+func NewContainerInfraV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	return initClientOpts(client, eo, "container-infra")
+}
+
+// NewWorkflowV2 creates a ServiceClient that may be used with the v2 workflow management package.
+func NewWorkflowV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	return initClientOpts(client, eo, "workflowv2")
 }

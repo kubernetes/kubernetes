@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func TestGetPreferredAddress(t *testing.T) {
@@ -53,7 +52,7 @@ func TestGetPreferredAddress(t *testing.T) {
 			ExpectAddress: "1.2.3.5",
 		},
 		"found hostname address": {
-			Labels: map[string]string{kubeletapis.LabelHostname: "label-hostname"},
+			Labels: map[string]string{v1.LabelHostname: "label-hostname"},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeExternalIP, Address: "1.2.3.5"},
 				{Type: v1.NodeHostName, Address: "status-hostname"},
@@ -62,7 +61,7 @@ func TestGetPreferredAddress(t *testing.T) {
 			ExpectAddress: "status-hostname",
 		},
 		"label address ignored": {
-			Labels: map[string]string{kubeletapis.LabelHostname: "label-hostname"},
+			Labels: map[string]string{v1.LabelHostname: "label-hostname"},
 			Addresses: []v1.NodeAddress{
 				{Type: v1.NodeExternalIP, Address: "1.2.3.5"},
 			},
@@ -119,5 +118,86 @@ func TestGetHostname(t *testing.T) {
 			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
 		}
 
+	}
+}
+
+func Test_GetZoneKey(t *testing.T) {
+	tests := []struct {
+		name string
+		node *v1.Node
+		zone string
+	}{
+		{
+			name: "has no zone or region keys",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			zone: "",
+		},
+		{
+			name: "has beta zone and region keys",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "zone1",
+						v1.LabelZoneRegion:        "region1",
+					},
+				},
+			},
+			zone: "region1:\x00:zone1",
+		},
+		{
+			name: "has GA zone and region keys",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomainStable: "zone1",
+						v1.LabelZoneRegionStable:        "region1",
+					},
+				},
+			},
+			zone: "region1:\x00:zone1",
+		},
+		{
+			name: "has both beta and GA zone and region keys",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomainStable: "zone1",
+						v1.LabelZoneRegionStable:        "region1",
+						v1.LabelZoneFailureDomain:       "zone1",
+						v1.LabelZoneRegion:              "region1",
+					},
+				},
+			},
+			zone: "region1:\x00:zone1",
+		},
+		{
+			name: "has both beta and GA zone and region keys, beta labels take precedent",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomainStable: "zone1",
+						v1.LabelZoneRegionStable:        "region1",
+						v1.LabelZoneFailureDomain:       "zone2",
+						v1.LabelZoneRegion:              "region2",
+					},
+				},
+			},
+			zone: "region2:\x00:zone2",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			zone := GetZoneKey(test.node)
+			if zone != test.zone {
+				t.Logf("actual zone key: %q", zone)
+				t.Logf("expected zone key: %q", test.zone)
+				t.Errorf("unexpected zone key")
+			}
+		})
 	}
 }

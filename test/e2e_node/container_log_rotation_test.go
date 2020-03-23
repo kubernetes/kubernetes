@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"time"
@@ -27,9 +27,10 @@ import (
 	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -42,10 +43,10 @@ const (
 
 var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("container-log-rotation-test")
-	Context("when a container generates a lot of log", func() {
-		BeforeEach(func() {
+	ginkgo.Context("when a container generates a lot of log", func() {
+		ginkgo.BeforeEach(func() {
 			if framework.TestContext.ContainerRuntime != kubetypes.RemoteContainerRuntime {
-				framework.Skipf("Skipping ContainerLogRotation test since the container runtime is not remote")
+				e2eskipper.Skipf("Skipping ContainerLogRotation test since the container runtime is not remote")
 			}
 		})
 
@@ -55,8 +56,8 @@ var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive
 			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
 		})
 
-		It("should be rotated and limited to a fixed amount of files", func() {
-			By("create log container")
+		ginkgo.It("should be rotated and limited to a fixed amount of files", func() {
+			ginkgo.By("create log container")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-container-log-rotation",
@@ -78,30 +79,30 @@ var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive
 				},
 			}
 			pod = f.PodClient().CreateSync(pod)
-			By("get container log path")
-			Expect(len(pod.Status.ContainerStatuses)).To(Equal(1))
+			ginkgo.By("get container log path")
+			framework.ExpectEqual(len(pod.Status.ContainerStatuses), 1)
 			id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			status, err := r.ContainerStatus(id)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			logPath := status.GetLogPath()
-			By("wait for container log being rotated to max file limit")
-			Eventually(func() (int, error) {
+			ginkgo.By("wait for container log being rotated to max file limit")
+			gomega.Eventually(func() (int, error) {
 				logs, err := kubelogs.GetAllLogs(logPath)
 				if err != nil {
 					return 0, err
 				}
 				return len(logs), nil
-			}, rotationEventuallyTimeout, rotationPollInterval).Should(Equal(testContainerLogMaxFiles), "should eventually rotate to max file limit")
-			By("make sure container log number won't exceed max file limit")
-			Consistently(func() (int, error) {
+			}, rotationEventuallyTimeout, rotationPollInterval).Should(gomega.Equal(testContainerLogMaxFiles), "should eventually rotate to max file limit")
+			ginkgo.By("make sure container log number won't exceed max file limit")
+			gomega.Consistently(func() (int, error) {
 				logs, err := kubelogs.GetAllLogs(logPath)
 				if err != nil {
 					return 0, err
 				}
 				return len(logs), nil
-			}, rotationConsistentlyTimeout, rotationPollInterval).Should(BeNumerically("<=", testContainerLogMaxFiles), "should never exceed max file limit")
+			}, rotationConsistentlyTimeout, rotationPollInterval).Should(gomega.BeNumerically("<=", testContainerLogMaxFiles), "should never exceed max file limit")
 		})
 	})
 })

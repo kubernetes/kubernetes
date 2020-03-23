@@ -74,15 +74,15 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
 	upgradeHeader := strings.ToLower(req.Header.Get(httpstream.HeaderUpgrade))
 	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "unable to upgrade: missing upgrade headers in request: %#v", req.Header)
+		errorMsg := fmt.Sprintf("unable to upgrade: missing upgrade headers in request: %#v", req.Header)
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return nil
 	}
 
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "unable to upgrade: unable to hijack response")
+		errorMsg := fmt.Sprintf("unable to upgrade: unable to hijack response")
+		http.Error(w, errorMsg, http.StatusInternalServerError)
 		return nil
 	}
 

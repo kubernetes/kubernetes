@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
 - smarterclayton
 - wojtek-t
@@ -6,5 +8,4 @@ reviewers:
 - timothysc
 - soltysh
 - mml
-- feihujiang
 - enj

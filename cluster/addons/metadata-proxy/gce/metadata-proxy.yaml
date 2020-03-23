@@ -8,7 +8,7 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: metadata-proxy-v0.1
@@ -19,6 +19,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v0.1
 spec:
+  selector:
+    matchLabels:
+      k8s-app: metadata-proxy
+      version: v0.1
   updateStrategy:
     type: RollingUpdate
   template:
@@ -27,11 +31,6 @@ spec:
         k8s-app: metadata-proxy
         kubernetes.io/cluster-service: "true"
         version: v0.1
-      # This annotation ensures that the proxy does not get evicted if the node
-      # supports critical pod annotation based priority scheme.
-      # Note that this does not guarantee admission on the nodes (#40573).
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: metadata-proxy
@@ -44,7 +43,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: metadata-proxy
-        image: k8s.gcr.io/metadata-proxy:v0.1.10
+        image: k8s.gcr.io/metadata-proxy:v0.1.12
         securityContext:
           privileged: true
         # Request and limit resources to get guaranteed QoS.
@@ -57,7 +56,7 @@ spec:
             cpu: "30m"
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.3.1
+        image: k8s.gcr.io/prometheus-to-sd:v0.5.0
         # Request and limit resources to get guaranteed QoS.
         resources:
           requests:
@@ -84,5 +83,6 @@ spec:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
-        beta.kubernetes.io/metadata-proxy-ready: "true"
+        cloud.google.com/metadata-proxy-ready: "true"
+        kubernetes.io/os: linux
       terminationGracePeriodSeconds: 30

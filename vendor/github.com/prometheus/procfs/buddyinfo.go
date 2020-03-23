@@ -31,19 +31,9 @@ type BuddyInfo struct {
 	Sizes []float64
 }
 
-// NewBuddyInfo reads the buddyinfo statistics.
-func NewBuddyInfo() ([]BuddyInfo, error) {
-	fs, err := NewFS(DefaultMountPoint)
-	if err != nil {
-		return nil, err
-	}
-
-	return fs.NewBuddyInfo()
-}
-
 // NewBuddyInfo reads the buddyinfo statistics from the specified `proc` filesystem.
-func (fs FS) NewBuddyInfo() ([]BuddyInfo, error) {
-	file, err := os.Open(fs.Path("buddyinfo"))
+func (fs FS) BuddyInfo() ([]BuddyInfo, error) {
+	file, err := os.Open(fs.proc.Path("buddyinfo"))
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +52,7 @@ func parseBuddyInfo(r io.Reader) ([]BuddyInfo, error) {
 	for scanner.Scan() {
 		var err error
 		line := scanner.Text()
-		parts := strings.Fields(string(line))
+		parts := strings.Fields(line)
 
 		if len(parts) < 4 {
 			return nil, fmt.Errorf("invalid number of fields when parsing buddyinfo")

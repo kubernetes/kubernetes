@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,6 +54,18 @@ const (
 	// WatchChangeDetectionStrategy is a mode in which kubelet uses
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
+	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with optimal NUMA node alignment for requested resources
+	RestrictedTopologyManagerPolicy = "restricted"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
+	// pods with NUMA alignment of CPU and device resources.
+	BestEffortTopologyManagerPolicy = "best-effort"
+	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
+	// of NUMA alignment of a pod's CPU and device resources.
+	NoneTopologyManagerPolicy = "none"
+	// SingleNumaNodeTopologyManager Policy iis a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	SingleNumaNodeTopologyManager = "single-numa-node"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -292,9 +304,11 @@ type KubeletConfiguration struct {
 	// Default: "4h"
 	// +optional
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout,omitempty"`
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
-	// status to master. Note: be cautious when changing the constant, it
-	// must work with nodeMonitorGracePeriod in nodecontroller.
+	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
+	// status. If node lease feature is not enabled, it is also the frequency that
+	// kubelet posts node status to master.
+	// Note: When node lease feature is not enabled, be cautious when changing the
+	// constant, it must work with nodeMonitorGracePeriod in nodecontroller.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may impact node scalability, and also that the node controller's
 	// nodeMonitorGracePeriod must be set to N*NodeStatusUpdateFrequency,
@@ -303,9 +317,19 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency,omitempty"`
+	// nodeStatusReportFrequency is the frequency that kubelet posts node
+	// status to master if node status does not change. Kubelet will ignore this
+	// frequency and post node status immediately if any change is detected. It is
+	// only used when node lease feature is enabled. nodeStatusReportFrequency's
+	// default value is 1m. But if nodeStatusUpdateFrequency is set explicitly,
+	// nodeStatusReportFrequency's default value will be set to
+	// nodeStatusUpdateFrequency for backward compatibility.
+	// Default: "1m"
+	// +optional
+	NodeStatusReportFrequency metav1.Duration `json:"nodeStatusReportFrequency,omitempty"`
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease,
 	// when the NodeLease feature is enabled. This feature provides an indicator of node
-	// health by having the Kublet create and periodically renew a lease, named after the node,
+	// health by having the Kubelet create and periodically renew a lease, named after the node,
 	// in the kube-node-lease namespace. If the lease expires, the node can be considered unhealthy.
 	// The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal interval
 	// may be set based on the lease duration.
@@ -397,6 +421,13 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
+	// TopologyManagerPolicy is the name of the policy to use.
+	// Policies other than "none" require the TopologyManager feature gate to be enabled.
+	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
+	// reboot. It is safest to keep this value the same as the local config.
+	// Default: "none"
+	// +optional
+	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
 	// qosReserved is a set of resource name to percentage pairs that specify
 	// the minimum percentage of a resource reserved for exclusive use by the
 	// guaranteed QoS tier.
@@ -651,7 +682,7 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles *int32 `json:"containerLogMaxFiles,omitempty"`
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which
 	// config map and secret managers are running.
-	// Default: "Watching"
+	// Default: "Watch"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
 
@@ -679,6 +710,18 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	KubeReserved map[string]string `json:"kubeReserved,omitempty"`
+	// This ReservedSystemCPUs option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
+	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
+	// This option overwrites CPUs provided by system-reserved and kube-reserved.
+	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// The previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	// Default: ""
+	// +optional
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
@@ -706,6 +749,12 @@ type KubeletConfiguration struct {
 	// Default: ["pods"]
 	// +optional
 	EnforceNodeAllocatable []string `json:"enforceNodeAllocatable,omitempty"`
+	// A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// Unsafe sysctl groups are kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*, and net.*.
+	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
+	// Default: []
+	// +optional
+	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
 }
 
 type KubeletAuthorizationMode string

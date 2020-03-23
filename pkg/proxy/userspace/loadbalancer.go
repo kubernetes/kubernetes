@@ -19,6 +19,7 @@ package userspace
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/proxy"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"net"
 )
 
@@ -31,4 +32,6 @@ type LoadBalancer interface {
 	DeleteService(service proxy.ServicePortName)
 	CleanupStaleStickySessions(service proxy.ServicePortName)
 	ServiceHasEndpoints(service proxy.ServicePortName) bool
+
+	proxyconfig.EndpointsHandler
 }

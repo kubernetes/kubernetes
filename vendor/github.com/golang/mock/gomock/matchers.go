@@ -22,7 +22,7 @@ import (
 // A Matcher is a representation of a class of values.
 // It is used to represent the valid or expected arguments to a mocked method.
 type Matcher interface {
-	// Matches returns whether y is a match.
+	// Matches returns whether x is a match.
 	Matches(x interface{}) bool
 
 	// String describes what the matcher matches.
@@ -85,13 +85,57 @@ func (n notMatcher) String() string {
 	return "not(" + n.m.String() + ")"
 }
 
+type assignableToTypeOfMatcher struct {
+	targetType reflect.Type
+}
+
+func (m assignableToTypeOfMatcher) Matches(x interface{}) bool {
+	return reflect.TypeOf(x).AssignableTo(m.targetType)
+}
+
+func (m assignableToTypeOfMatcher) String() string {
+	return "is assignable to " + m.targetType.Name()
+}
+
 // Constructors
-func Any() Matcher             { return anyMatcher{} }
+// Any returns a matcher that always matches.
+func Any() Matcher { return anyMatcher{} }
+
+// Eq returns a matcher that matches on equality.
+//
+// Example usage:
+//   Eq(5).Matches(5) // returns true
+//   Eq(5).Matches(4) // returns false
 func Eq(x interface{}) Matcher { return eqMatcher{x} }
-func Nil() Matcher             { return nilMatcher{} }
+
+// Nil returns a matcher that matches if the received value is nil.
+//
+// Example usage:
+//   var x *bytes.Buffer
+//   Nil().Matches(x) // returns true
+//   x = &bytes.Buffer{}
+//   Nil().Matches(x) // returns false
+func Nil() Matcher { return nilMatcher{} }
+
+// Not reverses the results of its given child matcher.
+//
+// Example usage:
+//   Not(Eq(5)).Matches(4) // returns true
+//   Not(Eq(5)).Matches(5) // returns false
 func Not(x interface{}) Matcher {
 	if m, ok := x.(Matcher); ok {
 		return notMatcher{m}
 	}
 	return notMatcher{Eq(x)}
+}
+
+// AssignableToTypeOf is a Matcher that matches if the parameter to the mock
+// function is assignable to the type of the parameter to this function.
+//
+// Example usage:
+//   var s fmt.Stringer = &bytes.Buffer{}
+//   AssignableToTypeOf(s).Matches(time.Second) // returns true
+//   AssignableToTypeOf(s).Matches(99) // returns false
+func AssignableToTypeOf(x interface{}) Matcher {
+	return assignableToTypeOfMatcher{reflect.TypeOf(x)}
 }

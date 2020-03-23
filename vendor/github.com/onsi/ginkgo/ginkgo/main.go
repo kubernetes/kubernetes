@@ -50,6 +50,10 @@ By default, when running multiple tests (with -r or a list of packages) Ginkgo w
 
 	ginkgo -keepGoing
 
+To fail if there are ginkgo tests in a directory but no test suite (missing `RunSpecs`)
+
+	ginkgo -requireSuite
+
 To monitor packages and rerun tests when changes occur:
 
 	ginkgo watch <-r> </path/to/package>
@@ -149,6 +153,7 @@ func (c *Command) Matches(name string) bool {
 }
 
 func (c *Command) Run(args []string, additionalArgs []string) {
+	c.FlagSet.Usage = usage
 	c.FlagSet.Parse(args)
 	c.Command(c.FlagSet.Args(), additionalArgs)
 }
@@ -211,20 +216,21 @@ func commandMatching(name string) (*Command, bool) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "Ginkgo Version %s\n\n", config.VERSION)
+	fmt.Printf("Ginkgo Version %s\n\n", config.VERSION)
 	usageForCommand(DefaultCommand, false)
 	for _, command := range Commands {
-		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Printf("\n")
 		usageForCommand(command, false)
 	}
 }
 
 func usageForCommand(command *Command, longForm bool) {
-	fmt.Fprintf(os.Stderr, "%s\n%s\n", command.UsageCommand, strings.Repeat("-", len(command.UsageCommand)))
-	fmt.Fprintf(os.Stderr, "%s\n", strings.Join(command.Usage, "\n"))
+	fmt.Printf("%s\n%s\n", command.UsageCommand, strings.Repeat("-", len(command.UsageCommand)))
+	fmt.Printf("%s\n", strings.Join(command.Usage, "\n"))
 	if command.SuppressFlagDocumentation && !longForm {
-		fmt.Fprintf(os.Stderr, "%s\n", strings.Join(command.FlagDocSubstitute, "\n  "))
+		fmt.Printf("%s\n", strings.Join(command.FlagDocSubstitute, "\n  "))
 	} else {
+		command.FlagSet.SetOutput(os.Stdout)
 		command.FlagSet.PrintDefaults()
 	}
 }

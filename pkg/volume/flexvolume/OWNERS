@@ -1,6 +1,9 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - chakri-nelluri
 - saad-ali
+emeritus_approvers:
 - MikaelCluseau
 reviewers:
 - ivan4th
@@ -12,4 +15,3 @@ reviewers:
 - jingxu97
 - msau42
 - chakri-nelluri
-- MikaelCluseau

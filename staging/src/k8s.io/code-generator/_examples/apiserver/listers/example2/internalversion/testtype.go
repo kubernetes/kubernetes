@@ -29,8 +29,8 @@ import (
 type TestTypeLister interface {
 	// List lists all TestTypes in the indexer.
 	List(selector labels.Selector) (ret []*example2.TestType, err error)
-	// TestTypes returns an object that can list and get TestTypes.
-	TestTypes(namespace string) TestTypeNamespaceLister
+	// Get retrieves the TestType from the index for a given name.
+	Get(name string) (*example2.TestType, error)
 	TestTypeListerExpansion
 }
 
@@ -52,38 +52,9 @@ func (s *testTypeLister) List(selector labels.Selector) (ret []*example2.TestTyp
 	return ret, err
 }
 
-// TestTypes returns an object that can list and get TestTypes.
-func (s *testTypeLister) TestTypes(namespace string) TestTypeNamespaceLister {
-	return testTypeNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// TestTypeNamespaceLister helps list and get TestTypes.
-type TestTypeNamespaceLister interface {
-	// List lists all TestTypes in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*example2.TestType, err error)
-	// Get retrieves the TestType from the indexer for a given namespace and name.
-	Get(name string) (*example2.TestType, error)
-	TestTypeNamespaceListerExpansion
-}
-
-// testTypeNamespaceLister implements the TestTypeNamespaceLister
-// interface.
-type testTypeNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all TestTypes in the indexer for a given namespace.
-func (s testTypeNamespaceLister) List(selector labels.Selector) (ret []*example2.TestType, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*example2.TestType))
-	})
-	return ret, err
-}
-
-// Get retrieves the TestType from the indexer for a given namespace and name.
-func (s testTypeNamespaceLister) Get(name string) (*example2.TestType, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the TestType from the index for a given name.
+func (s *testTypeLister) Get(name string) (*example2.TestType, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

@@ -20,16 +20,12 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/spf13/pflag"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	utilpointer "k8s.io/utils/pointer"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 )
 
 func TestValidateToken(t *testing.T) {
@@ -114,7 +110,7 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		{"invalid-node?name", "/some/path", true},                                            // Unsupported characters
 		{"valid-nodename", "/some/path", false},                                              // supported
 		{"valid-nodename-with-numbers01234", "/some/path/with/numbers/01234/", false},        // supported, with numbers as well
-		{"valid-nodename", kubeadmapiv1beta1.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
+		{"valid-nodename", kubeadmapiv1beta2.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
 		{"valid-nodename", "bla:///some/path", true},                                         // unsupported url scheme
 		{"valid-nodename", ":::", true},                                                      // unparseable url
 	}
@@ -145,6 +141,11 @@ func TestValidateCertSANs(t *testing.T) {
 		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true},    // supported
 		{[]string{"my-hostname", "my.subdomain", "2001:db8::4"}, true},         // supported
 		{[]string{"my-hostname2", "my.other.subdomain", "2001:db8::10"}, true}, // supported
+		{[]string{"*.my-hostname2", "*.my.other.subdomain"}, true},             // supported Wildcard DNS label
+		{[]string{"**.my-hostname2", "my.other.subdomain"}, false},             // not a Wildcard DNS label
+		{[]string{"*.*.my-hostname2", "my.other.subdomain"}, false},            // not a Wildcard DNS label
+		{[]string{"a.*.my-hostname2", "my.other.subdomain"}, false},            // not a Wildcard DNS label
+		{[]string{"*", "my.other.subdomain", "2001:db8::10"}, false},           // not a Wildcard DNS label
 	}
 	for _, rt := range tests {
 		actual := ValidateCertSANs(rt.sans, nil)
@@ -189,29 +190,48 @@ func TestValidateIPFromString(t *testing.T) {
 
 func TestValidateIPNetFromString(t *testing.T) {
 	var tests = []struct {
-		name     string
-		subnet   string
-		minaddrs int64
-		expected bool
+		name           string
+		subnet         string
+		minaddrs       int64
+		checkDualStack bool
+		expected       bool
 	}{
-		{"invalid missing CIDR", "", 0, false},
-		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false},
-		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false},
-		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false},
-		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false},
-		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false},
-		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false},
-		{"valid IPv4 CIDR", "10.0.0.16/12", 10, true},
-		{"valid IPv6 CIDR", "2001:db8::/98", 10, true},
+		{"invalid missing CIDR", "", 0, false, false},
+		{"invalid  CIDR", "a", 0, false, false},
+		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false, false},
+		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false, false},
+		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false, false},
+		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false, false},
+		{"invalid multiple CIDR provided in a single stack cluster", "2001:db8::1/64,1.2.3.4/24", 0, false, false},
+		{"invalid multiple CIDR provided in a single stack cluster and one invalid subnet", "2001:db8::1/64,a", 0, false, false},
+		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false, false},
+		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false, false},
+		{"valid IPv4 CIDR", "10.0.0.16/12", 10, false, true},
+		{"valid IPv6 CIDR", "2001:db8::/98", 10, false, true},
+		// dual-stack:
+		{"invalid missing CIDR", "", 0, true, false},
+		{"valid dual-stack enabled but only an IPv4 CIDR specified", "10.0.0.16/12", 10, true, true},
+		{"valid dual-stack enabled but only an IPv6 CIDR specified", "2001:db8::/98", 10, true, true},
+		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4,2001:db8::/98", 0, true, false},
+		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1,10.0.0.16/12", 0, true, false},
+		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29,2001:db8::/98", 10, true, false},
+		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "10.0.0.16/12,2001:db8::/125", 10, true, false},
+		{"valid, but only IPv4 family addresses specified. IPv6 CIDR is necessary.", "10.0.0.16/12,192.168.0.0/16", 10, true, false},
+		{"valid, but only IPv6 family addresses specified. IPv4 CIDR is necessary.", "2001:db8::/98,2005:db8::/98", 10, true, false},
+		{"valid IPv4 and IPv6 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
+		{"valid IPv6 and IPv4 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16", 10, true, false},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16,a.b.c.d/24", 10, true, false},
 	}
 	for _, rt := range tests {
-		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, nil)
+		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, rt.checkDualStack, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"%s test case failed :\n\texpected: %t\n\t  actual: %t",
+				"%s test case failed :\n\texpected: %t\n\t  actual: %t\n\t  err(s): %v\n\t",
 				rt.name,
 				rt.expected,
 				(len(actual) == 0),
+				actual,
 			)
 		}
 	}
@@ -355,11 +375,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 		s        *kubeadm.InitConfiguration
 		expected bool
 	}{
-		{"invalid missing master configuration",
+		{"invalid missing InitConfiguration",
 			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -374,7 +394,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -389,7 +409,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -401,9 +421,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/other/cert/dir",
 				},
 			}, false},
-		{"valid master configuration with incorrect IPv4 pod subnet",
+		{"valid InitConfiguration with incorrect IPv4 pod subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -417,9 +437,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
-		{"valid master configuration with IPv4 service subnet",
+		{"valid InitConfiguration with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -427,32 +447,6 @@ func TestValidateInitConfiguration(t *testing.T) {
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
-						},
-					},
-					ComponentConfigs: kubeadm.ComponentConfigs{
-						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
-							BindAddress:        "192.168.59.103",
-							HealthzBindAddress: "0.0.0.0:10256",
-							MetricsBindAddress: "127.0.0.1:10249",
-							ClusterCIDR:        "192.168.59.0/24",
-							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-								MasqueradeAll: true,
-								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-							},
-							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
-							},
-							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								Max:                   utilpointer.Int32Ptr(2),
-								MaxPerCore:            utilpointer.Int32Ptr(1),
-								Min:                   utilpointer.Int32Ptr(1),
-								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-							},
 						},
 					},
 					Networking: kubeadm.Networking{
@@ -464,9 +458,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
-		{"valid master configuration using IPv6 service subnet",
+		{"valid InitConfiguration using IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
 				},
@@ -474,32 +468,6 @@ func TestValidateInitConfiguration(t *testing.T) {
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
-						},
-					},
-					ComponentConfigs: kubeadm.ComponentConfigs{
-						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
-							BindAddress:        "192.168.59.103",
-							HealthzBindAddress: "0.0.0.0:10256",
-							MetricsBindAddress: "127.0.0.1:10249",
-							ClusterCIDR:        "192.168.59.0/24",
-							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-								MasqueradeAll: true,
-								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-							},
-							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
-								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
-							},
-							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								Max:                   utilpointer.Int32Ptr(2),
-								MaxPerCore:            utilpointer.Int32Ptr(1),
-								Min:                   utilpointer.Int32Ptr(1),
-								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-							},
 						},
 					},
 					Networking: kubeadm.Networking{
@@ -538,6 +506,84 @@ func TestValidateJoinConfiguration(t *testing.T) {
 				},
 				File: &kubeadm.FileDiscovery{
 					KubeConfigPath: "foo",
+				},
+			},
+		}, false},
+		{&kubeadm.JoinConfiguration{ // Pass without JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Pass with JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         1234,
+				},
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.AdvertiseAddress validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "aaa",
+					BindPort:         1234,
+				},
+			},
+		}, false},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.BindPort validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         -1,
 				},
 			},
 		}, false},
@@ -603,17 +649,15 @@ func TestValidateFeatureGates(t *testing.T) {
 		featureGates featureFlag
 		expected     bool
 	}{
-		{featureFlag{"SelfHosting": true}, true},
-		{featureFlag{"SelfHosting": false}, true},
-		{featureFlag{"StoreCertsInSecrets": true}, true},
-		{featureFlag{"StoreCertsInSecrets": false}, true},
-		{featureFlag{"Foo": true}, false},
+		{featureFlag{"Unknown": true}, false},
+		{featureFlag{"Unknown": false}, false},
 	}
 	for _, rt := range tests {
 		actual := ValidateFeatureGates(rt.featureGates, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed featureGates:\n\texpected: %t\n\t  actual: %t",
+				"failed featureGates %v:\n\texpected: %t\n\t  actual: %t",
+				rt.featureGates,
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -623,26 +667,81 @@ func TestValidateFeatureGates(t *testing.T) {
 
 func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
-		ignorePreflightErrors []string
-		expectedLen           int
-		expectedError         bool
+		ignorePreflightErrorsFromCLI        []string
+		ignorePreflightErrorsFromConfigFile []string
+		expectedSet                         sets.String
+		expectedError                       bool
 	}{
-		{[]string{}, 0, false},                             // empty list
-		{[]string{"check1", "check2"}, 2, false},           // non-duplicate
-		{[]string{"check1", "check2", "check1"}, 2, false}, // duplicates
-		{[]string{"check1", "check2", "all"}, 3, true},     // non-duplicate, but 'all' present together wth individual checks
-		{[]string{"all"}, 1, false},                        // skip all checks by using new flag
-		{[]string{"all"}, 1, false},                        // skip all checks by using both old and new flags at the same time
+		{ // empty lists in CLI and config file
+			[]string{},
+			[]string{},
+			sets.NewString(),
+			false,
+		},
+		{ // empty list in CLI only
+			[]string{},
+			[]string{"a"},
+			sets.NewString("a"),
+			false,
+		},
+		{ // empty list in config file only
+			[]string{"a"},
+			[]string{},
+			sets.NewString("a"),
+			false,
+		},
+		{ // no duplicates, no overlap
+			[]string{"a", "b"},
+			[]string{"c", "d"},
+			sets.NewString("a", "b", "c", "d"),
+			false,
+		},
+		{ // some duplicates, with some overlapping duplicates
+			[]string{"a", "b", "a"},
+			[]string{"c", "b"},
+			sets.NewString("a", "b", "c"),
+			false,
+		},
+		{ // non-duplicate, but 'all' present together with individual checks in CLI
+			[]string{"a", "b", "all"},
+			[]string{},
+			sets.NewString(),
+			true,
+		},
+		{ // empty list in CLI, but 'all' present in config file, which is forbidden
+			[]string{},
+			[]string{"all"},
+			sets.NewString(),
+			true,
+		},
+		{ // non-duplicate, but 'all' present in config file, which is forbidden
+			[]string{"a", "b"},
+			[]string{"all"},
+			sets.NewString(),
+			true,
+		},
+		{ // non-duplicate, but 'all' present in CLI, while values are in config file, which is forbidden
+			[]string{"all"},
+			[]string{"a", "b"},
+			sets.NewString(),
+			true,
+		},
+		{ // skip all checks
+			[]string{"all"},
+			[]string{},
+			sets.NewString("all"),
+			false,
+		},
 	}
 	for _, rt := range tests {
-		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrors)
+		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile)
 		switch {
 		case err != nil && !rt.expectedError:
-			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s), error: %v", rt.ignorePreflightErrors, err)
+			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s, %s), error: %v", rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile, err)
 		case err == nil && rt.expectedError:
-			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s) but got: %v", rt.ignorePreflightErrors, result)
-		case result.Len() != rt.expectedLen:
-			t.Errorf("ValidateIgnorePreflightErrors: expected Len = %d for input (%s) but got: %v, %v", rt.expectedLen, rt.ignorePreflightErrors, result.Len(), result)
+			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s, %s) but got: %v", rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile, result)
+		case err == nil && !result.Equal(rt.expectedSet):
+			t.Errorf("ValidateIgnorePreflightErrors: expected (%v) for input (%s, %s) but got: %v", rt.expectedSet, rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile, result)
 		}
 	}
 }
@@ -692,7 +791,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 		expected bool
 	}{
 		{
-			"invalid: .APIServerEndpoints not set",
+			"invalid: .APIServerEndpoint not set",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token: "abcdef.1234567890123456",
 			},
@@ -702,25 +801,16 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 			"invalid: using token-based discovery without .BootstrapToken.CACertHashes and .BootstrapToken.UnsafeSkipCAVerification",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443"},
+				APIServerEndpoint:        "192.168.122.100:6443",
 				UnsafeSkipCAVerification: false,
 			},
 			false,
 		},
 		{
-			"WARNING: kubeadm doesn't fully support multiple API Servers yet",
-			&kubeadm.BootstrapTokenDiscovery{
-				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443", "192.168.122.88:6443"},
-				UnsafeSkipCAVerification: true,
-			},
-			true,
-		},
-		{
 			"valid: using token-based discovery with .BootstrapToken.CACertHashes",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443"},
+				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
 				UnsafeSkipCAVerification: false,
 			},
@@ -730,7 +820,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 			"valid: using token-based discovery with .BootstrapToken.CACertHashe but skip ca verification",
 			&kubeadm.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
-				APIServerEndpoints:       []string{"192.168.122.100:6443"},
+				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
 				UnsafeSkipCAVerification: true,
 			},
@@ -753,20 +843,20 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 
 func TestValidateDiscoveryTokenAPIServer(t *testing.T) {
 	var tests = []struct {
-		apiServerEndpoints []string
-		expected           bool
+		apiServerEndpoint string
+		expected          bool
 	}{
 		{
-			[]string{"192.168.122.100"},
+			"192.168.122.100",
 			false,
 		},
 		{
-			[]string{"192.168.122.100:6443"},
+			"192.168.122.100:6443",
 			true,
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateDiscoveryTokenAPIServer(rt.apiServerEndpoints, nil)
+		actual := ValidateDiscoveryTokenAPIServer(rt.apiServerEndpoint, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"failed ValidateDiscoveryTokenAPIServer:\n\texpected: %t\n\t  actual: %t",

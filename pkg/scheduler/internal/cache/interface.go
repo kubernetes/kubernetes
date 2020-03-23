@@ -17,13 +17,10 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	v1 "k8s.io/api/core/v1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
-
-// PodFilter is a function to filter a pod. If pod passed return true else return false.
-type PodFilter func(*v1.Pod) bool
 
 // Cache collects pods' information and provides node-level aggregated information.
 // It's intended for generic scheduler to do efficient lookup.
@@ -60,6 +57,8 @@ type PodFilter func(*v1.Pod) bool
 // - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
+	schedulerlisters.PodLister
+
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
@@ -97,26 +96,17 @@ type Cache interface {
 	// RemoveNode removes overall information about node.
 	RemoveNode(node *v1.Node) error
 
-	// UpdateNodeNameToInfoMap updates the passed infoMap to the current contents of Cache.
+	// UpdateSnapshot updates the passed infoSnapshot to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
-	UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error
+	UpdateSnapshot(nodeSnapshot *Snapshot) error
 
-	// List lists all cached pods (including assumed ones).
-	List(labels.Selector) ([]*v1.Pod, error)
-
-	// FilteredList returns all cached pods that pass the filter.
-	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
-
-	// Snapshot takes a snapshot on current cache
-	Snapshot() *Snapshot
-
-	// NodeTree returns a node tree structure
-	NodeTree() *NodeTree
+	// Dump produces a dump of the current cache.
+	Dump() *Dump
 }
 
-// Snapshot is a snapshot of cache state
-type Snapshot struct {
+// Dump is a dump of the cache state.
+type Dump struct {
 	AssumedPods map[string]bool
-	Nodes       map[string]*schedulercache.NodeInfo
+	Nodes       map[string]*schedulernodeinfo.NodeInfo
 }

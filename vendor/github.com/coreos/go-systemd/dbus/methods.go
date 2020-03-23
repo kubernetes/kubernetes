@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015, 2018 CoreOS, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package dbus
 
 import (
 	"errors"
+	"fmt"
 	"path"
 	"strconv"
 
@@ -116,13 +117,13 @@ func (c *Conn) TryRestartUnit(name string, mode string, ch chan<- string) (int, 
 	return c.startJob(ch, "org.freedesktop.systemd1.Manager.TryRestartUnit", name, mode)
 }
 
-// ReloadOrRestart attempts a reload if the unit supports it and use a restart
+// ReloadOrRestartUnit attempts a reload if the unit supports it and use a restart
 // otherwise.
 func (c *Conn) ReloadOrRestartUnit(name string, mode string, ch chan<- string) (int, error) {
 	return c.startJob(ch, "org.freedesktop.systemd1.Manager.ReloadOrRestartUnit", name, mode)
 }
 
-// ReloadOrTryRestart attempts a reload if the unit supports it and use a "Try"
+// ReloadOrTryRestartUnit attempts a reload if the unit supports it and use a "Try"
 // flavored restart otherwise.
 func (c *Conn) ReloadOrTryRestartUnit(name string, mode string, ch chan<- string) (int, error) {
 	return c.startJob(ch, "org.freedesktop.systemd1.Manager.ReloadOrTryRestartUnit", name, mode)
@@ -148,14 +149,27 @@ func (c *Conn) ResetFailedUnit(name string) error {
 	return c.sysobj.Call("org.freedesktop.systemd1.Manager.ResetFailedUnit", 0, name).Store()
 }
 
-// getProperties takes the unit name and returns all of its dbus object properties, for the given dbus interface
-func (c *Conn) getProperties(unit string, dbusInterface string) (map[string]interface{}, error) {
+// SystemState returns the systemd state. Equivalent to `systemctl is-system-running`.
+func (c *Conn) SystemState() (*Property, error) {
+	var err error
+	var prop dbus.Variant
+
+	obj := c.sysconn.Object("org.freedesktop.systemd1", "/org/freedesktop/systemd1")
+	err = obj.Call("org.freedesktop.DBus.Properties.Get", 0, "org.freedesktop.systemd1.Manager", "SystemState").Store(&prop)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Property{Name: "SystemState", Value: prop}, nil
+}
+
+// getProperties takes the unit path and returns all of its dbus object properties, for the given dbus interface
+func (c *Conn) getProperties(path dbus.ObjectPath, dbusInterface string) (map[string]interface{}, error) {
 	var err error
 	var props map[string]dbus.Variant
 
-	path := unitPath(unit)
 	if !path.IsValid() {
-		return nil, errors.New("invalid unit name: " + unit)
+		return nil, fmt.Errorf("invalid unit name: %v", path)
 	}
 
 	obj := c.sysconn.Object("org.freedesktop.systemd1", path)
@@ -172,9 +186,15 @@ func (c *Conn) getProperties(unit string, dbusInterface string) (map[string]inte
 	return out, nil
 }
 
-// GetUnitProperties takes the unit name and returns all of its dbus object properties.
+// GetUnitProperties takes the (unescaped) unit name and returns all of its dbus object properties.
 func (c *Conn) GetUnitProperties(unit string) (map[string]interface{}, error) {
-	return c.getProperties(unit, "org.freedesktop.systemd1.Unit")
+	path := unitPath(unit)
+	return c.getProperties(path, "org.freedesktop.systemd1.Unit")
+}
+
+// GetUnitPathProperties takes the (escaped) unit path and returns all of its dbus object properties.
+func (c *Conn) GetUnitPathProperties(path dbus.ObjectPath) (map[string]interface{}, error) {
+	return c.getProperties(path, "org.freedesktop.systemd1.Unit")
 }
 
 func (c *Conn) getProperty(unit string, dbusInterface string, propertyName string) (*Property, error) {
@@ -208,7 +228,8 @@ func (c *Conn) GetServiceProperty(service string, propertyName string) (*Propert
 // Valid values for unitType: Service, Socket, Target, Device, Mount, Automount, Snapshot, Timer, Swap, Path, Slice, Scope
 // return "dbus.Error: Unknown interface" if the unitType is not the correct type of the unit
 func (c *Conn) GetUnitTypeProperties(unit string, unitType string) (map[string]interface{}, error) {
-	return c.getProperties(unit, "org.freedesktop.systemd1."+unitType)
+	path := unitPath(unit)
+	return c.getProperties(path, "org.freedesktop.systemd1."+unitType)
 }
 
 // SetUnitProperties() may be used to modify certain unit properties at runtime.
@@ -270,6 +291,8 @@ func (c *Conn) listUnitsInternal(f storeFunc) ([]UnitStatus, error) {
 // ListUnits returns an array with all currently loaded units. Note that
 // units may be known by multiple names at the same time, and hence there might
 // be more unit names loaded than actual units behind them.
+// Also note that a unit is only loaded if it is active and/or enabled.
+// Units that are both disabled and inactive will thus not be returned.
 func (c *Conn) ListUnits() ([]UnitStatus, error) {
 	return c.listUnitsInternal(c.sysobj.Call("org.freedesktop.systemd1.Manager.ListUnits", 0).Store)
 }
@@ -292,6 +315,7 @@ func (c *Conn) ListUnitsByPatterns(states []string, patterns []string) ([]UnitSt
 // names and returns an UnitStatus array. Comparing to ListUnitsByPatterns
 // method, this method returns statuses even for inactive or non-existing
 // units. Input array should contain exact unit names, but not patterns.
+// Note: Requires systemd v230 or higher
 func (c *Conn) ListUnitsByNames(units []string) ([]UnitStatus, error) {
 	return c.listUnitsInternal(c.sysobj.Call("org.freedesktop.systemd1.Manager.ListUnitsByNames", 0, units).Store)
 }
@@ -562,4 +586,9 @@ func (c *Conn) Reload() error {
 
 func unitPath(name string) dbus.ObjectPath {
 	return dbus.ObjectPath("/org/freedesktop/systemd1/unit/" + PathBusEscape(name))
+}
+
+// unitName returns the unescaped base element of the supplied escaped path
+func unitName(dpath dbus.ObjectPath) string {
+	return pathBusUnescape(path.Base(string(dpath)))
 }

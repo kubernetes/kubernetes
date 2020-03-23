@@ -111,7 +111,7 @@
         "snapshots": {
           "methods": {
             "create": {
-              "description": "Creates a snapshot from the requested subscription.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.\nIf the snapshot already exists, returns `ALREADY_EXISTS`.\nIf the requested subscription doesn't exist, returns `NOT_FOUND`.\nIf the backlog in the subscription is too old -- and the resulting snapshot\nwould expire in less than 1 hour -- then `FAILED_PRECONDITION` is returned.\nSee also the `Snapshot.expire_time` field. If the name is not provided in\nthe request, the server will assign a random\nname for this snapshot on the same project as the subscription, conforming\nto the [resource name format](https://cloud.google.com/pubsub/docs/overview#names).\nThe generated\nname is populated in the returned Snapshot object. Note that for REST API\nrequests, you must specify a name in the request.",
+              "description": "Creates a snapshot from the requested subscription. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow\nyou to manage message acknowledgments in bulk. That is, you can set the\nacknowledgment state of messages in an existing subscription to the state\ncaptured by a snapshot.\n\u003cbr\u003e\u003cbr\u003eIf the snapshot already exists, returns `ALREADY_EXISTS`.\nIf the requested subscription doesn't exist, returns `NOT_FOUND`.\nIf the backlog in the subscription is too old -- and the resulting snapshot\nwould expire in less than 1 hour -- then `FAILED_PRECONDITION` is returned.\nSee also the `Snapshot.expire_time` field. If the name is not provided in\nthe request, the server will assign a random\nname for this snapshot on the same project as the subscription, conforming\nto the\n[resource name\nformat](https://cloud.google.com/pubsub/docs/admin#resource_names). The\ngenerated name is populated in the returned Snapshot object. Note that for\nREST API requests, you must specify a name in the request.",
               "flatPath": "v1/projects/{projectsId}/snapshots/{snapshotsId}",
               "httpMethod": "PUT",
               "id": "pubsub.projects.snapshots.create",
@@ -120,7 +120,7 @@
               ],
               "parameters": {
                 "name": {
-                  "description": "Optional user-provided name for this snapshot.\nIf the name is not provided in the request, the server will assign a random\nname for this snapshot on the same project as the subscription.\nNote that for REST API requests, you must specify a name.\nFormat is `projects/{project}/snapshots/{snap}`.",
+                  "description": "Optional user-provided name for this snapshot.\nIf the name is not provided in the request, the server will assign a random\nname for this snapshot on the same project as the subscription.\nNote that for REST API requests, you must specify a name.  See the\n\u003ca href=\"https://cloud.google.com/pubsub/docs/admin#resource_names\"\u003e\nresource name rules\u003c/a\u003e.\nFormat is `projects/{project}/snapshots/{snap}`.",
                   "location": "path",
                   "pattern": "^projects/[^/]+/snapshots/[^/]+$",
                   "required": true,
@@ -140,7 +140,7 @@
               ]
             },
             "delete": {
-              "description": "Removes an existing snapshot. \u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.\nWhen the snapshot is deleted, all messages retained in the snapshot\nare immediately dropped. After a snapshot is deleted, a new one may be\ncreated with the same name, but the new one has no association with the old\nsnapshot or its subscription, unless the same subscription is specified.",
+              "description": "Removes an existing snapshot. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow\nyou to manage message acknowledgments in bulk. That is, you can set the\nacknowledgment state of messages in an existing subscription to the state\ncaptured by a snapshot.\u003cbr\u003e\u003cbr\u003e\nWhen the snapshot is deleted, all messages retained in the snapshot\nare immediately dropped. After a snapshot is deleted, a new one may be\ncreated with the same name, but the new one has no association with the old\nsnapshot or its subscription, unless the same subscription is specified.",
               "flatPath": "v1/projects/{projectsId}/snapshots/{snapshotsId}",
               "httpMethod": "DELETE",
               "id": "pubsub.projects.snapshots.delete",
@@ -166,7 +166,7 @@
               ]
             },
             "get": {
-              "description": "Gets the configuration details of a snapshot.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+              "description": "Gets the configuration details of a snapshot. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow you to manage message acknowledgments in bulk. That\nis, you can set the acknowledgment state of messages in an existing\nsubscription to the state captured by a snapshot.",
               "flatPath": "v1/projects/{projectsId}/snapshots/{snapshotsId}",
               "httpMethod": "GET",
               "id": "pubsub.projects.snapshots.get",
@@ -218,7 +218,7 @@
               ]
             },
             "list": {
-              "description": "Lists the existing snapshots.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+              "description": "Lists the existing snapshots. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow\nyou to manage message acknowledgments in bulk. That is, you can set the\nacknowledgment state of messages in an existing subscription to the state\ncaptured by a snapshot.",
               "flatPath": "v1/projects/{projectsId}/snapshots",
               "httpMethod": "GET",
               "id": "pubsub.projects.snapshots.list",
@@ -238,7 +238,7 @@
                   "type": "string"
                 },
                 "project": {
-                  "description": "The name of the cloud project that snapshots belong to.\nFormat is `projects/{project}`.",
+                  "description": "The name of the project in which to list snapshots.\nFormat is `projects/{project-id}`.",
                   "location": "path",
                   "pattern": "^projects/[^/]+$",
                   "required": true,
@@ -255,7 +255,7 @@
               ]
             },
             "patch": {
-              "description": "Updates an existing snapshot.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.\nNote that certain properties of a snapshot are not modifiable.",
+              "description": "Updates an existing snapshot. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow\nyou to manage message acknowledgments in bulk. That is, you can set the\nacknowledgment state of messages in an existing subscription to the state\ncaptured by a snapshot.",
               "flatPath": "v1/projects/{projectsId}/snapshots/{snapshotsId}",
               "httpMethod": "PATCH",
               "id": "pubsub.projects.snapshots.patch",
@@ -375,7 +375,7 @@
               ]
             },
             "create": {
-              "description": "Creates a subscription to a given topic. See the\n\u003ca href=\"/pubsub/docs/admin#resource_names\"\u003e resource name rules\u003c/a\u003e.\nIf the subscription already exists, returns `ALREADY_EXISTS`.\nIf the corresponding topic doesn't exist, returns `NOT_FOUND`.\n\nIf the name is not provided in the request, the server will assign a random\nname for this subscription on the same project as the topic, conforming\nto the\n[resource name format](https://cloud.google.com/pubsub/docs/overview#names).\nThe generated name is populated in the returned Subscription object.\nNote that for REST API requests, you must specify a name in the request.",
+              "description": "Creates a subscription to a given topic. See the\n\u003ca href=\"https://cloud.google.com/pubsub/docs/admin#resource_names\"\u003e\nresource name rules\u003c/a\u003e.\nIf the subscription already exists, returns `ALREADY_EXISTS`.\nIf the corresponding topic doesn't exist, returns `NOT_FOUND`.\n\nIf the name is not provided in the request, the server will assign a random\nname for this subscription on the same project as the topic, conforming\nto the\n[resource name\nformat](https://cloud.google.com/pubsub/docs/admin#resource_names). The\ngenerated name is populated in the returned Subscription object. Note that\nfor REST API requests, you must specify a name in the request.",
               "flatPath": "v1/projects/{projectsId}/subscriptions/{subscriptionsId}",
               "httpMethod": "PUT",
               "id": "pubsub.projects.subscriptions.create",
@@ -502,7 +502,7 @@
                   "type": "string"
                 },
                 "project": {
-                  "description": "The name of the cloud project that subscriptions belong to.\nFormat is `projects/{project}`.",
+                  "description": "The name of the project in which to list subscriptions.\nFormat is `projects/{project-id}`.",
                   "location": "path",
                   "pattern": "^projects/[^/]+$",
                   "required": true,
@@ -606,7 +606,7 @@
               ]
             },
             "pull": {
-              "description": "Pulls messages from the server. Returns an empty list if there are no\nmessages available in the backlog. The server may return `UNAVAILABLE` if\nthere are too many concurrent pull requests pending for the given\nsubscription.",
+              "description": "Pulls messages from the server. The server may return `UNAVAILABLE` if\nthere are too many concurrent pull requests pending for the given\nsubscription.",
               "flatPath": "v1/projects/{projectsId}/subscriptions/{subscriptionsId}:pull",
               "httpMethod": "POST",
               "id": "pubsub.projects.subscriptions.pull",
@@ -635,7 +635,7 @@
               ]
             },
             "seek": {
-              "description": "Seeks an existing subscription to a point in time or to a given snapshot,\nwhichever is provided in the request.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+              "description": "Seeks an existing subscription to a point in time or to a given snapshot,\nwhichever is provided in the request. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow\nyou to manage message acknowledgments in bulk. That is, you can set the\nacknowledgment state of messages in an existing subscription to the state\ncaptured by a snapshot. Note that both the subscription and the snapshot\nmust be on the same topic.",
               "flatPath": "v1/projects/{projectsId}/subscriptions/{subscriptionsId}:seek",
               "httpMethod": "POST",
               "id": "pubsub.projects.subscriptions.seek",
@@ -726,7 +726,7 @@
         "topics": {
           "methods": {
             "create": {
-              "description": "Creates the given topic with the given name. See the\n\u003ca href=\"/pubsub/docs/admin#resource_names\"\u003e resource name rules\u003c/a\u003e.",
+              "description": "Creates the given topic with the given name. See the\n\u003ca href=\"https://cloud.google.com/pubsub/docs/admin#resource_names\"\u003e\nresource name rules\u003c/a\u003e.",
               "flatPath": "v1/projects/{projectsId}/topics/{topicsId}",
               "httpMethod": "PUT",
               "id": "pubsub.projects.topics.create",
@@ -853,7 +853,7 @@
                   "type": "string"
                 },
                 "project": {
-                  "description": "The name of the cloud project that topics belong to.\nFormat is `projects/{project}`.",
+                  "description": "The name of the project in which to list topics.\nFormat is `projects/{project-id}`.",
                   "location": "path",
                   "pattern": "^projects/[^/]+$",
                   "required": true,
@@ -869,8 +869,37 @@
                 "https://www.googleapis.com/auth/pubsub"
               ]
             },
+            "patch": {
+              "description": "Updates an existing topic. Note that certain properties of a\ntopic are not modifiable.",
+              "flatPath": "v1/projects/{projectsId}/topics/{topicsId}",
+              "httpMethod": "PATCH",
+              "id": "pubsub.projects.topics.patch",
+              "parameterOrder": [
+                "name"
+              ],
+              "parameters": {
+                "name": {
+                  "description": "The name of the topic. It must have the format\n`\"projects/{project}/topics/{topic}\"`. `{topic}` must start with a letter,\nand contain only letters (`[A-Za-z]`), numbers (`[0-9]`), dashes (`-`),\nunderscores (`_`), periods (`.`), tildes (`~`), plus (`+`) or percent\nsigns (`%`). It must be between 3 and 255 characters in length, and it\nmust not start with `\"goog\"`.",
+                  "location": "path",
+                  "pattern": "^projects/[^/]+/topics/[^/]+$",
+                  "required": true,
+                  "type": "string"
+                }
+              },
+              "path": "v1/{+name}",
+              "request": {
+                "$ref": "UpdateTopicRequest"
+              },
+              "response": {
+                "$ref": "Topic"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/pubsub"
+              ]
+            },
             "publish": {
-              "description": "Adds one or more messages to the topic. Returns `NOT_FOUND` if the topic\ndoes not exist. The message payload must not be empty; it must contain\n either a non-empty data field, or at least one attribute.",
+              "description": "Adds one or more messages to the topic. Returns `NOT_FOUND` if the topic\ndoes not exist.",
               "flatPath": "v1/projects/{projectsId}/topics/{topicsId}:publish",
               "httpMethod": "POST",
               "id": "pubsub.projects.topics.publish",
@@ -961,7 +990,7 @@
             "snapshots": {
               "methods": {
                 "list": {
-                  "description": "Lists the names of the snapshots on this topic.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+                  "description": "Lists the names of the snapshots on this topic. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow\nyou to manage message acknowledgments in bulk. That is, you can set the\nacknowledgment state of messages in an existing subscription to the state\ncaptured by a snapshot.",
                   "flatPath": "v1/projects/{projectsId}/topics/{topicsId}/snapshots",
                   "httpMethod": "GET",
                   "id": "pubsub.projects.topics.snapshots.list",
@@ -1045,7 +1074,7 @@
       }
     }
   },
-  "revision": "20180604",
+  "revision": "20190429",
   "rootUrl": "https://pubsub.googleapis.com/",
   "schemas": {
     "AcknowledgeRequest": {
@@ -1066,24 +1095,35 @@
       "description": "Associates `members` with a `role`.",
       "id": "Binding",
       "properties": {
+        "condition": {
+          "$ref": "Expr",
+          "description": "The condition that is associated with this binding.\nNOTE: An unsatisfied condition will not allow user access via current\nbinding. Different bindings, including their conditions, are examined\nindependently."
+        },
         "members": {
-          "description": "Specifies the identities requesting access for a Cloud Platform resource.\n`members` can have the following values:\n\n* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without a Google account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with a Google account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific Google\n   account. For example, `alice@gmail.com` .\n\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a Google group.\n   For example, `admins@example.com`.\n\n\n* `domain:{domain}`: A Google Apps domain name that represents all the\n   users of that domain. For example, `google.com` or `example.com`.\n\n",
+          "description": "Specifies the identities requesting access for a Cloud Platform resource.\n`members` can have the following values:\n\n* `allUsers`: A special identifier that represents anyone who is\n   on the internet; with or without a Google account.\n\n* `allAuthenticatedUsers`: A special identifier that represents anyone\n   who is authenticated with a Google account or a service account.\n\n* `user:{emailid}`: An email address that represents a specific Google\n   account. For example, `alice@gmail.com` .\n\n\n* `serviceAccount:{emailid}`: An email address that represents a service\n   account. For example, `my-other-app@appspot.gserviceaccount.com`.\n\n* `group:{emailid}`: An email address that represents a Google group.\n   For example, `admins@example.com`.\n\n\n* `domain:{domain}`: The G Suite domain (primary) that represents all the\n   users of that domain. For example, `google.com` or `example.com`.\n\n",
           "items": {
             "type": "string"
           },
           "type": "array"
         },
         "role": {
-          "description": "Role that is assigned to `members`.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`.\nRequired",
+          "description": "Role that is assigned to `members`.\nFor example, `roles/viewer`, `roles/editor`, or `roles/owner`.",
           "type": "string"
         }
       },
       "type": "object"
     },
     "CreateSnapshotRequest": {
-      "description": "Request for the `CreateSnapshot` method.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be changed in\nbackward-incompatible ways and is not recommended for production use.\nIt is not subject to any SLA or deprecation policy.",
+      "description": "Request for the `CreateSnapshot` method.",
       "id": "CreateSnapshotRequest",
       "properties": {
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "See \u003ca href=\"https://cloud.google.com/pubsub/docs/labels\"\u003e Creating and\nmanaging labels\u003c/a\u003e.",
+          "type": "object"
+        },
         "subscription": {
           "description": "The subscription whose backlog the snapshot retains.\nSpecifically, the created snapshot is guaranteed to retain:\n (a) The existing backlog on the subscription. More precisely, this is\n     defined as the messages in the subscription's backlog that are\n     unacknowledged upon the successful completion of the\n     `CreateSnapshot` request; as well as:\n (b) Any messages published to the subscription's topic following the\n     successful completion of the CreateSnapshot request.\nFormat is `projects/{project}/subscriptions/{sub}`.",
           "type": "string"
@@ -1097,8 +1137,43 @@
       "properties": {},
       "type": "object"
     },
+    "ExpirationPolicy": {
+      "description": "A policy that specifies the conditions for resource expiration (i.e.,\nautomatic resource deletion).",
+      "id": "ExpirationPolicy",
+      "properties": {
+        "ttl": {
+          "description": "Specifies the \"time-to-live\" duration for an associated resource. The\nresource expires if it is not active for a period of `ttl`. The definition\nof \"activity\" depends on the type of the associated resource. The minimum\nand maximum allowed values for `ttl` depend on the type of the associated\nresource, as well. If `ttl` is not set, the associated resource never\nexpires.",
+          "format": "google-duration",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Expr": {
+      "description": "Represents an expression text. Example:\n\n    title: \"User account presence\"\n    description: \"Determines whether the request has a user account\"\n    expression: \"size(request.user) \u003e 0\"",
+      "id": "Expr",
+      "properties": {
+        "description": {
+          "description": "An optional description of the expression. This is a longer text which\ndescribes the expression, e.g. when hovered over it in a UI.",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Textual representation of an expression in\nCommon Expression Language syntax.\n\nThe application context of the containing message determines which\nwell-known feature set of CEL is supported.",
+          "type": "string"
+        },
+        "location": {
+          "description": "An optional string indicating the location of the expression for error\nreporting, e.g. a file name and a position in the file.",
+          "type": "string"
+        },
+        "title": {
+          "description": "An optional title for the expression, i.e. a short string describing\nits purpose. This can be used e.g. in UIs which allow to enter the\nexpression.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ListSnapshotsResponse": {
-      "description": "Response for the `ListSnapshots` method.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+      "description": "Response for the `ListSnapshots` method.",
       "id": "ListSnapshotsResponse",
       "properties": {
         "nextPageToken": {
@@ -1134,7 +1209,7 @@
       "type": "object"
     },
     "ListTopicSnapshotsResponse": {
-      "description": "Response for the `ListTopicSnapshots` method.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+      "description": "Response for the `ListTopicSnapshots` method.",
       "id": "ListTopicSnapshotsResponse",
       "properties": {
         "nextPageToken": {
@@ -1192,7 +1267,7 @@
       "id": "ModifyAckDeadlineRequest",
       "properties": {
         "ackDeadlineSeconds": {
-          "description": "The new ack deadline with respect to the time this request was sent to\nthe Pub/Sub system. For example, if the value is 10, the new\nack deadline will expire 10 seconds after the `ModifyAckDeadline` call\nwas made. Specifying zero may immediately make the message available for\nanother pull request.\nThe minimum deadline you can specify is 0 seconds.\nThe maximum deadline you can specify is 600 seconds (10 minutes).",
+          "description": "The new ack deadline with respect to the time this request was sent to\nthe Pub/Sub system. For example, if the value is 10, the new\nack deadline will expire 10 seconds after the `ModifyAckDeadline` call\nwas made. Specifying zero might immediately make the message available for\ndelivery to another subscriber client. This typically results in an\nincrease in the rate of message redeliveries (that is, duplicates).\nThe minimum deadline you can specify is 0 seconds.\nThe maximum deadline you can specify is 600 seconds (10 minutes).",
           "format": "int32",
           "type": "integer"
         },
@@ -1213,6 +1288,21 @@
         "pushConfig": {
           "$ref": "PushConfig",
           "description": "The push configuration for future deliveries.\n\nAn empty `pushConfig` indicates that the Pub/Sub system should\nstop pushing messages from the given subscription and allow\nmessages to be pulled and acknowledged - effectively pausing\nthe subscription if `Pull` or `StreamingPull` is not called."
+        }
+      },
+      "type": "object"
+    },
+    "OidcToken": {
+      "description": "Contains information needed for generating an\n[OpenID Connect\ntoken](https://developers.google.com/identity/protocols/OpenIDConnect).",
+      "id": "OidcToken",
+      "properties": {
+        "audience": {
+          "description": "Audience to be used when generating OIDC token. The audience claim\nidentifies the recipients that the JWT is intended for. The audience\nvalue is a single case-sensitive string. Having multiple values (array)\nfor the audience field is not supported. More info about the OIDC JWT\ntoken audience here: https://tools.ietf.org/html/rfc7519#section-4.1.3\nNote: if not specified, the Push endpoint URL will be used.",
+          "type": "string"
+        },
+        "serviceAccountEmail": {
+          "description": "[Service account\nemail](https://cloud.google.com/iam/docs/service-accounts)\nto be used for generating the OIDC token. The caller (for\nCreateSubscription, UpdateSubscription, and ModifyPushConfig RPCs) must\nhave the iam.serviceAccounts.actAs permission for the service account.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -1270,7 +1360,7 @@
       "type": "object"
     },
     "PubsubMessage": {
-      "description": "A message data and its attributes. The message payload must not be empty;\nit must contain either a non-empty data field, or at least one attribute.",
+      "description": "A message that is published by publishers and consumed by subscribers. The\nmessage must contain either a non-empty data field or at least one attribute.\nNote that client libraries represent this object differently\ndepending on the language. See the corresponding\n\u003ca href=\"https://cloud.google.com/pubsub/docs/reference/libraries\"\u003eclient\nlibrary documentation\u003c/a\u003e for more information. See\n\u003ca href=\"https://cloud.google.com/pubsub/quotas\"\u003eQuotas and limits\u003c/a\u003e\nfor more information about message limits.",
       "id": "PubsubMessage",
       "properties": {
         "attributes": {
@@ -1281,7 +1371,7 @@
           "type": "object"
         },
         "data": {
-          "description": "The message payload.",
+          "description": "The message data field. If this field is empty, the message must contain\nat least one attribute.",
           "format": "byte",
           "type": "string"
         },
@@ -1307,7 +1397,7 @@
           "type": "integer"
         },
         "returnImmediately": {
-          "description": "If this field set to true, the system will respond immediately even if\nit there are no messages available to return in the `Pull` response.\nOtherwise, the system may wait (for a bounded amount of time) until at\nleast one message is available, rather than returning no messages. The\nclient may cancel the request if it does not wish to wait any longer for\nthe response.",
+          "description": "If this field set to true, the system will respond immediately even if\nit there are no messages available to return in the `Pull` response.\nOtherwise, the system may wait (for a bounded amount of time) until at\nleast one message is available, rather than returning no messages.",
           "type": "boolean"
         }
       },
@@ -1318,7 +1408,7 @@
       "id": "PullResponse",
       "properties": {
         "receivedMessages": {
-          "description": "Received Pub/Sub messages. The Pub/Sub system will return zero messages if\nthere are no more available in the backlog. The Pub/Sub system may return\nfewer than the `maxMessages` requested even if there are more messages\navailable in the backlog.",
+          "description": "Received Pub/Sub messages. The list will be empty if there are no more\nmessages available in the backlog. For JSON, the response can be entirely\nempty. The Pub/Sub system may return fewer than the `maxMessages` requested\neven if there are more messages available in the backlog.",
           "items": {
             "$ref": "ReceivedMessage"
           },
@@ -1337,6 +1427,10 @@
           },
           "description": "Endpoint configuration attributes.\n\nEvery endpoint has a set of API supported attributes that can be used to\ncontrol different aspects of the message delivery.\n\nThe currently supported attribute is `x-goog-version`, which you can\nuse to change the format of the pushed message. This attribute\nindicates the version of the data expected by the endpoint. This\ncontrols the shape of the pushed message (i.e., its fields and metadata).\nThe endpoint version is based on the version of the Pub/Sub API.\n\nIf not present during the `CreateSubscription` call, it will default to\nthe version of the API used to make such call. If not present during a\n`ModifyPushConfig` call, its value will not be changed. `GetSubscription`\ncalls will always return a valid version, even if the subscription was\ncreated without this attribute.\n\nThe possible values for this attribute are:\n\n* `v1beta1`: uses the push format defined in the v1beta1 Pub/Sub API.\n* `v1` or `v1beta2`: uses the push format defined in the v1 Pub/Sub API.",
           "type": "object"
+        },
+        "oidcToken": {
+          "$ref": "OidcToken",
+          "description": "If specified, Pub/Sub will generate and attach an OIDC JWT token as an\n`Authorization` header in the HTTP request for every pushed message."
         },
         "pushEndpoint": {
           "description": "A URL locating the endpoint to which messages should be pushed.\nFor example, a Webhook endpoint might use \"https://example.com/push\".",
@@ -1361,7 +1455,7 @@
       "type": "object"
     },
     "SeekRequest": {
-      "description": "Request for the `Seek` method.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+      "description": "Request for the `Seek` method.",
       "id": "SeekRequest",
       "properties": {
         "snapshot": {
@@ -1377,6 +1471,7 @@
       "type": "object"
     },
     "SeekResponse": {
+      "description": "Response for the `Seek` method (this response is empty).",
       "id": "SeekResponse",
       "properties": {},
       "type": "object"
@@ -1393,13 +1488,20 @@
       "type": "object"
     },
     "Snapshot": {
-      "description": "A snapshot resource.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+      "description": "A snapshot resource. Snapshots are used in\n\u003ca href=\"https://cloud.google.com/pubsub/docs/replay-overview\"\u003eSeek\u003c/a\u003e\noperations, which allow\nyou to manage message acknowledgments in bulk. That is, you can set the\nacknowledgment state of messages in an existing subscription to the state\ncaptured by a snapshot.",
       "id": "Snapshot",
       "properties": {
         "expireTime": {
           "description": "The snapshot is guaranteed to exist up until this time.\nA newly-created snapshot expires no later than 7 days from the time of its\ncreation. Its exact lifetime is determined at creation by the existing\nbacklog in the source subscription. Specifically, the lifetime of the\nsnapshot is `7 days - (age of oldest unacked message in the subscription)`.\nFor example, consider a subscription whose oldest unacked message is 3 days\nold. If a snapshot is created from this subscription, the snapshot -- which\nwill always capture this 3-day-old backlog as long as the snapshot\nexists -- will expire in 4 days. The service will refuse to create a\nsnapshot that would expire in less than 1 hour after creation.",
           "format": "google-datetime",
           "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "See \u003ca href=\"https://cloud.google.com/pubsub/docs/labels\"\u003e Creating and\nmanaging labels\u003c/a\u003e.",
+          "type": "object"
         },
         "name": {
           "description": "The name of the snapshot.",
@@ -1417,12 +1519,23 @@
       "id": "Subscription",
       "properties": {
         "ackDeadlineSeconds": {
-          "description": "This value is the maximum time after a subscriber receives a message\nbefore the subscriber should acknowledge the message. After message\ndelivery but before the ack deadline expires and before the message is\nacknowledged, it is an outstanding message and will not be delivered\nagain during that time (on a best-effort basis).\n\nFor pull subscriptions, this value is used as the initial value for the ack\ndeadline. To override this value for a given message, call\n`ModifyAckDeadline` with the corresponding `ack_id` if using\nnon-streaming pull or send the `ack_id` in a\n`StreamingModifyAckDeadlineRequest` if using streaming pull.\nThe minimum custom deadline you can specify is 10 seconds.\nThe maximum custom deadline you can specify is 600 seconds (10 minutes).\nIf this parameter is 0, a default value of 10 seconds is used.\n\nFor push delivery, this value is also used to set the request timeout for\nthe call to the push endpoint.\n\nIf the subscriber never acknowledges the message, the Pub/Sub\nsystem will eventually redeliver the message.",
+          "description": "The approximate amount of time (on a best-effort basis) Pub/Sub waits for\nthe subscriber to acknowledge receipt before resending the message. In the\ninterval after the message is delivered and before it is acknowledged, it\nis considered to be \u003ci\u003eoutstanding\u003c/i\u003e. During that time period, the\nmessage will not be redelivered (on a best-effort basis).\n\nFor pull subscriptions, this value is used as the initial value for the ack\ndeadline. To override this value for a given message, call\n`ModifyAckDeadline` with the corresponding `ack_id` if using\nnon-streaming pull or send the `ack_id` in a\n`StreamingModifyAckDeadlineRequest` if using streaming pull.\nThe minimum custom deadline you can specify is 10 seconds.\nThe maximum custom deadline you can specify is 600 seconds (10 minutes).\nIf this parameter is 0, a default value of 10 seconds is used.\n\nFor push delivery, this value is also used to set the request timeout for\nthe call to the push endpoint.\n\nIf the subscriber never acknowledges the message, the Pub/Sub\nsystem will eventually redeliver the message.",
           "format": "int32",
           "type": "integer"
         },
+        "expirationPolicy": {
+          "$ref": "ExpirationPolicy",
+          "description": "A policy that specifies the conditions for this subscription's expiration.\nA subscription is considered active as long as any connected subscriber is\nsuccessfully consuming messages from the subscription or is issuing\noperations on the subscription. If `expiration_policy` is not set, a\n*default policy* with `ttl` of 31 days will be used. The minimum allowed\nvalue for `expiration_policy.ttl` is 1 day."
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "See \u003ca href=\"https://cloud.google.com/pubsub/docs/labels\"\u003e Creating and\nmanaging labels\u003c/a\u003e.",
+          "type": "object"
+        },
         "messageRetentionDuration": {
-          "description": "How long to retain unacknowledged messages in the subscription's backlog,\nfrom the moment a message is published.\nIf `retain_acked_messages` is true, then this also configures the retention\nof acknowledged messages, and thus configures how far back in time a `Seek`\ncan be done. Defaults to 7 days. Cannot be more than 7 days or less than 10\nminutes.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+          "description": "How long to retain unacknowledged messages in the subscription's backlog,\nfrom the moment a message is published.\nIf `retain_acked_messages` is true, then this also configures the retention\nof acknowledged messages, and thus configures how far back in time a `Seek`\ncan be done. Defaults to 7 days. Cannot be more than 7 days or less than 10\nminutes.",
           "format": "google-duration",
           "type": "string"
         },
@@ -1435,7 +1548,7 @@
           "description": "If push delivery is used with this subscription, this field is\nused to configure it. An empty `pushConfig` signifies that the subscriber\nwill pull and ack messages using API methods."
         },
         "retainAckedMessages": {
-          "description": "Indicates whether to retain acknowledged messages. If true, then\nmessages are not expunged from the subscription's backlog, even if they are\nacknowledged, until they fall out of the `message_retention_duration`\nwindow.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+          "description": "Indicates whether to retain acknowledged messages. If true, then\nmessages are not expunged from the subscription's backlog, even if they are\nacknowledged, until they fall out of the `message_retention_duration`\nwindow. This must be true if you would like to\n\u003ca\nhref=\"https://cloud.google.com/pubsub/docs/replay-overview#seek_to_a_time\"\u003e\nSeek to a timestamp\u003c/a\u003e.",
           "type": "boolean"
         },
         "topic": {
@@ -1477,6 +1590,13 @@
       "description": "A topic resource.",
       "id": "Topic",
       "properties": {
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "See \u003ca href=\"https://cloud.google.com/pubsub/docs/labels\"\u003e Creating and\nmanaging labels\u003c/a\u003e.",
+          "type": "object"
+        },
         "name": {
           "description": "The name of the topic. It must have the format\n`\"projects/{project}/topics/{topic}\"`. `{topic}` must start with a letter,\nand contain only letters (`[A-Za-z]`), numbers (`[0-9]`), dashes (`-`),\nunderscores (`_`), periods (`.`), tildes (`~`), plus (`+`) or percent\nsigns (`%`). It must be between 3 and 255 characters in length, and it\nmust not start with `\"goog\"`.",
           "type": "string"
@@ -1485,7 +1605,7 @@
       "type": "object"
     },
     "UpdateSnapshotRequest": {
-      "description": "Request for the UpdateSnapshot method.\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eALPHA:\u003c/b\u003e This feature is part of an alpha release. This API might be\nchanged in backward-incompatible ways and is not recommended for production\nuse. It is not subject to any SLA or deprecation policy.",
+      "description": "Request for the UpdateSnapshot method.",
       "id": "UpdateSnapshotRequest",
       "properties": {
         "snapshot": {
@@ -1510,6 +1630,22 @@
         },
         "updateMask": {
           "description": "Indicates which fields in the provided subscription to update.\nMust be specified and non-empty.",
+          "format": "google-fieldmask",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UpdateTopicRequest": {
+      "description": "Request for the UpdateTopic method.",
+      "id": "UpdateTopicRequest",
+      "properties": {
+        "topic": {
+          "$ref": "Topic",
+          "description": "The updated topic object."
+        },
+        "updateMask": {
+          "description": "Indicates which fields in the provided topic to update. Must be specified\nand non-empty. Note that if `update_mask` contains\n\"message_storage_policy\" then the new value will be determined based on the\npolicy configured at the project or organization level. The\n`message_storage_policy` must not be set in the `topic` provided above.",
           "format": "google-fieldmask",
           "type": "string"
         }

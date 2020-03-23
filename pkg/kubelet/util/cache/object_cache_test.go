@@ -32,7 +32,7 @@ type testObject struct {
 
 // A fake objectCache for unit test.
 func NewFakeObjectCache(f func() (interface{}, error), ttl time.Duration, clock clock.Clock) *ObjectCache {
-	ttlPolicy := &expirationcache.TTLPolicy{Ttl: ttl, Clock: clock}
+	ttlPolicy := &expirationcache.TTLPolicy{TTL: ttl, Clock: clock}
 	deleteChan := make(chan string, 1)
 	return &ObjectCache{
 		updater: f,
@@ -46,7 +46,7 @@ func TestAddAndGet(t *testing.T) {
 		val: "bar",
 	}
 	objectCache := NewFakeObjectCache(func() (interface{}, error) {
-		return nil, fmt.Errorf("Unexpected Error: updater should never be called in this test!")
+		return nil, fmt.Errorf("Unexpected Error: updater should never be called in this test")
 	}, 1*time.Hour, clock.NewFakeClock(time.Now()))
 
 	err := objectCache.Add(testObj.key, testObj.val)

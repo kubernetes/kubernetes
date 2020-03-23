@@ -17,11 +17,12 @@ limitations under the License.
 package kubeletconfig
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -197,8 +198,8 @@ func restartForNewConfig(eventClient v1core.EventsGetter, nodeName string, sourc
 	// we directly log and send the event, instead of using the event recorder,
 	// because the event recorder won't flush its queue before we exit (we'd lose the event)
 	event := makeEvent(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, message)
-	glog.V(3).Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(event); err != nil {
+	klog.V(3).Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(context.TODO(), event, metav1.CreateOptions{}); err != nil {
 		utillog.Errorf("failed to send event, error: %v", err)
 	}
 	utillog.Infof(message)
@@ -213,7 +214,7 @@ func latestNodeConfigSource(store cache.Store, nodeName string) (*apiv1.NodeConf
 		utillog.Errorf(err.Error())
 		return nil, err
 	} else if !ok {
-		err := fmt.Errorf("Node %q does not exist in the informer's store, can't sync config source", nodeName)
+		err := fmt.Errorf("node %q does not exist in the informer's store, can't sync config source", nodeName)
 		utillog.Errorf(err.Error())
 		return nil, err
 	}

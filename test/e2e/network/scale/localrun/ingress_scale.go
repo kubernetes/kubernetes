@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -24,13 +25,13 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
@@ -91,19 +92,19 @@ func main() {
 	registerFlags()
 	flag.Parse()
 	if err := verifyFlags(); err != nil {
-		glog.Errorf("Failed to verify flags: %v", err)
+		klog.Errorf("Failed to verify flags: %v", err)
 		os.Exit(1)
 	}
 
 	// Initializing a k8s client.
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		glog.Errorf("Failed to build kubeconfig: %v", err)
+		klog.Errorf("Failed to build kubeconfig: %v", err)
 		os.Exit(1)
 	}
 	cs, err := clientset.NewForConfig(config)
 	if err != nil {
-		glog.Errorf("Failed to create kubeclient: %v", err)
+		klog.Errorf("Failed to create kubeclient: %v", err)
 		os.Exit(1)
 	}
 
@@ -116,7 +117,7 @@ func main() {
 		AlphaFeatureGate: gceAlphaFeatureGate,
 	})
 	if err != nil {
-		glog.Errorf("Error building GCE provider: %v", err)
+		klog.Errorf("Error building GCE provider: %v", err)
 		os.Exit(1)
 	}
 	cloudConfig.Provider = gce.NewProvider(gceCloud)
@@ -124,7 +125,7 @@ func main() {
 	testSuccessFlag := true
 	defer func() {
 		if !testSuccessFlag {
-			glog.Errorf("Ingress scale test failed.")
+			klog.Errorf("Ingress scale test failed.")
 			os.Exit(1)
 		}
 	}()
@@ -134,17 +135,17 @@ func main() {
 			Name: testNamespace,
 		},
 	}
-	glog.Infof("Creating namespace %s...", ns.Name)
-	if _, err := cs.CoreV1().Namespaces().Create(ns); err != nil {
-		glog.Errorf("Failed to create namespace %s: %v", ns.Name, err)
+	klog.Infof("Creating namespace %s...", ns.Name)
+	if _, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
+		klog.Errorf("Failed to create namespace %s: %v", ns.Name, err)
 		testSuccessFlag = false
 		return
 	}
 	if cleanup {
 		defer func() {
-			glog.Infof("Deleting namespace %s...", ns.Name)
-			if err := cs.CoreV1().Namespaces().Delete(ns.Name, nil); err != nil {
-				glog.Errorf("Failed to delete namespace %s: %v", ns.Name, err)
+			klog.Infof("Deleting namespace %s...", ns.Name)
+			if err := cs.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{}); err != nil {
+				klog.Errorf("Failed to delete namespace %s: %v", ns.Name, err)
 				testSuccessFlag = false
 			}
 		}()
@@ -164,20 +165,20 @@ func main() {
 	if cleanup {
 		defer func() {
 			if errs := f.CleanupScaleTest(); len(errs) != 0 {
-				glog.Errorf("Failed to cleanup scale test: %v", errs)
+				klog.Errorf("Failed to cleanup scale test: %v", errs)
 				testSuccessFlag = false
 			}
 		}()
 	}
 	err = f.PrepareScaleTest()
 	if err != nil {
-		glog.Errorf("Failed to prepare scale test: %v", err)
+		klog.Errorf("Failed to prepare scale test: %v", err)
 		testSuccessFlag = false
 		return
 	}
 
 	if errs := f.RunScaleTest(); len(errs) != 0 {
-		glog.Errorf("Failed while running scale test: %v", errs)
+		klog.Errorf("Failed while running scale test: %v", errs)
 		testSuccessFlag = false
 	}
 }

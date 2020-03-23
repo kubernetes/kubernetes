@@ -16,13 +16,14 @@ package strfmt
 
 import (
 	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func init() {
@@ -52,13 +53,19 @@ func IsDateTime(str string) bool {
 const (
 	// RFC3339Millis represents a ISO8601 format to millis instead of to nanos
 	RFC3339Millis = "2006-01-02T15:04:05.000Z07:00"
+	// RFC3339Micro represents a ISO8601 format to micro instead of to nano
+	RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
+	// ISO8601LocalTime represents a ISO8601 format to ISO8601 in local time (no timezone)
+	ISO8601LocalTime = "2006-01-02T15:04:05"
 	// DateTimePattern pattern to match for the date-time format from http://tools.ietf.org/html/rfc3339#section-5.6
 	DateTimePattern = `^([0-9]{2}):([0-9]{2}):([0-9]{2})(.[0-9]+)?(z|([+-][0-9]{2}:[0-9]{2}))$`
 )
 
 var (
-	dateTimeFormats = []string{RFC3339Millis, time.RFC3339, time.RFC3339Nano}
+	dateTimeFormats = []string{RFC3339Micro, RFC3339Millis, time.RFC3339, time.RFC3339Nano, ISO8601LocalTime}
 	rxDateTime      = regexp.MustCompile(DateTimePattern)
+	// MarshalFormat sets the time resolution format used for marshaling time (set to milliseconds)
+	MarshalFormat = RFC3339Millis
 )
 
 // ParseDateTime parses a string that represents an ISO8601 time or a unix epoch
@@ -73,7 +80,6 @@ func ParseDateTime(data string) (DateTime, error) {
 			lastError = err
 			continue
 		}
-		lastError = nil
 		return DateTime(dd), nil
 	}
 	return DateTime{}, lastError
@@ -81,7 +87,8 @@ func ParseDateTime(data string) (DateTime, error) {
 
 // DateTime is a time but it serializes to ISO8601 format with millis
 // It knows how to read 3 different variations of a RFC3339 date time.
-// Most API's we encounter want either millisecond or second precision times. This just tries to make it worry-free.
+// Most APIs we encounter want either millisecond or second precision times.
+// This just tries to make it worry-free.
 //
 // swagger:strfmt date-time
 type DateTime time.Time
@@ -91,8 +98,9 @@ func NewDateTime() DateTime {
 	return DateTime(time.Unix(0, 0).UTC())
 }
 
+// String converts this time to a string
 func (t DateTime) String() string {
-	return time.Time(t).Format(RFC3339Millis)
+	return time.Time(t).Format(MarshalFormat)
 }
 
 // MarshalText implements the text marshaller interface
@@ -131,32 +139,65 @@ func (t *DateTime) Scan(raw interface{}) error {
 
 // Value converts DateTime to a primitive value ready to written to a database.
 func (t DateTime) Value() (driver.Value, error) {
-	return driver.Value(t), nil
+	return driver.Value(t.String()), nil
 }
 
+// MarshalJSON returns the DateTime as JSON
 func (t DateTime) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	t.MarshalEasyJSON(&w)
-	return w.BuildBytes()
+	return json.Marshal(time.Time(t).Format(MarshalFormat))
 }
 
-func (t DateTime) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(time.Time(t).Format(RFC3339Millis))
-}
-
+// UnmarshalJSON sets the DateTime from JSON
 func (t *DateTime) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	t.UnmarshalEasyJSON(&l)
-	return l.Error()
+	if string(data) == jsonNull {
+		return nil
+	}
+
+	var tstr string
+	if err := json.Unmarshal(data, &tstr); err != nil {
+		return err
+	}
+	tt, err := ParseDateTime(tstr)
+	if err != nil {
+		return err
+	}
+	*t = tt
+	return nil
 }
 
-func (t *DateTime) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		tt, err := ParseDateTime(data)
-		if err != nil {
-			in.AddError(err)
-			return
-		}
-		*t = tt
+func (t DateTime) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": t.String()})
+}
+
+func (t *DateTime) UnmarshalBSON(data []byte) error {
+	var m bson.M
+	if err := bson.Unmarshal(data, &m); err != nil {
+		return err
 	}
+
+	if data, ok := m["data"].(string); ok {
+		rd, err := ParseDateTime(data)
+		if err != nil {
+			return err
+		}
+		*t = rd
+		return nil
+	}
+
+	return errors.New("couldn't unmarshal bson bytes value as Date")
+}
+
+// DeepCopyInto copies the receiver and writes its value into out.
+func (t *DateTime) DeepCopyInto(out *DateTime) {
+	*out = *t
+}
+
+// DeepCopy copies the receiver into a new DateTime.
+func (t *DateTime) DeepCopy() *DateTime {
+	if t == nil {
+		return nil
+	}
+	out := new(DateTime)
+	t.DeepCopyInto(out)
+	return out
 }

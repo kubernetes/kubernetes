@@ -17,9 +17,9 @@ limitations under the License.
 package aggregator
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/go-openapi/spec"
@@ -27,154 +27,16 @@ import (
 	"k8s.io/kube-openapi/pkg/util"
 )
 
-const (
-	definitionPrefix = "#/definitions/"
-)
-
-// Run a walkRefCallback method on all references of an OpenAPI spec
-type referenceWalker struct {
-	// walkRefCallback will be called on each reference and the return value
-	// will replace that reference. This will allow the callers to change
-	// all/some references of an spec (e.g. useful in renaming definitions).
-	walkRefCallback func(ref spec.Ref) spec.Ref
-
-	// The spec to walk through.
-	root *spec.Swagger
-
-	// Keep track of visited references
-	alreadyVisited map[string]bool
-}
-
-func walkOnAllReferences(walkRef func(ref spec.Ref) spec.Ref, sp *spec.Swagger) {
-	walker := &referenceWalker{walkRefCallback: walkRef, root: sp, alreadyVisited: map[string]bool{}}
-	walker.Start()
-}
-
-func (s *referenceWalker) walkRef(ref spec.Ref) spec.Ref {
-	refStr := ref.String()
-	// References that start with #/definitions/ has a definition
-	// inside the same spec file. If that is the case, walk through
-	// those definitions too.
-	// We do not support external references yet.
-	if !s.alreadyVisited[refStr] && strings.HasPrefix(refStr, definitionPrefix) {
-		s.alreadyVisited[refStr] = true
-		k := refStr[len(definitionPrefix):]
-		def := s.root.Definitions[k]
-		s.walkSchema(&def)
-		// Make sure we don't assign to nil map
-		if s.root.Definitions == nil {
-			s.root.Definitions = spec.Definitions{}
-		}
-		s.root.Definitions[k] = def
-	}
-	return s.walkRefCallback(ref)
-}
-
-func (s *referenceWalker) walkSchema(schema *spec.Schema) {
-	if schema == nil {
-		return
-	}
-	schema.Ref = s.walkRef(schema.Ref)
-	for k, v := range schema.Definitions {
-		s.walkSchema(&v)
-		schema.Definitions[k] = v
-	}
-	for k, v := range schema.Properties {
-		s.walkSchema(&v)
-		schema.Properties[k] = v
-	}
-	for k, v := range schema.PatternProperties {
-		s.walkSchema(&v)
-		schema.PatternProperties[k] = v
-	}
-	for i, _ := range schema.AllOf {
-		s.walkSchema(&schema.AllOf[i])
-	}
-	for i, _ := range schema.AnyOf {
-		s.walkSchema(&schema.AnyOf[i])
-	}
-	for i, _ := range schema.OneOf {
-		s.walkSchema(&schema.OneOf[i])
-	}
-	if schema.Not != nil {
-		s.walkSchema(schema.Not)
-	}
-	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
-		s.walkSchema(schema.AdditionalProperties.Schema)
-	}
-	if schema.AdditionalItems != nil && schema.AdditionalItems.Schema != nil {
-		s.walkSchema(schema.AdditionalItems.Schema)
-	}
-	if schema.Items != nil {
-		if schema.Items.Schema != nil {
-			s.walkSchema(schema.Items.Schema)
-		}
-		for i, _ := range schema.Items.Schemas {
-			s.walkSchema(&schema.Items.Schemas[i])
-		}
-	}
-}
-
-func (s *referenceWalker) walkParams(params []spec.Parameter) {
-	if params == nil {
-		return
-	}
-	for _, param := range params {
-		param.Ref = s.walkRef(param.Ref)
-		s.walkSchema(param.Schema)
-		if param.Items != nil {
-			param.Items.Ref = s.walkRef(param.Items.Ref)
-		}
-	}
-}
-
-func (s *referenceWalker) walkResponse(resp *spec.Response) {
-	if resp == nil {
-		return
-	}
-	resp.Ref = s.walkRef(resp.Ref)
-	s.walkSchema(resp.Schema)
-}
-
-func (s *referenceWalker) walkOperation(op *spec.Operation) {
-	if op == nil {
-		return
-	}
-	s.walkParams(op.Parameters)
-	if op.Responses == nil {
-		return
-	}
-	s.walkResponse(op.Responses.Default)
-	for _, r := range op.Responses.StatusCodeResponses {
-		s.walkResponse(&r)
-	}
-}
-
-func (s *referenceWalker) Start() {
-	if s.root.Paths == nil {
-		return
-	}
-	for _, pathItem := range s.root.Paths.Paths {
-		s.walkParams(pathItem.Parameters)
-		s.walkOperation(pathItem.Delete)
-		s.walkOperation(pathItem.Get)
-		s.walkOperation(pathItem.Head)
-		s.walkOperation(pathItem.Options)
-		s.walkOperation(pathItem.Patch)
-		s.walkOperation(pathItem.Post)
-		s.walkOperation(pathItem.Put)
-	}
-}
+const gvkKey = "x-kubernetes-group-version-kind"
 
 // usedDefinitionForSpec returns a map with all used definitions in the provided spec as keys and true as values.
-func usedDefinitionForSpec(sp *spec.Swagger) map[string]bool {
+func usedDefinitionForSpec(root *spec.Swagger) map[string]bool {
 	usedDefinitions := map[string]bool{}
-	walkOnAllReferences(func(ref spec.Ref) spec.Ref {
+	walkOnAllReferences(func(ref *spec.Ref) {
 		if refStr := ref.String(); refStr != "" && strings.HasPrefix(refStr, definitionPrefix) {
 			usedDefinitions[refStr[len(definitionPrefix):]] = true
 		}
-		return ref
-	}, sp)
+	}, root)
 	return usedDefinitions
 }
 
@@ -182,6 +44,18 @@ func usedDefinitionForSpec(sp *spec.Swagger) map[string]bool {
 // i.e. if a Path removed by this function, all definitions used by it and not used
 // anywhere else will also be removed.
 func FilterSpecByPaths(sp *spec.Swagger, keepPathPrefixes []string) {
+	*sp = *FilterSpecByPathsWithoutSideEffects(sp, keepPathPrefixes)
+}
+
+// FilterSpecByPathsWithoutSideEffects removes unnecessary paths and definitions used by those paths.
+// i.e. if a Path removed by this function, all definitions used by it and not used
+// anywhere else will also be removed.
+// It does not modify the input, but the output shares data structures with the input.
+func FilterSpecByPathsWithoutSideEffects(sp *spec.Swagger, keepPathPrefixes []string) *spec.Swagger {
+	if sp.Paths == nil {
+		return sp
+	}
+
 	// Walk all references to find all used definitions. This function
 	// want to only deal with unused definitions resulted from filtering paths.
 	// Thus a definition will be removed only if it has been used before but
@@ -190,74 +64,105 @@ func FilterSpecByPaths(sp *spec.Swagger, keepPathPrefixes []string) {
 
 	// First remove unwanted paths
 	prefixes := util.NewTrie(keepPathPrefixes)
-	orgPaths := sp.Paths
-	if orgPaths == nil {
-		return
-	}
-	sp.Paths = &spec.Paths{
-		VendorExtensible: orgPaths.VendorExtensible,
+	ret := *sp
+	ret.Paths = &spec.Paths{
+		VendorExtensible: sp.Paths.VendorExtensible,
 		Paths:            map[string]spec.PathItem{},
 	}
-	for path, pathItem := range orgPaths.Paths {
+	for path, pathItem := range sp.Paths.Paths {
 		if !prefixes.HasPrefix(path) {
 			continue
 		}
-		sp.Paths.Paths[path] = pathItem
+		ret.Paths.Paths[path] = pathItem
 	}
 
 	// Walk all references to find all definition references.
-	usedDefinitions := usedDefinitionForSpec(sp)
+	usedDefinitions := usedDefinitionForSpec(&ret)
 
 	// Remove unused definitions
-	orgDefinitions := sp.Definitions
-	sp.Definitions = spec.Definitions{}
-	for k, v := range orgDefinitions {
+	ret.Definitions = spec.Definitions{}
+	for k, v := range sp.Definitions {
 		if usedDefinitions[k] || !initialUsedDefinitions[k] {
-			sp.Definitions[k] = v
+			ret.Definitions[k] = v
 		}
 	}
+
+	return &ret
 }
 
-func renameDefinition(s *spec.Swagger, old, new string) {
-	oldRef := definitionPrefix + old
-	newRef := definitionPrefix + new
-	walkOnAllReferences(func(ref spec.Ref) spec.Ref {
-		if ref.String() == oldRef {
-			return spec.MustCreateRef(newRef)
+type rename struct {
+	from, to string
+}
+
+// renameDefinition renames references, without mutating the input.
+// The output might share data structures with the input.
+func renameDefinition(s *spec.Swagger, renames map[string]string) *spec.Swagger {
+	refRenames := make(map[string]string, len(renames))
+	foundOne := false
+	for k, v := range renames {
+		refRenames[definitionPrefix+k] = definitionPrefix + v
+		if _, ok := s.Definitions[k]; ok {
+			foundOne = true
+		}
+	}
+
+	if !foundOne {
+		return s
+	}
+
+	ret := &spec.Swagger{}
+	*ret = *s
+
+	ret = replaceReferences(func(ref *spec.Ref) *spec.Ref {
+		refName := ref.String()
+		if newRef, found := refRenames[refName]; found {
+			ret := spec.MustCreateRef(newRef)
+			return &ret
 		}
 		return ref
-	}, s)
-	// Make sure we don't assign to nil map
-	if s.Definitions == nil {
-		s.Definitions = spec.Definitions{}
+	}, ret)
+
+	renamedDefinitions := make(spec.Definitions, len(ret.Definitions))
+	for k, v := range ret.Definitions {
+		if newRef, found := renames[k]; found {
+			k = newRef
+		}
+		renamedDefinitions[k] = v
 	}
-	s.Definitions[new] = s.Definitions[old]
-	delete(s.Definitions, old)
+	ret.Definitions = renamedDefinitions
+
+	return ret
 }
 
 // MergeSpecsIgnorePathConflict is the same as MergeSpecs except it will ignore any path
 // conflicts by keeping the paths of destination. It will rename definition conflicts.
+// The source is not mutated.
 func MergeSpecsIgnorePathConflict(dest, source *spec.Swagger) error {
 	return mergeSpecs(dest, source, true, true)
 }
 
 // MergeSpecsFailOnDefinitionConflict is differ from MergeSpecs as it fails if there is
 // a definition conflict.
+// The source is not mutated.
 func MergeSpecsFailOnDefinitionConflict(dest, source *spec.Swagger) error {
 	return mergeSpecs(dest, source, false, false)
 }
 
 // MergeSpecs copies paths and definitions from source to dest, rename definitions if needed.
 // dest will be mutated, and source will not be changed. It will fail on path conflicts.
+// The source is not mutated.
 func MergeSpecs(dest, source *spec.Swagger) error {
 	return mergeSpecs(dest, source, true, false)
 }
 
+// mergeSpecs merges source into dest while resolving conflicts.
+// The source is not mutated.
 func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConflicts bool) (err error) {
-	specCloned := false
 	// Paths may be empty, due to [ACL constraints](http://goo.gl/8us55a#securityFiltering).
 	if source.Paths == nil {
-		source.Paths = &spec.Paths{}
+		// When a source spec does not have any path, that means none of the definitions
+		// are used thus we should not do anything
+		return nil
 	}
 	if dest.Paths == nil {
 		dest.Paths = &spec.Paths{}
@@ -277,88 +182,66 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 			return nil
 		}
 		if hasConflictingPath {
-			source, err = CloneSpec(source)
-			if err != nil {
-				return err
-			}
-			specCloned = true
-			FilterSpecByPaths(source, keepPaths)
+			source = FilterSpecByPathsWithoutSideEffects(source, keepPaths)
 		}
 	}
-	// Check for model conflicts
-	conflicts := false
+
+	// Check for model conflicts and rename to make definitions conflict-free (modulo different GVKs)
+	usedNames := map[string]bool{}
+	for k := range dest.Definitions {
+		usedNames[k] = true
+	}
+	renames := map[string]string{}
+DEFINITIONLOOP:
 	for k, v := range source.Definitions {
-		v2, found := dest.Definitions[k]
-		if found && !reflect.DeepEqual(v, v2) {
-			if !renameModelConflicts {
-				return fmt.Errorf("model name conflict in merging OpenAPI spec: %s", k)
-			}
-			conflicts = true
-			break
+		existing, found := dest.Definitions[k]
+		if !found || deepEqualDefinitionsModuloGVKs(&existing, &v) {
+			// skip for now, we copy them after the rename loop
+			continue
 		}
+
+		if !renameModelConflicts {
+			return fmt.Errorf("model name conflict in merging OpenAPI spec: %s", k)
+		}
+
+		// Reuse previously renamed model if one exists
+		var newName string
+		i := 1
+		for found {
+			i++
+			newName = fmt.Sprintf("%s_v%d", k, i)
+			existing, found = dest.Definitions[newName]
+			if found && deepEqualDefinitionsModuloGVKs(&existing, &v) {
+				renames[k] = newName
+				continue DEFINITIONLOOP
+			}
+		}
+
+		_, foundInSource := source.Definitions[newName]
+		for usedNames[newName] || foundInSource {
+			i++
+			newName = fmt.Sprintf("%s_v%d", k, i)
+			_, foundInSource = source.Definitions[newName]
+		}
+		renames[k] = newName
+		usedNames[newName] = true
 	}
+	source = renameDefinition(source, renames)
 
-	if conflicts {
-		if !specCloned {
-			source, err = CloneSpec(source)
-			if err != nil {
-				return err
-			}
-		}
-		specCloned = true
-		usedNames := map[string]bool{}
-		for k := range dest.Definitions {
-			usedNames[k] = true
-		}
-		type Rename struct {
-			from, to string
-		}
-		renames := []Rename{}
-
-	OUTERLOOP:
-		for k, v := range source.Definitions {
-			if usedNames[k] {
-				v2, found := dest.Definitions[k]
-				// Reuse model if they are exactly the same.
-				if found && reflect.DeepEqual(v, v2) {
-					continue
-				}
-
-				// Reuse previously renamed model if one exists
-				var newName string
-				i := 1
-				for found {
-					i++
-					newName = fmt.Sprintf("%s_v%d", k, i)
-					v2, found = dest.Definitions[newName]
-					if found && reflect.DeepEqual(v, v2) {
-						renames = append(renames, Rename{from: k, to: newName})
-						continue OUTERLOOP
-					}
-				}
-
-				_, foundInSource := source.Definitions[newName]
-				for usedNames[newName] || foundInSource {
-					i++
-					newName = fmt.Sprintf("%s_v%d", k, i)
-					_, foundInSource = source.Definitions[newName]
-				}
-				renames = append(renames, Rename{from: k, to: newName})
-				usedNames[newName] = true
-			}
-		}
-		for _, r := range renames {
-			renameDefinition(source, r.from, r.to)
-		}
-	}
+	// now without conflict (modulo different GVKs), copy definitions to dest
 	for k, v := range source.Definitions {
-		if _, found := dest.Definitions[k]; !found {
+		if existing, found := dest.Definitions[k]; !found {
 			if dest.Definitions == nil {
 				dest.Definitions = spec.Definitions{}
 			}
 			dest.Definitions[k] = v
+		} else if merged, changed, err := mergedGVKs(&existing, &v); err != nil {
+			return err
+		} else if changed {
+			existing.Extensions[gvkKey] = merged
 		}
 	}
+
 	// Check for path conflicts
 	for k, v := range source.Paths.Paths {
 		if _, found := dest.Paths.Paths[k]; found {
@@ -370,20 +253,124 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 		}
 		dest.Paths.Paths[k] = v
 	}
+
 	return nil
 }
 
-// CloneSpec clones OpenAPI spec
-func CloneSpec(source *spec.Swagger) (*spec.Swagger, error) {
-	// TODO(mehdy): Find a faster way to clone an spec
-	bytes, err := json.Marshal(source)
-	if err != nil {
-		return nil, err
+// deepEqualDefinitionsModuloGVKs compares s1 and s2, but ignores the x-kubernetes-group-version-kind extension.
+func deepEqualDefinitionsModuloGVKs(s1, s2 *spec.Schema) bool {
+	if s1 == nil {
+		return s2 == nil
+	} else if s2 == nil {
+		return false
 	}
-	var ret spec.Swagger
-	err = json.Unmarshal(bytes, &ret)
-	if err != nil {
-		return nil, err
+	if !reflect.DeepEqual(s1.Extensions, s2.Extensions) {
+		for k, v := range s1.Extensions {
+			if k == gvkKey {
+				continue
+			}
+			if !reflect.DeepEqual(v, s2.Extensions[k]) {
+				return false
+			}
+		}
+		len1 := len(s1.Extensions)
+		len2 := len(s2.Extensions)
+		if _, found := s1.Extensions[gvkKey]; found {
+			len1--
+		}
+		if _, found := s2.Extensions[gvkKey]; found {
+			len2--
+		}
+		if len1 != len2 {
+			return false
+		}
+
+		if s1.Extensions != nil {
+			shallowCopy := *s1
+			s1 = &shallowCopy
+			s1.Extensions = nil
+		}
+		if s2.Extensions != nil {
+			shallowCopy := *s2
+			s2 = &shallowCopy
+			s2.Extensions = nil
+		}
 	}
-	return &ret, nil
+
+	return reflect.DeepEqual(s1, s2)
+}
+
+// mergedGVKs merges the x-kubernetes-group-version-kind slices and returns the result, and whether
+// s1's x-kubernetes-group-version-kind slice was changed at all.
+func mergedGVKs(s1, s2 *spec.Schema) (interface{}, bool, error) {
+	gvk1, found1 := s1.Extensions[gvkKey]
+	gvk2, found2 := s2.Extensions[gvkKey]
+
+	if !found1 {
+		return gvk2, found2, nil
+	}
+	if !found2 {
+		return gvk1, false, nil
+	}
+
+	slice1, ok := gvk1.([]interface{})
+	if !ok {
+		return nil, false, fmt.Errorf("expected slice of GroupVersionKinds, got: %+v", slice1)
+	}
+	slice2, ok := gvk2.([]interface{})
+	if !ok {
+		return nil, false, fmt.Errorf("expected slice of GroupVersionKinds, got: %+v", slice2)
+	}
+
+	ret := make([]interface{}, len(slice1), len(slice1)+len(slice2))
+	keys := make([]string, 0, len(slice1)+len(slice2))
+	copy(ret, slice1)
+	seen := make(map[string]bool, len(slice1))
+	for _, x := range slice1 {
+		gvk, ok := x.(map[string]interface{})
+		if !ok {
+			return nil, false, fmt.Errorf(`expected {"group": <group>, "kind": <kind>, "version": <version>}, got: %#v`, x)
+		}
+		k := fmt.Sprintf("%s/%s.%s", gvk["group"], gvk["version"], gvk["kind"])
+		keys = append(keys, k)
+		seen[k] = true
+	}
+	changed := false
+	for _, x := range slice2 {
+		gvk, ok := x.(map[string]interface{})
+		if !ok {
+			return nil, false, fmt.Errorf(`expected {"group": <group>, "kind": <kind>, "version": <version>}, got: %#v`, x)
+		}
+		k := fmt.Sprintf("%s/%s.%s", gvk["group"], gvk["version"], gvk["kind"])
+		if seen[k] {
+			continue
+		}
+		ret = append(ret, x)
+		keys = append(keys, k)
+		changed = true
+	}
+
+	if changed {
+		sort.Sort(byKeys{ret, keys})
+	}
+
+	return ret, changed, nil
+}
+
+type byKeys struct {
+	values []interface{}
+	keys   []string
+}
+
+func (b byKeys) Len() int {
+	return len(b.values)
+}
+
+func (b byKeys) Less(i, j int) bool {
+	return b.keys[i] < b.keys[j]
+}
+
+func (b byKeys) Swap(i, j int) {
+	b.values[i], b.values[j] = b.values[j], b.values[i]
+	b.keys[i], b.keys[j] = b.keys[j], b.keys[i]
 }

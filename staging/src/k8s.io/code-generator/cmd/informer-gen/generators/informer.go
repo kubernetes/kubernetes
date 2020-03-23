@@ -28,7 +28,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // informerGenerator produces a file of listers for a given GroupVersion and
@@ -66,7 +66,7 @@ func (g *informerGenerator) Imports(c *generator.Context) (imports []string) {
 func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	glog.V(5).Infof("processing type %v", t)
+	klog.V(5).Infof("processing type %v", t)
 
 	listerPackage := fmt.Sprintf("%s/%s/%s", g.listersPackage, g.groupPkgName, strings.ToLower(g.groupVersion.Version.NonEmpty()))
 	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
@@ -151,13 +151,13 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(context.TODO(), options)
 			},
 			WatchFunc: func(options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(options)
+				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).Watch(context.TODO(), options)
 			},
 		},
 		&$.type|raw${},

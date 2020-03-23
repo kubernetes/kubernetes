@@ -17,14 +17,19 @@ limitations under the License.
 package podpreset
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
+	fuzz "github.com/google/gofuzz"
 	corev1 "k8s.io/api/core/v1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	kadmission "k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -397,7 +402,7 @@ func NewTestAdmission(lister settingsv1alpha1listers.PodPresetLister, objects ..
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset(objects...)
 
-	return &podPresetPlugin{
+	return &Plugin{
 		client:  client,
 		Handler: kadmission.NewHandler(kadmission.Create),
 		lister:  lister,
@@ -444,7 +449,7 @@ func TestAdmitConflictWithDifferentNamespaceShouldDoNothing(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +495,7 @@ func TestAdmitConflictWithNonMatchingLabelsShouldNotError(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,7 +542,7 @@ func TestAdmitConflictShouldNotModifyPod(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,7 +605,7 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -660,7 +665,7 @@ func TestAdmitMirrorPod(t *testing.T) {
 		},
 	}
 
-	if err := admitPod(mirrorPod, pip); err != nil {
+	if err := admitPod(t, mirrorPod, pip); err != nil {
 		t.Fatal(err)
 	}
 
@@ -730,7 +735,7 @@ func TestExclusionNoAdmit(t *testing.T) {
 		},
 	}
 	originalPod := pod.DeepCopy()
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -794,7 +799,7 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 		},
 	}
 	originalPod := pod.DeepCopy()
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -805,11 +810,11 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 	}
 }
 
-func admitPod(pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
+func admitPod(t *testing.T, pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	store := informerFactory.Settings().V1alpha1().PodPresets().Informer().GetStore()
 	store.Add(pip)
-	plugin := NewTestAdmission(informerFactory.Settings().V1alpha1().PodPresets().Lister())
+	plugin := admissiontesting.WithReinvocationTesting(t, NewTestAdmission(informerFactory.Settings().V1alpha1().PodPresets().Lister()))
 	attrs := kadmission.NewAttributesRecord(
 		pod,
 		nil,
@@ -819,14 +824,67 @@ func admitPod(pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
 		api.Resource("pods").WithVersion("version"),
 		"",
 		kadmission.Create,
+		&metav1.CreateOptions{},
 		false,
 		&user.DefaultInfo{},
 	)
 
-	err := plugin.Admit(attrs)
+	err := plugin.Admit(context.TODO(), attrs, nil)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func TestEnvFromMergeKey(t *testing.T) {
+	f := fuzz.New()
+	for i := 0; i < 100; i++ {
+		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
+			orig := api.EnvFromSource{}
+			f.Fuzz(&orig)
+			clone := api.EnvFromSource{}
+			f.Fuzz(&clone)
+
+			key := newEnvFromMergeKey(orig)
+
+			// copy all key fields into the clone so it only differs by fields not from the key
+			clone.Prefix = key.prefix
+			if orig.ConfigMapRef == nil {
+				clone.ConfigMapRef = nil
+			} else {
+				if clone.ConfigMapRef == nil {
+					clone.ConfigMapRef = &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{},
+					}
+				}
+				clone.ConfigMapRef.Name = key.configMapRefName
+			}
+			if orig.SecretRef == nil {
+				clone.SecretRef = nil
+			} else {
+				if clone.SecretRef == nil {
+					clone.SecretRef = &api.SecretEnvSource{
+						LocalObjectReference: api.LocalObjectReference{},
+					}
+				}
+				clone.SecretRef.Name = key.secretRefName
+			}
+
+			// zero out known non-identifying fields
+			for _, e := range []api.EnvFromSource{orig, clone} {
+				if e.ConfigMapRef != nil {
+					e.ConfigMapRef.Optional = nil
+				}
+				if e.SecretRef != nil {
+					e.SecretRef.Optional = nil
+				}
+			}
+
+			if !reflect.DeepEqual(orig, clone) {
+				t.Errorf("expected all but known non-identifying fields for envFrom to be in envFromMergeKey but found unaccounted for differences, diff:\n%s", diff.ObjectReflectDiff(orig, clone))
+			}
+
+		})
+	}
 }

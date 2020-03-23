@@ -15,14 +15,18 @@ limitations under the License.
 */
 
 // This test is volumes test for configmap.
+
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	"context"
+
+	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -35,19 +39,17 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	var cs clientset.Interface
 	var namespace *v1.Namespace
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		namespace = f.Namespace
 	})
 
-	Describe("ConfigMap", func() {
-		It("should be mountable", func() {
-			config := framework.VolumeTestConfig{
+	ginkgo.Describe("ConfigMap", func() {
+		ginkgo.It("should be mountable", func() {
+			config := volume.TestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "configmap",
 			}
-
-			defer framework.VolumeTestCleanup(f, config)
 			configMap := &v1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "ConfigMap",
@@ -62,15 +64,15 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					"third":  "this is the third file",
 				},
 			}
-			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(configMap); err != nil {
+			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
-				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
+				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{})
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502
-			tests := []framework.VolumeTest{
+			tests := []volume.Test{
 				{
 					Volume: v1.VolumeSource{
 						ConfigMap: &v1.ConfigMapVolumeSource{
@@ -106,7 +108,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					ExpectedContent: "this is the second file",
 				},
 			}
-			framework.TestVolumeClient(cs, config, nil, tests)
+			volume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

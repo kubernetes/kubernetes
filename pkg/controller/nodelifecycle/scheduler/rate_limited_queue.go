@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -194,6 +194,15 @@ func (q *UniqueQueue) Clear() {
 	}
 }
 
+// SetRemove remove value from the set if value existed
+func (q *UniqueQueue) SetRemove(value string) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	if q.set.Has(value) {
+		q.set.Delete(value)
+	}
+}
+
 // RateLimitedTimedQueue is a unique item priority queue ordered by
 // the expected next time of execution. It is also rate limited.
 type RateLimitedTimedQueue struct {
@@ -236,7 +245,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
-			glog.V(10).Infof("Try rate limited for value: %v", val)
+			klog.V(10).Infof("Try rate limited for value: %v", val)
 			// Try again later
 			break
 		}
@@ -278,6 +287,11 @@ func (q *RateLimitedTimedQueue) Remove(value string) bool {
 // Clear removes all items from the queue
 func (q *RateLimitedTimedQueue) Clear() {
 	q.queue.Clear()
+}
+
+// SetRemove remove value from the set of the queue
+func (q *RateLimitedTimedQueue) SetRemove(value string) {
+	q.queue.SetRemove(value)
 }
 
 // SwapLimiter safely swaps current limiter for this queue with the

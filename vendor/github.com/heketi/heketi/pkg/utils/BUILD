@@ -5,17 +5,11 @@ go_library(
     srcs = [
         "bodystring.go",
         "jsonutils.go",
-        "log.go",
-        "sortedstrings.go",
         "statusgroup.go",
-        "stringset.go",
-        "stringstack.go",
-        "uuid.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/heketi/heketi/pkg/utils",
     importpath = "github.com/heketi/heketi/pkg/utils",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/lpabon/godbc:go_default_library"],
 )
 
 filegroup(

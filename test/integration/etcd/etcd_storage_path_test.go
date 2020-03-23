@@ -24,9 +24,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/coreos/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -49,13 +50,14 @@ const testNamespace = "etcdstoragepathtestnamespace"
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	master := StartRealMasterOrDie(t)
+	master := StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
+	})
 	defer master.Cleanup()
 	defer dumpEtcdKVOnFailure(t, master.KV)
 
 	client := &allClient{dynamicClient: master.Dynamic}
 
-	if _, err := master.Client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	if _, err := master.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,6 +101,10 @@ func TestEtcdStoragePath(t *testing.T) {
 				if input, err = jsonToMetaObject([]byte(testData.Stub)); err != nil || input.isEmpty() {
 					t.Fatalf("invalid test data for %s: %v", gvResource, err)
 				}
+				// unset type meta fields - we only set these in the CRD test data and it makes
+				// any CRD test with an expectedGVK override fail the DeepDerivative test
+				input.Kind = ""
+				input.APIVersion = ""
 			}
 
 			all := &[]cleanupData{}
@@ -270,7 +276,7 @@ func (c *allClient) create(stub, ns string, mapping *meta.RESTMapping, all *[]cl
 		return err
 	}
 
-	actual, err := resourceClient.Create(obj, metav1.CreateOptions{})
+	actual, err := resourceClient.Create(context.TODO(), obj, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -285,7 +291,7 @@ func (c *allClient) cleanup(all *[]cleanupData) error {
 		obj := (*all)[i].obj
 		gvr := (*all)[i].resource
 
-		if err := c.dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), nil); err != nil {
+		if err := c.dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}

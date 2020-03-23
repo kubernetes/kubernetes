@@ -1,15 +1,23 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
-  - eparis
-  - jbeda
+  - bentheelder
+  - justaugustus
+  - Katharine
   - mikedanese
-  - roberthbailey
-  - spiffxp
-  - zmerlynn
+  - cheftako
+  - dims
 approvers:
-  - eparis
-  - jbeda
+  - bentheelder
   - mikedanese
-  - roberthbailey
+  - spiffxp
+  - dims
+  - cheftako
+emeritus_approvers:
+  - eparis
+  - roberthbailey   # 2019-03-08
+  - jbeda
   - zmerlynn
 labels:
 - sig/cluster-lifecycle
+- area/release-eng

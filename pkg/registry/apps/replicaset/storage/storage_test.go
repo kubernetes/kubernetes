@@ -30,40 +30,43 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
 const defaultReplicas = 100
 
-func newStorage(t *testing.T) (*ReplicaSetStorage, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*ReplicaSetStorage, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "replicasets"}
-	replicaSetStorage := NewStorage(restOptions)
+	replicaSetStorage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return &replicaSetStorage, server
 }
 
 // createReplicaSet is a helper function that returns a ReplicaSet with the updated resource version.
-func createReplicaSet(storage *REST, rs extensions.ReplicaSet, t *testing.T) (extensions.ReplicaSet, error) {
+func createReplicaSet(storage *REST, rs apps.ReplicaSet, t *testing.T) (apps.ReplicaSet, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rs.Namespace)
 	obj, err := storage.Create(ctx, &rs, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create ReplicaSet, %v", err)
 	}
-	newRS := obj.(*extensions.ReplicaSet)
+	newRS := obj.(*apps.ReplicaSet)
 	return *newRS, nil
 }
 
-func validNewReplicaSet() *extensions.ReplicaSet {
-	return &extensions.ReplicaSet{
+func validNewReplicaSet() *apps.ReplicaSet {
+	return &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -84,7 +87,7 @@ func validNewReplicaSet() *extensions.ReplicaSet {
 			},
 			Replicas: 7,
 		},
-		Status: extensions.ReplicaSetStatus{
+		Status: apps.ReplicaSetStatus{
 			Replicas: 5,
 		},
 	}
@@ -103,8 +106,8 @@ func TestCreate(t *testing.T) {
 		// valid
 		rs,
 		// invalid (invalid selector)
-		&extensions.ReplicaSet{
-			Spec: extensions.ReplicaSetSpec{
+		&apps.ReplicaSet{
+			Spec: apps.ReplicaSetSpec{
 				Replicas: 2,
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{}},
 				Template: validReplicaSet.Spec.Template,
@@ -123,18 +126,18 @@ func TestUpdate(t *testing.T) {
 		validNewReplicaSet(),
 		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.ReplicaSet)
+			object := obj.(*apps.ReplicaSet)
 			object.Spec.Replicas = object.Spec.Replicas + 1
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.ReplicaSet)
+			object := obj.(*apps.ReplicaSet)
 			object.Name = ""
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.ReplicaSet)
+			object := obj.(*apps.ReplicaSet)
 			object.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
@@ -165,7 +168,7 @@ func TestGenerationNumber(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	storedRS, _ := etcdRS.(*extensions.ReplicaSet)
+	storedRS, _ := etcdRS.(*apps.ReplicaSet)
 
 	// Generation initialization
 	if storedRS.Generation != 1 || storedRS.Status.ObservedGeneration != 0 {
@@ -173,7 +176,7 @@ func TestGenerationNumber(t *testing.T) {
 	}
 
 	// Updates to spec should increment the generation number
-	storedRS.Spec.Replicas += 1
+	storedRS.Spec.Replicas++
 	if _, _, err := storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -181,13 +184,13 @@ func TestGenerationNumber(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	storedRS, _ = etcdRS.(*extensions.ReplicaSet)
+	storedRS, _ = etcdRS.(*apps.ReplicaSet)
 	if storedRS.Generation != 2 || storedRS.Status.ObservedGeneration != 0 {
 		t.Fatalf("Unexpected generation, spec: %v, status: %v", storedRS.Generation, storedRS.Status.ObservedGeneration)
 	}
 
 	// Updates to status should not increment either spec or status generation numbers
-	storedRS.Status.Replicas += 1
+	storedRS.Status.Replicas++
 	if _, _, err := storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -195,7 +198,7 @@ func TestGenerationNumber(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	storedRS, _ = etcdRS.(*extensions.ReplicaSet)
+	storedRS, _ = etcdRS.(*apps.ReplicaSet)
 	if storedRS.Generation != 2 || storedRS.Status.ObservedGeneration != 0 {
 		t.Fatalf("Unexpected generation number, spec: %v, status: %v", storedRS.Generation, storedRS.Status.ObservedGeneration)
 	}
@@ -257,7 +260,7 @@ func TestScaleGet(t *testing.T) {
 
 	name := "foo"
 
-	var rs extensions.ReplicaSet
+	var rs apps.ReplicaSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/replicasets/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, &rs, 0, false); err != nil {
@@ -302,7 +305,7 @@ func TestScaleUpdate(t *testing.T) {
 
 	name := "foo"
 
-	var rs extensions.ReplicaSet
+	var rs apps.ReplicaSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/replicasets/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, &rs, 0, false); err != nil {
@@ -350,12 +353,12 @@ func TestStatusUpdate(t *testing.T) {
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	update := extensions.ReplicaSet{
+	update := apps.ReplicaSet{
 		ObjectMeta: validReplicaSet.ObjectMeta,
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: defaultReplicas,
 		},
-		Status: extensions.ReplicaSetStatus{
+		Status: apps.ReplicaSetStatus{
 			Replicas: defaultReplicas,
 		},
 	}
@@ -368,7 +371,7 @@ func TestStatusUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rs := obj.(*extensions.ReplicaSet)
+	rs := obj.(*apps.ReplicaSet)
 	if rs.Spec.Replicas != 7 {
 		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", rs.Spec.Replicas)
 	}

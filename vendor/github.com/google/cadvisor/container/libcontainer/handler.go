@@ -27,17 +27,14 @@ import (
 
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
+	"golang.org/x/sys/unix"
 
 	"bytes"
-	"github.com/golang/glog"
+
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/klog"
 )
-
-/*
-#include <unistd.h>
-*/
-import "C"
 
 type Handler struct {
 	cgroupManager   cgroups.Manager
@@ -66,17 +63,16 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
 	}
-	withPerCPU := h.includedMetrics.Has(container.PerCpuUsageMetrics)
-	stats := newContainerStats(libcontainerStats, withPerCPU)
+	stats := newContainerStats(libcontainerStats, h.includedMetrics)
 
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
 		pids, err := h.cgroupManager.GetAllPids()
 		if err != nil {
-			glog.V(4).Infof("Could not get PIDs for container %d: %v", h.pid, err)
+			klog.V(4).Infof("Could not get PIDs for container %d: %v", h.pid, err)
 		} else {
 			stats.Cpu.Schedstat, err = schedulerStatsFromProcs(h.rootFs, pids, h.pidMetricsCache)
 			if err != nil {
-				glog.V(4).Infof("Unable to get Process Scheduler Stats: %v", err)
+				klog.V(4).Infof("Unable to get Process Scheduler Stats: %v", err)
 			}
 		}
 	}
@@ -88,7 +84,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
 		netStats, err := networkStatsFromProc(h.rootFs, h.pid)
 		if err != nil {
-			glog.V(4).Infof("Unable to get network stats from pid %d: %v", h.pid, err)
+			klog.V(4).Infof("Unable to get network stats from pid %d: %v", h.pid, err)
 		} else {
 			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
 		}
@@ -96,14 +92,14 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	if h.includedMetrics.Has(container.NetworkTcpUsageMetrics) {
 		t, err := tcpStatsFromProc(h.rootFs, h.pid, "net/tcp")
 		if err != nil {
-			glog.V(4).Infof("Unable to get tcp stats from pid %d: %v", h.pid, err)
+			klog.V(4).Infof("Unable to get tcp stats from pid %d: %v", h.pid, err)
 		} else {
 			stats.Network.Tcp = t
 		}
 
 		t6, err := tcpStatsFromProc(h.rootFs, h.pid, "net/tcp6")
 		if err != nil {
-			glog.V(4).Infof("Unable to get tcp6 stats from pid %d: %v", h.pid, err)
+			klog.V(4).Infof("Unable to get tcp6 stats from pid %d: %v", h.pid, err)
 		} else {
 			stats.Network.Tcp6 = t6
 		}
@@ -111,17 +107,32 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	if h.includedMetrics.Has(container.NetworkUdpUsageMetrics) {
 		u, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp")
 		if err != nil {
-			glog.V(4).Infof("Unable to get udp stats from pid %d: %v", h.pid, err)
+			klog.V(4).Infof("Unable to get udp stats from pid %d: %v", h.pid, err)
 		} else {
 			stats.Network.Udp = u
 		}
 
 		u6, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp6")
 		if err != nil {
-			glog.V(4).Infof("Unable to get udp6 stats from pid %d: %v", h.pid, err)
+			klog.V(4).Infof("Unable to get udp6 stats from pid %d: %v", h.pid, err)
 		} else {
 			stats.Network.Udp6 = u6
 		}
+	}
+	if h.includedMetrics.Has(container.ProcessMetrics) {
+		paths := h.cgroupManager.GetPaths()
+		path, ok := paths["cpu"]
+		if !ok {
+			klog.V(4).Infof("Could not find cgroups CPU for container %d", h.pid)
+		} else {
+			stats.Processes, err = processStatsFromProcs(h.rootFs, path)
+			if err != nil {
+				klog.V(4).Infof("Unable to get Process Stats: %v", err)
+			}
+		}
+
+		// if include processes metrics, just set threads metrics if exist, and has no relationship with cpu path
+		setThreadsStats(cgroupStats, stats)
 	}
 
 	// For backwards compatibility.
@@ -130,6 +141,53 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	}
 
 	return stats, nil
+}
+
+func processStatsFromProcs(rootFs string, cgroupPath string) (info.ProcessStats, error) {
+	var fdCount, socketCount uint64
+	filePath := path.Join(cgroupPath, "cgroup.procs")
+	out, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return info.ProcessStats{}, fmt.Errorf("couldn't open cpu cgroup procs file %v : %v", filePath, err)
+	}
+
+	pids := strings.Split(string(out), "\n")
+
+	// EOL is also treated as a new line while reading "cgroup.procs" file with ioutil.ReadFile.
+	// The last value is an empty string "". Ex: pids = ["22", "1223", ""]
+	// Trim the last value
+	if len(pids) != 0 && pids[len(pids)-1] == "" {
+		pids = pids[:len(pids)-1]
+	}
+
+	for _, pid := range pids {
+		dirPath := path.Join(rootFs, "/proc", pid, "fd")
+		fds, err := ioutil.ReadDir(dirPath)
+		if err != nil {
+			klog.V(4).Infof("error while listing directory %q to measure fd count: %v", dirPath, err)
+			continue
+		}
+		fdCount += uint64(len(fds))
+		for _, fd := range fds {
+			fdPath := path.Join(dirPath, fd.Name())
+			linkName, err := os.Readlink(fdPath)
+			if err != nil {
+				klog.V(4).Infof("error while reading %q link: %v", fdPath, err)
+				continue
+			}
+			if strings.HasPrefix(linkName, "socket") {
+				socketCount++
+			}
+		}
+	}
+
+	processStats := info.ProcessStats{
+		ProcessCount: uint64(len(pids)),
+		FdCount:      fdCount,
+		SocketCount:  socketCount,
+	}
+
+	return processStats, nil
 }
 
 func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]*info.CpuSchedstat) (info.CpuSchedstat, error) {
@@ -451,13 +509,13 @@ func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 	// We intentionally ignore these extra zeroes.
 	numActual, err := numCpusFunc()
 	if err != nil {
-		glog.Errorf("unable to determine number of actual cpus; defaulting to maximum possible number: errno %v", err)
+		klog.Errorf("unable to determine number of actual cpus; defaulting to maximum possible number: errno %v", err)
 		numActual = numPossible
 	}
 	if numActual > numPossible {
 		// The real number of cores should never be greater than the number of
 		// datapoints reported in cpu usage.
-		glog.Errorf("PercpuUsage had %v cpus, but the actual number is %v; ignoring extra CPUs", numPossible, numActual)
+		klog.Errorf("PercpuUsage had %v cpus, but the actual number is %v; ignoring extra CPUs", numPossible, numActual)
 	}
 	numActual = minUint32(numPossible, numActual)
 	ret.Cpu.Usage.PerCpu = make([]uint64, numActual)
@@ -468,19 +526,12 @@ func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 
 }
 
-// Copied from
-// https://github.com/moby/moby/blob/8b1adf55c2af329a4334f21d9444d6a169000c81/daemon/stats/collector_unix.go#L73
-// Apache 2.0, Copyright Docker, Inc.
 func getNumberOnlineCPUs() (uint32, error) {
-	i, err := C.sysconf(C._SC_NPROCESSORS_ONLN)
-	// According to POSIX - errno is undefined after successful
-	// sysconf, and can be non-zero in several cases, so look for
-	// error in returned value not in errno.
-	// (https://sourceware.org/bugzilla/show_bug.cgi?id=21536)
-	if i == -1 {
+	var availableCPUs unix.CPUSet
+	if err := unix.SchedGetaffinity(0, &availableCPUs); err != nil {
 		return 0, err
 	}
-	return uint32(i), nil
+	return uint32(availableCPUs.Count()), nil
 }
 
 func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
@@ -552,14 +603,25 @@ func setNetworkStats(libcontainerStats *libcontainer.Stats, ret *info.ContainerS
 	}
 }
 
-func newContainerStats(libcontainerStats *libcontainer.Stats, withPerCPU bool) *info.ContainerStats {
+// read from pids path not cpu
+func setThreadsStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	if s != nil {
+		ret.Processes.ThreadsCurrent = s.PidsStats.Current
+		ret.Processes.ThreadsMax = s.PidsStats.Limit
+	}
+
+}
+
+func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics container.MetricSet) *info.ContainerStats {
 	ret := &info.ContainerStats{
 		Timestamp: time.Now(),
 	}
 
 	if s := libcontainerStats.CgroupStats; s != nil {
-		setCpuStats(s, ret, withPerCPU)
-		setDiskIoStats(s, ret)
+		setCpuStats(s, ret, includedMetrics.Has(container.PerCpuUsageMetrics))
+		if includedMetrics.Has(container.DiskIOMetrics) {
+			setDiskIoStats(s, ret)
+		}
 		setMemoryStats(s, ret)
 	}
 	if len(libcontainerStats.Interfaces) > 0 {

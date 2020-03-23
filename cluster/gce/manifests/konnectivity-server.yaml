@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: konnectivity-server
+  namespace: kube-system
+  annotations:
+    seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+  component: konnectivity-server
+spec:
+  priorityClassName: system-cluster-critical
+  hostNetwork: true
+  containers:
+  - name: konnectivity-server-container
+    image: us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-server:v0.0.8
+    resources:
+      requests:
+        cpu: 25m
+    command: [ "/proxy-server"{{ konnectivity_args }} ]
+    livenessProbe:
+      httpGet:
+        scheme: HTTP
+        host: 127.0.0.1
+        port: {{ admin_port }}
+        path: /healthz
+      initialDelaySeconds: {{ liveness_probe_initial_delay }}
+      timeoutSeconds: 60
+    ports:
+    - name: agentport
+      containerPort: {{ agent_port }}
+      hostPort: {{ agent_port }}
+    - name: adminport
+      containerPort: {{ admin_port }}
+      hostPort: {{ admin_port }}
+    volumeMounts:
+    - name: varlogkonnectivityserver
+      mountPath: /var/log/konnectivity-server.log
+      readOnly: false
+    - name: pki
+      mountPath: /etc/srv/kubernetes/pki
+      readOnly: true
+    - name: konnectivity-uds
+      mountPath: /etc/srv/kubernetes/konnectivity-server
+      readOnly: false
+  volumes:
+  - name: varlogkonnectivityserver
+    hostPath:
+      path: /var/log/konnectivity-server.log
+      type: FileOrCreate
+  - name: pki
+    hostPath:
+      path: /etc/srv/kubernetes/pki
+  - name: konnectivity-uds
+    hostPath:
+      path: /etc/srv/kubernetes/konnectivity-server
+      type: DirectoryOrCreate

@@ -16,18 +16,76 @@ limitations under the License.
 
 package apis
 
+import (
+	"strings"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
 const (
-	LabelHostname           = "kubernetes.io/hostname"
-	LabelZoneFailureDomain  = "failure-domain.beta.kubernetes.io/zone"
-	LabelMultiZoneDelimiter = "__"
-	LabelZoneRegion         = "failure-domain.beta.kubernetes.io/region"
-
-	LabelInstanceType = "beta.kubernetes.io/instance-type"
-
-	LabelOS   = "beta.kubernetes.io/os"
+	// LabelOS is a label to indicate the operating system of the node.
+	// The OS labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta OS labels in Kubernetes 1.18.
+	LabelOS = "beta.kubernetes.io/os"
+	// LabelArch is a label to indicate the architecture of the node.
+	// The Arch labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta Arch labels in Kubernetes 1.18.
 	LabelArch = "beta.kubernetes.io/arch"
 )
 
-// When the --failure-domains scheduler flag is not specified,
-// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
-var DefaultFailureDomains string = LabelHostname + "," + LabelZoneFailureDomain + "," + LabelZoneRegion
+var kubeletLabels = sets.NewString(
+	v1.LabelHostname,
+	v1.LabelZoneFailureDomainStable,
+	v1.LabelZoneRegionStable,
+	v1.LabelZoneFailureDomain,
+	v1.LabelZoneRegion,
+	v1.LabelInstanceType,
+	v1.LabelInstanceTypeStable,
+	v1.LabelOSStable,
+	v1.LabelArchStable,
+
+	LabelOS,
+	LabelArch,
+)
+
+var kubeletLabelNamespaces = sets.NewString(
+	v1.LabelNamespaceSuffixKubelet,
+	v1.LabelNamespaceSuffixNode,
+)
+
+// KubeletLabels returns the list of label keys kubelets are allowed to set on their own Node objects
+func KubeletLabels() []string {
+	return kubeletLabels.List()
+}
+
+// KubeletLabelNamespaces returns the list of label key namespaces kubelets are allowed to set on their own Node objects
+func KubeletLabelNamespaces() []string {
+	return kubeletLabelNamespaces.List()
+}
+
+// IsKubeletLabel returns true if the label key is one that kubelets are allowed to set on their own Node object.
+// This checks if the key is in the KubeletLabels() list, or has a namespace in the KubeletLabelNamespaces() list.
+func IsKubeletLabel(key string) bool {
+	if kubeletLabels.Has(key) {
+		return true
+	}
+
+	namespace := getLabelNamespace(key)
+	for allowedNamespace := range kubeletLabelNamespaces {
+		if namespace == allowedNamespace || strings.HasSuffix(namespace, "."+allowedNamespace) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getLabelNamespace(key string) string {
+	if parts := strings.SplitN(key, "/", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
+}

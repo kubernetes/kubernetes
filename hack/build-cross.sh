@@ -15,12 +15,18 @@
 # limitations under the License.
 
 # This script is a vestigial redirection.  Please do not add "real" logic.
+# The "true" target of this makerule is `hack/make-rules/cross.sh`.
+
+# This script runs `make cross` command.
+# The command sets up a go workspace locally and builds all for all appropriate
+# platforms.
+# Usage: `hack/build-cross.sh`.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 echo "NOTE: $0 has been replaced by 'make cross'"
 echo

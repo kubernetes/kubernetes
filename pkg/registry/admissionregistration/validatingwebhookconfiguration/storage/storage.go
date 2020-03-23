@@ -21,16 +21,19 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration"
 )
 
-// rest implements a RESTStorage for pod disruption budgets against etcd
+// REST implements a RESTStorage for pod disruption budgets against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against pod disruption budgets.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &admissionregistration.ValidatingWebhookConfiguration{} },
 		NewListFunc: func() runtime.Object { return &admissionregistration.ValidatingWebhookConfigurationList{} },
@@ -42,10 +45,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		CreateStrategy: validatingwebhookconfiguration.Strategy,
 		UpdateStrategy: validatingwebhookconfiguration.Strategy,
 		DeleteStrategy: validatingwebhookconfiguration.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
-	return &REST{store}
+	return &REST{store}, nil
 }

@@ -1,60 +1,47 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
-  - bowei
-  - rramkumar1
-  - MrHohn
-  - deads2k
-  - enisoc
-  - enj # for test/integration/etcd/etcd_storage_path_test.go
-  - erictune
-  - foxish # for test/e2e/network-partition.go
-  - gmarek
-  - janetkuo
-  - kow3ns # for test/e2e/statefulset.go
-  - krousey
-  - liggitt
-  - madhusudancs
-  - marun
-  - mikedanese
-  - ncdc
-  - pwittrock # for test/e2e/kubectl.go
-  - saad-ali
-  - shyamjvs
-  - smarterclayton
-  - soltysh
-  - sig-testing-reviewers
-  - sttts
-  - timothysc
-  - zmerlynn
-  - vishh
+  - neolit123
+  - johnSchnake
+  - SataQiu
 approvers:
+  - alejandrox1
+  - andrewsykim
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
-  - rramkumar1
   - MrHohn
   - deads2k
   - enisoc
-  - enj # for test/integration/etcd/etcd_storage_path_test.go
-  - eparis
-  - erictune
-  - foxish # for test/e2e/network-partition.go
-  - gmarek
   - janetkuo
-  - kow3ns # for test/e2e/statefulset.go
-  - krousey
   - liggitt
-  - madhusudancs
-  - marun
   - mikedanese
-  - ncdc
+  - msau42
+  - oomichi
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
-  - shyamjvs
+  - SataQiu
   - sig-testing-approvers
   - smarterclayton
   - soltysh
   - sttts
   - timothysc
+emeritus_approvers:
+  - enj
+  - eparis
+  - erictune
+  - foxish
+  - gmarek
+  - krousey
+  - kow3ns
+  - madhusudancs
+  - marun
   - zmerlynn
+  - MaciekPytel
+  - rramkumar1
+  - ncdc
   - vishh
+  - shyamjvs
+
 labels:
+- area/test
 - sig/testing

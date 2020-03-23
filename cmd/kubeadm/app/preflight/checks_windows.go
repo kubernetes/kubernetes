@@ -19,26 +19,38 @@ limitations under the License.
 package preflight
 
 import (
-	"fmt"
-	"os/exec"
-	"strings"
+	"os/user"
+
+	"github.com/pkg/errors"
 )
 
-// Check validates if an user has elevated (administrator) privileges.
-func (ipuc IsPrivilegedUserCheck) Check() (warnings, errors []error) {
-	errors = []error{}
+// The "Well-known SID" of Administrator group
+// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
+const administratorSID = "S-1-5-32-544"
 
-	// The "Well-known SID" of Administrator group is S-1-5-32-544
-	// The following powershell will return "True" if run as an administrator, "False" otherwise
-	// See https://msdn.microsoft.com/en-us/library/cc980032.aspx
-	args := []string{"[bool](([System.Security.Principal.WindowsIdentity]::GetCurrent()).groups -match \"S-1-5-32-544\")"}
-	isAdmin, err := exec.Command("powershell", args...).Output()
-
+// Check validates if a user has elevated (administrator) privileges.
+func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
+	currUser, err := user.Current()
 	if err != nil {
-		errors = append(errors, fmt.Errorf("unable to determine if user is running as administrator: %s", err))
-	} else if strings.EqualFold(strings.TrimSpace(string(isAdmin)), "false") {
-		errors = append(errors, fmt.Errorf("user is not running as administrator"))
+		return nil, []error{errors.Wrap(err, "cannot get current user")}
 	}
 
-	return nil, errors
+	groupIds, err := currUser.GroupIds()
+	if err != nil {
+		return nil, []error{errors.Wrap(err, "cannot get group IDs for current user")}
+	}
+
+	for _, sid := range groupIds {
+		if sid == administratorSID {
+			return nil, nil
+		}
+	}
+
+	return nil, []error{errors.New("user is not running as administrator")}
+}
+
+// Check validates if Docker is setup to use systemd as the cgroup driver.
+// No-op for Windows.
+func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
+	return nil, nil
 }

@@ -35,10 +35,10 @@ var parserTests = []parserTest{
 		[]Node{newText("hello "), newList(), newField("jsonpath")}, false},
 	{"quote", `{"{"}`, []Node{newList(), newText("{")}, false},
 	{"array", `{[1:3]}`, []Node{newList(),
-		newArray([3]ParamsEntry{{1, true}, {3, true}, {0, false}})}, false},
+		newArray([3]ParamsEntry{{1, true, false}, {3, true, false}, {0, false, false}})}, false},
 	{"allarray", `{.book[*].author}`,
 		[]Node{newList(), newField("book"),
-			newArray([3]ParamsEntry{{0, false}, {0, false}, {0, false}}), newField("author")}, false},
+			newArray([3]ParamsEntry{{0, false, false}, {0, false, false}, {0, false, false}}), newField("author")}, false},
 	{"wildcard", `{.bicycle.*}`,
 		[]Node{newList(), newField("bicycle"), newWildcard()}, false},
 	{"filter", `{[?(@.price<3)]}`,
@@ -52,7 +52,7 @@ var parserTests = []parserTest{
 	}, false},
 	{"union", `{['bicycle.price', 3, 'book.price']}`, []Node{newList(), newUnion([]*ListNode{}),
 		newList(), newField("bicycle"), newField("price"),
-		newList(), newArray([3]ParamsEntry{{3, true}, {4, true}, {0, false}}),
+		newList(), newArray([3]ParamsEntry{{3, true, false}, {4, true, true}, {0, false, false}}),
 		newList(), newField("book"), newField("price"),
 	}, false},
 	{"range", `{range .items}{.name},{end}`, []Node{
@@ -77,6 +77,12 @@ var parserTests = []parserTest{
 		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("\"\"")}, false},
 	{"single containing escaped single", `{[?(@.status.nodeInfo.osImage == '\\\'')]}`,
 		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("\\'")}, false},
+	{"negative index slice, equals a[len-5] to a[len-1]", `{[-5:]}`, []Node{newList(),
+		newArray([3]ParamsEntry{{-5, true, false}, {0, false, false}, {0, false, false}})}, false},
+	{"negative index slice, equals a[len-1]", `{[-1]}`, []Node{newList(),
+		newArray([3]ParamsEntry{{-1, true, false}, {0, true, true}, {0, false, false}})}, false},
+	{"negative index slice, equals a[1] to a[len-1]", `{[1:-1]}`, []Node{newList(),
+		newArray([3]ParamsEntry{{1, true, false}, {-1, true, false}, {0, false, false}})}, false},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {
@@ -134,7 +140,6 @@ func TestFailParser(t *testing.T) {
 		{"unrecognized character", "{*}", "unrecognized character in action: U+002A '*'"},
 		{"invalid number", "{+12.3.0}", "cannot parse number +12.3.0"},
 		{"unterminated array", "{[1}", "unterminated array"},
-		{"invalid index", "{[::-1]}", "invalid array index ::-1"},
 		{"unterminated filter", "{[?(.price]}", "unterminated filter"},
 	}
 	for _, test := range failParserTests {

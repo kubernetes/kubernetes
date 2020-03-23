@@ -25,7 +25,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	flag "github.com/spf13/pflag"
 
 	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
@@ -33,8 +36,6 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/parser"
 	"k8s.io/gengo/types"
-
-	flag "github.com/spf13/pflag"
 )
 
 type Generator struct {
@@ -202,6 +203,18 @@ func Run(g *Generator) {
 	c.Verify = g.Common.VerifyOnly
 	c.FileTypes["protoidl"] = NewProtoFile()
 
+	// order package by imports, importees first
+	deps := deps(c, protobufNames.packages)
+	order, err := importOrder(deps)
+	if err != nil {
+		log.Fatalf("Failed to order packages by imports: %v", err)
+	}
+	topologicalPos := map[string]int{}
+	for i, p := range order {
+		topologicalPos[p] = i
+	}
+	sort.Sort(positionOrder{topologicalPos, protobufNames.packages})
+
 	var vendoredOutputPackages, localOutputPackages generator.Packages
 	for _, p := range protobufNames.packages {
 		if _, ok := nonOutputPackages[p.Name()]; ok {
@@ -263,7 +276,7 @@ func Run(g *Generator) {
 		cmd := exec.Command("protoc", append(args, path)...)
 		out, err := cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -284,7 +297,7 @@ func Run(g *Generator) {
 		cmd = exec.Command("goimports", "-w", outputPath)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -295,7 +308,7 @@ func Run(g *Generator) {
 		cmd = exec.Command("gofmt", "-s", "-w", outputPath)
 		out, err = cmd.CombinedOutput()
 		if len(out) > 0 {
-			log.Printf(string(out))
+			log.Print(string(out))
 		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
@@ -346,4 +359,102 @@ func Run(g *Generator) {
 			}
 		}
 	}
+}
+
+func deps(c *generator.Context, pkgs []*protobufPackage) map[string][]string {
+	ret := map[string][]string{}
+	for _, p := range pkgs {
+		for _, d := range c.Universe[p.PackagePath].Imports {
+			ret[p.PackagePath] = append(ret[p.PackagePath], d.Path)
+		}
+	}
+	return ret
+}
+
+// given a set of pkg->[]deps, return the order that ensures all deps are processed before the things that depend on them
+func importOrder(deps map[string][]string) ([]string, error) {
+	// add all nodes and edges
+	var remainingNodes = map[string]struct{}{}
+	var graph = map[edge]struct{}{}
+	for to, froms := range deps {
+		remainingNodes[to] = struct{}{}
+		for _, from := range froms {
+			remainingNodes[from] = struct{}{}
+			graph[edge{from: from, to: to}] = struct{}{}
+		}
+	}
+
+	// find initial nodes without any dependencies
+	sorted := findAndRemoveNodesWithoutDependencies(remainingNodes, graph)
+	for i := 0; i < len(sorted); i++ {
+		node := sorted[i]
+		removeEdgesFrom(node, graph)
+		sorted = append(sorted, findAndRemoveNodesWithoutDependencies(remainingNodes, graph)...)
+	}
+	if len(remainingNodes) > 0 {
+		return nil, fmt.Errorf("cycle: remaining nodes: %#v, remaining edges: %#v", remainingNodes, graph)
+	}
+	for _, n := range sorted {
+		fmt.Println("topological order", n)
+	}
+	return sorted, nil
+}
+
+// edge describes a from->to relationship in a graph
+type edge struct {
+	from string
+	to   string
+}
+
+// findAndRemoveNodesWithoutDependencies finds nodes in the given set which are not pointed to by any edges in the graph,
+// removes them from the set of nodes, and returns them in sorted order
+func findAndRemoveNodesWithoutDependencies(nodes map[string]struct{}, graph map[edge]struct{}) []string {
+	roots := []string{}
+	// iterate over all nodes as potential "to" nodes
+	for node := range nodes {
+		incoming := false
+		// iterate over all remaining edges
+		for edge := range graph {
+			// if there's any edge to the node we care about, it's not a root
+			if edge.to == node {
+				incoming = true
+				break
+			}
+		}
+		// if there are no incoming edges, remove from the set of remaining nodes and add to our results
+		if !incoming {
+			delete(nodes, node)
+			roots = append(roots, node)
+		}
+	}
+	sort.Strings(roots)
+	return roots
+}
+
+// removeEdgesFrom removes any edges from the graph where edge.from == node
+func removeEdgesFrom(node string, graph map[edge]struct{}) {
+	for edge := range graph {
+		if edge.from == node {
+			delete(graph, edge)
+		}
+	}
+}
+
+type positionOrder struct {
+	pos      map[string]int
+	elements []*protobufPackage
+}
+
+func (o positionOrder) Len() int {
+	return len(o.elements)
+}
+
+func (o positionOrder) Less(i, j int) bool {
+	return o.pos[o.elements[i].PackagePath] < o.pos[o.elements[j].PackagePath]
+}
+
+func (o positionOrder) Swap(i, j int) {
+	x := o.elements[i]
+	o.elements[i] = o.elements[j]
+	o.elements[j] = x
 }

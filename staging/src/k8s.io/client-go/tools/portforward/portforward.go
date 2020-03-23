@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
+// PortForwardProtocolV1Name is the subprotocol used for port forwarding.
 // TODO move to API machinery and re-unify with kubelet/server/portfoward
-// The subprotocol "portforward.k8s.io" is used for port forwarding.
 const PortForwardProtocolV1Name = "portforward.k8s.io"
 
 // PortForwarder knows how to listen for local connections and forward them to
@@ -89,20 +90,20 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 			}
 			remoteString = parts[1]
 		} else {
-			return nil, fmt.Errorf("Invalid port format '%s'", portString)
+			return nil, fmt.Errorf("invalid port format '%s'", portString)
 		}
 
 		localPort, err := strconv.ParseUint(localString, 10, 16)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing local port '%s': %s", localString, err)
+			return nil, fmt.Errorf("error parsing local port '%s': %s", localString, err)
 		}
 
 		remotePort, err := strconv.ParseUint(remoteString, 10, 16)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing remote port '%s': %s", remoteString, err)
+			return nil, fmt.Errorf("error parsing remote port '%s': %s", remoteString, err)
 		}
 		if remotePort == 0 {
-			return nil, fmt.Errorf("Remote port must be > 0")
+			return nil, fmt.Errorf("remote port must be > 0")
 		}
 
 		forwards = append(forwards, ForwardedPort{uint16(localPort), uint16(remotePort)})
@@ -122,10 +123,14 @@ func parseAddresses(addressesToParse []string) ([]listenAddress, error) {
 	parsed := make(map[string]listenAddress)
 	for _, address := range addressesToParse {
 		if address == "localhost" {
-			ip := listenAddress{address: "127.0.0.1", protocol: "tcp4", failureMode: "all"}
-			parsed[ip.address] = ip
-			ip = listenAddress{address: "::1", protocol: "tcp6", failureMode: "all"}
-			parsed[ip.address] = ip
+			if _, exists := parsed["127.0.0.1"]; !exists {
+				ip := listenAddress{address: "127.0.0.1", protocol: "tcp4", failureMode: "all"}
+				parsed[ip.address] = ip
+			}
+			if _, exists := parsed["::1"]; !exists {
+				ip := listenAddress{address: "::1", protocol: "tcp6", failureMode: "all"}
+				parsed[ip.address] = ip
+			}
 		} else if net.ParseIP(address).To4() != nil {
 			parsed[address] = listenAddress{address: address, protocol: "tcp4", failureMode: "any"}
 		} else if net.ParseIP(address) != nil {
@@ -140,6 +145,9 @@ func parseAddresses(addressesToParse []string) ([]listenAddress, error) {
 		addresses[id] = v
 		id++
 	}
+	// Sort addresses before returning to get a stable order
+	sort.Slice(addresses, func(i, j int) bool { return addresses[i].address < addresses[j].address })
+
 	return addresses, nil
 }
 
@@ -151,14 +159,14 @@ func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, rea
 // NewOnAddresses creates a new PortForwarder with custom listen addresses.
 func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
 	if len(addresses) == 0 {
-		return nil, errors.New("You must specify at least 1 address")
+		return nil, errors.New("you must specify at least 1 address")
 	}
 	parsedAddresses, err := parseAddresses(addresses)
 	if err != nil {
 		return nil, err
 	}
 	if len(ports) == 0 {
-		return nil, errors.New("You must specify at least 1 port")
+		return nil, errors.New("you must specify at least 1 port")
 	}
 	parsedPorts, err := parsePorts(ports)
 	if err != nil {
@@ -197,8 +205,9 @@ func (pf *PortForwarder) forward() error {
 	var err error
 
 	listenSuccess := false
-	for _, port := range pf.ports {
-		err = pf.listenOnPort(&port)
+	for i := range pf.ports {
+		port := &pf.ports[i]
+		err = pf.listenOnPort(port)
 		switch {
 		case err == nil:
 			listenSuccess = true
@@ -210,7 +219,7 @@ func (pf *PortForwarder) forward() error {
 	}
 
 	if !listenSuccess {
-		return fmt.Errorf("Unable to listen on any of the requested ports: %v", pf.ports)
+		return fmt.Errorf("unable to listen on any of the requested ports: %v", pf.ports)
 	}
 
 	if pf.Ready != nil {
@@ -268,7 +277,7 @@ func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol st
 func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (net.Listener, error) {
 	listener, err := net.Listen(protocol, net.JoinHostPort(hostname, strconv.Itoa(int(port.Local))))
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create listener: Error %s", err)
+		return nil, fmt.Errorf("unable to create listener: Error %s", err)
 	}
 	listenerAddress := listener.Addr().String()
 	host, localPort, _ := net.SplitHostPort(listenerAddress)
@@ -276,7 +285,7 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 
 	if err != nil {
 		fmt.Fprintf(pf.out, "Failed to forward from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
-		return nil, fmt.Errorf("Error parsing local port: %s from %s (%s)", err, listenerAddress, host)
+		return nil, fmt.Errorf("error parsing local port: %s from %s (%s)", err, listenerAddress, host)
 	}
 	port.Local = uint16(localPortUInt)
 	if pf.out != nil {
@@ -294,7 +303,7 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 		if err != nil {
 			// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
 			if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
-				runtime.HandleError(fmt.Errorf("Error accepting connection on port %d: %v", port.Local, err))
+				runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
 			}
 			return
 		}
@@ -392,6 +401,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	}
 }
 
+// Close stops all listeners of PortForwarder.
 func (pf *PortForwarder) Close() {
 	// stop all listeners
 	for _, l := range pf.listeners {

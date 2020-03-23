@@ -20,12 +20,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 var (
+	// SchemeBuilder stores functions to add things to a scheme.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme applies all stored functions t oa scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 // GroupName is the group name use in this package
@@ -48,18 +49,18 @@ func Resource(resource string) schema.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&extensions.DaemonSet{},
-		&extensions.DaemonSetList{},
-		&extensions.Deployment{},
-		&extensions.DeploymentList{},
-		&extensions.DeploymentRollback{},
+		&DaemonSet{},
+		&DaemonSetList{},
+		&Deployment{},
+		&DeploymentList{},
+		&DeploymentRollback{},
 		&autoscaling.Scale{},
 		&StatefulSet{},
 		&StatefulSetList{},
 		&ControllerRevision{},
 		&ControllerRevisionList{},
-		&extensions.ReplicaSet{},
-		&extensions.ReplicaSetList{},
+		&ReplicaSet{},
+		&ReplicaSetList{},
 	)
 	return nil
 }

@@ -111,7 +111,7 @@ func (e *EndpointRegistry) Update(ctx context.Context, name string, objInfo rest
 	return endpoints, false, nil
 }
 
-func (e *EndpointRegistry) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (e *EndpointRegistry) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -130,6 +130,6 @@ func (e *EndpointRegistry) Delete(ctx context.Context, name string, options *met
 	return nil, true, nil
 }
 
-func (e *EndpointRegistry) DeleteCollection(ctx context.Context, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *EndpointRegistry) DeleteCollection(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
 	return nil, fmt.Errorf("unimplemented!")
 }

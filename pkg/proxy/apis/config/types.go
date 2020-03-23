@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
@@ -55,14 +55,23 @@ type KubeProxyIPVSConfiguration struct {
 	// excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch
 	// when cleaning up ipvs services.
 	ExcludeCIDRs []string
+	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
+	// from kube-ipvs0 interface
+	StrictARP bool
+	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPTimeout metav1.Duration
+	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPFinTimeout metav1.Duration
+	// udpTimeout is the timeout value used for IPVS UDP packets.
+	// The default value is 0, which preserves the current timeout value on the system.
+	UDPTimeout metav1.Duration
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
-	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over maxPerCore and min.
-	Max *int32
 	// maxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave the limit as-is and ignore min).
 	MaxPerCore *int32
@@ -76,6 +85,20 @@ type KubeProxyConntrackConfiguration struct {
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
 	TCPCloseWaitTimeout *metav1.Duration
+}
+
+// KubeProxyWinkernelConfiguration contains Windows/HNS settings for
+// the Kubernetes proxy server.
+type KubeProxyWinkernelConfiguration struct {
+	// networkName is the name of the network kube-proxy will use
+	// to create endpoints and policies
+	NetworkName string
+	// sourceVip is the IP address of the source VIP endpoint used for
+	// NAT when loadbalancing
+	SourceVip string
+	// enableDSR tells kube-proxy whether HNS policies should be created
+	// with DSR
+	EnableDSR bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -108,7 +131,7 @@ type KubeProxyConfiguration struct {
 	HostnameOverride string
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfig.ClientConnectionConfiguration
+	ClientConnection componentbaseconfig.ClientConnectionConfiguration
 	// iptables contains iptables-related configuration options.
 	IPTables KubeProxyIPTablesConfiguration
 	// ipvs contains ipvs-related configuration options.
@@ -121,9 +144,6 @@ type KubeProxyConfiguration struct {
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string
-	// resourceContainer is the absolute name of the resource-only container to create and run
-	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout metav1.Duration
@@ -140,6 +160,12 @@ type KubeProxyConfiguration struct {
 	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
 	// An empty string slice is meant to select all network interfaces.
 	NodePortAddresses []string
+	// winkernel contains winkernel-related configuration options.
+	Winkernel KubeProxyWinkernelConfiguration
+	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string
+	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
@@ -164,6 +190,15 @@ const (
 	ProxyModeKernelspace ProxyMode = "kernelspace"
 )
 
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string
+
+// Currently supported modes for LocalMode
+const (
+	LocalModeClusterCIDR LocalMode = "ClusterCIDR"
+	LocalModeNodeCIDR    LocalMode = "NodeCIDR"
+)
+
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
 // UDP datagrams to real servers.  Scheduling algorithms are imple-
 //wanted as kernel modules. Ten are shipped with the Linux Virtual Server.
@@ -172,7 +207,7 @@ type IPVSSchedulerMethod string
 const (
 	// RoundRobin distributes jobs equally amongst the available real servers.
 	RoundRobin IPVSSchedulerMethod = "rr"
-	// WeightedRoundRobin assigns jobs to real servers proportionally to there real servers' weight.
+	// WeightedRoundRobin assigns jobs to real servers proportionally to their real servers' weight.
 	// Servers with higher weights receive new jobs first and get more jobs than servers with lower weights.
 	// Servers with equal weights get an equal distribution of new jobs.
 	WeightedRoundRobin IPVSSchedulerMethod = "wrr"
@@ -220,6 +255,22 @@ func (m *ProxyMode) String() string {
 
 func (m *ProxyMode) Type() string {
 	return "ProxyMode"
+}
+
+func (m *LocalMode) Set(s string) error {
+	*m = LocalMode(s)
+	return nil
+}
+
+func (m *LocalMode) String() string {
+	if m != nil {
+		return string(*m)
+	}
+	return ""
+}
+
+func (m *LocalMode) Type() string {
+	return "LocalMode"
 }
 
 type ConfigurationMap map[string]string

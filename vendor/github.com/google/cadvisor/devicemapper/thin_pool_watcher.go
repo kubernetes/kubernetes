@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ThinPoolWatcher maintains a cache of device name -> usage stats for a
@@ -58,7 +58,7 @@ func NewThinPoolWatcher(poolName, metadataDevice string) (*ThinPoolWatcher, erro
 func (w *ThinPoolWatcher) Start() {
 	err := w.Refresh()
 	if err != nil {
-		glog.Errorf("encountered error refreshing thin pool watcher: %v", err)
+		klog.Errorf("encountered error refreshing thin pool watcher: %v", err)
 	}
 
 	for {
@@ -69,12 +69,12 @@ func (w *ThinPoolWatcher) Start() {
 			start := time.Now()
 			err = w.Refresh()
 			if err != nil {
-				glog.Errorf("encountered error refreshing thin pool watcher: %v", err)
+				klog.Errorf("encountered error refreshing thin pool watcher: %v", err)
 			}
 
 			// print latency for refresh
 			duration := time.Since(start)
-			glog.V(5).Infof("thin_ls(%d) took %s", start.Unix(), duration)
+			klog.V(5).Infof("thin_ls(%d) took %s", start.Unix(), duration)
 		}
 	}
 }
@@ -115,7 +115,7 @@ func (w *ThinPoolWatcher) Refresh() error {
 	}
 
 	if currentlyReserved {
-		glog.V(5).Infof("metadata for %v is currently reserved; releasing", w.poolName)
+		klog.V(5).Infof("metadata for %v is currently reserved; releasing", w.poolName)
 		_, err = w.dmsetup.Message(w.poolName, 0, releaseMetadataMessage)
 		if err != nil {
 			err = fmt.Errorf("error releasing metadata snapshot for %v: %v", w.poolName, err)
@@ -123,22 +123,22 @@ func (w *ThinPoolWatcher) Refresh() error {
 		}
 	}
 
-	glog.V(5).Infof("reserving metadata snapshot for thin-pool %v", w.poolName)
+	klog.V(5).Infof("reserving metadata snapshot for thin-pool %v", w.poolName)
 	// NOTE: "0" in the call below is for the 'sector' argument to 'dmsetup
 	// message'.  It's not needed for thin pools.
 	if output, err := w.dmsetup.Message(w.poolName, 0, reserveMetadataMessage); err != nil {
 		err = fmt.Errorf("error reserving metadata for thin-pool %v: %v output: %v", w.poolName, err, string(output))
 		return err
 	} else {
-		glog.V(5).Infof("reserved metadata snapshot for thin-pool %v", w.poolName)
+		klog.V(5).Infof("reserved metadata snapshot for thin-pool %v", w.poolName)
 	}
 
 	defer func() {
-		glog.V(5).Infof("releasing metadata snapshot for thin-pool %v", w.poolName)
+		klog.V(5).Infof("releasing metadata snapshot for thin-pool %v", w.poolName)
 		w.dmsetup.Message(w.poolName, 0, releaseMetadataMessage)
 	}()
 
-	glog.V(5).Infof("running thin_ls on metadata device %v", w.metadataDevice)
+	klog.V(5).Infof("running thin_ls on metadata device %v", w.metadataDevice)
 	newCache, err := w.thinLsClient.ThinLs(w.metadataDevice)
 	if err != nil {
 		err = fmt.Errorf("error performing thin_ls on metadata device %v: %v", w.metadataDevice, err)
@@ -157,7 +157,7 @@ const (
 // checkReservation checks to see whether the thin device is currently holding
 // userspace metadata.
 func (w *ThinPoolWatcher) checkReservation(poolName string) (bool, error) {
-	glog.V(5).Infof("checking whether the thin-pool is holding a metadata snapshot")
+	klog.V(5).Infof("checking whether the thin-pool is holding a metadata snapshot")
 	output, err := w.dmsetup.Status(poolName)
 	if err != nil {
 		return false, err

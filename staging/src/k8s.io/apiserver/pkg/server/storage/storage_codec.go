@@ -40,15 +40,15 @@ type StorageCodecConfig struct {
 
 // NewStorageCodec assembles a storage codec for the provided storage media type, the provided serializer, and the requested
 // storage and memory versions.
-func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, error) {
+func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, runtime.GroupVersioner, error) {
 	mediaType, _, err := mime.ParseMediaType(opts.StorageMediaType)
 	if err != nil {
-		return nil, fmt.Errorf("%q is not a valid mime-type", opts.StorageMediaType)
+		return nil, nil, fmt.Errorf("%q is not a valid mime-type", opts.StorageMediaType)
 	}
 
 	serializer, ok := runtime.SerializerInfoForMediaType(opts.StorageSerializer.SupportedMediaTypes(), mediaType)
 	if !ok {
-		return nil, fmt.Errorf("unable to find serializer for %q", mediaType)
+		return nil, nil, fmt.Errorf("unable to find serializer for %q", mediaType)
 	}
 
 	s := serializer.Serializer
@@ -74,23 +74,25 @@ func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, error) {
 		decoders = opts.DecoderDecoratorFn(decoders)
 	}
 
+	encodeVersioner := runtime.NewMultiGroupVersioner(
+		opts.StorageVersion,
+		schema.GroupKind{Group: opts.StorageVersion.Group},
+		schema.GroupKind{Group: opts.MemoryVersion.Group},
+	)
+
 	// Ensure the storage receives the correct version.
 	encoder = opts.StorageSerializer.EncoderForVersion(
 		encoder,
-		runtime.NewMultiGroupVersioner(
-			opts.StorageVersion,
-			schema.GroupKind{Group: opts.StorageVersion.Group},
-			schema.GroupKind{Group: opts.MemoryVersion.Group},
-		),
+		encodeVersioner,
 	)
 	decoder := opts.StorageSerializer.DecoderToVersion(
 		recognizer.NewDecoder(decoders...),
-		runtime.NewMultiGroupVersioner(
+		runtime.NewCoercingMultiGroupVersioner(
 			opts.MemoryVersion,
 			schema.GroupKind{Group: opts.MemoryVersion.Group},
 			schema.GroupKind{Group: opts.StorageVersion.Group},
 		),
 	)
 
-	return runtime.NewCodec(encoder, decoder), nil
+	return runtime.NewCodec(encoder, decoder), encodeVersioner, nil
 }

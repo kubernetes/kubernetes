@@ -17,11 +17,13 @@ limitations under the License.
 package util
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
@@ -64,16 +66,35 @@ type preflightError interface {
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an exit code.
 func checkErr(err error, handleErr func(string, int)) {
+
+	var msg string
+	if err != nil {
+		msg = fmt.Sprintf("%s\nTo see the stack trace of this error execute with --v=5 or higher", err.Error())
+		// check if the verbosity level in klog is high enough and print a stack trace.
+		f := flag.CommandLine.Lookup("v")
+		if f != nil {
+			// assume that the "v" flag contains a parseable Int32 as per klog's "Level" type alias,
+			// thus no error from ParseInt is handled here.
+			if v, e := strconv.ParseInt(f.Value.String(), 10, 32); e == nil {
+				// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md
+				// klog.V(5) - Trace level verbosity
+				if v > 4 {
+					msg = fmt.Sprintf("%+v", err)
+				}
+			}
+		}
+	}
+
 	switch err.(type) {
 	case nil:
 		return
 	case preflightError:
-		handleErr(err.Error(), PreFlightExitCode)
-	case utilerrors.Aggregate:
-		handleErr(err.Error(), ValidationExitCode)
+		handleErr(msg, PreFlightExitCode)
+	case errorsutil.Aggregate:
+		handleErr(msg, ValidationExitCode)
 
 	default:
-		handleErr(err.Error(), DefaultErrorExitCode)
+		handleErr(msg, DefaultErrorExitCode)
 	}
 }
 

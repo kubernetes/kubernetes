@@ -7,10 +7,10 @@ package gonum
 import "gonum.org/v1/gonum/blas"
 
 // Dormhr multiplies an m×n general matrix C with an nq×nq orthogonal matrix Q
-//  Q * C,    if side == blas.Left and trans == blas.NoTrans,
-//  Q^T * C,  if side == blas.Left and trans == blas.Trans,
-//  C * Q,    if side == blas.Right and trans == blas.NoTrans,
-//  C * Q^T,  if side == blas.Right and trans == blas.Trans,
+//  Q * C   if side == blas.Left  and trans == blas.NoTrans,
+//  Qᵀ * C  if side == blas.Left  and trans == blas.Trans,
+//  C * Q   if side == blas.Right and trans == blas.NoTrans,
+//  C * Qᵀ  if side == blas.Right and trans == blas.Trans,
 // where nq == m if side == blas.Left and nq == n if side == blas.Right.
 //
 // Q is defined implicitly as the product of ihi-ilo elementary reflectors, as
@@ -21,10 +21,10 @@ import "gonum.org/v1/gonum/blas"
 //
 // ilo and ihi must have the same values as in the previous call of Dgehrd. It
 // must hold that
-//  0 <= ilo <= ihi < m,   if m > 0 and side == blas.Left,
-//  ilo = 0 and ihi = -1,  if m = 0 and side == blas.Left,
-//  0 <= ilo <= ihi < n,   if n > 0 and side == blas.Right,
-//  ilo = 0 and ihi = -1,  if n = 0 and side == blas.Right.
+//  0 <= ilo <= ihi < m   if m > 0 and side == blas.Left,
+//  ilo = 0 and ihi = -1  if m = 0 and side == blas.Left,
+//  0 <= ilo <= ihi < n   if n > 0 and side == blas.Right,
+//  ilo = 0 and ihi = -1  if n = 0 and side == blas.Right.
 //
 // a and lda represent an m×m matrix if side == blas.Left and an n×n matrix if
 // side == blas.Right. The matrix contains vectors which define the elementary
@@ -50,39 +50,37 @@ import "gonum.org/v1/gonum/blas"
 //
 // Dormhr is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dormhr(side blas.Side, trans blas.Transpose, m, n, ilo, ihi int, a []float64, lda int, tau, c []float64, ldc int, work []float64, lwork int) {
-	var (
-		nq int // The order of Q.
-		nw int // The minimum length of work.
-	)
-	switch side {
-	case blas.Left:
+	nq := n // The order of Q.
+	nw := m // The minimum length of work.
+	if side == blas.Left {
 		nq = m
 		nw = n
-	case blas.Right:
-		nq = n
-		nw = m
-	default:
-		panic(badSide)
 	}
 	switch {
+	case side != blas.Left && side != blas.Right:
+		panic(badSide)
 	case trans != blas.NoTrans && trans != blas.Trans:
 		panic(badTrans)
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
 	case ilo < 0 || max(1, nq) <= ilo:
 		panic(badIlo)
 	case ihi < min(ilo, nq-1) || nq <= ihi:
 		panic(badIhi)
+	case lda < max(1, nq):
+		panic(badLdA)
 	case lwork < max(1, nw) && lwork != -1:
-		panic(badWork)
+		panic(badLWork)
 	case len(work) < max(1, lwork):
 		panic(shortWork)
 	}
-	if lwork != -1 {
-		checkMatrix(m, n, c, ldc)
-		checkMatrix(nq, nq, a, lda)
-		if len(tau) != nq-1 && nq > 0 {
-			panic(badTau)
-		}
 
+	// Quick return if possible.
+	if m == 0 || n == 0 {
+		work[0] = 1
+		return
 	}
 
 	nh := ihi - ilo
@@ -106,10 +104,20 @@ func (impl Implementation) Dormhr(side blas.Side, trans blas.Transpose, m, n, il
 		return
 	}
 
-	if m == 0 || n == 0 || nh == 0 {
+	if nh == 0 {
 		work[0] = 1
 		return
 	}
+
+	switch {
+	case len(a) < (nq-1)*lda+nq:
+		panic(shortA)
+	case len(c) < (m-1)*ldc+n:
+		panic(shortC)
+	case len(tau) != nq-1:
+		panic(badLenTau)
+	}
+
 	if side == blas.Left {
 		impl.Dormqr(side, trans, nh, n, nh, a[(ilo+1)*lda+ilo:], lda,
 			tau[ilo:ihi], c[(ilo+1)*ldc:], ldc, work, lwork)

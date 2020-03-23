@@ -78,22 +78,22 @@ You may use one of several pre-defined schedules in place of a cron expression.
 	-----                  | -----------                                | -------------
 	@yearly (or @annually) | Run once a year, midnight, Jan. 1st        | 0 0 0 1 1 *
 	@monthly               | Run once a month, midnight, first of month | 0 0 0 1 * *
-	@weekly                | Run once a week, midnight on Sunday        | 0 0 0 * * 0
+	@weekly                | Run once a week, midnight between Sat/Sun  | 0 0 0 * * 0
 	@daily (or @midnight)  | Run once a day, midnight                   | 0 0 0 * * *
 	@hourly                | Run once an hour, beginning of hour        | 0 0 * * * *
 
 Intervals
 
-You may also schedule a job to execute at fixed intervals.  This is supported by
-formatting the cron spec like this:
+You may also schedule a job to execute at fixed intervals, starting at the time it's added 
+or cron is run. This is supported by formatting the cron spec like this:
 
     @every <duration>
 
 where "duration" is a string accepted by time.ParseDuration
 (http://golang.org/pkg/time/#ParseDuration).
 
-For example, "@every 1h30m10s" would indicate a schedule that activates every
-1 hour, 30 minutes, 10 seconds.
+For example, "@every 1h30m10s" would indicate a schedule that activates after
+1 hour, 30 minutes, 10 seconds, and then every interval after that.
 
 Note: The interval does not take the job runtime into account.  For example,
 if a job takes 3 minutes to run, and it is scheduled to run every 5 minutes,

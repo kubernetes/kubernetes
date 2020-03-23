@@ -98,7 +98,6 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"apiPath":                        apiPath(g.group),
 		"schemaGroupVersion":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 		"runtimeAPIVersionInternal":      c.Universe.Variable(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "APIVersionInternal"}),
-		"serializerDirectCodecFactory":   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/serializer", Name: "DirectCodecFactory"}),
 		"restConfig":                     c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
 		"restDefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
 		"restRESTClientInterface":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
@@ -236,7 +235,7 @@ func setConfigDefaults(config *$.restConfig|raw$) error {
 	gv := $.SchemeGroupVersion|raw$
 	config.GroupVersion =  &gv
 	config.APIPath = $.apiPath$
-	config.NegotiatedSerializer = $.serializerDirectCodecFactory|raw${CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -24,10 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/exec"
 )
 
 type fakeFileInfo struct {
@@ -62,7 +63,6 @@ var (
 	lunStr    = "1"
 	diskPath  = "4:0:0:" + lunStr
 	devName   = "sdd"
-	lun1      = 2
 	lunStr1   = "2"
 	diskPath1 = "3:0:0:" + lunStr1
 	devName1  = "sde"
@@ -125,7 +125,7 @@ func TestIoHandler(t *testing.T) {
 	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 		t.Skipf("TestIoHandler not supported on GOOS=%s", runtime.GOOS)
 	}
-	disk, err := findDiskByLun(lun, &fakeIOHandler{}, mount.NewOsExec())
+	disk, err := findDiskByLun(lun, &fakeIOHandler{}, exec.New())
 	if runtime.GOOS == "windows" {
 		if err != nil {
 			t.Errorf("no data disk found: disk %v err %v", disk, err)
@@ -141,12 +141,12 @@ func TestIoHandler(t *testing.T) {
 func TestNormalizeStorageAccountType(t *testing.T) {
 	tests := []struct {
 		storageAccountType  string
-		expectedAccountType storage.SkuName
+		expectedAccountType compute.DiskStorageAccountTypes
 		expectError         bool
 	}{
 		{
 			storageAccountType:  "",
-			expectedAccountType: storage.StandardLRS,
+			expectedAccountType: compute.StandardSSDLRS,
 			expectError:         false,
 		},
 		{
@@ -156,27 +156,22 @@ func TestNormalizeStorageAccountType(t *testing.T) {
 		},
 		{
 			storageAccountType:  "Standard_LRS",
-			expectedAccountType: storage.StandardLRS,
+			expectedAccountType: compute.StandardLRS,
 			expectError:         false,
 		},
 		{
 			storageAccountType:  "Premium_LRS",
-			expectedAccountType: storage.PremiumLRS,
+			expectedAccountType: compute.PremiumLRS,
 			expectError:         false,
 		},
 		{
-			storageAccountType:  "Standard_GRS",
-			expectedAccountType: storage.StandardGRS,
+			storageAccountType:  "StandardSSD_LRS",
+			expectedAccountType: compute.StandardSSDLRS,
 			expectError:         false,
 		},
 		{
-			storageAccountType:  "Standard_RAGRS",
-			expectedAccountType: storage.StandardRAGRS,
-			expectError:         false,
-		},
-		{
-			storageAccountType:  "Standard_ZRS",
-			expectedAccountType: storage.StandardZRS,
+			storageAccountType:  "UltraSSD_LRS",
+			expectedAccountType: compute.UltraSSDLRS,
 			expectError:         false,
 		},
 	}
@@ -184,6 +179,46 @@ func TestNormalizeStorageAccountType(t *testing.T) {
 	for _, test := range tests {
 		result, err := normalizeStorageAccountType(test.storageAccountType)
 		assert.Equal(t, result, test.expectedAccountType)
+		assert.Equal(t, err != nil, test.expectError, fmt.Sprintf("error msg: %v", err))
+	}
+}
+
+func TestGetDiskNum(t *testing.T) {
+	tests := []struct {
+		deviceInfo  string
+		expectedNum string
+		expectError bool
+	}{
+		{
+			deviceInfo:  "/dev/disk0",
+			expectedNum: "0",
+			expectError: false,
+		},
+		{
+			deviceInfo:  "/dev/disk99",
+			expectedNum: "99",
+			expectError: false,
+		},
+		{
+			deviceInfo:  "",
+			expectedNum: "",
+			expectError: true,
+		},
+		{
+			deviceInfo:  "/dev/disk",
+			expectedNum: "",
+			expectError: true,
+		},
+		{
+			deviceInfo:  "999",
+			expectedNum: "",
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		result, err := getDiskNum(test.deviceInfo)
+		assert.Equal(t, result, test.expectedNum)
 		assert.Equal(t, err != nil, test.expectError, fmt.Sprintf("error msg: %v", err))
 	}
 }

@@ -17,16 +17,21 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -48,71 +53,71 @@ import (
 
 var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-ops-storm")
-	const DEFAULT_VOLUME_OPS_SCALE = 30
+	const defaultVolumeOpsScale = 30
 	var (
 		client            clientset.Interface
 		namespace         string
-		storageclass      *storage.StorageClass
+		storageclass      *storagev1.StorageClass
 		pvclaims          []*v1.PersistentVolumeClaim
 		persistentvolumes []*v1.PersistentVolume
 		err               error
-		volume_ops_scale  int
+		volumeOpsScale    int
 	)
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		Expect(GetReadySchedulableNodeInfos()).NotTo(BeEmpty())
-		if os.Getenv("VOLUME_OPS_SCALE") != "" {
-			volume_ops_scale, err = strconv.Atoi(os.Getenv("VOLUME_OPS_SCALE"))
-			Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(GetReadySchedulableNodeInfos()).NotTo(gomega.BeEmpty())
+		if scale := os.Getenv("VOLUME_OPS_SCALE"); scale != "" {
+			volumeOpsScale, err = strconv.Atoi(scale)
+			framework.ExpectNoError(err)
 		} else {
-			volume_ops_scale = DEFAULT_VOLUME_OPS_SCALE
+			volumeOpsScale = defaultVolumeOpsScale
 		}
-		pvclaims = make([]*v1.PersistentVolumeClaim, volume_ops_scale)
+		pvclaims = make([]*v1.PersistentVolumeClaim, volumeOpsScale)
 	})
-	AfterEach(func() {
-		By("Deleting PVCs")
+	ginkgo.AfterEach(func() {
+		ginkgo.By("Deleting PVCs")
 		for _, claim := range pvclaims {
-			framework.DeletePersistentVolumeClaim(client, claim.Name, namespace)
+			e2epv.DeletePersistentVolumeClaim(client, claim.Name, namespace)
 		}
-		By("Deleting StorageClass")
-		err = client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
-		Expect(err).NotTo(HaveOccurred())
+		ginkgo.By("Deleting StorageClass")
+		err = client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
 	})
 
-	It("should create pod with many volumes and verify no attach call fails", func() {
-		By(fmt.Sprintf("Running test with VOLUME_OPS_SCALE: %v", volume_ops_scale))
-		By("Creating Storage Class")
+	ginkgo.It("should create pod with many volumes and verify no attach call fails", func() {
+		ginkgo.By(fmt.Sprintf("Running test with VOLUME_OPS_SCALE: %v", volumeOpsScale))
+		ginkgo.By("Creating Storage Class")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
-		storageclass, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("thinsc", scParameters))
-		Expect(err).NotTo(HaveOccurred())
+		storageclass, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("thinsc", scParameters, nil, ""), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
 
-		By("Creating PVCs using the Storage Class")
+		ginkgo.By("Creating PVCs using the Storage Class")
 		count := 0
-		for count < volume_ops_scale {
-			pvclaims[count], err = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-			Expect(err).NotTo(HaveOccurred())
+		for count < volumeOpsScale {
+			pvclaims[count], err = e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
+			framework.ExpectNoError(err)
 			count++
 		}
 
-		By("Waiting for all claims to be in bound phase")
-		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		ginkgo.By("Waiting for all claims to be in bound phase")
+		persistentvolumes, err = e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		framework.ExpectNoError(err)
 
-		By("Creating pod to attach PVs to the node")
-		pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
-		Expect(err).NotTo(HaveOccurred())
+		ginkgo.By("Creating pod to attach PVs to the node")
+		pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
+		framework.ExpectNoError(err)
 
-		By("Verify all volumes are accessible and available in the pod")
+		ginkgo.By("Verify all volumes are accessible and available in the pod")
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
-		By("Deleting pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, client, pod))
+		ginkgo.By("Deleting pod")
+		framework.ExpectNoError(e2epod.DeletePodWithWait(client, pod))
 
-		By("Waiting for volumes to be detached from the node")
+		ginkgo.By("Waiting for volumes to be detached from the node")
 		for _, pv := range persistentvolumes {
 			waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 		}

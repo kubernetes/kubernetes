@@ -24,6 +24,7 @@ go_library(
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/checkpoint:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -40,15 +41,21 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/io:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+            "//vendor/github.com/fsnotify/fsnotify:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-            "//vendor/golang.org/x/exp/inotify:go_default_library",
+            "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -67,7 +74,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
@@ -87,6 +93,9 @@ go_test(
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         ],

@@ -23,12 +23,14 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
@@ -308,7 +310,9 @@ func TestSetListToMatchingType(t *testing.T) {
 }
 
 func TestSetExtractListRoundTrip(t *testing.T) {
-	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5)
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).MaxDepth(10)
 	for i := 0; i < 5; i++ {
 		start := &testapigroup.CarpList{}
 		fuzzer.Fuzz(&start.Items)

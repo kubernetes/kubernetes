@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -55,9 +55,9 @@ func RegisterAuthProviderPlugin(name string, plugin Factory) error {
 	pluginsLock.Lock()
 	defer pluginsLock.Unlock()
 	if _, found := plugins[name]; found {
-		return fmt.Errorf("Auth Provider Plugin %q was registered twice", name)
+		return fmt.Errorf("auth Provider Plugin %q was registered twice", name)
 	}
-	glog.V(4).Infof("Registered Auth Provider Plugin %q", name)
+	klog.V(4).Infof("Registered Auth Provider Plugin %q", name)
 	plugins[name] = plugin
 	return nil
 }
@@ -67,7 +67,7 @@ func GetAuthProvider(clusterAddress string, apc *clientcmdapi.AuthProviderConfig
 	defer pluginsLock.Unlock()
 	p, ok := plugins[apc.Name]
 	if !ok {
-		return nil, fmt.Errorf("No Auth Provider found for name %q", apc.Name)
+		return nil, fmt.Errorf("no Auth Provider found for name %q", apc.Name)
 	}
 	return p(clusterAddress, apc.Config, persister)
 }

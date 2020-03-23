@@ -7,8 +7,8 @@ go_library(
     importpath = "github.com/google/cadvisor/zfs",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/mistifyio/go-zfs:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

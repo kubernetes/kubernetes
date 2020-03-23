@@ -56,8 +56,12 @@ func main() {
 	log.SetPrefix("gazelle: ")
 	log.SetFlags(0) // don't print timestamps
 
-	if err := run(os.Args[1:]); err != nil {
-		log.Fatal(err)
+	if err := run(os.Args[1:]); err != nil && err != flag.ErrHelp {
+		if err == exitError {
+			os.Exit(1)
+		} else {
+			log.Fatal(err)
+		}
 	}
 }
 
@@ -112,7 +116,7 @@ For example:
 
   gazelle update -h
 
-Gazelle is under active delevopment, and its interface may change
+Gazelle is under active development, and its interface may change
 without notice.
 
 `)

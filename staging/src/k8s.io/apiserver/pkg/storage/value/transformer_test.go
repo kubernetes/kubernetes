@@ -19,7 +19,11 @@ package value
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
+
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 type testTransformer struct {
@@ -41,7 +45,7 @@ func (t *testTransformer) TransformToStorage(to []byte, context Context) (data [
 
 func TestPrefixFrom(t *testing.T) {
 	testErr := fmt.Errorf("test error")
-	transformErr := fmt.Errorf("test error")
+	transformErr := fmt.Errorf("transform error")
 	transformers := []PrefixTransformer{
 		{Prefix: []byte("first:"), Transformer: &testTransformer{from: []byte("value1")}},
 		{Prefix: []byte("second:"), Transformer: &testTransformer{from: []byte("value2")}},
@@ -60,7 +64,7 @@ func TestPrefixFrom(t *testing.T) {
 		{[]byte("first:value"), []byte("value1"), false, nil, 0},
 		{[]byte("second:value"), []byte("value2"), true, nil, 1},
 		{[]byte("third:value"), nil, false, testErr, -1},
-		{[]byte("fails:value"), nil, true, transformErr, 2},
+		{[]byte("fails:value"), nil, false, transformErr, 2},
 		{[]byte("stale:value"), []byte("value3"), true, nil, 3},
 	}
 	for i, test := range testCases {
@@ -97,5 +101,151 @@ func TestPrefixTo(t *testing.T) {
 		if !bytes.Equal([]byte("value"), test.transformers[0].Transformer.(*testTransformer).receivedTo) {
 			t.Errorf("%d: unexpected value received by transformer: %s", i, test.transformers[0].Transformer.(*testTransformer).receivedTo)
 		}
+	}
+}
+
+func TestPrefixFromMetrics(t *testing.T) {
+	testErr := fmt.Errorf("test error")
+	transformerErr := fmt.Errorf("test error")
+	identityTransformer := PrefixTransformer{Prefix: []byte{}, Transformer: &testTransformer{from: []byte("value1")}}
+	identityTransformerErr := PrefixTransformer{Prefix: []byte{}, Transformer: &testTransformer{err: transformerErr}}
+	otherTransformer := PrefixTransformer{Prefix: []byte("other:"), Transformer: &testTransformer{from: []byte("value1")}}
+	otherTransformerErr := PrefixTransformer{Prefix: []byte("other:"), Transformer: &testTransformer{err: transformerErr}}
+
+	testCases := []struct {
+		desc    string
+		input   []byte
+		prefix  Transformer
+		metrics []string
+		want    string
+		err     error
+	}{
+		{
+			desc:   "identity prefix",
+			input:  []byte("value"),
+			prefix: NewPrefixTransformers(testErr, identityTransformer, otherTransformer),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+  # TYPE apiserver_storage_transformation_operations_total counter
+  apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="identity"} 1
+  `,
+			err: nil,
+		},
+		{
+			desc:   "other prefix (ok)",
+			input:  []byte("other:value"),
+			prefix: NewPrefixTransformers(testErr, identityTransformerErr, otherTransformer),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+  # TYPE apiserver_storage_transformation_operations_total counter
+  apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="other:"} 1
+  `,
+			err: nil,
+		},
+		{
+			desc:   "other prefix (error)",
+			input:  []byte("other:value"),
+			prefix: NewPrefixTransformers(testErr, identityTransformerErr, otherTransformerErr),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+  # TYPE apiserver_storage_transformation_operations_total counter
+  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="other:"} 1
+  `,
+			err: nil,
+		},
+		{
+			desc:   "unknown prefix",
+			input:  []byte("foo:value"),
+			prefix: NewPrefixTransformers(testErr, identityTransformerErr, otherTransformer),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+  # TYPE apiserver_storage_transformation_operations_total counter
+  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="unknown"} 1
+  `,
+			err: nil,
+		},
+	}
+
+	RegisterMetrics()
+	transformerOperationsTotal.Reset()
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			tc.prefix.TransformFromStorage(tc.input, nil)
+			defer transformerOperationsTotal.Reset()
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestPrefixToMetrics(t *testing.T) {
+	testErr := fmt.Errorf("test error")
+	transformerErr := fmt.Errorf("test error")
+	otherTransformer := PrefixTransformer{Prefix: []byte("other:"), Transformer: &testTransformer{from: []byte("value1")}}
+	otherTransformerErr := PrefixTransformer{Prefix: []byte("other:"), Transformer: &testTransformer{err: transformerErr}}
+
+	testCases := []struct {
+		desc    string
+		input   []byte
+		prefix  Transformer
+		metrics []string
+		want    string
+		err     error
+	}{
+		{
+			desc:   "ok",
+			input:  []byte("value"),
+			prefix: NewPrefixTransformers(testErr, otherTransformer),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+  # TYPE apiserver_storage_transformation_operations_total counter
+  apiserver_storage_transformation_operations_total{status="OK",transformation_type="to_storage",transformer_prefix="other:"} 1
+  `,
+			err: nil,
+		},
+		{
+			desc:   "error",
+			input:  []byte("value"),
+			prefix: NewPrefixTransformers(testErr, otherTransformerErr),
+			metrics: []string{
+				"apiserver_storage_transformation_operations_total",
+			},
+			want: `
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+  # TYPE apiserver_storage_transformation_operations_total counter
+  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="to_storage",transformer_prefix="other:"} 1
+  `,
+			err: nil,
+		},
+	}
+
+	RegisterMetrics()
+	transformerOperationsTotal.Reset()
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			tc.prefix.TransformToStorage(tc.input, nil)
+			defer transformerOperationsTotal.Reset()
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+
+	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
 // IsEnabled returns true if apparmor is enabled for the host.
@@ -19,7 +21,7 @@ func IsEnabled() bool {
 	return false
 }
 
-func setprocattr(attr, value string) error {
+func setProcAttr(attr, value string) error {
 	// Under AppArmor you can only change your own attr, so use /proc/self/
 	// instead of /proc/<tid>/ like libapparmor does
 	path := fmt.Sprintf("/proc/self/attr/%s", attr)
@@ -30,6 +32,10 @@ func setprocattr(attr, value string) error {
 	}
 	defer f.Close()
 
+	if err := utils.EnsureProcHandle(f); err != nil {
+		return err
+	}
+
 	_, err = fmt.Fprintf(f, "%s", value)
 	return err
 }
@@ -37,7 +43,7 @@ func setprocattr(attr, value string) error {
 // changeOnExec reimplements aa_change_onexec from libapparmor in Go
 func changeOnExec(name string) error {
 	value := "exec " + name
-	if err := setprocattr("exec", value); err != nil {
+	if err := setProcAttr("exec", value); err != nil {
 		return fmt.Errorf("apparmor failed to apply profile: %s", err)
 	}
 	return nil

@@ -1,0 +1,80 @@
+# Together with the RBAC file for external-provisioner, this YAML file
+# contains all RBAC objects that are necessary to run external CSI
+# snapshotter.
+#
+# In production, each CSI driver deployment has to be customized:
+# - to avoid conflicts, use non-default namespace and different names
+#   for non-namespaced entities like the ClusterRole
+# - optionally rename the non-namespaced ClusterRole if there
+#   are conflicts with other deployments
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-snapshotter
+
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  # rename if there are conflicts
+  name: external-snapshotter-runner
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents/status"]
+    verbs: ["update"]
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-snapshotter-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshotter
+    # replace with non-default namespace name
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  # change the name also here if the ClusterRole gets renamed
+  name: external-snapshotter-runner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: default # TODO: replace with the namespace you want for your sidecar
+  name: external-snapshotter-leaderelection
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: external-snapshotter-leaderelection
+  namespace: default # TODO: replace with the namespace you want for your sidecar
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshotter
+    namespace: default # TODO: replace with the namespace you want for your sidecar
+roleRef:
+  kind: Role
+  name: external-snapshotter-leaderelection
+  apiGroup: rbac.authorization.k8s.io
+

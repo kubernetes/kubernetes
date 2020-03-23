@@ -23,10 +23,11 @@ import (
 	"testing"
 	"time"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+
 	"k8s.io/utils/pointer"
 )
 
@@ -56,7 +57,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 			},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(2),
 				MaxPerCore:            pointer.Int32Ptr(1),
 				Min:                   pointer.Int32Ptr(1),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -76,7 +76,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(2),
 				MaxPerCore:            pointer.Int32Ptr(1),
 				Min:                   pointer.Int32Ptr(1),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -96,7 +95,85 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(2),
+				MaxPerCore:            pointer.Int32Ptr(1),
+				Min:                   pointer.Int32Ptr(1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+		},
+		{
+			BindAddress:        "fd00:192:168:59::103",
+			HealthzBindAddress: "",
+			MetricsBindAddress: "[::1]:10249",
+			ClusterCIDR:        "fd00:192:168:59::/64",
+			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore:            pointer.Int32Ptr(1),
+				Min:                   pointer.Int32Ptr(1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+		},
+		{
+			BindAddress:        "10.10.12.11",
+			HealthzBindAddress: "0.0.0.0:12345",
+			MetricsBindAddress: "127.0.0.1:10249",
+			FeatureGates:       map[string]bool{"IPv6DualStack": true},
+			ClusterCIDR:        "192.168.59.0/24",
+			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore:            pointer.Int32Ptr(1),
+				Min:                   pointer.Int32Ptr(1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+		},
+		{
+			BindAddress:        "10.10.12.11",
+			HealthzBindAddress: "0.0.0.0:12345",
+			MetricsBindAddress: "127.0.0.1:10249",
+			FeatureGates:       map[string]bool{"IPv6DualStack": true},
+			ClusterCIDR:        "fd00:192:168::/64",
+			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore:            pointer.Int32Ptr(1),
+				Min:                   pointer.Int32Ptr(1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+		},
+		{
+			BindAddress:        "10.10.12.11",
+			HealthzBindAddress: "0.0.0.0:12345",
+			MetricsBindAddress: "127.0.0.1:10249",
+			FeatureGates:       map[string]bool{"IPv6DualStack": true},
+			ClusterCIDR:        "192.168.59.0/24,fd00:192:168::/64",
+			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeAll: true,
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+			},
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore:            pointer.Int32Ptr(1),
 				Min:                   pointer.Int32Ptr(1),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -130,7 +207,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -154,7 +230,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -178,7 +253,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -202,14 +276,108 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 				},
 			},
-			msg: "must be a valid CIDR block (e.g. 10.100.0.0/16)",
+			msg: "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)",
+		},
+		{
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "10.10.12.11",
+				HealthzBindAddress: "0.0.0.0:12345",
+				MetricsBindAddress: "127.0.0.1:10249",
+				// DualStack ClusterCIDR without feature flag enabled
+				FeatureGates:     map[string]bool{"IPv6DualStack": false},
+				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64",
+				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
+				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            pointer.Int32Ptr(1),
+					Min:                   pointer.Int32Ptr(1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+			},
+			msg: "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)",
+		},
+		{
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "10.10.12.11",
+				HealthzBindAddress: "0.0.0.0:12345",
+				MetricsBindAddress: "127.0.0.1:10249",
+				// DualStack with multiple CIDRs but only one IP family
+				FeatureGates:     map[string]bool{"IPv6DualStack": true},
+				ClusterCIDR:      "192.168.59.0/24,10.0.0.0/16",
+				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
+				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            pointer.Int32Ptr(1),
+					Min:                   pointer.Int32Ptr(1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+			},
+			msg: "must be a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)",
+		},
+		{
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "10.10.12.11",
+				HealthzBindAddress: "0.0.0.0:12345",
+				MetricsBindAddress: "127.0.0.1:10249",
+				// DualStack with an invalid subnet
+				FeatureGates:     map[string]bool{"IPv6DualStack": true},
+				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64,a.b.c.d/f",
+				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
+				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            pointer.Int32Ptr(1),
+					Min:                   pointer.Int32Ptr(1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+			},
+			msg: "only one CIDR allowed or a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)",
+		},
+		{
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "10.10.12.11",
+				HealthzBindAddress: "0.0.0.0:12345",
+				MetricsBindAddress: "127.0.0.1:10249",
+				FeatureGates:       map[string]bool{"IPv6DualStack": true},
+				ClusterCIDR:        "192.168.59.0/24,fd00:192:168::/64,10.0.0.0/16",
+				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            pointer.Int32Ptr(1),
+					Min:                   pointer.Int32Ptr(1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+			},
+			msg: "only one CIDR allowed or a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)",
 		},
 		{
 			config: kubeproxyconfig.KubeProxyConfiguration{
@@ -226,7 +394,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -250,7 +417,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 				},
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -275,7 +441,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				// not specifying valid period in IPVS mode.
 				Mode: kubeproxyconfig.ProxyModeIPVS,
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -432,6 +597,53 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		// IPVS Timeout can be 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				TCPTimeout:    metav1.Duration{Duration: 0 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: 0 * time.Second},
+				UDPTimeout:    metav1.Duration{Duration: 0 * time.Second},
+			},
+			expectErr: false,
+		},
+		// IPVS Timeout > 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				TCPTimeout:    metav1.Duration{Duration: 1 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: 2 * time.Second},
+				UDPTimeout:    metav1.Duration{Duration: 3 * time.Second},
+			},
+			expectErr: false,
+		},
+		// TCPTimeout Timeout < 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+				TCPTimeout: metav1.Duration{Duration: -1 * time.Second},
+			},
+			expectErr: true,
+			reason:    "TCPTimeout must be greater than or equal to 0",
+		},
+		// TCPFinTimeout Timeout < 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: -1 * time.Second},
+			},
+			expectErr: true,
+			reason:    "TCPFinTimeout must be greater than or equal to 0",
+		},
+		// UDPTimeout Timeout < 0
+		{
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				SyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+				UDPTimeout: metav1.Duration{Duration: -1 * time.Second},
+			},
+			expectErr: true,
+			reason:    "UDPTimeout must be greater than or equal to 0",
+		},
 	}
 
 	for _, test := range testCases {
@@ -448,14 +660,12 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 	successCases := []kubeproxyconfig.KubeProxyConntrackConfiguration{
 		{
-			Max:                   pointer.Int32Ptr(2),
 			MaxPerCore:            pointer.Int32Ptr(1),
 			Min:                   pointer.Int32Ptr(1),
 			TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 			TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 		},
 		{
-			Max:                   pointer.Int32Ptr(0),
 			MaxPerCore:            pointer.Int32Ptr(0),
 			Min:                   pointer.Int32Ptr(0),
 			TCPEstablishedTimeout: &metav1.Duration{Duration: 0 * time.Second},
@@ -475,17 +685,6 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 	}{
 		{
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(-1),
-				MaxPerCore:            pointer.Int32Ptr(1),
-				Min:                   pointer.Int32Ptr(1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-			},
-			msg: "must be greater than or equal to 0",
-		},
-		{
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(2),
 				MaxPerCore:            pointer.Int32Ptr(-1),
 				Min:                   pointer.Int32Ptr(1),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -495,7 +694,6 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 		},
 		{
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(2),
 				MaxPerCore:            pointer.Int32Ptr(1),
 				Min:                   pointer.Int32Ptr(-1),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -505,7 +703,6 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 		},
 		{
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(4),
 				MaxPerCore:            pointer.Int32Ptr(1),
 				Min:                   pointer.Int32Ptr(3),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: -5 * time.Second},
@@ -515,7 +712,6 @@ func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
 		},
 		{
 			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   pointer.Int32Ptr(4),
 				MaxPerCore:            pointer.Int32Ptr(1),
 				Min:                   pointer.Int32Ptr(3),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -575,7 +771,7 @@ func TestValidateProxyMode(t *testing.T) {
 func TestValidateClientConnectionConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 
-	successCases := []apimachineryconfig.ClientConnectionConfiguration{
+	successCases := []componentbaseconfig.ClientConnectionConfiguration{
 		{
 			Burst: 0,
 		},
@@ -591,11 +787,11 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 	}
 
 	errorCases := []struct {
-		ccc apimachineryconfig.ClientConnectionConfiguration
+		ccc componentbaseconfig.ClientConnectionConfiguration
 		msg string
 	}{
 		{
-			ccc: apimachineryconfig.ClientConnectionConfiguration{Burst: -5},
+			ccc: componentbaseconfig.ClientConnectionConfiguration{Burst: -5},
 			msg: "must be greater than or equal to 0",
 		},
 	}

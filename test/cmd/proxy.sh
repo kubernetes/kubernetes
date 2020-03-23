@@ -27,10 +27,10 @@ run_kubectl_local_proxy_tests() {
   start-proxy
   check-curl-proxy-code /api/kubernetes 404
   check-curl-proxy-code /api/v1/namespaces 200
-  if kube::test::if_supports_resource "${metrics}" ; then
+  if kube::test::if_supports_resource "metrics" ; then
     check-curl-proxy-code /metrics 200
   fi
-  if kube::test::if_supports_resource "${static}" ; then
+  if kube::test::if_supports_resource "static" ; then
     check-curl-proxy-code /static/ 200
   fi
   stop-proxy
@@ -45,7 +45,7 @@ run_kubectl_local_proxy_tests() {
   start-proxy /custom
   check-curl-proxy-code /custom/api/kubernetes 404
   check-curl-proxy-code /custom/api/v1/namespaces 200
-  if kube::test::if_supports_resource "${metrics}" ; then
+  if kube::test::if_supports_resource "metrics" ; then
     check-curl-proxy-code /custom/metrics 200
   fi
   check-curl-proxy-code /custom/api/v1/namespaces 200

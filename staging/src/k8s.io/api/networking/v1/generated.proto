@@ -30,16 +30,16 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1";
 
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
-// matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should
-// not be included within this rule.
+// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
+// that should not be included within this rule.
 message IPBlock {
   // CIDR is a string representing the IP Block
-  // Valid examples are "192.168.1.1/24"
+  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
   optional string cidr = 1;
 
   // Except is a slice of CIDRs that should not be included within an IP Block
-  // Valid examples are "192.168.1.1/24"
+  // Valid examples are "192.168.1.1/24" or "2001:db9::/64"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
   repeated string except = 2;
@@ -48,7 +48,7 @@ message IPBlock {
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -92,7 +92,7 @@ message NetworkPolicyIngressRule {
   // List of sources which should be able to access the pods selected for this rule.
   // Items in this list are combined using a logical OR operation. If this field is
   // empty or missing, this rule matches all sources (traffic not restricted by
-  // source). If this field is present and contains at least on item, this rule
+  // source). If this field is present and contains at least one item, this rule
   // allows traffic only if the traffic matches at least one item in the from list.
   // +optional
   repeated NetworkPolicyPeer from = 2;
@@ -101,7 +101,7 @@ message NetworkPolicyIngressRule {
 // NetworkPolicyList is a list of NetworkPolicy objects.
 message NetworkPolicyList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -109,12 +109,12 @@ message NetworkPolicyList {
   repeated NetworkPolicy items = 2;
 }
 
-// NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of
+// NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of
 // fields are allowed
 message NetworkPolicyPeer {
   // This is a label selector which selects Pods. This field follows standard label
   // selector semantics; if present but empty, it selects all pods.
-  // 
+  //
   // If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
@@ -123,7 +123,7 @@ message NetworkPolicyPeer {
 
   // Selects Namespaces using cluster-scoped labels. This field follows standard label
   // selector semantics; if present but empty, it selects all namespaces.
-  // 
+  //
   // If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
@@ -180,7 +180,7 @@ message NetworkPolicySpec {
   repeated NetworkPolicyEgressRule egress = 3;
 
   // List of rule types that the NetworkPolicy relates to.
-  // Valid options are Ingress, Egress, or Ingress,Egress.
+  // Valid options are "Ingress", "Egress", or "Ingress,Egress".
   // If this field is not specified, it will default based on the existence of Ingress or Egress rules;
   // policies that contain an Egress section are assumed to affect Egress, and all policies
   // (whether or not they contain an Ingress section) are assumed to affect Ingress.

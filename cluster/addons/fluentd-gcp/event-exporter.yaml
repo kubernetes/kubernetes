@@ -26,34 +26,38 @@ subjects:
   name: event-exporter-sa
   namespace: kube-system
 ---
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: event-exporter-v0.2.3
+  name: event-exporter-v0.3.1
   namespace: kube-system
   labels:
     k8s-app: event-exporter
-    version: v0.2.3
+    version: v0.3.1
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: event-exporter
+      version: v0.3.1
   template:
     metadata:
       labels:
         k8s-app: event-exporter
-        version: v0.2.3
+        version: v0.3.1
     spec:
       serviceAccountName: event-exporter-sa
       containers:
       - name: event-exporter
-        image: k8s.gcr.io/event-exporter:v0.2.3
+        image: k8s.gcr.io/event-exporter:v0.3.1
         command:
         - /event-exporter
-        - -sink-opts=-stackdriver-resource-model={{ exporter_sd_resource_model }}
+        - -sink-opts=-stackdriver-resource-model={{ exporter_sd_resource_model }} -endpoint={{ exporter_sd_endpoint }}
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.3.1
+        image: k8s.gcr.io/prometheus-to-sd:v0.7.2
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons

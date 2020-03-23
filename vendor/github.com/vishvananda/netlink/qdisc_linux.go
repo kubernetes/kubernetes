@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
+	"golang.org/x/sys/unix"
 )
 
 // NOTE function is here because it uses other linux functions
@@ -84,7 +85,7 @@ func QdiscDel(qdisc Qdisc) error {
 // QdiscDel will delete a qdisc from the system.
 // Equivalent to: `tc qdisc del $qdisc`
 func (h *Handle) QdiscDel(qdisc Qdisc) error {
-	return h.qdiscModify(syscall.RTM_DELQDISC, 0, qdisc)
+	return h.qdiscModify(unix.RTM_DELQDISC, 0, qdisc)
 }
 
 // QdiscChange will change a qdisc in place
@@ -98,7 +99,7 @@ func QdiscChange(qdisc Qdisc) error {
 // Equivalent to: `tc qdisc change $qdisc`
 // The parent and handle MUST NOT be changed.
 func (h *Handle) QdiscChange(qdisc Qdisc) error {
-	return h.qdiscModify(syscall.RTM_NEWQDISC, 0, qdisc)
+	return h.qdiscModify(unix.RTM_NEWQDISC, 0, qdisc)
 }
 
 // QdiscReplace will replace a qdisc to the system.
@@ -113,8 +114,8 @@ func QdiscReplace(qdisc Qdisc) error {
 // The handle MUST change.
 func (h *Handle) QdiscReplace(qdisc Qdisc) error {
 	return h.qdiscModify(
-		syscall.RTM_NEWQDISC,
-		syscall.NLM_F_CREATE|syscall.NLM_F_REPLACE,
+		unix.RTM_NEWQDISC,
+		unix.NLM_F_CREATE|unix.NLM_F_REPLACE,
 		qdisc)
 }
 
@@ -128,13 +129,13 @@ func QdiscAdd(qdisc Qdisc) error {
 // Equivalent to: `tc qdisc add $qdisc`
 func (h *Handle) QdiscAdd(qdisc Qdisc) error {
 	return h.qdiscModify(
-		syscall.RTM_NEWQDISC,
-		syscall.NLM_F_CREATE|syscall.NLM_F_EXCL,
+		unix.RTM_NEWQDISC,
+		unix.NLM_F_CREATE|unix.NLM_F_EXCL,
 		qdisc)
 }
 
 func (h *Handle) qdiscModify(cmd, flags int, qdisc Qdisc) error {
-	req := h.newNetlinkRequest(cmd, flags|syscall.NLM_F_ACK)
+	req := h.newNetlinkRequest(cmd, flags|unix.NLM_F_ACK)
 	base := qdisc.Attrs()
 	msg := &nl.TcMsg{
 		Family:  nl.FAMILY_ALL,
@@ -145,13 +146,13 @@ func (h *Handle) qdiscModify(cmd, flags int, qdisc Qdisc) error {
 	req.AddData(msg)
 
 	// When deleting don't bother building the rest of the netlink payload
-	if cmd != syscall.RTM_DELQDISC {
+	if cmd != unix.RTM_DELQDISC {
 		if err := qdiscPayload(req, qdisc); err != nil {
 			return err
 		}
 	}
 
-	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
+	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
 	return err
 }
 
@@ -231,6 +232,48 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 		if qdisc.Attrs().Parent != HANDLE_INGRESS {
 			return fmt.Errorf("Ingress filters must set Parent to HANDLE_INGRESS")
 		}
+	case *FqCodel:
+		nl.NewRtAttrChild(options, nl.TCA_FQ_CODEL_ECN, nl.Uint32Attr((uint32(qdisc.ECN))))
+		if qdisc.Limit > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_CODEL_LIMIT, nl.Uint32Attr((uint32(qdisc.Limit))))
+		}
+		if qdisc.Interval > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_CODEL_INTERVAL, nl.Uint32Attr((uint32(qdisc.Interval))))
+		}
+		if qdisc.Flows > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_CODEL_FLOWS, nl.Uint32Attr((uint32(qdisc.Flows))))
+		}
+		if qdisc.Quantum > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_CODEL_QUANTUM, nl.Uint32Attr((uint32(qdisc.Quantum))))
+		}
+
+	case *Fq:
+		nl.NewRtAttrChild(options, nl.TCA_FQ_RATE_ENABLE, nl.Uint32Attr((uint32(qdisc.Pacing))))
+
+		if qdisc.Buckets > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_BUCKETS_LOG, nl.Uint32Attr((uint32(qdisc.Buckets))))
+		}
+		if qdisc.LowRateThreshold > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_LOW_RATE_THRESHOLD, nl.Uint32Attr((uint32(qdisc.LowRateThreshold))))
+		}
+		if qdisc.Quantum > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_QUANTUM, nl.Uint32Attr((uint32(qdisc.Quantum))))
+		}
+		if qdisc.InitialQuantum > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_INITIAL_QUANTUM, nl.Uint32Attr((uint32(qdisc.InitialQuantum))))
+		}
+		if qdisc.FlowRefillDelay > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_FLOW_REFILL_DELAY, nl.Uint32Attr((uint32(qdisc.FlowRefillDelay))))
+		}
+		if qdisc.FlowPacketLimit > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_FLOW_PLIMIT, nl.Uint32Attr((uint32(qdisc.FlowPacketLimit))))
+		}
+		if qdisc.FlowMaxRate > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_FLOW_MAX_RATE, nl.Uint32Attr((uint32(qdisc.FlowMaxRate))))
+		}
+		if qdisc.FlowDefaultRate > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_FQ_FLOW_DEFAULT_RATE, nl.Uint32Attr((uint32(qdisc.FlowDefaultRate))))
+		}
 	}
 
 	req.AddData(options)
@@ -248,7 +291,7 @@ func QdiscList(link Link) ([]Qdisc, error) {
 // Equivalent to: `tc qdisc show`.
 // The list can be filtered by link.
 func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
-	req := h.newNetlinkRequest(syscall.RTM_GETQDISC, syscall.NLM_F_DUMP)
+	req := h.newNetlinkRequest(unix.RTM_GETQDISC, unix.NLM_F_DUMP)
 	index := int32(0)
 	if link != nil {
 		base := link.Attrs()
@@ -261,7 +304,7 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 	}
 	req.AddData(msg)
 
-	msgs, err := req.Execute(syscall.NETLINK_ROUTE, syscall.RTM_NEWQDISC)
+	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWQDISC)
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +346,10 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 					qdisc = &Ingress{}
 				case "htb":
 					qdisc = &Htb{}
+				case "fq":
+					qdisc = &Fq{}
+				case "fq_codel":
+					qdisc = &FqCodel{}
 				case "netem":
 					qdisc = &Netem{}
 				default:
@@ -334,6 +381,22 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 						return nil, err
 					}
 					if err := parseHtbData(qdisc, data); err != nil {
+						return nil, err
+					}
+				case "fq":
+					data, err := nl.ParseRouteAttr(attr.Value)
+					if err != nil {
+						return nil, err
+					}
+					if err := parseFqData(qdisc, data); err != nil {
+						return nil, err
+					}
+				case "fq_codel":
+					data, err := nl.ParseRouteAttr(attr.Value)
+					if err != nil {
+						return nil, err
+					}
+					if err := parseFqCodelData(qdisc, data); err != nil {
 						return nil, err
 					}
 				case "netem":
@@ -383,6 +446,61 @@ func parseHtbData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 		case nl.TCA_HTB_DIRECT_QLEN:
 			// TODO
 			//htb.DirectQlen = native.uint32(datum.Value)
+		}
+	}
+	return nil
+}
+
+func parseFqCodelData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
+	native = nl.NativeEndian()
+	fqCodel := qdisc.(*FqCodel)
+	for _, datum := range data {
+
+		switch datum.Attr.Type {
+		case nl.TCA_FQ_CODEL_TARGET:
+			fqCodel.Target = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_LIMIT:
+			fqCodel.Limit = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_INTERVAL:
+			fqCodel.Interval = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_ECN:
+			fqCodel.ECN = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_FLOWS:
+			fqCodel.Flows = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_QUANTUM:
+			fqCodel.Quantum = native.Uint32(datum.Value)
+		}
+	}
+	return nil
+}
+
+func parseFqData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
+	native = nl.NativeEndian()
+	fq := qdisc.(*Fq)
+	for _, datum := range data {
+		switch datum.Attr.Type {
+		case nl.TCA_FQ_BUCKETS_LOG:
+			fq.Buckets = native.Uint32(datum.Value)
+		case nl.TCA_FQ_LOW_RATE_THRESHOLD:
+			fq.LowRateThreshold = native.Uint32(datum.Value)
+		case nl.TCA_FQ_QUANTUM:
+			fq.Quantum = native.Uint32(datum.Value)
+		case nl.TCA_FQ_RATE_ENABLE:
+			fq.Pacing = native.Uint32(datum.Value)
+		case nl.TCA_FQ_INITIAL_QUANTUM:
+			fq.InitialQuantum = native.Uint32(datum.Value)
+		case nl.TCA_FQ_ORPHAN_MASK:
+			// TODO
+		case nl.TCA_FQ_FLOW_REFILL_DELAY:
+			fq.FlowRefillDelay = native.Uint32(datum.Value)
+		case nl.TCA_FQ_FLOW_PLIMIT:
+			fq.FlowPacketLimit = native.Uint32(datum.Value)
+		case nl.TCA_FQ_PLIMIT:
+			fq.PacketLimit = native.Uint32(datum.Value)
+		case nl.TCA_FQ_FLOW_MAX_RATE:
+			fq.FlowMaxRate = native.Uint32(datum.Value)
+		case nl.TCA_FQ_FLOW_DEFAULT_RATE:
+			fq.FlowDefaultRate = native.Uint32(datum.Value)
 		}
 	}
 	return nil

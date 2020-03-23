@@ -18,7 +18,7 @@ REGISTRY ?= staging-k8s.gcr.io
 IMAGE ?= $(REGISTRY)/debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= 0.4.0
+TAG ?= v2.0.0
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
@@ -27,26 +27,28 @@ ALL_ARCH = amd64 arm arm64 ppc64le s390x
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.9.1
 
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
+
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
 ifeq ($(ARCH),amd64)
-	BASEIMAGE?=debian:stretch
+	BASEIMAGE?=debian:buster-slim
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/debian:stretch
+	BASEIMAGE?=arm32v7/debian:buster-slim
 	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/debian:stretch
+	BASEIMAGE?=arm64v8/debian:buster-slim
 	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/debian:stretch
+	BASEIMAGE?=ppc64le/debian:buster-slim
 	QEMUARCH=ppc64le
 endif
 ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/debian:stretch
+	BASEIMAGE?=s390x/debian:buster-slim
 	QEMUARCH=s390x
 endif
 
@@ -65,7 +67,7 @@ all-push: all-push-images push-manifest
 push-manifest:
 	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
 	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
-	docker manifest push ${IMAGE}:${TAG}
+	docker manifest push --purge ${IMAGE}:${TAG}
 
 build: clean
 	cp ./* $(TEMP_DIR)
@@ -80,7 +82,7 @@ ifeq ($(ARCH),amd64)
 else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
 	# Ensure we don't get surprised by umask settings
 	chmod 0755 $(TEMP_DIR)/qemu-$(QEMUARCH)-static

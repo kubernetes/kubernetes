@@ -17,10 +17,11 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ type resourceMetricsClient struct {
 // GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
 // for all pods matching the specified selector in the given namespace
 func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
-	metrics, err := c.client.PodMetricses(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	metrics, err := c.client.PodMetricses(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from resource metrics API: %v", err)
 	}
@@ -81,7 +82,7 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 			resValue, found := c.Usage[v1.ResourceName(resource)]
 			if !found {
 				missing = true
-				glog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)
+				klog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)
 				break // containers loop
 			}
 			podSum += resValue.MilliValue()
@@ -161,7 +162,7 @@ func (c *customMetricsClient) GetObjectMetric(metricName string, namespace strin
 	return metricValue.Value.MilliValue(), metricValue.Timestamp.Time, nil
 }
 
-// externalMetricsClient implenets the external metrics related parts of MetricsClient,
+// externalMetricsClient implements the external metrics related parts of MetricsClient,
 // using data from the external metrics API.
 type externalMetricsClient struct {
 	client externalclient.ExternalMetricsClient

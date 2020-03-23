@@ -13,25 +13,25 @@ import (
 
 // Dhseqr computes the eigenvalues of an n×n Hessenberg matrix H and,
 // optionally, the matrices T and Z from the Schur decomposition
-//  H = Z T Z^T,
+//  H = Z T Zᵀ,
 // where T is an n×n upper quasi-triangular matrix (the Schur form), and Z is
 // the n×n orthogonal matrix of Schur vectors.
 //
 // Optionally Z may be postmultiplied into an input orthogonal matrix Q so that
 // this routine can give the Schur factorization of a matrix A which has been
 // reduced to the Hessenberg form H by the orthogonal matrix Q:
-//  A = Q H Q^T = (QZ) T (QZ)^T.
+//  A = Q H Qᵀ = (QZ) T (QZ)ᵀ.
 //
 // If job == lapack.EigenvaluesOnly, only the eigenvalues will be computed.
 // If job == lapack.EigenvaluesAndSchur, the eigenvalues and the Schur form T will
 // be computed.
 // For other values of job Dhseqr will panic.
 //
-// If compz == lapack.None, no Schur vectors will be computed and Z will not be
+// If compz == lapack.SchurNone, no Schur vectors will be computed and Z will not be
 // referenced.
-// If compz == lapack.HessEV, on return Z will contain the matrix of Schur
+// If compz == lapack.SchurHess, on return Z will contain the matrix of Schur
 // vectors of H.
-// If compz == lapack.OriginalEV, on entry z is assumed to contain the orthogonal
+// If compz == lapack.SchurOrig, on entry z is assumed to contain the orthogonal
 // matrix Q that is the identity except for the submatrix
 // Q[ilo:ihi+1,ilo:ihi+1]. On return z will be updated to the product Q*Z.
 //
@@ -43,8 +43,8 @@ import (
 // and Dhseqr will panic otherwise. ilo and ihi are typically set by a previous
 // call to Dgebal, otherwise they should be set to 0 and n-1, respectively. It
 // must hold that
-//  0 <= ilo <= ihi < n,     if n > 0,
-//  ilo == 0 and ihi == -1,  if n == 0.
+//  0 <= ilo <= ihi < n     if n > 0,
+//  ilo == 0 and ihi == -1  if n == 0.
 //
 // wr and wi must have length n.
 //
@@ -96,11 +96,11 @@ import (
 // where U is an orthogonal matrix. The final H is upper Hessenberg and
 // H[unconverged:ihi+1,unconverged:ihi+1] is upper quasi-triangular.
 //
-// If unconverged > 0 and compz == lapack.OriginalEV, then on return
+// If unconverged > 0 and compz == lapack.SchurOrig, then on return
 //  (final Z) = (initial Z) U,
 // where U is the orthogonal matrix in (*) regardless of the value of job.
 //
-// If unconverged > 0 and compz == lapack.HessEV, then on return
+// If unconverged > 0 and compz == lapack.SchurHess, then on return
 //  (final Z) = U,
 // where U is the orthogonal matrix in (*) regardless of the value of job.
 //
@@ -118,45 +118,53 @@ import (
 //      URL: http://dx.doi.org/10.1137/S0895479801384585
 //
 // Dhseqr is an internal routine. It is exported for testing purposes.
-func (impl Implementation) Dhseqr(job lapack.EVJob, compz lapack.EVComp, n, ilo, ihi int, h []float64, ldh int, wr, wi []float64, z []float64, ldz int, work []float64, lwork int) (unconverged int) {
-	var wantt bool
-	switch job {
-	default:
-		panic(badEVJob)
-	case lapack.EigenvaluesOnly:
-	case lapack.EigenvaluesAndSchur:
-		wantt = true
-	}
-	var wantz bool
-	switch compz {
-	default:
-		panic(badEVComp)
-	case lapack.None:
-	case lapack.HessEV, lapack.OriginalEV:
-		wantz = true
-	}
+func (impl Implementation) Dhseqr(job lapack.SchurJob, compz lapack.SchurComp, n, ilo, ihi int, h []float64, ldh int, wr, wi []float64, z []float64, ldz int, work []float64, lwork int) (unconverged int) {
+	wantt := job == lapack.EigenvaluesAndSchur
+	wantz := compz == lapack.SchurHess || compz == lapack.SchurOrig
+
 	switch {
+	case job != lapack.EigenvaluesOnly && job != lapack.EigenvaluesAndSchur:
+		panic(badSchurJob)
+	case compz != lapack.SchurNone && compz != lapack.SchurHess && compz != lapack.SchurOrig:
+		panic(badSchurComp)
 	case n < 0:
 		panic(nLT0)
 	case ilo < 0 || max(0, n-1) < ilo:
 		panic(badIlo)
 	case ihi < min(ilo, n-1) || n <= ihi:
 		panic(badIhi)
-	case len(work) < lwork:
-		panic(shortWork)
+	case ldh < max(1, n):
+		panic(badLdH)
+	case ldz < 1, wantz && ldz < n:
+		panic(badLdZ)
 	case lwork < max(1, n) && lwork != -1:
-		panic(badWork)
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
-	if lwork != -1 {
-		checkMatrix(n, n, h, ldh)
-		switch {
-		case wantz:
-			checkMatrix(n, n, z, ldz)
-		case len(wr) < n:
-			panic("lapack: wr has insufficient length")
-		case len(wi) < n:
-			panic("lapack: wi has insufficient length")
-		}
+
+	// Quick return if possible.
+	if n == 0 {
+		work[0] = 1
+		return 0
+	}
+
+	// Quick return in case of a workspace query.
+	if lwork == -1 {
+		impl.Dlaqr04(wantt, wantz, n, ilo, ihi, h, ldh, wr, wi, ilo, ihi, z, ldz, work, -1, 1)
+		work[0] = math.Max(float64(n), work[0])
+		return 0
+	}
+
+	switch {
+	case len(h) < (n-1)*ldh+n:
+		panic(shortH)
+	case wantz && len(z) < (n-1)*ldz+n:
+		panic(shortZ)
+	case len(wr) < n:
+		panic(shortWr)
+	case len(wi) < n:
+		panic(shortWi)
 	}
 
 	const (
@@ -173,19 +181,6 @@ func (impl Implementation) Dhseqr(job lapack.EVJob, compz lapack.EVComp, n, ilo,
 		nl = 49
 	)
 
-	// Quick return if possible.
-	if n == 0 {
-		work[0] = 1
-		return 0
-	}
-
-	// Quick return in case of a workspace query.
-	if lwork == -1 {
-		impl.Dlaqr04(wantt, wantz, n, ilo, ihi, nil, 0, nil, nil, ilo, ihi, nil, 0, work, -1, 1)
-		work[0] = math.Max(float64(n), work[0])
-		return 0
-	}
-
 	// Copy eigenvalues isolated by Dgebal.
 	for i := 0; i < ilo; i++ {
 		wr[i] = h[i*ldh+i]
@@ -197,7 +192,7 @@ func (impl Implementation) Dhseqr(job lapack.EVJob, compz lapack.EVComp, n, ilo,
 	}
 
 	// Initialize Z to identity matrix if requested.
-	if compz == lapack.HessEV {
+	if compz == lapack.SchurHess {
 		impl.Dlaset(blas.All, n, n, 0, 1, z, ldz)
 	}
 

@@ -17,6 +17,9 @@ limitations under the License.
 package proxy
 
 import (
+	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -272,5 +275,85 @@ func TestProxyTransport(t *testing.T) {
 
 	for name, item := range table {
 		testItem(name, &item)
+	}
+}
+
+func TestRewriteResponse(t *testing.T) {
+	gzipbuf := bytes.NewBuffer(nil)
+	flatebuf := bytes.NewBuffer(nil)
+
+	testTransport := &Transport{
+		Scheme:      "http",
+		Host:        "foo.com",
+		PathPrepend: "/proxy/node/node1:10250",
+	}
+	expected := []string{
+		"short body test",
+		strings.Repeat("long body test", 4097),
+	}
+	test := []struct {
+		encodeType string
+		writer     func(string) *http.Response
+		reader     func(*http.Response) string
+	}{
+		{
+			encodeType: "gzip",
+			writer: func(ept string) *http.Response {
+				gzw := gzip.NewWriter(gzipbuf)
+				defer gzw.Close()
+
+				gzw.Write([]byte(ept))
+				gzw.Flush()
+				return &http.Response{
+					Body: ioutil.NopCloser(gzipbuf),
+				}
+			},
+			reader: func(rep *http.Response) string {
+				reader, _ := gzip.NewReader(rep.Body)
+				s, _ := ioutil.ReadAll(reader)
+				return string(s)
+			},
+		},
+		{
+			encodeType: "deflate",
+			writer: func(ept string) *http.Response {
+				flw, _ := flate.NewWriter(flatebuf, flate.BestCompression)
+				defer flw.Close()
+
+				flw.Write([]byte(ept))
+				flw.Flush()
+				return &http.Response{
+					Body: ioutil.NopCloser(flatebuf),
+				}
+			},
+			reader: func(rep *http.Response) string {
+				reader := flate.NewReader(rep.Body)
+				s, _ := ioutil.ReadAll(reader)
+				return string(s)
+			},
+		},
+	}
+
+	errFn := func(encode string, err error) {
+		t.Errorf("%s failed to read and write: %v", encode, err)
+	}
+	for _, v := range test {
+		request, _ := http.NewRequest("GET", "http://mynode.com/", nil)
+		request.Header.Set("Content-Encoding", v.encodeType)
+		request.Header.Add("Accept-Encoding", v.encodeType)
+
+		for _, exp := range expected {
+			resp := v.writer(exp)
+			gotResponse, err := testTransport.rewriteResponse(request, resp)
+
+			if err != nil {
+				errFn(v.encodeType, err)
+			}
+
+			result := v.reader(gotResponse)
+			if result != exp {
+				errFn(v.encodeType, fmt.Errorf("expected %s, get %s", exp, result))
+			}
+		}
 	}
 }

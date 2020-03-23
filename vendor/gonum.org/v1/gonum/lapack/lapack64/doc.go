@@ -17,4 +17,4 @@
 // The full set of Lapack functions is very large, and it is not clear that a
 // full implementation is desirable, let alone feasible. Please open up an issue
 // if there is a specific function you need and/or are willing to implement.
-package lapack64
+package lapack64 // import "gonum.org/v1/gonum/lapack/lapack64"

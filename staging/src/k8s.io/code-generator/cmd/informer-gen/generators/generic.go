@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	codegennamer "k8s.io/code-generator/pkg/namer"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
@@ -34,6 +35,7 @@ type genericGenerator struct {
 	imports              namer.ImportTracker
 	groupVersions        map[string]clientgentypes.GroupVersions
 	groupGoNames         map[string]string
+	pluralExceptions     map[string]string
 	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type
 	filtered             bool
 }
@@ -49,13 +51,11 @@ func (g *genericGenerator) Filter(c *generator.Context, t *types.Type) bool {
 }
 
 func (g *genericGenerator) Namers(c *generator.Context) namer.NameSystems {
-	pluralExceptions := map[string]string{
-		"Endpoints": "Endpoints",
-	}
 	return namer.NameSystems{
 		"raw":                namer.NewRawNamer(g.outputPackage, g.imports),
-		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
+		"allLowercasePlural": namer.NewAllLowercasePluralNamer(g.pluralExceptions),
+		"publicPlural":       namer.NewPublicPluralNamer(g.pluralExceptions),
+		"resource":           codegennamer.NewTagOverrideNamer("resourceName", namer.NewAllLowercasePluralNamer(g.pluralExceptions)),
 	}
 }
 
@@ -111,7 +111,9 @@ func (g *genericGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 				GoName:    namer.IC(v.Version.NonEmpty()),
 				Resources: orderer.OrderTypes(g.typesForGroupVersion[gv]),
 			}
-			schemeGVs[version] = c.Universe.Variable(types.Name{Package: g.typesForGroupVersion[gv][0].Name.Package, Name: "SchemeGroupVersion"})
+			func() {
+				schemeGVs[version] = c.Universe.Variable(types.Name{Package: g.typesForGroupVersion[gv][0].Name.Package, Name: "SchemeGroupVersion"})
+			}()
 			group.Versions = append(group.Versions, version)
 		}
 		sort.Sort(versionSort(group.Versions))
@@ -168,7 +170,7 @@ func (f *sharedInformerFactory) ForResource(resource {{.schemaGroupVersionResour
 			{{range $version := .Versions -}}
 	// Group={{$group.Name}}, Version={{.Name}}
 				{{range .Resources -}}
-	case {{index $.schemeGVs $version|raw}}.WithResource("{{.|allLowercasePlural}}"):
+	case {{index $.schemeGVs $version|raw}}.WithResource("{{.|resource}}"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.{{$GroupGoName}}().{{$version.GoName}}().{{.|publicPlural}}().Informer()}, nil
 				{{end}}
 			{{end}}

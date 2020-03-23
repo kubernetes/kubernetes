@@ -8,7 +8,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 kind: DaemonSet
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   labels:
     app: metadata-agent
@@ -29,6 +29,8 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       priorityClassName: system-node-critical
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
@@ -43,8 +45,8 @@ spec:
           failureThreshold: 1
           successThreshold: 1
         args:
-        - -o KubernetesUseWatch=true 
-        - -o KubernetesClusterLevelMetadata=false 
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=false
         - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000
@@ -69,7 +71,7 @@ spec:
     type: RollingUpdate
 ---
 kind: Deployment
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   labels:
     app: metadata-agent-cluster-level
@@ -91,6 +93,8 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       priorityClassName: system-cluster-critical
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
@@ -105,8 +109,8 @@ spec:
           failureThreshold: 1
           successThreshold: 1
         args:
-        - -o KubernetesUseWatch=true 
-        - -o KubernetesClusterLevelMetadata=true 
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=true
         - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000

@@ -17,10 +17,12 @@ limitations under the License.
 package certificates
 
 import (
-	"github.com/stretchr/testify/assert"
-	"k8s.io/api/certificates/v1beta1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestIsCertificateRequestApproved(t *testing.T) {

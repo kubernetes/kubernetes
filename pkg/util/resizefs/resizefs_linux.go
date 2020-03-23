@@ -21,8 +21,8 @@ package resizefs
 import (
 	"fmt"
 
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
 )
 
 // ResizeFs Provides support for resizing file systems
@@ -50,7 +50,7 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 		return false, nil
 	}
 
-	glog.V(3).Infof("ResizeFS.Resize - Expanding mounted volume %s", devicePath)
+	klog.V(3).Infof("ResizeFS.Resize - Expanding mounted volume %s", devicePath)
 	switch format {
 	case "ext3", "ext4":
 		return resizefs.extResize(devicePath)
@@ -61,9 +61,9 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 }
 
 func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {
-	output, err := resizefs.mounter.Exec.Run("resize2fs", devicePath)
+	output, err := resizefs.mounter.Exec.Command("resize2fs", devicePath).CombinedOutput()
 	if err == nil {
-		glog.V(2).Infof("Device %s resized successfully", devicePath)
+		klog.V(2).Infof("Device %s resized successfully", devicePath)
 		return true, nil
 	}
 
@@ -74,10 +74,10 @@ func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {
 
 func (resizefs *ResizeFs) xfsResize(deviceMountPath string) (bool, error) {
 	args := []string{"-d", deviceMountPath}
-	output, err := resizefs.mounter.Exec.Run("xfs_growfs", args...)
+	output, err := resizefs.mounter.Exec.Command("xfs_growfs", args...).CombinedOutput()
 
 	if err == nil {
-		glog.V(2).Infof("Device %s resized successfully", deviceMountPath)
+		klog.V(2).Infof("Device %s resized successfully", deviceMountPath)
 		return true, nil
 	}
 

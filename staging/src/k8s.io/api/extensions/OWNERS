@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
 - thockin
 - lavalamp
@@ -25,14 +27,12 @@ reviewers:
 - errordeveloper
 - madhusudancs
 - rootfs
-- jszczepkowski
 - mml
 - resouer
 - mbohlool
 - david-mcmahon
 - therc
 - pweil-
-- tmrts
 - mqliang
 - lukaszo
 - jianhuiz

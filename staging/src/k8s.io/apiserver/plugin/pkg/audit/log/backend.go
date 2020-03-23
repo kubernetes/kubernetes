@@ -44,47 +44,51 @@ var AllowedFormats = []string{
 }
 
 type backend struct {
-	out          io.Writer
-	format       string
-	groupVersion schema.GroupVersion
+	out     io.Writer
+	format  string
+	encoder runtime.Encoder
 }
 
 var _ audit.Backend = &backend{}
 
 func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
 	return &backend{
-		out:          out,
-		format:       format,
-		groupVersion: groupVersion,
+		out:     out,
+		format:  format,
+		encoder: audit.Codecs.LegacyCodec(groupVersion),
 	}
 }
 
-func (b *backend) ProcessEvents(events ...*auditinternal.Event) {
+func (b *backend) ProcessEvents(events ...*auditinternal.Event) bool {
+	success := true
 	for _, ev := range events {
-		b.logEvent(ev)
+		success = b.logEvent(ev) && success
 	}
+	return success
 }
 
-func (b *backend) logEvent(ev *auditinternal.Event) {
+func (b *backend) logEvent(ev *auditinternal.Event) bool {
 	line := ""
 	switch b.format {
 	case FormatLegacy:
 		line = audit.EventString(ev) + "\n"
 	case FormatJson:
-		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(b.groupVersion), ev)
+		bs, err := runtime.Encode(b.encoder, ev)
 		if err != nil {
 			audit.HandlePluginError(PluginName, err, ev)
-			return
+			return false
 		}
 		line = string(bs[:])
 	default:
 		audit.HandlePluginError(PluginName, fmt.Errorf("log format %q is not in list of known formats (%s)",
 			b.format, strings.Join(AllowedFormats, ",")), ev)
-		return
+		return false
 	}
 	if _, err := fmt.Fprint(b.out, line); err != nil {
 		audit.HandlePluginError(PluginName, err, ev)
+		return false
 	}
+	return true
 }
 
 func (b *backend) Run(stopCh <-chan struct{}) error {

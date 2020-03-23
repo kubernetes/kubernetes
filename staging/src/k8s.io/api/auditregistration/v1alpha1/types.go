@@ -133,7 +133,7 @@ type WebhookThrottleConfig struct {
 // WebhookClientConfig contains the information to make a connection with the webhook
 type WebhookClientConfig struct {
 	// `url` gives the location of the webhook, in standard URL form
-	// (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+	// (`scheme://host:port/path`). Exactly one of `url` or `service`
 	// must be specified.
 	//
 	// The `host` should not refer to a service running in the cluster; use
@@ -166,16 +166,13 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// Port 443 will be used if it is open, otherwise it is an error.
-	//
 	// +optional
-	Service *ServiceReference `json:"service" protobuf:"bytes,2,opt,name=service"`
+	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,2,opt,name=service"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate
-	// the webhook's server certificate.
-	// defaults to the apiservers CA bundle for the endpoint type
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
-	CABundle []byte `json:"caBundle" protobuf:"bytes,3,opt,name=caBundle"`
+	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,3,opt,name=caBundle"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
@@ -192,4 +189,10 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
+
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package exists
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -54,7 +55,7 @@ var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Exists{})
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Exists{})
 
 // Validate makes an admission decision based on the request attributes
-func (e *Exists) Validate(a admission.Attributes) error {
+func (e *Exists) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
@@ -75,7 +76,7 @@ func (e *Exists) Validate(a admission.Attributes) error {
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-	_, err = e.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+	_, err = e.client.CoreV1().Namespaces().Get(context.TODO(), a.GetNamespace(), metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return err

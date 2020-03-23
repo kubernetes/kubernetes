@@ -32,24 +32,26 @@ type extensionAttributes struct {
 	xName         string
 	kind          types.Kind
 	allowedValues sets.String
+	enforceArray  bool
 }
 
 // Extension tag to openapi extension attributes
 var tagToExtension = map[string]extensionAttributes{
-	"patchMergeKey": extensionAttributes{
+	"patchMergeKey": {
 		xName: "x-kubernetes-patch-merge-key",
 		kind:  types.Slice,
 	},
-	"patchStrategy": extensionAttributes{
+	"patchStrategy": {
 		xName:         "x-kubernetes-patch-strategy",
 		kind:          types.Slice,
 		allowedValues: sets.NewString("merge", "retainKeys"),
 	},
-	"listMapKey": extensionAttributes{
-		xName: "x-kubernetes-list-map-keys",
-		kind:  types.Slice,
+	"listMapKey": {
+		xName:        "x-kubernetes-list-map-keys",
+		kind:         types.Slice,
+		enforceArray: true,
 	},
-	"listType": extensionAttributes{
+	"listType": {
 		xName:         "x-kubernetes-list-type",
 		kind:          types.Slice,
 		allowedValues: sets.NewString("atomic", "set", "map"),
@@ -111,6 +113,10 @@ func (e extension) validateType(kind types.Kind) error {
 
 func (e extension) hasMultipleValues() bool {
 	return len(e.values) > 1
+}
+
+func (e extension) isAlwaysArrayFormat() bool {
+	return tagToExtension[e.idlTag].enforceArray
 }
 
 // Returns sorted list of map keys. Needed for deterministic testing.

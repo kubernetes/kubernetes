@@ -33,7 +33,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
+	"unsafe"
 )
 
 // Priority of a journal message
@@ -50,19 +53,35 @@ const (
 	PriDebug
 )
 
-var conn net.Conn
+var (
+	// This can be overridden at build-time:
+	// https://github.com/golang/go/wiki/GcToolchainTricks#including-build-information-in-the-executable
+	journalSocket = "/run/systemd/journal/socket"
+
+	// unixConnPtr atomically holds the local unconnected Unix-domain socket.
+	// Concrete safe pointer type: *net.UnixConn
+	unixConnPtr unsafe.Pointer
+	// onceConn ensures that unixConnPtr is initialized exactly once.
+	onceConn sync.Once
+)
 
 func init() {
-	var err error
-	conn, err = net.Dial("unixgram", "/run/systemd/journal/socket")
-	if err != nil {
-		conn = nil
-	}
+	onceConn.Do(initConn)
 }
 
-// Enabled returns true if the local systemd journal is available for logging
+// Enabled checks whether the local systemd journal is available for logging.
 func Enabled() bool {
-	return conn != nil
+	onceConn.Do(initConn)
+
+	if (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr)) == nil {
+		return false
+	}
+
+	if _, err := net.Dial("unixgram", journalSocket); err != nil {
+		return false
+	}
+
+	return true
 }
 
 // Send a message to the local systemd journal. vars is a map of journald
@@ -73,8 +92,14 @@ func Enabled() bool {
 // (http://www.freedesktop.org/software/systemd/man/systemd.journal-fields.html)
 // for more details.  vars may be nil.
 func Send(message string, priority Priority, vars map[string]string) error {
+	conn := (*net.UnixConn)(atomic.LoadPointer(&unixConnPtr))
 	if conn == nil {
-		return journalError("could not connect to journald socket")
+		return errors.New("could not initialize socket to journald")
+	}
+
+	socketAddr := &net.UnixAddr{
+		Name: journalSocket,
+		Net:  "unixgram",
 	}
 
 	data := new(bytes.Buffer)
@@ -84,29 +109,30 @@ func Send(message string, priority Priority, vars map[string]string) error {
 		appendVariable(data, k, v)
 	}
 
-	_, err := io.Copy(conn, data)
-	if err != nil && isSocketSpaceError(err) {
-		file, err := tempFd()
-		if err != nil {
-			return journalError(err.Error())
-		}
-		defer file.Close()
-		_, err = io.Copy(file, data)
-		if err != nil {
-			return journalError(err.Error())
-		}
-
-		rights := syscall.UnixRights(int(file.Fd()))
-
-		/* this connection should always be a UnixConn, but better safe than sorry */
-		unixConn, ok := conn.(*net.UnixConn)
-		if !ok {
-			return journalError("can't send file through non-Unix connection")
-		}
-		unixConn.WriteMsgUnix([]byte{}, rights, nil)
-	} else if err != nil {
-		return journalError(err.Error())
+	_, _, err := conn.WriteMsgUnix(data.Bytes(), nil, socketAddr)
+	if err == nil {
+		return nil
 	}
+	if !isSocketSpaceError(err) {
+		return err
+	}
+
+	// Large log entry, send it via tempfile and ancillary-fd.
+	file, err := tempFd()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = io.Copy(file, data)
+	if err != nil {
+		return err
+	}
+	rights := syscall.UnixRights(int(file.Fd()))
+	_, _, err = conn.WriteMsgUnix([]byte{}, rights, socketAddr)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -116,8 +142,8 @@ func Print(priority Priority, format string, a ...interface{}) error {
 }
 
 func appendVariable(w io.Writer, name, value string) {
-	if !validVarName(name) {
-		journalError("variable name contains invalid character, ignoring")
+	if err := validVarName(name); err != nil {
+		fmt.Fprintf(os.Stderr, "variable name %s contains invalid character, ignoring\n", name)
 	}
 	if strings.ContainsRune(value, '\n') {
 		/* When the value contains a newline, we write:
@@ -134,46 +160,66 @@ func appendVariable(w io.Writer, name, value string) {
 	}
 }
 
-func validVarName(name string) bool {
-	/* The variable name must be in uppercase and consist only of characters,
-	 * numbers and underscores, and may not begin with an underscore. (from the docs)
-	 */
-
-	valid := name[0] != '_'
-	for _, c := range name {
-		valid = valid && ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '_'
+// validVarName validates a variable name to make sure journald will accept it.
+// The variable name must be in uppercase and consist only of characters,
+// numbers and underscores, and may not begin with an underscore:
+// https://www.freedesktop.org/software/systemd/man/sd_journal_print.html
+func validVarName(name string) error {
+	if name == "" {
+		return errors.New("Empty variable name")
+	} else if name[0] == '_' {
+		return errors.New("Variable name begins with an underscore")
 	}
-	return valid
+
+	for _, c := range name {
+		if !(('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '_') {
+			return errors.New("Variable name contains invalid characters")
+		}
+	}
+	return nil
 }
 
+// isSocketSpaceError checks whether the error is signaling
+// an "overlarge message" condition.
 func isSocketSpaceError(err error) bool {
 	opErr, ok := err.(*net.OpError)
-	if !ok {
+	if !ok || opErr == nil {
 		return false
 	}
 
-	sysErr, ok := opErr.Err.(syscall.Errno)
-	if !ok {
+	sysErr, ok := opErr.Err.(*os.SyscallError)
+	if !ok || sysErr == nil {
 		return false
 	}
 
-	return sysErr == syscall.EMSGSIZE || sysErr == syscall.ENOBUFS
+	return sysErr.Err == syscall.EMSGSIZE || sysErr.Err == syscall.ENOBUFS
 }
 
+// tempFd creates a temporary, unlinked file under `/dev/shm`.
 func tempFd() (*os.File, error) {
 	file, err := ioutil.TempFile("/dev/shm/", "journal.XXXXX")
 	if err != nil {
 		return nil, err
 	}
-	syscall.Unlink(file.Name())
+	err = syscall.Unlink(file.Name())
 	if err != nil {
 		return nil, err
 	}
 	return file, nil
 }
 
-func journalError(s string) error {
-	s = "journal error: " + s
-	fmt.Fprintln(os.Stderr, s)
-	return errors.New(s)
+// initConn initializes the global `unixConnPtr` socket.
+// It is meant to be called exactly once, at program startup.
+func initConn() {
+	autobind, err := net.ResolveUnixAddr("unixgram", "")
+	if err != nil {
+		return
+	}
+
+	sock, err := net.ListenUnixgram("unixgram", autobind)
+	if err != nil {
+		return
+	}
+
+	atomic.StorePointer(&unixConnPtr, unsafe.Pointer(sock))
 }

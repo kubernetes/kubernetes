@@ -10,9 +10,9 @@ go_library(
     importpath = "github.com/google/cadvisor/accelerators",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/mindprince/gonvml:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

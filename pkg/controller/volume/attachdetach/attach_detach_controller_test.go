@@ -17,15 +17,17 @@ limitations under the License.
 package attachdetach
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
+	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
@@ -40,17 +42,19 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	// Act
 	_, err := NewAttachDetachController(
 		fakeKubeClient,
-		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Storage().V1().CSINodes(),
+		informerFactory.Storage().V1().CSIDrivers(),
 		nil, /* cloud */
 		nil, /* plugins */
 		nil, /* prober */
 		false,
 		5*time.Second,
-		DefaultTimerConfig)
+		DefaultTimerConfig,
+	)
 
 	// Assert
 	if err != nil {
@@ -110,7 +114,7 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
 		for _, attachedVolume := range node.Status.VolumesAttached {
-			found := adc.actualStateOfWorld.VolumeNodeExists(attachedVolume.Name, nodeName)
+			found := adc.actualStateOfWorld.IsVolumeAttachedToNode(attachedVolume.Name, nodeName)
 			if !found {
 				t.Fatalf("Run failed with error. Node %s, volume %s not found", nodeName, attachedVolume.Name)
 			}
@@ -151,12 +155,13 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	plugins := controllervolumetesting.CreateTestPlugin()
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	csiNodeInformer := informerFactory.Storage().V1().CSINodes().Informer()
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	var podsNum, extraPodsNum, nodesNum, i int
 
 	stopCh := make(chan struct{})
 
-	pods, err := fakeKubeClient.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{})
+	pods, err := fakeKubeClient.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
@@ -166,7 +171,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		podInformer.GetIndexer().Add(&podToAdd)
 		podsNum++
 	}
-	nodes, err := fakeKubeClient.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := fakeKubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
@@ -176,15 +181,25 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		nodesNum++
 	}
 
+	csiNodes, err := fakeKubeClient.StorageV1().CSINodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
+	}
+	for _, csiNode := range csiNodes.Items {
+		csiNodeToAdd := csiNode
+		csiNodeInformer.GetIndexer().Add(&csiNodeToAdd)
+	}
+
 	informerFactory.Start(stopCh)
 
-	if !controller.WaitForCacheSync("attach detach", stopCh,
+	if !kcache.WaitForNamedCacheSync("attach detach", stopCh,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
-		informerFactory.Core().V1().Nodes().Informer().HasSynced) {
+		informerFactory.Core().V1().Nodes().Informer().HasSynced,
+		informerFactory.Storage().V1().CSINodes().Informer().HasSynced) {
 		t.Fatalf("Error waiting for the informer caches to sync")
 	}
 
-	// Make sure the nodes and pods are in the inforer cache
+	// Make sure the nodes and pods are in the informer cache
 	i = 0
 	nodeList, err := informerFactory.Core().V1().Nodes().Lister().List(labels.Everything())
 	for len(nodeList) < nodesNum {
@@ -211,15 +226,29 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		podList, err = informerFactory.Core().V1().Pods().Lister().List(labels.Everything())
 		i++
 	}
+	i = 0
+	csiNodesList, err := informerFactory.Storage().V1().CSINodes().Lister().List(labels.Everything())
+	for len(csiNodesList) < nodesNum {
+		if err != nil {
+			t.Fatalf("Error getting list of csi nodes %v", err)
+		}
+		if i > 100 {
+			t.Fatalf("Time out while waiting for the csinodes informer sync: found %d csinodes, expected %d csinodes", len(csiNodesList), nodesNum)
+		}
+		time.Sleep(100 * time.Millisecond)
+		csiNodesList, err = informerFactory.Storage().V1().CSINodes().Lister().List(labels.Everything())
+		i++
+	}
 
 	// Create the controller
 	adcObj, err := NewAttachDetachController(
 		fakeKubeClient,
-		nil, /* csiClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Storage().V1().CSINodes(),
+		informerFactory.Storage().V1().CSIDrivers(),
 		nil, /* cloud */
 		plugins,
 		prober,
@@ -241,7 +270,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	for _, newPod := range extraPods1 {
 		// Add a new pod between ASW and DSW ppoulators
-		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
+		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(context.TODO(), newPod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pod: <%v>", err)
 		}
@@ -258,7 +287,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	for _, newPod := range extraPods2 {
 		// Add a new pod between DSW ppoulator and reconciler run
-		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(newPod)
+		_, err = adc.kubeClient.CoreV1().Pods(newPod.ObjectMeta.Namespace).Create(context.TODO(), newPod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pod: <%v>", err)
 		}

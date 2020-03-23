@@ -19,7 +19,6 @@ package kubeapiserver
 import (
 	"strings"
 
-	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -28,7 +27,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -37,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
-	kubeapiserveroptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -47,40 +44,42 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "", Resource: "nodes"}:                         "minions",
 	{Group: "", Resource: "services"}:                      "services/specs",
 	{Group: "extensions", Resource: "ingresses"}:           "ingress",
+	{Group: "networking.k8s.io", Resource: "ingresses"}:    "ingress",
 	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
 	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
+// NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
+
+	resources := []schema.GroupVersionResource{
+		batch.Resource("cronjobs").WithVersion("v1beta1"),
+		networking.Resource("ingresses").WithVersion("v1beta1"),
+		networking.Resource("ingressclasses").WithVersion("v1beta1"),
+		apisstorage.Resource("csidrivers").WithVersion("v1beta1"),
+	}
+
 	return &StorageFactoryConfig{
-		Serializer:              legacyscheme.Codecs,
-		DefaultResourceEncoding: serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme),
-		ResourceEncodingOverrides: []schema.GroupVersionResource{
-			batch.Resource("cronjobs").WithVersion("v1beta1"),
-			apisstorage.Resource("volumeattachments").WithVersion("v1beta1"),
-			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
-		},
+		Serializer:                legacyscheme.Codecs,
+		DefaultResourceEncoding:   serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme),
+		ResourceEncodingOverrides: resources,
 	}
 }
 
+// StorageFactoryConfig is a configuration for creating storage factory.
 type StorageFactoryConfig struct {
 	StorageConfig                    storagebackend.Config
-	ApiResourceConfig                *serverstorage.ResourceConfig
+	APIResourceConfig                *serverstorage.ResourceConfig
 	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
 	DefaultStorageMediaType          string
 	Serializer                       runtime.StorageSerializer
-	StorageEncodingOverrides         map[string]schema.GroupVersion
 	ResourceEncodingOverrides        []schema.GroupVersionResource
 	EtcdServersOverrides             []string
 	EncryptionProviderConfigFilepath string
 }
 
-func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions, serializationOptions *kubeapiserveroptions.StorageSerializationOptions) (*completedStorageFactoryConfig, error) {
-	storageGroupsToEncodingVersion, err := serializationOptions.StorageGroupsToEncodingVersion()
-	if err != nil {
-		return nil, fmt.Errorf("error generating storage version map: %s", err)
-	}
-	c.StorageEncodingOverrides = storageGroupsToEncodingVersion
+// Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
+func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*completedStorageFactoryConfig, error) {
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
 	c.EtcdServersOverrides = etcdOptions.EtcdServersOverrides
@@ -88,19 +87,23 @@ func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions, 
 	return &completedStorageFactoryConfig{c}, nil
 }
 
+// completedStorageFactoryConfig is a wrapper around StorageFactoryConfig completed with etcd options.
+//
+// Note: this struct is intentionally unexported so that it can only be constructed via a StorageFactoryConfig.Complete
+// call. The implied consequence is that this does not comply with golint.
 type completedStorageFactoryConfig struct {
 	*StorageFactoryConfig
 }
 
+// New returns a new storage factory created from the completed storage factory configuration.
 func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
-	resourceEncodingConfig := resourceconfig.MergeGroupEncodingConfigs(c.DefaultResourceEncoding, c.StorageEncodingOverrides)
-	resourceEncodingConfig = resourceconfig.MergeResourceEncodingConfigs(resourceEncodingConfig, c.ResourceEncodingOverrides)
+	resourceEncodingConfig := resourceconfig.MergeResourceEncodingConfigs(c.DefaultResourceEncoding, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
 		c.StorageConfig,
 		c.DefaultStorageMediaType,
 		c.Serializer,
 		resourceEncodingConfig,
-		c.ApiResourceConfig,
+		c.APIResourceConfig,
 		SpecialDefaultResourcePrefixes)
 
 	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))
@@ -108,7 +111,9 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 	storageFactory.AddCohabitatingResources(apps.Resource("daemonsets"), extensions.Resource("daemonsets"))
 	storageFactory.AddCohabitatingResources(apps.Resource("replicasets"), extensions.Resource("replicasets"))
 	storageFactory.AddCohabitatingResources(api.Resource("events"), events.Resource("events"))
+	storageFactory.AddCohabitatingResources(api.Resource("replicationcontrollers"), extensions.Resource("replicationcontrollers")) // to make scale subresources equivalent
 	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
+	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
 
 	for _, override := range c.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")

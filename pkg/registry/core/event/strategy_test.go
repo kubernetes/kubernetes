@@ -26,8 +26,8 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
-	// install all api groups for testing
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	// ensure types are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestGetAttrs(t *testing.T) {
@@ -49,7 +49,7 @@ func TestGetAttrs(t *testing.T) {
 		Source: api.EventSource{Component: "test"},
 		Type:   api.EventTypeNormal,
 	}
-	field := EventToSelectableFields(eventA)
+	field := ToSelectableFields(eventA)
 	expect := fields.Set{
 		"metadata.name":                  "f0118",
 		"metadata.namespace":             "default",
@@ -70,7 +70,7 @@ func TestGetAttrs(t *testing.T) {
 }
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
-	fset := EventToSelectableFields(&api.Event{})
+	fset := ToSelectableFields(&api.Event{})
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"v1",
 		"Event",

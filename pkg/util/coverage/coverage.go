@@ -23,11 +23,12 @@ package coverage
 import (
 	"flag"
 	"fmt"
-	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 )
 
 var coverageFile string
@@ -86,6 +87,6 @@ func FlushCoverage() {
 	// This gets us atomic updates from the perspective of another process trying to access
 	// the file.
 	if err := os.Rename(tempCoveragePath(), coverageFile); err != nil {
-		glog.Errorf("Couldn't move coverage file from %s to %s", coverageFile, tempCoveragePath())
+		klog.Errorf("Couldn't move coverage file from %s to %s", coverageFile, tempCoveragePath())
 	}
 }

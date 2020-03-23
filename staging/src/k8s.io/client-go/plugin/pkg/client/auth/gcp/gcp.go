@@ -27,18 +27,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/klog"
 )
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("gcp", newGCPAuthProvider); err != nil {
-		glog.Fatalf("Failed to register gcp auth plugin: %v", err)
+		klog.Fatalf("Failed to register gcp auth plugin: %v", err)
 	}
 }
 
@@ -223,7 +223,7 @@ func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
 	cache := t.update(tok)
 	if t.persister != nil {
 		if err := t.persister.Persist(cache); err != nil {
-			glog.V(4).Infof("Failed to persist token: %v", err)
+			klog.V(4).Infof("Failed to persist token: %v", err)
 		}
 	}
 	return tok, nil
@@ -329,7 +329,7 @@ func (c *commandTokenSource) parseTokenCmdOutput(output []byte) (*oauth2.Token, 
 	}
 	var expiry time.Time
 	if t, err := time.Parse(c.timeFmt, expiryStr); err != nil {
-		glog.V(4).Infof("Failed to parse token expiry from %s (fmt=%s): %v", expiryStr, c.timeFmt, err)
+		klog.V(4).Infof("Failed to parse token expiry from %s (fmt=%s): %v", expiryStr, c.timeFmt, err)
 	} else {
 		expiry = t
 	}
@@ -373,7 +373,7 @@ func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}
 
 	if res.StatusCode == 401 {
-		glog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
+		klog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
 		t.persister.Persist(t.resetCache)
 	}
 

@@ -17,31 +17,41 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"os"
+	"time"
+
+	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
 type healthCheck struct {
 	name   string
 	client clientset.Interface
-	// f is invoked with a k8s client passed to it. Should return an optional error
-	f func(clientset.Interface) error
+	cfg    *kubeadmapi.ClusterConfiguration
+	// f is invoked with a k8s client and a kubeadm ClusterConfiguration passed to it. Should return an optional error
+	f func(clientset.Interface, *kubeadmapi.ClusterConfiguration) error
 }
 
 // Check is part of the preflight.Checker interface
 func (c *healthCheck) Check() (warnings, errors []error) {
-	if err := c.f(c.client); err != nil {
+	if err := c.f(c.client, c.cfg); err != nil {
 		return nil, []error{err}
 	}
 	return nil, nil
@@ -54,99 +64,175 @@ func (c *healthCheck) Name() string {
 
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
-// - all master Nodes are Ready
+// - all control-plane Nodes are Ready
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
-	fmt.Println("[upgrade] Making sure the cluster is healthy:")
+func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.String) error {
+	fmt.Println("[upgrade] Running cluster health checks")
 
 	healthChecks := []preflight.Checker{
 		&healthCheck{
-			name:   "APIServerHealth",
+			name:   "CreateJob",
 			client: client,
-			f:      apiServerHealthy,
+			cfg:    cfg,
+			f:      createJob,
 		},
 		&healthCheck{
-			name:   "MasterNodesReady",
+			name:   "ControlPlaneNodesReady",
 			client: client,
-			f:      masterNodesReady,
+			f:      controlPlaneNodesReady,
 		},
-		// TODO: Add a check for ComponentStatuses here?
-	}
-
-	// Run slightly different health checks depending on control plane hosting type
-	if IsControlPlaneSelfHosted(client) {
-		healthChecks = append(healthChecks, &healthCheck{
-			name:   "ControlPlaneHealth",
-			client: client,
-			f:      controlPlaneHealth,
-		})
-	} else {
-		healthChecks = append(healthChecks, &healthCheck{
+		&healthCheck{
 			name:   "StaticPodManifest",
 			client: client,
+			cfg:    cfg,
 			f:      staticPodManifestHealth,
-		})
+		},
 	}
 
 	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
 }
 
-// apiServerHealthy checks whether the API server's /healthz endpoint is healthy
-func apiServerHealthy(client clientset.Interface) error {
-	healthStatus := 0
+// CreateJob is a check that verifies that a Job can be created in the cluster
+func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) (lastError error) {
+	const (
+		jobName = "upgrade-health-check"
+		ns      = metav1.NamespaceSystem
+		timeout = 15 * time.Second
+	)
 
-	// If client.Discovery().RESTClient() is nil, the fake client is used, and that means we are dry-running. Just proceed
+	// If client.Discovery().RESTClient() is nil, the fake client is used.
+	// Return early because the kubeadm dryrun dynamic client only handles the core/v1 GroupVersion.
 	if client.Discovery().RESTClient() == nil {
+		fmt.Printf("[dryrun] Would create the Job %q in namespace %q and wait until it completes\n", jobName, ns)
 		return nil
 	}
-	client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
-	if healthStatus != http.StatusOK {
-		return fmt.Errorf("the API Server is unhealthy; /healthz didn't return %q", "ok")
+
+	// Prepare Job
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: ns,
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: utilpointer.Int32Ptr(0),
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser:    utilpointer.Int64Ptr(999),
+						RunAsGroup:   utilpointer.Int64Ptr(999),
+						RunAsNonRoot: utilpointer.BoolPtr(true),
+					},
+					Tolerations: []v1.Toleration{
+						{
+							Key:    "node-role.kubernetes.io/master",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  jobName,
+							Image: images.GetPauseImage(cfg),
+							Args:  []string{"-v"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Check if the Job already exists and delete it
+	if _, err := client.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{}); err == nil {
+		if err = deleteHealthCheckJob(client, ns, jobName); err != nil {
+			return err
+		}
+	}
+
+	// Cleanup the Job on exit
+	defer func() {
+		lastError = deleteHealthCheckJob(client, ns, jobName)
+	}()
+
+	// Create the Job, but retry in case it is being currently deleted
+	klog.V(2).Infof("Creating Job %q in the namespace %q", jobName, ns)
+	err := wait.PollImmediate(time.Second*1, timeout, func() (bool, error) {
+		if _, err := client.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
+			klog.V(2).Infof("Could not create Job %q in the namespace %q, retrying: %v", jobName, ns, err)
+			lastError = err
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return errors.Wrapf(lastError, "could not create Job %q in the namespace %q", jobName, ns)
+	}
+
+	// Waiting and manually deleteing the Job is a workaround to not enabling the TTL controller.
+	// TODO: refactor this if the TTL controller is enabled in kubeadm once it goes Beta.
+
+	// Wait for the Job to complete
+	err = wait.PollImmediate(time.Second*1, timeout, func() (bool, error) {
+		job, err := client.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
+		if err != nil {
+			lastError = err
+			klog.V(2).Infof("could not get Job %q in the namespace %q, retrying: %v", jobName, ns, err)
+			return false, nil
+		}
+		for _, cond := range job.Status.Conditions {
+			if cond.Type == batchv1.JobComplete {
+				return true, nil
+			}
+		}
+		lastError = errors.Errorf("no condition of type %v", batchv1.JobComplete)
+		klog.V(2).Infof("Job %q in the namespace %q is not yet complete, retrying", jobName, ns)
+		return false, nil
+	})
+	if err != nil {
+		return errors.Wrapf(lastError, "Job %q in the namespace %q did not complete in %v", jobName, ns, timeout)
+	}
+
+	klog.V(2).Infof("Job %q in the namespace %q completed", jobName, ns)
+
+	return nil
+}
+
+func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error {
+	klog.V(2).Infof("Deleting Job %q in the namespace %q", jobName, ns)
+	propagation := metav1.DeletePropagationForeground
+	if err := client.BatchV1().Jobs(ns).Delete(context.TODO(), jobName, metav1.DeleteOptions{PropagationPolicy: &propagation}); err != nil {
+		return errors.Wrapf(err, "could not delete Job %q in the namespace %q", jobName, ns)
 	}
 	return nil
 }
 
-// masterNodesReady checks whether all master Nodes in the cluster are in the Running state
-func masterNodesReady(client clientset.Interface) error {
+// controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
+func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		constants.LabelNodeRoleMaster: "",
 	}))
-	masters, err := client.CoreV1().Nodes().List(metav1.ListOptions{
+	controlPlanes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return fmt.Errorf("couldn't list masters in cluster: %v", err)
+		return errors.Wrap(err, "couldn't list control-planes in cluster")
 	}
 
-	if len(masters.Items) == 0 {
-		return fmt.Errorf("failed to find any nodes with master role")
+	if len(controlPlanes.Items) == 0 {
+		return errors.New("failed to find any nodes with a control-plane role")
 	}
 
-	notReadyMasters := getNotReadyNodes(masters.Items)
-	if len(notReadyMasters) != 0 {
-		return fmt.Errorf("there are NotReady masters in the cluster: %v", notReadyMasters)
-	}
-	return nil
-}
-
-// controlPlaneHealth ensures all control plane DaemonSets are healthy
-func controlPlaneHealth(client clientset.Interface) error {
-	notReadyDaemonSets, err := getNotReadyDaemonSets(client)
-	if err != nil {
-		return err
-	}
-
-	if len(notReadyDaemonSets) != 0 {
-		return fmt.Errorf("there are control plane DaemonSets in the cluster that are not ready: %v", notReadyDaemonSets)
+	notReadyControlPlanes := getNotReadyNodes(controlPlanes.Items)
+	if len(notReadyControlPlanes) != 0 {
+		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}
 	return nil
 }
 
 // staticPodManifestHealth makes sure the required static pods are presents
-func staticPodManifestHealth(_ clientset.Interface) error {
+func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
 	nonExistentManifests := []string{}
-	for _, component := range constants.MasterComponents {
+	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
 		if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
 			nonExistentManifests = append(nonExistentManifests, manifestFile)
@@ -155,7 +241,7 @@ func staticPodManifestHealth(_ clientset.Interface) error {
 	if len(nonExistentManifests) == 0 {
 		return nil
 	}
-	return fmt.Errorf("The control plane seems to be Static Pod-hosted, but some of the manifests don't seem to exist on disk. This probably means you're running 'kubeadm upgrade' on a remote machine, which is not supported for a Static Pod-hosted cluster. Manifest files not found: %v", nonExistentManifests)
+	return errors.Errorf("The control plane seems to be Static Pod-hosted, but some of the manifests don't seem to exist on disk. This probably means you're running 'kubeadm upgrade' on a remote machine, which is not supported for a Static Pod-hosted cluster. Manifest files not found: %v", nonExistentManifests)
 }
 
 // IsControlPlaneSelfHosted returns whether the control plane is self hosted or not
@@ -165,22 +251,22 @@ func IsControlPlaneSelfHosted(client clientset.Interface) bool {
 		return false
 	}
 
-	// If there are no NotReady DaemonSets, we are using self-hosting
+	// If there are no NotReady DaemonSets, we are using selfhosting
 	return len(notReadyDaemonSets) == 0
 }
 
 // getNotReadyDaemonSets gets the amount of Ready control plane DaemonSets
 func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 	notReadyDaemonSets := []error{}
-	for _, component := range constants.MasterComponents {
+	for _, component := range constants.ControlPlaneComponents {
 		dsName := constants.AddSelfHostedPrefix(component)
-		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
+		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
+			return nil, errors.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
 		}
 
 		if err := daemonSetHealth(&ds.Status); err != nil {
-			notReadyDaemonSets = append(notReadyDaemonSets, fmt.Errorf("DaemonSet %q not healthy: %v", dsName, err))
+			notReadyDaemonSets = append(notReadyDaemonSets, errors.Wrapf(err, "DaemonSet %q not healthy", dsName))
 		}
 	}
 	return notReadyDaemonSets, nil
@@ -189,13 +275,14 @@ func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 // daemonSetHealth is a helper function for getting the health of a DaemonSet's status
 func daemonSetHealth(dsStatus *apps.DaemonSetStatus) error {
 	if dsStatus.CurrentNumberScheduled != dsStatus.DesiredNumberScheduled {
-		return fmt.Errorf("current number of scheduled Pods ('%d') doesn't match the amount of desired Pods ('%d')", dsStatus.CurrentNumberScheduled, dsStatus.DesiredNumberScheduled)
+		return errors.Errorf("current number of scheduled Pods ('%d') doesn't match the amount of desired Pods ('%d')",
+			dsStatus.CurrentNumberScheduled, dsStatus.DesiredNumberScheduled)
 	}
 	if dsStatus.NumberAvailable == 0 {
-		return fmt.Errorf("no available Pods for DaemonSet")
+		return errors.New("no available Pods for DaemonSet")
 	}
 	if dsStatus.NumberReady == 0 {
-		return fmt.Errorf("no ready Pods for DaemonSet")
+		return errors.New("no ready Pods for DaemonSet")
 	}
 	return nil
 }

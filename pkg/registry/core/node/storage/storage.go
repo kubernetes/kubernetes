@@ -22,12 +22,13 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -38,7 +39,7 @@ import (
 	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
 )
 
-// NodeStorage includes storage for nodes and all sub resources
+// NodeStorage includes storage for nodes and all sub resources.
 type NodeStorage struct {
 	Node   *REST
 	Status *StatusREST
@@ -47,6 +48,7 @@ type NodeStorage struct {
 	KubeletConnectionInfo client.ConnectionInfoGetter
 }
 
+// REST implements a RESTStorage for nodes.
 type REST struct {
 	*genericregistry.Store
 	connection     client.ConnectionInfoGetter
@@ -58,6 +60,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new Node object.
 func (r *StatusREST) New() runtime.Object {
 	return &api.Node{}
 }
@@ -87,9 +90,13 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		DeleteStrategy: node.Strategy,
 		ExportStrategy: node.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: node.GetAttrs, TriggerFunc: node.NodeNameTriggerFunc}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    node.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{"metadata.name": node.NameTriggerFunc},
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}

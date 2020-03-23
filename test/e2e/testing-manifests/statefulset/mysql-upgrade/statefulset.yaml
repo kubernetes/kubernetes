@@ -152,7 +152,7 @@ spec:
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
- name: mysql-pdb 
+ name: mysql-pdb
  labels:
    pdb: mysql
 spec:

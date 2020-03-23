@@ -27,10 +27,10 @@ go_test(
     srcs = ["gc_admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -38,6 +38,9 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/restmapper:go_default_library",
+        "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

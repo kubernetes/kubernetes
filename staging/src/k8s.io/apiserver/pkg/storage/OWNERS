@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - lavalamp
 - liggitt
@@ -17,14 +19,11 @@ reviewers:
 - timothysc
 - hongchaodeng
 - krousey
-- fgrzadkowski
 - xiang90
 - mml
 - ingvagabund
 - resouer
 - mbohlool
-- lixiaobing10051267
 - mqliang
-- feihujiang
 - rrati
 - enj

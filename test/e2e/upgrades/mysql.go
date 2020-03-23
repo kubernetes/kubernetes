@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -25,29 +26,30 @@ import (
 	"strconv"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 const mysqlManifestPath = "test/e2e/testing-manifests/statefulset/mysql-upgrade"
 
-// MySqlUpgradeTest implements an upgrade test harness that polls a replicated sql database.
-type MySqlUpgradeTest struct {
+// MySQLUpgradeTest implements an upgrade test harness that polls a replicated sql database.
+type MySQLUpgradeTest struct {
 	ip               string
 	successfulWrites int
 	nextWrite        int
-	ssTester         *framework.StatefulSetTester
 }
 
-func (MySqlUpgradeTest) Name() string { return "mysql-upgrade" }
+// Name returns the tracking name of the test.
+func (MySQLUpgradeTest) Name() string { return "mysql-upgrade" }
 
-func (MySqlUpgradeTest) Skip(upgCtx UpgradeContext) bool {
+// Skip returns true when this test can be skipped.
+func (MySQLUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	minVersion := version.MustParseSemantic("1.5.0")
 
 	for _, vCtx := range upgCtx.Versions {
@@ -59,13 +61,13 @@ func (MySqlUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func mysqlKubectlCreate(ns, file string) {
-	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file), Fail))
-	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file)))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
-func (t *MySqlUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
-	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
+	svc, err := f.ClientSet.CoreV1().Services(ns).Get(context.TODO(), svcName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -77,22 +79,21 @@ func (t *MySqlUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName stri
 // from the db. It then connects to the db with the write Service and populates the db with a table
 // and a few entries. Finally, it connects to the db with the read Service, and confirms the data is
 // available. The db connections are left open to be used later in the test.
-func (t *MySqlUpgradeTest) Setup(f *framework.Framework) {
+func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 	statefulsetPoll := 30 * time.Second
 	statefulsetTimeout := 10 * time.Minute
-	t.ssTester = framework.NewStatefulSetTester(f.ClientSet)
 
-	By("Creating a configmap")
+	ginkgo.By("Creating a configmap")
 	mysqlKubectlCreate(ns, "configmap.yaml")
 
-	By("Creating a mysql StatefulSet")
-	t.ssTester.CreateStatefulSet(mysqlManifestPath, ns)
+	ginkgo.By("Creating a mysql StatefulSet")
+	e2esset.CreateStatefulSet(f.ClientSet, mysqlManifestPath, ns)
 
-	By("Creating a mysql-test-server deployment")
+	ginkgo.By("Creating a mysql-test-server deployment")
 	mysqlKubectlCreate(ns, "tester.yaml")
 
-	By("Getting the ingress IPs from the test-service")
+	ginkgo.By("Getting the ingress IPs from the test-service")
 	err := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
 		if t.ip = t.getServiceIP(f, ns, "test-server"); t.ip == "" {
 			return false, nil
@@ -103,24 +104,26 @@ func (t *MySqlUpgradeTest) Setup(f *framework.Framework) {
 		}
 		return true, nil
 	})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("Service endpoint is up")
 
-	By("Adding 2 names to the database")
-	Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(HaveOccurred())
-	Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(HaveOccurred())
+	ginkgo.By("Adding 2 names to the database")
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
 
-	By("Verifying that the 2 names have been inserted")
+	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(count).To(Equal(2))
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(count, 2)
 }
 
 // Test continually polls the db using the read and write connections, inserting data, and checking
 // that all the data is readable.
-func (t *MySqlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
+func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	var writeSuccess, readSuccess, writeFailure, readFailure int
-	By("Continuously polling the database during upgrade.")
+	ginkgo.By("Continuously polling the database during upgrade.")
 	go wait.Until(func() {
 		_, err := t.countNames()
 		if err != nil {
@@ -162,14 +165,14 @@ func (t *MySqlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 }
 
 // Teardown performs one final check of the data's availability.
-func (t *MySqlUpgradeTest) Teardown(f *framework.Framework) {
+func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
 	count, err := t.countNames()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(count >= t.successfulWrites).To(BeTrue())
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(count >= t.successfulWrites, true)
 }
 
 // addName adds a new value to the db.
-func (t *MySqlUpgradeTest) addName(name string) error {
+func (t *MySQLUpgradeTest) addName(name string) error {
 	val := map[string][]string{"name": {name}}
 	t.nextWrite++
 	r, err := http.PostForm(fmt.Sprintf("http://%s:8080/addName", t.ip), val)
@@ -189,7 +192,7 @@ func (t *MySqlUpgradeTest) addName(name string) error {
 
 // countNames checks to make sure the values in testing.users are available, and returns
 // the count of them.
-func (t *MySqlUpgradeTest) countNames() (int, error) {
+func (t *MySQLUpgradeTest) countNames() (int, error) {
 	r, err := http.Get(fmt.Sprintf("http://%s:8080/countNames", t.ip))
 	if err != nil {
 		return 0, err

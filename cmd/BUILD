@@ -20,7 +20,6 @@ filegroup(
         "//cmd/genswaggertypedocs:all-srcs",
         "//cmd/genutils:all-srcs",
         "//cmd/genyaml:all-srcs",
-        "//cmd/hyperkube:all-srcs",
         "//cmd/importverifier:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",
@@ -31,6 +30,8 @@ filegroup(
         "//cmd/kubelet:all-srcs",
         "//cmd/kubemark:all-srcs",
         "//cmd/linkcheck:all-srcs",
+        "//cmd/preferredimports:all-srcs",
+        "//cmd/verifydependencies:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -17,10 +17,11 @@ limitations under the License.
 package setdefault
 
 import (
+	"context"
 	"fmt"
 	"io"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,7 +86,7 @@ func (a *claimDefaulterPlugin) ValidateInitialization() error {
 // 1.  Find available StorageClasses.
 // 2.  Figure which is the default
 // 3.  Write to the PVClaim
-func (a *claimDefaulterPlugin) Admit(attr admission.Attributes) error {
+func (a *claimDefaulterPlugin) Admit(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if attr.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}
@@ -105,7 +106,7 @@ func (a *claimDefaulterPlugin) Admit(attr admission.Attributes) error {
 		return nil
 	}
 
-	glog.V(4).Infof("no storage class for claim %s (generate: %s)", pvc.Name, pvc.GenerateName)
+	klog.V(4).Infof("no storage class for claim %s (generate: %s)", pvc.Name, pvc.GenerateName)
 
 	def, err := getDefaultClass(a.lister)
 	if err != nil {
@@ -116,7 +117,7 @@ func (a *claimDefaulterPlugin) Admit(attr admission.Attributes) error {
 		return nil
 	}
 
-	glog.V(4).Infof("defaulting storage class for claim %s (generate: %s) to %s", pvc.Name, pvc.GenerateName, def.Name)
+	klog.V(4).Infof("defaulting storage class for claim %s (generate: %s) to %s", pvc.Name, pvc.GenerateName, def.Name)
 	pvc.Spec.StorageClassName = &def.Name
 	return nil
 }
@@ -132,7 +133,7 @@ func getDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.Sto
 	for _, class := range list {
 		if storageutil.IsDefaultAnnotation(class.ObjectMeta) {
 			defaultClasses = append(defaultClasses, class)
-			glog.V(4).Infof("getDefaultClass added: %s", class.Name)
+			klog.V(4).Infof("getDefaultClass added: %s", class.Name)
 		}
 	}
 
@@ -140,7 +141,7 @@ func getDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.Sto
 		return nil, nil
 	}
 	if len(defaultClasses) > 1 {
-		glog.V(4).Infof("getDefaultClass %d defaults found", len(defaultClasses))
+		klog.V(4).Infof("getDefaultClass %d defaults found", len(defaultClasses))
 		return nil, errors.NewInternalError(fmt.Errorf("%d default StorageClasses were found", len(defaultClasses)))
 	}
 	return defaultClasses[0], nil

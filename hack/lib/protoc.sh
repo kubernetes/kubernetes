@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 # The root of the build/dist directory
-KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
+KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Generates $1/api.pb.go from the protobuf file $1/api.proto
@@ -35,8 +35,8 @@ function kube::protoc::generate_proto() {
   kube::protoc::check_protoc
 
   local package=${1}
-  kube::protoc::protoc ${package}
-  kube::protoc::format ${package}
+  kube::protoc::protoc "${package}"
+  kube::protoc::format "${package}"
 }
 
 # Checks that the current protoc version is at least version 3.0.0-beta1
@@ -62,7 +62,7 @@ function kube::protoc::protoc() {
   PATH="${gogopath}:${PATH}" protoc \
     --proto_path="${package}" \
     --proto_path="${KUBE_ROOT}/vendor" \
-    --gogo_out=plugins=grpc:${package} ${package}/api.proto
+    --gogo_out=plugins=grpc:"${package}" "${package}/api.proto"
 }
 
 # Formats $1/api.pb.go, adds the boilerplate comments and run gofmt on it
@@ -71,20 +71,20 @@ function kube::protoc::format() {
   local package=${1}
 
   # Update boilerplate for the generated file.
-  echo "$(cat hack/boilerplate/boilerplate.generatego.txt ${package}/api.pb.go)" > ${package}/api.pb.go
+  cat hack/boilerplate/boilerplate.generatego.txt "${package}/api.pb.go" > tmpfile && mv tmpfile "${package}/api.pb.go"
 
   # Run gofmt to clean up the generated code.
   kube::golang::verify_go_version
-  gofmt -l -s -w ${package}/api.pb.go
+  gofmt -l -s -w "${package}/api.pb.go"
 }
 
 # Compares the contents of $1 and $2
 # Echo's $3 in case of error and exits 1
 function kube::protoc::diff() {
   local ret=0
-  diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${1} ${2} || ret=$?
-  if [[ $ret -ne 0 ]]; then
-    echo ${3}
+  diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr "${1}" "${2}" || ret=$?
+  if [[ ${ret} -ne 0 ]]; then
+    echo "${3}"
     exit 1
   fi
 }

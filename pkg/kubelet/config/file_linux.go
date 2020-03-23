@@ -16,7 +16,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from file or a directory of files.
 package config
 
 import (
@@ -26,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-	"golang.org/x/exp/inotify"
+	"github.com/fsnotify/fsnotify"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -50,17 +49,17 @@ func (e *retryableError) Error() string {
 
 func (s *sourceFile) startWatch() {
 	backOff := flowcontrol.NewBackOff(retryPeriod, maxRetryPeriod)
-	backOffId := "watch"
+	backOffID := "watch"
 
 	go wait.Forever(func() {
-		if backOff.IsInBackOffSinceUpdate(backOffId, time.Now()) {
+		if backOff.IsInBackOffSinceUpdate(backOffID, time.Now()) {
 			return
 		}
 
 		if err := s.doWatch(); err != nil {
-			glog.Errorf("Unable to read config path %q: %v", s.path, err)
+			klog.Errorf("Unable to read config path %q: %v", s.path, err)
 			if _, retryable := err.(*retryableError); !retryable {
-				backOff.Next(backOffId, time.Now())
+				backOff.Next(backOffID, time.Now())
 			}
 		}
 	}, retryPeriod)
@@ -77,54 +76,47 @@ func (s *sourceFile) doWatch() error {
 		return &retryableError{"path does not exist, ignoring"}
 	}
 
-	w, err := inotify.NewWatcher()
+	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("unable to create inotify: %v", err)
 	}
 	defer w.Close()
 
-	err = w.AddWatch(s.path, inotify.IN_DELETE_SELF|inotify.IN_CREATE|inotify.IN_MOVED_TO|inotify.IN_MODIFY|inotify.IN_MOVED_FROM|inotify.IN_DELETE|inotify.IN_ATTRIB)
+	err = w.Add(s.path)
 	if err != nil {
 		return fmt.Errorf("unable to create inotify for path %q: %v", s.path, err)
 	}
 
 	for {
 		select {
-		case event := <-w.Event:
-			if err = s.produceWatchEvent(event); err != nil {
+		case event := <-w.Events:
+			if err = s.produceWatchEvent(&event); err != nil {
 				return fmt.Errorf("error while processing inotify event (%+v): %v", event, err)
 			}
-		case err = <-w.Error:
+		case err = <-w.Errors:
 			return fmt.Errorf("error while watching %q: %v", s.path, err)
 		}
 	}
 }
 
-func (s *sourceFile) produceWatchEvent(e *inotify.Event) error {
+func (s *sourceFile) produceWatchEvent(e *fsnotify.Event) error {
 	// Ignore file start with dots
 	if strings.HasPrefix(filepath.Base(e.Name), ".") {
-		glog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
+		klog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
 		return nil
 	}
 	var eventType podEventType
 	switch {
-	case (e.Mask & inotify.IN_ISDIR) > 0:
-		glog.Errorf("Not recursing into manifest path %q", s.path)
-		return nil
-	case (e.Mask & inotify.IN_CREATE) > 0:
+	case (e.Op & fsnotify.Create) > 0:
 		eventType = podAdd
-	case (e.Mask & inotify.IN_MOVED_TO) > 0:
-		eventType = podAdd
-	case (e.Mask & inotify.IN_MODIFY) > 0:
+	case (e.Op & fsnotify.Write) > 0:
 		eventType = podModify
-	case (e.Mask & inotify.IN_ATTRIB) > 0:
+	case (e.Op & fsnotify.Chmod) > 0:
 		eventType = podModify
-	case (e.Mask & inotify.IN_DELETE) > 0:
+	case (e.Op & fsnotify.Remove) > 0:
 		eventType = podDelete
-	case (e.Mask & inotify.IN_MOVED_FROM) > 0:
+	case (e.Op & fsnotify.Rename) > 0:
 		eventType = podDelete
-	case (e.Mask & inotify.IN_DELETE_SELF) > 0:
-		return fmt.Errorf("the watched path is deleted")
 	default:
 		// Ignore rest events
 		return nil
@@ -137,11 +129,11 @@ func (s *sourceFile) produceWatchEvent(e *inotify.Event) error {
 func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 	switch e.eventType {
 	case podAdd, podModify:
-		if pod, err := s.extractFromFile(e.fileName); err != nil {
+		pod, err := s.extractFromFile(e.fileName)
+		if err != nil {
 			return fmt.Errorf("can't process config file %q: %v", e.fileName, err)
-		} else {
-			return s.store.Add(pod)
 		}
+		return s.store.Add(pod)
 	case podDelete:
 		if objKey, keyExist := s.fileKeyMapping[e.fileName]; keyExist {
 			pod, podExist, err := s.store.GetByKey(objKey)
@@ -152,9 +144,8 @@ func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 			} else {
 				if err = s.store.Delete(pod); err != nil {
 					return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
-				} else {
-					delete(s.fileKeyMapping, e.fileName)
 				}
+				delete(s.fileKeyMapping, e.fileName)
 			}
 		}
 	}

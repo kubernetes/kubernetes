@@ -20,14 +20,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -41,7 +44,7 @@ type Prepuller interface {
 	DeleteFunc(string) error
 }
 
-// DaemonSetPrepuller makes sure the control plane images are available on all masters
+// DaemonSetPrepuller makes sure the control-plane images are available on all control-planes
 type DaemonSetPrepuller struct {
 	client clientset.Interface
 	cfg    *kubeadmapi.ClusterConfiguration
@@ -63,13 +66,13 @@ func (d *DaemonSetPrepuller) CreateFunc(component string) error {
 	if component == constants.Etcd {
 		image = images.GetEtcdImage(d.cfg)
 	} else {
-		image = images.GetKubeControlPlaneImage(component, d.cfg)
+		image = images.GetKubernetesImage(component, d.cfg)
 	}
 	ds := buildPrePullDaemonSet(component, image)
 
 	// Create the DaemonSet in the API Server
 	if err := apiclient.CreateOrUpdateDaemonSet(d.client, ds); err != nil {
-		return fmt.Errorf("unable to create a DaemonSet for prepulling the component %q: %v", component, err)
+		return errors.Wrapf(err, "unable to create a DaemonSet for prepulling the component %q", component)
 	}
 	return nil
 }
@@ -83,8 +86,10 @@ func (d *DaemonSetPrepuller) WaitFunc(component string) {
 // DeleteFunc deletes the DaemonSet used for making the image available on every relevant node
 func (d *DaemonSetPrepuller) DeleteFunc(component string) error {
 	dsName := addPrepullPrefix(component)
-	if err := apiclient.DeleteDaemonSetForeground(d.client, metav1.NamespaceSystem, dsName); err != nil {
-		return fmt.Errorf("unable to cleanup the DaemonSet used for prepulling %s: %v", component, err)
+	// TODO: The IsNotFound() check is required in cases where the DaemonSet is missing.
+	// Investigate why this happens: https://github.com/kubernetes/kubeadm/issues/1700
+	if err := apiclient.DeleteDaemonSetForeground(d.client, metav1.NamespaceSystem, dsName); err != nil && !apierrors.IsNotFound(err) {
+		return errors.Wrapf(err, "unable to cleanup the DaemonSet used for prepulling %s", component)
 	}
 	fmt.Printf("[upgrade/prepull] Prepulled image for component %s.\n", component)
 	return nil
@@ -130,7 +135,7 @@ func waitForItemsFromChan(timeoutChan <-chan time.Time, stringChan chan string, 
 	for {
 		select {
 		case <-timeoutChan:
-			return fmt.Errorf("The prepull operation timed out")
+			return errors.New("the prepull operation timed out")
 		case result := <-stringChan:
 			i++
 			// If the cleanup function errors; error here as well
@@ -180,8 +185,13 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 					NodeSelector: map[string]string{
 						constants.LabelNodeRoleMaster: "",
 					},
-					Tolerations:                   []v1.Toleration{constants.MasterToleration},
+					Tolerations:                   []v1.Toleration{constants.ControlPlaneToleration},
 					TerminationGracePeriodSeconds: &gracePeriodSecs,
+					// Explicitly add a PodSecurityContext to allow these Pods to run as non-root.
+					// This prevents restrictive PSPs from blocking the Pod creation.
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser: utilpointer.Int64Ptr(999),
+					},
 				},
 			},
 		},

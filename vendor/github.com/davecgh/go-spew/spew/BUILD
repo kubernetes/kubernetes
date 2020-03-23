@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "bypass.go",
+        "bypasssafe.go",
         "common.go",
         "config.go",
         "doc.go",

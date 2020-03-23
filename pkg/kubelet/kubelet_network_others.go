@@ -19,4 +19,4 @@ limitations under the License.
 package kubelet
 
 // Do nothing.
-func (kl *Kubelet) syncNetworkUtil() {}
+func (kl *Kubelet) initNetworkUtil() {}

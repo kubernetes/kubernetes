@@ -1,0 +1,60 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-hostpath-provisioner 
+  labels:
+    app: csi-hostpath-provisioner 
+spec:
+  selector:
+    app: csi-hostpath-provisioner 
+  ports:
+    - name: dummy
+      port: 12345
+
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-hostpath-provisioner
+spec:
+  serviceName: "csi-hostpath-provisioner"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-hostpath-provisioner
+  template:
+    metadata:
+      labels:
+        app: csi-hostpath-provisioner
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - csi-hostpathplugin
+            topologyKey: kubernetes.io/hostname
+      serviceAccountName: csi-provisioner
+      containers:
+        - name: csi-provisioner
+          image: quay.io/k8scsi/csi-provisioner:v1.5.0
+          args:
+            - -v=5
+            - --csi-address=/csi/csi.sock
+            - --connection-timeout=15s
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-hostpath
+            type: DirectoryOrCreate
+          name: socket-dir

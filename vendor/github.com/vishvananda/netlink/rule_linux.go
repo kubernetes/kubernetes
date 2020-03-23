@@ -3,10 +3,12 @@ package netlink
 import (
 	"fmt"
 	"net"
-	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
+	"golang.org/x/sys/unix"
 )
+
+const FibRuleInvert = 0x2
 
 // RuleAdd adds a rule to the system.
 // Equivalent to: ip rule add
@@ -17,7 +19,7 @@ func RuleAdd(rule *Rule) error {
 // RuleAdd adds a rule to the system.
 // Equivalent to: ip rule add
 func (h *Handle) RuleAdd(rule *Rule) error {
-	req := h.newNetlinkRequest(syscall.RTM_NEWRULE, syscall.NLM_F_CREATE|syscall.NLM_F_EXCL|syscall.NLM_F_ACK)
+	req := h.newNetlinkRequest(unix.RTM_NEWRULE, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
 	return ruleHandle(rule, req)
 }
 
@@ -30,18 +32,31 @@ func RuleDel(rule *Rule) error {
 // RuleDel deletes a rule from the system.
 // Equivalent to: ip rule del
 func (h *Handle) RuleDel(rule *Rule) error {
-	req := h.newNetlinkRequest(syscall.RTM_DELRULE, syscall.NLM_F_CREATE|syscall.NLM_F_EXCL|syscall.NLM_F_ACK)
+	req := h.newNetlinkRequest(unix.RTM_DELRULE, unix.NLM_F_ACK)
 	return ruleHandle(rule, req)
 }
 
 func ruleHandle(rule *Rule, req *nl.NetlinkRequest) error {
 	msg := nl.NewRtMsg()
-	msg.Family = syscall.AF_INET
+	msg.Family = unix.AF_INET
+	msg.Protocol = unix.RTPROT_BOOT
+	msg.Scope = unix.RT_SCOPE_UNIVERSE
+	msg.Table = unix.RT_TABLE_UNSPEC
+	msg.Type = unix.RTN_UNSPEC
+	if req.NlMsghdr.Flags&unix.NLM_F_CREATE > 0 {
+		msg.Type = unix.RTN_UNICAST
+	}
+	if rule.Invert {
+		msg.Flags |= FibRuleInvert
+	}
 	if rule.Family != 0 {
 		msg.Family = uint8(rule.Family)
 	}
-	var dstFamily uint8
+	if rule.Table >= 0 && rule.Table < 256 {
+		msg.Table = uint8(rule.Table)
+	}
 
+	var dstFamily uint8
 	var rtAttrs []*nl.RtAttr
 	if rule.Dst != nil && rule.Dst.IP != nil {
 		dstLen, _ := rule.Dst.Mask.Size()
@@ -49,12 +64,12 @@ func ruleHandle(rule *Rule, req *nl.NetlinkRequest) error {
 		msg.Family = uint8(nl.GetIPFamily(rule.Dst.IP))
 		dstFamily = msg.Family
 		var dstData []byte
-		if msg.Family == syscall.AF_INET {
+		if msg.Family == unix.AF_INET {
 			dstData = rule.Dst.IP.To4()
 		} else {
 			dstData = rule.Dst.IP.To16()
 		}
-		rtAttrs = append(rtAttrs, nl.NewRtAttr(syscall.RTA_DST, dstData))
+		rtAttrs = append(rtAttrs, nl.NewRtAttr(unix.RTA_DST, dstData))
 	}
 
 	if rule.Src != nil && rule.Src.IP != nil {
@@ -65,19 +80,12 @@ func ruleHandle(rule *Rule, req *nl.NetlinkRequest) error {
 		srcLen, _ := rule.Src.Mask.Size()
 		msg.Src_len = uint8(srcLen)
 		var srcData []byte
-		if msg.Family == syscall.AF_INET {
+		if msg.Family == unix.AF_INET {
 			srcData = rule.Src.IP.To4()
 		} else {
 			srcData = rule.Src.IP.To16()
 		}
-		rtAttrs = append(rtAttrs, nl.NewRtAttr(syscall.RTA_SRC, srcData))
-	}
-
-	if rule.Table >= 0 {
-		msg.Table = uint8(rule.Table)
-		if rule.Table >= 256 {
-			msg.Table = syscall.RT_TABLE_UNSPEC
-		}
+		rtAttrs = append(rtAttrs, nl.NewRtAttr(unix.RTA_SRC, srcData))
 	}
 
 	req.AddData(msg)
@@ -142,7 +150,7 @@ func ruleHandle(rule *Rule, req *nl.NetlinkRequest) error {
 		req.AddData(nl.NewRtAttr(nl.FRA_GOTO, b))
 	}
 
-	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
+	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
 	return err
 }
 
@@ -155,11 +163,11 @@ func RuleList(family int) ([]Rule, error) {
 // RuleList lists rules in the system.
 // Equivalent to: ip rule list
 func (h *Handle) RuleList(family int) ([]Rule, error) {
-	req := h.newNetlinkRequest(syscall.RTM_GETRULE, syscall.NLM_F_DUMP|syscall.NLM_F_REQUEST)
+	req := h.newNetlinkRequest(unix.RTM_GETRULE, unix.NLM_F_DUMP|unix.NLM_F_REQUEST)
 	msg := nl.NewIfInfomsg(family)
 	req.AddData(msg)
 
-	msgs, err := req.Execute(syscall.NETLINK_ROUTE, syscall.RTM_NEWRULE)
+	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWRULE)
 	if err != nil {
 		return nil, err
 	}
@@ -175,9 +183,11 @@ func (h *Handle) RuleList(family int) ([]Rule, error) {
 
 		rule := NewRule()
 
+		rule.Invert = msg.Flags&FibRuleInvert > 0
+
 		for j := range attrs {
 			switch attrs[j].Attr.Type {
-			case syscall.RTA_TABLE:
+			case unix.RTA_TABLE:
 				rule.Table = int(native.Uint32(attrs[j].Value[0:4]))
 			case nl.FRA_SRC:
 				rule.Src = &net.IPNet{

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -34,7 +34,7 @@ import (
 )
 
 type AuthorizationRuleResolver interface {
-	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namepsace
+	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namespace
 	// of the role binding, the empty string if a cluster role binding.
 	GetRoleReferenceRules(roleRef rbacv1.RoleRef, namespace string) ([]rbacv1.PolicyRule, error)
 
@@ -61,7 +61,7 @@ func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleReso
 	ownerRules, err := ruleResolver.RulesFor(user, namespace)
 	if err != nil {
 		// As per AuthorizationRuleResolver contract, this may return a non fatal error with an incomplete list of policies. Log the error and continue.
-		glog.V(1).Infof("non-fatal error getting local rules for %v: %v", user, err)
+		klog.V(1).Infof("non-fatal error getting local rules for %v: %v", user, err)
 		ruleResolutionErrors = append(ruleResolutionErrors, err)
 	}
 
@@ -286,7 +286,8 @@ func appliesToUser(user user.Info, subject rbacv1.Subject, namespace string) boo
 		if len(saNamespace) == 0 {
 			return false
 		}
-		return serviceaccount.MakeUsername(saNamespace, subject.Name) == user.GetName()
+		// use a more efficient comparison for RBAC checking
+		return serviceaccount.MatchesUsername(saNamespace, subject.Name, user.GetName())
 	default:
 		return false
 	}

@@ -24,7 +24,7 @@ import (
 )
 
 // TestOnlyStaticRESTMapper returns a union RESTMapper of all known types with priorities chosen in the following order:
-//  1. legacy kube group preferred version, extensions preferred version, metrics perferred version, legacy
+//  1. legacy kube group preferred version, extensions preferred version, metrics preferred version, legacy
 //     kube any version, extensions any version, metrics any version, all other groups alphabetical preferred version,
 //     all other groups alphabetical.
 // TODO callers of this method should be updated to build their own specific restmapper based on their scheme for their tests
@@ -111,7 +111,6 @@ func newRESTMapper(group string, scheme *runtime.Scheme) meta.RESTMapper {
 var rootScopedKinds = map[schema.GroupKind]bool{
 	{Group: "admission.k8s.io", Kind: "AdmissionReview"}: true,
 
-	{Group: "admissionregistration.k8s.io", Kind: "InitializerConfiguration"}:       true,
 	{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"}: true,
 	{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"}:   true,
 
@@ -153,7 +152,7 @@ var rootScopedKinds = map[schema.GroupKind]bool{
 
 	{Group: "metrics.k8s.io", Kind: "NodeMetrics"}: true,
 
-	{Group: "wardle.k8s.io", Kind: "Fischer"}: true,
+	{Group: "wardle.example.com", Kind: "Fischer"}: true,
 }
 
 // hardcoded is good enough for the test we're running

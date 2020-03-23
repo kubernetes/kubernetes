@@ -1,4 +1,4 @@
-// Copyright 2016 Frank Schroeder. All rights reserved.
+// Copyright 2018 Frank Schroeder. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -72,7 +72,7 @@ type lexer struct {
 
 // next returns the next rune in the input.
 func (l *lexer) next() rune {
-	if int(l.pos) >= len(l.input) {
+	if l.pos >= len(l.input) {
 		l.width = 0
 		return eof
 	}
@@ -96,8 +96,8 @@ func (l *lexer) backup() {
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
-	item := item{t, l.start, string(l.runes)}
-	l.items <- item
+	i := item{t, l.start, string(l.runes)}
+	l.items <- i
 	l.start = l.pos
 	l.runes = l.runes[:0]
 }
@@ -114,7 +114,7 @@ func (l *lexer) appendRune(r rune) {
 
 // accept consumes the next rune if it's from the valid set.
 func (l *lexer) accept(valid string) bool {
-	if strings.IndexRune(valid, l.next()) >= 0 {
+	if strings.ContainsRune(valid, l.next()) {
 		return true
 	}
 	l.backup()
@@ -123,7 +123,7 @@ func (l *lexer) accept(valid string) bool {
 
 // acceptRun consumes a run of runes from the valid set.
 func (l *lexer) acceptRun(valid string) {
-	for strings.IndexRune(valid, l.next()) >= 0 {
+	for strings.ContainsRune(valid, l.next()) {
 	}
 	l.backup()
 }
@@ -156,9 +156,9 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 
 // nextItem returns the next item from the input.
 func (l *lexer) nextItem() item {
-	item := <-l.items
-	l.lastPos = item.pos
-	return item
+	i := <-l.items
+	l.lastPos = i.pos
+	return i
 }
 
 // lex creates a new scanner for the input string.
@@ -196,9 +196,8 @@ func lexBeforeKey(l *lexer) stateFn {
 		return lexComment
 
 	case isWhitespace(r):
-		l.acceptRun(whitespace)
 		l.ignore()
-		return lexKey
+		return lexBeforeKey
 
 	default:
 		l.backup()
@@ -279,8 +278,7 @@ func lexValue(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
 		case isEscape(r):
-			r := l.peek()
-			if isEOL(r) {
+			if isEOL(l.peek()) {
 				l.next()
 				l.acceptRun(whitespace)
 			} else {

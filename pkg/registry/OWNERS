@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - lavalamp
@@ -26,7 +28,6 @@ reviewers:
 - janetkuo
 - justinsb
 - pwittrock
-- roberthbailey
 - ncdc
 - tallclair
 - eparis

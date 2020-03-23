@@ -1,3 +1,5 @@
+// untested sections: 2
+
 package matchers
 
 import (
@@ -22,19 +24,21 @@ func (matcher *ContainElementMatcher) Match(actual interface{}) (success bool, e
 	}
 
 	value := reflect.ValueOf(actual)
-	var keys []reflect.Value
+	var valueAt func(int) interface{}
 	if isMap(actual) {
-		keys = value.MapKeys()
+		keys := value.MapKeys()
+		valueAt = func(i int) interface{} {
+			return value.MapIndex(keys[i]).Interface()
+		}
+	} else {
+		valueAt = func(i int) interface{} {
+			return value.Index(i).Interface()
+		}
 	}
+
 	var lastError error
 	for i := 0; i < value.Len(); i++ {
-		var success bool
-		var err error
-		if isMap(actual) {
-			success, err = elemMatcher.Match(value.MapIndex(keys[i]).Interface())
-		} else {
-			success, err = elemMatcher.Match(value.Index(i).Interface())
-		}
+		success, err := elemMatcher.Match(valueAt(i))
 		if err != nil {
 			lastError = err
 			continue

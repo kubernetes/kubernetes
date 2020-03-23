@@ -43,7 +43,7 @@ var packageCases = []struct {
 		if err != unix.ENXIO {
 			panic("woops")
 		}
-	}`, map[string]string{"linux/amd64": "", "windows/amd64": "test.go:4:13: ENXIO not declared by package unix"}},
+	}`, map[string]string{"linux/amd64": "", "windows/amd64": "test.go:4:18: ENXIO not declared by package unix"}},
 	// Fixed in #51984
 	{`import "golang.org/x/sys/unix"
 	const linuxHugetlbfsMagic = 0x958458f6
@@ -146,7 +146,9 @@ func TestHandlePackage(t *testing.T) {
 }
 
 func TestHandlePath(t *testing.T) {
-	c := collector{}
+	c := collector{
+		ignoreDirs: standardIgnoreDirs,
+	}
 	e := errors.New("ex")
 	i, _ := os.Stat(".") // i.IsDir() == true
 	if c.handlePath("foo", nil, e) != e {

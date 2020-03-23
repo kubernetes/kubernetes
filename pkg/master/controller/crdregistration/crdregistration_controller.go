@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,15 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 // AutoAPIServiceRegistration is an interface which callers can re-declare locally and properly cast to for
 // adding and removing APIServices
 type AutoAPIServiceRegistration interface {
 	// AddAPIServiceToSync adds an API service to auto-register.
-	AddAPIServiceToSync(in *apiregistration.APIService)
+	AddAPIServiceToSync(in *v1.APIService)
 	// RemoveAPIServiceToSync removes an API service to auto-register.
 	RemoveAPIServiceToSync(name string)
 }
@@ -60,40 +59,40 @@ type crdRegistrationController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewAutoRegistrationController returns a controller which will register CRD GroupVersions with the auto APIService registration
+// NewCRDRegistrationController returns a controller which will register CRD GroupVersions with the auto APIService registration
 // controller so they automatically stay in sync.
-func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
+func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
 	c := &crdRegistrationController{
 		crdLister:              crdinformer.Lister(),
 		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
 		syncedInitialSet:       make(chan struct{}),
-		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd-autoregister"),
+		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_autoregistration_controller"),
 	}
 	c.syncHandler = c.handleVersionUpdate
 
 	crdinformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			cast := obj.(*apiextensions.CustomResourceDefinition)
+			cast := obj.(*apiextensionsv1.CustomResourceDefinition)
 			c.enqueueCRD(cast)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			// Enqueue both old and new object to make sure we remove and add appropriate API services.
 			// The working queue will resolve any duplicates and only changes will stay in the queue.
-			c.enqueueCRD(oldObj.(*apiextensions.CustomResourceDefinition))
-			c.enqueueCRD(newObj.(*apiextensions.CustomResourceDefinition))
+			c.enqueueCRD(oldObj.(*apiextensionsv1.CustomResourceDefinition))
+			c.enqueueCRD(newObj.(*apiextensionsv1.CustomResourceDefinition))
 		},
 		DeleteFunc: func(obj interface{}) {
-			cast, ok := obj.(*apiextensions.CustomResourceDefinition)
+			cast, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					glog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
 					return
 				}
-				cast, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
+				cast, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
 				if !ok {
-					glog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
+					klog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
 					return
 				}
 			}
@@ -109,11 +108,11 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting crd-autoregister controller")
-	defer glog.Infof("Shutting down crd-autoregister controller")
+	klog.Infof("Starting crd-autoregister controller")
+	defer klog.Infof("Shutting down crd-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
-	if !controller.WaitForCacheSync("crd-autoregister", stopCh, c.crdSynced) {
+	if !cache.WaitForNamedCacheSync("crd-autoregister", stopCh, c.crdSynced) {
 		return
 	}
 
@@ -185,7 +184,7 @@ func (c *crdRegistrationController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *crdRegistrationController) enqueueCRD(crd *apiextensions.CustomResourceDefinition) {
+func (c *crdRegistrationController) enqueueCRD(crd *apiextensionsv1.CustomResourceDefinition) {
 	for _, version := range crd.Spec.Versions {
 		c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name})
 	}
@@ -208,9 +207,9 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 				continue
 			}
 
-			c.apiServiceRegistration.AddAPIServiceToSync(&apiregistration.APIService{
+			c.apiServiceRegistration.AddAPIServiceToSync(&v1.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
-				Spec: apiregistration.APIServiceSpec{
+				Spec: v1.APIServiceSpec{
 					Group:                groupVersion.Group,
 					Version:              groupVersion.Version,
 					GroupPriorityMinimum: 1000, // CRDs should have relatively low priority

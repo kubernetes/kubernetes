@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -19,16 +21,19 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -52,7 +57,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedNameForDisk(vsphereVolumePluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(vsphereVolumePluginName), volName)
 }
 
 // vSphere Volume Plugin
@@ -138,13 +143,18 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	volumePath, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
+	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
+	volumePath, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
 	volumePath = strings.Replace(volumePath, "\\040", " ", -1)
-	glog.V(5).Infof("vSphere volume path is %q", volumePath)
+	klog.V(5).Infof("vSphere volume path is %q", volumePath)
 	vsphereVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -159,7 +169,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 // Abstract interface to disk operations.
 type vdManager interface {
 	// Creates a volume
-	CreateVolume(provisioner *vsphereVolumeProvisioner) (volSpec *VolumeSpec, err error)
+	CreateVolume(provisioner *vsphereVolumeProvisioner, selectedNode *v1.Node, selectedZone []string) (volSpec *VolumeSpec, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *vsphereVolumeDeleter) error
 }
@@ -170,17 +180,11 @@ type vsphereVolume struct {
 	podUID  types.UID
 	// Unique identifier of the volume, used to find the disk resource in the provider.
 	volPath string
-	// Filesystem type, optional.
-	fsType string
-	//diskID for detach disk
-	diskID string
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager vdManager
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
-	// diskMounter provides the interface that is used to mount the actual block device.
-	diskMounter mount.Interface
-	plugin      *vsphereVolumePlugin
+	plugin  *vsphereVolumePlugin
 	volume.MetricsProvider
 }
 
@@ -201,8 +205,8 @@ func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *vsphereVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
@@ -213,23 +217,27 @@ func (b *vsphereVolumeMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
+func (b *vsphereVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+	klog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
 
 	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
+		klog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
 		return err
 	}
 	if !notmnt {
-		glog.V(4).Infof("Something is already mounted to target %s", dir)
+		klog.V(4).Infof("Something is already mounted to target %s", dir)
 		return nil
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
-		return err
+	if runtime.GOOS != "windows" {
+		// On Windows, Mount will create the parent of dir and mklink (create a symbolic link) at dir later, so don't create a
+		// directory at dir now. Otherwise mklink will error: "Cannot create a file when that file already exists".
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			klog.Errorf("Could not create directory %s: %v", dir, err)
+			return err
+		}
 	}
 
 	options := []string{"bind"}
@@ -241,29 +249,29 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notmnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notmnt {
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
 				return err
 			}
 		}
 		os.Remove(dir)
 		return err
 	}
-	volume.SetVolumeOwnership(b, fsGroup)
-	glog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
+	volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+	klog.V(3).Infof("vSphere volume %s mounted to %s", b.volPath, dir)
 
 	return nil
 }
@@ -283,16 +291,16 @@ func (v *vsphereVolumeUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, v.mounter)
+	return mount.CleanupMountPoint(dir, v.mounter, false)
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(vsphereVolumePluginName), mount.MountsInGlobalPDPath, devName)
+	return filepath.Join(host.GetPluginDir(vsphereVolumePluginName), util.MountsInGlobalPDPath, devName)
 }
 
 func (vv *vsphereVolume) GetPath() string {
 	name := vsphereVolumePluginName
-	return vv.plugin.host.GetPodVolumeDir(vv.podUID, utilstrings.EscapeQualifiedNameForDisk(name), vv.volName)
+	return vv.plugin.host.GetPodVolumeDir(vv.podUID, utilstrings.EscapeQualifiedName(name), vv.volName)
 }
 
 // vSphere Persistent Volume Plugin
@@ -356,17 +364,26 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
 	}
-	if util.CheckPersistentVolumeClaimModeBlock(v.options.PVC) {
-		return nil, fmt.Errorf("%s does not support block volume provisioning", v.plugin.GetPluginName())
+	klog.V(1).Infof("Provision with selectedNode: %s and allowedTopologies : %s", getNodeName(selectedNode), allowedTopologies)
+	selectedZones, err := volumehelpers.ZonesFromAllowedTopologies(allowedTopologies)
+	if err != nil {
+		return nil, err
 	}
 
-	volSpec, err := v.manager.CreateVolume(v)
+	klog.V(4).Infof("Selected zones for volume : %s", selectedZones)
+	volSpec, err := v.manager.CreateVolume(v, selectedNode, selectedZones.List())
 	if err != nil {
 		return nil, err
 	}
 
 	if volSpec.Fstype == "" {
 		volSpec.Fstype = "ext4"
+	}
+
+	volumeMode := v.options.PVC.Spec.VolumeMode
+	if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+		klog.V(5).Infof("vSphere block volume should not have any FSType")
+		volSpec.Fstype = ""
 	}
 
 	pv := &v1.PersistentVolume{
@@ -383,6 +400,7 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", volSpec.Size)),
 			},
+			VolumeMode: volumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
 					VolumePath:        volSpec.Path,
@@ -398,6 +416,34 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 		pv.Spec.AccessModes = v.plugin.GetAccessModes()
 	}
 
+	labels := volSpec.Labels
+	requirements := make([]v1.NodeSelectorRequirement, 0)
+	if len(labels) != 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		for k, v := range labels {
+			pv.Labels[k] = v
+			var values []string
+			if k == v1.LabelZoneFailureDomain {
+				values, err = volumehelpers.LabelZonesToList(v)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a List: %v", v, err)
+				}
+			} else {
+				values = []string{v}
+			}
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: values})
+		}
+	}
+
+	if len(requirements) > 0 {
+		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
+	}
+
 	return pv, nil
 }
 
@@ -411,4 +457,11 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
+}
+
+func getNodeName(node *v1.Node) string {
+	if node == nil {
+		return ""
+	}
+	return node.Name
 }

@@ -24,12 +24,13 @@ import (
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	watch "github.com/google/cadvisor/manager/watcher"
+	watch "github.com/google/cadvisor/watcher"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")
+var disableRootCgroupStats = flag.Bool("disable_root_cgroup_stats", false, "Disable collecting root Cgroup stats")
 
 type rawFactory struct {
 	// Factory for machine information.
@@ -63,17 +64,20 @@ func (self *rawFactory) NewContainerHandler(name string, inHostNamespace bool) (
 	return newRawContainerHandler(name, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo, self.watcher, rootFs, self.includedMetrics)
 }
 
-// The raw factory can handle any container. If --docker_only is set to false, non-docker containers are ignored.
+// The raw factory can handle any container. If --docker_only is set to true, non-docker containers are ignored except for "/" and those whitelisted by raw_cgroup_prefix_whitelist flag.
 func (self *rawFactory) CanHandleAndAccept(name string) (bool, bool, error) {
-	accept := name == "/" || !*dockerOnly
-
+	if name == "/" {
+		return true, true, nil
+	}
+	if *dockerOnly && self.rawPrefixWhiteList[0] == "" {
+		return true, false, nil
+	}
 	for _, prefix := range self.rawPrefixWhiteList {
 		if strings.HasPrefix(name, prefix) {
-			accept = true
-			break
+			return true, true, nil
 		}
 	}
-	return true, accept, nil
+	return true, false, nil
 }
 
 func (self *rawFactory) DebugInfo() map[string][]string {
@@ -81,7 +85,7 @@ func (self *rawFactory) DebugInfo() map[string][]string {
 }
 
 func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics map[container.MetricKind]struct{}, rawPrefixWhiteList []string) error {
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
@@ -94,7 +98,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, incl
 		return err
 	}
 
-	glog.V(1).Infof("Registering Raw factory")
+	klog.V(1).Infof("Registering Raw factory")
 	factory := &rawFactory{
 		machineInfoFactory: machineInfoFactory,
 		fsInfo:             fsInfo,

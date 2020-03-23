@@ -17,6 +17,7 @@ limitations under the License.
 package limitranger
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -78,16 +79,19 @@ type liveLookupEntry struct {
 	items  []*corev1.LimitRange
 }
 
+// SetExternalKubeInformerFactory registers an informer factory into the LimitRanger
 func (l *LimitRanger) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	limitRangeInformer := f.Core().V1().LimitRanges()
 	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
 	l.lister = limitRangeInformer.Lister()
 }
 
-func (a *LimitRanger) SetExternalKubeClientSet(client kubernetes.Interface) {
-	a.client = client
+// SetExternalKubeClientSet registers the client into LimitRanger
+func (l *LimitRanger) SetExternalKubeClientSet(client kubernetes.Interface) {
+	l.client = client
 }
 
+// ValidateInitialization verifies the LimitRanger object has been properly initialized
 func (l *LimitRanger) ValidateInitialization() error {
 	if l.lister == nil {
 		return fmt.Errorf("missing limitRange lister")
@@ -99,12 +103,12 @@ func (l *LimitRanger) ValidateInitialization() error {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Admit(a admission.Attributes) (err error) {
+func (l *LimitRanger) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return l.runLimitFunc(a, l.actions.MutateLimit)
 }
 
 // Validate admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Validate(a admission.Attributes) (err error) {
+func (l *LimitRanger) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return l.runLimitFunc(a, l.actions.ValidateLimit)
 }
 
@@ -146,6 +150,8 @@ func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRan
 	return nil
 }
 
+// GetLimitRanges returns a LimitRange object with the items held in
+// the indexer if available, or do alive lookup of the value.
 func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRange, error) {
 	items, err := l.lister.LimitRanges(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
@@ -161,7 +167,7 @@ func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRan
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := l.client.CoreV1().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
+			liveList, err := l.client.CoreV1().LimitRanges(a.GetNamespace()).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return nil, admission.NewForbidden(a, err)
 			}
@@ -214,12 +220,10 @@ func defaultContainerResourceRequirements(limitRange *corev1.LimitRange) api.Res
 		limit := limitRange.Spec.Limits[i]
 		if limit.Type == corev1.LimitTypeContainer {
 			for k, v := range limit.DefaultRequest {
-				value := v.Copy()
-				requirements.Requests[api.ResourceName(k)] = *value
+				requirements.Requests[api.ResourceName(k)] = v.DeepCopy()
 			}
 			for k, v := range limit.Default {
-				value := v.Copy()
-				requirements.Limits[api.ResourceName(k)] = *value
+				requirements.Limits[api.ResourceName(k)] = v.DeepCopy()
 			}
 		}
 	}
@@ -239,14 +243,14 @@ func mergeContainerResources(container *api.Container, defaultRequirements *api.
 	for k, v := range defaultRequirements.Limits {
 		_, found := container.Resources.Limits[k]
 		if !found {
-			container.Resources.Limits[k] = *v.Copy()
+			container.Resources.Limits[k] = v.DeepCopy()
 			setLimits = append(setLimits, string(k))
 		}
 	}
 	for k, v := range defaultRequirements.Requests {
 		_, found := container.Resources.Requests[k]
 		if !found {
-			container.Resources.Requests[k] = *v.Copy()
+			container.Resources.Requests[k] = v.DeepCopy()
 			setRequests = append(setRequests, string(k))
 		}
 	}
@@ -306,13 +310,13 @@ func minConstraint(limitType string, resourceName string, enforced resource.Quan
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !reqExists {
-		return fmt.Errorf("minimum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
+		return fmt.Errorf("minimum %s usage per %s is %s.  No request is specified", resourceName, limitType, enforced.String())
 	}
 	if observedReqValue < enforcedValue {
-		return fmt.Errorf("minimum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+		return fmt.Errorf("minimum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
 	}
 	if limExists && (observedLimValue < enforcedValue) {
-		return fmt.Errorf("minimum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+		return fmt.Errorf("minimum %s usage per %s is %s, but limit is %s", resourceName, limitType, enforced.String(), lim.String())
 	}
 	return nil
 }
@@ -324,10 +328,10 @@ func maxRequestConstraint(limitType string, resourceName string, enforced resour
 	observedReqValue, _, enforcedValue := requestLimitEnforcedValues(req, resource.Quantity{}, enforced)
 
 	if !reqExists {
-		return fmt.Errorf("maximum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
+		return fmt.Errorf("maximum %s usage per %s is %s.  No request is specified", resourceName, limitType, enforced.String())
 	}
 	if observedReqValue > enforcedValue {
-		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
 }
@@ -339,13 +343,13 @@ func maxConstraint(limitType string, resourceName string, enforced resource.Quan
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !limExists {
-		return fmt.Errorf("maximum %s usage per %s is %s.  No limit is specified.", resourceName, limitType, enforced.String())
+		return fmt.Errorf("maximum %s usage per %s is %s.  No limit is specified", resourceName, limitType, enforced.String())
 	}
 	if observedLimValue > enforcedValue {
-		return fmt.Errorf("maximum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+		return fmt.Errorf("maximum %s usage per %s is %s, but limit is %s", resourceName, limitType, enforced.String(), lim.String())
 	}
 	if reqExists && (observedReqValue > enforcedValue) {
-		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
 }
@@ -357,10 +361,10 @@ func limitRequestRatioConstraint(limitType string, resourceName string, enforced
 	observedReqValue, observedLimValue, _ := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !reqExists || (observedReqValue == int64(0)) {
-		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no request is specified or request is 0.", resourceName, limitType, enforced.String())
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no request is specified or request is 0", resourceName, limitType, enforced.String())
 	}
 	if !limExists || (observedLimValue == int64(0)) {
-		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no limit is specified or limit is 0.", resourceName, limitType, enforced.String())
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no limit is specified or limit is 0", resourceName, limitType, enforced.String())
 	}
 
 	observedRatio := float64(observedLimValue) / float64(observedReqValue)
@@ -372,7 +376,7 @@ func limitRequestRatioConstraint(limitType string, resourceName string, enforced
 	}
 
 	if observedRatio > maxLimitRequestRatio {
-		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %f.", resourceName, limitType, enforced.String(), displayObservedRatio)
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %f", resourceName, limitType, enforced.String(), displayObservedRatio)
 	}
 
 	return nil
@@ -423,9 +427,10 @@ type DefaultLimitRangerActions struct{}
 // ensure DefaultLimitRangerActions implements the LimitRangerActions interface.
 var _ LimitRangerActions = &DefaultLimitRangerActions{}
 
-// Limit enforces resource requirements of incoming resources against enumerated constraints
-// on the LimitRange.  It may modify the incoming object to apply default resource requirements
-// if not specified, and enumerated on the LimitRange
+// MutateLimit enforces resource requirements of incoming resources
+// against enumerated constraints on the LimitRange.  It may modify
+// the incoming object to apply default resource requirements if not
+// specified, and enumerated on the LimitRange
 func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, resourceName string, obj runtime.Object) error {
 	switch resourceName {
 	case "pods":
@@ -434,9 +439,9 @@ func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, r
 	return nil
 }
 
-// Limit enforces resource requirements of incoming resources against enumerated constraints
-// on the LimitRange.  It may modify the incoming object to apply default resource requirements
-// if not specified, and enumerated on the LimitRange
+// ValidateLimit verifies the resource requirements of incoming
+// resources against enumerated constraints on the LimitRange are
+// valid
 func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange, resourceName string, obj runtime.Object) error {
 	switch resourceName {
 	case "pods":

@@ -23,7 +23,6 @@ import (
 
 	"github.com/go-openapi/spec"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	openapitesting "k8s.io/apiserver/pkg/endpoints/openapi/testing"
 )
@@ -58,13 +57,13 @@ func TestGetDefinitionName(t *testing.T) {
 	namer := NewDefinitionNamer(s)
 	n, e := namer.GetDefinitionName(typePkgName)
 	assertEqual(t, typeFriendlyName, n)
-	assertEqual(t, e["x-kubernetes-group-version-kind"], []v1.GroupVersionKind{
-		{
-			Group:   "test",
-			Version: "v1",
-			Kind:    "TestType",
+	assertEqual(t, []interface{}{
+		map[string]interface{}{
+			"group":   "test",
+			"version": "v1",
+			"kind":    "TestType",
 		},
-	})
+	}, e["x-kubernetes-group-version-kind"])
 	n, e2 := namer.GetDefinitionName("test.com/another.Type")
 	assertEqual(t, "com.test.another.Type", n)
 	assertEqual(t, e2, spec.Extensions(nil))

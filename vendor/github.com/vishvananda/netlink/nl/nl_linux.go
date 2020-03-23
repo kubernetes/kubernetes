@@ -13,18 +13,19 @@ import (
 	"unsafe"
 
 	"github.com/vishvananda/netns"
+	"golang.org/x/sys/unix"
 )
 
 const (
 	// Family type definitions
-	FAMILY_ALL  = syscall.AF_UNSPEC
-	FAMILY_V4   = syscall.AF_INET
-	FAMILY_V6   = syscall.AF_INET6
+	FAMILY_ALL  = unix.AF_UNSPEC
+	FAMILY_V4   = unix.AF_INET
+	FAMILY_V6   = unix.AF_INET6
 	FAMILY_MPLS = AF_MPLS
 )
 
 // SupportedNlFamilies contains the list of netlink families this netlink package supports
-var SupportedNlFamilies = []int{syscall.NETLINK_ROUTE, syscall.NETLINK_XFRM, syscall.NETLINK_NETFILTER}
+var SupportedNlFamilies = []int{unix.NETLINK_ROUTE, unix.NETLINK_XFRM, unix.NETLINK_NETFILTER}
 
 var nextSeqNr uint32
 
@@ -77,161 +78,161 @@ type NetlinkRequestData interface {
 
 // IfInfomsg is related to links, but it is used for list requests as well
 type IfInfomsg struct {
-	syscall.IfInfomsg
+	unix.IfInfomsg
 }
 
 // Create an IfInfomsg with family specified
 func NewIfInfomsg(family int) *IfInfomsg {
 	return &IfInfomsg{
-		IfInfomsg: syscall.IfInfomsg{
+		IfInfomsg: unix.IfInfomsg{
 			Family: uint8(family),
 		},
 	}
 }
 
 func DeserializeIfInfomsg(b []byte) *IfInfomsg {
-	return (*IfInfomsg)(unsafe.Pointer(&b[0:syscall.SizeofIfInfomsg][0]))
+	return (*IfInfomsg)(unsafe.Pointer(&b[0:unix.SizeofIfInfomsg][0]))
 }
 
 func (msg *IfInfomsg) Serialize() []byte {
-	return (*(*[syscall.SizeofIfInfomsg]byte)(unsafe.Pointer(msg)))[:]
+	return (*(*[unix.SizeofIfInfomsg]byte)(unsafe.Pointer(msg)))[:]
 }
 
 func (msg *IfInfomsg) Len() int {
-	return syscall.SizeofIfInfomsg
+	return unix.SizeofIfInfomsg
 }
 
 func (msg *IfInfomsg) EncapType() string {
 	switch msg.Type {
 	case 0:
 		return "generic"
-	case syscall.ARPHRD_ETHER:
+	case unix.ARPHRD_ETHER:
 		return "ether"
-	case syscall.ARPHRD_EETHER:
+	case unix.ARPHRD_EETHER:
 		return "eether"
-	case syscall.ARPHRD_AX25:
+	case unix.ARPHRD_AX25:
 		return "ax25"
-	case syscall.ARPHRD_PRONET:
+	case unix.ARPHRD_PRONET:
 		return "pronet"
-	case syscall.ARPHRD_CHAOS:
+	case unix.ARPHRD_CHAOS:
 		return "chaos"
-	case syscall.ARPHRD_IEEE802:
+	case unix.ARPHRD_IEEE802:
 		return "ieee802"
-	case syscall.ARPHRD_ARCNET:
+	case unix.ARPHRD_ARCNET:
 		return "arcnet"
-	case syscall.ARPHRD_APPLETLK:
+	case unix.ARPHRD_APPLETLK:
 		return "atalk"
-	case syscall.ARPHRD_DLCI:
+	case unix.ARPHRD_DLCI:
 		return "dlci"
-	case syscall.ARPHRD_ATM:
+	case unix.ARPHRD_ATM:
 		return "atm"
-	case syscall.ARPHRD_METRICOM:
+	case unix.ARPHRD_METRICOM:
 		return "metricom"
-	case syscall.ARPHRD_IEEE1394:
+	case unix.ARPHRD_IEEE1394:
 		return "ieee1394"
-	case syscall.ARPHRD_INFINIBAND:
+	case unix.ARPHRD_INFINIBAND:
 		return "infiniband"
-	case syscall.ARPHRD_SLIP:
+	case unix.ARPHRD_SLIP:
 		return "slip"
-	case syscall.ARPHRD_CSLIP:
+	case unix.ARPHRD_CSLIP:
 		return "cslip"
-	case syscall.ARPHRD_SLIP6:
+	case unix.ARPHRD_SLIP6:
 		return "slip6"
-	case syscall.ARPHRD_CSLIP6:
+	case unix.ARPHRD_CSLIP6:
 		return "cslip6"
-	case syscall.ARPHRD_RSRVD:
+	case unix.ARPHRD_RSRVD:
 		return "rsrvd"
-	case syscall.ARPHRD_ADAPT:
+	case unix.ARPHRD_ADAPT:
 		return "adapt"
-	case syscall.ARPHRD_ROSE:
+	case unix.ARPHRD_ROSE:
 		return "rose"
-	case syscall.ARPHRD_X25:
+	case unix.ARPHRD_X25:
 		return "x25"
-	case syscall.ARPHRD_HWX25:
+	case unix.ARPHRD_HWX25:
 		return "hwx25"
-	case syscall.ARPHRD_PPP:
+	case unix.ARPHRD_PPP:
 		return "ppp"
-	case syscall.ARPHRD_HDLC:
+	case unix.ARPHRD_HDLC:
 		return "hdlc"
-	case syscall.ARPHRD_LAPB:
+	case unix.ARPHRD_LAPB:
 		return "lapb"
-	case syscall.ARPHRD_DDCMP:
+	case unix.ARPHRD_DDCMP:
 		return "ddcmp"
-	case syscall.ARPHRD_RAWHDLC:
+	case unix.ARPHRD_RAWHDLC:
 		return "rawhdlc"
-	case syscall.ARPHRD_TUNNEL:
+	case unix.ARPHRD_TUNNEL:
 		return "ipip"
-	case syscall.ARPHRD_TUNNEL6:
+	case unix.ARPHRD_TUNNEL6:
 		return "tunnel6"
-	case syscall.ARPHRD_FRAD:
+	case unix.ARPHRD_FRAD:
 		return "frad"
-	case syscall.ARPHRD_SKIP:
+	case unix.ARPHRD_SKIP:
 		return "skip"
-	case syscall.ARPHRD_LOOPBACK:
+	case unix.ARPHRD_LOOPBACK:
 		return "loopback"
-	case syscall.ARPHRD_LOCALTLK:
+	case unix.ARPHRD_LOCALTLK:
 		return "ltalk"
-	case syscall.ARPHRD_FDDI:
+	case unix.ARPHRD_FDDI:
 		return "fddi"
-	case syscall.ARPHRD_BIF:
+	case unix.ARPHRD_BIF:
 		return "bif"
-	case syscall.ARPHRD_SIT:
+	case unix.ARPHRD_SIT:
 		return "sit"
-	case syscall.ARPHRD_IPDDP:
+	case unix.ARPHRD_IPDDP:
 		return "ip/ddp"
-	case syscall.ARPHRD_IPGRE:
+	case unix.ARPHRD_IPGRE:
 		return "gre"
-	case syscall.ARPHRD_PIMREG:
+	case unix.ARPHRD_PIMREG:
 		return "pimreg"
-	case syscall.ARPHRD_HIPPI:
+	case unix.ARPHRD_HIPPI:
 		return "hippi"
-	case syscall.ARPHRD_ASH:
+	case unix.ARPHRD_ASH:
 		return "ash"
-	case syscall.ARPHRD_ECONET:
+	case unix.ARPHRD_ECONET:
 		return "econet"
-	case syscall.ARPHRD_IRDA:
+	case unix.ARPHRD_IRDA:
 		return "irda"
-	case syscall.ARPHRD_FCPP:
+	case unix.ARPHRD_FCPP:
 		return "fcpp"
-	case syscall.ARPHRD_FCAL:
+	case unix.ARPHRD_FCAL:
 		return "fcal"
-	case syscall.ARPHRD_FCPL:
+	case unix.ARPHRD_FCPL:
 		return "fcpl"
-	case syscall.ARPHRD_FCFABRIC:
+	case unix.ARPHRD_FCFABRIC:
 		return "fcfb0"
-	case syscall.ARPHRD_FCFABRIC + 1:
+	case unix.ARPHRD_FCFABRIC + 1:
 		return "fcfb1"
-	case syscall.ARPHRD_FCFABRIC + 2:
+	case unix.ARPHRD_FCFABRIC + 2:
 		return "fcfb2"
-	case syscall.ARPHRD_FCFABRIC + 3:
+	case unix.ARPHRD_FCFABRIC + 3:
 		return "fcfb3"
-	case syscall.ARPHRD_FCFABRIC + 4:
+	case unix.ARPHRD_FCFABRIC + 4:
 		return "fcfb4"
-	case syscall.ARPHRD_FCFABRIC + 5:
+	case unix.ARPHRD_FCFABRIC + 5:
 		return "fcfb5"
-	case syscall.ARPHRD_FCFABRIC + 6:
+	case unix.ARPHRD_FCFABRIC + 6:
 		return "fcfb6"
-	case syscall.ARPHRD_FCFABRIC + 7:
+	case unix.ARPHRD_FCFABRIC + 7:
 		return "fcfb7"
-	case syscall.ARPHRD_FCFABRIC + 8:
+	case unix.ARPHRD_FCFABRIC + 8:
 		return "fcfb8"
-	case syscall.ARPHRD_FCFABRIC + 9:
+	case unix.ARPHRD_FCFABRIC + 9:
 		return "fcfb9"
-	case syscall.ARPHRD_FCFABRIC + 10:
+	case unix.ARPHRD_FCFABRIC + 10:
 		return "fcfb10"
-	case syscall.ARPHRD_FCFABRIC + 11:
+	case unix.ARPHRD_FCFABRIC + 11:
 		return "fcfb11"
-	case syscall.ARPHRD_FCFABRIC + 12:
+	case unix.ARPHRD_FCFABRIC + 12:
 		return "fcfb12"
-	case syscall.ARPHRD_IEEE802_TR:
+	case unix.ARPHRD_IEEE802_TR:
 		return "tr"
-	case syscall.ARPHRD_IEEE80211:
+	case unix.ARPHRD_IEEE80211:
 		return "ieee802.11"
-	case syscall.ARPHRD_IEEE80211_PRISM:
+	case unix.ARPHRD_IEEE80211_PRISM:
 		return "ieee802.11/prism"
-	case syscall.ARPHRD_IEEE80211_RADIOTAP:
+	case unix.ARPHRD_IEEE80211_RADIOTAP:
 		return "ieee802.11/radiotap"
-	case syscall.ARPHRD_IEEE802154:
+	case unix.ARPHRD_IEEE802154:
 		return "ieee802.15.4"
 
 	case 65534:
@@ -243,7 +244,7 @@ func (msg *IfInfomsg) EncapType() string {
 }
 
 func rtaAlignOf(attrlen int) int {
-	return (attrlen + syscall.RTA_ALIGNTO - 1) & ^(syscall.RTA_ALIGNTO - 1)
+	return (attrlen + unix.RTA_ALIGNTO - 1) & ^(unix.RTA_ALIGNTO - 1)
 }
 
 func NewIfInfomsgChild(parent *RtAttr, family int) *IfInfomsg {
@@ -254,7 +255,7 @@ func NewIfInfomsgChild(parent *RtAttr, family int) *IfInfomsg {
 
 // Extend RtAttr to handle data and children
 type RtAttr struct {
-	syscall.RtAttr
+	unix.RtAttr
 	Data     []byte
 	children []NetlinkRequestData
 }
@@ -262,7 +263,7 @@ type RtAttr struct {
 // Create a new Extended RtAttr object
 func NewRtAttr(attrType int, data []byte) *RtAttr {
 	return &RtAttr{
-		RtAttr: syscall.RtAttr{
+		RtAttr: unix.RtAttr{
 			Type: uint16(attrType),
 		},
 		children: []NetlinkRequestData{},
@@ -277,16 +278,21 @@ func NewRtAttrChild(parent *RtAttr, attrType int, data []byte) *RtAttr {
 	return attr
 }
 
+// AddChild adds an existing RtAttr as a child.
+func (a *RtAttr) AddChild(attr *RtAttr) {
+	a.children = append(a.children, attr)
+}
+
 func (a *RtAttr) Len() int {
 	if len(a.children) == 0 {
-		return (syscall.SizeofRtAttr + len(a.Data))
+		return (unix.SizeofRtAttr + len(a.Data))
 	}
 
 	l := 0
 	for _, child := range a.children {
 		l += rtaAlignOf(child.Len())
 	}
-	l += syscall.SizeofRtAttr
+	l += unix.SizeofRtAttr
 	return rtaAlignOf(l + len(a.Data))
 }
 
@@ -319,7 +325,7 @@ func (a *RtAttr) Serialize() []byte {
 }
 
 type NetlinkRequest struct {
-	syscall.NlMsghdr
+	unix.NlMsghdr
 	Data    []NetlinkRequestData
 	RawData []byte
 	Sockets map[int]*SocketHandle
@@ -327,7 +333,7 @@ type NetlinkRequest struct {
 
 // Serialize the Netlink Request into a byte array
 func (req *NetlinkRequest) Serialize() []byte {
-	length := syscall.SizeofNlMsghdr
+	length := unix.SizeofNlMsghdr
 	dataBytes := make([][]byte, len(req.Data))
 	for i, data := range req.Data {
 		dataBytes[i] = data.Serialize()
@@ -337,8 +343,8 @@ func (req *NetlinkRequest) Serialize() []byte {
 
 	req.Len = uint32(length)
 	b := make([]byte, length)
-	hdr := (*(*[syscall.SizeofNlMsghdr]byte)(unsafe.Pointer(req)))[:]
-	next := syscall.SizeofNlMsghdr
+	hdr := (*(*[unix.SizeofNlMsghdr]byte)(unsafe.Pointer(req)))[:]
+	next := unix.SizeofNlMsghdr
 	copy(b[0:next], hdr)
 	for _, data := range dataBytes {
 		for _, dataByte := range data {
@@ -421,10 +427,10 @@ done:
 			if m.Header.Pid != pid {
 				return nil, fmt.Errorf("Wrong pid %d, expected %d", m.Header.Pid, pid)
 			}
-			if m.Header.Type == syscall.NLMSG_DONE {
+			if m.Header.Type == unix.NLMSG_DONE {
 				break done
 			}
-			if m.Header.Type == syscall.NLMSG_ERROR {
+			if m.Header.Type == unix.NLMSG_ERROR {
 				native := NativeEndian()
 				error := int32(native.Uint32(m.Data[0:4]))
 				if error == 0 {
@@ -436,7 +442,7 @@ done:
 				continue
 			}
 			res = append(res, m.Data)
-			if m.Header.Flags&syscall.NLM_F_MULTI == 0 {
+			if m.Header.Flags&unix.NLM_F_MULTI == 0 {
 				break done
 			}
 		}
@@ -449,10 +455,10 @@ done:
 // the message is serialized
 func NewNetlinkRequest(proto, flags int) *NetlinkRequest {
 	return &NetlinkRequest{
-		NlMsghdr: syscall.NlMsghdr{
-			Len:   uint32(syscall.SizeofNlMsghdr),
+		NlMsghdr: unix.NlMsghdr{
+			Len:   uint32(unix.SizeofNlMsghdr),
 			Type:  uint16(proto),
-			Flags: syscall.NLM_F_REQUEST | uint16(flags),
+			Flags: unix.NLM_F_REQUEST | uint16(flags),
 			Seq:   atomic.AddUint32(&nextSeqNr, 1),
 		},
 	}
@@ -460,21 +466,21 @@ func NewNetlinkRequest(proto, flags int) *NetlinkRequest {
 
 type NetlinkSocket struct {
 	fd  int32
-	lsa syscall.SockaddrNetlink
+	lsa unix.SockaddrNetlink
 	sync.Mutex
 }
 
 func getNetlinkSocket(protocol int) (*NetlinkSocket, error) {
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, protocol)
+	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW|unix.SOCK_CLOEXEC, protocol)
 	if err != nil {
 		return nil, err
 	}
 	s := &NetlinkSocket{
 		fd: int32(fd),
 	}
-	s.lsa.Family = syscall.AF_NETLINK
-	if err := syscall.Bind(fd, &s.lsa); err != nil {
-		syscall.Close(fd)
+	s.lsa.Family = unix.AF_NETLINK
+	if err := unix.Bind(fd, &s.lsa); err != nil {
+		unix.Close(fd)
 		return nil, err
 	}
 
@@ -551,21 +557,21 @@ func executeInNetns(newNs, curNs netns.NsHandle) (func(), error) {
 // Returns the netlink socket on which Receive() method can be called
 // to retrieve the messages from the kernel.
 func Subscribe(protocol int, groups ...uint) (*NetlinkSocket, error) {
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, protocol)
+	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, protocol)
 	if err != nil {
 		return nil, err
 	}
 	s := &NetlinkSocket{
 		fd: int32(fd),
 	}
-	s.lsa.Family = syscall.AF_NETLINK
+	s.lsa.Family = unix.AF_NETLINK
 
 	for _, g := range groups {
 		s.lsa.Groups |= (1 << (g - 1))
 	}
 
-	if err := syscall.Bind(fd, &s.lsa); err != nil {
-		syscall.Close(fd)
+	if err := unix.Bind(fd, &s.lsa); err != nil {
+		unix.Close(fd)
 		return nil, err
 	}
 
@@ -586,7 +592,7 @@ func SubscribeAt(newNs, curNs netns.NsHandle, protocol int, groups ...uint) (*Ne
 
 func (s *NetlinkSocket) Close() {
 	fd := int(atomic.SwapInt32(&s.fd, -1))
-	syscall.Close(fd)
+	unix.Close(fd)
 }
 
 func (s *NetlinkSocket) GetFd() int {
@@ -598,7 +604,7 @@ func (s *NetlinkSocket) Send(request *NetlinkRequest) error {
 	if fd < 0 {
 		return fmt.Errorf("Send called on a closed socket")
 	}
-	if err := syscall.Sendto(fd, request.Serialize(), 0, &s.lsa); err != nil {
+	if err := unix.Sendto(fd, request.Serialize(), 0, &s.lsa); err != nil {
 		return err
 	}
 	return nil
@@ -609,12 +615,12 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, error) {
 	if fd < 0 {
 		return nil, fmt.Errorf("Receive called on a closed socket")
 	}
-	rb := make([]byte, syscall.Getpagesize())
-	nr, _, err := syscall.Recvfrom(fd, rb, 0)
+	rb := make([]byte, unix.Getpagesize())
+	nr, _, err := unix.Recvfrom(fd, rb, 0)
 	if err != nil {
 		return nil, err
 	}
-	if nr < syscall.NLMSG_HDRLEN {
+	if nr < unix.NLMSG_HDRLEN {
 		return nil, fmt.Errorf("Got short response from netlink")
 	}
 	rb = rb[:nr]
@@ -622,27 +628,27 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, error) {
 }
 
 // SetSendTimeout allows to set a send timeout on the socket
-func (s *NetlinkSocket) SetSendTimeout(timeout *syscall.Timeval) error {
+func (s *NetlinkSocket) SetSendTimeout(timeout *unix.Timeval) error {
 	// Set a send timeout of SOCKET_SEND_TIMEOUT, this will allow the Send to periodically unblock and avoid that a routine
 	// remains stuck on a send on a closed fd
-	return syscall.SetsockoptTimeval(int(s.fd), syscall.SOL_SOCKET, syscall.SO_SNDTIMEO, timeout)
+	return unix.SetsockoptTimeval(int(s.fd), unix.SOL_SOCKET, unix.SO_SNDTIMEO, timeout)
 }
 
 // SetReceiveTimeout allows to set a receive timeout on the socket
-func (s *NetlinkSocket) SetReceiveTimeout(timeout *syscall.Timeval) error {
+func (s *NetlinkSocket) SetReceiveTimeout(timeout *unix.Timeval) error {
 	// Set a read timeout of SOCKET_READ_TIMEOUT, this will allow the Read to periodically unblock and avoid that a routine
 	// remains stuck on a recvmsg on a closed fd
-	return syscall.SetsockoptTimeval(int(s.fd), syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, timeout)
+	return unix.SetsockoptTimeval(int(s.fd), unix.SOL_SOCKET, unix.SO_RCVTIMEO, timeout)
 }
 
 func (s *NetlinkSocket) GetPid() (uint32, error) {
 	fd := int(atomic.LoadInt32(&s.fd))
-	lsa, err := syscall.Getsockname(fd)
+	lsa, err := unix.Getsockname(fd)
 	if err != nil {
 		return 0, err
 	}
 	switch v := lsa.(type) {
-	case *syscall.SockaddrNetlink:
+	case *unix.SockaddrNetlink:
 		return v.Pid, nil
 	}
 	return 0, fmt.Errorf("Wrong socket type")
@@ -697,24 +703,24 @@ func Uint64Attr(v uint64) []byte {
 
 func ParseRouteAttr(b []byte) ([]syscall.NetlinkRouteAttr, error) {
 	var attrs []syscall.NetlinkRouteAttr
-	for len(b) >= syscall.SizeofRtAttr {
+	for len(b) >= unix.SizeofRtAttr {
 		a, vbuf, alen, err := netlinkRouteAttrAndValue(b)
 		if err != nil {
 			return nil, err
 		}
-		ra := syscall.NetlinkRouteAttr{Attr: *a, Value: vbuf[:int(a.Len)-syscall.SizeofRtAttr]}
+		ra := syscall.NetlinkRouteAttr{Attr: syscall.RtAttr(*a), Value: vbuf[:int(a.Len)-unix.SizeofRtAttr]}
 		attrs = append(attrs, ra)
 		b = b[alen:]
 	}
 	return attrs, nil
 }
 
-func netlinkRouteAttrAndValue(b []byte) (*syscall.RtAttr, []byte, int, error) {
-	a := (*syscall.RtAttr)(unsafe.Pointer(&b[0]))
-	if int(a.Len) < syscall.SizeofRtAttr || int(a.Len) > len(b) {
-		return nil, nil, 0, syscall.EINVAL
+func netlinkRouteAttrAndValue(b []byte) (*unix.RtAttr, []byte, int, error) {
+	a := (*unix.RtAttr)(unsafe.Pointer(&b[0]))
+	if int(a.Len) < unix.SizeofRtAttr || int(a.Len) > len(b) {
+		return nil, nil, 0, unix.EINVAL
 	}
-	return a, b[syscall.SizeofRtAttr:], rtaAlignOf(int(a.Len)), nil
+	return a, b[unix.SizeofRtAttr:], rtaAlignOf(int(a.Len)), nil
 }
 
 // SocketHandle contains the netlink socket and the associated

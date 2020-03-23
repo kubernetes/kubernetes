@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,8 +34,22 @@ func SetDefaults_StorageClass(obj *storagev1.StorageClass) {
 		*obj.ReclaimPolicy = v1.PersistentVolumeReclaimDelete
 	}
 
-	if obj.VolumeBindingMode == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+	if obj.VolumeBindingMode == nil {
 		obj.VolumeBindingMode = new(storagev1.VolumeBindingMode)
 		*obj.VolumeBindingMode = storagev1.VolumeBindingImmediate
+	}
+}
+
+func SetDefaults_CSIDriver(obj *storagev1.CSIDriver) {
+	if obj.Spec.AttachRequired == nil {
+		obj.Spec.AttachRequired = new(bool)
+		*(obj.Spec.AttachRequired) = true
+	}
+	if obj.Spec.PodInfoOnMount == nil {
+		obj.Spec.PodInfoOnMount = new(bool)
+		*(obj.Spec.PodInfoOnMount) = false
+	}
+	if len(obj.Spec.VolumeLifecycleModes) == 0 && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		obj.Spec.VolumeLifecycleModes = append(obj.Spec.VolumeLifecycleModes, storagev1.VolumeLifecyclePersistent)
 	}
 }

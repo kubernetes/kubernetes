@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/docker/spdystream"
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/klog"
 )
 
 // connection maintains state about a spdystream.Connection and its associated
@@ -128,7 +128,7 @@ func (c *connection) newSpdyStream(stream *spdystream.Stream) {
 	err := c.newStreamHandler(stream, replySent)
 	rejectStream := (err != nil)
 	if rejectStream {
-		glog.Warningf("Stream rejected: %v", err)
+		klog.Warningf("Stream rejected: %v", err)
 		stream.Reset()
 		return
 	}

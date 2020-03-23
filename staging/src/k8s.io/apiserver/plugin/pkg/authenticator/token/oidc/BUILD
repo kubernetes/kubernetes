@@ -15,8 +15,8 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/github.com/coreos/go-oidc:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -32,7 +32,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/coreos/go-oidc:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

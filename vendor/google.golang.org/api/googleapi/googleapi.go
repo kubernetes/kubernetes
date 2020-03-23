@@ -4,7 +4,7 @@
 
 // Package googleapi contains the common code shared by all Google API
 // libraries.
-package googleapi
+package googleapi // import "google.golang.org/api/googleapi"
 
 import (
 	"bytes"
@@ -37,24 +37,28 @@ type SizeReaderAt interface {
 // ServerResponse is embedded in each Do response and
 // provides the HTTP status code and header sent by the server.
 type ServerResponse struct {
-	// HTTPStatusCode is the server's response status code.
-	// When using a resource method's Do call, this will always be in the 2xx range.
+	// HTTPStatusCode is the server's response status code. When using a
+	// resource method's Do call, this will always be in the 2xx range.
 	HTTPStatusCode int
 	// Header contains the response header fields from the server.
 	Header http.Header
 }
 
 const (
+	// Version defines the gax version being used. This is typically sent
+	// in an HTTP header to services.
 	Version = "0.5"
 
 	// UserAgent is the header string used to identify this package.
 	UserAgent = "google-api-go-client/" + Version
 
-	// The default chunk size to use for resumable uploads if not specified by the user.
+	// DefaultUploadChunkSize is the default chunk size to use for resumable
+	// uploads if not specified by the user.
 	DefaultUploadChunkSize = 8 * 1024 * 1024
 
-	// The minimum chunk size that can be used for resumable uploads.  All
-	// user-specified chunk sizes must be multiple of this value.
+	// MinUploadChunkSize is the minimum chunk size that can be used for
+	// resumable uploads.  All user-specified chunk sizes must be multiple of
+	// this value.
 	MinUploadChunkSize = 256 * 1024
 )
 
@@ -161,9 +165,13 @@ func CheckMediaResponse(res *http.Response) error {
 	}
 }
 
+// MarshalStyle defines whether to marshal JSON with a {"data": ...} wrapper.
 type MarshalStyle bool
 
+// WithDataWrapper marshals JSON with a {"data": ...} wrapper.
 var WithDataWrapper = MarshalStyle(true)
+
+// WithoutDataWrapper marshals JSON without a {"data": ...} wrapper.
 var WithoutDataWrapper = MarshalStyle(false)
 
 func (wrap MarshalStyle) JSONReader(v interface{}) (io.Reader, error) {
@@ -181,37 +189,12 @@ func (wrap MarshalStyle) JSONReader(v interface{}) (io.Reader, error) {
 	return buf, nil
 }
 
-// endingWithErrorReader from r until it returns an error.  If the
-// final error from r is io.EOF and e is non-nil, e is used instead.
-type endingWithErrorReader struct {
-	r io.Reader
-	e error
-}
-
-func (er endingWithErrorReader) Read(p []byte) (n int, err error) {
-	n, err = er.r.Read(p)
-	if err == io.EOF && er.e != nil {
-		err = er.e
-	}
-	return
-}
-
-// countingWriter counts the number of bytes it receives to write, but
-// discards them.
-type countingWriter struct {
-	n *int64
-}
-
-func (w countingWriter) Write(p []byte) (int, error) {
-	*w.n += int64(len(p))
-	return len(p), nil
-}
-
 // ProgressUpdater is a function that is called upon every progress update of a resumable upload.
 // This is the only part of a resumable upload (from googleapi) that is usable by the developer.
 // The remaining usable pieces of resumable uploads is exposed in each auto-generated API.
 type ProgressUpdater func(current, total int64)
 
+// MediaOption defines the interface for setting media options.
 type MediaOption interface {
 	setOptions(o *MediaOptions)
 }
@@ -268,6 +251,11 @@ func ProcessMediaOptions(opts []MediaOption) *MediaOptions {
 	return mo
 }
 
+// ResolveRelative resolves relatives such as "http://www.golang.org/" and
+// "topics/myproject/mytopic" into a single string, such as
+// "http://www.golang.org/topics/myproject/mytopic". It strips all parent
+// references (e.g. ../..) as well as anything after the host
+// (e.g. /bar/gaz gets stripped out of foo.com/bar/gaz).
 func ResolveRelative(basestr, relstr string) string {
 	u, _ := url.Parse(basestr)
 	afterColonPath := ""

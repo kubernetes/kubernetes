@@ -40,16 +40,16 @@ func (c *FakeExtensionsV1beta1) Ingresses(namespace string) v1beta1.IngressInter
 	return &FakeIngresses{c, namespace}
 }
 
+func (c *FakeExtensionsV1beta1) NetworkPolicies(namespace string) v1beta1.NetworkPolicyInterface {
+	return &FakeNetworkPolicies{c, namespace}
+}
+
 func (c *FakeExtensionsV1beta1) PodSecurityPolicies() v1beta1.PodSecurityPolicyInterface {
 	return &FakePodSecurityPolicies{c}
 }
 
 func (c *FakeExtensionsV1beta1) ReplicaSets(namespace string) v1beta1.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
-}
-
-func (c *FakeExtensionsV1beta1) Scales(namespace string) v1beta1.ScaleInterface {
-	return &FakeScales{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -17,11 +17,12 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -69,11 +70,11 @@ func (cc *ConformanceContainer) Create() {
 }
 
 func (cc *ConformanceContainer) Delete() error {
-	return cc.PodClient.Delete(cc.podName, metav1.NewDeleteOptions(0))
+	return cc.PodClient.Delete(context.TODO(), cc.podName, *metav1.NewDeleteOptions(0))
 }
 
 func (cc *ConformanceContainer) IsReady() (bool, error) {
-	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -81,7 +82,7 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 }
 
 func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
-	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return v1.PodUnknown, err
 	}
@@ -89,7 +90,7 @@ func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 }
 
 func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
-	pod, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
 		return v1.ContainerStatus{}, err
 	}
@@ -101,11 +102,11 @@ func (cc *ConformanceContainer) GetStatus() (v1.ContainerStatus, error) {
 }
 
 func (cc *ConformanceContainer) Present() (bool, error) {
-	_, err := cc.PodClient.Get(cc.podName, metav1.GetOptions{})
+	_, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
 	return false, err

@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	"github.com/onsi/gomega/format"
 )
 
 type MatchJSONMatcher struct {
-	JSONToMatch interface{}
+	JSONToMatch      interface{}
+	firstFailurePath []interface{}
 }
 
 func (matcher *MatchJSONMatcher) Match(actual interface{}) (success bool, err error) {
@@ -25,18 +25,19 @@ func (matcher *MatchJSONMatcher) Match(actual interface{}) (success bool, err er
 	// this is guarded by prettyPrint
 	json.Unmarshal([]byte(actualString), &aval)
 	json.Unmarshal([]byte(expectedString), &eval)
-
-	return reflect.DeepEqual(aval, eval), nil
+	var equal bool
+	equal, matcher.firstFailurePath = deepEqual(aval, eval)
+	return equal, nil
 }
 
 func (matcher *MatchJSONMatcher) FailureMessage(actual interface{}) (message string) {
 	actualString, expectedString, _ := matcher.prettyPrint(actual)
-	return format.Message(actualString, "to match JSON of", expectedString)
+	return formattedMessage(format.Message(actualString, "to match JSON of", expectedString), matcher.firstFailurePath)
 }
 
 func (matcher *MatchJSONMatcher) NegatedFailureMessage(actual interface{}) (message string) {
 	actualString, expectedString, _ := matcher.prettyPrint(actual)
-	return format.Message(actualString, "not to match JSON of", expectedString)
+	return formattedMessage(format.Message(actualString, "not to match JSON of", expectedString), matcher.firstFailurePath)
 }
 
 func (matcher *MatchJSONMatcher) prettyPrint(actual interface{}) (actualFormatted, expectedFormatted string, err error) {

@@ -98,7 +98,7 @@ message Event {
 // EventList is a list of Event objects.
 message EventList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -116,6 +116,7 @@ message EventSeries {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 
   // Information whether this series is ongoing or finished.
+  // Deprecated. Planned removal for 1.18
   optional string state = 3;
 }
 

@@ -46,7 +46,7 @@ func (r *SpecBuilder) BuildSpecs(args []string, additionalArgs []string) {
 
 	passed := true
 	for _, suite := range suites {
-		runner := testrunner.New(suite, 1, false, r.commandFlags.GoOpts, nil)
+		runner := testrunner.New(suite, 1, false, 0, r.commandFlags.GoOpts, nil)
 		fmt.Printf("Compiling %s...\n", suite.PackageName)
 
 		path, _ := filepath.Abs(filepath.Join(suite.Path, fmt.Sprintf("%s.test", suite.PackageName)))

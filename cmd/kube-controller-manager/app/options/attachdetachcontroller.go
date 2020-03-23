@@ -19,14 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 )
 
 // AttachDetachControllerOptions holds the AttachDetachController options.
 type AttachDetachControllerOptions struct {
-	ReconcilerSyncLoopPeriod          metav1.Duration
-	DisableAttachDetachReconcilerSync bool
+	*attachdetachconfig.AttachDetachControllerConfiguration
 }
 
 // AddFlags adds flags related to AttachDetachController for controller manager to the specified FlagSet.
@@ -40,7 +38,7 @@ func (o *AttachDetachControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up AttachDetachController config with options.
-func (o *AttachDetachControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.AttachDetachControllerConfiguration) error {
+func (o *AttachDetachControllerOptions) ApplyTo(cfg *attachdetachconfig.AttachDetachControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

@@ -27,14 +27,16 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/integration"
 	"github.com/coreos/pkg/capnslog"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/integration"
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,10 +45,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd"
-	storagetests "k8s.io/apiserver/pkg/storage/tests"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var scheme = runtime.NewScheme()
@@ -67,18 +72,20 @@ type prefixTransformer struct {
 	prefix []byte
 	stale  bool
 	err    error
+	reads  uint64
 }
 
-func (p prefixTransformer) TransformFromStorage(b []byte, ctx value.Context) ([]byte, bool, error) {
+func (p *prefixTransformer) TransformFromStorage(b []byte, ctx value.Context) ([]byte, bool, error) {
+	atomic.AddUint64(&p.reads, 1)
 	if ctx == nil {
 		panic("no context provided")
 	}
 	if !bytes.HasPrefix(b, p.prefix) {
-		return nil, false, fmt.Errorf("value does not have expected prefix: %s", string(b))
+		return nil, false, fmt.Errorf("value does not have expected prefix %q: %s,", p.prefix, string(b))
 	}
 	return bytes.TrimPrefix(b, p.prefix), p.stale, p.err
 }
-func (p prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
+func (p *prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
 	if ctx == nil {
 		panic("no context provided")
 	}
@@ -86,6 +93,10 @@ func (p prefixTransformer) TransformToStorage(b []byte, ctx value.Context) ([]by
 		return append(append([]byte{}, p.prefix...), b...), p.err
 	}
 	return b, p.err
+}
+
+func (p *prefixTransformer) resetReads() {
+	p.reads = 0
 }
 
 func TestCreate(t *testing.T) {
@@ -179,44 +190,87 @@ func TestCreateWithKeyExist(t *testing.T) {
 func TestGet(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
+	// create an object to test
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	// create an additional object to increment the resource version for pods above the resource version of the foo object
+	lastUpdatedObj := &example.Pod{}
+	if err := store.Create(ctx, "bar", &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, lastUpdatedObj, 0); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+	lastUpdatedCurrentRV, _ := strconv.Atoi(lastUpdatedObj.ResourceVersion)
 
 	tests := []struct {
+		name              string
 		key               string
 		ignoreNotFound    bool
 		expectNotFoundErr bool
+		expectRVTooLarge  bool
 		expectedOut       *example.Pod
+		rv                string
 	}{{ // test get on existing item
+		name:              "get existing",
 		key:               key,
 		ignoreNotFound:    false,
 		expectNotFoundErr: false,
 		expectedOut:       storedObj,
+	}, { // test get on existing item with minimum resource version set to 0
+		name:        "resource version 0",
+		key:         key,
+		expectedOut: storedObj,
+		rv:          "0",
+	}, { // test get on existing item with minimum resource version set to current resource version of the object
+		name:        "current object resource version",
+		key:         key,
+		expectedOut: storedObj,
+		rv:          fmt.Sprintf("%d", currentRV),
+	}, { // test get on existing item with minimum resource version set to latest pod resource version
+		name:        "latest resource version",
+		key:         key,
+		expectedOut: storedObj,
+		rv:          fmt.Sprintf("%d", lastUpdatedCurrentRV),
+	}, { // test get on existing item with minimum resource version set too high
+		name:             "too high resource version",
+		key:              key,
+		expectRVTooLarge: true,
+		rv:               fmt.Sprintf("%d", lastUpdatedCurrentRV+1),
 	}, { // test get on non-existing item with ignoreNotFound=false
+		name:              "get non-existing",
 		key:               "/non-existing",
 		ignoreNotFound:    false,
 		expectNotFoundErr: true,
 	}, { // test get on non-existing item with ignoreNotFound=true
+		name:              "get non-existing, ignore not found",
 		key:               "/non-existing",
 		ignoreNotFound:    true,
 		expectNotFoundErr: false,
 		expectedOut:       &example.Pod{},
 	}}
 
-	for i, tt := range tests {
-		out := &example.Pod{}
-		err := store.Get(ctx, tt.key, "", out, tt.ignoreNotFound)
-		if tt.expectNotFoundErr {
-			if err == nil || !storage.IsNotFound(err) {
-				t.Errorf("#%d: expecting not found error, but get: %s", i, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &example.Pod{}
+			err := store.Get(ctx, tt.key, tt.rv, out, tt.ignoreNotFound)
+			if tt.expectNotFoundErr {
+				if err == nil || !storage.IsNotFound(err) {
+					t.Errorf("expecting not found error, but get: %v", err)
+				}
+				return
 			}
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Get failed: %v", err)
-		}
-		if !reflect.DeepEqual(tt.expectedOut, out) {
-			t.Errorf("#%d: pod want=%#v, get=%#v", i, tt.expectedOut, out)
-		}
+			if tt.expectRVTooLarge {
+				if err == nil || !storage.IsTooLargeResourceVersion(err) {
+					t.Errorf("expecting resource version too high error, but get: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Get failed: %v", err)
+			}
+			if !reflect.DeepEqual(tt.expectedOut, out) {
+				t.Errorf("pod want=%#v, get=%#v", tt.expectedOut, out)
+			}
+		})
 	}
 }
 
@@ -241,7 +295,7 @@ func TestUnconditionalDelete(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.Pod{} // reset
-		err := store.Delete(ctx, tt.key, out, nil)
+		err := store.Delete(ctx, tt.key, out, nil, storage.ValidateAllObjectFunc)
 		if tt.expectNotFoundErr {
 			if err == nil || !storage.IsNotFound(err) {
 				t.Errorf("#%d: expecting not found error, but get: %s", i, err)
@@ -275,7 +329,7 @@ func TestConditionalDelete(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.Pod{}
-		err := store.Delete(ctx, key, out, tt.precondition)
+		err := store.Delete(ctx, key, out, tt.precondition, storage.ValidateAllObjectFunc)
 		if tt.expectInvalidObjErr {
 			if err == nil || !storage.IsInvalidObj(err) {
 				t.Errorf("#%d: expecting invalid UID error, but get: %s", i, err)
@@ -297,14 +351,34 @@ func TestGetToList(t *testing.T) {
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
+	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+
 	tests := []struct {
-		key         string
-		pred        storage.SelectionPredicate
-		expectedOut []*example.Pod
+		key              string
+		pred             storage.SelectionPredicate
+		expectedOut      []*example.Pod
+		rv               string
+		expectRVTooLarge bool
 	}{{ // test GetToList on existing key
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []*example.Pod{storedObj},
+	}, { // test GetToList on existing key with minimum resource version set to 0
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          "0",
+	}, { // test GetToList on existing key with minimum resource version set to current resource version
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []*example.Pod{storedObj},
+		rv:          fmt.Sprintf("%d", currentRV),
+	}, { // test GetToList on existing key with minimum resource version set too high
+		key:              key,
+		pred:             storage.Everything,
+		expectedOut:      []*example.Pod{storedObj},
+		rv:               fmt.Sprintf("%d", currentRV+1),
+		expectRVTooLarge: true,
 	}, { // test GetToList on non-existing key
 		key:         "/non-existing",
 		pred:        storage.Everything,
@@ -314,9 +388,9 @@ func TestGetToList(t *testing.T) {
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
 			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		},
 		expectedOut: nil,
@@ -324,7 +398,15 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.PodList{}
-		err := store.GetToList(ctx, tt.key, "", tt.pred, out)
+		err := store.GetToList(ctx, tt.key, tt.rv, tt.pred, out)
+
+		if tt.expectRVTooLarge {
+			if err == nil || !storage.IsTooLargeResourceVersion(err) {
+				t.Errorf("#%d: expecting resource version too high error, but get: %s", i, err)
+			}
+			continue
+		}
+
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
 		}
@@ -427,11 +509,11 @@ func TestGuaranteedUpdate(t *testing.T) {
 		if tt.expectNoUpdate {
 			name = storeObj.Name
 		}
-		originalTransformer := store.transformer.(prefixTransformer)
+		originalTransformer := store.transformer.(*prefixTransformer)
 		if tt.transformStale {
-			transformer := originalTransformer
+			transformer := *originalTransformer
 			transformer.stale = true
-			store.transformer = transformer
+			store.transformer = &transformer
 		}
 		version := storeObj.ResourceVersion
 		err := store.GuaranteedUpdate(ctx, tt.key, out, tt.ignoreNotFound, tt.precondition,
@@ -531,7 +613,7 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store.transformer = prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	store.transformer = &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 
 	// this update should write the canonical value to etcd because the new serialization differs
 	// from the stored serialization
@@ -564,7 +646,7 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 		t.Errorf("guaranteed update should have short-circuited write, got %#v", out)
 	}
 
-	store.transformer = prefixTransformer{prefix: []byte(defaultTestPrefix), stale: true}
+	store.transformer = &prefixTransformer{prefix: []byte(defaultTestPrefix), stale: true}
 
 	// this update should write to etcd because the transformer reported stale
 	err = store.GuaranteedUpdate(ctx, key, out, true, nil,
@@ -677,7 +759,7 @@ func TestTransformationFailure(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), false, codec, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	preset := []struct {
@@ -688,13 +770,13 @@ func TestTransformationFailure(t *testing.T) {
 		key: "/one-level/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec:       storagetests.DeepEqualSafePodSpec(),
+			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}, {
 		key: "/two-level/1/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
-			Spec:       storagetests.DeepEqualSafePodSpec(),
+			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}}
 	for i, ps := range preset[:1] {
@@ -707,7 +789,7 @@ func TestTransformationFailure(t *testing.T) {
 
 	// create a second resource with an invalid prefix
 	oldTransformer := store.transformer
-	store.transformer = prefixTransformer{prefix: []byte("otherprefix!")}
+	store.transformer = &prefixTransformer{prefix: []byte("otherprefix!")}
 	for i, ps := range preset[1:] {
 		preset[1:][i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[1:][i].storedObj, 0)
@@ -740,22 +822,22 @@ func TestTransformationFailure(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// Delete succeeds but reports an error because we cannot access the body
-	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil); !storage.IsInternalError(err) {
+	// Delete fails with internal error.
+	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil, storage.ValidateAllObjectFunc); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
-
-	if err := store.Get(ctx, preset[1].key, "", &example.Pod{}, false); !storage.IsNotFound(err) {
+	if err := store.Get(ctx, preset[1].key, "", &example.Pod{}, false); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
 func TestList(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
-	disablePagingStore := newStore(cluster.RandClient(), false, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), true, codec, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	disablePagingStore := newStore(cluster.RandClient(), false, codec, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -819,20 +901,22 @@ func TestList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod := obj.(*example.Pod)
-		return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+		return nil, fields.Set{"metadata.name": pod.Name}, nil
 	}
 
 	tests := []struct {
-		name           string
-		disablePaging  bool
-		rv             string
-		prefix         string
-		pred           storage.SelectionPredicate
-		expectedOut    []*example.Pod
-		expectContinue bool
-		expectError    bool
+		name                       string
+		disablePaging              bool
+		rv                         string
+		prefix                     string
+		pred                       storage.SelectionPredicate
+		expectedOut                []*example.Pod
+		expectContinue             bool
+		expectedRemainingItemCount *int64
+		expectError                bool
+		expectRVTooLarge           bool
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -854,10 +938,30 @@ func TestList(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name:             "rejects resource version set too high",
+			prefix:           "/",
+			rv:               fmt.Sprintf("%d", continueRV+1),
+			expectRVTooLarge: true,
+		},
+		{
 			name:        "test List on existing key",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
+		},
+		{
+			name:        "test List on existing key with minimum resource version set to 0",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          "0",
+		},
+		{
+			name:        "test List on existing key with minimum resource version set to current resource version",
+			prefix:      "/one-level/",
+			pred:        storage.Everything,
+			expectedOut: []*example.Pod{preset[0].storedObj},
+			rv:          list.ResourceVersion,
 		},
 		{
 			name:        "test List on non-existing key",
@@ -882,8 +986,9 @@ func TestList(t *testing.T) {
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:    []*example.Pod{preset[1].storedObj},
-			expectContinue: true,
+			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 		},
 		{
 			name:          "test List with limit when paging disabled",
@@ -1048,6 +1153,13 @@ func TestList(t *testing.T) {
 		} else {
 			err = store.List(ctx, tt.prefix, tt.rv, tt.pred, out)
 		}
+		if tt.expectRVTooLarge {
+			if err == nil || !storage.IsTooLargeResourceVersion(err) {
+				t.Errorf("(%s): expecting resource version too high error, but get: %s", tt.name, err)
+			}
+			continue
+		}
+
 		if (err != nil) != tt.expectError {
 			t.Errorf("(%s): List failed: %v", tt.name, err)
 		}
@@ -1060,6 +1172,9 @@ func TestList(t *testing.T) {
 		if len(tt.expectedOut) != len(out.Items) {
 			t.Errorf("(%s): length of list want=%d, got=%d", tt.name, len(tt.expectedOut), len(out.Items))
 			continue
+		}
+		if e, a := tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount(); (e == nil) != (a == nil) || (e != nil && a != nil && *e != *a) {
+			t.Errorf("(%s): remainingItemCount want=%#v, got=%#v", tt.name, e, a)
 		}
 		for j, wantPod := range tt.expectedOut {
 			getPod := &out.Items[j]
@@ -1074,7 +1189,11 @@ func TestListContinuation(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	etcdClient := cluster.RandClient()
+	recorder := &clientRecorder{KV: etcdClient.KV}
+	etcdClient.KV = recorder
+	store := newStore(etcdClient, true, codec, "", transformer)
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1124,9 +1243,9 @@ func TestListContinuation(t *testing.T) {
 			Continue: continueValue,
 			Label:    labels.Everything(),
 			Field:    fields.Everything(),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		}
 	}
@@ -1139,6 +1258,14 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[0].storedObj) {
 		t.Fatalf("Unexpected first page: %#v", out.Items)
 	}
+	if transformer.reads != 1 {
+		t.Errorf("unexpected reads: %d", transformer.reads)
+	}
+	if recorder.reads != 1 {
+		t.Errorf("unexpected reads: %d", recorder.reads)
+	}
+	transformer.resetReads()
+	recorder.resetReads()
 
 	continueFromSecondItem := out.Continue
 
@@ -1155,6 +1282,14 @@ func TestListContinuation(t *testing.T) {
 		t.Logf("continue token was %d %s %v", rv, key, err)
 		t.Fatalf("Unexpected second page: %#v", out.Items)
 	}
+	if transformer.reads != 2 {
+		t.Errorf("unexpected reads: %d", transformer.reads)
+	}
+	if recorder.reads != 1 {
+		t.Errorf("unexpected reads: %d", recorder.reads)
+	}
+	transformer.resetReads()
+	recorder.resetReads()
 
 	// limit, should get two more pages
 	out = &example.PodList{}
@@ -1167,7 +1302,17 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[1].storedObj) {
 		t.Fatalf("Unexpected second page: %#v", out.Items)
 	}
+	if transformer.reads != 1 {
+		t.Errorf("unexpected reads: %d", transformer.reads)
+	}
+	if recorder.reads != 1 {
+		t.Errorf("unexpected reads: %d", recorder.reads)
+	}
+	transformer.resetReads()
+	recorder.resetReads()
+
 	continueFromThirdItem := out.Continue
+
 	out = &example.PodList{}
 	if err := store.List(ctx, "/", "0", pred(1, continueFromThirdItem), out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
@@ -1178,14 +1323,142 @@ func TestListContinuation(t *testing.T) {
 	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[2].storedObj) {
 		t.Fatalf("Unexpected third page: %#v", out.Items)
 	}
+	if transformer.reads != 1 {
+		t.Errorf("unexpected reads: %d", transformer.reads)
+	}
+	if recorder.reads != 1 {
+		t.Errorf("unexpected reads: %d", recorder.reads)
+	}
+	transformer.resetReads()
+	recorder.resetReads()
+}
 
+type clientRecorder struct {
+	reads uint64
+	clientv3.KV
+}
+
+func (r *clientRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	atomic.AddUint64(&r.reads, 1)
+	return r.KV.Get(ctx, key, opts...)
+}
+
+func (r *clientRecorder) resetReads() {
+	r.reads = 0
+}
+
+func TestListContinuationWithFilter(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	defer cluster.Terminate(t)
+	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	etcdClient := cluster.RandClient()
+	recorder := &clientRecorder{KV: etcdClient.KV}
+	etcdClient.KV = recorder
+	store := newStore(etcdClient, true, codec, "", transformer)
+	ctx := context.Background()
+
+	preset := []struct {
+		key       string
+		obj       *example.Pod
+		storedObj *example.Pod
+	}{
+		{
+			key: "/1",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/2",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, // this should not match
+		},
+		{
+			key: "/3",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/4",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+	}
+
+	for i, ps := range preset {
+		preset[i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+	}
+
+	// the first list call should try to get 2 items from etcd (and only those items should be returned)
+	// the field selector should result in it reading 3 items via the transformer
+	// the chunking should result in 2 etcd Gets
+	// there should be a continueValue because there is more data
+	out := &example.PodList{}
+	pred := func(limit int64, continueValue string) storage.SelectionPredicate {
+		return storage.SelectionPredicate{
+			Limit:    limit,
+			Continue: continueValue,
+			Label:    labels.Everything(),
+			Field:    fields.OneTermNotEqualSelector("metadata.name", "bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*example.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
+		}
+	}
+	if err := store.List(ctx, "/", "0", pred(2, ""), out); err != nil {
+		t.Errorf("Unable to get initial list: %v", err)
+	}
+	if len(out.Continue) == 0 {
+		t.Errorf("No continuation token set")
+	}
+	if len(out.Items) != 2 || !reflect.DeepEqual(&out.Items[0], preset[0].storedObj) || !reflect.DeepEqual(&out.Items[1], preset[2].storedObj) {
+		t.Errorf("Unexpected first page, len=%d: %#v", len(out.Items), out.Items)
+	}
+	if transformer.reads != 3 {
+		t.Errorf("unexpected reads: %d", transformer.reads)
+	}
+	if recorder.reads != 2 {
+		t.Errorf("unexpected reads: %d", recorder.reads)
+	}
+	transformer.resetReads()
+	recorder.resetReads()
+
+	// the rest of the test does not make sense if the previous call failed
+	if t.Failed() {
+		return
+	}
+
+	cont := out.Continue
+
+	// the second list call should try to get 2 more items from etcd
+	// but since there is only one item left, that is all we should get with no continueValue
+	// both read counters should be incremented for the singular calls they make in this case
+	out = &example.PodList{}
+	if err := store.List(ctx, "/", "0", pred(2, cont), out); err != nil {
+		t.Errorf("Unable to get second page: %v", err)
+	}
+	if len(out.Continue) != 0 {
+		t.Errorf("Unexpected continuation token set")
+	}
+	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[3].storedObj) {
+		t.Errorf("Unexpected second page, len=%d: %#v", len(out.Items), out.Items)
+	}
+	if transformer.reads != 1 {
+		t.Errorf("unexpected reads: %d", transformer.reads)
+	}
+	if recorder.reads != 1 {
+		t.Errorf("unexpected reads: %d", recorder.reads)
+	}
+	transformer.resetReads()
+	recorder.resetReads()
 }
 
 func TestListInconsistentContinuation(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), true, codec, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1233,9 +1506,9 @@ func TestListInconsistentContinuation(t *testing.T) {
 			Continue: continueValue,
 			Label:    labels.Everything(),
 			Field:    fields.Everything(),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		}
 	}
@@ -1271,7 +1544,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	// compact to latest revision.
-	versioner := etcd.APIObjectVersioner{}
+	versioner := APIObjectVersioner{}
 	lastRVString := preset[2].storedObj.ResourceVersion
 	lastRV, err := versioner.ParseResourceVersion(lastRVString)
 	if err != nil {
@@ -1330,7 +1603,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	store := newStore(cluster.RandClient(), true, codec, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)})
 	ctx := context.Background()
 	// As 30s is the default timeout for testing in glboal configuration,
 	// we cannot wait longer than that in a single time: change it to 10
@@ -1344,7 +1617,11 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
-	err := store.unconditionalDelete(ctx, key, &example.Pod{})
+	v, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		panic("unable to convert output object to pointer")
+	}
+	err = store.conditionalDelete(ctx, key, &example.Pod{}, v, nil, storage.ValidateAllObjectFunc)
 	if err != nil && !storage.IsNotFound(err) {
 		t.Fatalf("Cleanup failed: %v", err)
 	}
@@ -1359,7 +1636,7 @@ func TestPrefix(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	transformer := prefixTransformer{prefix: []byte(defaultTestPrefix)}
+	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	testcases := map[string]string{
 		"custom/prefix":     "/custom/prefix",
 		"/custom//prefix//": "/custom/prefix",

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // APIGroupResources is an API group with a mapping of versions to
@@ -145,27 +145,26 @@ func NewDiscoveryRESTMapper(groupResources []*APIGroupResources) meta.RESTMapper
 // GetAPIGroupResources uses the provided discovery client to gather
 // discovery information and populate a slice of APIGroupResources.
 func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources, error) {
-	apiGroups, err := cl.ServerGroups()
-	if err != nil {
-		if apiGroups == nil || len(apiGroups.Groups) == 0 {
-			return nil, err
-		}
+	gs, rs, err := cl.ServerGroupsAndResources()
+	if rs == nil || gs == nil {
+		return nil, err
 		// TODO track the errors and update callers to handle partial errors.
 	}
+	rsm := map[string]*metav1.APIResourceList{}
+	for _, r := range rs {
+		rsm[r.GroupVersion] = r
+	}
+
 	var result []*APIGroupResources
-	for _, group := range apiGroups.Groups {
+	for _, group := range gs {
 		groupResources := &APIGroupResources{
-			Group:              group,
+			Group:              *group,
 			VersionedResources: make(map[string][]metav1.APIResource),
 		}
 		for _, version := range group.Versions {
-			resources, err := cl.ServerResourcesForGroupVersion(version.GroupVersion)
-			if err != nil {
-				// continue as best we can
-				// TODO track the errors and update callers to handle partial errors.
-				if resources == nil || len(resources.APIResources) == 0 {
-					continue
-				}
+			resources, ok := rsm[version.GroupVersion]
+			if !ok {
+				continue
 			}
 			groupResources.VersionedResources[version.Version] = resources.APIResources
 		}
@@ -212,7 +211,7 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 // Reset resets the internally cached Discovery information and will
 // cause the next mapping request to re-discover.
 func (d *DeferredDiscoveryRESTMapper) Reset() {
-	glog.V(5).Info("Invalidating discovery information")
+	klog.V(5).Info("Invalidating discovery information")
 
 	d.initMu.Lock()
 	defer d.initMu.Unlock()

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/time/rate"
 
 	certificates "k8s.io/api/certificates/v1beta1"
@@ -36,10 +35,15 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 type CertificateController struct {
+	// name is an identifier for this particular controller instance.
+	name string
+
 	kubeClient clientset.Interface
 
 	csrLister  certificateslisters.CertificateSigningRequestLister
@@ -51,16 +55,18 @@ type CertificateController struct {
 }
 
 func NewCertificateController(
+	name string,
 	kubeClient clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	handler func(*certificates.CertificateSigningRequest) error,
 ) *CertificateController {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	cc := &CertificateController{
+		name:       name,
 		kubeClient: kubeClient,
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
 			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 1000*time.Second),
@@ -74,12 +80,12 @@ func NewCertificateController(
 	csrInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			csr := obj.(*certificates.CertificateSigningRequest)
-			glog.V(4).Infof("Adding certificate request %s", csr.Name)
+			klog.V(4).Infof("Adding certificate request %s", csr.Name)
 			cc.enqueueCertificateRequest(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldCSR := old.(*certificates.CertificateSigningRequest)
-			glog.V(4).Infof("Updating certificate request %s", oldCSR.Name)
+			klog.V(4).Infof("Updating certificate request %s", oldCSR.Name)
 			cc.enqueueCertificateRequest(new)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -87,16 +93,16 @@ func NewCertificateController(
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					glog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
 					return
 				}
 				csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
 				if !ok {
-					glog.V(2).Infof("Tombstone contained object that is not a CSR: %#v", obj)
+					klog.V(2).Infof("Tombstone contained object that is not a CSR: %#v", obj)
 					return
 				}
 			}
-			glog.V(4).Infof("Deleting certificate request %s", csr.Name)
+			klog.V(4).Infof("Deleting certificate request %s", csr.Name)
 			cc.enqueueCertificateRequest(obj)
 		},
 	})
@@ -110,10 +116,10 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer cc.queue.ShutDown()
 
-	glog.Infof("Starting certificate controller")
-	defer glog.Infof("Shutting down certificate controller")
+	klog.Infof("Starting certificate controller %q", cc.name)
+	defer klog.Infof("Shutting down certificate controller %q", cc.name)
 
-	if !controller.WaitForCacheSync("certificate", stopCh, cc.csrsSynced) {
+	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), stopCh, cc.csrsSynced) {
 		return
 	}
 
@@ -143,7 +149,7 @@ func (cc *CertificateController) processNextWorkItem() bool {
 		if _, ignorable := err.(ignorableError); !ignorable {
 			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
 		} else {
-			glog.V(4).Infof("Sync %v failed with : %v", cKey, err)
+			klog.V(4).Infof("Sync %v failed with : %v", cKey, err)
 		}
 		return true
 	}
@@ -169,11 +175,11 @@ func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 func (cc *CertificateController) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Since(startTime))
 	}()
 	csr, err := cc.csrLister.Get(key)
 	if errors.IsNotFound(err) {
-		glog.V(3).Infof("csr has been deleted: %v", key)
+		klog.V(3).Infof("csr has been deleted: %v", key)
 		return nil
 	}
 	if err != nil {
@@ -187,7 +193,15 @@ func (cc *CertificateController) syncFunc(key string) error {
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
 	csr = csr.DeepCopy()
-
+	// If the `signerName` field is not set, we are talking to a pre-1.18 apiserver.
+	// As per the KEP document for the certificates API, this will be defaulted here
+	// in the controller to maintain backwards compatibility.
+	// This should be removed after a deprecation window has passed.
+	// Default here to allow handlers to assume the field is set.
+	if csr.Spec.SignerName == nil {
+		signerName := capihelper.DefaultSignerNameFromSpec(&csr.Spec)
+		csr.Spec.SignerName = &signerName
+	}
 	return cc.handler(csr)
 }
 

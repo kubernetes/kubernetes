@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - thockin
 - lavalamp
@@ -22,7 +24,6 @@ reviewers:
 - erictune
 - davidopp
 - pmorie
-- kargakis
 - janetkuo
 - justinsb
 - eparis
@@ -32,8 +33,6 @@ reviewers:
 - madhusudancs
 - hongchaodeng
 - krousey
-- markturansky
-- fgrzadkowski
 - xiang90
 - mml
 - ingvagabund
@@ -41,10 +40,6 @@ reviewers:
 - jessfraz
 - david-mcmahon
 - mfojtik
-- '249043822'
-- lixiaobing10051267
-- ddysher
 - mqliang
-- feihujiang
 - sdminonne
 - ncdc

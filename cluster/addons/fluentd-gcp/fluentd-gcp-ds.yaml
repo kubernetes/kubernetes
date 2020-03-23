@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: fluentd-gcp-{{ fluentd_gcp_yaml_version }}
@@ -9,6 +9,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: {{ fluentd_gcp_yaml_version }}
 spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-gcp
+      version: {{ fluentd_gcp_yaml_version }}
   updateStrategy:
     type: RollingUpdate
   template:
@@ -17,11 +21,6 @@ spec:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
         version: {{ fluentd_gcp_yaml_version }}
-      # This annotation ensures that fluentd does not get evicted if the node
-      # supports critical pod annotation based priority scheme.
-      # Note that this does not guarantee admission on the nodes (#40573).
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: fluentd-gcp
@@ -62,25 +61,25 @@ spec:
             - '-c'
             - >
               LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-300};
-              STUCK_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-900};
+              STUCK_THRESHOLD_SECONDS=${STUCK_THRESHOLD_SECONDS:-900};
               if [ ! -e /var/log/fluentd-buffers ];
               then
                 exit 1;
               fi;
               touch -d "${STUCK_THRESHOLD_SECONDS} seconds ago" /tmp/marker-stuck;
-              if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-stuck -print -quit)" ]];
+              if [ -z "$(find /var/log/fluentd-buffers -type d -newer /tmp/marker-stuck -print -quit)" ];
               then
                 rm -rf /var/log/fluentd-buffers;
                 exit 1;
               fi;
               touch -d "${LIVENESS_THRESHOLD_SECONDS} seconds ago" /tmp/marker-liveness;
-              if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-liveness -print -quit)" ]];
+              if [ -z "$(find /var/log/fluentd-buffers -type d -newer /tmp/marker-liveness -print -quit)" ];
               then
                 exit 1;
               fi;
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.3.1
+        image: k8s.gcr.io/prometheus-to-sd:v0.5.0
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
@@ -99,7 +98,7 @@ spec:
                 fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
-        beta.kubernetes.io/fluentd-ds-ready: "true"
+        kubernetes.io/os: linux
       terminationGracePeriodSeconds: 60
       tolerations:
       - operator: "Exists"

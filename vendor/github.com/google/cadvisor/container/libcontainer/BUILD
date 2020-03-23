@@ -6,16 +6,16 @@ go_library(
         "handler.go",
         "helpers.go",
     ],
-    cgo = True,
     importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/libcontainer",
     importpath = "github.com/google/cadvisor/container/libcontainer",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

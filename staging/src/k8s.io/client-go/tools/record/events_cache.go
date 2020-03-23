@@ -443,6 +443,52 @@ func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
 	}
 }
 
+func NewEventCorrelatorWithOptions(options CorrelatorOptions) *EventCorrelator {
+	optionsWithDefaults := populateDefaults(options)
+	spamFilter := NewEventSourceObjectSpamFilter(optionsWithDefaults.LRUCacheSize,
+		optionsWithDefaults.BurstSize, optionsWithDefaults.QPS, optionsWithDefaults.Clock)
+	return &EventCorrelator{
+		filterFunc: spamFilter.Filter,
+		aggregator: NewEventAggregator(
+			optionsWithDefaults.LRUCacheSize,
+			optionsWithDefaults.KeyFunc,
+			optionsWithDefaults.MessageFunc,
+			optionsWithDefaults.MaxEvents,
+			optionsWithDefaults.MaxIntervalInSeconds,
+			optionsWithDefaults.Clock),
+		logger: newEventLogger(optionsWithDefaults.LRUCacheSize, optionsWithDefaults.Clock),
+	}
+}
+
+// populateDefaults populates the zero value options with defaults
+func populateDefaults(options CorrelatorOptions) CorrelatorOptions {
+	if options.LRUCacheSize == 0 {
+		options.LRUCacheSize = maxLruCacheEntries
+	}
+	if options.BurstSize == 0 {
+		options.BurstSize = defaultSpamBurst
+	}
+	if options.QPS == 0 {
+		options.QPS = defaultSpamQPS
+	}
+	if options.KeyFunc == nil {
+		options.KeyFunc = EventAggregatorByReasonFunc
+	}
+	if options.MessageFunc == nil {
+		options.MessageFunc = EventAggregatorByReasonMessageFunc
+	}
+	if options.MaxEvents == 0 {
+		options.MaxEvents = defaultAggregateMaxEvents
+	}
+	if options.MaxIntervalInSeconds == 0 {
+		options.MaxIntervalInSeconds = defaultAggregateIntervalInSeconds
+	}
+	if options.Clock == nil {
+		options.Clock = clock.RealClock{}
+	}
+	return options
+}
+
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events
 func (c *EventCorrelator) EventCorrelate(newEvent *v1.Event) (*EventCorrelateResult, error) {
 	if newEvent == nil {

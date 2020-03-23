@@ -11,14 +11,19 @@ import (
 // sort by a particular network attribute. SortDir sets the direction, and is
 // either `asc' or `desc'. Marker and Limit are used for pagination.
 type ListOpts struct {
-	ID        string `q:"id"`
-	Name      string `q:"name"`
-	TenantID  string `q:"tenant_id"`
-	ProjectID string `q:"project_id"`
-	Limit     int    `q:"limit"`
-	Marker    string `q:"marker"`
-	SortKey   string `q:"sort_key"`
-	SortDir   string `q:"sort_dir"`
+	ID          string `q:"id"`
+	Name        string `q:"name"`
+	Description string `q:"description"`
+	TenantID    string `q:"tenant_id"`
+	ProjectID   string `q:"project_id"`
+	Limit       int    `q:"limit"`
+	Marker      string `q:"marker"`
+	SortKey     string `q:"sort_key"`
+	SortDir     string `q:"sort_dir"`
+	Tags        string `q:"tags"`
+	TagsAny     string `q:"tags-any"`
+	NotTags     string `q:"not-tags"`
+	NotTagsAny  string `q:"not-tags-any"`
 }
 
 // List returns a Pager which allows you to iterate over a collection of
@@ -88,7 +93,7 @@ type UpdateOpts struct {
 	Name string `json:"name,omitempty"`
 
 	// Describes the security group.
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // ToSecGroupUpdateMap builds a request body from UpdateOpts.
@@ -128,7 +133,12 @@ func Delete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
-	pages, err := List(client, ListOpts{}).AllPages()
+
+	listOpts := ListOpts{
+		Name: name,
+	}
+
+	pages, err := List(client, listOpts).AllPages()
 	if err != nil {
 		return "", err
 	}

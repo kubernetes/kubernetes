@@ -17,9 +17,11 @@
 # A library of helper functions and constant for GCI distro
 source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 
-function get-node-instance-metadata {
+# shellcheck disable=SC2120
+function get-node-instance-metadata-from-file {
+  local kube_env=${1:-node-kube-env} # optional
   local metadata=""
-  metadata+="kube-env=${KUBE_TEMP}/node-kube-env.yaml,"
+  metadata+="kube-env=${KUBE_TEMP}/${kube_env}.yaml,"
   metadata+="kubelet-config=${KUBE_TEMP}/node-kubelet-config.yaml,"
   metadata+="user-data=${KUBE_ROOT}/cluster/gce/gci/node.yaml,"
   metadata+="configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,"
@@ -33,9 +35,15 @@ function get-node-instance-metadata {
   echo "${metadata}"
 }
 
-# $1: template name (required).
-function create-node-instance-template {
+# Assumed vars:
+#   scope_flags
+# Parameters:
+#   $1: template name (required).
+function create-linux-node-instance-template {
   local template_name="$1"
+  local machine_type="${2:-$NODE_SIZE}"
+
   ensure-gci-metadata-files
-  create-node-template "$template_name" "${scope_flags[*]}" "$(get-node-instance-metadata)"
+  # shellcheck disable=2154 # 'scope_flags' is assigned by upstream
+  create-node-template "${template_name}" "${scope_flags[*]}" "$(get-node-instance-metadata-from-file)" "" "linux" "${machine_type}"
 }

@@ -4,7 +4,6 @@ package ec2query
 
 import (
 	"encoding/xml"
-	"io"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -27,7 +26,12 @@ func Unmarshal(r *request.Request) {
 		decoder := xml.NewDecoder(r.HTTPResponse.Body)
 		err := xmlutil.UnmarshalXML(r.Data, decoder, "")
 		if err != nil {
-			r.Error = awserr.New("SerializationError", "failed decoding EC2 Query response", err)
+			r.Error = awserr.NewRequestFailure(
+				awserr.New(request.ErrCodeSerialization,
+					"failed decoding EC2 Query response", err),
+				r.HTTPResponse.StatusCode,
+				r.RequestID,
+			)
 			return
 		}
 	}
@@ -35,7 +39,11 @@ func Unmarshal(r *request.Request) {
 
 // UnmarshalMeta unmarshals response headers for the EC2 protocol.
 func UnmarshalMeta(r *request.Request) {
-	// TODO implement unmarshaling of request IDs
+	r.RequestID = r.HTTPResponse.Header.Get("X-Amzn-Requestid")
+	if r.RequestID == "" {
+		// Alternative version of request id in the header
+		r.RequestID = r.HTTPResponse.Header.Get("X-Amz-Request-Id")
+	}
 }
 
 type xmlErrorResponse struct {
@@ -49,15 +57,21 @@ type xmlErrorResponse struct {
 func UnmarshalError(r *request.Request) {
 	defer r.HTTPResponse.Body.Close()
 
-	resp := &xmlErrorResponse{}
-	err := xml.NewDecoder(r.HTTPResponse.Body).Decode(resp)
-	if err != nil && err != io.EOF {
-		r.Error = awserr.New("SerializationError", "failed decoding EC2 Query error response", err)
-	} else {
+	var respErr xmlErrorResponse
+	err := xmlutil.UnmarshalXMLError(&respErr, r.HTTPResponse.Body)
+	if err != nil {
 		r.Error = awserr.NewRequestFailure(
-			awserr.New(resp.Code, resp.Message, nil),
+			awserr.New(request.ErrCodeSerialization,
+				"failed to unmarshal error message", err),
 			r.HTTPResponse.StatusCode,
-			resp.RequestID,
+			r.RequestID,
 		)
+		return
 	}
+
+	r.Error = awserr.NewRequestFailure(
+		awserr.New(respErr.Code, respErr.Message, nil),
+		r.HTTPResponse.StatusCode,
+		respErr.RequestID,
+	)
 }

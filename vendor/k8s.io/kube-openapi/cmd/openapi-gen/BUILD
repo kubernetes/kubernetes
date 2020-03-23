@@ -8,6 +8,7 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/kube-openapi/cmd/openapi-gen/args:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/generators:go_default_library",
     ],
@@ -16,6 +17,7 @@ go_library(
 go_binary(
     name = "openapi-gen",
     embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

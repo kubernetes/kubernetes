@@ -25,14 +25,14 @@ import (
 	"strings"
 	"sync"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
+	"go.etcd.io/etcd/clientv3"
+	"k8s.io/klog"
 )
 
 const (
@@ -56,7 +56,13 @@ func testingDeferOnDecodeError() {
 
 func init() {
 	// check to see if we are running in a test environment
+	TestOnlySetFatalOnDecodeError(true)
 	fatalOnDecodeError, _ = strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
+}
+
+// TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
+func TestOnlySetFatalOnDecodeError(b bool) {
+	fatalOnDecodeError = b
 }
 
 type watcher struct {
@@ -185,13 +191,22 @@ func (wc *watchChan) sync() error {
 	return nil
 }
 
+// logWatchChannelErr checks whether the error is about mvcc revision compaction which is regarded as warning
+func logWatchChannelErr(err error) {
+	if !strings.Contains(err.Error(), "mvcc: required revision has been compacted") {
+		klog.Errorf("watch chan error: %v", err)
+	} else {
+		klog.Warningf("watch chan error: %v", err)
+	}
+}
+
 // startWatching does:
 // - get current objects if initialRev=0; set initialRev to current rev
 // - watch on given key and send events to process.
 func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 	if wc.initialRev == 0 {
 		if err := wc.sync(); err != nil {
-			glog.Errorf("failed to sync with latest state: %v", err)
+			klog.Errorf("failed to sync with latest state: %v", err)
 			wc.sendError(err)
 			return
 		}
@@ -205,12 +220,18 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		if wres.Err() != nil {
 			err := wres.Err()
 			// If there is an error on server (e.g. compaction), the channel will return it before closed.
-			glog.Errorf("watch chan error: %v", err)
+			logWatchChannelErr(err)
 			wc.sendError(err)
 			return
 		}
 		for _, e := range wres.Events {
-			wc.sendEvent(parseEvent(e))
+			parsedEvent, err := parseEvent(e)
+			if err != nil {
+				logWatchChannelErr(err)
+				wc.sendError(err)
+				return
+			}
+			wc.sendEvent(parsedEvent)
 		}
 	}
 	// When we come to this point, it's only possible that client side ends the watch.
@@ -232,7 +253,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 				continue
 			}
 			if len(wc.resultChan) == outgoingBufSize {
-				glog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
+				klog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
 					"Probably caused by slow dispatching events to watchers", outgoingBufSize)
 			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
@@ -265,7 +286,7 @@ func (wc *watchChan) acceptAll() bool {
 func (wc *watchChan) transform(e *event) (res *watch.Event) {
 	curObj, oldObj, err := wc.prepareObjs(e)
 	if err != nil {
-		glog.Errorf("failed to prepare current and previous objects: %v", err)
+		klog.Errorf("failed to prepare current and previous objects: %v", err)
 		wc.sendError(err)
 		return nil
 	}
@@ -320,10 +341,10 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 func transformErrorToEvent(err error) *watch.Event {
 	err = interpretWatchError(err)
-	if _, ok := err.(apierrs.APIStatus); !ok {
-		err = apierrs.NewInternalError(err)
+	if _, ok := err.(apierrors.APIStatus); !ok {
+		err = apierrors.NewInternalError(err)
 	}
-	status := err.(apierrs.APIStatus).Status()
+	status := err.(apierrors.APIStatus).Status()
 	return &watch.Event{
 		Type:   watch.Error,
 		Object: &status,
@@ -339,7 +360,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		glog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
+		klog.V(3).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
 			"Probably caused by slow decoding, user not receiving fast, or other processing logic",
 			incomingBufSize)
 	}

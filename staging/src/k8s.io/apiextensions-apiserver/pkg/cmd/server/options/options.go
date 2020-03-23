@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,6 +32,9 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/util/webhook"
+	corev1 "k8s.io/client-go/listers/core/v1"
 )
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
@@ -46,8 +51,12 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
-		APIEnablement:      genericoptions.NewAPIEnablementOptions(),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("apiextensions-apiserver", "kube-system"),
+		),
+		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -83,7 +92,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
+	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
 	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Scheme); err != nil {
@@ -94,6 +103,8 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
 			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig),
 		},
 	}
 	return config, nil
@@ -113,4 +124,12 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 
 	return ret
+}
+
+type serviceResolver struct {
+	services corev1.ServiceLister
+}
+
+func (r *serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return proxy.ResolveCluster(r.services, namespace, name, port)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -24,21 +25,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
-	"k8s.io/client-go/util/integer"
+	appslisters "k8s.io/client-go/listers/apps/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/utils/integer"
 )
 
 const (
@@ -61,10 +63,11 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
+
 	// Reasons for deployment conditions
 	//
 	// Progressing:
-	//
+
 	// ReplicaSetUpdatedReason is added in a deployment when one of its replica sets is updated as part
 	// of the rollout process.
 	ReplicaSetUpdatedReason = "ReplicaSetUpdated"
@@ -89,7 +92,7 @@ const (
 	ResumedDeployReason = "DeploymentResumed"
 	//
 	// Available:
-	//
+
 	// MinimumReplicasAvailable is added in a deployment when it has its minimum replicas required available.
 	MinimumReplicasAvailable = "MinimumReplicasAvailable"
 	// MinimumReplicasUnavailable is added in a deployment when it doesn't have the minimum required replicas
@@ -186,7 +189,7 @@ func MaxRevision(allRSs []*apps.ReplicaSet) int64 {
 	for _, rs := range allRSs {
 		if v, err := Revision(rs); err != nil {
 			// Skip the replica sets when it failed to parse their revision information
-			glog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
+			klog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
 		} else if v > max {
 			max = v
 		}
@@ -200,7 +203,7 @@ func LastRevision(allRSs []*apps.ReplicaSet) int64 {
 	for _, rs := range allRSs {
 		if v, err := Revision(rs); err != nil {
 			// Skip the replica sets when it failed to parse their revision information
-			glog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
+			klog.V(4).Infof("Error: %v. Couldn't parse revision for replica set %#v, deployment controller will skip it when reconciling revisions.", err, rs)
 		} else if v >= max {
 			secMax = max
 			max = v
@@ -226,7 +229,7 @@ func Revision(obj runtime.Object) (int64, error) {
 
 // SetNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
 // copying required deployment annotations to it; it returns true if replica set's annotation is changed.
-func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.ReplicaSet, newRevision string, exists bool) bool {
+func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.ReplicaSet, newRevision string, exists bool, revHistoryLimitInChars int) bool {
 	// First, copy deployment's annotations (except for apply and revision annotations)
 	annotationChanged := copyDeploymentAnnotationsToReplicaSet(deployment, newRS)
 	// Then, update replica set's revision annotation
@@ -241,7 +244,7 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 	oldRevisionInt, err := strconv.ParseInt(oldRevision, 10, 64)
 	if err != nil {
 		if oldRevision != "" {
-			glog.Warningf("Updating replica set revision OldRevision not int %s", err)
+			klog.Warningf("Updating replica set revision OldRevision not int %s", err)
 			return false
 		}
 		//If the RS annotation is empty then initialise it to 0
@@ -249,25 +252,36 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 	}
 	newRevisionInt, err := strconv.ParseInt(newRevision, 10, 64)
 	if err != nil {
-		glog.Warningf("Updating replica set revision NewRevision not int %s", err)
+		klog.Warningf("Updating replica set revision NewRevision not int %s", err)
 		return false
 	}
 	if oldRevisionInt < newRevisionInt {
 		newRS.Annotations[RevisionAnnotation] = newRevision
 		annotationChanged = true
-		glog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
+		klog.V(4).Infof("Updating replica set %q revision to %s", newRS.Name, newRevision)
 	}
 	// If a revision annotation already existed and this replica set was updated with a new revision
 	// then that means we are rolling back to this replica set. We need to preserve the old revisions
 	// for historical information.
-	if ok && annotationChanged {
+	if ok && oldRevisionInt < newRevisionInt {
 		revisionHistoryAnnotation := newRS.Annotations[RevisionHistoryAnnotation]
 		oldRevisions := strings.Split(revisionHistoryAnnotation, ",")
 		if len(oldRevisions[0]) == 0 {
 			newRS.Annotations[RevisionHistoryAnnotation] = oldRevision
 		} else {
-			oldRevisions = append(oldRevisions, oldRevision)
-			newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
+			totalLen := len(revisionHistoryAnnotation) + len(oldRevision) + 1
+			// index for the starting position in oldRevisions
+			start := 0
+			for totalLen > revHistoryLimitInChars && start < len(oldRevisions) {
+				totalLen = totalLen - len(oldRevisions[start]) - 1
+				start++
+			}
+			if totalLen <= revHistoryLimitInChars {
+				oldRevisions = append(oldRevisions[start:], oldRevision)
+				newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
+			} else {
+				klog.Warningf("Not appending revision due to length limit of %v reached", revHistoryLimitInChars)
+			}
 		}
 	}
 	// If the new replica set is about to be created, we need to add replica annotations to it.
@@ -376,7 +390,7 @@ func getIntFromAnnotation(rs *apps.ReplicaSet, annotationKey string) (int32, boo
 	}
 	intValue, err := strconv.Atoi(annotationValue)
 	if err != nil {
-		glog.V(2).Infof("Cannot convert the value %q with annotation key %q for the replica set %q", annotationValue, annotationKey, rs.Name)
+		klog.V(2).Infof("Cannot convert the value %q with annotation key %q for the replica set %q", annotationValue, annotationKey, rs.Name)
 		return int32(0), false
 	}
 	return int32(intValue), true
@@ -401,7 +415,7 @@ func SetReplicasAnnotations(rs *apps.ReplicaSet, desiredReplicas, maxReplicas in
 	return updated
 }
 
-// AnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
+// ReplicasAnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
 func ReplicasAnnotationsNeedUpdate(rs *apps.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
 	if rs.Annotations == nil {
 		return true
@@ -532,7 +546,7 @@ func GetNewReplicaSet(deployment *apps.Deployment, c appsclient.AppsV1Interface)
 // RsListFromClient returns an rsListFunc that wraps the given client.
 func RsListFromClient(c appsclient.AppsV1Interface) RsListFunc {
 	return func(namespace string, options metav1.ListOptions) ([]*apps.ReplicaSet, error) {
-		rsList, err := c.ReplicaSets(namespace).List(options)
+		rsList, err := c.ReplicaSets(namespace).List(context.TODO(), options)
 		if err != nil {
 			return nil, err
 		}
@@ -544,8 +558,12 @@ func RsListFromClient(c appsclient.AppsV1Interface) RsListFunc {
 	}
 }
 
-// TODO: switch this to full namespacers
+// TODO: switch RsListFunc and podListFunc to full namespacers
+
+// RsListFunc returns the ReplicaSet from the ReplicaSet namespace and the List metav1.ListOptions.
 type RsListFunc func(string, metav1.ListOptions) ([]*apps.ReplicaSet, error)
+
+// podListFunc returns the PodList from the Pod namespace and the List metav1.ListOptions.
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
@@ -787,7 +805,7 @@ func DeploymentTimedOut(deployment *apps.Deployment, newStatus *apps.DeploymentS
 	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
 	timedOut := from.Add(delta).Before(now)
 
-	glog.V(4).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
+	klog.V(4).Infof("Deployment %q timed out (%t) [last progress check: %v - now: %v]", deployment.Name, timedOut, from, now)
 	return timedOut
 }
 
@@ -883,9 +901,51 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	return int32(surge), int32(unavailable), nil
 }
 
+// HasProgressDeadline checks if the Deployment d is expected to surface the reason
+// "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
 func HasProgressDeadline(d *apps.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }
+
+// HasRevisionHistoryLimit checks if the Deployment d is expected to keep a specified number of
+// old replicaSets. These replicaSets are mainly kept with the purpose of rollback.
+// The RevisionHistoryLimit can start from 0 (no retained replicasSet). When set to math.MaxInt32,
+// the Deployment will keep all revisions.
 func HasRevisionHistoryLimit(d *apps.Deployment) bool {
 	return d.Spec.RevisionHistoryLimit != nil && *d.Spec.RevisionHistoryLimit != math.MaxInt32
+}
+
+// GetDeploymentsForReplicaSet returns a list of Deployments that potentially
+// match a ReplicaSet. Only the one specified in the ReplicaSet's ControllerRef
+// will actually manage it.
+// Returns an error only if no matching Deployments are found.
+func GetDeploymentsForReplicaSet(deploymentLister appslisters.DeploymentLister, rs *apps.ReplicaSet) ([]*apps.Deployment, error) {
+	if len(rs.Labels) == 0 {
+		return nil, fmt.Errorf("no deployments found for ReplicaSet %v because it has no labels", rs.Name)
+	}
+
+	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
+	dList, err := deploymentLister.Deployments(rs.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	var deployments []*apps.Deployment
+	for _, d := range dList {
+		selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+		// If a deployment with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(rs.Labels)) {
+			continue
+		}
+		deployments = append(deployments, d)
+	}
+
+	if len(deployments) == 0 {
+		return nil, fmt.Errorf("could not find deployments set for ReplicaSet %s in namespace %s with labels: %v", rs.Name, rs.Namespace, rs.Labels)
+	}
+
+	return deployments, nil
 }

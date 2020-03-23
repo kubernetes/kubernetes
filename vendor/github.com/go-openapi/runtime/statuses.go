@@ -15,7 +15,7 @@
 package runtime
 
 // Statuses lists the most common HTTP status codes to default message
-// taken from http://status.es
+// taken from https://httpstatuses.com/
 var Statuses = map[int]string{
 	100: "Continue",
 	101: "Switching Protocols",
@@ -29,7 +29,7 @@ var Statuses = map[int]string{
 	204: "No Content",
 	205: "Reset Content",
 	206: "Partial Content",
-	207: "Mutli-Status",
+	207: "Multi-Status",
 	208: "Already Reported",
 	226: "IM Used",
 	300: "Multiple Choices",

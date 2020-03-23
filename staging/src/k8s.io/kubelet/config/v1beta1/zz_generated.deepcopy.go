@@ -143,6 +143,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
+	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	if in.ImageGCHighThresholdPercent != nil {
 		in, out := &in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
@@ -276,6 +277,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	if in.EnforceNodeAllocatable != nil {
 		in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.AllowedUnsafeSysctls != nil {
+		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

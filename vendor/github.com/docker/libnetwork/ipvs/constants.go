@@ -144,4 +144,35 @@ const (
 	// a statically assigned hash table by their source IP
 	// addresses.
 	SourceHashing = "sh"
+
+	// WeightedRoundRobin assigns jobs to real servers proportionally
+	// to there real servers' weight. Servers with higher weights
+	// receive new jobs first and get more jobs than servers
+	// with lower weights. Servers with equal weights get
+	// an equal distribution of new jobs
+	WeightedRoundRobin = "wrr"
+
+	// WeightedLeastConnection assigns more jobs to servers
+	// with fewer jobs and relative to the real servers' weight
+	WeightedLeastConnection = "wlc"
+)
+
+const (
+	// ConnFwdMask is a mask for the fwd methods
+	ConnFwdMask = 0x0007
+
+	// ConnFwdMasq denotes forwarding via masquerading/NAT
+	ConnFwdMasq = 0x0000
+
+	// ConnFwdLocalNode denotes forwarding to a local node
+	ConnFwdLocalNode = 0x0001
+
+	// ConnFwdTunnel denotes forwarding via a tunnel
+	ConnFwdTunnel = 0x0002
+
+	// ConnFwdDirectRoute denotes forwarding via direct routing
+	ConnFwdDirectRoute = 0x0003
+
+	// ConnFwdBypass denotes forwarding while bypassing the cache
+	ConnFwdBypass = 0x0004
 )

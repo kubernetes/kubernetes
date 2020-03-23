@@ -15,20 +15,60 @@
  *
  */
 
-// Package internal contains gRPC-internal code for testing, to avoid polluting
-// the godoc of the top-level grpc package.
+// Package internal contains gRPC-internal code, to avoid polluting
+// the godoc of the top-level grpc package.  It must not import any grpc
+// symbols to avoid circular dependencies.
 package internal
 
-// TestingCloseConns closes all existing transports but keeps
-// grpcServer.lis accepting new connections.
-//
-// The provided grpcServer must be of type *grpc.Server. It is untyped
-// for circular dependency reasons.
-var TestingCloseConns func(grpcServer interface{})
+import (
+	"context"
+	"time"
 
-// TestingUseHandlerImpl enables the http.Handler-based server implementation.
-// It must be called before Serve and requires TLS credentials.
+	"google.golang.org/grpc/connectivity"
+)
+
+var (
+	// WithResolverBuilder is set by dialoptions.go
+	WithResolverBuilder interface{} // func (resolver.Builder) grpc.DialOption
+	// WithHealthCheckFunc is set by dialoptions.go
+	WithHealthCheckFunc interface{} // func (HealthChecker) DialOption
+	// HealthCheckFunc is used to provide client-side LB channel health checking
+	HealthCheckFunc HealthChecker
+	// BalancerUnregister is exported by package balancer to unregister a balancer.
+	BalancerUnregister func(name string)
+	// KeepaliveMinPingTime is the minimum ping interval.  This must be 10s by
+	// default, but tests may wish to set it lower for convenience.
+	KeepaliveMinPingTime = 10 * time.Second
+	// StatusRawProto is exported by status/status.go. This func returns a
+	// pointer to the wrapped Status proto for a given status.Status without a
+	// call to proto.Clone(). The returned Status proto should not be mutated by
+	// the caller.
+	StatusRawProto interface{} // func (*status.Status) *spb.Status
+	// NewRequestInfoContext creates a new context based on the argument context attaching
+	// the passed in RequestInfo to the new context.
+	NewRequestInfoContext interface{} // func(context.Context, credentials.RequestInfo) context.Context
+	// ParseServiceConfigForTesting is for creating a fake
+	// ClientConn for resolver testing only
+	ParseServiceConfigForTesting interface{} // func(string) *serviceconfig.ParseResult
+)
+
+// HealthChecker defines the signature of the client-side LB channel health checking function.
 //
-// The provided grpcServer must be of type *grpc.Server. It is untyped
-// for circular dependency reasons.
-var TestingUseHandlerImpl func(grpcServer interface{})
+// The implementation is expected to create a health checking RPC stream by
+// calling newStream(), watch for the health status of serviceName, and report
+// it's health back by calling setConnectivityState().
+//
+// The health checking protocol is defined at:
+// https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+type HealthChecker func(ctx context.Context, newStream func(string) (interface{}, error), setConnectivityState func(connectivity.State, error), serviceName string) error
+
+const (
+	// CredsBundleModeFallback switches GoogleDefaultCreds to fallback mode.
+	CredsBundleModeFallback = "fallback"
+	// CredsBundleModeBalancer switches GoogleDefaultCreds to grpclb balancer
+	// mode.
+	CredsBundleModeBalancer = "balancer"
+	// CredsBundleModeBackendFromBalancer switches GoogleDefaultCreds to mode
+	// that supports backend returned by grpclb balancer.
+	CredsBundleModeBackendFromBalancer = "backend-from-balancer"
+)

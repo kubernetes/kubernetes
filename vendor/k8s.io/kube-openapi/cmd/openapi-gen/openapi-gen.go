@@ -28,9 +28,12 @@ import (
 	"k8s.io/kube-openapi/pkg/generators"
 
 	"github.com/spf13/pflag"
+
+	"k8s.io/klog"
 )
 
 func main() {
+	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	genericArgs.AddFlags(pflag.CommandLine)
@@ -51,5 +54,4 @@ func main() {
 	); err != nil {
 		log.Fatalf("OpenAPI code generation error: %v", err)
 	}
-	log.Println("Code for OpenAPI definitions generated")
 }

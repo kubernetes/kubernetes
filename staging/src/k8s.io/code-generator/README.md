@@ -1,6 +1,6 @@
 # code-generator
 
-Golang code-generators used to implement [Kubernetes-style API types](https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md).
+Golang code-generators used to implement [Kubernetes-style API types](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md).
 
 ## Purpose
 

@@ -8,8 +8,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "csidriver.go",
+        "csinode.go",
         "expansion_generated.go",
         "storageclass.go",
+        "volumeattachment.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/storage/v1",
     importpath = "k8s.io/client-go/listers/storage/v1",

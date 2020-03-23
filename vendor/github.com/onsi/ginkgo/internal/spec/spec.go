@@ -5,6 +5,8 @@ import (
 	"io"
 	"time"
 
+	"sync"
+
 	"github.com/onsi/ginkgo/internal/containernode"
 	"github.com/onsi/ginkgo/internal/leafnodes"
 	"github.com/onsi/ginkgo/types"
@@ -19,8 +21,11 @@ type Spec struct {
 
 	state            types.SpecState
 	runTime          time.Duration
+	startTime        time.Time
 	failure          types.SpecFailure
 	previousFailures bool
+
+	stateMutex *sync.Mutex
 }
 
 func New(subject leafnodes.SubjectNode, containers []*containernode.ContainerNode, announceProgress bool) *Spec {
@@ -29,6 +34,7 @@ func New(subject leafnodes.SubjectNode, containers []*containernode.ContainerNod
 		containers:       containers,
 		focused:          subject.Flag() == types.FlagTypeFocused,
 		announceProgress: announceProgress,
+		stateMutex:       &sync.Mutex{},
 	}
 
 	spec.processFlag(subject.Flag())
@@ -43,32 +49,32 @@ func (spec *Spec) processFlag(flag types.FlagType) {
 	if flag == types.FlagTypeFocused {
 		spec.focused = true
 	} else if flag == types.FlagTypePending {
-		spec.state = types.SpecStatePending
+		spec.setState(types.SpecStatePending)
 	}
 }
 
 func (spec *Spec) Skip() {
-	spec.state = types.SpecStateSkipped
+	spec.setState(types.SpecStateSkipped)
 }
 
 func (spec *Spec) Failed() bool {
-	return spec.state == types.SpecStateFailed || spec.state == types.SpecStatePanicked || spec.state == types.SpecStateTimedOut
+	return spec.getState() == types.SpecStateFailed || spec.getState() == types.SpecStatePanicked || spec.getState() == types.SpecStateTimedOut
 }
 
 func (spec *Spec) Passed() bool {
-	return spec.state == types.SpecStatePassed
+	return spec.getState() == types.SpecStatePassed
 }
 
 func (spec *Spec) Flaked() bool {
-	return spec.state == types.SpecStatePassed && spec.previousFailures
+	return spec.getState() == types.SpecStatePassed && spec.previousFailures
 }
 
 func (spec *Spec) Pending() bool {
-	return spec.state == types.SpecStatePending
+	return spec.getState() == types.SpecStatePending
 }
 
 func (spec *Spec) Skipped() bool {
-	return spec.state == types.SpecStateSkipped
+	return spec.getState() == types.SpecStateSkipped
 }
 
 func (spec *Spec) Focused() bool {
@@ -91,16 +97,21 @@ func (spec *Spec) Summary(suiteID string) *types.SpecSummary {
 	componentTexts[len(spec.containers)] = spec.subject.Text()
 	componentCodeLocations[len(spec.containers)] = spec.subject.CodeLocation()
 
+	runTime := spec.runTime
+	if runTime == 0 && !spec.startTime.IsZero() {
+		runTime = time.Since(spec.startTime)
+	}
+
 	return &types.SpecSummary{
 		IsMeasurement:          spec.IsMeasurement(),
 		NumberOfSamples:        spec.subject.Samples(),
 		ComponentTexts:         componentTexts,
 		ComponentCodeLocations: componentCodeLocations,
-		State:        spec.state,
-		RunTime:      spec.runTime,
-		Failure:      spec.failure,
-		Measurements: spec.measurementsReport(),
-		SuiteID:      suiteID,
+		State:                  spec.getState(),
+		RunTime:                runTime,
+		Failure:                spec.failure,
+		Measurements:           spec.measurementsReport(),
+		SuiteID:                suiteID,
 	}
 }
 
@@ -114,37 +125,61 @@ func (spec *Spec) ConcatenatedString() string {
 }
 
 func (spec *Spec) Run(writer io.Writer) {
-	if spec.state == types.SpecStateFailed {
+	if spec.getState() == types.SpecStateFailed {
 		spec.previousFailures = true
 	}
 
-	startTime := time.Now()
+	spec.startTime = time.Now()
 	defer func() {
-		spec.runTime = time.Since(startTime)
+		spec.runTime = time.Since(spec.startTime)
 	}()
 
 	for sample := 0; sample < spec.subject.Samples(); sample++ {
 		spec.runSample(sample, writer)
 
-		if spec.state != types.SpecStatePassed {
+		if spec.getState() != types.SpecStatePassed {
 			return
 		}
 	}
 }
 
+func (spec *Spec) getState() types.SpecState {
+	spec.stateMutex.Lock()
+	defer spec.stateMutex.Unlock()
+	return spec.state
+}
+
+func (spec *Spec) setState(state types.SpecState) {
+	spec.stateMutex.Lock()
+	defer spec.stateMutex.Unlock()
+	spec.state = state
+}
+
 func (spec *Spec) runSample(sample int, writer io.Writer) {
-	spec.state = types.SpecStatePassed
+	spec.setState(types.SpecStatePassed)
 	spec.failure = types.SpecFailure{}
 	innerMostContainerIndexToUnwind := -1
 
 	defer func() {
 		for i := innerMostContainerIndexToUnwind; i >= 0; i-- {
 			container := spec.containers[i]
+			for _, justAfterEach := range container.SetupNodesOfType(types.SpecComponentTypeJustAfterEach) {
+				spec.announceSetupNode(writer, "JustAfterEach", container, justAfterEach)
+				justAfterEachState, justAfterEachFailure := justAfterEach.Run()
+				if justAfterEachState != types.SpecStatePassed && spec.state == types.SpecStatePassed {
+					spec.state = justAfterEachState
+					spec.failure = justAfterEachFailure
+				}
+			}
+		}
+
+		for i := innerMostContainerIndexToUnwind; i >= 0; i-- {
+			container := spec.containers[i]
 			for _, afterEach := range container.SetupNodesOfType(types.SpecComponentTypeAfterEach) {
 				spec.announceSetupNode(writer, "AfterEach", container, afterEach)
 				afterEachState, afterEachFailure := afterEach.Run()
-				if afterEachState != types.SpecStatePassed && spec.state == types.SpecStatePassed {
-					spec.state = afterEachState
+				if afterEachState != types.SpecStatePassed && spec.getState() == types.SpecStatePassed {
+					spec.setState(afterEachState)
 					spec.failure = afterEachFailure
 				}
 			}
@@ -155,8 +190,10 @@ func (spec *Spec) runSample(sample int, writer io.Writer) {
 		innerMostContainerIndexToUnwind = i
 		for _, beforeEach := range container.SetupNodesOfType(types.SpecComponentTypeBeforeEach) {
 			spec.announceSetupNode(writer, "BeforeEach", container, beforeEach)
-			spec.state, spec.failure = beforeEach.Run()
-			if spec.state != types.SpecStatePassed {
+			s, f := beforeEach.Run()
+			spec.failure = f
+			spec.setState(s)
+			if spec.getState() != types.SpecStatePassed {
 				return
 			}
 		}
@@ -165,15 +202,19 @@ func (spec *Spec) runSample(sample int, writer io.Writer) {
 	for _, container := range spec.containers {
 		for _, justBeforeEach := range container.SetupNodesOfType(types.SpecComponentTypeJustBeforeEach) {
 			spec.announceSetupNode(writer, "JustBeforeEach", container, justBeforeEach)
-			spec.state, spec.failure = justBeforeEach.Run()
-			if spec.state != types.SpecStatePassed {
+			s, f := justBeforeEach.Run()
+			spec.failure = f
+			spec.setState(s)
+			if spec.getState() != types.SpecStatePassed {
 				return
 			}
 		}
 	}
 
 	spec.announceSubject(writer, spec.subject)
-	spec.state, spec.failure = spec.subject.Run()
+	s, f := spec.subject.Run()
+	spec.failure = f
+	spec.setState(s)
 }
 
 func (spec *Spec) announceSetupNode(writer io.Writer, nodeType string, container *containernode.ContainerNode, setupNode leafnodes.BasicNode) {

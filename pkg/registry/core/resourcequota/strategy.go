@@ -84,6 +84,7 @@ type resourcequotaStatusStrategy struct {
 	resourcequotaStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = resourcequotaStatusStrategy{Strategy}
 
 func (resourcequotaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

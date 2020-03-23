@@ -2,8 +2,8 @@ package dns
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 )
@@ -18,142 +18,225 @@ import (
 // * rhs (rdata)
 // But we are lazy here, only the range is parsed *all* occurrences
 // of $ after that are interpreted.
-// Any error are returned as a string value, the empty string signals
-// "no error".
-func generate(l lex, c chan lex, t chan *Token, o string) string {
+func (zp *ZoneParser) generate(l lex) (RR, bool) {
+	token := l.token
 	step := 1
-	if i := strings.IndexAny(l.token, "/"); i != -1 {
-		if i+1 == len(l.token) {
-			return "bad step in $GENERATE range"
+	if i := strings.IndexByte(token, '/'); i >= 0 {
+		if i+1 == len(token) {
+			return zp.setParseError("bad step in $GENERATE range", l)
 		}
-		if s, err := strconv.Atoi(l.token[i+1:]); err == nil {
-			if s < 0 {
-				return "bad step in $GENERATE range"
-			}
-			step = s
-		} else {
-			return "bad step in $GENERATE range"
+
+		s, err := strconv.Atoi(token[i+1:])
+		if err != nil || s <= 0 {
+			return zp.setParseError("bad step in $GENERATE range", l)
 		}
-		l.token = l.token[:i]
+
+		step = s
+		token = token[:i]
 	}
-	sx := strings.SplitN(l.token, "-", 2)
+
+	sx := strings.SplitN(token, "-", 2)
 	if len(sx) != 2 {
-		return "bad start-stop in $GENERATE range"
+		return zp.setParseError("bad start-stop in $GENERATE range", l)
 	}
+
 	start, err := strconv.Atoi(sx[0])
 	if err != nil {
-		return "bad start in $GENERATE range"
+		return zp.setParseError("bad start in $GENERATE range", l)
 	}
+
 	end, err := strconv.Atoi(sx[1])
 	if err != nil {
-		return "bad stop in $GENERATE range"
+		return zp.setParseError("bad stop in $GENERATE range", l)
 	}
 	if end < 0 || start < 0 || end < start {
-		return "bad range in $GENERATE range"
+		return zp.setParseError("bad range in $GENERATE range", l)
 	}
 
-	<-c // _BLANK
+	zp.c.Next() // _BLANK
+
 	// Create a complete new string, which we then parse again.
-	s := ""
-BuildRR:
-	l = <-c
-	if l.value != zNewline && l.value != zEOF {
-		s += l.token
-		goto BuildRR
-	}
-	for i := start; i <= end; i += step {
-		var (
-			escape bool
-			dom    bytes.Buffer
-			mod    string
-			err    error
-			offset int
-		)
+	var s string
+	for l, ok := zp.c.Next(); ok; l, ok = zp.c.Next() {
+		if l.err {
+			return zp.setParseError("bad data in $GENERATE directive", l)
+		}
+		if l.value == zNewline {
+			break
+		}
 
-		for j := 0; j < len(s); j++ { // No 'range' because we need to jump around
-			switch s[j] {
-			case '\\':
-				if escape {
-					dom.WriteByte('\\')
-					escape = false
-					continue
-				}
-				escape = true
-			case '$':
-				mod = "%d"
-				offset = 0
-				if escape {
-					dom.WriteByte('$')
-					escape = false
-					continue
-				}
-				escape = false
-				if j+1 >= len(s) { // End of the string
-					dom.WriteString(fmt.Sprintf(mod, i+offset))
-					continue
-				} else {
-					if s[j+1] == '$' {
-						dom.WriteByte('$')
-						j++
-						continue
-					}
-				}
-				// Search for { and }
-				if s[j+1] == '{' { // Modifier block
-					sep := strings.Index(s[j+2:], "}")
-					if sep == -1 {
-						return "bad modifier in $GENERATE"
-					}
-					mod, offset, err = modToPrintf(s[j+2 : j+2+sep])
-					if err != nil {
-						return err.Error()
-					}
-					j += 2 + sep // Jump to it
-				}
-				dom.WriteString(fmt.Sprintf(mod, i+offset))
-			default:
-				if escape { // Pretty useless here
-					escape = false
-					continue
-				}
-				dom.WriteByte(s[j])
-			}
-		}
-		// Re-parse the RR and send it on the current channel t
-		rx, err := NewRR("$ORIGIN " + o + "\n" + dom.String())
-		if err != nil {
-			return err.Error()
-		}
-		t <- &Token{RR: rx}
-		// Its more efficient to first built the rrlist and then parse it in
-		// one go! But is this a problem?
+		s += l.token
 	}
-	return ""
+
+	r := &generateReader{
+		s: s,
+
+		cur:   start,
+		start: start,
+		end:   end,
+		step:  step,
+
+		file: zp.file,
+		lex:  &l,
+	}
+	zp.sub = NewZoneParser(r, zp.origin, zp.file)
+	zp.sub.includeDepth, zp.sub.includeAllowed = zp.includeDepth, zp.includeAllowed
+	zp.sub.SetDefaultTTL(defaultTtl)
+	return zp.subNext()
+}
+
+type generateReader struct {
+	s  string
+	si int
+
+	cur   int
+	start int
+	end   int
+	step  int
+
+	mod bytes.Buffer
+
+	escape bool
+
+	eof bool
+
+	file string
+	lex  *lex
+}
+
+func (r *generateReader) parseError(msg string, end int) *ParseError {
+	r.eof = true // Make errors sticky.
+
+	l := *r.lex
+	l.token = r.s[r.si-1 : end]
+	l.column += r.si // l.column starts one zBLANK before r.s
+
+	return &ParseError{r.file, msg, l}
+}
+
+func (r *generateReader) Read(p []byte) (int, error) {
+	// NewZLexer, through NewZoneParser, should use ReadByte and
+	// not end up here.
+
+	panic("not implemented")
+}
+
+func (r *generateReader) ReadByte() (byte, error) {
+	if r.eof {
+		return 0, io.EOF
+	}
+	if r.mod.Len() > 0 {
+		return r.mod.ReadByte()
+	}
+
+	if r.si >= len(r.s) {
+		r.si = 0
+		r.cur += r.step
+
+		r.eof = r.cur > r.end || r.cur < 0
+		return '\n', nil
+	}
+
+	si := r.si
+	r.si++
+
+	switch r.s[si] {
+	case '\\':
+		if r.escape {
+			r.escape = false
+			return '\\', nil
+		}
+
+		r.escape = true
+		return r.ReadByte()
+	case '$':
+		if r.escape {
+			r.escape = false
+			return '$', nil
+		}
+
+		mod := "%d"
+
+		if si >= len(r.s)-1 {
+			// End of the string
+			fmt.Fprintf(&r.mod, mod, r.cur)
+			return r.mod.ReadByte()
+		}
+
+		if r.s[si+1] == '$' {
+			r.si++
+			return '$', nil
+		}
+
+		var offset int
+
+		// Search for { and }
+		if r.s[si+1] == '{' {
+			// Modifier block
+			sep := strings.Index(r.s[si+2:], "}")
+			if sep < 0 {
+				return 0, r.parseError("bad modifier in $GENERATE", len(r.s))
+			}
+
+			var errMsg string
+			mod, offset, errMsg = modToPrintf(r.s[si+2 : si+2+sep])
+			if errMsg != "" {
+				return 0, r.parseError(errMsg, si+3+sep)
+			}
+			if r.start+offset < 0 || r.end+offset > 1<<31-1 {
+				return 0, r.parseError("bad offset in $GENERATE", si+3+sep)
+			}
+
+			r.si += 2 + sep // Jump to it
+		}
+
+		fmt.Fprintf(&r.mod, mod, r.cur+offset)
+		return r.mod.ReadByte()
+	default:
+		if r.escape { // Pretty useless here
+			r.escape = false
+			return r.ReadByte()
+		}
+
+		return r.s[si], nil
+	}
 }
 
 // Convert a $GENERATE modifier 0,0,d to something Printf can deal with.
-func modToPrintf(s string) (string, int, error) {
-	xs := strings.SplitN(s, ",", 3)
-	if len(xs) != 3 {
-		return "", 0, errors.New("bad modifier in $GENERATE")
+func modToPrintf(s string) (string, int, string) {
+	// Modifier is { offset [ ,width [ ,base ] ] } - provide default
+	// values for optional width and type, if necessary.
+	var offStr, widthStr, base string
+	switch xs := strings.Split(s, ","); len(xs) {
+	case 1:
+		offStr, widthStr, base = xs[0], "0", "d"
+	case 2:
+		offStr, widthStr, base = xs[0], xs[1], "d"
+	case 3:
+		offStr, widthStr, base = xs[0], xs[1], xs[2]
+	default:
+		return "", 0, "bad modifier in $GENERATE"
 	}
-	// xs[0] is offset, xs[1] is width, xs[2] is base
-	if xs[2] != "o" && xs[2] != "d" && xs[2] != "x" && xs[2] != "X" {
-		return "", 0, errors.New("bad base in $GENERATE")
+
+	switch base {
+	case "o", "d", "x", "X":
+	default:
+		return "", 0, "bad base in $GENERATE"
 	}
-	offset, err := strconv.Atoi(xs[0])
-	if err != nil || offset > 255 {
-		return "", 0, errors.New("bad offset in $GENERATE")
+
+	offset, err := strconv.Atoi(offStr)
+	if err != nil {
+		return "", 0, "bad offset in $GENERATE"
 	}
-	width, err := strconv.Atoi(xs[1])
-	if err != nil || width > 255 {
-		return "", offset, errors.New("bad width in $GENERATE")
+
+	width, err := strconv.Atoi(widthStr)
+	if err != nil || width < 0 || width > 255 {
+		return "", 0, "bad width in $GENERATE"
 	}
-	switch {
-	case width < 0:
-		return "", offset, errors.New("bad width in $GENERATE")
-	case width == 0:
-		return "%" + xs[1] + xs[2], offset, nil
+
+	if width == 0 {
+		return "%" + base, offset, ""
 	}
-	return "%0" + xs[1] + xs[2], offset, nil
+
+	return "%0" + widthStr + base, offset, ""
 }

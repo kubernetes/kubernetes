@@ -19,6 +19,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -31,8 +32,15 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
-	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
+	//
+	// Uncomment to load all auth plugins
+	// _ "k8s.io/client-go/plugin/pkg/client/auth"
+	//
+	// Or uncomment to load specific auth plugins
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 )
 
 func main() {
@@ -93,7 +101,7 @@ func main() {
 
 	// Create Deployment
 	fmt.Println("Creating deployment...")
-	result, err := deploymentsClient.Create(deployment)
+	result, err := deploymentsClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -113,19 +121,19 @@ func main() {
 	//			 using the retry utility package included with client-go. (RECOMMENDED)
 	//
 	// More Info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		result, getErr := deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
+		result, getErr := deploymentsClient.Get(context.TODO(), "demo-deployment", metav1.GetOptions{})
 		if getErr != nil {
 			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
 		}
 
 		result.Spec.Replicas = int32Ptr(1)                           // reduce replica count
 		result.Spec.Template.Spec.Containers[0].Image = "nginx:1.13" // change nginx version
-		_, updateErr := deploymentsClient.Update(result)
+		_, updateErr := deploymentsClient.Update(context.TODO(), result, metav1.UpdateOptions{})
 		return updateErr
 	})
 	if retryErr != nil {
@@ -136,7 +144,7 @@ func main() {
 	// List Deployments
 	prompt()
 	fmt.Printf("Listing deployments in namespace %q:\n", apiv1.NamespaceDefault)
-	list, err := deploymentsClient.List(metav1.ListOptions{})
+	list, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -148,7 +156,7 @@ func main() {
 	prompt()
 	fmt.Println("Deleting deployment...")
 	deletePolicy := metav1.DeletePropagationForeground
-	if err := deploymentsClient.Delete("demo-deployment", &metav1.DeleteOptions{
+	if err := deploymentsClient.Delete(context.TODO(), "demo-deployment", metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}); err != nil {
 		panic(err)

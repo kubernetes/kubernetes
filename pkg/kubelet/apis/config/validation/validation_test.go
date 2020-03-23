@@ -26,9 +26,11 @@ import (
 )
 
 func TestValidateKubeletConfiguration(t *testing.T) {
-	successCase := &kubeletconfig.KubeletConfiguration{
+	successCase1 := &kubeletconfig.KubeletConfiguration{
 		CgroupsPerQOS:               true,
 		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
+		SystemReservedCgroup:        "/system.slice",
+		KubeReservedCgroup:          "/kubelet.service",
 		SystemCgroups:               "",
 		CgroupRoot:                  "",
 		EventBurst:                  10,
@@ -52,11 +54,44 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		NodeLeaseDurationSeconds:    1,
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
 	}
-	if allErrors := ValidateKubeletConfiguration(successCase); allErrors != nil {
+	if allErrors := ValidateKubeletConfiguration(successCase1); allErrors != nil {
 		t.Errorf("expect no errors, got %v", allErrors)
 	}
 
-	errorCase := &kubeletconfig.KubeletConfiguration{
+	successCase2 := &kubeletconfig.KubeletConfiguration{
+		CgroupsPerQOS:               true,
+		EnforceNodeAllocatable:      []string{"pods"},
+		SystemReservedCgroup:        "",
+		KubeReservedCgroup:          "",
+		SystemCgroups:               "",
+		CgroupRoot:                  "",
+		EventBurst:                  10,
+		EventRecordQPS:              5,
+		HealthzPort:                 10248,
+		ImageGCHighThresholdPercent: 85,
+		ImageGCLowThresholdPercent:  80,
+		IPTablesDropBit:             15,
+		IPTablesMasqueradeBit:       14,
+		KubeAPIBurst:                10,
+		KubeAPIQPS:                  5,
+		MaxOpenFiles:                1000000,
+		MaxPods:                     110,
+		OOMScoreAdj:                 -999,
+		PodsPerCore:                 100,
+		Port:                        65535,
+		ReadOnlyPort:                0,
+		RegistryBurst:               10,
+		RegistryPullQPS:             5,
+		HairpinMode:                 kubeletconfig.PromiscuousBridge,
+		NodeLeaseDurationSeconds:    1,
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
+		ReservedSystemCPUs:          "0-3",
+	}
+	if allErrors := ValidateKubeletConfiguration(successCase2); allErrors != nil {
+		t.Errorf("expect no errors, got %v", allErrors)
+	}
+
+	errorCase1 := &kubeletconfig.KubeletConfiguration{
 		CgroupsPerQOS:               false,
 		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
 		SystemCgroups:               "/",
@@ -82,8 +117,42 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		NodeLeaseDurationSeconds:    -1,
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 0},
 	}
-	const numErrs = 23
-	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrs {
-		t.Errorf("expect %d errors, got %v", numErrs, len(allErrors.(utilerrors.Aggregate).Errors()))
+	const numErrsErrorCase1 = 25
+	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
+		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
+	}
+
+	errorCase2 := &kubeletconfig.KubeletConfiguration{
+		CgroupsPerQOS:               true,
+		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
+		SystemReservedCgroup:        "/system.slice",
+		KubeReservedCgroup:          "/kubelet.service",
+		SystemCgroups:               "",
+		CgroupRoot:                  "",
+		EventBurst:                  10,
+		EventRecordQPS:              5,
+		HealthzPort:                 10248,
+		ImageGCHighThresholdPercent: 85,
+		ImageGCLowThresholdPercent:  80,
+		IPTablesDropBit:             15,
+		IPTablesMasqueradeBit:       14,
+		KubeAPIBurst:                10,
+		KubeAPIQPS:                  5,
+		MaxOpenFiles:                1000000,
+		MaxPods:                     110,
+		OOMScoreAdj:                 -999,
+		PodsPerCore:                 100,
+		Port:                        65535,
+		ReadOnlyPort:                0,
+		RegistryBurst:               10,
+		RegistryPullQPS:             5,
+		HairpinMode:                 kubeletconfig.PromiscuousBridge,
+		NodeLeaseDurationSeconds:    1,
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
+		ReservedSystemCPUs:          "0-3",
+	}
+	const numErrsErrorCase2 = 1
+	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
+		t.Errorf("expect %d errors, got %v", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
 }

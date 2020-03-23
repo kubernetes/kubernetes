@@ -20,7 +20,7 @@ import (
 //  2. If m < n and trans == blas.NoTrans, Dgels finds the minimum norm solution of
 //     A * X = B.
 //  3. If m >= n and trans == blas.Trans, Dgels finds the minimum norm solution of
-//     A^T * X = B.
+//     Aᵀ * X = B.
 //  4. If m < n and trans == blas.Trans, Dgels finds X such that || A*X - B||_2
 //     is minimized.
 // Note that the least-squares solutions (cases 1 and 3) perform the minimization
@@ -39,46 +39,63 @@ import (
 // In the special case that lwork == -1, work[0] will be set to the optimal working
 // length.
 func (impl Implementation) Dgels(trans blas.Transpose, m, n, nrhs int, a []float64, lda int, b []float64, ldb int, work []float64, lwork int) bool {
-	notran := trans == blas.NoTrans
-	checkMatrix(m, n, a, lda)
 	mn := min(m, n)
-	checkMatrix(max(m, n), nrhs, b, ldb)
+	minwrk := mn + max(mn, nrhs)
+	switch {
+	case trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans:
+		panic(badTrans)
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case nrhs < 0:
+		panic(nrhsLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldb < max(1, nrhs):
+		panic(badLdB)
+	case lwork < max(1, minwrk) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
+	}
+
+	// Quick return if possible.
+	if mn == 0 || nrhs == 0 {
+		impl.Dlaset(blas.All, max(m, n), nrhs, 0, 0, b, ldb)
+		work[0] = 1
+		return true
+	}
 
 	// Find optimal block size.
-	tpsd := true
-	if notran {
-		tpsd = false
-	}
 	var nb int
 	if m >= n {
 		nb = impl.Ilaenv(1, "DGEQRF", " ", m, n, -1, -1)
-		if tpsd {
+		if trans != blas.NoTrans {
 			nb = max(nb, impl.Ilaenv(1, "DORMQR", "LN", m, nrhs, n, -1))
 		} else {
 			nb = max(nb, impl.Ilaenv(1, "DORMQR", "LT", m, nrhs, n, -1))
 		}
 	} else {
 		nb = impl.Ilaenv(1, "DGELQF", " ", m, n, -1, -1)
-		if tpsd {
+		if trans != blas.NoTrans {
 			nb = max(nb, impl.Ilaenv(1, "DORMLQ", "LT", n, nrhs, m, -1))
 		} else {
 			nb = max(nb, impl.Ilaenv(1, "DORMLQ", "LN", n, nrhs, m, -1))
 		}
 	}
+	wsize := max(1, mn+max(mn, nrhs)*nb)
+	work[0] = float64(wsize)
+
 	if lwork == -1 {
-		work[0] = float64(max(1, mn+max(mn, nrhs)*nb))
 		return true
 	}
 
-	if len(work) < lwork {
-		panic(shortWork)
-	}
-	if lwork < mn+max(mn, nrhs) {
-		panic(badWork)
-	}
-	if m == 0 || n == 0 || nrhs == 0 {
-		impl.Dlaset(blas.All, max(m, n), nrhs, 0, 0, b, ldb)
-		return true
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(b) < (max(m, n)-1)*ldb+nrhs:
+		panic(shortB)
 	}
 
 	// Scale the input matrices if they contain extreme values.
@@ -97,7 +114,7 @@ func (impl Implementation) Dgels(trans blas.Transpose, m, n, nrhs int, a []float
 		return true
 	}
 	brow := m
-	if tpsd {
+	if trans != blas.NoTrans {
 		brow = n
 	}
 	bnrm := impl.Dlange(lapack.MaxAbs, brow, nrhs, b, ldb, nil)
@@ -114,7 +131,7 @@ func (impl Implementation) Dgels(trans blas.Transpose, m, n, nrhs int, a []float
 	var scllen int
 	if m >= n {
 		impl.Dgeqrf(m, n, a, lda, work, work[mn:], lwork-mn)
-		if !tpsd {
+		if trans == blas.NoTrans {
 			impl.Dormqr(blas.Left, blas.Trans, m, nrhs, n,
 				a, lda,
 				work[:n],
@@ -148,7 +165,7 @@ func (impl Implementation) Dgels(trans blas.Transpose, m, n, nrhs int, a []float
 		}
 	} else {
 		impl.Dgelqf(m, n, a, lda, work, work[mn:], lwork-mn)
-		if !tpsd {
+		if trans == blas.NoTrans {
 			ok := impl.Dtrtrs(blas.Lower, blas.NoTrans, blas.NonUnit,
 				m, nrhs,
 				a, lda,
@@ -196,5 +213,7 @@ func (impl Implementation) Dgels(trans blas.Transpose, m, n, nrhs int, a []float
 	if ibscl == 2 {
 		impl.Dlascl(lapack.General, 0, 0, bignum, bnrm, scllen, nrhs, b, ldb)
 	}
+
+	work[0] = float64(wsize)
 	return true
 }

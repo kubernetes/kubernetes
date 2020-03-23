@@ -33,11 +33,3 @@ type DeploymentListerExpansion interface{}
 // DeploymentNamespaceListerExpansion allows custom methods to be added to
 // DeploymentNamespaceLister.
 type DeploymentNamespaceListerExpansion interface{}
-
-// ScaleListerExpansion allows custom methods to be added to
-// ScaleLister.
-type ScaleListerExpansion interface{}
-
-// ScaleNamespaceListerExpansion allows custom methods to be added to
-// ScaleNamespaceLister.
-type ScaleNamespaceListerExpansion interface{}

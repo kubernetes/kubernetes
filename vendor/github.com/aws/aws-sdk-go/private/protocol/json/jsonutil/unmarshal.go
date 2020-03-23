@@ -1,32 +1,47 @@
 package jsonutil
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"reflect"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/private/protocol"
 )
+
+// UnmarshalJSONError unmarshal's the reader's JSON document into the passed in
+// type. The value to unmarshal the json document into must be a pointer to the
+// type.
+func UnmarshalJSONError(v interface{}, stream io.Reader) error {
+	var errBuf bytes.Buffer
+	body := io.TeeReader(stream, &errBuf)
+
+	err := json.NewDecoder(body).Decode(v)
+	if err != nil {
+		msg := "failed decoding error message"
+		if err == io.EOF {
+			msg = "error message missing"
+			err = nil
+		}
+		return awserr.NewUnmarshalError(err, msg, errBuf.Bytes())
+	}
+
+	return nil
+}
 
 // UnmarshalJSON reads a stream and unmarshals the results in object v.
 func UnmarshalJSON(v interface{}, stream io.Reader) error {
 	var out interface{}
 
-	b, err := ioutil.ReadAll(stream)
-	if err != nil {
-		return err
-	}
-
-	if len(b) == 0 {
+	err := json.NewDecoder(stream).Decode(&out)
+	if err == io.EOF {
 		return nil
-	}
-
-	if err := json.Unmarshal(b, &out); err != nil {
+	} else if err != nil {
 		return err
 	}
 
@@ -172,9 +187,6 @@ func unmarshalMap(value reflect.Value, data interface{}, tag reflect.StructTag) 
 }
 
 func unmarshalScalar(value reflect.Value, data interface{}, tag reflect.StructTag) error {
-	errf := func() error {
-		return fmt.Errorf("unsupported value: %v (%s)", value.Interface(), value.Type())
-	}
 
 	switch d := data.(type) {
 	case nil:
@@ -189,6 +201,17 @@ func unmarshalScalar(value reflect.Value, data interface{}, tag reflect.StructTa
 				return err
 			}
 			value.Set(reflect.ValueOf(b))
+		case *time.Time:
+			format := tag.Get("timestampFormat")
+			if len(format) == 0 {
+				format = protocol.ISO8601TimeFormatName
+			}
+
+			t, err := protocol.ParseTime(format, d)
+			if err != nil {
+				return err
+			}
+			value.Set(reflect.ValueOf(&t))
 		case aws.JSONValue:
 			// No need to use escaping as the value is a non-quoted string.
 			v, err := protocol.DecodeJSONValue(d, protocol.NoEscape)
@@ -197,7 +220,7 @@ func unmarshalScalar(value reflect.Value, data interface{}, tag reflect.StructTa
 			}
 			value.Set(reflect.ValueOf(v))
 		default:
-			return errf()
+			return fmt.Errorf("unsupported value: %v (%s)", value.Interface(), value.Type())
 		}
 	case float64:
 		switch value.Interface().(type) {
@@ -207,17 +230,18 @@ func unmarshalScalar(value reflect.Value, data interface{}, tag reflect.StructTa
 		case *float64:
 			value.Set(reflect.ValueOf(&d))
 		case *time.Time:
+			// Time unmarshaled from a float64 can only be epoch seconds
 			t := time.Unix(int64(d), 0).UTC()
 			value.Set(reflect.ValueOf(&t))
 		default:
-			return errf()
+			return fmt.Errorf("unsupported value: %v (%s)", value.Interface(), value.Type())
 		}
 	case bool:
 		switch value.Interface().(type) {
 		case *bool:
 			value.Set(reflect.ValueOf(&d))
 		default:
-			return errf()
+			return fmt.Errorf("unsupported value: %v (%s)", value.Interface(), value.Type())
 		}
 	default:
 		return fmt.Errorf("unsupported JSON value (%v)", data)

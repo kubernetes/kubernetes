@@ -40,12 +40,15 @@ func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 		j.AllowMissingKeys(allowMissingKeys)
 		err := j.Parse(test.template)
 		if err != nil {
-			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
+			if !test.expectError {
+				t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
+			}
+			continue
 		}
 		buf := new(bytes.Buffer)
 		err = j.Execute(buf, test.input)
 		if test.expectError {
-			if test.expectError && err == nil {
+			if err == nil {
 				t.Errorf("in %s, expected execute error", test.name)
 			}
 			continue
@@ -366,6 +369,286 @@ func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 			},
 		},
 		false, // don't allow missing keys
+		t,
+	)
+}
+
+func TestNegativeIndex(t *testing.T) {
+	var input = []byte(
+		`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"spec": {
+				"containers": [
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake0"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake1"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake2"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake3"
+					}]}}`)
+
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"test containers[0], it equals containers[0]",
+				`{.spec.containers[0].name}`,
+				data,
+				"fake0",
+				false,
+			},
+			{
+				"test containers[0:0], it equals the empty set",
+				`{.spec.containers[0:0].name}`,
+				data,
+				"",
+				false,
+			},
+			{
+				"test containers[0:-1], it equals containers[0:3]",
+				`{.spec.containers[0:-1].name}`,
+				data,
+				"fake0 fake1 fake2",
+				false,
+			},
+			{
+				"test containers[-1:0], expect error",
+				`{.spec.containers[-1:0].name}`,
+				data,
+				"",
+				true,
+			},
+			{
+				"test containers[-1], it equals containers[3]",
+				`{.spec.containers[-1].name}`,
+				data,
+				"fake3",
+				false,
+			},
+			{
+				"test containers[-1:], it equals containers[3:]",
+				`{.spec.containers[-1:].name}`,
+				data,
+				"fake3",
+				false,
+			},
+			{
+				"test containers[-2], it equals containers[2]",
+				`{.spec.containers[-2].name}`,
+				data,
+				"fake2",
+				false,
+			},
+			{
+				"test containers[-2:], it equals containers[2:]",
+				`{.spec.containers[-2:].name}`,
+				data,
+				"fake2 fake3",
+				false,
+			},
+			{
+				"test containers[-3], it equals containers[1]",
+				`{.spec.containers[-3].name}`,
+				data,
+				"fake1",
+				false,
+			},
+			{
+				"test containers[-4], it equals containers[0]",
+				`{.spec.containers[-4].name}`,
+				data,
+				"fake0",
+				false,
+			},
+			{
+				"test containers[-4:], it equals containers[0:]",
+				`{.spec.containers[-4:].name}`,
+				data,
+				"fake0 fake1 fake2 fake3",
+				false,
+			},
+			{
+				"test containers[-5], expect a error cause it out of bounds",
+				`{.spec.containers[-5].name}`,
+				data,
+				"",
+				true, // expect error
+			},
+			{
+				"test containers[5:5], expect empty set",
+				`{.spec.containers[5:5].name}`,
+				data,
+				"",
+				false,
+			},
+			{
+				"test containers[-5:-5], expect empty set",
+				`{.spec.containers[-5:-5].name}`,
+				data,
+				"",
+				false,
+			},
+			{
+				"test containers[3:1], expect a error cause start index is greater than end index",
+				`{.spec.containers[3:1].name}`,
+				data,
+				"",
+				true,
+			},
+			{
+				"test containers[-1:-2], it equals containers[3:2], expect a error cause start index is greater than end index",
+				`{.spec.containers[-1:-2].name}`,
+				data,
+				"",
+				true,
+			},
+		},
+		false,
+		t,
+	)
+}
+
+func TestStep(t *testing.T) {
+	var input = []byte(
+		`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"spec": {
+				"containers": [
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake0"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake1"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake2"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake3"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake4"
+					},
+					{
+						"image": "radial/busyboxplus:curl",
+						"name": "fake5"
+					}]}}`)
+
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"test containers[0:], it equals containers[0:6:1]",
+				`{.spec.containers[0:].name}`,
+				data,
+				"fake0 fake1 fake2 fake3 fake4 fake5",
+				false,
+			},
+			{
+				"test containers[0:6:], it equals containers[0:6:1]",
+				`{.spec.containers[0:6:].name}`,
+				data,
+				"fake0 fake1 fake2 fake3 fake4 fake5",
+				false,
+			},
+			{
+				"test containers[0:6:1]",
+				`{.spec.containers[0:6:1].name}`,
+				data,
+				"fake0 fake1 fake2 fake3 fake4 fake5",
+				false,
+			},
+			{
+				"test containers[0:6:0], it errors",
+				`{.spec.containers[0:6:0].name}`,
+				data,
+				"",
+				true,
+			},
+			{
+				"test containers[0:6:-1], it errors",
+				`{.spec.containers[0:6:-1].name}`,
+				data,
+				"",
+				true,
+			},
+			{
+				"test containers[1:4:2]",
+				`{.spec.containers[1:4:2].name}`,
+				data,
+				"fake1 fake3",
+				false,
+			},
+			{
+				"test containers[1:4:3]",
+				`{.spec.containers[1:4:3].name}`,
+				data,
+				"fake1",
+				false,
+			},
+			{
+				"test containers[1:4:4]",
+				`{.spec.containers[1:4:4].name}`,
+				data,
+				"fake1",
+				false,
+			},
+			{
+				"test containers[0:6:2]",
+				`{.spec.containers[0:6:2].name}`,
+				data,
+				"fake0 fake2 fake4",
+				false,
+			},
+			{
+				"test containers[0:6:3]",
+				`{.spec.containers[0:6:3].name}`,
+				data,
+				"fake0 fake3",
+				false,
+			},
+			{
+				"test containers[0:6:5]",
+				`{.spec.containers[0:6:5].name}`,
+				data,
+				"fake0 fake5",
+				false,
+			},
+			{
+				"test containers[0:6:6]",
+				`{.spec.containers[0:6:6].name}`,
+				data,
+				"fake0",
+				false,
+			},
+		},
+		false,
 		t,
 	)
 }

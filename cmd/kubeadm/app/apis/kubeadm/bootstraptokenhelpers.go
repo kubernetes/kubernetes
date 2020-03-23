@@ -17,15 +17,17 @@ limitations under the License.
 package kubeadm
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
 )
 
 // ToSecret converts the given BootstrapToken object to its Secret representation that
@@ -54,7 +56,7 @@ func encodeTokenSecretData(token *BootstrapToken, now time.Time) map[string][]by
 	}
 
 	// If for some strange reason both token.TTL and token.Expires would be set
-	// (they are mutually exlusive in validation so this shouldn't be the case),
+	// (they are mutually exclusive in validation so this shouldn't be the case),
 	// token.Expires has higher priority, as can be seen in the logic here.
 	if token.Expires != nil {
 		// Format the expiration date accordingly
@@ -82,39 +84,39 @@ func encodeTokenSecretData(token *BootstrapToken, now time.Time) map[string][]by
 // BootstrapTokenFromSecret returns a BootstrapToken object from the given Secret
 func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 	// Get the Token ID field from the Secret data
-	tokenID := getSecretString(secret, bootstrapapi.BootstrapTokenIDKey)
+	tokenID := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenIDKey)
 	if len(tokenID) == 0 {
-		return nil, fmt.Errorf("Bootstrap Token Secret has no token-id data: %s", secret.Name)
+		return nil, errors.Errorf("bootstrap Token Secret has no token-id data: %s", secret.Name)
 	}
 
 	// Enforce the right naming convention
 	if secret.Name != bootstraputil.BootstrapTokenSecretName(tokenID) {
-		return nil, fmt.Errorf("bootstrap token name is not of the form '%s(token-id)'. Actual: %q. Expected: %q",
+		return nil, errors.Errorf("bootstrap token name is not of the form '%s(token-id)'. Actual: %q. Expected: %q",
 			bootstrapapi.BootstrapTokenSecretPrefix, secret.Name, bootstraputil.BootstrapTokenSecretName(tokenID))
 	}
 
-	tokenSecret := getSecretString(secret, bootstrapapi.BootstrapTokenSecretKey)
+	tokenSecret := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if len(tokenSecret) == 0 {
-		return nil, fmt.Errorf("Bootstrap Token Secret has no token-secret data: %s", secret.Name)
+		return nil, errors.Errorf("bootstrap Token Secret has no token-secret data: %s", secret.Name)
 	}
 
 	// Create the BootstrapTokenString object based on the ID and Secret
 	bts, err := NewBootstrapTokenStringFromIDAndSecret(tokenID, tokenSecret)
 	if err != nil {
-		return nil, fmt.Errorf("Bootstrap Token Secret is invalid and couldn't be parsed: %v", err)
+		return nil, errors.Wrap(err, "bootstrap Token Secret is invalid and couldn't be parsed")
 	}
 
 	// Get the description (if any) from the Secret
-	description := getSecretString(secret, bootstrapapi.BootstrapTokenDescriptionKey)
+	description := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenDescriptionKey)
 
 	// Expiration time is optional, if not specified this implies the token
 	// never expires.
-	secretExpiration := getSecretString(secret, bootstrapapi.BootstrapTokenExpirationKey)
+	secretExpiration := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenExpirationKey)
 	var expires *metav1.Time
 	if len(secretExpiration) > 0 {
 		expTime, err := time.Parse(time.RFC3339, secretExpiration)
 		if err != nil {
-			return nil, fmt.Errorf("can't parse expiration time of bootstrap token %q: %v", secret.Name, err)
+			return nil, errors.Wrapf(err, "can't parse expiration time of bootstrap token %q", secret.Name)
 		}
 		expires = &metav1.Time{Time: expTime}
 	}
@@ -141,7 +143,7 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 	// It's done this way to make .Groups be nil in case there is no items, rather than an
 	// empty slice or an empty slice with a "" string only
 	var groups []string
-	groupsString := getSecretString(secret, bootstrapapi.BootstrapTokenExtraGroupsKey)
+	groupsString := bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenExtraGroupsKey)
 	g := strings.Split(groupsString, ",")
 	if len(g) > 0 && len(g[0]) > 0 {
 		groups = g
@@ -154,15 +156,4 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 		Usages:      usages,
 		Groups:      groups,
 	}, nil
-}
-
-// getSecretString returns the string value for the given key in the specified Secret
-func getSecretString(secret *v1.Secret, key string) string {
-	if secret.Data == nil {
-		return ""
-	}
-	if val, ok := secret.Data[key]; ok {
-		return string(val)
-	}
-	return ""
 }

@@ -29,12 +29,12 @@ import (
 )
 
 var (
-	// Timeout after which tokens become invalid.
-	CacheTTL = 1 * time.Minute
-	// The maximum number of in-flight requests to allow.
-	MaxInFlight = 1000
-	// Length of the random base64 encoded token identifying the request.
-	TokenLen = 8
+	// cacheTTL is the timeout after which tokens become invalid.
+	cacheTTL = 1 * time.Minute
+	// maxInFlight is the maximum number of in-flight requests to allow.
+	maxInFlight = 1000
+	// tokenLen is the length of the random base64 encoded token identifying the request.
+	tokenLen = 8
 )
 
 // requestCache caches streaming (exec/attach/port-forward) requests and generates a single-use
@@ -77,14 +77,14 @@ func (c *requestCache) Insert(req request) (token string, err error) {
 	// Remove expired entries.
 	c.gc()
 	// If the cache is full, reject the request.
-	if c.ll.Len() == MaxInFlight {
-		return "", ErrorTooManyInFlight()
+	if c.ll.Len() == maxInFlight {
+		return "", NewErrorTooManyInFlight()
 	}
 	token, err = c.uniqueToken()
 	if err != nil {
 		return "", err
 	}
-	ele := c.ll.PushFront(&cacheEntry{token, req, c.clock.Now().Add(CacheTTL)})
+	ele := c.ll.PushFront(&cacheEntry{token, req, c.clock.Now().Add(cacheTTL)})
 
 	c.tokens[token] = ele
 	return token, nil
@@ -112,15 +112,15 @@ func (c *requestCache) Consume(token string) (req request, found bool) {
 // uniqueToken generates a random URL-safe token and ensures uniqueness.
 func (c *requestCache) uniqueToken() (string, error) {
 	const maxTries = 10
-	// Number of bytes to be TokenLen when base64 encoded.
-	tokenSize := math.Ceil(float64(TokenLen) * 6 / 8)
+	// Number of bytes to be tokenLen when base64 encoded.
+	tokenSize := math.Ceil(float64(tokenLen) * 6 / 8)
 	rawToken := make([]byte, int(tokenSize))
 	for i := 0; i < maxTries; i++ {
 		if _, err := rand.Read(rawToken); err != nil {
 			return "", err
 		}
 		encoded := base64.RawURLEncoding.EncodeToString(rawToken)
-		token := encoded[:TokenLen]
+		token := encoded[:tokenLen]
 		// If it's unique, return it. Otherwise retry.
 		if _, exists := c.tokens[encoded]; !exists {
 			return token, nil

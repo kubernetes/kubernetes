@@ -3,14 +3,14 @@ IPAM Performance Test
 
 Motivation
 -----
-We wanted to be able to test the behavior of the IPAM controller's under various scenarios, 
+We wanted to be able to test the behavior of the IPAM controller's under various scenarios,
 by mocking and monitoring the edges that the controller interacts with. This has the following goals:
 
 - Save time on testing
 - To simulate various behaviors cheaply
 - To observe and model the ideal behavior of the IPAM controller code
 
-Currently the test runs through the 4 different IPAM controller modes for cases where the kube API QPS is a) 
+Currently the test runs through the 4 different IPAM controller modes for cases where the kube API QPS is a)
 equal to and b) significantly less than the number of nodes being added to observe and quantify behavior.
 
 How to run
@@ -43,8 +43,8 @@ usage: ./test-performance.sh <options>
  -l <num> gce cloud endpoint qps
 ```
 
-The tests follow the pattern TestPerformance/{AllocatorType}-KubeQPS{X}-Nodes{Y}, where AllocatorType 
-is one of 
+The tests follow the pattern TestPerformance/{AllocatorType}-KubeQPS{X}-Nodes{Y}, where AllocatorType
+is one of
 
 - RangeAllocator
 - IPAMFromCluster
@@ -61,7 +61,7 @@ So to run the test for CloudAllocator with 10 nodes, one can run
 ./test-performance.sh -r /CloudAllocator.*Nodes10$
 ```
 
-At the end of the test, a JSON format of the results for all the tests run is printed. Passing the -o option 
+At the end of the test, a JSON format of the results for all the tests run is printed. Passing the -o option
 allows for also saving this JSON to a named file.
 
 ### Profiling the code
@@ -72,8 +72,8 @@ of nodes being simulated as the id, or 'all' in case running the full suite.
 
 ### Custom Test Configuration
 It's also possible to run a custom test configuration by passing the -c option. With this option, it then
-possible to specify the number of nodes to simulate and the API server qps values for creation, 
-IPAM allocation and cloud endpoint, along with the allocator name to run. The defaults values for the 
+possible to specify the number of nodes to simulate and the API server qps values for creation,
+IPAM allocation and cloud endpoint, along with the allocator name to run. The defaults values for the
 qps parmeters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
 default allocator is the RangeAllocator.
 

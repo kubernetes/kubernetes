@@ -14,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# verify-readonly-packages.sh checks whether between $KUBE_VERIFY_GIT_BRANCH and HEAD files
-# in readonly directories were modified. A directory is readonly iff it contains a .readonly
-# file. Being readonly DOES NOT apply recursively to subdirectories.
+# This script checks whether between $KUBE_VERIFY_GIT_BRANCH and HEAD files in
+# readonly directories were modified. A directory is readonly if it contains a
+# .readonly file. Being readonly DOES NOT apply recursively to subdirectories.
+# Usage: `hack/verify-readonly-packages.sh`.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
@@ -43,14 +44,13 @@ find_files() {
     \) -name '.readonly'
 }
 
-IFS=$'\n'
-conflicts=($(find_files | sed 's|/.readonly||' | while read dir; do
+conflicts=()
+while IFS=$'\n' read -r dir; do
     dir=${dir#./}
-    if kube::util::has_changes_against_upstream_branch "${branch}" "^${dir}/[^/]*\$" '/\.readonly$|/BUILD$|/zz_generated|/\.generated\.|\.proto$|\.pb\.go$' >/dev/null; then
-        echo "${dir}"
+    if kube::util::has_changes "${branch}" "^${dir}/[^/]*\$" '/\.readonly$|/BUILD$|/zz_generated|/\.generated\.|\.proto$|\.pb\.go$' >/dev/null; then
+        conflicts+=("${dir}")
     fi
-done))
-unset IFS
+done < <(find_files | sed 's|/.readonly||')
 
 if [ ${#conflicts[@]} -gt 0 ]; then
     exec 1>&2

@@ -17,14 +17,15 @@ limitations under the License.
 package defaulttolerationseconds
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 // PluginName indicates name of admission plugin.
@@ -40,14 +41,14 @@ var (
 			" that is added by default to every pod that does not already have such a toleration.")
 
 	notReadyToleration = api.Toleration{
-		Key:               schedulerapi.TaintNodeNotReady,
+		Key:               v1.TaintNodeNotReady,
 		Operator:          api.TolerationOpExists,
 		Effect:            api.TaintEffectNoExecute,
 		TolerationSeconds: defaultNotReadyTolerationSeconds,
 	}
 
 	unreachableToleration = api.Toleration{
-		Key:               schedulerapi.TaintNodeUnreachable,
+		Key:               v1.TaintNodeUnreachable,
 		Operator:          api.TolerationOpExists,
 		Effect:            api.TaintEffectNoExecute,
 		TolerationSeconds: defaultUnreachableTolerationSeconds,
@@ -81,7 +82,7 @@ func NewDefaultTolerationSeconds() *Plugin {
 }
 
 // Admit makes an admission decision based on the request attributes
-func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
+func (p *Plugin) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
@@ -101,12 +102,12 @@ func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 	toleratesNodeNotReady := false
 	toleratesNodeUnreachable := false
 	for _, toleration := range tolerations {
-		if (toleration.Key == schedulerapi.TaintNodeNotReady || len(toleration.Key) == 0) &&
+		if (toleration.Key == v1.TaintNodeNotReady || len(toleration.Key) == 0) &&
 			(toleration.Effect == api.TaintEffectNoExecute || len(toleration.Effect) == 0) {
 			toleratesNodeNotReady = true
 		}
 
-		if (toleration.Key == schedulerapi.TaintNodeUnreachable || len(toleration.Key) == 0) &&
+		if (toleration.Key == v1.TaintNodeUnreachable || len(toleration.Key) == 0) &&
 			(toleration.Effect == api.TaintEffectNoExecute || len(toleration.Effect) == 0) {
 			toleratesNodeUnreachable = true
 		}

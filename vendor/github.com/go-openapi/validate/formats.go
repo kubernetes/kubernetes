@@ -15,7 +15,6 @@
 package validate
 
 import (
-	"log"
 	"reflect"
 
 	"github.com/go-openapi/spec"
@@ -38,28 +37,26 @@ func (f *formatValidator) Applies(source interface{}, kind reflect.Kind) bool {
 		if source == nil {
 			return false
 		}
-		switch source.(type) {
+		switch source := source.(type) {
 		case *spec.Items:
-			it := source.(*spec.Items)
-			return kind == reflect.String && f.KnownFormats.ContainsName(it.Format)
+			return kind == reflect.String && f.KnownFormats.ContainsName(source.Format)
 		case *spec.Parameter:
-			par := source.(*spec.Parameter)
-			return kind == reflect.String && f.KnownFormats.ContainsName(par.Format)
+			return kind == reflect.String && f.KnownFormats.ContainsName(source.Format)
 		case *spec.Schema:
-			sch := source.(*spec.Schema)
-			return kind == reflect.String && f.KnownFormats.ContainsName(sch.Format)
+			return kind == reflect.String && f.KnownFormats.ContainsName(source.Format)
+		case *spec.Header:
+			return kind == reflect.String && f.KnownFormats.ContainsName(source.Format)
 		}
 		return false
 	}
 	r := doit()
-	if Debug {
-		log.Printf("format validator for %q applies %t for %T (kind: %v)\n", f.Path, r, source, kind)
-	}
+	debugLog("format validator for %q applies %t for %T (kind: %v)\n", f.Path, r, source, kind)
 	return r
 }
 
 func (f *formatValidator) Validate(val interface{}) *Result {
 	result := new(Result)
+	debugLog("validating \"%v\" against format: %s", val, f.Format)
 
 	if err := FormatOf(f.Path, f.In, f.Format, val.(string), f.KnownFormats); err != nil {
 		result.AddErrors(err)

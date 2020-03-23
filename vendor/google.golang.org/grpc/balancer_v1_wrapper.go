@@ -21,9 +21,7 @@ package grpc
 import (
 	"sync"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/balancer"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/resolver"
@@ -34,22 +32,23 @@ type balancerWrapperBuilder struct {
 }
 
 func (bwb *balancerWrapperBuilder) Build(cc balancer.ClientConn, opts balancer.BuildOptions) balancer.Balancer {
-	bwb.b.Start(cc.Target(), BalancerConfig{
+	bwb.b.Start(opts.Target.Endpoint, BalancerConfig{
 		DialCreds: opts.DialCreds,
 		Dialer:    opts.Dialer,
 	})
 	_, pickfirst := bwb.b.(*pickFirst)
 	bw := &balancerWrapper{
-		balancer:  bwb.b,
-		pickfirst: pickfirst,
-		cc:        cc,
-		startCh:   make(chan struct{}),
-		conns:     make(map[resolver.Address]balancer.SubConn),
-		connSt:    make(map[balancer.SubConn]*scState),
-		csEvltr:   &connectivityStateEvaluator{},
-		state:     connectivity.Idle,
+		balancer:   bwb.b,
+		pickfirst:  pickfirst,
+		cc:         cc,
+		targetAddr: opts.Target.Endpoint,
+		startCh:    make(chan struct{}),
+		conns:      make(map[resolver.Address]balancer.SubConn),
+		connSt:     make(map[balancer.SubConn]*scState),
+		csEvltr:    &balancer.ConnectivityStateEvaluator{},
+		state:      connectivity.Idle,
 	}
-	cc.UpdateBalancerState(connectivity.Idle, bw)
+	cc.UpdateState(balancer.State{ConnectivityState: connectivity.Idle, Picker: bw})
 	go bw.lbWatcher()
 	return bw
 }
@@ -68,11 +67,8 @@ type balancerWrapper struct {
 	balancer  Balancer // The v1 balancer.
 	pickfirst bool
 
-	cc balancer.ClientConn
-
-	// To aggregate the connectivity state.
-	csEvltr *connectivityStateEvaluator
-	state   connectivity.State
+	cc         balancer.ClientConn
+	targetAddr string // Target without the scheme.
 
 	mu     sync.Mutex
 	conns  map[resolver.Address]balancer.SubConn
@@ -82,18 +78,21 @@ type balancerWrapper struct {
 	// - NewSubConn is created, cc wants to notify balancer of state changes;
 	// - Build hasn't return, cc doesn't have access to balancer.
 	startCh chan struct{}
+
+	// To aggregate the connectivity state.
+	csEvltr *balancer.ConnectivityStateEvaluator
+	state   connectivity.State
 }
 
 // lbWatcher watches the Notify channel of the balancer and manages
 // connections accordingly.
 func (bw *balancerWrapper) lbWatcher() {
 	<-bw.startCh
-	grpclog.Infof("balancerWrapper: is pickfirst: %v\n", bw.pickfirst)
 	notifyCh := bw.balancer.Notify()
 	if notifyCh == nil {
 		// There's no resolver in the balancer. Connect directly.
 		a := resolver.Address{
-			Addr: bw.cc.Target(),
+			Addr: bw.targetAddr,
 			Type: resolver.Backend,
 		}
 		sc, err := bw.cc.NewSubConn([]resolver.Address{a}, balancer.NewSubConnOptions{})
@@ -103,7 +102,7 @@ func (bw *balancerWrapper) lbWatcher() {
 			bw.mu.Lock()
 			bw.conns[a] = sc
 			bw.connSt[sc] = &scState{
-				addr: Address{Addr: bw.cc.Target()},
+				addr: Address{Addr: bw.targetAddr},
 				s:    connectivity.Idle,
 			}
 			bw.mu.Unlock()
@@ -113,7 +112,7 @@ func (bw *balancerWrapper) lbWatcher() {
 	}
 
 	for addrs := range notifyCh {
-		grpclog.Infof("balancerWrapper: got update addr from Notify: %v\n", addrs)
+		grpclog.Infof("balancerWrapper: got update addr from Notify: %v", addrs)
 		if bw.pickfirst {
 			var (
 				oldA  resolver.Address
@@ -165,10 +164,10 @@ func (bw *balancerWrapper) lbWatcher() {
 					sc.Connect()
 				}
 			} else {
-				oldSC.UpdateAddresses(newAddrs)
 				bw.mu.Lock()
 				bw.connSt[oldSC].addr = addrs[0]
 				bw.mu.Unlock()
+				oldSC.UpdateAddresses(newAddrs)
 			}
 		} else {
 			var (
@@ -221,7 +220,6 @@ func (bw *balancerWrapper) lbWatcher() {
 }
 
 func (bw *balancerWrapper) HandleSubConnStateChange(sc balancer.SubConn, s connectivity.State) {
-	grpclog.Infof("balancerWrapper: handle subconn state change: %p, %v", sc, s)
 	bw.mu.Lock()
 	defer bw.mu.Unlock()
 	scSt, ok := bw.connSt[sc]
@@ -240,16 +238,15 @@ func (bw *balancerWrapper) HandleSubConnStateChange(sc balancer.SubConn, s conne
 			scSt.down(errConnClosing)
 		}
 	}
-	sa := bw.csEvltr.recordTransition(oldS, s)
+	sa := bw.csEvltr.RecordTransition(oldS, s)
 	if bw.state != sa {
 		bw.state = sa
 	}
-	bw.cc.UpdateBalancerState(bw.state, bw)
+	bw.cc.UpdateState(balancer.State{ConnectivityState: bw.state, Picker: bw})
 	if s == connectivity.Shutdown {
 		// Remove state for this sc.
 		delete(bw.connSt, sc)
 	}
-	return
 }
 
 func (bw *balancerWrapper) HandleResolvedAddrs([]resolver.Address, error) {
@@ -262,7 +259,6 @@ func (bw *balancerWrapper) HandleResolvedAddrs([]resolver.Address, error) {
 	}
 	// There should be a resolver inside the balancer.
 	// All updates here, if any, are ignored.
-	return
 }
 
 func (bw *balancerWrapper) Close() {
@@ -274,94 +270,65 @@ func (bw *balancerWrapper) Close() {
 		close(bw.startCh)
 	}
 	bw.balancer.Close()
-	return
 }
 
 // The picker is the balancerWrapper itself.
-// Pick should never return ErrNoSubConnAvailable.
 // It either blocks or returns error, consistent with v1 balancer Get().
-func (bw *balancerWrapper) Pick(ctx context.Context, opts balancer.PickOptions) (balancer.SubConn, func(balancer.DoneInfo), error) {
+func (bw *balancerWrapper) Pick(info balancer.PickInfo) (result balancer.PickResult, err error) {
 	failfast := true // Default failfast is true.
-	if ss, ok := rpcInfoFromContext(ctx); ok {
+	if ss, ok := rpcInfoFromContext(info.Ctx); ok {
 		failfast = ss.failfast
 	}
-	a, p, err := bw.balancer.Get(ctx, BalancerGetOptions{BlockingWait: !failfast})
+	a, p, err := bw.balancer.Get(info.Ctx, BalancerGetOptions{BlockingWait: !failfast})
 	if err != nil {
-		return nil, nil, err
+		return balancer.PickResult{}, toRPCErr(err)
 	}
-	var done func(balancer.DoneInfo)
 	if p != nil {
-		done = func(i balancer.DoneInfo) { p() }
+		result.Done = func(balancer.DoneInfo) { p() }
+		defer func() {
+			if err != nil {
+				p()
+			}
+		}()
 	}
-	var sc balancer.SubConn
+
 	bw.mu.Lock()
 	defer bw.mu.Unlock()
 	if bw.pickfirst {
 		// Get the first sc in conns.
-		for _, sc = range bw.conns {
-			break
+		for _, result.SubConn = range bw.conns {
+			return result, nil
 		}
-	} else {
-		var ok bool
-		sc, ok = bw.conns[resolver.Address{
-			Addr:       a.Addr,
-			Type:       resolver.Backend,
-			ServerName: "",
-			Metadata:   a.Metadata,
-		}]
-		if !ok && failfast {
-			return nil, nil, Errorf(codes.Unavailable, "there is no connection available")
-		}
-		if s, ok := bw.connSt[sc]; failfast && (!ok || s.s != connectivity.Ready) {
-			// If the returned sc is not ready and RPC is failfast,
-			// return error, and this RPC will fail.
-			return nil, nil, Errorf(codes.Unavailable, "there is no connection available")
-		}
+		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
-
-	return sc, done, nil
-}
-
-// connectivityStateEvaluator gets updated by addrConns when their
-// states transition, based on which it evaluates the state of
-// ClientConn.
-type connectivityStateEvaluator struct {
-	mu                  sync.Mutex
-	numReady            uint64 // Number of addrConns in ready state.
-	numConnecting       uint64 // Number of addrConns in connecting state.
-	numTransientFailure uint64 // Number of addrConns in transientFailure.
-}
-
-// recordTransition records state change happening in every subConn and based on
-// that it evaluates what aggregated state should be.
-// It can only transition between Ready, Connecting and TransientFailure. Other states,
-// Idle and Shutdown are transitioned into by ClientConn; in the beginning of the connection
-// before any subConn is created ClientConn is in idle state. In the end when ClientConn
-// closes it is in Shutdown state.
-// TODO Note that in later releases, a ClientConn with no activity will be put into an Idle state.
-func (cse *connectivityStateEvaluator) recordTransition(oldState, newState connectivity.State) connectivity.State {
-	cse.mu.Lock()
-	defer cse.mu.Unlock()
-
-	// Update counters.
-	for idx, state := range []connectivity.State{oldState, newState} {
-		updateVal := 2*uint64(idx) - 1 // -1 for oldState and +1 for new.
-		switch state {
-		case connectivity.Ready:
-			cse.numReady += updateVal
-		case connectivity.Connecting:
-			cse.numConnecting += updateVal
-		case connectivity.TransientFailure:
-			cse.numTransientFailure += updateVal
-		}
+	var ok1 bool
+	result.SubConn, ok1 = bw.conns[resolver.Address{
+		Addr:       a.Addr,
+		Type:       resolver.Backend,
+		ServerName: "",
+		Metadata:   a.Metadata,
+	}]
+	s, ok2 := bw.connSt[result.SubConn]
+	if !ok1 || !ok2 {
+		// This can only happen due to a race where Get() returned an address
+		// that was subsequently removed by Notify.  In this case we should
+		// retry always.
+		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
-
-	// Evaluate.
-	if cse.numReady > 0 {
-		return connectivity.Ready
+	switch s.s {
+	case connectivity.Ready, connectivity.Idle:
+		return result, nil
+	case connectivity.Shutdown, connectivity.TransientFailure:
+		// If the returned sc has been shut down or is in transient failure,
+		// return error, and this RPC will fail or wait for another picker (if
+		// non-failfast).
+		return balancer.PickResult{}, balancer.ErrTransientFailure
+	default:
+		// For other states (connecting or unknown), the v1 balancer would
+		// traditionally wait until ready and then issue the RPC.  Returning
+		// ErrNoSubConnAvailable will be a slight improvement in that it will
+		// allow the balancer to choose another address in case others are
+		// connected.
+		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
-	if cse.numConnecting > 0 {
-		return connectivity.Connecting
-	}
-	return connectivity.TransientFailure
 }

@@ -17,12 +17,13 @@ limitations under the License.
 package storageobjectinuseprotection
 
 import (
+	"context"
 	"io"
 
-	"github.com/golang/glog"
-
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -44,9 +45,12 @@ func Register(plugins *admission.Plugins) {
 // storageProtectionPlugin holds state for and implements the admission plugin.
 type storageProtectionPlugin struct {
 	*admission.Handler
+
+	storageObjectInUseProtection bool
 }
 
 var _ admission.Interface = &storageProtectionPlugin{}
+var _ initializer.WantsFeatures = &storageProtectionPlugin{}
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *storageProtectionPlugin {
@@ -65,8 +69,8 @@ var (
 //
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
-func (c *storageProtectionPlugin) Admit(a admission.Attributes) error {
-	if !feature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
+func (c *storageProtectionPlugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	if !c.storageObjectInUseProtection {
 		return nil
 	}
 
@@ -97,7 +101,7 @@ func (c *storageProtectionPlugin) admitPV(a admission.Attributes) error {
 			return nil
 		}
 	}
-	glog.V(4).Infof("adding PV protection finalizer to %s", pv.Name)
+	klog.V(4).Infof("adding PV protection finalizer to %s", pv.Name)
 	pv.Finalizers = append(pv.Finalizers, volumeutil.PVProtectionFinalizer)
 
 	return nil
@@ -121,7 +125,15 @@ func (c *storageProtectionPlugin) admitPVC(a admission.Attributes) error {
 		}
 	}
 
-	glog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
+	klog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
 	pvc.Finalizers = append(pvc.Finalizers, volumeutil.PVCProtectionFinalizer)
+	return nil
+}
+
+func (c *storageProtectionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	c.storageObjectInUseProtection = featureGates.Enabled(features.StorageObjectInUseProtection)
+}
+
+func (c *storageProtectionPlugin) ValidateInitialization() error {
 	return nil
 }

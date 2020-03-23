@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -31,9 +32,8 @@ import (
 	kubeclient "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/controller"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -114,7 +114,7 @@ func NewKubemarkController(externalClient kubeclient.Interface, externalInformer
 
 // WaitForCacheSync waits until all caches in the controller are populated.
 func (kubemarkController *KubemarkController) WaitForCacheSync(stopCh chan struct{}) bool {
-	return controller.WaitForCacheSync("kubemark", stopCh,
+	return cache.WaitForNamedCacheSync("kubemark", stopCh,
 		kubemarkController.externalCluster.rcSynced,
 		kubemarkController.externalCluster.podSynced,
 		kubemarkController.kubemarkCluster.nodeSynced)
@@ -125,7 +125,7 @@ func (kubemarkController *KubemarkController) WaitForCacheSync(stopCh chan struc
 func (kubemarkController *KubemarkController) Run(stopCh chan struct{}) {
 	nodeTemplate, err := kubemarkController.getNodeTemplate()
 	if err != nil {
-		glog.Fatalf("failed to get node template: %s", err)
+		klog.Fatalf("failed to get node template: %s", err)
 	}
 	kubemarkController.nodeTemplate = nodeTemplate
 
@@ -195,11 +195,11 @@ func (kubemarkController *KubemarkController) SetNodeGroupSize(nodeGroup string,
 		}
 	case delta > 0:
 		kubemarkController.nodeGroupQueueSizeLock.Lock()
+		kubemarkController.nodeGroupQueueSize[nodeGroup] += delta
+		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 		for i := 0; i < delta; i++ {
-			kubemarkController.nodeGroupQueueSize[nodeGroup]++
 			kubemarkController.createNodeQueue <- nodeGroup
 		}
-		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 	}
 
 	return nil
@@ -227,7 +227,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 
 	var err error
 	for i := 0; i < numRetries; i++ {
-		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(node)
+		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(context.TODO(), node, metav1.CreateOptions{})
 		if err == nil {
 			return nil
 		}
@@ -239,7 +239,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup string, node string) error {
 	pod := kubemarkController.getPodByName(node)
 	if pod == nil {
-		glog.Warningf("Can't delete node %s from nodegroup %s. Node does not exist.", node, nodeGroup)
+		klog.Warningf("Can't delete node %s from nodegroup %s. Node does not exist.", node, nodeGroup)
 		return nil
 	}
 	if pod.ObjectMeta.Labels[nodeGroupLabel] != nodeGroup {
@@ -248,11 +248,10 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 	policy := metav1.DeletePropagationForeground
 	var err error
 	for i := 0; i < numRetries; i++ {
-		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(
-			pod.ObjectMeta.Labels["name"],
-			&metav1.DeleteOptions{PropagationPolicy: &policy})
+		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(context.TODO(), pod.ObjectMeta.Labels["name"],
+			metav1.DeleteOptions{PropagationPolicy: &policy})
 		if err == nil {
-			glog.Infof("marking node %s for deletion", node)
+			klog.Infof("marking node %s for deletion", node)
 			// Mark node for deletion from kubemark cluster.
 			// Once it becomes unready after replication controller
 			// deletion has been noticed, we will delete it explicitly.
@@ -340,7 +339,7 @@ func (kubemarkController *KubemarkController) runNodeCreation(stop <-chan struct
 			kubemarkController.nodeGroupQueueSizeLock.Lock()
 			err := kubemarkController.addNodeToNodeGroup(nodeGroup)
 			if err != nil {
-				glog.Errorf("failed to add node to node group %s: %v", nodeGroup, err)
+				klog.Errorf("failed to add node to node group %s: %v", nodeGroup, err)
 			} else {
 				kubemarkController.nodeGroupQueueSize[nodeGroup]--
 			}
@@ -375,8 +374,8 @@ func (kubemarkCluster *kubemarkCluster) removeUnneededNodes(oldObj interface{}, 
 			defer kubemarkCluster.nodesToDeleteLock.Unlock()
 			if kubemarkCluster.nodesToDelete[node.Name] {
 				kubemarkCluster.nodesToDelete[node.Name] = false
-				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(node.Name, &metav1.DeleteOptions{}); err != nil {
-					glog.Errorf("failed to delete node %s from kubemark cluster, err: %v", node.Name, err)
+				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
+					klog.Errorf("failed to delete node %s from kubemark cluster, err: %v", node.Name, err)
 				}
 			}
 			return

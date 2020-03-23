@@ -43,7 +43,7 @@ const (
 // (1970-01-01 00:00 UTC) excluding leap seconds.
 type Time int64
 
-// Interval describes and interval between two timestamps.
+// Interval describes an interval between two timestamps.
 type Interval struct {
 	Start, End Time
 }
@@ -150,7 +150,13 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 			return err
 		}
 
-		*t = Time(v + va)
+		// If the value was something like -0.1 the negative is lost in the
+		// parsing because of the leading zero, this ensures that we capture it.
+		if len(p[0]) > 0 && p[0][0] == '-' && v+va > 0 {
+			*t = Time(v+va) * -1
+		} else {
+			*t = Time(v + va)
+		}
 
 	default:
 		return fmt.Errorf("invalid time %q", string(b))
@@ -163,9 +169,21 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // This type should not propagate beyond the scope of input/output processing.
 type Duration time.Duration
 
+// Set implements pflag/flag.Value
+func (d *Duration) Set(s string) error {
+	var err error
+	*d, err = ParseDuration(s)
+	return err
+}
+
+// Type implements pflag.Value
+func (d *Duration) Type() string {
+	return "duration"
+}
+
 var durationRE = regexp.MustCompile("^([0-9]+)(y|w|d|h|m|s|ms)$")
 
-// StringToDuration parses a string into a time.Duration, assuming that a year
+// ParseDuration parses a string into a time.Duration, assuming that a year
 // always has 365d, a week always has 7d, and a day always has 24h.
 func ParseDuration(durationStr string) (Duration, error) {
 	matches := durationRE.FindStringSubmatch(durationStr)
@@ -202,6 +220,9 @@ func (d Duration) String() string {
 		ms   = int64(time.Duration(d) / time.Millisecond)
 		unit = "ms"
 	)
+	if ms == 0 {
+		return "0s"
+	}
 	factors := map[string]int64{
 		"y":  1000 * 60 * 60 * 24 * 365,
 		"w":  1000 * 60 * 60 * 24 * 7,

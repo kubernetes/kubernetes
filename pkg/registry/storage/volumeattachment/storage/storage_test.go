@@ -19,21 +19,22 @@ package storage
 import (
 	"testing"
 
-	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
-	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/apiserver/pkg/registry/rest"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, storageapi.GroupName)
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -41,8 +42,11 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "volumeattachments",
 	}
-	volumeAttachmentStorage := NewREST(restOptions)
-	return volumeAttachmentStorage, server
+	volumeAttachmentStorage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	return volumeAttachmentStorage.VolumeAttachment, volumeAttachmentStorage.Status, server
 }
 
 func validNewVolumeAttachment(name string) *storageapi.VolumeAttachment {
@@ -62,13 +66,7 @@ func validNewVolumeAttachment(name string) *storageapi.VolumeAttachment {
 }
 
 func TestCreate(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
-		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1alpha1 and v1beta1
-		return
-	}
-
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -93,20 +91,16 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
-		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1alpha1 and v1beta1
-		return
-	}
-
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+
 	test.TestUpdate(
 		// valid
 		validNewVolumeAttachment("foo"),
-		// updateFunc
+		// we still allow status field to be set in both v1 and v1beta1
+		// it is just that in v1 the new value does not take effect.
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.VolumeAttachment)
 			object.Status.Attached = true
@@ -122,13 +116,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
-		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1alpha1 and v1beta1
-		return
-	}
-
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
@@ -136,13 +124,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
-		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1alpha1 and v1beta1
-		return
-	}
-
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -150,13 +132,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
-		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1alpha1 and v1beta1
-		return
-	}
-
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -164,13 +140,7 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1alpha1.SchemeGroupVersion &&
-		*testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1alpha1 and v1beta1
-		return
-	}
-
-	storage, server := newStorage(t)
+	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -191,4 +161,42 @@ func TestWatch(t *testing.T) {
 			{"metadata.name": "bar"},
 		},
 	)
+}
+
+func TestEtcdStatusUpdate(t *testing.T) {
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+
+	attachment := validNewVolumeAttachment("foo")
+	if _, err := storage.Create(ctx, attachment, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	obj, err := storage.Get(ctx, attachment.ObjectMeta.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// update status
+	attachmentIn := obj.(*storageapi.VolumeAttachment).DeepCopy()
+	attachmentIn.Status.Attached = true
+
+	_, _, err = statusStorage.Update(ctx, attachmentIn.Name, rest.DefaultUpdatedObjectInfo(attachmentIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update status: %v", err)
+	}
+
+	// validate object got updated
+	obj, err = storage.Get(ctx, attachmentIn.ObjectMeta.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	attachmentOut := obj.(*storageapi.VolumeAttachment)
+	if !apiequality.Semantic.DeepEqual(attachmentIn.Spec, attachmentOut.Spec) {
+		t.Errorf("objects differ: %v", diff.ObjectDiff(attachmentOut.Spec, attachmentIn.Spec))
+	}
+	if !apiequality.Semantic.DeepEqual(attachmentIn.Status, attachmentOut.Status) {
+		t.Errorf("objects differ: %v", diff.ObjectDiff(attachmentOut.Status, attachmentIn.Status))
+	}
 }

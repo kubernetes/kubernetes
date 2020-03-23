@@ -17,26 +17,31 @@ limitations under the License.
 package upgrades
 
 import (
-	api "k8s.io/api/core/v1"
+	"context"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 )
 
 // AppArmorUpgradeTest tests that AppArmor profiles are enforced & usable across upgrades.
 type AppArmorUpgradeTest struct {
-	pod *api.Pod
+	pod *v1.Pod
 }
 
+// Name returns the tracking name of the test.
 func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 
+// Skip returns true when this test can be skipped.
 func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	supportedImages := make(map[string]bool)
-	for _, d := range common.AppArmorDistros {
+	for _, d := range e2eskipper.AppArmorDistros {
 		supportedImages[d] = true
 	}
 
@@ -50,12 +55,12 @@ func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
-	By("Loading AppArmor profiles to nodes")
-	common.LoadAppArmorProfiles(f)
+	ginkgo.By("Loading AppArmor profiles to nodes")
+	e2esecurity.LoadAppArmorProfiles(f.Namespace.Name, f.ClientSet)
 
 	// Create the initial test pod.
-	By("Creating a long-running AppArmor enabled pod.")
-	t.pod = common.CreateAppArmorTestPod(f, false, false)
+	ginkgo.By("Creating a long-running AppArmor enabled pod.")
+	t.pod = e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(f)
@@ -76,37 +81,37 @@ func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{},
 // Teardown cleans up any remaining resources.
 func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
-	By("Logging container failures")
-	framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+	ginkgo.By("Logging container failures")
+	e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 }
 
 func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
-	By("Verifying an AppArmor profile is continuously enforced for a pod")
-	pod, err := f.PodClient().Get(t.pod.Name, metav1.GetOptions{})
+	ginkgo.By("Verifying an AppArmor profile is continuously enforced for a pod")
+	pod, err := f.PodClient().Get(context.TODO(), t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
-	Expect(pod.Status.Phase).To(Equal(api.PodRunning), "Pod should stay running")
-	Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(BeNil(), "Container should be running")
-	Expect(pod.Status.ContainerStatuses[0].RestartCount).To(BeZero(), "Container should not need to be restarted")
+	framework.ExpectEqual(pod.Status.Phase, v1.PodRunning, "Pod should stay running")
+	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "Container should be running")
+	gomega.Expect(pod.Status.ContainerStatuses[0].RestartCount).To(gomega.BeZero(), "Container should not need to be restarted")
 }
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
-	By("Verifying an AppArmor profile is enforced for a new pod")
-	common.CreateAppArmorTestPod(f, false, true)
+	ginkgo.By("Verifying an AppArmor profile is enforced for a new pod")
+	e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {
-	By("Verifying nodes are AppArmor enabled")
-	nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	ginkgo.By("Verifying nodes are AppArmor enabled")
+	nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err, "Failed to list nodes")
 	for _, node := range nodes.Items {
-		Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{
+		gomega.Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{
 			"Ready": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"Message": ContainSubstring("AppArmor enabled"),
+				"Message": gomega.ContainSubstring("AppArmor enabled"),
 			}),
 		}))
 	}
 }
 
 func conditionType(condition interface{}) string {
-	return string(condition.(api.NodeCondition).Type)
+	return string(condition.(v1.NodeCondition).Type)
 }

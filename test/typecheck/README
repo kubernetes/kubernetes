@@ -19,5 +19,4 @@ Things go/types errors on that go build doesn't:
     These should be ignored and reported upstream if applicable.
     - type checking mismatches between staging and generated types
 Things go build fails on that we don't:
-  Please send examples of this to rmmh@ and extend this list.
   - CGo errors, including syntax and linker errors.

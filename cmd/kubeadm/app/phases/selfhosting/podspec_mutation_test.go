@@ -21,17 +21,19 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestMutatePodSpec(t *testing.T) {
 	var tests = []struct {
+		name      string
 		component string
 		podSpec   *v1.PodSpec
 		expected  v1.PodSpec
 	}{
 		{
+			name:      "mutate api server podspec",
 			component: kubeadmconstants.KubeAPIServer,
 			podSpec: &v1.PodSpec{
 				Containers: []v1.Container{
@@ -67,12 +69,13 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
 		},
 		{
+			name:      "mutate controller manager podspec",
 			component: kubeadmconstants.KubeControllerManager,
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
@@ -80,12 +83,13 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
 		},
 		{
+			name:      "mutate scheduler podspec",
 			component: kubeadmconstants.KubeScheduler,
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
@@ -93,7 +97,7 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -101,20 +105,24 @@ func TestMutatePodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		mutatePodSpec(GetDefaultMutators(), rt.component, rt.podSpec)
+		t.Run(rt.name, func(t *testing.T) {
+			mutatePodSpec(GetDefaultMutators(), rt.component, rt.podSpec)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed mutatePodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed mutatePodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }
 
 func TestAddNodeSelectorToPodSpec(t *testing.T) {
 	var tests = []struct {
+		name     string
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
 	}{
 		{
+			name:    "empty podspec",
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
@@ -123,6 +131,7 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 			},
 		},
 		{
+			name: "podspec with a valid node selector",
 			podSpec: &v1.PodSpec{
 				NodeSelector: map[string]string{
 					"foo": "bar",
@@ -138,28 +147,33 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		addNodeSelectorToPodSpec(rt.podSpec)
+		t.Run(rt.name, func(t *testing.T) {
+			addNodeSelectorToPodSpec(rt.podSpec)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed addNodeSelectorToPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed addNodeSelectorToPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }
 
-func TestSetMasterTolerationOnPodSpec(t *testing.T) {
+func TestSetControlPlaneTolerationOnPodSpec(t *testing.T) {
 	var tests = []struct {
+		name     string
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
 	}{
 		{
+			name:    "empty podspec",
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 			},
 		},
 		{
+			name: "podspec with a valid toleration",
 			podSpec: &v1.PodSpec{
 				Tolerations: []v1.Toleration{
 					{Key: "foo", Value: "bar"},
@@ -168,33 +182,38 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
 					{Key: "foo", Value: "bar"},
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		setMasterTolerationOnPodSpec(rt.podSpec)
+		t.Run(rt.name, func(t *testing.T) {
+			setControlPlaneTolerationOnPodSpec(rt.podSpec)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed setMasterTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed setControlPlaneTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }
 
 func TestSetRightDNSPolicyOnPodSpec(t *testing.T) {
 	var tests = []struct {
+		name     string
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
 	}{
 		{
+			name:    "empty podspec",
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
 		},
 		{
+			name: "podspec with a v1.DNSClusterFirst policy",
 			podSpec: &v1.PodSpec{
 				DNSPolicy: v1.DNSClusterFirst,
 			},
@@ -205,20 +224,24 @@ func TestSetRightDNSPolicyOnPodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setRightDNSPolicyOnPodSpec(rt.podSpec)
+		t.Run(rt.name, func(t *testing.T) {
+			setRightDNSPolicyOnPodSpec(rt.podSpec)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed setRightDNSPolicyOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed setRightDNSPolicyOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }
 
 func TestSetHostIPOnPodSpec(t *testing.T) {
 	var tests = []struct {
+		name     string
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
 	}{
 		{
+			name: "set HOST_IP env var on a podspec",
 			podSpec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{
@@ -254,21 +277,25 @@ func TestSetHostIPOnPodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setHostIPOnPodSpec(rt.podSpec)
+		t.Run(rt.name, func(t *testing.T) {
+			setHostIPOnPodSpec(rt.podSpec)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed setHostIPOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed setHostIPOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }
 
 func TestSetSelfHostedVolumesForAPIServer(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	var tests = []struct {
+		name     string
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
 	}{
 		{
+			name: "set selfhosted volumes for api server",
 			podSpec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{
@@ -346,13 +373,15 @@ func TestSetSelfHostedVolumesForAPIServer(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setSelfHostedVolumesForAPIServer(rt.podSpec)
-		sort.Strings(rt.podSpec.Containers[0].Command)
-		sort.Strings(rt.expected.Containers[0].Command)
+		t.Run(rt.name, func(t *testing.T) {
+			setSelfHostedVolumesForAPIServer(rt.podSpec)
+			sort.Strings(rt.podSpec.Containers[0].Command)
+			sort.Strings(rt.expected.Containers[0].Command)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed setSelfHostedVolumesForAPIServer:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed setSelfHostedVolumesForAPIServer:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }
 
@@ -360,10 +389,12 @@ func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	var tests = []struct {
+		name     string
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
 	}{
 		{
+			name: "set selfhosted volumes for controller mananger",
 			podSpec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{
@@ -383,6 +414,8 @@ func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/controller-manager.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/controller-manager.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/controller-manager.conf",
 							"--foo=bar",
 						},
 					},
@@ -436,6 +469,8 @@ func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/kubeconfig/controller-manager.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/kubeconfig/controller-manager.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/kubeconfig/controller-manager.conf",
 							"--foo=bar",
 						},
 					},
@@ -464,23 +499,27 @@ func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setSelfHostedVolumesForControllerManager(rt.podSpec)
-		sort.Strings(rt.podSpec.Containers[0].Command)
-		sort.Strings(rt.expected.Containers[0].Command)
+		t.Run(rt.name, func(t *testing.T) {
+			setSelfHostedVolumesForControllerManager(rt.podSpec)
+			sort.Strings(rt.podSpec.Containers[0].Command)
+			sort.Strings(rt.expected.Containers[0].Command)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed setSelfHostedVolumesForControllerManager:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed setSelfHostedVolumesForControllerManager:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }
 
 func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
 	var tests = []struct {
+		name     string
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
 	}{
 		{
+			name: "set selfhosted volumes for scheduler",
 			podSpec: &v1.PodSpec{
 				Containers: []v1.Container{
 					{
@@ -492,6 +531,8 @@ func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/scheduler.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/scheduler.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/scheduler.conf",
 							"--foo=bar",
 						},
 					},
@@ -519,6 +560,8 @@ func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/kubeconfig/scheduler.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/kubeconfig/scheduler.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/kubeconfig/scheduler.conf",
 							"--foo=bar",
 						},
 					},
@@ -534,12 +577,14 @@ func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setSelfHostedVolumesForScheduler(rt.podSpec)
-		sort.Strings(rt.podSpec.Containers[0].Command)
-		sort.Strings(rt.expected.Containers[0].Command)
+		t.Run(rt.name, func(t *testing.T) {
+			setSelfHostedVolumesForScheduler(rt.podSpec)
+			sort.Strings(rt.podSpec.Containers[0].Command)
+			sort.Strings(rt.expected.Containers[0].Command)
 
-		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed setSelfHostedVolumesForScheduler:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
-		}
+			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+				t.Errorf("failed setSelfHostedVolumesForScheduler:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			}
+		})
 	}
 }

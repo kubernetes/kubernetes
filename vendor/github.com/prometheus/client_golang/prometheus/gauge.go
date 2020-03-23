@@ -13,6 +13,14 @@
 
 package prometheus
 
+import (
+	"math"
+	"sync/atomic"
+	"time"
+
+	dto "github.com/prometheus/client_model/go"
+)
+
 // Gauge is a Metric that represents a single numerical value that can
 // arbitrarily go up and down.
 //
@@ -48,13 +56,74 @@ type Gauge interface {
 type GaugeOpts Opts
 
 // NewGauge creates a new Gauge based on the provided GaugeOpts.
+//
+// The returned implementation is optimized for a fast Set method. If you have a
+// choice for managing the value of a Gauge via Set vs. Inc/Dec/Add/Sub, pick
+// the former. For example, the Inc method of the returned Gauge is slower than
+// the Inc method of a Counter returned by NewCounter. This matches the typical
+// scenarios for Gauges and Counters, where the former tends to be Set-heavy and
+// the latter Inc-heavy.
 func NewGauge(opts GaugeOpts) Gauge {
-	return newValue(NewDesc(
+	desc := NewDesc(
 		BuildFQName(opts.Namespace, opts.Subsystem, opts.Name),
 		opts.Help,
 		nil,
 		opts.ConstLabels,
-	), GaugeValue, 0)
+	)
+	result := &gauge{desc: desc, labelPairs: desc.constLabelPairs}
+	result.init(result) // Init self-collection.
+	return result
+}
+
+type gauge struct {
+	// valBits contains the bits of the represented float64 value. It has
+	// to go first in the struct to guarantee alignment for atomic
+	// operations.  http://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	valBits uint64
+
+	selfCollector
+
+	desc       *Desc
+	labelPairs []*dto.LabelPair
+}
+
+func (g *gauge) Desc() *Desc {
+	return g.desc
+}
+
+func (g *gauge) Set(val float64) {
+	atomic.StoreUint64(&g.valBits, math.Float64bits(val))
+}
+
+func (g *gauge) SetToCurrentTime() {
+	g.Set(float64(time.Now().UnixNano()) / 1e9)
+}
+
+func (g *gauge) Inc() {
+	g.Add(1)
+}
+
+func (g *gauge) Dec() {
+	g.Add(-1)
+}
+
+func (g *gauge) Add(val float64) {
+	for {
+		oldBits := atomic.LoadUint64(&g.valBits)
+		newBits := math.Float64bits(math.Float64frombits(oldBits) + val)
+		if atomic.CompareAndSwapUint64(&g.valBits, oldBits, newBits) {
+			return
+		}
+	}
+}
+
+func (g *gauge) Sub(val float64) {
+	g.Add(val * -1)
+}
+
+func (g *gauge) Write(out *dto.Metric) error {
+	val := math.Float64frombits(atomic.LoadUint64(&g.valBits))
+	return populateMetric(GaugeValue, val, g.labelPairs, out)
 }
 
 // GaugeVec is a Collector that bundles a set of Gauges that all share the same
@@ -63,12 +132,11 @@ func NewGauge(opts GaugeOpts) Gauge {
 // (e.g. number of operations queued, partitioned by user and operation
 // type). Create instances with NewGaugeVec.
 type GaugeVec struct {
-	*MetricVec
+	*metricVec
 }
 
 // NewGaugeVec creates a new GaugeVec based on the provided GaugeOpts and
-// partitioned by the given label names. At least one label name must be
-// provided.
+// partitioned by the given label names.
 func NewGaugeVec(opts GaugeOpts, labelNames []string) *GaugeVec {
 	desc := NewDesc(
 		BuildFQName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -77,28 +145,62 @@ func NewGaugeVec(opts GaugeOpts, labelNames []string) *GaugeVec {
 		opts.ConstLabels,
 	)
 	return &GaugeVec{
-		MetricVec: newMetricVec(desc, func(lvs ...string) Metric {
-			return newValue(desc, GaugeValue, 0, lvs...)
+		metricVec: newMetricVec(desc, func(lvs ...string) Metric {
+			if len(lvs) != len(desc.variableLabels) {
+				panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels, lvs))
+			}
+			result := &gauge{desc: desc, labelPairs: makeLabelPairs(desc, lvs)}
+			result.init(result) // Init self-collection.
+			return result
 		}),
 	}
 }
 
-// GetMetricWithLabelValues replaces the method of the same name in
-// MetricVec. The difference is that this method returns a Gauge and not a
-// Metric so that no type conversion is required.
-func (m *GaugeVec) GetMetricWithLabelValues(lvs ...string) (Gauge, error) {
-	metric, err := m.MetricVec.GetMetricWithLabelValues(lvs...)
+// GetMetricWithLabelValues returns the Gauge for the given slice of label
+// values (same order as the VariableLabels in Desc). If that combination of
+// label values is accessed for the first time, a new Gauge is created.
+//
+// It is possible to call this method without using the returned Gauge to only
+// create the new Gauge but leave it at its starting value 0. See also the
+// SummaryVec example.
+//
+// Keeping the Gauge for later use is possible (and should be considered if
+// performance is critical), but keep in mind that Reset, DeleteLabelValues and
+// Delete can be used to delete the Gauge from the GaugeVec. In that case, the
+// Gauge will still exist, but it will not be exported anymore, even if a
+// Gauge with the same label values is created later. See also the CounterVec
+// example.
+//
+// An error is returned if the number of label values is not the same as the
+// number of VariableLabels in Desc (minus any curried labels).
+//
+// Note that for more than one label value, this method is prone to mistakes
+// caused by an incorrect order of arguments. Consider GetMetricWith(Labels) as
+// an alternative to avoid that type of mistake. For higher label numbers, the
+// latter has a much more readable (albeit more verbose) syntax, but it comes
+// with a performance overhead (for creating and processing the Labels map).
+func (v *GaugeVec) GetMetricWithLabelValues(lvs ...string) (Gauge, error) {
+	metric, err := v.metricVec.getMetricWithLabelValues(lvs...)
 	if metric != nil {
 		return metric.(Gauge), err
 	}
 	return nil, err
 }
 
-// GetMetricWith replaces the method of the same name in MetricVec. The
-// difference is that this method returns a Gauge and not a Metric so that no
-// type conversion is required.
-func (m *GaugeVec) GetMetricWith(labels Labels) (Gauge, error) {
-	metric, err := m.MetricVec.GetMetricWith(labels)
+// GetMetricWith returns the Gauge for the given Labels map (the label names
+// must match those of the VariableLabels in Desc). If that label map is
+// accessed for the first time, a new Gauge is created. Implications of
+// creating a Gauge without using it and keeping the Gauge for later use are
+// the same as for GetMetricWithLabelValues.
+//
+// An error is returned if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc (minus any curried labels).
+//
+// This method is used for the same purpose as
+// GetMetricWithLabelValues(...string). See there for pros and cons of the two
+// methods.
+func (v *GaugeVec) GetMetricWith(labels Labels) (Gauge, error) {
+	metric, err := v.metricVec.getMetricWith(labels)
 	if metric != nil {
 		return metric.(Gauge), err
 	}
@@ -106,18 +208,57 @@ func (m *GaugeVec) GetMetricWith(labels Labels) (Gauge, error) {
 }
 
 // WithLabelValues works as GetMetricWithLabelValues, but panics where
-// GetMetricWithLabelValues would have returned an error. By not returning an
-// error, WithLabelValues allows shortcuts like
+// GetMetricWithLabelValues would have returned an error. Not returning an
+// error allows shortcuts like
 //     myVec.WithLabelValues("404", "GET").Add(42)
-func (m *GaugeVec) WithLabelValues(lvs ...string) Gauge {
-	return m.MetricVec.WithLabelValues(lvs...).(Gauge)
+func (v *GaugeVec) WithLabelValues(lvs ...string) Gauge {
+	g, err := v.GetMetricWithLabelValues(lvs...)
+	if err != nil {
+		panic(err)
+	}
+	return g
 }
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
-// returned an error. By not returning an error, With allows shortcuts like
-//     myVec.With(Labels{"code": "404", "method": "GET"}).Add(42)
-func (m *GaugeVec) With(labels Labels) Gauge {
-	return m.MetricVec.With(labels).(Gauge)
+// returned an error. Not returning an error allows shortcuts like
+//     myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Add(42)
+func (v *GaugeVec) With(labels Labels) Gauge {
+	g, err := v.GetMetricWith(labels)
+	if err != nil {
+		panic(err)
+	}
+	return g
+}
+
+// CurryWith returns a vector curried with the provided labels, i.e. the
+// returned vector has those labels pre-set for all labeled operations performed
+// on it. The cardinality of the curried vector is reduced accordingly. The
+// order of the remaining labels stays the same (just with the curried labels
+// taken out of the sequence – which is relevant for the
+// (GetMetric)WithLabelValues methods). It is possible to curry a curried
+// vector, but only with labels not yet used for currying before.
+//
+// The metrics contained in the GaugeVec are shared between the curried and
+// uncurried vectors. They are just accessed differently. Curried and uncurried
+// vectors behave identically in terms of collection. Only one must be
+// registered with a given registry (usually the uncurried version). The Reset
+// method deletes all metrics, even if called on a curried vector.
+func (v *GaugeVec) CurryWith(labels Labels) (*GaugeVec, error) {
+	vec, err := v.curryWith(labels)
+	if vec != nil {
+		return &GaugeVec{vec}, err
+	}
+	return nil, err
+}
+
+// MustCurryWith works as CurryWith but panics where CurryWith would have
+// returned an error.
+func (v *GaugeVec) MustCurryWith(labels Labels) *GaugeVec {
+	vec, err := v.CurryWith(labels)
+	if err != nil {
+		panic(err)
+	}
+	return vec
 }
 
 // GaugeFunc is a Gauge whose value is determined at collect time by calling a

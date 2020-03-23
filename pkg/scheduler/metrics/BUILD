@@ -1,15 +1,19 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["metrics.go"],
+    srcs = [
+        "metric_recorder.go",
+        "metrics.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/metrics",
-    deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
+    deps = [
+        "//pkg/controller/volume/scheduling/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+    ],
 )
 
 filegroup(
@@ -23,4 +27,10 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["metric_recorder_test.go"],
+    embed = [":go_default_library"],
 )

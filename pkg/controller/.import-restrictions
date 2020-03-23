@@ -12,7 +12,5 @@
         "k8s.io/kubernetes/pkg/client/unversioned/testclient"
       ]
     }
-
   ]
 }
-

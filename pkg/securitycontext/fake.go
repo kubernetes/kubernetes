@@ -25,9 +25,11 @@ import (
 // empty container defaults.  Used for testing.
 func ValidSecurityContextWithContainerDefaults() *v1.SecurityContext {
 	priv := false
+	defProcMount := v1.DefaultProcMount
 	return &v1.SecurityContext{
 		Capabilities: &v1.Capabilities{},
 		Privileged:   &priv,
+		ProcMount:    &defProcMount,
 	}
 }
 

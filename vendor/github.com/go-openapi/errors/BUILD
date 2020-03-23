@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "api.go",
         "auth.go",
+        "doc.go",
         "headers.go",
         "middleware.go",
         "parsing.go",

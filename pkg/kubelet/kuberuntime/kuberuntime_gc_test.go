@@ -25,7 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -179,28 +179,29 @@ func TestSandboxGC(t *testing.T) {
 	}
 }
 
+func makeGCContainer(podStateProvider *fakePodStateProvider, podName, containerName string, attempt int, createdAt int64, state runtimeapi.ContainerState) containerTemplate {
+	container := makeTestContainer(containerName, "test-image")
+	pod := makeTestPod(podName, "test-ns", podName, []v1.Container{container})
+	if podName == "running" {
+		podStateProvider.runningPods[pod.UID] = struct{}{}
+	}
+	if podName != "deleted" {
+		podStateProvider.existingPods[pod.UID] = struct{}{}
+	}
+	return containerTemplate{
+		pod:       pod,
+		container: &container,
+		attempt:   attempt,
+		createdAt: createdAt,
+		state:     state,
+	}
+}
+
 func TestContainerGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
-	makeGCContainer := func(podName, containerName string, attempt int, createdAt int64, state runtimeapi.ContainerState) containerTemplate {
-		container := makeTestContainer(containerName, "test-image")
-		pod := makeTestPod(podName, "test-ns", podName, []v1.Container{container})
-		if podName == "running" {
-			podStateProvider.runningPods[pod.UID] = struct{}{}
-		}
-		if podName != "deleted" {
-			podStateProvider.existingPods[pod.UID] = struct{}{}
-		}
-		return containerTemplate{
-			pod:       pod,
-			container: &container,
-			attempt:   attempt,
-			createdAt: createdAt,
-			state:     state,
-		}
-	}
 	defaultGCPolicy := kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}
 
 	for c, test := range []struct {
@@ -214,7 +215,7 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "all containers should be removed when max container limit is 0",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0},
 			remain:              []int{},
@@ -224,11 +225,11 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "max containers should be complied when no max per pod container limit is set",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 4, 4, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 3, 3, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 4, 4, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 3, 3, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4},
 			remain:              []int{0, 1, 2, 3},
@@ -238,9 +239,9 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "no containers should be removed if both max container and per pod container limits are not set",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1},
 			remain:              []int{0, 1, 2},
@@ -250,9 +251,9 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "recently started containers should not be removed",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 2, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
@@ -261,9 +262,9 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "oldest containers should be removed when per pod container limit exceeded",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0, 1},
 			evictTerminatedPods: false,
@@ -272,9 +273,9 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "running containers should not be removed",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
 			},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
@@ -283,8 +284,8 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "no containers should be removed when limits are not exceeded",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0, 1},
 			evictTerminatedPods: false,
@@ -293,15 +294,15 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "max container count should apply per (UID, container) pair",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "baz", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "baz", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "baz", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo2", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo2", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo2", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "baz", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "baz", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "baz", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo2", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo2", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo2", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0, 1, 3, 4, 6, 7},
 			evictTerminatedPods: false,
@@ -310,16 +311,16 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "max limit should apply and try to keep from every pod",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo2", "bar2", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo2", "bar2", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo3", "bar3", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo3", "bar3", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo4", "bar4", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo4", "bar4", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo2", "bar2", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo2", "bar2", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo3", "bar3", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo3", "bar3", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo4", "bar4", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo4", "bar4", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0, 2, 4, 6, 8},
 			evictTerminatedPods: false,
@@ -328,16 +329,16 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "oldest pods should be removed if limit exceeded",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "bar1", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo2", "bar2", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo3", "bar3", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo4", "bar4", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo5", "bar5", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo6", "bar6", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo7", "bar7", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "bar1", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo2", "bar2", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo3", "bar3", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo4", "bar4", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo5", "bar5", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo6", "bar6", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo7", "bar7", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0, 2, 4, 6, 8, 9},
 			evictTerminatedPods: false,
@@ -346,12 +347,12 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "all non-running containers should be removed when evictTerminatedPods is set",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "bar1", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo1", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("running", "bar2", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo3", "bar3", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
+				makeGCContainer(podStateProvider, "foo", "bar", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "bar1", 2, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo1", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "running", "bar2", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo3", "bar3", 0, 0, runtimeapi.ContainerState_CONTAINER_RUNNING),
 			},
 			remain:              []int{4, 5},
 			evictTerminatedPods: true,
@@ -360,12 +361,12 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "containers for deleted pods should be removed",
 			containers: []containerTemplate{
-				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 				// deleted pods still respect MinAge.
-				makeGCContainer("deleted", "bar1", 2, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("deleted", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
-				makeGCContainer("deleted", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "deleted", "bar1", 2, time.Now().UnixNano(), runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "deleted", "bar1", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "deleted", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
@@ -374,7 +375,7 @@ func TestContainerGC(t *testing.T) {
 		{
 			description: "containers for deleted pods may not be removed if allSourcesReady is set false ",
 			containers: []containerTemplate{
-				makeGCContainer("deleted", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer(podStateProvider, "deleted", "bar1", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
 			remain:              []int{0},
 			evictTerminatedPods: true,
@@ -411,10 +412,16 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	// pod log directories without corresponding pods should be removed.
 	podStateProvider.existingPods["123"] = struct{}{}
 	podStateProvider.existingPods["456"] = struct{}{}
+	podStateProvider.existingPods["321"] = struct{}{}
 	podStateProvider.runningPods["123"] = struct{}{}
 	podStateProvider.runningPods["456"] = struct{}{}
-	files := []string{"123", "456", "789", "012"}
-	removed := []string{filepath.Join(podLogsRootDirectory, "789"), filepath.Join(podLogsRootDirectory, "012")}
+	podStateProvider.existingPods["321"] = struct{}{}
+	files := []string{"123", "456", "789", "012", "name_namespace_321", "name_namespace_654"}
+	removed := []string{
+		filepath.Join(podLogsRootDirectory, "789"),
+		filepath.Join(podLogsRootDirectory, "012"),
+		filepath.Join(podLogsRootDirectory, "name_namespace_654"),
+	}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -439,4 +446,27 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	err = m.containerGC.evictPodLogsDirectories(false)
 	assert.NoError(t, err)
 	assert.Empty(t, fakeOS.Removes)
+}
+
+func TestUnknownStateContainerGC(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
+	defaultGCPolicy := kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 0, MaxContainers: 0}
+
+	fakeContainers := makeFakeContainers(t, m, []containerTemplate{
+		makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_UNKNOWN),
+	})
+	fakeRuntime.SetFakeContainers(fakeContainers)
+
+	err = m.containerGC.evictContainers(defaultGCPolicy, true, false)
+	assert.NoError(t, err)
+
+	assert.Contains(t, fakeRuntime.GetCalls(), "StopContainer", "RemoveContainer",
+		"container in unknown state should be stopped before being removed")
+
+	remain, err := fakeRuntime.ListContainers(nil)
+	assert.NoError(t, err)
+	assert.Empty(t, remain)
 }

@@ -17,31 +17,31 @@ limitations under the License.
 package vsphere
 
 import (
-	"fmt"
-	"strings"
+	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
-	DiskSizeSCName = "disksizesc"
+	diskSizeSCName = "disksizesc"
 )
 
 /*
-	Test to verify disk size specified in PVC is being honored while volume creation.
+	Test to verify disk size specified in PVC is being rounded up correctly.
 
 	Steps
 	1. Create StorageClass.
 	2. Create PVC with invalid disk size which uses the StorageClass created in step 1.
-	3. Expect the PVC to fail.
-	4. Verify the error returned on PVC failure is the correct.
+	3. Verify the provisioned PV size is correct.
 */
 
 var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
@@ -52,8 +52,8 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		scParameters map[string]string
 		datastore    string
 	)
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -61,35 +61,38 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		datastore = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
-	It("verify dynamically provisioned pv using storageclass with an invalid disk size fails", func() {
-		By("Invoking Test for invalid disk size")
+	ginkgo.It("verify dynamically provisioned pv has size rounded up correctly", func() {
+		ginkgo.By("Invoking Test disk size")
 		scParameters[Datastore] = datastore
 		scParameters[DiskFormat] = ThinDisk
 		diskSize := "1"
-		err := invokeInvalidDiskSizeTestNeg(client, namespace, scParameters, diskSize)
-		Expect(err).To(HaveOccurred())
-		errorMsg := `Failed to provision volume with StorageClass \"` + DiskSizeSCName + `\": A specified parameter was not correct`
-		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
-		}
+		expectedDiskSize := "1Mi"
+
+		ginkgo.By("Creating Storage Class")
+		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+
+		ginkgo.By("Creating PVC using the Storage Class")
+		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
+		framework.ExpectNoError(err)
+		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+
+		ginkgo.By("Waiting for claim to be in bound phase")
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Getting new copy of PVC")
+		pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Getting PV created")
+		pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying if provisioned PV has the correct size")
+		expectedCapacity := resource.MustParse(expectedDiskSize)
+		pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+		framework.ExpectEqual(pvCapacity.Value(), expectedCapacity.Value())
 	})
 })
-
-func invokeInvalidDiskSizeTestNeg(client clientset.Interface, namespace string, scParameters map[string]string, diskSize string) error {
-	By("Creating Storage Class With invalid disk size")
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(DiskSizeSCName, scParameters))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
-
-	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
-	Expect(err).NotTo(HaveOccurred())
-	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
-
-	By("Expect claim to fail provisioning volume")
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	Expect(err).To(HaveOccurred())
-
-	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
-	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
-}

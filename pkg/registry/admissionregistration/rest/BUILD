@@ -12,10 +12,9 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",
-        "//pkg/registry/admissionregistration/initializerconfiguration/storage:go_default_library",
         "//pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage:go_default_library",
         "//pkg/registry/admissionregistration/validatingwebhookconfiguration/storage:go_default_library",
-        "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",

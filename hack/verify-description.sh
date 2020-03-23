@@ -14,11 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks API-related files for missing descriptions and outputs a
+# list of structs and fields that are missing descriptions.
+# Usage: `hack/verify-description.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -49,7 +53,7 @@ find_files() {
 }
 
 if [[ $# -eq 0 ]]; then
-  versioned_api_files=$(find_files | egrep "pkg/.[^/]*/((v.[^/]*)|unversioned)/types\.go") || true
+  versioned_api_files=$(find_files | grep -E "pkg/.[^/]*/((v.[^/]*)|unversioned)/types\.go") || true
 else
   versioned_api_files="${*}"
 fi

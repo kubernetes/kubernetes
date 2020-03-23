@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/emicklei/go-restful"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -130,7 +130,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// normally these are passed to the nonGoRestfulMux, but if discovery is enabled, it will go directly.
 			// We can't rely on a prefix match since /apis matches everything (see the big comment on Director above)
 			if path == "/apis" || path == "/apis/" {
-				glog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+				klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
 				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
 				// TODO fix gorestful, remove TPRs, or stop using gorestful
 				d.goRestfulContainer.Dispatch(w, req)
@@ -140,7 +140,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case strings.HasPrefix(path, ws.RootPath()):
 			// ensure an exact match or a path boundary match
 			if len(path) == len(ws.RootPath()) || path[len(ws.RootPath())] == '/' {
-				glog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+				klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
 				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
 				// TODO fix gorestful, remove TPRs, or stop using gorestful
 				d.goRestfulContainer.Dispatch(w, req)
@@ -150,7 +150,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// if we didn't find a match, then we just skip gorestful altogether
-	glog.V(5).Infof("%v: %v %q satisfied by nonGoRestful", d.name, req.Method, path)
+	klog.V(5).Infof("%v: %v %q satisfied by nonGoRestful", d.name, req.Method, path)
 	d.nonGoRestfulMux.ServeHTTP(w, req)
 }
 
@@ -165,7 +165,7 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 		}
 		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
 	}
-	glog.Errorln(buffer.String())
+	klog.Errorln(buffer.String())
 
 	headers := http.Header{}
 	if ct := w.Header().Get("Content-Type"); len(ct) > 0 {

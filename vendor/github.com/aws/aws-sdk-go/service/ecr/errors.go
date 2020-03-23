@@ -2,6 +2,10 @@
 
 package ecr
 
+import (
+	"github.com/aws/aws-sdk-go/private/protocol"
+)
+
 const (
 
 	// ErrCodeEmptyUploadException for service response error code
@@ -23,6 +27,13 @@ const (
 	// The image requested does not exist in the specified repository.
 	ErrCodeImageNotFoundException = "ImageNotFoundException"
 
+	// ErrCodeImageTagAlreadyExistsException for service response error code
+	// "ImageTagAlreadyExistsException".
+	//
+	// The specified image is tagged with a tag that already exists. The repository
+	// is configured for tag immutability.
+	ErrCodeImageTagAlreadyExistsException = "ImageTagAlreadyExistsException"
+
 	// ErrCodeInvalidLayerException for service response error code
 	// "InvalidLayerException".
 	//
@@ -43,6 +54,14 @@ const (
 	// The specified parameter is invalid. Review the available parameters for the
 	// API request.
 	ErrCodeInvalidParameterException = "InvalidParameterException"
+
+	// ErrCodeInvalidTagParameterException for service response error code
+	// "InvalidTagParameterException".
+	//
+	// An invalid parameter has been specified. Tag keys can have a maximum character
+	// length of 128 characters, and tag values can have a maximum length of 256
+	// characters.
+	ErrCodeInvalidTagParameterException = "InvalidTagParameterException"
 
 	// ErrCodeLayerAlreadyExistsException for service response error code
 	// "LayerAlreadyExistsException".
@@ -94,7 +113,7 @@ const (
 	//
 	// The operation did not succeed because it would have exceeded a service limit
 	// for your account. For more information, see Amazon ECR Default Service Limits
-	// (http://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
+	// (https://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
 	// in the Amazon Elastic Container Registry User Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
 
@@ -125,11 +144,25 @@ const (
 	// repository policy.
 	ErrCodeRepositoryPolicyNotFoundException = "RepositoryPolicyNotFoundException"
 
+	// ErrCodeScanNotFoundException for service response error code
+	// "ScanNotFoundException".
+	//
+	// The specified image scan could not be found. Ensure that image scanning is
+	// enabled on the repository and try again.
+	ErrCodeScanNotFoundException = "ScanNotFoundException"
+
 	// ErrCodeServerException for service response error code
 	// "ServerException".
 	//
 	// These errors are usually caused by a server-side issue.
 	ErrCodeServerException = "ServerException"
+
+	// ErrCodeTooManyTagsException for service response error code
+	// "TooManyTagsException".
+	//
+	// The list of tags on the repository is over the limit. The maximum number
+	// of tags that can be applied to a repository is 50.
+	ErrCodeTooManyTagsException = "TooManyTagsException"
 
 	// ErrCodeUploadNotFoundException for service response error code
 	// "UploadNotFoundException".
@@ -138,3 +171,30 @@ const (
 	// this repository.
 	ErrCodeUploadNotFoundException = "UploadNotFoundException"
 )
+
+var exceptionFromCode = map[string]func(protocol.ResponseMetadata) error{
+	"EmptyUploadException":                      newErrorEmptyUploadException,
+	"ImageAlreadyExistsException":               newErrorImageAlreadyExistsException,
+	"ImageNotFoundException":                    newErrorImageNotFoundException,
+	"ImageTagAlreadyExistsException":            newErrorImageTagAlreadyExistsException,
+	"InvalidLayerException":                     newErrorInvalidLayerException,
+	"InvalidLayerPartException":                 newErrorInvalidLayerPartException,
+	"InvalidParameterException":                 newErrorInvalidParameterException,
+	"InvalidTagParameterException":              newErrorInvalidTagParameterException,
+	"LayerAlreadyExistsException":               newErrorLayerAlreadyExistsException,
+	"LayerInaccessibleException":                newErrorLayerInaccessibleException,
+	"LayerPartTooSmallException":                newErrorLayerPartTooSmallException,
+	"LayersNotFoundException":                   newErrorLayersNotFoundException,
+	"LifecyclePolicyNotFoundException":          newErrorLifecyclePolicyNotFoundException,
+	"LifecyclePolicyPreviewInProgressException": newErrorLifecyclePolicyPreviewInProgressException,
+	"LifecyclePolicyPreviewNotFoundException":   newErrorLifecyclePolicyPreviewNotFoundException,
+	"LimitExceededException":                    newErrorLimitExceededException,
+	"RepositoryAlreadyExistsException":          newErrorRepositoryAlreadyExistsException,
+	"RepositoryNotEmptyException":               newErrorRepositoryNotEmptyException,
+	"RepositoryNotFoundException":               newErrorRepositoryNotFoundException,
+	"RepositoryPolicyNotFoundException":         newErrorRepositoryPolicyNotFoundException,
+	"ScanNotFoundException":                     newErrorScanNotFoundException,
+	"ServerException":                           newErrorServerException,
+	"TooManyTagsException":                      newErrorTooManyTagsException,
+	"UploadNotFoundException":                   newErrorUploadNotFoundException,
+}

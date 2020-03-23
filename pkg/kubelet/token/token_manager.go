@@ -19,16 +19,20 @@ limitations under the License.
 package token
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 const (
@@ -38,12 +42,35 @@ const (
 
 // NewManager returns a new token manager.
 func NewManager(c clientset.Interface) *Manager {
+	// check whether the server supports token requests so we can give a more helpful error message
+	supported := false
+	once := &sync.Once{}
+	tokenRequestsSupported := func() bool {
+		once.Do(func() {
+			resources, err := c.Discovery().ServerResourcesForGroupVersion("v1")
+			if err != nil {
+				return
+			}
+			for _, resource := range resources.APIResources {
+				if resource.Name == "serviceaccounts/token" {
+					supported = true
+					return
+				}
+			}
+		})
+		return supported
+	}
+
 	m := &Manager{
 		getToken: func(name, namespace string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 			if c == nil {
 				return nil, errors.New("cannot use TokenManager when kubelet is in standalone mode")
 			}
-			return c.CoreV1().ServiceAccounts(namespace).CreateToken(name, tr)
+			tokenRequest, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, tr, metav1.CreateOptions{})
+			if apierrors.IsNotFound(err) && !tokenRequestsSupported() {
+				return nil, fmt.Errorf("the API server does not have TokenRequest endpoints enabled")
+			}
+			return tokenRequest, err
 		},
 		cache: make(map[string]*authenticationv1.TokenRequest),
 		clock: clock.RealClock{},
@@ -89,13 +116,25 @@ func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticat
 		case m.expired(ctr):
 			return nil, fmt.Errorf("token %s expired and refresh failed: %v", key, err)
 		default:
-			glog.Errorf("couldn't update token %s: %v", key, err)
+			klog.Errorf("couldn't update token %s: %v", key, err)
 			return ctr, nil
 		}
 	}
 
 	m.set(key, tr)
 	return tr, nil
+}
+
+// DeleteServiceAccountToken should be invoked when pod got deleted. It simply
+// clean token manager cache.
+func (m *Manager) DeleteServiceAccountToken(podUID types.UID) {
+	m.cacheMutex.Lock()
+	defer m.cacheMutex.Unlock()
+	for k, tr := range m.cache {
+		if tr.Spec.BoundObjectRef.UID == podUID {
+			delete(m.cache, k)
+		}
+	}
 }
 
 func (m *Manager) cleanup() {
@@ -129,7 +168,7 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 // ttl, or if the token is older than 24 hours.
 func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
-		glog.Errorf("expiration seconds was nil for tr: %#v", tr)
+		klog.Errorf("expiration seconds was nil for tr: %#v", tr)
 		return false
 	}
 	now := m.clock.Now()

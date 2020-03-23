@@ -57,8 +57,7 @@ func (m *AndMatcher) MatchMayChangeInTheFuture(actual interface{}) bool {
 			}
 		}
 		return false // none of were going to change
-	} else {
-		// one of the matchers failed.. it must be able to change in order to affect the result
-		return oraclematcher.MatchMayChangeInTheFuture(m.firstFailedMatcher, actual)
 	}
+	// one of the matchers failed.. it must be able to change in order to affect the result
+	return oraclematcher.MatchMayChangeInTheFuture(m.firstFailedMatcher, actual)
 }

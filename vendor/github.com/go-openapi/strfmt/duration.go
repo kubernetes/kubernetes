@@ -16,18 +16,20 @@ package strfmt
 
 import (
 	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func init() {
 	d := Duration(0)
+	// register this format in the default registry
 	Default.Add("duration", &d, IsDuration)
 }
 
@@ -64,6 +66,9 @@ func IsDuration(str string) bool {
 }
 
 // Duration represents a duration
+//
+// Duration stores a period of time as a nanosecond count, with the largest
+// repesentable duration being approximately 290 years.
 //
 // swagger:strfmt duration
 type Duration time.Duration
@@ -115,7 +120,7 @@ func ParseDuration(cand string) (time.Duration, error) {
 	if ok {
 		return dur, nil
 	}
-	return 0, fmt.Errorf("Unable to parse %s as duration", cand)
+	return 0, fmt.Errorf("unable to parse %s as duration", cand)
 }
 
 // Scan reads a Duration value from database driver type.
@@ -135,7 +140,7 @@ func (d *Duration) Scan(raw interface{}) error {
 	return nil
 }
 
-// Value converts Duration to a primitive value ready to written to a database.
+// Value converts Duration to a primitive value ready to be written to a database.
 func (d Duration) Value() (driver.Value, error) {
 	return driver.Value(int64(d)), nil
 }
@@ -145,29 +150,62 @@ func (d Duration) String() string {
 	return time.Duration(d).String()
 }
 
+// MarshalJSON returns the Duration as JSON
 func (d Duration) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	d.MarshalEasyJSON(&w)
-	return w.BuildBytes()
+	return json.Marshal(time.Duration(d).String())
 }
 
-func (d Duration) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(time.Duration(d).String())
-}
-
+// UnmarshalJSON sets the Duration from JSON
 func (d *Duration) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	d.UnmarshalEasyJSON(&l)
-	return l.Error()
+	if string(data) == jsonNull {
+		return nil
+	}
+
+	var dstr string
+	if err := json.Unmarshal(data, &dstr); err != nil {
+		return err
+	}
+	tt, err := ParseDuration(dstr)
+	if err != nil {
+		return err
+	}
+	*d = Duration(tt)
+	return nil
 }
 
-func (d *Duration) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		tt, err := ParseDuration(data)
-		if err != nil {
-			in.AddError(err)
-			return
-		}
-		*d = Duration(tt)
+func (d Duration) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": d.String()})
+}
+
+func (d *Duration) UnmarshalBSON(data []byte) error {
+	var m bson.M
+	if err := bson.Unmarshal(data, &m); err != nil {
+		return err
 	}
+
+	if data, ok := m["data"].(string); ok {
+		rd, err := ParseDuration(data)
+		if err != nil {
+			return err
+		}
+		*d = Duration(rd)
+		return nil
+	}
+
+	return errors.New("couldn't unmarshal bson bytes value as Date")
+}
+
+// DeepCopyInto copies the receiver and writes its value into out.
+func (d *Duration) DeepCopyInto(out *Duration) {
+	*out = *d
+}
+
+// DeepCopy copies the receiver into a new Duration.
+func (d *Duration) DeepCopy() *Duration {
+	if d == nil {
+		return nil
+	}
+	out := new(Duration)
+	d.DeepCopyInto(out)
+	return out
 }

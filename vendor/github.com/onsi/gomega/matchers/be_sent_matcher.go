@@ -1,3 +1,5 @@
+// untested sections: 3
+
 package matchers
 
 import (
@@ -42,8 +44,8 @@ func (matcher *BeSentMatcher) Match(actual interface{}) (success bool, err error
 	}()
 
 	winnerIndex, _, _ := reflect.Select([]reflect.SelectCase{
-		reflect.SelectCase{Dir: reflect.SelectSend, Chan: channelValue, Send: argValue},
-		reflect.SelectCase{Dir: reflect.SelectDefault},
+		{Dir: reflect.SelectSend, Chan: channelValue, Send: argValue},
+		{Dir: reflect.SelectDefault},
 	})
 
 	var didSend bool

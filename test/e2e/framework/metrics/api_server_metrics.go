@@ -16,27 +16,35 @@ limitations under the License.
 
 package metrics
 
-type ApiServerMetrics Metrics
+import (
+	"context"
 
-func (m *ApiServerMetrics) Equal(o ApiServerMetrics) bool {
-	return (*Metrics)(m).Equal(Metrics(o))
+	"k8s.io/component-base/metrics/testutil"
+)
+
+// APIServerMetrics is metrics for API server
+type APIServerMetrics testutil.Metrics
+
+// Equal returns true if all metrics are the same as the arguments.
+func (m *APIServerMetrics) Equal(o APIServerMetrics) bool {
+	return (*testutil.Metrics)(m).Equal(testutil.Metrics(o))
 }
 
-func NewApiServerMetrics() ApiServerMetrics {
-	result := NewMetrics()
-	return ApiServerMetrics(result)
+func newAPIServerMetrics() APIServerMetrics {
+	result := testutil.NewMetrics()
+	return APIServerMetrics(result)
 }
 
-func parseApiServerMetrics(data string) (ApiServerMetrics, error) {
-	result := NewApiServerMetrics()
-	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
-		return ApiServerMetrics{}, err
+func parseAPIServerMetrics(data string) (APIServerMetrics, error) {
+	result := newAPIServerMetrics()
+	if err := testutil.ParseMetrics(data, (*testutil.Metrics)(&result)); err != nil {
+		return APIServerMetrics{}, err
 	}
 	return result, nil
 }
 
-func (g *MetricsGrabber) getMetricsFromApiServer() (string, error) {
-	rawOutput, err := g.client.CoreV1().RESTClient().Get().RequestURI("/metrics").Do().Raw()
+func (g *Grabber) getMetricsFromAPIServer() (string, error) {
+	rawOutput, err := g.client.CoreV1().RESTClient().Get().RequestURI("/metrics").Do(context.TODO()).Raw()
 	if err != nil {
 		return "", err
 	}

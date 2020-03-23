@@ -30,8 +30,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	critest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	critest "k8s.io/cri-api/pkg/apis/testing"
 )
 
 func TestGetAllLogs(t *testing.T) {

@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "key.go",
-        "mksyscall.go",
         "syscall.go",
         "value.go",
         "zsyscall_windows.go",

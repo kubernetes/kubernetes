@@ -43,7 +43,7 @@ option go_package = "v1beta1";
 // depend on its stability. It is primarily for internal use by controllers.
 message ControllerRevision {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -56,7 +56,7 @@ message ControllerRevision {
 
 // ControllerRevisionList is a resource containing a list of ControllerRevision objects.
 message ControllerRevisionList {
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -143,6 +143,7 @@ message DeploymentSpec {
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
+  // +patchStrategy=retainKeys
   optional DeploymentStrategy strategy = 4;
 
   // Minimum number of seconds for which a newly created pod should be ready
@@ -262,7 +263,7 @@ message RollingUpdateDeployment {
   // the rolling update starts, such that the total number of old and new pods do not exceed
   // 130% of desired pods. Once old pods have been killed,
   // new ReplicaSet can be scaled up further, ensuring that total number of pods running
-  // at any time during the update is atmost 130% of desired pods.
+  // at any time during the update is at most 130% of desired pods.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
@@ -276,15 +277,15 @@ message RollingUpdateStatefulSetStrategy {
 
 // Scale represents a scaling request for a resource.
 message Scale {
-  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional ScaleSpec spec = 2;
 
-  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
   // +optional
   optional ScaleStatus status = 3;
 }

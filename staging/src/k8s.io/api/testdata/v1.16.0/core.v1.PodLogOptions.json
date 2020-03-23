@@ -1,0 +1,10 @@
+{
+  "kind": "PodLogOptions",
+  "apiVersion": "v1",
+  "container": "2",
+  "follow": true,
+  "sinceSeconds": 1002466899136229878,
+  "timestamps": true,
+  "tailLines": -6357999603795826160,
+  "limitBytes": 5323465663502687351
+}

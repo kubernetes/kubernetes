@@ -14,13 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a vestigial redirection.  Please do not add "real" logic.
+# This script runs all the verify scripts respectively, so we should run
+# `hack/verify-all.sh` before submit a PR. It is equivalent to `make verify`.
+# Usage: `hack/verify-all.sh` or `make verify`.
+# Note: This script is a vestigial redirection. Please do not add "real" logic.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # For help output
 ARGHELP=""

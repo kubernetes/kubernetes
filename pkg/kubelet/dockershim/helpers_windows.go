@@ -20,15 +20,16 @@ package dockershim
 
 import (
 	"os"
+	"runtime"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -37,7 +38,7 @@ func DefaultMemorySwap() int64 {
 
 func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
 	if seccompProfile != "" {
-		glog.Warningf("seccomp annotations are not supported on windows")
+		klog.Warningf("seccomp annotations are not supported on windows")
 	}
 	return nil, nil
 }
@@ -69,11 +70,12 @@ func (ds *dockerService) updateCreateConfig(
 	if wc := config.GetWindows(); wc != nil {
 		rOpts := wc.GetResources()
 		if rOpts != nil {
+			// Precedence and units for these are described at length in kuberuntime_container_windows.go - generateWindowsContainerConfig()
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
-				Memory:     rOpts.MemoryLimitInBytes,
-				CPUShares:  rOpts.CpuShares,
-				CPUCount:   rOpts.CpuCount,
-				CPUPercent: rOpts.CpuMaximum,
+				Memory:    rOpts.MemoryLimitInBytes,
+				CPUShares: rOpts.CpuShares,
+				CPUCount:  rOpts.CpuCount,
+				NanoCPUs:  rOpts.CpuMaximum * int64(runtime.NumCPU()) * (1e9 / 10000),
 			}
 		}
 
@@ -97,7 +99,7 @@ func applyWindowsContainerSecurityContext(wsc *runtimeapi.WindowsContainerSecuri
 	}
 }
 
-func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
+func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) []string {
 	opts := dockertypes.ContainerListOptions{
 		All:     true,
 		Filters: dockerfilters.NewArgs(),
@@ -108,7 +110,7 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 	f.AddLabel(sandboxIDLabelKey, sandboxID)
 	containers, err := ds.client.ListContainers(opts)
 	if err != nil {
-		return ""
+		return nil
 	}
 
 	for _, c := range containers {
@@ -119,7 +121,7 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 
 		// Versions and feature support
 		// ============================
-		// Windows version == Windows Server, Version 1709,, Supports both sandbox and non-sandbox case
+		// Windows version == Windows Server, Version 1709, Supports both sandbox and non-sandbox case
 		// Windows version == Windows Server 2016   Support only non-sandbox case
 		// Windows version < Windows Server 2016 is Not Supported
 
@@ -144,8 +146,8 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 				// Hyper-V only supports one container per Pod yet and the container will have a different
 				// IP address from sandbox. Return the first non-sandbox container IP as POD IP.
 				// TODO(feiskyer): remove this workaround after Hyper-V supports multiple containers per Pod.
-				if containerIP := ds.getIP(c.ID, r); containerIP != "" {
-					return containerIP
+				if containerIPs := ds.getIPs(c.ID, r); len(containerIPs) != 0 {
+					return containerIPs
 				}
 			} else {
 				// Do not return any IP, so that we would continue and get the IP of the Sandbox.
@@ -153,17 +155,17 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 				// to replicate the DNS registry key to the Workload container (IP/Gateway/MAC is
 				// set separately than DNS).
 				// TODO(feiskyer): remove this workaround after Namespace is supported in Windows RS5.
-				ds.getIP(sandboxID, r)
+				ds.getIPs(sandboxID, r)
 			}
 		} else {
 			// ds.getIP will call the CNI plugin to fetch the IP
-			if containerIP := ds.getIP(c.ID, r); containerIP != "" {
-				return containerIP
+			if containerIPs := ds.getIPs(c.ID, r); len(containerIPs) != 0 {
+				return containerIPs
 			}
 		}
 	}
 
-	return ""
+	return nil
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {

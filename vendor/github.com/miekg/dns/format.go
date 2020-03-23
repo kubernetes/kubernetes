@@ -20,7 +20,7 @@ func Field(r RR, i int) string {
 		return ""
 	}
 	d := reflect.ValueOf(r).Elem().Field(i)
-	switch k := d.Kind(); k {
+	switch d.Kind() {
 	case reflect.String:
 		return d.String()
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:

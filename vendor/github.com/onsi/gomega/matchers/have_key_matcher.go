@@ -1,9 +1,12 @@
+// untested sections: 6
+
 package matchers
 
 import (
 	"fmt"
-	"github.com/onsi/gomega/format"
 	"reflect"
+
+	"github.com/onsi/gomega/format"
 )
 
 type HaveKeyMatcher struct {

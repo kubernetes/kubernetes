@@ -1,8 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- DirectXMan12
 - kawych
-- piosz
+- serathius
+- sig-instrumentation-approvers
 reviewers:
-- DirectXMan12
-- kawych
-- piosz
+- sig-instrumentation-reviewers
+labels:
+- sig/instrumentation

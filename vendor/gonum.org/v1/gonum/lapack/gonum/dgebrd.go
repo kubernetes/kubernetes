@@ -11,7 +11,7 @@ import (
 
 // Dgebrd reduces a general m×n matrix A to upper or lower bidiagonal form B by
 // an orthogonal transformation:
-//  Q^T * A * P = B.
+//  Qᵀ * A * P = B.
 // The diagonal elements of B are stored in d and the off-diagonal elements are stored
 // in e. These are additionally stored along the diagonal of A and the off-diagonal
 // of A. If m >= n B is an upper-bidiagonal matrix, and if m < n B is a
@@ -24,8 +24,8 @@ import (
 //  if m < n,  Q = H_0 * H_1 * ... * H_{m-2},
 //             P = G_0 * G_1 * ... * G_{m-1},
 // where
-//  H_i = I - tauQ[i] * v_i * v_i^T,
-//  G_i = I - tauP[i] * u_i * u_i^T.
+//  H_i = I - tauQ[i] * v_i * v_iᵀ,
+//  G_i = I - tauP[i] * u_i * u_iᵀ.
 //
 // As an example, on exit the entries of A when m = 6, and n = 5
 //  [ d   e  u1  u1  u1]
@@ -53,46 +53,62 @@ import (
 //
 // Dgebrd is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgebrd(m, n int, a []float64, lda int, d, e, tauQ, tauP, work []float64, lwork int) {
-	checkMatrix(m, n, a, lda)
-	// Calculate optimal work.
-	nb := impl.Ilaenv(1, "DGEBRD", " ", m, n, -1, -1)
-	var lworkOpt int
-	if lwork == -1 {
-		if len(work) < 1 {
-			panic(badWork)
-		}
-		lworkOpt = ((m + n) * nb)
-		work[0] = float64(max(1, lworkOpt))
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case lwork < max(1, max(m, n)) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
+	}
+
+	// Quick return if possible.
+	minmn := min(m, n)
+	if minmn == 0 {
+		work[0] = 1
 		return
 	}
-	minmn := min(m, n)
-	if len(d) < minmn {
-		panic(badD)
+
+	nb := impl.Ilaenv(1, "DGEBRD", " ", m, n, -1, -1)
+	lwkopt := (m + n) * nb
+	if lwork == -1 {
+		work[0] = float64(lwkopt)
+		return
 	}
-	if len(e) < minmn-1 {
-		panic(badE)
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(d) < minmn:
+		panic(shortD)
+	case len(e) < minmn-1:
+		panic(shortE)
+	case len(tauQ) < minmn:
+		panic(shortTauQ)
+	case len(tauP) < minmn:
+		panic(shortTauP)
 	}
-	if len(tauQ) < minmn {
-		panic(badTauQ)
-	}
-	if len(tauP) < minmn {
-		panic(badTauP)
-	}
+
+	nx := minmn
 	ws := max(m, n)
-	if lwork < max(1, ws) {
-		panic(badWork)
-	}
-	if len(work) < lwork {
-		panic(badWork)
-	}
-	var nx int
-	if nb > 1 && nb < minmn {
+	if 1 < nb && nb < minmn {
+		// At least one blocked operation can be done.
+		// Get the crossover point nx.
 		nx = max(nb, impl.Ilaenv(3, "DGEBRD", " ", m, n, -1, -1))
+		// Determine when to switch from blocked to unblocked code.
 		if nx < minmn {
+			// At least one blocked operation will be done.
 			ws = (m + n) * nb
 			if lwork < ws {
+				// Not enough work space for the optimal nb,
+				// consider using a smaller block size.
 				nbmin := impl.Ilaenv(2, "DGEBRD", " ", m, n, -1, -1)
 				if lwork >= (m+n)*nbmin {
+					// Enough work space for minimum block size.
 					nb = lwork / (m + n)
 				} else {
 					nb = minmn
@@ -100,17 +116,12 @@ func (impl Implementation) Dgebrd(m, n int, a []float64, lda int, d, e, tauQ, ta
 				}
 			}
 		}
-	} else {
-		nx = minmn
 	}
 	bi := blas64.Implementation()
 	ldworkx := nb
 	ldworky := nb
 	var i int
-	// Netlib lapack has minmn - nx, but this makes the last nx rows (which by
-	// default is large) be unblocked. As written here, the blocking is more
-	// consistent.
-	for i = 0; i < minmn-nb; i += nb {
+	for i = 0; i < minmn-nx; i += nb {
 		// Reduce rows and columns i:i+nb to bidiagonal form and return
 		// the matrices X and Y which are needed to update the unreduced
 		// part of the matrix.
@@ -146,5 +157,5 @@ func (impl Implementation) Dgebrd(m, n int, a []float64, lda int, d, e, tauQ, ta
 	}
 	// Use unblocked code to reduce the remainder of the matrix.
 	impl.Dgebd2(m-i, n-i, a[i*lda+i:], lda, d[i:], e[i:], tauQ[i:], tauP[i:], work)
-	work[0] = float64(lworkOpt)
+	work[0] = float64(ws)
 }

@@ -9,6 +9,9 @@ import (
 // with the standard "encoding/json" package of Golang.
 // Although it is generally faster for simple proto messages than JSONPb,
 // it does not support advanced features of protobuf, e.g. map, oneof, ....
+//
+// The NewEncoder and NewDecoder types return *json.Encoder and
+// *json.Decoder respectively.
 type JSONBuiltin struct{}
 
 // ContentType always Returns "application/json".
@@ -34,4 +37,9 @@ func (j *JSONBuiltin) NewDecoder(r io.Reader) Decoder {
 // NewEncoder returns an Encoder which writes JSON stream into "w".
 func (j *JSONBuiltin) NewEncoder(w io.Writer) Encoder {
 	return json.NewEncoder(w)
+}
+
+// Delimiter for newline encoded JSON streams.
+func (j *JSONBuiltin) Delimiter() []byte {
+	return []byte("\n")
 }

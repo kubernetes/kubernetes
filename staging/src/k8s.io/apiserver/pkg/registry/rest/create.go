@@ -92,9 +92,9 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
 	}
 
-	// Ensure Initializers are not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		objectMeta.SetInitializers(nil)
+	// Ensure managedFields is not set unless the feature is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		objectMeta.SetManagedFields(nil)
 	}
 
 	// ClusterName is ignored and should not be saved
@@ -157,27 +157,36 @@ type NamespaceScopedStrategy interface {
 }
 
 // AdmissionToValidateObjectFunc converts validating admission to a rest validate object func
-func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectFunc {
+func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
-		return func(obj runtime.Object) error { return nil }
+		return func(ctx context.Context, obj runtime.Object) error { return nil }
 	}
-	return func(obj runtime.Object) error {
+	return func(ctx context.Context, obj runtime.Object) error {
+		name := staticAttributes.GetName()
+		// in case the generated name is populated
+		if len(name) == 0 {
+			if metadata, err := meta.Accessor(obj); err == nil {
+				name = metadata.GetName()
+			}
+		}
+
 		finalAttributes := admission.NewAttributesRecord(
 			obj,
 			staticAttributes.GetOldObject(),
 			staticAttributes.GetKind(),
 			staticAttributes.GetNamespace(),
-			staticAttributes.GetName(),
+			name,
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes)
+		return validatingAdmission.Validate(ctx, finalAttributes, o)
 	}
 }

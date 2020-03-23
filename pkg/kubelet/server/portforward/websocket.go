@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -43,15 +43,15 @@ const (
 	v4Base64WebsocketProtocol = "v4." + wsstream.Base64ChannelWebSocketProtocol
 )
 
-// options contains details about which streams are required for
-// port forwarding.
+// V4Options contains details about which streams are required for port
+// forwarding.
 // All fields included in V4Options need to be expressed explicitly in the
-// CRI (pkg/kubelet/apis/cri/{version}/api.proto) PortForwardRequest.
+// CRI (k8s.io/cri-api/pkg/apis/{version}/api.proto) PortForwardRequest.
 type V4Options struct {
 	Ports []int32
 }
 
-// newOptions creates a new options from the Request.
+// NewV4Options creates a new options from the Request.
 func NewV4Options(req *http.Request) (*V4Options, error) {
 	if !wsstream.IsWebSocketRequest(req) {
 		return &V4Options{}, nil
@@ -113,9 +113,9 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		},
 	})
 	conn.SetIdleTimeout(idleTimeout)
-	_, streams, err := conn.Open(httplog.Unlogged(w), req)
+	_, streams, err := conn.Open(httplog.Unlogged(req, w), req)
 	if err != nil {
-		err = fmt.Errorf("Unable to upgrade websocket connection: %v", err)
+		err = fmt.Errorf("unable to upgrade websocket connection: %v", err)
 		return err
 	}
 	defer conn.Close()
@@ -185,9 +185,9 @@ func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
 	defer p.dataStream.Close()
 	defer p.errorStream.Close()
 
-	glog.V(5).Infof("(conn=%p) invoking forwarder.PortForward for port %d", h.conn, p.port)
+	klog.V(5).Infof("(conn=%p) invoking forwarder.PortForward for port %d", h.conn, p.port)
 	err := h.forwarder.PortForward(h.pod, h.uid, p.port, p.dataStream)
-	glog.V(5).Infof("(conn=%p) done invoking forwarder.PortForward for port %d", h.conn, p.port)
+	klog.V(5).Infof("(conn=%p) done invoking forwarder.PortForward for port %d", h.conn, p.port)
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", p.port, h.pod, h.uid, err)

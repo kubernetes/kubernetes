@@ -17,6 +17,7 @@ limitations under the License.
 package anonymous
 
 import (
+	"net/http"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -26,7 +27,7 @@ import (
 
 func TestAnonymous(t *testing.T) {
 	var a authenticator.Request = NewAuthenticator()
-	r, ok, err := a.AuthenticateRequest(nil)
+	r, ok, err := a.AuthenticateRequest(&http.Request{})
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

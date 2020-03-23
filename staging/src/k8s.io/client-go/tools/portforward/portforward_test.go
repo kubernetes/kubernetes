@@ -18,11 +18,13 @@ package portforward
 
 import (
 	"net"
+	"net/http"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
@@ -37,6 +39,37 @@ type fakeDialer struct {
 func (d *fakeDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	d.dialed = true
 	return d.conn, d.negotiatedProtocol, d.err
+}
+
+type fakeConnection struct {
+	closed    bool
+	closeChan chan bool
+}
+
+func newFakeConnection() httpstream.Connection {
+	return &fakeConnection{
+		closeChan: make(chan bool),
+	}
+}
+
+func (c *fakeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
+	return nil, nil
+}
+
+func (c *fakeConnection) Close() error {
+	if !c.closed {
+		c.closed = true
+		close(c.closeChan)
+	}
+	return nil
+}
+
+func (c *fakeConnection) CloseChan() <-chan bool {
+	return c.closeChan
+}
+
+func (c *fakeConnection) SetIdleTimeout(timeout time.Duration) {
+	// no-op
 }
 
 func TestParsePortsAndNew(t *testing.T) {
@@ -81,6 +114,62 @@ func TestParsePortsAndNew(t *testing.T) {
 			expectedAddresses: []listenAddress{
 				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
 				{protocol: "tcp6", address: "::1", failureMode: "all"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"localhost", "::1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "all"},
+				{protocol: "tcp6", address: "::1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"localhost", "127.0.0.1", "::1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
+				{protocol: "tcp6", address: "::1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"localhost", "127.0.0.1", "10.10.10.1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
+				{protocol: "tcp6", address: "::1", failureMode: "all"},
+				{protocol: "tcp4", address: "10.10.10.1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"127.0.0.1", "::1", "localhost"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
+				{protocol: "tcp6", address: "::1", failureMode: "any"},
+			},
+		},
+		{
+			input:     []string{"5000:5000"},
+			addresses: []string{"10.0.0.1", "127.0.0.1"},
+			expectedPorts: []ForwardedPort{
+				{5000, 5000},
+			},
+			expectedAddresses: []listenAddress{
+				{protocol: "tcp4", address: "10.0.0.1", failureMode: "any"},
+				{protocol: "tcp4", address: "127.0.0.1", failureMode: "any"},
 			},
 		},
 		{
@@ -252,5 +341,51 @@ func TestGetListener(t *testing.T) {
 		}
 		listener.Close()
 
+	}
+}
+
+func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
+	dialer := &fakeDialer{
+		conn: newFakeConnection(),
+	}
+
+	stopChan := make(chan struct{})
+	readyChan := make(chan struct{})
+	errChan := make(chan error)
+
+	defer func() {
+		close(stopChan)
+
+		forwardErr := <-errChan
+		if forwardErr != nil {
+			t.Fatalf("ForwardPorts returned error: %s", forwardErr)
+		}
+	}()
+
+	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+
+	if err != nil {
+		t.Fatalf("error while calling New: %s", err)
+	}
+
+	go func() {
+		errChan <- pf.ForwardPorts()
+		close(errChan)
+	}()
+
+	<-pf.Ready
+
+	ports, err := pf.GetPorts()
+	if err != nil {
+		t.Fatalf("Failed to get ports. error: %v", err)
+	}
+
+	if len(ports) != 1 {
+		t.Fatalf("expected 1 port, got %d", len(ports))
+	}
+
+	port := ports[0]
+	if port.Local == 0 {
+		t.Fatalf("local port is 0, expected != 0")
 	}
 }

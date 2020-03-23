@@ -17,23 +17,23 @@ limitations under the License.
 package tests
 
 import (
+	"context"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -47,13 +47,12 @@ func parseSelectorOrDie(s string) fields.Selector {
 // buildQueryValues is a convenience function for knowing if a namespace should be in a query param or not
 func buildQueryValues(query url.Values) url.Values {
 	v := url.Values{}
-	if query != nil {
-		for key, values := range query {
-			for _, value := range values {
-				v.Add(key, value)
-			}
+	for key, values := range query {
+		for _, value := range values {
+			v.Add(key, value)
 		}
 	}
+
 	return v
 }
 
@@ -71,7 +70,7 @@ func TestListWatchesCanList(t *testing.T) {
 	}{
 		// Node
 		{
-			location:      testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+			location:      "/api/v1/nodes",
 			resource:      "nodes",
 			namespace:     metav1.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
@@ -79,7 +78,7 @@ func TestListWatchesCanList(t *testing.T) {
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", metav1.NamespaceAll, ""),
+				"/api/v1/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}})),
 			resource:      "pods",
 			namespace:     metav1.NamespaceAll,
@@ -88,7 +87,7 @@ func TestListWatchesCanList(t *testing.T) {
 		// pod in namespace "foo"
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", "foo", ""),
+				"/api/v1/namespaces/foo/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}})),
 			resource:      "pods",
 			namespace:     "foo",
@@ -104,7 +103,7 @@ func TestListWatchesCanList(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
+		lw := NewListWatchFromClient(client.CoreV1().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		lw.DisableChunking = true
 		// This test merely tests that the correct request is made.
 		lw.List(metav1.ListOptions{})
@@ -124,7 +123,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// Node
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+				"/api/v1/nodes",
 				buildQueryValues(url.Values{"watch": []string{"true"}})),
 			rv:            "",
 			resource:      "nodes",
@@ -133,7 +132,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		},
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+				"/api/v1/nodes",
 				buildQueryValues(url.Values{"resourceVersion": []string{"42"}, "watch": []string{"true"}})),
 			rv:            "42",
 			resource:      "nodes",
@@ -143,7 +142,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", metav1.NamespaceAll, ""),
+				"/api/v1/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}, "watch": []string{"true"}})),
 			rv:            "0",
 			resource:      "pods",
@@ -153,7 +152,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// pod with namespace foo and assigned field selector
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", "foo", ""),
+				"/api/v1/namespaces/foo/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}, "watch": []string{"true"}})),
 			rv:            "0",
 			resource:      "pods",
@@ -171,7 +170,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
+		lw := NewListWatchFromClient(client.CoreV1().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.Watch(metav1.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -194,11 +193,20 @@ func (w lw) Watch(options metav1.ListOptions) (watch.Interface, error) {
 func TestListWatchUntil(t *testing.T) {
 	fw := watch.NewFake()
 	go func() {
-		var obj *v1.Pod
+		obj := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "2",
+			},
+		}
 		fw.Modify(obj)
 	}()
 	listwatch := lw{
-		list:  &v1.PodList{Items: []v1.Pod{{}}},
+		list: &v1.PodList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: "1",
+			},
+			Items: []v1.Pod{{}},
+		},
 		watch: fw,
 	}
 
@@ -213,8 +221,9 @@ func TestListWatchUntil(t *testing.T) {
 		},
 	}
 
-	timeout := 10 * time.Second
-	lastEvent, err := watchtools.ListWatchUntil(timeout, listwatch, conditions...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	lastEvent, err := watchtools.ListWatchUntil(ctx, listwatch, conditions...)
 	if err != nil {
 		t.Fatalf("expected nil error, got %#v", err)
 	}

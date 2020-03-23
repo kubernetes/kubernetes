@@ -21,10 +21,11 @@ import (
 	"time"
 )
 
-// SdWatchdogEnabled return watchdog information for a service.
-// Process should send daemon.SdNotify("WATCHDOG=1") every time / 2.
-// If `unsetEnvironment` is true, the environment variables `WATCHDOG_USEC`
-// and `WATCHDOG_PID` will be unconditionally unset.
+// SdWatchdogEnabled returns watchdog information for a service.
+// Processes should call daemon.SdNotify(false, daemon.SdNotifyWatchdog) every
+// time / 2.
+// If `unsetEnvironment` is true, the environment variables `WATCHDOG_USEC` and
+// `WATCHDOG_PID` will be unconditionally unset.
 //
 // It returns one of the following:
 // (0, nil) - watchdog isn't enabled or we aren't the watched PID.

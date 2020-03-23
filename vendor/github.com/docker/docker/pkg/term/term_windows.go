@@ -1,4 +1,4 @@
-package term
+package term // import "github.com/docker/docker/pkg/term"
 
 import (
 	"io"
@@ -60,13 +60,6 @@ func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 		} else {
 			winterm.SetConsoleMode(fd, mode|winterm.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
 		}
-	}
-
-	if os.Getenv("ConEmuANSI") == "ON" || os.Getenv("ConsoleZVersion") != "" {
-		// The ConEmu and ConsoleZ terminals emulate ANSI on output streams well.
-		emulateStdin = true
-		emulateStdout = false
-		emulateStderr = false
 	}
 
 	// Temporarily use STD_INPUT_HANDLE, STD_OUTPUT_HANDLE and

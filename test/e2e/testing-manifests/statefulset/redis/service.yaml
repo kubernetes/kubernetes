@@ -13,3 +13,4 @@ spec:
   clusterIP: None
   selector:
     app: redis
+  publishNotReadyAddresses: true

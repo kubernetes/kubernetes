@@ -17,12 +17,13 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,10 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	typedv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
+	typedappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+
 	//svc "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -42,17 +44,7 @@ import (
 const (
 	pollInterval = 100 * time.Millisecond
 	pollTimeout  = 60 * time.Second
-
-	fakeImageName = "fake-name"
-	fakeImage     = "fakeimage"
 )
-
-type statefulsetTester struct {
-	t           *testing.T
-	c           clientset.Interface
-	service     *v1.Service
-	statefulset *v1beta1.StatefulSet
-}
 
 func labelMap() map[string]string {
 	return map[string]string{"foo": "bar"}
@@ -80,19 +72,19 @@ func newHeadlessService(namespace string) *v1.Service {
 }
 
 // newSTS returns a StatefulSet with a fake container image
-func newSTS(name, namespace string, replicas int) *v1beta1.StatefulSet {
+func newSTS(name, namespace string, replicas int) *appsv1.StatefulSet {
 	replicasCopy := int32(replicas)
-	return &v1beta1.StatefulSet{
+	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
-			APIVersion: "apps/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: v1beta1.StatefulSetSpec{
-			PodManagementPolicy: v1beta1.ParallelPodManagement,
+		Spec: appsv1.StatefulSetSpec{
+			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            &replicasCopy,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelMap(),
@@ -133,8 +125,8 @@ func newSTS(name, namespace string, replicas int) *v1beta1.StatefulSet {
 				},
 			},
 			ServiceName: "fake-service-name",
-			UpdateStrategy: v1beta1.StatefulSetUpdateStrategy{
-				Type: v1beta1.RollingUpdateStatefulSetStrategyType,
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			},
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{
 				// for volume mount "datadir"
@@ -198,24 +190,24 @@ func runControllerAndInformers(sc *statefulset.StatefulSetController, informers 
 }
 
 func createHeadlessService(t *testing.T, clientSet clientset.Interface, headlessService *v1.Service) {
-	_, err := clientSet.Core().Services(headlessService.Namespace).Create(headlessService)
+	_, err := clientSet.CoreV1().Services(headlessService.Namespace).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed creating headless service: %v", err)
 	}
 }
 
-func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*v1beta1.StatefulSet, pods []*v1.Pod) ([]*v1beta1.StatefulSet, []*v1.Pod) {
-	var createdSTSs []*v1beta1.StatefulSet
+func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.StatefulSet, pods []*v1.Pod) ([]*appsv1.StatefulSet, []*v1.Pod) {
+	var createdSTSs []*appsv1.StatefulSet
 	var createdPods []*v1.Pod
 	for _, sts := range stss {
-		createdSTS, err := clientSet.AppsV1beta1().StatefulSets(sts.Namespace).Create(sts)
+		createdSTS, err := clientSet.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("failed to create sts %s: %v", sts.Name, err)
 		}
 		createdSTSs = append(createdSTSs, createdSTS)
 	}
 	for _, pod := range pods {
-		createdPod, err := clientSet.Core().Pods(pod.Namespace).Create(pod)
+		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("failed to create pod %s: %v", pod.Name, err)
 		}
@@ -226,15 +218,15 @@ func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*v1beta1
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *v1beta1.StatefulSet) {
-	stsClient := clientSet.AppsV1beta1().StatefulSets(sts.Namespace)
+func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *appsv1.StatefulSet) {
+	stsClient := clientSet.AppsV1().StatefulSets(sts.Namespace)
 	desiredGeneration := sts.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newSTS, err := stsClient.Get(sts.Name, metav1.GetOptions{})
+		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		return newSTS.Status.Replicas == *newSTS.Spec.Replicas && *newSTS.Status.ObservedGeneration >= desiredGeneration, nil
+		return newSTS.Status.Replicas == *newSTS.Spec.Replicas && newSTS.Status.ObservedGeneration >= desiredGeneration, nil
 	}); err != nil {
 		t.Fatalf("failed to verify .Status.Replicas is equal to .Spec.Replicas for sts %s: %v", sts.Name, err)
 	}
@@ -243,12 +235,12 @@ func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *v1beta1.Sta
 func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateFunc(newPod)
-		pod, err = podClient.Update(newPod)
+		pod, err = podClient.Update(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update pod %s: %v", podName, err)
@@ -259,12 +251,12 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateStatusFunc(newPod)
-		pod, err = podClient.UpdateStatus(newPod)
+		pod, err = podClient.UpdateStatus(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update status of pod %s: %v", podName, err)
@@ -275,7 +267,7 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName strin
 func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]string) *v1.PodList {
 	podSelector := labels.Set(labelMap).AsSelector()
 	options := metav1.ListOptions{LabelSelector: podSelector.String()}
-	pods, err := podClient.List(options)
+	pods, err := podClient.List(context.TODO(), options)
 	if err != nil {
 		t.Fatalf("failed obtaining a list of pods that match the pod labels %v: %v", labelMap, err)
 	}
@@ -285,15 +277,15 @@ func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]s
 	return pods
 }
 
-func updateSTS(t *testing.T, stsClient typedv1beta1.StatefulSetInterface, stsName string, updateFunc func(*v1beta1.StatefulSet)) *v1beta1.StatefulSet {
-	var sts *v1beta1.StatefulSet
+func updateSTS(t *testing.T, stsClient typedappsv1.StatefulSetInterface, stsName string, updateFunc func(*appsv1.StatefulSet)) *appsv1.StatefulSet {
+	var sts *appsv1.StatefulSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newSTS, err := stsClient.Get(stsName, metav1.GetOptions{})
+		newSTS, err := stsClient.Get(context.TODO(), stsName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateFunc(newSTS)
-		sts, err = stsClient.Update(newSTS)
+		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update sts %s: %v", stsName, err)
@@ -302,15 +294,15 @@ func updateSTS(t *testing.T, stsClient typedv1beta1.StatefulSetInterface, stsNam
 }
 
 // Update .Spec.Replicas to replicas and verify .Status.Replicas is changed accordingly
-func scaleSTS(t *testing.T, c clientset.Interface, sts *v1beta1.StatefulSet, replicas int32) {
-	stsClient := c.AppsV1beta1().StatefulSets(sts.Namespace)
+func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, replicas int32) {
+	stsClient := c.AppsV1().StatefulSets(sts.Namespace)
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newSTS, err := stsClient.Get(sts.Name, metav1.GetOptions{})
+		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		*newSTS.Spec.Replicas = replicas
-		sts, err = stsClient.Update(newSTS)
+		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update .Spec.Replicas to %d for sts %s: %v", replicas, sts.Name, err)

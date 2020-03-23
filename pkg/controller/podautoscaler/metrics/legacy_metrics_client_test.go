@@ -17,13 +17,14 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,11 +41,11 @@ import (
 
 var fixedTimestamp = time.Date(2015, time.November, 10, 12, 30, 0, 0, time.UTC)
 
-func (w fakeResponseWrapper) DoRaw() ([]byte, error) {
+func (w fakeResponseWrapper) DoRaw(context.Context) ([]byte, error) {
 	return w.raw, nil
 }
 
-func (w fakeResponseWrapper) Stream() (io.ReadCloser, error) {
+func (w fakeResponseWrapper) Stream(context.Context) (io.ReadCloser, error) {
 	return nil, nil
 }
 
@@ -387,22 +388,6 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 		reportedPodMetrics: [][]int64{{100}, {300, 400}, {}},
 	}
 	tc.runTest(t)
-}
-
-func testCollapseTimeSamples(t *testing.T) {
-	now := time.Now()
-	metrics := heapster.MetricResult{
-		Metrics: []heapster.MetricPoint{
-			{Timestamp: now, Value: 50, FloatValue: nil},
-			{Timestamp: now.Add(-15 * time.Second), Value: 100, FloatValue: nil},
-			{Timestamp: now.Add(-60 * time.Second), Value: 100000, FloatValue: nil}},
-		LatestTimestamp: now,
-	}
-
-	val, timestamp, hadMetrics := collapseTimeSamples(metrics, time.Minute)
-	assert.True(t, hadMetrics, "should report that it received a populated list of metrics")
-	assert.InEpsilon(t, float64(75), val, 0.1, "collapsed sample value should be as expected")
-	assert.True(t, timestamp.Equal(now), "timestamp should be the current time (the newest)")
 }
 
 func offsetTimestampBy(t int) time.Time {

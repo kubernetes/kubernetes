@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -22,15 +24,15 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	volPath := "[local] volumes/test"
 	spec := createVolSpec(volPath)
 
@@ -44,7 +46,7 @@ func TestGetDeviceName_Volume(t *testing.T) {
 }
 
 func TestGetDeviceName_PersistentVolume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	volPath := "[local] volumes/test"
 	spec := createPVSpec(volPath)
 
@@ -164,8 +166,8 @@ func TestAttachDetach(t *testing.T) {
 
 // newPlugin creates a new vsphereVolumePlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *vsphereVolumePlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
+func newPlugin(t *testing.T) *vsphereVolumePlugin {
+	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
@@ -253,7 +255,7 @@ func (testcase *testcase) AttachDisk(diskName string, storagePolicyName string, 
 		return "", errors.New("Unexpected AttachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceUUID, expected.ret)
+	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceUUID, expected.ret)
 
 	return expected.retDeviceUUID, expected.ret
 }
@@ -278,7 +280,7 @@ func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) e
 		return errors.New("Unexpected DetachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
+	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
 
 	return expected.ret
 }
@@ -303,7 +305,7 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 		return false, errors.New("Unexpected DiskIsAttached call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
+	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
 
 	return expected.isAttached, expected.ret
 }

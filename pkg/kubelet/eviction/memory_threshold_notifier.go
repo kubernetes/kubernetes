@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -71,7 +71,7 @@ func NewMemoryThresholdNotifier(threshold evictionapi.Threshold, cgroupRoot stri
 }
 
 func (m *memoryThresholdNotifier) Start() {
-	glog.Infof("eviction manager: created %s", m.Description())
+	klog.Infof("eviction manager: created %s", m.Description())
 	for range m.events {
 		m.handler(fmt.Sprintf("eviction manager: %s crossed", m.Description()))
 	}
@@ -98,7 +98,7 @@ func (m *memoryThresholdNotifier) UpdateThreshold(summary *statsapi.Summary) err
 	memcgThreshold.Sub(*evictionThresholdQuantity)
 	memcgThreshold.Add(*inactiveFile)
 
-	glog.V(3).Infof("eviction manager: setting %s to %s\n", m.Description(), memcgThreshold.String())
+	klog.V(3).Infof("eviction manager: setting %s to %s\n", m.Description(), memcgThreshold.String())
 	if m.notifier != nil {
 		m.notifier.Stop()
 	}

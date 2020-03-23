@@ -17,9 +17,13 @@ limitations under the License.
 package serializer
 
 import (
+	"mime"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 )
@@ -44,29 +48,52 @@ type serializerType struct {
 	StreamSerializer runtime.Serializer
 }
 
-func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []serializerType {
-	jsonSerializer := json.NewSerializer(mf, scheme, scheme, false)
-	jsonPrettySerializer := json.NewSerializer(mf, scheme, scheme, true)
-	yamlSerializer := json.NewYAMLSerializer(mf, scheme, scheme)
+func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, options CodecFactoryOptions) []serializerType {
+	jsonSerializer := json.NewSerializerWithOptions(
+		mf, scheme, scheme,
+		json.SerializerOptions{Yaml: false, Pretty: false, Strict: options.Strict},
+	)
+	jsonSerializerType := serializerType{
+		AcceptContentTypes: []string{runtime.ContentTypeJSON},
+		ContentType:        runtime.ContentTypeJSON,
+		FileExtensions:     []string{"json"},
+		EncodesAsText:      true,
+		Serializer:         jsonSerializer,
+
+		Framer:           json.Framer,
+		StreamSerializer: jsonSerializer,
+	}
+	if options.Pretty {
+		jsonSerializerType.PrettySerializer = json.NewSerializerWithOptions(
+			mf, scheme, scheme,
+			json.SerializerOptions{Yaml: false, Pretty: true, Strict: options.Strict},
+		)
+	}
+
+	yamlSerializer := json.NewSerializerWithOptions(
+		mf, scheme, scheme,
+		json.SerializerOptions{Yaml: true, Pretty: false, Strict: options.Strict},
+	)
+	protoSerializer := protobuf.NewSerializer(scheme, scheme)
+	protoRawSerializer := protobuf.NewRawSerializer(scheme, scheme)
 
 	serializers := []serializerType{
+		jsonSerializerType,
 		{
-			AcceptContentTypes: []string{"application/json"},
-			ContentType:        "application/json",
-			FileExtensions:     []string{"json"},
-			EncodesAsText:      true,
-			Serializer:         jsonSerializer,
-			PrettySerializer:   jsonPrettySerializer,
-
-			Framer:           json.Framer,
-			StreamSerializer: jsonSerializer,
-		},
-		{
-			AcceptContentTypes: []string{"application/yaml"},
-			ContentType:        "application/yaml",
+			AcceptContentTypes: []string{runtime.ContentTypeYAML},
+			ContentType:        runtime.ContentTypeYAML,
 			FileExtensions:     []string{"yaml"},
 			EncodesAsText:      true,
 			Serializer:         yamlSerializer,
+		},
+		{
+			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
+			ContentType:        runtime.ContentTypeProtobuf,
+			FileExtensions:     []string{"pb"},
+			Serializer:         protoSerializer,
+
+			Framer:           protobuf.LengthDelimitedFramer,
+			StreamSerializer: protoRawSerializer,
 		},
 	}
 
@@ -89,14 +116,56 @@ type CodecFactory struct {
 	legacySerializer runtime.Serializer
 }
 
+// CodecFactoryOptions holds the options for configuring CodecFactory behavior
+type CodecFactoryOptions struct {
+	// Strict configures all serializers in strict mode
+	Strict bool
+	// Pretty includes a pretty serializer along with the non-pretty one
+	Pretty bool
+}
+
+// CodecFactoryOptionsMutator takes a pointer to an options struct and then modifies it.
+// Functions implementing this type can be passed to the NewCodecFactory() constructor.
+type CodecFactoryOptionsMutator func(*CodecFactoryOptions)
+
+// EnablePretty enables including a pretty serializer along with the non-pretty one
+func EnablePretty(options *CodecFactoryOptions) {
+	options.Pretty = true
+}
+
+// DisablePretty disables including a pretty serializer along with the non-pretty one
+func DisablePretty(options *CodecFactoryOptions) {
+	options.Pretty = false
+}
+
+// EnableStrict enables configuring all serializers in strict mode
+func EnableStrict(options *CodecFactoryOptions) {
+	options.Strict = true
+}
+
+// DisableStrict disables configuring all serializers in strict mode
+func DisableStrict(options *CodecFactoryOptions) {
+	options.Strict = false
+}
+
 // NewCodecFactory provides methods for retrieving serializers for the supported wire formats
 // and conversion wrappers to define preferred internal and external versions. In the future,
 // as the internal version is used less, callers may instead use a defaulting serializer and
 // only convert objects which are shared internally (Status, common API machinery).
+//
+// Mutators can be passed to change the CodecFactoryOptions before construction of the factory.
+// It is recommended to explicitly pass mutators instead of relying on defaults.
+// By default, Pretty is enabled -- this is conformant with previously supported behavior.
+//
 // TODO: allow other codecs to be compiled in?
 // TODO: accept a scheme interface
-func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
-	serializers := newSerializersForScheme(scheme, json.DefaultMetaFactory)
+func NewCodecFactory(scheme *runtime.Scheme, mutators ...CodecFactoryOptionsMutator) CodecFactory {
+	options := CodecFactoryOptions{Pretty: true}
+	for _, fn := range mutators {
+		fn(&options)
+	}
+
+	serializers := newSerializersForScheme(scheme, json.DefaultMetaFactory, options)
 	return newCodecFactory(scheme, serializers)
 }
 
@@ -120,6 +189,15 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 				Serializer:       d.Serializer,
 				PrettySerializer: d.PrettySerializer,
 			}
+
+			mediaType, _, err := mime.ParseMediaType(info.MediaType)
+			if err != nil {
+				panic(err)
+			}
+			parts := strings.SplitN(mediaType, "/", 2)
+			info.MediaTypeType = parts[0]
+			info.MediaTypeSubType = parts[1]
+
 			if d.StreamSerializer != nil {
 				info.StreamSerializer = &runtime.StreamSerializerInfo{
 					Serializer:    d.StreamSerializer,
@@ -146,6 +224,12 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 
 		legacySerializer: legacySerializer,
 	}
+}
+
+// WithoutConversion returns a NegotiatedSerializer that performs no conversion, even if the
+// caller requests it.
+func (f CodecFactory) WithoutConversion() runtime.NegotiatedSerializer {
+	return WithoutConversionCodecFactory{f}
 }
 
 // SupportedMediaTypes returns the RFC2046 media types that this factory has serializers for.
@@ -215,23 +299,26 @@ func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv runtime.Grou
 	return f.CodecForVersions(encoder, nil, gv, nil)
 }
 
-// DirectCodecFactory provides methods for retrieving "DirectCodec"s, which do not do conversion.
-type DirectCodecFactory struct {
+// WithoutConversionCodecFactory is a CodecFactory that will explicitly ignore requests to perform conversion.
+// This wrapper is used while code migrates away from using conversion (such as external clients) and in the future
+// will be unnecessary when we change the signature of NegotiatedSerializer.
+type WithoutConversionCodecFactory struct {
 	CodecFactory
 }
 
-// EncoderForVersion returns an encoder that does not do conversion.
-func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, version runtime.GroupVersioner) runtime.Encoder {
-	return versioning.DirectEncoder{
+// EncoderForVersion returns an encoder that does not do conversion, but does set the group version kind of the object
+// when serialized.
+func (f WithoutConversionCodecFactory) EncoderForVersion(serializer runtime.Encoder, version runtime.GroupVersioner) runtime.Encoder {
+	return runtime.WithVersionEncoder{
 		Version:     version,
 		Encoder:     serializer,
 		ObjectTyper: f.CodecFactory.scheme,
 	}
 }
 
-// DecoderToVersion returns an decoder that does not do conversion. gv is ignored.
-func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
-	return versioning.DirectDecoder{
+// DecoderToVersion returns an decoder that does not do conversion.
+func (f WithoutConversionCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
+	return runtime.WithoutVersionDecoder{
 		Decoder: serializer,
 	}
 }

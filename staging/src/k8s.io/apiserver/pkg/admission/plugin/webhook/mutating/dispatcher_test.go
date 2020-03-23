@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,121 +17,116 @@ limitations under the License.
 package mutating
 
 import (
-	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
-	"k8s.io/apiserver/pkg/apis/example"
-	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
+	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/stretchr/testify/assert"
 )
 
-var sampleCRD = unstructured.Unstructured{
-	Object: map[string]interface{}{
-		"apiVersion": "mygroup.k8s.io/v1",
-		"kind":       "Flunder",
-		"data": map[string]interface{}{
-			"Key": "Value",
-		},
-	},
-}
-
-func TestDispatch(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, example.AddToScheme(scheme))
-	require.NoError(t, examplev1.AddToScheme(scheme))
-	require.NoError(t, example2v1.AddToScheme(scheme))
-
-	tests := []struct {
-		name        string
-		in          runtime.Object
-		out         runtime.Object
-		expectedObj runtime.Object
+func TestMutationAnnotationValue(t *testing.T) {
+	tcs := []struct {
+		config   string
+		webhook  string
+		mutated  bool
+		expected string
 	}{
 		{
-			name: "convert example/v1#Pod to example#Pod",
-			in: &examplev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: examplev1.PodSpec{
-					RestartPolicy: examplev1.RestartPolicy("never"),
-				},
-			},
-			out: &example.Pod{},
-			expectedObj: &example.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: example.PodSpec{
-					RestartPolicy: example.RestartPolicy("never"),
-				},
-			},
+			config:   "test-config",
+			webhook:  "test-webhook",
+			mutated:  true,
+			expected: `{"configuration":"test-config","webhook":"test-webhook","mutated":true}`,
 		},
 		{
-			name: "convert example2/v1#replicaset to example#replicaset",
-			in: &example2v1.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "rs1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: example2v1.ReplicaSetSpec{
-					Replicas: func() *int32 { var i int32; i = 1; return &i }(),
-				},
-			},
-			out: &example.ReplicaSet{},
-			expectedObj: &example.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "rs1",
-					Labels: map[string]string{
-						"key": "value",
-					},
-				},
-				Spec: example.ReplicaSetSpec{
-					Replicas: 1,
-				},
-			},
-		},
-		{
-			name:        "no conversion if the object is the same",
-			in:          &sampleCRD,
-			out:         &sampleCRD,
-			expectedObj: &sampleCRD,
+			config:   "test-config",
+			webhook:  "test-webhook",
+			mutated:  false,
+			expected: `{"configuration":"test-config","webhook":"test-webhook","mutated":false}`,
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			a := &mutatingDispatcher{
-				plugin: &Plugin{
-					scheme: scheme,
-				},
+
+	for _, tc := range tcs {
+		actual, err := mutationAnnotationValue(tc.config, tc.webhook, tc.mutated)
+		assert.NoError(t, err, "unexpected error")
+		if actual != tc.expected {
+			t.Errorf("composed mutation annotation value doesn't match, want: %s, got: %s", tc.expected, actual)
+		}
+	}
+}
+
+func TestJSONPatchAnnotationValue(t *testing.T) {
+	tcs := []struct {
+		name     string
+		config   string
+		webhook  string
+		patch    []byte
+		expected string
+	}{
+		{
+			name:     "valid patch annotation",
+			config:   "test-config",
+			webhook:  "test-webhook",
+			patch:    []byte(`[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+			expected: `{"configuration":"test-config","webhook":"test-webhook","patch":[{"op":"add","path":"/metadata/labels/a","value":"true"}],"patchType":"JSONPatch"}`,
+		},
+		{
+			name:     "empty configuration",
+			config:   "",
+			webhook:  "test-webhook",
+			patch:    []byte(`[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+			expected: `{"configuration":"","webhook":"test-webhook","patch":[{"op":"add","path":"/metadata/labels/a","value":"true"}],"patchType":"JSONPatch"}`,
+		},
+		{
+			name:     "empty webhook",
+			config:   "test-config",
+			webhook:  "",
+			patch:    []byte(`[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+			expected: `{"configuration":"test-config","webhook":"","patch":[{"op":"add","path":"/metadata/labels/a","value":"true"}],"patchType":"JSONPatch"}`,
+		},
+		{
+			name:     "valid JSON patch empty operation",
+			config:   "test-config",
+			webhook:  "test-webhook",
+			patch:    []byte("[{}]"),
+			expected: `{"configuration":"test-config","webhook":"test-webhook","patch":[{}],"patchType":"JSONPatch"}`,
+		},
+		{
+			name:     "empty slice patch",
+			config:   "test-config",
+			webhook:  "test-webhook",
+			patch:    []byte("[]"),
+			expected: `{"configuration":"test-config","webhook":"test-webhook","patch":[],"patchType":"JSONPatch"}`,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			jsonPatch, err := jsonpatch.DecodePatch(tc.patch)
+			assert.NoError(t, err, "unexpected error decode patch")
+			actual, err := jsonPatchAnnotationValue(tc.config, tc.webhook, jsonPatch)
+			assert.NoError(t, err, "unexpected error getting json patch annotation")
+			if actual != tc.expected {
+				t.Errorf("composed patch annotation value doesn't match, want: %s, got: %s", tc.expected, actual)
 			}
-			attr := generic.VersionedAttributes{
-				Attributes:         admission.NewAttributesRecord(test.out, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", admission.Operation(""), false, nil),
-				VersionedOldObject: nil,
-				VersionedObject:    test.in,
+
+			var p map[string]interface{}
+			if err := json.Unmarshal([]byte(actual), &p); err != nil {
+				t.Errorf("unexpected error unmarshaling patch annotation: %v", err)
 			}
-			if err := a.Dispatch(context.TODO(), &attr, nil); err != nil {
-				t.Fatalf("%s: unexpected error: %v", test.name, err)
+			if p["configuration"] != tc.config {
+				t.Errorf("unmarshaled configuration doesn't match, want: %s, got: %v", tc.config, p["configuration"])
 			}
-			if !reflect.DeepEqual(attr.Attributes.GetObject(), test.expectedObj) {
-				t.Errorf("\nexpected:\n%#v\ngot:\n %#v\n", test.expectedObj, test.out)
+			if p["webhook"] != tc.webhook {
+				t.Errorf("unmarshaled webhook doesn't match, want: %s, got: %v", tc.webhook, p["webhook"])
+			}
+			var expectedPatch interface{}
+			err = json.Unmarshal(tc.patch, &expectedPatch)
+			if err != nil {
+				t.Errorf("unexpected error unmarshaling patch: %v, %v", tc.patch, err)
+			}
+			if !reflect.DeepEqual(expectedPatch, p["patch"]) {
+				t.Errorf("unmarshaled patch doesn't match, want: %v, got: %v", expectedPatch, p["patch"])
 			}
 		})
 	}

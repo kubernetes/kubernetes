@@ -14,13 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# GoFmt apparently is changing @ head...
+# This script checks whether the source codes need to be formatted or not by
+# `gofmt`. We should run `hack/update-gofmt.sh` if actually formats them.
+# Usage: `hack/verify-gofmt.sh`.
+# Note: GoFmt apparently is changing @ head...
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
@@ -53,7 +56,7 @@ find_files() {
 # formatting (e.g., a file does not parse correctly). Without "|| true" this
 # would have led to no useful error message from gofmt, because the script would
 # have failed before getting to the "echo" in the block below.
-diff=$(find_files | xargs ${gofmt} -d -s 2>&1) || true
+diff=$(find_files | xargs "${gofmt}" -d -s 2>&1) || true
 if [[ -n "${diff}" ]]; then
   echo "${diff}" >&2
   echo >&2

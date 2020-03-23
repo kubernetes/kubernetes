@@ -10,7 +10,7 @@ go_library(
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig",
     deps = [
-        "//cmd/kubeadm/test/certs:go_default_library",
+        "//cmd/kubeadm/app/util/certs:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )

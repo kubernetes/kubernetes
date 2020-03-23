@@ -28,18 +28,22 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AdmissionRequest = map[string]string{
-	"":            "AdmissionRequest describes the admission.Attributes for the admission request.",
-	"uid":         "UID is an identifier for the individual request/response. It allows us to distinguish instances of requests which are otherwise identical (parallel requests, requests when earlier requests did not modify etc) The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request. It is suitable for correlating log entries between the webhook and apiserver, for either auditing or debugging.",
-	"kind":        "Kind is the type of object being manipulated.  For example: Pod",
-	"resource":    "Resource is the name of the resource being requested.  This is not the kind.  For example: pods",
-	"subResource": "SubResource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind. For instance, /pods has the resource \"pods\" and the kind \"Pod\", while /pods/foo/status has the resource \"pods\", the sub resource \"status\", and the kind \"Pod\" (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource \"pods\", subresource \"binding\", and kind \"Binding\".",
-	"name":        "Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and rely on the server to generate the name.  If that is the case, this method will return the empty string.",
-	"namespace":   "Namespace is the namespace associated with the request (if any).",
-	"operation":   "Operation is the operation being performed",
-	"userInfo":    "UserInfo is information about the requesting user",
-	"object":      "Object is the object from the incoming request prior to default values being applied",
-	"oldObject":   "OldObject is the existing object. Only populated for UPDATE requests.",
-	"dryRun":      "DryRun indicates that modifications will definitely not be persisted for this request. Defaults to false.",
+	"":                   "AdmissionRequest describes the admission.Attributes for the admission request.",
+	"uid":                "UID is an identifier for the individual request/response. It allows us to distinguish instances of requests which are otherwise identical (parallel requests, requests when earlier requests did not modify etc) The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request. It is suitable for correlating log entries between the webhook and apiserver, for either auditing or debugging.",
+	"kind":               "Kind is the fully-qualified type of object being submitted (for example, v1.Pod or autoscaling.v1.Scale)",
+	"resource":           "Resource is the fully-qualified resource being requested (for example, v1.pods)",
+	"subResource":        "SubResource is the subresource being requested, if any (for example, \"status\" or \"scale\")",
+	"requestKind":        "RequestKind is the fully-qualified type of the original API request (for example, v1.Pod or autoscaling.v1.Scale). If this is specified and differs from the value in \"kind\", an equivalent match and conversion was performed.\n\nFor example, if deployments can be modified via apps/v1 and apps/v1beta1, and a webhook registered a rule of `apiGroups:[\"apps\"], apiVersions:[\"v1\"], resources: [\"deployments\"]` and `matchPolicy: Equivalent`, an API request to apps/v1beta1 deployments would be converted and sent to the webhook with `kind: {group:\"apps\", version:\"v1\", kind:\"Deployment\"}` (matching the rule the webhook registered for), and `requestKind: {group:\"apps\", version:\"v1beta1\", kind:\"Deployment\"}` (indicating the kind of the original API request).\n\nSee documentation for the \"matchPolicy\" field in the webhook configuration type for more details.",
+	"requestResource":    "RequestResource is the fully-qualified resource of the original API request (for example, v1.pods). If this is specified and differs from the value in \"resource\", an equivalent match and conversion was performed.\n\nFor example, if deployments can be modified via apps/v1 and apps/v1beta1, and a webhook registered a rule of `apiGroups:[\"apps\"], apiVersions:[\"v1\"], resources: [\"deployments\"]` and `matchPolicy: Equivalent`, an API request to apps/v1beta1 deployments would be converted and sent to the webhook with `resource: {group:\"apps\", version:\"v1\", resource:\"deployments\"}` (matching the resource the webhook registered for), and `requestResource: {group:\"apps\", version:\"v1beta1\", resource:\"deployments\"}` (indicating the resource of the original API request).\n\nSee documentation for the \"matchPolicy\" field in the webhook configuration type.",
+	"requestSubResource": "RequestSubResource is the name of the subresource of the original API request, if any (for example, \"status\" or \"scale\") If this is specified and differs from the value in \"subResource\", an equivalent match and conversion was performed. See documentation for the \"matchPolicy\" field in the webhook configuration type.",
+	"name":               "Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and rely on the server to generate the name.  If that is the case, this field will contain an empty string.",
+	"namespace":          "Namespace is the namespace associated with the request (if any).",
+	"operation":          "Operation is the operation being performed. This may be different than the operation requested. e.g. a patch can result in either a CREATE or UPDATE Operation.",
+	"userInfo":           "UserInfo is information about the requesting user",
+	"object":             "Object is the object from the incoming request.",
+	"oldObject":          "OldObject is the existing object. Only populated for DELETE and UPDATE requests.",
+	"dryRun":             "DryRun indicates that modifications will definitely not be persisted for this request. Defaults to false.",
+	"options":            "Options is the operation option structure of the operation being performed. e.g. `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This may be different than the options the caller provided. e.g. for a patch request the performed Operation might be a CREATE, in which case the Options will a `meta.k8s.io/v1.CreateOptions` even though the caller provided `meta.k8s.io/v1.PatchOptions`.",
 }
 
 func (AdmissionRequest) SwaggerDoc() map[string]string {

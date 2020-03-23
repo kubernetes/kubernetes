@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Common logic used by both http and file channels.
 package config
 
 import (
@@ -28,19 +27,27 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
+
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
 	// to "v1"?
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	// Ensure that core apis are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/hash"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+)
+
+const (
+	maxConfigLength = 10 * 1 << 20 // 10MB
 )
 
 // Generate a pod name that is unique among nodes by appending the nodeName.
@@ -59,16 +66,16 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 		}
 		hash.DeepHashObject(hasher, pod)
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
-		glog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
+		klog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
 	}
 
 	pod.Name = generatePodName(pod.Name, nodeName)
-	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
+	klog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
 
 	if pod.Namespace == "" {
 		pod.Namespace = metav1.NamespaceDefault
 	}
-	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
+	klog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
 	pod.Spec.NodeName = string(nodeName)
@@ -106,6 +113,7 @@ func getSelfLink(name, namespace string) string {
 
 type defaultFunc func(pod *api.Pod) error
 
+// tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
 func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
 	// JSON is valid YAML, so this should work for everything.
 	json, err := utilyaml.ToJSON(data)
@@ -127,12 +135,15 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
 	}
-	if errs := validation.ValidatePod(newPod); len(errs) > 0 {
+	opts := validation.PodValidationOptions{
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+	if errs := validation.ValidatePod(newPod, opts); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
 	if err := k8s_api_v1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
-		glog.Errorf("Pod %q failed to convert to v1", newPod.Name)
+		klog.Errorf("Pod %q failed to convert to v1", newPod.Name)
 		return true, nil, err
 	}
 	return true, v1Pod, nil
@@ -151,13 +162,17 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		return false, pods, err
 	}
 
+	opts := validation.PodValidationOptions{
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+
 	// Apply default values and validate pods.
 	for i := range newPods.Items {
 		newPod := &newPods.Items[i]
 		if err = defaultFn(newPod); err != nil {
 			return true, pods, err
 		}
-		if errs := validation.ValidatePod(newPod); len(errs) > 0 {
+		if errs := validation.ValidatePod(newPod, opts); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
 		}

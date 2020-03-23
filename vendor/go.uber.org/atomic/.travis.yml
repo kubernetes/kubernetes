@@ -1,0 +1,23 @@
+sudo: false
+language: go
+go_import_path: go.uber.org/atomic
+
+go:
+  - 1.7
+  - 1.8
+  - 1.9
+
+cache:
+  directories:
+    - vendor
+
+install:
+  - make install_ci
+
+script:
+  - make test_ci
+  - scripts/test-ubergo.sh
+  - make lint
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

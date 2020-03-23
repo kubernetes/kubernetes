@@ -16,7 +16,9 @@ package prometheus
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
+	"sync"
 	"sync/atomic"
 
 	"github.com/golang/protobuf/proto"
@@ -108,8 +110,9 @@ func ExponentialBuckets(start, factor float64, count int) []float64 {
 }
 
 // HistogramOpts bundles the options for creating a Histogram metric. It is
-// mandatory to set Name and Help to a non-empty string. All other fields are
-// optional and can safely be left at their zero value.
+// mandatory to set Name to a non-empty string. All other fields are optional
+// and can safely be left at their zero value, although it is strongly
+// encouraged to set a Help string.
 type HistogramOpts struct {
 	// Namespace, Subsystem, and Name are components of the fully-qualified
 	// name of the Histogram (created by joining these components with
@@ -120,29 +123,22 @@ type HistogramOpts struct {
 	Subsystem string
 	Name      string
 
-	// Help provides information about this Histogram. Mandatory!
+	// Help provides information about this Histogram.
 	//
 	// Metrics with the same fully-qualified name must have the same Help
 	// string.
 	Help string
 
-	// ConstLabels are used to attach fixed labels to this
-	// Histogram. Histograms with the same fully-qualified name must have the
-	// same label names in their ConstLabels.
+	// ConstLabels are used to attach fixed labels to this metric. Metrics
+	// with the same fully-qualified name must have the same label names in
+	// their ConstLabels.
 	//
-	// Note that in most cases, labels have a value that varies during the
-	// lifetime of a process. Those labels are usually managed with a
-	// HistogramVec. ConstLabels serve only special purposes. One is for the
-	// special case where the value of a label does not change during the
-	// lifetime of a process, e.g. if the revision of the running binary is
-	// put into a label. Another, more advanced purpose is if more than one
-	// Collector needs to collect Histograms with the same fully-qualified
-	// name. In that case, those Summaries must differ in the values of
-	// their ConstLabels. See the Collector examples.
-	//
-	// If the value of a label never changes (not even between binaries),
-	// that label most likely should not be a label at all (but part of the
-	// metric name).
+	// ConstLabels are only used rarely. In particular, do not use them to
+	// attach the same labels to all your metrics. Those use cases are
+	// better covered by target labels set by the scraping Prometheus
+	// server, or by one specific metric (e.g. a build_info or a
+	// machine_role metric). See also
+	// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels,-not-static-scraped-labels
 	ConstLabels Labels
 
 	// Buckets defines the buckets into which observations are counted. Each
@@ -169,7 +165,7 @@ func NewHistogram(opts HistogramOpts) Histogram {
 
 func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogram {
 	if len(desc.variableLabels) != len(labelValues) {
-		panic(errInconsistentCardinality)
+		panic(makeInconsistentCardinalityError(desc.fqName, desc.variableLabels, labelValues))
 	}
 
 	for _, n := range desc.variableLabels {
@@ -191,6 +187,7 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 		desc:        desc,
 		upperBounds: opts.Buckets,
 		labelPairs:  makeLabelPairs(desc, labelValues),
+		counts:      [2]*histogramCounts{&histogramCounts{}, &histogramCounts{}},
 	}
 	for i, upperBound := range h.upperBounds {
 		if i < len(h.upperBounds)-1 {
@@ -207,30 +204,56 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 			}
 		}
 	}
-	// Finally we know the final length of h.upperBounds and can make counts.
-	h.counts = make([]uint64, len(h.upperBounds))
+	// Finally we know the final length of h.upperBounds and can make buckets
+	// for both counts:
+	h.counts[0].buckets = make([]uint64, len(h.upperBounds))
+	h.counts[1].buckets = make([]uint64, len(h.upperBounds))
 
 	h.init(h) // Init self-collection.
 	return h
 }
 
-type histogram struct {
+type histogramCounts struct {
 	// sumBits contains the bits of the float64 representing the sum of all
 	// observations. sumBits and count have to go first in the struct to
 	// guarantee alignment for atomic operations.
 	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
 	sumBits uint64
 	count   uint64
+	buckets []uint64
+}
+
+type histogram struct {
+	// countAndHotIdx enables lock-free writes with use of atomic updates.
+	// The most significant bit is the hot index [0 or 1] of the count field
+	// below. Observe calls update the hot one. All remaining bits count the
+	// number of Observe calls. Observe starts by incrementing this counter,
+	// and finish by incrementing the count field in the respective
+	// histogramCounts, as a marker for completion.
+	//
+	// Calls of the Write method (which are non-mutating reads from the
+	// perspective of the histogram) swap the hot–cold under the writeMtx
+	// lock. A cooldown is awaited (while locked) by comparing the number of
+	// observations with the initiation count. Once they match, then the
+	// last observation on the now cool one has completed. All cool fields must
+	// be merged into the new hot before releasing writeMtx.
+	//
+	// Fields with atomic access first! See alignment constraint:
+	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	countAndHotIdx uint64
 
 	selfCollector
-	// Note that there is no mutex required.
+	desc     *Desc
+	writeMtx sync.Mutex // Only used in the Write method.
 
-	desc *Desc
+	// Two counts, one is "hot" for lock-free observations, the other is
+	// "cold" for writing out a dto.Metric. It has to be an array of
+	// pointers to guarantee 64bit alignment of the histogramCounts, see
+	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG.
+	counts [2]*histogramCounts
 
 	upperBounds []float64
-	counts      []uint64
-
-	labelPairs []*dto.LabelPair
+	labelPairs  []*dto.LabelPair
 }
 
 func (h *histogram) Desc() *Desc {
@@ -248,36 +271,84 @@ func (h *histogram) Observe(v float64) {
 	// 100 buckets: 78.1 ns/op linear - binary 54.9 ns/op
 	// 300 buckets: 154 ns/op linear - binary 61.6 ns/op
 	i := sort.SearchFloat64s(h.upperBounds, v)
-	if i < len(h.counts) {
-		atomic.AddUint64(&h.counts[i], 1)
+
+	// We increment h.countAndHotIdx so that the counter in the lower
+	// 63 bits gets incremented. At the same time, we get the new value
+	// back, which we can use to find the currently-hot counts.
+	n := atomic.AddUint64(&h.countAndHotIdx, 1)
+	hotCounts := h.counts[n>>63]
+
+	if i < len(h.upperBounds) {
+		atomic.AddUint64(&hotCounts.buckets[i], 1)
 	}
-	atomic.AddUint64(&h.count, 1)
 	for {
-		oldBits := atomic.LoadUint64(&h.sumBits)
+		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
 		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
-		if atomic.CompareAndSwapUint64(&h.sumBits, oldBits, newBits) {
+		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
 			break
 		}
 	}
+	// Increment count last as we take it as a signal that the observation
+	// is complete.
+	atomic.AddUint64(&hotCounts.count, 1)
 }
 
 func (h *histogram) Write(out *dto.Metric) error {
-	his := &dto.Histogram{}
-	buckets := make([]*dto.Bucket, len(h.upperBounds))
+	// For simplicity, we protect this whole method by a mutex. It is not in
+	// the hot path, i.e. Observe is called much more often than Write. The
+	// complication of making Write lock-free isn't worth it, if possible at
+	// all.
+	h.writeMtx.Lock()
+	defer h.writeMtx.Unlock()
 
-	his.SampleSum = proto.Float64(math.Float64frombits(atomic.LoadUint64(&h.sumBits)))
-	his.SampleCount = proto.Uint64(atomic.LoadUint64(&h.count))
-	var count uint64
+	// Adding 1<<63 switches the hot index (from 0 to 1 or from 1 to 0)
+	// without touching the count bits. See the struct comments for a full
+	// description of the algorithm.
+	n := atomic.AddUint64(&h.countAndHotIdx, 1<<63)
+	// count is contained unchanged in the lower 63 bits.
+	count := n & ((1 << 63) - 1)
+	// The most significant bit tells us which counts is hot. The complement
+	// is thus the cold one.
+	hotCounts := h.counts[n>>63]
+	coldCounts := h.counts[(^n)>>63]
+
+	// Await cooldown.
+	for count != atomic.LoadUint64(&coldCounts.count) {
+		runtime.Gosched() // Let observations get work done.
+	}
+
+	his := &dto.Histogram{
+		Bucket:      make([]*dto.Bucket, len(h.upperBounds)),
+		SampleCount: proto.Uint64(count),
+		SampleSum:   proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+	}
+	var cumCount uint64
 	for i, upperBound := range h.upperBounds {
-		count += atomic.LoadUint64(&h.counts[i])
-		buckets[i] = &dto.Bucket{
-			CumulativeCount: proto.Uint64(count),
+		cumCount += atomic.LoadUint64(&coldCounts.buckets[i])
+		his.Bucket[i] = &dto.Bucket{
+			CumulativeCount: proto.Uint64(cumCount),
 			UpperBound:      proto.Float64(upperBound),
 		}
 	}
-	his.Bucket = buckets
+
 	out.Histogram = his
 	out.Label = h.labelPairs
+
+	// Finally add all the cold counts to the new hot counts and reset the cold counts.
+	atomic.AddUint64(&hotCounts.count, count)
+	atomic.StoreUint64(&coldCounts.count, 0)
+	for {
+		oldBits := atomic.LoadUint64(&hotCounts.sumBits)
+		newBits := math.Float64bits(math.Float64frombits(oldBits) + his.GetSampleSum())
+		if atomic.CompareAndSwapUint64(&hotCounts.sumBits, oldBits, newBits) {
+			atomic.StoreUint64(&coldCounts.sumBits, 0)
+			break
+		}
+	}
+	for i := range h.upperBounds {
+		atomic.AddUint64(&hotCounts.buckets[i], atomic.LoadUint64(&coldCounts.buckets[i]))
+		atomic.StoreUint64(&coldCounts.buckets[i], 0)
+	}
 	return nil
 }
 
@@ -287,12 +358,11 @@ func (h *histogram) Write(out *dto.Metric) error {
 // (e.g. HTTP request latencies, partitioned by status code and method). Create
 // instances with NewHistogramVec.
 type HistogramVec struct {
-	*MetricVec
+	*metricVec
 }
 
 // NewHistogramVec creates a new HistogramVec based on the provided HistogramOpts and
-// partitioned by the given label names. At least one label name must be
-// provided.
+// partitioned by the given label names.
 func NewHistogramVec(opts HistogramOpts, labelNames []string) *HistogramVec {
 	desc := NewDesc(
 		BuildFQName(opts.Namespace, opts.Subsystem, opts.Name),
@@ -301,28 +371,58 @@ func NewHistogramVec(opts HistogramOpts, labelNames []string) *HistogramVec {
 		opts.ConstLabels,
 	)
 	return &HistogramVec{
-		MetricVec: newMetricVec(desc, func(lvs ...string) Metric {
+		metricVec: newMetricVec(desc, func(lvs ...string) Metric {
 			return newHistogram(desc, opts, lvs...)
 		}),
 	}
 }
 
-// GetMetricWithLabelValues replaces the method of the same name in
-// MetricVec. The difference is that this method returns an Observer and not a
-// Metric so that no type conversion to an Observer is required.
-func (m *HistogramVec) GetMetricWithLabelValues(lvs ...string) (Observer, error) {
-	metric, err := m.MetricVec.GetMetricWithLabelValues(lvs...)
+// GetMetricWithLabelValues returns the Histogram for the given slice of label
+// values (same order as the VariableLabels in Desc). If that combination of
+// label values is accessed for the first time, a new Histogram is created.
+//
+// It is possible to call this method without using the returned Histogram to only
+// create the new Histogram but leave it at its starting value, a Histogram without
+// any observations.
+//
+// Keeping the Histogram for later use is possible (and should be considered if
+// performance is critical), but keep in mind that Reset, DeleteLabelValues and
+// Delete can be used to delete the Histogram from the HistogramVec. In that case, the
+// Histogram will still exist, but it will not be exported anymore, even if a
+// Histogram with the same label values is created later. See also the CounterVec
+// example.
+//
+// An error is returned if the number of label values is not the same as the
+// number of VariableLabels in Desc (minus any curried labels).
+//
+// Note that for more than one label value, this method is prone to mistakes
+// caused by an incorrect order of arguments. Consider GetMetricWith(Labels) as
+// an alternative to avoid that type of mistake. For higher label numbers, the
+// latter has a much more readable (albeit more verbose) syntax, but it comes
+// with a performance overhead (for creating and processing the Labels map).
+// See also the GaugeVec example.
+func (v *HistogramVec) GetMetricWithLabelValues(lvs ...string) (Observer, error) {
+	metric, err := v.metricVec.getMetricWithLabelValues(lvs...)
 	if metric != nil {
 		return metric.(Observer), err
 	}
 	return nil, err
 }
 
-// GetMetricWith replaces the method of the same name in MetricVec. The
-// difference is that this method returns an Observer and not a Metric so that no
-// type conversion to an Observer is required.
-func (m *HistogramVec) GetMetricWith(labels Labels) (Observer, error) {
-	metric, err := m.MetricVec.GetMetricWith(labels)
+// GetMetricWith returns the Histogram for the given Labels map (the label names
+// must match those of the VariableLabels in Desc). If that label map is
+// accessed for the first time, a new Histogram is created. Implications of
+// creating a Histogram without using it and keeping the Histogram for later use
+// are the same as for GetMetricWithLabelValues.
+//
+// An error is returned if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc (minus any curried labels).
+//
+// This method is used for the same purpose as
+// GetMetricWithLabelValues(...string). See there for pros and cons of the two
+// methods.
+func (v *HistogramVec) GetMetricWith(labels Labels) (Observer, error) {
+	metric, err := v.metricVec.getMetricWith(labels)
 	if metric != nil {
 		return metric.(Observer), err
 	}
@@ -330,18 +430,57 @@ func (m *HistogramVec) GetMetricWith(labels Labels) (Observer, error) {
 }
 
 // WithLabelValues works as GetMetricWithLabelValues, but panics where
-// GetMetricWithLabelValues would have returned an error. By not returning an
-// error, WithLabelValues allows shortcuts like
+// GetMetricWithLabelValues would have returned an error. Not returning an
+// error allows shortcuts like
 //     myVec.WithLabelValues("404", "GET").Observe(42.21)
-func (m *HistogramVec) WithLabelValues(lvs ...string) Observer {
-	return m.MetricVec.WithLabelValues(lvs...).(Observer)
+func (v *HistogramVec) WithLabelValues(lvs ...string) Observer {
+	h, err := v.GetMetricWithLabelValues(lvs...)
+	if err != nil {
+		panic(err)
+	}
+	return h
 }
 
-// With works as GetMetricWith, but panics where GetMetricWithLabels would have
-// returned an error. By not returning an error, With allows shortcuts like
-//     myVec.With(Labels{"code": "404", "method": "GET"}).Observe(42.21)
-func (m *HistogramVec) With(labels Labels) Observer {
-	return m.MetricVec.With(labels).(Observer)
+// With works as GetMetricWith but panics where GetMetricWithLabels would have
+// returned an error. Not returning an error allows shortcuts like
+//     myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Observe(42.21)
+func (v *HistogramVec) With(labels Labels) Observer {
+	h, err := v.GetMetricWith(labels)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}
+
+// CurryWith returns a vector curried with the provided labels, i.e. the
+// returned vector has those labels pre-set for all labeled operations performed
+// on it. The cardinality of the curried vector is reduced accordingly. The
+// order of the remaining labels stays the same (just with the curried labels
+// taken out of the sequence – which is relevant for the
+// (GetMetric)WithLabelValues methods). It is possible to curry a curried
+// vector, but only with labels not yet used for currying before.
+//
+// The metrics contained in the HistogramVec are shared between the curried and
+// uncurried vectors. They are just accessed differently. Curried and uncurried
+// vectors behave identically in terms of collection. Only one must be
+// registered with a given registry (usually the uncurried version). The Reset
+// method deletes all metrics, even if called on a curried vector.
+func (v *HistogramVec) CurryWith(labels Labels) (ObserverVec, error) {
+	vec, err := v.curryWith(labels)
+	if vec != nil {
+		return &HistogramVec{vec}, err
+	}
+	return nil, err
+}
+
+// MustCurryWith works as CurryWith but panics where CurryWith would have
+// returned an error.
+func (v *HistogramVec) MustCurryWith(labels Labels) ObserverVec {
+	vec, err := v.CurryWith(labels)
+	if err != nil {
+		panic(err)
+	}
+	return vec
 }
 
 type constHistogram struct {
@@ -393,7 +532,7 @@ func (h *constHistogram) Write(out *dto.Metric) error {
 // bucket.
 //
 // NewConstHistogram returns an error if the length of labelValues is not
-// consistent with the variable labels in Desc.
+// consistent with the variable labels in Desc or if Desc is invalid.
 func NewConstHistogram(
 	desc *Desc,
 	count uint64,
@@ -401,8 +540,11 @@ func NewConstHistogram(
 	buckets map[float64]uint64,
 	labelValues ...string,
 ) (Metric, error) {
-	if len(desc.variableLabels) != len(labelValues) {
-		return nil, errInconsistentCardinality
+	if desc.err != nil {
+		return nil, desc.err
+	}
+	if err := validateLabelValues(labelValues, len(desc.variableLabels)); err != nil {
+		return nil, err
 	}
 	return &constHistogram{
 		desc:       desc,

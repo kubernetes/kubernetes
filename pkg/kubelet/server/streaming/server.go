@@ -34,12 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 
-// The library interface to serve the stream requests.
+// Server is the library interface to serve the stream requests.
 type Server interface {
 	http.Handler
 
@@ -59,7 +59,7 @@ type Server interface {
 	Stop() error
 }
 
-// The interface to execute the commands and provide the streams.
+// Runtime is the interface to execute the commands and provide the streams.
 type Runtime interface {
 	Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
@@ -103,6 +103,7 @@ var DefaultConfig = Config{
 	SupportedPortForwardProtocols:   portforward.SupportedProtocols,
 }
 
+// NewServer creates a new Server for stream requests.
 // TODO(tallclair): Add auth(n/z) interface & handling.
 func NewServer(config Config, runtime Runtime) (Server, error) {
 	s := &server{
@@ -243,9 +244,8 @@ func (s *server) Start(stayUp bool) error {
 	s.config.BaseURL.Host = listener.Addr().String()
 	if s.config.TLSConfig != nil {
 		return s.server.ServeTLS(listener, "", "") // Use certs from TLSConfig.
-	} else {
-		return s.server.Serve(listener)
 	}
+	return s.server.Serve(listener)
 }
 
 func (s *server) Stop() error {

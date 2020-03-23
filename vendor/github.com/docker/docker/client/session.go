@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -14,5 +14,5 @@ func (cli *Client) DialSession(ctx context.Context, proto string, meta map[strin
 	}
 	req = cli.addHeaders(req, meta)
 
-	return cli.setupHijackConn(req, proto)
+	return cli.setupHijackConn(ctx, req, proto)
 }

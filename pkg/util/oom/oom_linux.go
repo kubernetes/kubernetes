@@ -29,7 +29,7 @@ import (
 
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func NewOOMAdjuster() *OOMAdjuster {
@@ -62,24 +62,24 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	maxTries := 2
 	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
 	value := strconv.Itoa(oomScoreAdj)
-	glog.V(4).Infof("attempting to set %q to %q", oomScoreAdjPath, value)
+	klog.V(4).Infof("attempting to set %q to %q", oomScoreAdjPath, value)
 	var err error
 	for i := 0; i < maxTries; i++ {
 		err = ioutil.WriteFile(oomScoreAdjPath, []byte(value), 0700)
 		if err != nil {
 			if os.IsNotExist(err) {
-				glog.V(2).Infof("%q does not exist", oomScoreAdjPath)
+				klog.V(2).Infof("%q does not exist", oomScoreAdjPath)
 				return os.ErrNotExist
 			}
 
-			glog.V(3).Info(err)
+			klog.V(3).Info(err)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		return nil
 	}
 	if err != nil {
-		glog.V(2).Infof("failed to set %q to %q: %v", oomScoreAdjPath, value, err)
+		klog.V(2).Infof("failed to set %q to %q: %v", oomScoreAdjPath, value, err)
 	}
 	return err
 }
@@ -97,20 +97,20 @@ func (oomAdjuster *OOMAdjuster) applyOOMScoreAdjContainer(cgroupName string, oom
 				return os.ErrNotExist
 			}
 			continueAdjusting = true
-			glog.V(10).Infof("Error getting process list for cgroup %s: %+v", cgroupName, err)
+			klog.V(10).Infof("Error getting process list for cgroup %s: %+v", cgroupName, err)
 		} else if len(pidList) == 0 {
-			glog.V(10).Infof("Pid list is empty")
+			klog.V(10).Infof("Pid list is empty")
 			continueAdjusting = true
 		} else {
 			for _, pid := range pidList {
 				if !adjustedProcessSet[pid] {
-					glog.V(10).Infof("pid %d needs to be set", pid)
+					klog.V(10).Infof("pid %d needs to be set", pid)
 					if err = oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err == nil {
 						adjustedProcessSet[pid] = true
 					} else if err == os.ErrNotExist {
 						continue
 					} else {
-						glog.V(10).Infof("cannot adjust oom score for pid %d - %v", pid, err)
+						klog.V(10).Infof("cannot adjust oom score for pid %d - %v", pid, err)
 						continueAdjusting = true
 					}
 					// Processes can come and go while we try to apply oom score adjust value. So ignore errors here.

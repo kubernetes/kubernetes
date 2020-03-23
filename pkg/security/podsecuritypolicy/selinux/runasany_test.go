@@ -17,8 +17,8 @@ limitations under the License.
 package selinux
 
 import (
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	corev1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"testing"
 )
 
@@ -49,7 +49,7 @@ func TestRunAsAnyGenerate(t *testing.T) {
 
 func TestRunAsAnyValidate(t *testing.T) {
 	s, err := NewRunAsAny(&policy.SELinuxStrategyOptions{
-		SELinuxOptions: &api.SELinuxOptions{
+		SELinuxOptions: &corev1.SELinuxOptions{
 			Level: "foo",
 		},
 	},

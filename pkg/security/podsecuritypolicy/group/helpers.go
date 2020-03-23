@@ -19,8 +19,8 @@ package group
 import (
 	"fmt"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 

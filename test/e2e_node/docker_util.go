@@ -14,34 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
-	"context"
 	"fmt"
+	"strings"
 
 	"github.com/blang/semver"
 	systemdutil "github.com/coreos/go-systemd/util"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
-)
-
-const (
-	defaultDockerEndpoint  = "unix:///var/run/docker.sock"
-	dockerDaemonConfigName = "/etc/docker/daemon.json"
 )
 
 // getDockerAPIVersion returns the Docker's API version.
 func getDockerAPIVersion() (semver.Version, error) {
-	c, err := client.NewClient(defaultDockerEndpoint, "", nil, nil)
-	if err != nil {
-		return semver.Version{}, fmt.Errorf("failed to create docker client: %v", err)
-	}
-	version, err := c.ServerVersion(context.Background())
+	output, err := runCommand("docker", "version", "-f", "{{.Server.APIVersion}}")
 	if err != nil {
 		return semver.Version{}, fmt.Errorf("failed to get docker server version: %v", err)
 	}
-	return semver.MustParse(version.APIVersion + ".0"), nil
+	return semver.MustParse(strings.TrimSpace(output) + ".0"), nil
 }
 
 // isSharedPIDNamespaceSupported returns true if the Docker version is 1.13.1+
@@ -52,16 +41,6 @@ func isSharedPIDNamespaceSupported() (bool, error) {
 		return false, err
 	}
 	return version.GTE(semver.MustParse("1.26.0")), nil
-}
-
-// isDockerNoNewPrivilegesSupported returns true if Docker version is 1.11+
-// (API version 1.23+), and false otherwise.
-func isDockerNoNewPrivilegesSupported() (bool, error) {
-	version, err := getDockerAPIVersion()
-	if err != nil {
-		return false, err
-	}
-	return version.GTE(semver.MustParse("1.23.0")), nil
 }
 
 // isDockerLiveRestoreSupported returns true if live-restore is supported in
@@ -75,51 +54,41 @@ func isDockerLiveRestoreSupported() (bool, error) {
 }
 
 // getDockerInfo returns the Info struct for the running Docker daemon.
-func getDockerInfo() (types.Info, error) {
-	var info types.Info
-	c, err := client.NewClient(defaultDockerEndpoint, "", nil, nil)
+func getDockerInfo(key string) (string, error) {
+	output, err := runCommand("docker", "info", "-f", "{{."+key+"}}")
 	if err != nil {
-		return info, fmt.Errorf("failed to create docker client: %v", err)
+		return "", fmt.Errorf("failed to get docker info: %v", err)
 	}
-	info, err = c.Info(context.Background())
-	if err != nil {
-		return info, fmt.Errorf("failed to get docker info: %v", err)
-	}
-	return info, nil
+	return strings.TrimSpace(output), nil
 }
 
 // isDockerLiveRestoreEnabled returns true if live-restore is enabled in the
 // Docker.
 func isDockerLiveRestoreEnabled() (bool, error) {
-	info, err := getDockerInfo()
+	info, err := getDockerInfo("LiveRestoreEnabled")
 	if err != nil {
 		return false, err
 	}
-	return info.LiveRestoreEnabled, nil
+	return info == "true", nil
 }
 
 // getDockerLoggingDriver returns the name of the logging driver.
 func getDockerLoggingDriver() (string, error) {
-	info, err := getDockerInfo()
+	info, err := getDockerInfo("LoggingDriver")
 	if err != nil {
 		return "", err
 	}
-	return info.LoggingDriver, nil
+	return info, nil
 }
 
 // isDockerSELinuxSupportEnabled checks whether the Docker daemon was started
 // with SELinux support enabled.
 func isDockerSELinuxSupportEnabled() (bool, error) {
-	info, err := getDockerInfo()
+	info, err := getDockerInfo("SecurityOptions")
 	if err != nil {
 		return false, err
 	}
-	for _, s := range info.SecurityOptions {
-		if s == "selinux" {
-			return true, nil
-		}
-	}
-	return false, nil
+	return strings.Contains(info, "name=selinux"), nil
 }
 
 // startDockerDaemon starts the Docker daemon.

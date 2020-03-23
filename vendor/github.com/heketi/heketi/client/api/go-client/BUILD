@@ -3,11 +3,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "admin.go",
         "backup.go",
+        "block_volume.go",
         "client.go",
         "cluster.go",
+        "db.go",
         "device.go",
+        "logging.go",
         "node.go",
+        "operations.go",
+        "state.go",
         "topology.go",
         "volume.go",
     ],

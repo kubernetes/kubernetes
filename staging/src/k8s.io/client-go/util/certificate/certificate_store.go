@@ -23,10 +23,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog"
 )
 
 const (
@@ -127,7 +127,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 	if pairFileExists, err := fileExists(pairFile); err != nil {
 		return nil, err
 	} else if pairFileExists {
-		glog.Infof("Loading cert/key pair from %q.", pairFile)
+		klog.Infof("Loading cert/key pair from %q.", pairFile)
 		return loadFile(pairFile)
 	}
 
@@ -140,7 +140,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return nil, err
 	}
 	if certFileExists && keyFileExists {
-		glog.Infof("Loading cert/key pair from (%q, %q).", s.certFile, s.keyFile)
+		klog.Infof("Loading cert/key pair from (%q, %q).", s.certFile, s.keyFile)
 		return loadX509KeyPair(s.certFile, s.keyFile)
 	}
 
@@ -155,7 +155,7 @@ func (s *fileStore) Current() (*tls.Certificate, error) {
 		return nil, err
 	}
 	if certFileExists && keyFileExists {
-		glog.Infof("Loading cert/key pair from (%q, %q).", c, k)
+		klog.Infof("Loading cert/key pair from (%q, %q).", c, k)
 		return loadX509KeyPair(c, k)
 	}
 
@@ -198,11 +198,16 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("could not open %q: %v", certPath, err)
 	}
 	defer f.Close()
-	certBlock, _ := pem.Decode(certData)
-	if certBlock == nil {
-		return nil, fmt.Errorf("invalid certificate data")
+
+	// First cert is leaf, remainder are intermediates
+	certs, err := certutil.ParseCertsPEM(certData)
+	if err != nil {
+		return nil, fmt.Errorf("invalid certificate data: %v", err)
 	}
-	pem.Encode(f, certBlock)
+	for _, c := range certs {
+		pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: c.Raw})
+	}
+
 	keyBlock, _ := pem.Decode(keyData)
 	if keyBlock == nil {
 		return nil, fmt.Errorf("invalid key data")
@@ -287,12 +292,6 @@ func (s *fileStore) updateSymlink(filename string) error {
 
 func (s *fileStore) filename(qualifier string) string {
 	return s.pairNamePrefix + "-" + qualifier + pemExtension
-}
-
-// withoutExt returns the given filename after removing the extension. The
-// extension to remove will be the result of filepath.Ext().
-func withoutExt(filename string) string {
-	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
 func loadX509KeyPair(certFile, keyFile string) (*tls.Certificate, error) {

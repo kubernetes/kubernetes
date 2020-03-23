@@ -17,17 +17,18 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	heapster "k8s.io/heapster/metrics/api/v1/types"
+	"k8s.io/klog"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
@@ -68,12 +69,12 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 
 	resultRaw, err := h.services.
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, params).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod resource metrics: %v", err)
 	}
 
-	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
+	klog.V(8).Infof("Heapster metrics result: %s", string(resultRaw))
 
 	metrics := metricsapi.PodMetricsList{}
 	err = json.Unmarshal(resultRaw, &metrics)
@@ -94,7 +95,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 			resValue, found := c.Usage[v1.ResourceName(resource)]
 			if !found {
 				missing = true
-				glog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)
+				klog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)
 				continue
 			}
 			podSum += resValue.MilliValue()
@@ -115,7 +116,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 }
 
 func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector, metricSelector labels.Selector) (PodMetricsInfo, time.Time, error) {
-	podList, err := h.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	podList, err := h.podsGetter.Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod list while fetching metrics: %v", err)
 	}
@@ -139,7 +140,7 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 
 	resultRaw, err := h.services.
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod metrics: %v", err)
 	}
@@ -150,7 +151,7 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 		return nil, time.Time{}, fmt.Errorf("failed to unmarshal heapster response: %v", err)
 	}
 
-	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
+	klog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
 
 	if len(metrics.Items) != len(podNames) {
 		// if we get too many metrics or two few metrics, we have no way of knowing which metric goes to which pod

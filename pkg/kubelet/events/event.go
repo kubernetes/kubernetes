@@ -16,8 +16,8 @@ limitations under the License.
 
 package events
 
+// Container event reason list
 const (
-	// Container event reason list
 	CreatedContainer        = "Created"
 	StartedContainer        = "Started"
 	FailedToCreateContainer = "Failed"
@@ -26,22 +26,28 @@ const (
 	PreemptContainer        = "Preempting"
 	BackOffStartContainer   = "BackOff"
 	ExceededGracePeriod     = "ExceededGracePeriod"
+)
 
-	// Pod event reason list
+// Pod event reason list
+const (
 	FailedToKillPod                = "FailedKillPod"
 	FailedToCreatePodContainer     = "FailedCreatePodContainer"
 	FailedToMakePodDataDirectories = "Failed"
 	NetworkNotReady                = "NetworkNotReady"
+)
 
-	// Image event reason list
+// Image event reason list
+const (
 	PullingImage            = "Pulling"
 	PulledImage             = "Pulled"
 	FailedToPullImage       = "Failed"
 	FailedToInspectImage    = "InspectFailed"
 	ErrImageNeverPullPolicy = "ErrImageNeverPull"
 	BackOffPullImage        = "BackOff"
+)
 
-	// kubelet event reason list
+// kubelet event reason list
+const (
 	NodeReady                            = "NodeReady"
 	NodeNotReady                         = "NodeNotReady"
 	NodeSchedulable                      = "NodeSchedulable"
@@ -49,49 +55,50 @@ const (
 	StartingKubelet                      = "Starting"
 	KubeletSetupFailed                   = "KubeletSetupFailed"
 	FailedAttachVolume                   = "FailedAttachVolume"
-	FailedDetachVolume                   = "FailedDetachVolume"
 	FailedMountVolume                    = "FailedMount"
 	VolumeResizeFailed                   = "VolumeResizeFailed"
 	VolumeResizeSuccess                  = "VolumeResizeSuccessful"
 	FileSystemResizeFailed               = "FileSystemResizeFailed"
 	FileSystemResizeSuccess              = "FileSystemResizeSuccessful"
-	FailedUnMountVolume                  = "FailedUnMount"
 	FailedMapVolume                      = "FailedMapVolume"
-	FailedUnmapDevice                    = "FailedUnmapDevice"
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"
-	SuccessfulDetachVolume               = "SuccessfulDetachVolume"
 	SuccessfulAttachVolume               = "SuccessfulAttachVolume"
 	SuccessfulMountVolume                = "SuccessfulMountVolume"
-	SuccessfulUnMountVolume              = "SuccessfulUnMountVolume"
-	HostPortConflict                     = "HostPortConflict"
-	NodeSelectorMismatching              = "NodeSelectorMismatching"
-	InsufficientFreeCPU                  = "InsufficientFreeCPU"
-	InsufficientFreeMemory               = "InsufficientFreeMemory"
 	NodeRebooted                         = "Rebooted"
 	ContainerGCFailed                    = "ContainerGCFailed"
 	ImageGCFailed                        = "ImageGCFailed"
 	FailedNodeAllocatableEnforcement     = "FailedNodeAllocatableEnforcement"
 	SuccessfulNodeAllocatableEnforcement = "NodeAllocatableEnforced"
-	UnsupportedMountOption               = "UnsupportedMountOption"
 	SandboxChanged                       = "SandboxChanged"
 	FailedCreatePodSandBox               = "FailedCreatePodSandBox"
 	FailedStatusPodSandBox               = "FailedPodSandBoxStatus"
+	FailedMountOnFilesystemMismatch      = "FailedMountOnFilesystemMismatch"
+)
 
-	// Image manager event reason list
+// Image manager event reason list
+const (
 	InvalidDiskCapacity = "InvalidDiskCapacity"
 	FreeDiskSpaceFailed = "FreeDiskSpaceFailed"
+)
 
-	// Probe event reason list
-	ContainerUnhealthy = "Unhealthy"
+// Probe event reason list
+const (
+	ContainerUnhealthy    = "Unhealthy"
+	ContainerProbeWarning = "ProbeWarning"
+)
 
-	// Pod worker event reason list
+// Pod worker event reason list
+const (
 	FailedSync = "FailedSync"
+)
 
-	// Config event reason list
+// Config event reason list
+const (
 	FailedValidation = "FailedValidation"
+)
 
-	// Lifecycle hooks
-	FailedPostStartHook   = "FailedPostStartHook"
-	FailedPreStopHook     = "FailedPreStopHook"
-	UnfinishedPreStopHook = "UnfinishedPreStopHook"
+// Lifecycle hooks
+const (
+	FailedPostStartHook = "FailedPostStartHook"
+	FailedPreStopHook   = "FailedPreStopHook"
 )

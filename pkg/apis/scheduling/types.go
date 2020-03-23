@@ -16,7 +16,10 @@ limitations under the License.
 
 package scheduling
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
+)
 
 const (
 	// DefaultPriorityWhenNoDefaultClassExists is used to set priority of pods
@@ -29,22 +32,22 @@ const (
 	SystemCriticalPriority = 2 * HighestUserDefinablePriority
 	// SystemPriorityClassPrefix is the prefix reserved for system priority class names. Other priority
 	// classes are not allowed to start with this prefix.
-	SystemPriorityClassPrefix = "system-"
 	// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
 	// start with SystemPriorityClassPrefix.
+	SystemPriorityClassPrefix = "system-"
+	// SystemClusterCritical is the system priority class name that represents cluster-critical.
 	SystemClusterCritical = SystemPriorityClassPrefix + "cluster-critical"
-	SystemNodeCritical    = SystemPriorityClassPrefix + "node-critical"
+	// SystemNodeCritical is the system priority class name that represents node-critical.
+	SystemNodeCritical = SystemPriorityClassPrefix + "node-critical"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PriorityClass defines the mapping from a priority class name to the priority
 // integer value. The value can be any valid integer.
 type PriorityClass struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
@@ -64,6 +67,11 @@ type PriorityClass struct {
 	// when this priority class should be used.
 	// +optional
 	Description string
+
+	// PreemptionPolicy it the Policy for preempting pods with lower priority.
+	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+	// +optional
+	PreemptionPolicy *core.PreemptionPolicy
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -72,7 +80,7 @@ type PriorityClass struct {
 type PriorityClassList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 

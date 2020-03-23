@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -19,18 +21,19 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/vsphere"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -40,7 +43,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -62,11 +65,7 @@ func TestCanSupport(t *testing.T) {
 type fakePDManager struct {
 }
 
-func getFakeDeviceName(host volume.VolumeHost, volPath string) string {
-	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "device", volPath)
-}
-
-func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (volSpec *VolumeSpec, err error) {
+func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner, selectedNode *v1.Node, selectedZone []string) (volSpec *VolumeSpec, err error) {
 	volSpec = &VolumeSpec{
 		Path:              "[local] test-volume-name.vmdk",
 		Size:              100,
@@ -93,7 +92,7 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -112,7 +111,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Mounter
 	fakeManager := &fakePDManager{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := mount.NewFakeMounter(nil)
 	mounter, err := plug.(*vsphereVolumePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -121,13 +120,13 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	mntPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~vsphere-volume/vol1")
+	mntPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~vsphere-volume/vol1")
 	path := mounter.GetPath()
 	if path != mntPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -207,7 +206,7 @@ func TestUnsupportedCloudProvider(t *testing.T) {
 	}{
 		{name: "nil cloudprovider", cloudProvider: nil},
 		{name: "vSphere", cloudProvider: &vsphere.VSphere{}, success: true},
-		{name: "fake cloudprovider", cloudProvider: &fake.FakeCloud{}},
+		{name: "fake cloudprovider", cloudProvider: &fake.Cloud{}},
 	}
 
 	for _, tc := range testcases {
@@ -215,7 +214,7 @@ func TestUnsupportedCloudProvider(t *testing.T) {
 
 		plugMgr := volume.VolumePluginMgr{}
 		plugMgr.InitPlugins(ProbeVolumePlugins(), nil, /* prober */
-			volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, tc.cloudProvider))
+			volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, tc.cloudProvider))
 
 		plug, err := plugMgr.FindAttachablePluginByName("kubernetes.io/vsphere-volume")
 		if err != nil {

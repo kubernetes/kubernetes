@@ -22,7 +22,7 @@ This plugin provides an integration with Azure Active Directory device flow. If 
    * Replace `TENANT_ID` with your tenant ID.
    * For a list of alternative username claims that are supported by the OIDC issuer check the JSON response at `https://sts.windows.net/TENANT_ID/.well-known/openid-configuration`.
 
-5. Configure `kubectl` to use the `azure` authentication provider 
+5. Configure `kubectl` to use the `azure` authentication provider
 
    ```
    kubectl config set-credentials "USER_NAME" --auth-provider=azure \
@@ -38,7 +38,13 @@ This plugin provides an integration with Azure Active Directory device flow. If 
    * Replace `APISERVER_APPLICATION_ID` with the application ID of your `apiserver` application ID
    * Be sure to also (create and) select a context that uses above user
 
- 6. The access token is acquired when first `kubectl` command is executed
+6. (Optionally) the AAD token has `aud` claim with `spn:` prefix. To omit that, add following auth configuration:
+
+   ```
+     --auth-provider-arg=config-mode="1"
+   ```
+
+ 7. The access token is acquired when first `kubectl` command is executed
 
    ```
    kubectl get pods

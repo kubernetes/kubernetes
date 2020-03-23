@@ -23,10 +23,12 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	libipvs "github.com/docker/libnetwork/ipvs"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -34,6 +36,7 @@ import (
 type runner struct {
 	exec       utilexec.Interface
 	ipvsHandle *libipvs.Handle
+	mu         sync.Mutex // Protect Netlink calls
 }
 
 // Protocol is the IPVS service protocol type
@@ -43,7 +46,7 @@ type Protocol uint16
 func New(exec utilexec.Interface) Interface {
 	handle, err := libipvs.New("")
 	if err != nil {
-		glog.Errorf("IPVS interface can't be initialized, error: %v", err)
+		klog.Errorf("IPVS interface can't be initialized, error: %v", err)
 		return nil
 	}
 	return &runner{
@@ -58,6 +61,8 @@ func (runner *runner) AddVirtualServer(vs *VirtualServer) error {
 	if err != nil {
 		return err
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.NewService(svc)
 }
 
@@ -67,6 +72,8 @@ func (runner *runner) UpdateVirtualServer(vs *VirtualServer) error {
 	if err != nil {
 		return err
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.UpdateService(svc)
 }
 
@@ -76,6 +83,8 @@ func (runner *runner) DeleteVirtualServer(vs *VirtualServer) error {
 	if err != nil {
 		return err
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.DelService(svc)
 }
 
@@ -85,7 +94,10 @@ func (runner *runner) GetVirtualServer(vs *VirtualServer) (*VirtualServer, error
 	if err != nil {
 		return nil, err
 	}
+	runner.mu.Lock()
 	ipvsSvc, err := runner.ipvsHandle.GetService(svc)
+	runner.mu.Unlock()
+
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +110,9 @@ func (runner *runner) GetVirtualServer(vs *VirtualServer) (*VirtualServer, error
 
 // GetVirtualServers is part of ipvs.Interface.
 func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
+	runner.mu.Lock()
 	ipvsSvcs, err := runner.ipvsHandle.GetServices()
+	runner.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +129,8 @@ func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 
 // Flush is part of ipvs.Interface. Currently we delete IPVS services one by one
 func (runner *runner) Flush() error {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.Flush()
 }
 
@@ -128,6 +144,8 @@ func (runner *runner) AddRealServer(vs *VirtualServer, rs *RealServer) error {
 	if err != nil {
 		return err
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.NewDestination(svc, dst)
 }
 
@@ -141,6 +159,8 @@ func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error 
 	if err != nil {
 		return err
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.DelDestination(svc, dst)
 }
 
@@ -153,6 +173,8 @@ func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error 
 	if err != nil {
 		return err
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.UpdateDestination(svc, dst)
 }
 
@@ -162,7 +184,9 @@ func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 	if err != nil {
 		return nil, err
 	}
+	runner.mu.Lock()
 	dsts, err := runner.ipvsHandle.GetDestinations(svc)
+	runner.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +200,17 @@ func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 		rss = append(rss, dst)
 	}
 	return rss, nil
+}
+
+// ConfigureTimeouts is the equivalent to running "ipvsadm --set" to configure tcp, tcpfin and udp timeouts
+func (runner *runner) ConfigureTimeouts(tcpTimeout, tcpFinTimeout, udpTimeout time.Duration) error {
+	ipvsConfig := &libipvs.Config{
+		TimeoutTCP:    tcpTimeout,
+		TimeoutTCPFin: tcpFinTimeout,
+		TimeoutUDP:    udpTimeout,
+	}
+
+	return runner.ipvsHandle.SetConfig(ipvsConfig)
 }
 
 // toVirtualServer converts an IPVS Service to the equivalent VirtualServer structure.

@@ -112,6 +112,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
+	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
@@ -159,6 +160,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.AllowedUnsafeSysctls != nil {
+		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved

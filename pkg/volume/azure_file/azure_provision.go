@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -20,17 +22,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
-	"github.com/golang/glog"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
@@ -56,7 +59,7 @@ type azureFileDeleter struct {
 func (plugin *azureFilePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
-		glog.V(4).Infof("failed to get azure provider")
+		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
 
@@ -92,7 +95,7 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
-		glog.V(4).Infof("failed to get azure provider")
+		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
 	if len(options.PVC.Spec.AccessModes) == 0 {
@@ -116,11 +119,11 @@ var _ volume.Deleter = &azureFileDeleter{}
 
 func (f *azureFileDeleter) GetPath() string {
 	name := azureFilePluginName
-	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedNameForDisk(name), f.volName)
+	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedName(name), f.volName)
 }
 
 func (f *azureFileDeleter) Delete() error {
-	glog.V(4).Infof("deleting volume %s", f.shareName)
+	klog.V(4).Infof("deleting volume %s", f.shareName)
 	return f.azureProvider.DeleteFileShare(f.accountName, f.accountKey, f.shareName)
 }
 
@@ -141,14 +144,10 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("%s does not support block volume provisioning", a.plugin.GetPluginName())
 	}
 
-	var sku, resourceGroup, location, account string
+	var sku, resourceGroup, location, account, shareName string
 
-	// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
-	name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
-	name = strings.Replace(name, "--", "-", -1)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestBytes := capacity.Value()
-	requestGiB := int(util.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGiB := int(volumehelpers.RoundUpToGiB(capacity))
 	secretNamespace := a.options.PVC.Namespace
 	// Apply ProvisionerParameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
@@ -164,6 +163,8 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			secretNamespace = v
 		case "resourcegroup":
 			resourceGroup = v
+		case "sharename":
+			shareName = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, a.plugin.GetPluginName())
 		}
@@ -173,12 +174,18 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure file")
 	}
 
+	if shareName == "" {
+		// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
+		name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
+		shareName = strings.Replace(name, "--", "-", -1)
+	}
+
 	// when use azure file premium, account kind should be specified as FileStorage
 	accountKind := string(storage.StorageV2)
 	if strings.HasPrefix(strings.ToLower(sku), "premium") {
 		accountKind = string(storage.FileStorage)
 	}
-	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, accountKind, resourceGroup, location, requestGiB)
+	account, key, err := a.azureProvider.CreateFileShare(shareName, account, sku, accountKind, resourceGroup, location, requestGiB)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +213,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureFile: &v1.AzureFilePersistentVolumeSource{
 					SecretName:      secretName,
-					ShareName:       name,
+					ShareName:       shareName,
 					SecretNamespace: &secretNamespace,
 				},
 			},

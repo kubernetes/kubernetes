@@ -23,13 +23,13 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimagetypes "github.com/docker/docker/api/types/image"
 	dockerapi "github.com/docker/docker/client"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.11.x
-	MinimumDockerAPIVersion = "1.23.0"
+	// docker version should be at least 1.13.1
+	MinimumDockerAPIVersion = "1.26.0"
 
 	// Status of a container returned by ListContainers.
 	StatusRunningPrefix = "Up"
@@ -72,10 +72,10 @@ type Interface interface {
 // DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
 func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
-		glog.Infof("Connecting to docker on %s", dockerEndpoint)
+		klog.Infof("Connecting to docker on %s", dockerEndpoint)
 		return dockerapi.NewClient(dockerEndpoint, "", nil, nil)
 	}
-	return dockerapi.NewEnvClient()
+	return dockerapi.NewClientWithOpts(dockerapi.FromEnv)
 }
 
 // ConnectToDockerOrDie creates docker client connecting to docker daemon.
@@ -84,23 +84,11 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // is the timeout for docker requests. If timeout is exceeded, the request
 // will be cancelled and throw out an error. If requestTimeout is 0, a default
 // value will be applied.
-func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration,
-	withTraceDisabled bool, enableSleep bool) Interface {
-	if dockerEndpoint == FakeDockerEndpoint {
-		fakeClient := NewFakeDockerClient()
-		if withTraceDisabled {
-			fakeClient = fakeClient.WithTraceDisabled()
-		}
-
-		if enableSleep {
-			fakeClient.EnableSleep = true
-		}
-		return fakeClient
-	}
+func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
 	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
-		glog.Fatalf("Couldn't connect to docker: %v", err)
+		klog.Fatalf("Couldn't connect to docker: %v", err)
 	}
-	glog.Infof("Start docker client with request timeout=%v", requestTimeout)
+	klog.Infof("Start docker client with request timeout=%v", requestTimeout)
 	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline)
 }

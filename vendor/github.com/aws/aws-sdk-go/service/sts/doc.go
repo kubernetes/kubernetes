@@ -7,22 +7,14 @@
 // request temporary, limited-privilege credentials for AWS Identity and Access
 // Management (IAM) users or for users that you authenticate (federated users).
 // This guide provides descriptions of the STS API. For more detailed information
-// about using this service, go to Temporary Security Credentials (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
-//
-// As an alternative to using the API, you can use one of the AWS SDKs, which
-// consist of libraries and sample code for various programming languages and
-// platforms (Java, Ruby, .NET, iOS, Android, etc.). The SDKs provide a convenient
-// way to create programmatic access to STS. For example, the SDKs take care
-// of cryptographically signing requests, managing errors, and retrying requests
-// automatically. For information about the AWS SDKs, including how to download
-// and install them, see the Tools for Amazon Web Services page (http://aws.amazon.com/tools/).
+// about using this service, go to Temporary Security Credentials (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
 //
 // For information about setting up signatures and authorization through the
-// API, go to Signing AWS API Requests (http://docs.aws.amazon.com/general/latest/gr/signing_aws_api_requests.html)
+// API, go to Signing AWS API Requests (https://docs.aws.amazon.com/general/latest/gr/signing_aws_api_requests.html)
 // in the AWS General Reference. For general information about the Query API,
-// go to Making Query Requests (http://docs.aws.amazon.com/IAM/latest/UserGuide/IAM_UsingQueryAPI.html)
+// go to Making Query Requests (https://docs.aws.amazon.com/IAM/latest/UserGuide/IAM_UsingQueryAPI.html)
 // in Using IAM. For information about using security tokens with other AWS
-// products, go to AWS Services That Work with IAM (http://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-services-that-work-with-iam.html)
+// products, go to AWS Services That Work with IAM (https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-services-that-work-with-iam.html)
 // in the IAM User Guide.
 //
 // If you're new to AWS and need additional technical information about a specific
@@ -31,14 +23,38 @@
 //
 // Endpoints
 //
-// The AWS Security Token Service (STS) has a default endpoint of https://sts.amazonaws.com
-// that maps to the US East (N. Virginia) region. Additional regions are available
-// and are activated by default. For more information, see Activating and Deactivating
-// AWS STS in an AWS Region (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
+// By default, AWS Security Token Service (STS) is available as a global service,
+// and all AWS STS requests go to a single endpoint at https://sts.amazonaws.com.
+// Global requests map to the US East (N. Virginia) region. AWS recommends using
+// Regional AWS STS endpoints instead of the global endpoint to reduce latency,
+// build in redundancy, and increase session token validity. For more information,
+// see Managing AWS STS in an AWS Region (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 // in the IAM User Guide.
 //
-// For information about STS endpoints, see Regions and Endpoints (http://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region)
-// in the AWS General Reference.
+// Most AWS Regions are enabled for operations in all AWS services by default.
+// Those Regions are automatically activated for use with AWS STS. Some Regions,
+// such as Asia Pacific (Hong Kong), must be manually enabled. To learn more
+// about enabling and disabling AWS Regions, see Managing AWS Regions (https://docs.aws.amazon.com/general/latest/gr/rande-manage.html)
+// in the AWS General Reference. When you enable these AWS Regions, they are
+// automatically activated for use with AWS STS. You cannot activate the STS
+// endpoint for a Region that is disabled. Tokens that are valid in all AWS
+// Regions are longer than tokens that are valid in Regions that are enabled
+// by default. Changing this setting might affect existing systems where you
+// temporarily store tokens. For more information, see Managing Global Endpoint
+// Session Tokens (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html#sts-regions-manage-tokens)
+// in the IAM User Guide.
+//
+// After you activate a Region for use with AWS STS, you can direct AWS STS
+// API calls to that Region. AWS STS recommends that you provide both the Region
+// and endpoint when you make calls to a Regional endpoint. You can provide
+// the Region alone for manually enabled Regions, such as Asia Pacific (Hong
+// Kong). In this case, the calls are directed to the STS Regional endpoint.
+// However, if you provide the Region alone for Regions enabled by default,
+// the calls are directed to the global endpoint of https://sts.amazonaws.com.
+//
+// To view the list of AWS STS endpoints and whether they are active by default,
+// see Writing Code to Use AWS STS Regions (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html#id_credentials_temp_enable-regions_writing_code)
+// in the IAM User Guide.
 //
 // Recording API requests
 //
@@ -46,8 +62,28 @@
 // your AWS account and delivers log files to an Amazon S3 bucket. By using
 // information collected by CloudTrail, you can determine what requests were
 // successfully made to STS, who made the request, when it was made, and so
-// on. To learn more about CloudTrail, including how to turn it on and find
-// your log files, see the AWS CloudTrail User Guide (http://docs.aws.amazon.com/awscloudtrail/latest/userguide/what_is_cloud_trail_top_level.html).
+// on.
+//
+// If you activate AWS STS endpoints in Regions other than the default global
+// endpoint, then you must also turn on CloudTrail logging in those Regions.
+// This is necessary to record any AWS STS API calls that are made in those
+// Regions. For more information, see Turning On CloudTrail in Additional Regions
+// (https://docs.aws.amazon.com/awscloudtrail/latest/userguide/aggregating_logs_regions_turn_on_ct.html)
+// in the AWS CloudTrail User Guide.
+//
+// AWS Security Token Service (STS) is a global service with a single endpoint
+// at https://sts.amazonaws.com. Calls to this endpoint are logged as calls
+// to a global service. However, because this endpoint is physically located
+// in the US East (N. Virginia) Region, your logs list us-east-1 as the event
+// Region. CloudTrail does not write these logs to the US East (Ohio) Region
+// unless you choose to include global service logs in that Region. CloudTrail
+// writes calls to all Regional endpoints to their respective Regions. For example,
+// calls to sts.us-east-2.amazonaws.com are published to the US East (Ohio)
+// Region and calls to sts.eu-central-1.amazonaws.com are published to the EU
+// (Frankfurt) Region.
+//
+// To learn more about CloudTrail, including how to turn it on and find your
+// log files, see the AWS CloudTrail User Guide (https://docs.aws.amazon.com/awscloudtrail/latest/userguide/what_is_cloud_trail_top_level.html).
 //
 // See https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15 for more information on this service.
 //

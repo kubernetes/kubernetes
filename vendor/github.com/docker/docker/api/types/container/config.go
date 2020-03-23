@@ -1,4 +1,4 @@
-package container
+package container // import "github.com/docker/docker/api/types/container"
 
 import (
 	"time"
@@ -54,7 +54,7 @@ type Config struct {
 	Env             []string            // List of environment variable to set in the container
 	Cmd             strslice.StrSlice   // Command to run when starting the container
 	Healthcheck     *HealthConfig       `json:",omitempty"` // Healthcheck describes how to check the container is healthy
-	ArgsEscaped     bool                `json:",omitempty"` // True if command is already escaped (Windows specific)
+	ArgsEscaped     bool                `json:",omitempty"` // True if command is already escaped (meaning treat as a command line) (Windows specific).
 	Image           string              // Name of the image as it was passed by the operator (e.g. could be symbolic)
 	Volumes         map[string]struct{} // List of volumes (mounts) used for the container
 	WorkingDir      string              // Current directory (PWD) in the command will be launched

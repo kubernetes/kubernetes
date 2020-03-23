@@ -21,10 +21,11 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
 
@@ -55,7 +56,7 @@ func TestRepair(t *testing.T) {
 		item: &api.RangeAllocation{Range: "100-200"},
 	}
 	pr, _ := net.ParsePortRange(registry.item.Range)
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
 
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
@@ -68,7 +69,7 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "100-200"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
+	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
 	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -76,11 +77,14 @@ func TestRepair(t *testing.T) {
 
 func TestRepairLeak(t *testing.T) {
 	pr, _ := net.ParsePortRange("100-200")
-	previous := portallocator.NewPortAllocator(*pr)
+	previous, err := portallocator.NewPortAllocator(*pr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	previous.Allocate(111)
 
 	var dst api.RangeAllocation
-	err := previous.Snapshot(&dst)
+	err = previous.Snapshot(&dst)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +100,7 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.RunOnce(); err != nil {
@@ -125,48 +129,51 @@ func TestRepairLeak(t *testing.T) {
 
 func TestRepairWithExisting(t *testing.T) {
 	pr, _ := net.ParsePortRange("100-200")
-	previous := portallocator.NewPortAllocator(*pr)
+	previous, err := portallocator.NewPortAllocator(*pr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var dst api.RangeAllocation
-	err := previous.Snapshot(&dst)
+	err = previous.Snapshot(&dst)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	fakeClient := fake.NewSimpleClientset(
-		&api.Service{
+		&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{NodePort: 111}},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{NodePort: 111}},
 			},
 		},
-		&api.Service{
+		&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "two"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{NodePort: 122}, {NodePort: 133}},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{NodePort: 122}, {NodePort: 133}},
 			},
 		},
-		&api.Service{ // outside range, will be dropped
+		&corev1.Service{ // outside range, will be dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "three", Name: "three"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{NodePort: 201}},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{NodePort: 201}},
 			},
 		},
-		&api.Service{ // empty, ignored
+		&corev1.Service{ // empty, ignored
 			ObjectMeta: metav1.ObjectMeta{Namespace: "four", Name: "four"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{}},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{}},
 			},
 		},
-		&api.Service{ // duplicate, dropped
+		&corev1.Service{ // duplicate, dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "five", Name: "five"},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{NodePort: 111}},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{NodePort: 111}},
 			},
 		},
-		&api.Service{
+		&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "six", Name: "six"},
-			Spec: api.ServiceSpec{
+			Spec: corev1.ServiceSpec{
 				HealthCheckNodePort: 144,
 			},
 		},
@@ -181,7 +188,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}

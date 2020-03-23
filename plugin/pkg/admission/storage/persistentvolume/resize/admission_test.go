@@ -17,18 +17,19 @@ limitations under the License.
 package resize
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/informers"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -44,7 +45,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 	goldClassName := "gold"
 	trueVal := true
 	falseVar := false
-	goldClass := &storage.StorageClass{
+	goldClass := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -55,7 +56,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 		AllowVolumeExpansion: &trueVal,
 	}
 	silverClassName := "silver"
-	silverClass := &storage.StorageClass{
+	silverClass := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -237,40 +238,16 @@ func TestPVCResizeAdmission(t *testing.T) {
 
 	ctrl := newPlugin()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	ctrl.SetInternalKubeInformerFactory(informerFactory)
+	ctrl.SetExternalKubeInformerFactory(informerFactory)
 	err := ctrl.ValidateInitialization()
 	if err != nil {
 		t.Fatalf("neither pv lister nor storageclass lister can be nil")
 	}
 
-	pv1 := &api.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{Name: "volume1"},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				Glusterfs: &api.GlusterfsVolumeSource{
-					EndpointsName: "http://localhost:8080/",
-					Path:          "/heketi",
-					ReadOnly:      false,
-				},
-			},
-			StorageClassName: goldClassName,
-		},
-	}
-
-	pvs := []*api.PersistentVolume{}
-	pvs = append(pvs, pv1)
-
-	for _, pv := range pvs {
-		err := informerFactory.Core().InternalVersion().PersistentVolumes().Informer().GetStore().Add(pv)
-		if err != nil {
-			fmt.Println("add pv error: ", err)
-		}
-	}
-
-	scs := []*storage.StorageClass{}
+	scs := []*storagev1.StorageClass{}
 	scs = append(scs, goldClass, silverClass)
 	for _, sc := range scs {
-		err := informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(sc)
+		err := informerFactory.Storage().V1().StorageClasses().Informer().GetStore().Add(sc)
 		if err != nil {
 			fmt.Println("add storageclass error: ", err)
 		}
@@ -278,11 +255,10 @@ func TestPVCResizeAdmission(t *testing.T) {
 
 	for _, tc := range tests {
 		operation := admission.Update
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, nil)
+		operationOptions := &metav1.CreateOptions{}
+		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, operationOptions, false, nil)
 
-		err := ctrl.Validate(attributes)
-		fmt.Println(tc.name)
-		fmt.Println(err)
+		err := ctrl.Validate(context.TODO(), attributes, nil)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

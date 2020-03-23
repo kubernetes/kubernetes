@@ -8,8 +8,9 @@ go_library(
     deps = [
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/volume:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//pkg/volume/util:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
     ],
 )
 
@@ -36,6 +37,7 @@ go_test(
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/operationexecutor:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

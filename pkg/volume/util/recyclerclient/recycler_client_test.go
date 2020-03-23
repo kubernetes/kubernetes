@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -88,7 +88,7 @@ func TestRecyclerPod(t *testing.T) {
 				// Pod gets Running and Succeeded
 				newPodEvent(watch.Added, "podRecyclerSuccess", v1.PodPending, ""),
 				newEvent(v1.EventTypeNormal, "Successfully assigned recycler-for-podRecyclerSuccess to 127.0.0.1"),
-				newEvent(v1.EventTypeNormal, "pulling image \"k8s.gcr.io/busybox\""),
+				newEvent(v1.EventTypeNormal, "Pulling image \"k8s.gcr.io/busybox\""),
 				newEvent(v1.EventTypeNormal, "Successfully pulled image \"k8s.gcr.io/busybox\""),
 				newEvent(v1.EventTypeNormal, "Created container with docker id 83d929aeac82"),
 				newEvent(v1.EventTypeNormal, "Started container with docker id 83d929aeac82"),
@@ -97,7 +97,7 @@ func TestRecyclerPod(t *testing.T) {
 			},
 			expectedEvents: []mockEvent{
 				{v1.EventTypeNormal, "Successfully assigned recycler-for-podRecyclerSuccess to 127.0.0.1"},
-				{v1.EventTypeNormal, "pulling image \"k8s.gcr.io/busybox\""},
+				{v1.EventTypeNormal, "Pulling image \"k8s.gcr.io/busybox\""},
 				{v1.EventTypeNormal, "Successfully pulled image \"k8s.gcr.io/busybox\""},
 				{v1.EventTypeNormal, "Created container with docker id 83d929aeac82"},
 				{v1.EventTypeNormal, "Started container with docker id 83d929aeac82"},
@@ -210,9 +210,8 @@ func (c *mockRecyclerClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
 func (c *mockRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
 	if c.pod != nil {
 		return c.pod, nil
-	} else {
-		return nil, fmt.Errorf("pod does not exist")
 	}
+	return nil, fmt.Errorf("pod does not exist")
 }
 
 func (c *mockRecyclerClient) DeletePod(name, namespace string) error {

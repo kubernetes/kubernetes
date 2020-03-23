@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -28,20 +29,26 @@ import (
 
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
-	schedulerapi "k8s.io/api/scheduling/v1beta1"
+	schedulerapi "k8s.io/api/scheduling/v1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/discovery"
+	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/gengo/examples/set-gen/sets"
+	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -53,11 +60,13 @@ var kindWhiteList = sets.NewString(
 	"APIVersions",
 	"Binding",
 	"DeleteOptions",
+	"EphemeralContainers",
 	"ExportOptions",
 	"GetOptions",
 	"ListOptions",
 	"CreateOptions",
 	"UpdateOptions",
+	"PatchOptions",
 	"NodeProxyOptions",
 	"PodAttachOptions",
 	"PodExecOptions",
@@ -72,10 +81,6 @@ var kindWhiteList = sets.NewString(
 
 	// k8s.io/api/admission
 	"AdmissionReview",
-	// --
-
-	// k8s.io/api/admissionregistration
-	"InitializerConfiguration",
 	// --
 
 	// k8s.io/api/authentication
@@ -102,10 +107,6 @@ var kindWhiteList = sets.NewString(
 	"JobTemplate",
 	// --
 
-	// k8s.io/api/extensions
-	"ReplicationControllerDummy",
-	// --
-
 	// k8s.io/api/imagepolicy
 	"ImageReview",
 	// --
@@ -124,25 +125,53 @@ var kindWhiteList = sets.NewString(
 var missingHanlders = sets.NewString(
 	"ClusterRole",
 	"LimitRange",
-	"MutatingWebhookConfiguration",
 	"ResourceQuota",
 	"Role",
-	"ValidatingWebhookConfiguration",
-	"VolumeAttachment",
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
 )
 
+// known types that are no longer served we should tolerate restmapper errors for
+var unservedTypes = map[schema.GroupVersionKind]bool{
+	{Group: "extensions", Version: "v1beta1", Kind: "ControllerRevision"}: true,
+	{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:          true,
+	{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:         true,
+	{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:      true,
+	{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicy"}:  true,
+	{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:         true,
+
+	{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"}: true,
+	{Group: "apps", Version: "v1beta1", Kind: "DaemonSet"}:          true,
+	{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:         true,
+	{Group: "apps", Version: "v1beta1", Kind: "ReplicaSet"}:         true,
+	{Group: "apps", Version: "v1beta1", Kind: "StatefulSet"}:        true,
+
+	{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"}: true,
+	{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:          true,
+	{Group: "apps", Version: "v1beta2", Kind: "Deployment"}:         true,
+	{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}:         true,
+	{Group: "apps", Version: "v1beta2", Kind: "StatefulSet"}:        true,
+}
+
 func TestServerSidePrint(t *testing.T) {
-	s, _, closeFn := setup(t,
+	s, _, closeFn := setupWithResources(t,
 		// additional groupversions needed for the test to run
-		auditregv1alpha1.SchemeGroupVersion,
-		batchv2alpha1.SchemeGroupVersion,
-		rbacv1alpha1.SchemeGroupVersion,
-		settingsv1alpha1.SchemeGroupVersion,
-		schedulerapi.SchemeGroupVersion,
-		storagev1alpha1.SchemeGroupVersion)
+		[]schema.GroupVersion{
+			auditregv1alpha1.SchemeGroupVersion,
+			batchv2alpha1.SchemeGroupVersion,
+			discoveryv1alpha1.SchemeGroupVersion,
+			discoveryv1beta1.SchemeGroupVersion,
+			rbacv1alpha1.SchemeGroupVersion,
+			settingsv1alpha1.SchemeGroupVersion,
+			schedulerapi.SchemeGroupVersion,
+			storagev1alpha1.SchemeGroupVersion,
+			extensionsv1beta1.SchemeGroupVersion,
+			nodev1alpha1.SchemeGroupVersion,
+			flowcontrolv1alpha1.SchemeGroupVersion,
+		},
+		[]schema.GroupVersionResource{},
+	)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("server-print", s, t)
@@ -167,7 +196,7 @@ func TestServerSidePrint(t *testing.T) {
 		os.Remove(cacheDir)
 	}()
 
-	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
+	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -193,6 +222,9 @@ func TestServerSidePrint(t *testing.T) {
 		// read table definition as returned by the server
 		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
+			if unservedTypes[gvk] {
+				continue
+			}
 			t.Errorf("unexpected error getting mapping for GVK %s: %v", gvk, err)
 			continue
 		}
@@ -205,7 +237,7 @@ func TestServerSidePrint(t *testing.T) {
 		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 			req = req.Namespace(ns.Name)
 		}
-		body, err := req.Resource(mapping.Resource.Resource).SetHeader("Accept", tableParam).Do().Raw()
+		body, err := req.Resource(mapping.Resource.Resource).SetHeader("Accept", tableParam).Do(context.TODO()).Raw()
 		if err != nil {
 			t.Errorf("unexpected error getting %s: %v", gvk, err)
 			continue

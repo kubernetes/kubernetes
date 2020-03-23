@@ -86,7 +86,7 @@ func clockSequence() int {
 	return int(clockSeq & 0x3fff)
 }
 
-// SetClockSeq sets the clock sequence to the lower 14 bits of seq.  Setting to
+// SetClockSequence sets the clock sequence to the lower 14 bits of seq.  Setting to
 // -1 causes a new sequence to be generated.
 func SetClockSequence(seq int) {
 	defer timeMu.Unlock()
@@ -100,9 +100,9 @@ func setClockSequence(seq int) {
 		randomBits(b[:]) // clock sequence
 		seq = int(b[0])<<8 | int(b[1])
 	}
-	old_seq := clockSeq
+	oldSeq := clockSeq
 	clockSeq = uint16(seq&0x3fff) | 0x8000 // Set our variant
-	if old_seq != clockSeq {
+	if oldSeq != clockSeq {
 		lasttime = 0
 	}
 }

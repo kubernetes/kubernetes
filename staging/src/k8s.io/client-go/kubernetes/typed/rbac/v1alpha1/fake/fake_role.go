@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var rolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.i
 var rolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "Role"}
 
 // Get takes name of the role, and returns the corresponding role object, and an error if there is any.
-func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *v1alpha1.Role, err error) {
+func (c *FakeRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(rolesResource, c.ns, name), &v1alpha1.Role{})
 
@@ -50,7 +52,7 @@ func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *v1alpha1.Ro
 }
 
 // List takes label and field selectors, and returns the list of Roles that match those selectors.
-func (c *FakeRoles) List(opts v1.ListOptions) (result *v1alpha1.RoleList, err error) {
+func (c *FakeRoles) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.RoleList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(rolesResource, rolesKind, c.ns, opts), &v1alpha1.RoleList{})
 
@@ -72,14 +74,14 @@ func (c *FakeRoles) List(opts v1.ListOptions) (result *v1alpha1.RoleList, err er
 }
 
 // Watch returns a watch.Interface that watches the requested roles.
-func (c *FakeRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rolesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
-func (c *FakeRoles) Create(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
+func (c *FakeRoles) Create(ctx context.Context, role *v1alpha1.Role, opts v1.CreateOptions) (result *v1alpha1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), &v1alpha1.Role{})
 
@@ -90,7 +92,7 @@ func (c *FakeRoles) Create(role *v1alpha1.Role) (result *v1alpha1.Role, err erro
 }
 
 // Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
-func (c *FakeRoles) Update(role *v1alpha1.Role) (result *v1alpha1.Role, err error) {
+func (c *FakeRoles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.UpdateOptions) (result *v1alpha1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(rolesResource, c.ns, role), &v1alpha1.Role{})
 
@@ -101,7 +103,7 @@ func (c *FakeRoles) Update(role *v1alpha1.Role) (result *v1alpha1.Role, err erro
 }
 
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
-func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1alpha1.Role{})
 
@@ -109,15 +111,15 @@ func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
+func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.RoleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *FakeRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Role, err error) {
+func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, pt, data, subresources...), &v1alpha1.Role{})
 

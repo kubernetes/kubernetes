@@ -19,20 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	poautosclerconfig "k8s.io/kubernetes/pkg/controller/podautoscaler/config"
 )
 
 // HPAControllerOptions holds the HPAController options.
 type HPAControllerOptions struct {
-	HorizontalPodAutoscalerUseRESTClients               bool
-	HorizontalPodAutoscalerTolerance                    float64
-	HorizontalPodAutoscalerDownscaleStabilizationWindow metav1.Duration
-	HorizontalPodAutoscalerDownscaleForbiddenWindow     metav1.Duration
-	HorizontalPodAutoscalerUpscaleForbiddenWindow       metav1.Duration
-	HorizontalPodAutoscalerSyncPeriod                   metav1.Duration
-	HorizontalPodAutoscalerCPUInitializationPeriod      metav1.Duration
-	HorizontalPodAutoscalerInitialReadinessDelay        metav1.Duration
+	*poautosclerconfig.HPAControllerConfiguration
 }
 
 // AddFlags adds flags related to HPAController for controller manager to the specified FlagSet.
@@ -55,7 +47,7 @@ func (o *HPAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up HPAController config with options.
-func (o *HPAControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.HPAControllerConfiguration) error {
+func (o *HPAControllerOptions) ApplyTo(cfg *poautosclerconfig.HPAControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
@@ -66,6 +58,8 @@ func (o *HPAControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.HPAControllerConfi
 	cfg.HorizontalPodAutoscalerUseRESTClients = o.HorizontalPodAutoscalerUseRESTClients
 	cfg.HorizontalPodAutoscalerCPUInitializationPeriod = o.HorizontalPodAutoscalerCPUInitializationPeriod
 	cfg.HorizontalPodAutoscalerInitialReadinessDelay = o.HorizontalPodAutoscalerInitialReadinessDelay
+	cfg.HorizontalPodAutoscalerUpscaleForbiddenWindow = o.HorizontalPodAutoscalerUpscaleForbiddenWindow
+	cfg.HorizontalPodAutoscalerDownscaleForbiddenWindow = o.HorizontalPodAutoscalerDownscaleForbiddenWindow
 
 	return nil
 }

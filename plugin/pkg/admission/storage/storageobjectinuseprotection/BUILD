@@ -10,8 +10,9 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -26,7 +27,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
     ],
 )

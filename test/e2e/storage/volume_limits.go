@@ -17,11 +17,13 @@ limitations under the License.
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -30,24 +32,21 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 		c clientset.Interface
 	)
 	f := framework.NewDefaultFramework("volume-limits-on-node")
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("aws", "gce", "gke")
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	It("should verify that all nodes have volume limits", func() {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) == 0 {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+	ginkgo.It("should verify that all nodes have volume limits", func() {
+		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		for _, node := range nodeList.Items {
 			volumeLimits := getVolumeLimit(&node)
 			if len(volumeLimits) == 0 {
 				framework.Failf("Expected volume limits to be set")
 			}
 		}
-
 	})
 })
 

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -107,7 +107,7 @@ func TestPVProtectionController(t *testing.T) {
 		// Optional client reactors.
 		reactors []reaction
 		// PV event to simulate. This PV will be automatically added to
-		// initalObjects.
+		// initialObjects.
 		updatedPV *v1.PersistentVolume
 		// List of expected kubeclient actions that should happen during the
 		// test.
@@ -220,7 +220,7 @@ func TestPVProtectionController(t *testing.T) {
 			case *v1.PersistentVolume:
 				pvInformer.Informer().GetStore().Add(obj)
 			default:
-				t.Fatalf("Unknown initalObject type: %+v", obj)
+				t.Fatalf("Unknown initialObject type: %+v", obj)
 			}
 		}
 
@@ -246,7 +246,7 @@ func TestPVProtectionController(t *testing.T) {
 				break
 			}
 			if ctrl.queue.Len() > 0 {
-				glog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
+				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
 				ctrl.processNextWorkItem()
 			}
 			if ctrl.queue.Len() > 0 {
@@ -257,7 +257,7 @@ func TestPVProtectionController(t *testing.T) {
 			if currentActionCount < len(test.expectedActions) {
 				// Do not log evey wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
-					glog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
+					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
 				}
 				// The test expected more to happen, wait for the actions.

@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
 
 	restful "github.com/emicklei/go-restful"
@@ -32,8 +31,6 @@ import (
 
 const (
 	OpenAPIVersion = "2.0"
-	// TODO: Make this configurable.
-	extensionPrefix = "x-kubernetes-"
 )
 
 type openAPI struct {
@@ -58,7 +55,7 @@ func BuildOpenAPIDefinitionsForResource(model interface{}, config *common.Config
 	o := newOpenAPI(config)
 	// We can discard the return value of toSchema because all we care about is the side effect of calling it.
 	// All the models created for this resource get added to o.swagger.Definitions
-	_, err := o.toSchema(getCanonicalTypeName(model))
+	_, err := o.toSchema(util.GetCanonicalTypeName(model))
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +89,7 @@ func newOpenAPI(config *common.Config) openAPI {
 			SwaggerProps: spec.SwaggerProps{
 				Swagger:     OpenAPIVersion,
 				Definitions: spec.Definitions{},
+				Responses:   config.ResponseDefinitions,
 				Paths:       &spec.Paths{Paths: map[string]spec.PathItem{}},
 				Info:        config.Info,
 			},
@@ -135,21 +133,6 @@ func (o *openAPI) finalizeSwagger() (*spec.Swagger, error) {
 	return o.swagger, nil
 }
 
-func getCanonicalTypeName(model interface{}) string {
-	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	if t.PkgPath() == "" {
-		return t.Name()
-	}
-	path := t.PkgPath()
-	if strings.Contains(path, "/vendor/") {
-		path = path[strings.Index(path, "/vendor/")+len("/vendor/"):]
-	}
-	return path + "." + t.Name()
-}
-
 func (o *openAPI) buildDefinitionRecursively(name string) error {
 	uniqueName, extensions := o.config.GetDefinitionName(name)
 	if _, ok := o.swagger.Definitions[uniqueName]; ok {
@@ -167,6 +150,11 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 			}
 			for k, v := range extensions {
 				schema.Extensions[k] = v
+			}
+		}
+		if v, ok := item.Schema.Extensions[common.ExtensionV2Schema]; ok {
+			if v2Schema, isOpenAPISchema := v.(spec.Schema); isOpenAPISchema {
+				schema = v2Schema
 			}
 		}
 		o.swagger.Definitions[uniqueName] = schema
@@ -285,7 +273,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 		},
 	}
 	for k, v := range route.Metadata {
-		if strings.HasPrefix(k, extensionPrefix) {
+		if strings.HasPrefix(k, common.ExtensionPrefix) {
 			if ret.Extensions == nil {
 				ret.Extensions = spec.Extensions{}
 			}
@@ -335,7 +323,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 }
 
 func (o *openAPI) buildResponse(model interface{}, description string) (spec.Response, error) {
-	schema, err := o.toSchema(getCanonicalTypeName(model))
+	schema, err := o.toSchema(util.GetCanonicalTypeName(model))
 	if err != nil {
 		return spec.Response{}, err
 	}
@@ -413,7 +401,7 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData, bodySample int
 	case restful.BodyParameterKind:
 		if bodySample != nil {
 			ret.In = "body"
-			ret.Schema, err = o.toSchema(getCanonicalTypeName(bodySample))
+			ret.Schema, err = o.toSchema(util.GetCanonicalTypeName(bodySample))
 			return ret, err
 		} else {
 			// There is not enough information in the body parameter to build the definition.

@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -139,6 +140,38 @@ func TestMergeResizeCondition(t *testing.T) {
 		}
 	}
 
+}
+
+func TestCreatePVCPatch(t *testing.T) {
+	pvc1 := getPVC([]v1.PersistentVolumeClaimCondition{
+		{
+			Type:               v1.PersistentVolumeClaimFileSystemResizePending,
+			Status:             v1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+		},
+	})
+	pvc1.SetResourceVersion("10")
+	pvc2 := pvc1.DeepCopy()
+	pvc2.Status.Capacity = v1.ResourceList{
+		v1.ResourceName("size"): resource.MustParse("10G"),
+	}
+	patchBytes, err := createPVCPatch(pvc1, pvc2)
+	if err != nil {
+		t.Errorf("error creating patch bytes %v", err)
+	}
+	var patchMap map[string]interface{}
+	err = json.Unmarshal(patchBytes, &patchMap)
+	if err != nil {
+		t.Errorf("error unmarshalling json patch : %v", err)
+	}
+	metadata, ok := patchMap["metadata"].(map[string]interface{})
+	if !ok {
+		t.Errorf("error converting metadata to version map")
+	}
+	resourceVersion, _ := metadata["resourceVersion"].(string)
+	if resourceVersion != "10" {
+		t.Errorf("expected resource version to 10 got %s", resourceVersion)
+	}
 }
 
 func getPVC(conditions []v1.PersistentVolumeClaimCondition) *v1.PersistentVolumeClaim {

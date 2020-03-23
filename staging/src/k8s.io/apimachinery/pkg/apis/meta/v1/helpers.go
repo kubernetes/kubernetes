@@ -17,6 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -227,8 +230,53 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	return &Preconditions{UID: &u}
 }
 
+// NewRVDeletionPrecondition returns a DeleteOptions with a ResourceVersion precondition set.
+func NewRVDeletionPrecondition(rv string) *DeleteOptions {
+	p := Preconditions{ResourceVersion: &rv}
+	return &DeleteOptions{Preconditions: &p}
+}
+
 // HasObjectMetaSystemFieldValues returns true if fields that are managed by the system on ObjectMeta have values.
 func HasObjectMetaSystemFieldValues(meta Object) bool {
 	return !meta.GetCreationTimestamp().Time.IsZero() ||
 		len(meta.GetUID()) != 0
 }
+
+// ResetObjectMetaForStatus forces the meta fields for a status update to match the meta fields
+// for a pre-existing object. This is opt-in for new objects with Status subresource.
+func ResetObjectMetaForStatus(meta, existingMeta Object) {
+	meta.SetDeletionTimestamp(existingMeta.GetDeletionTimestamp())
+	meta.SetGeneration(existingMeta.GetGeneration())
+	meta.SetSelfLink(existingMeta.GetSelfLink())
+	meta.SetLabels(existingMeta.GetLabels())
+	meta.SetAnnotations(existingMeta.GetAnnotations())
+	meta.SetFinalizers(existingMeta.GetFinalizers())
+	meta.SetOwnerReferences(existingMeta.GetOwnerReferences())
+	// managedFields must be preserved since it's been modified to
+	// track changed fields in the status update.
+	//meta.SetManagedFields(existingMeta.GetManagedFields())
+}
+
+// MarshalJSON implements json.Marshaler
+// MarshalJSON may get called on pointers or values, so implement MarshalJSON on value.
+// http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
+func (f FieldsV1) MarshalJSON() ([]byte, error) {
+	if f.Raw == nil {
+		return []byte("null"), nil
+	}
+	return f.Raw, nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (f *FieldsV1) UnmarshalJSON(b []byte) error {
+	if f == nil {
+		return errors.New("metav1.Fields: UnmarshalJSON on nil pointer")
+	}
+	if !bytes.Equal(b, []byte("null")) {
+		f.Raw = append(f.Raw[0:0], b...)
+	}
+	return nil
+}
+
+var _ json.Marshaler = FieldsV1{}
+var _ json.Unmarshaler = &FieldsV1{}

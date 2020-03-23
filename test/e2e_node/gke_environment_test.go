@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -27,10 +27,11 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/blang/semver"
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 // checkProcess checks whether there's a process whose command line contains
@@ -87,16 +88,24 @@ func checkIPTables() (err error) {
 func checkPublicGCR() error {
 	const image = "k8s.gcr.io/busybox"
 	output, err := runCommand("docker", "images", "-q", image)
+	if err != nil {
+		return err
+	}
+
 	if len(output) != 0 {
 		if _, err := runCommand("docker", "rmi", "-f", image); err != nil {
 			return err
 		}
 	}
 	output, err = runCommand("docker", "pull", image)
+	if err != nil {
+		return err
+	}
+
 	if len(output) == 0 {
 		return fmt.Errorf("failed to pull %s", image)
 	}
-	if _, err = runCommand("docker", "rmi", "-f", image); err != nil {
+	if _, err := runCommand("docker", "rmi", "-f", image); err != nil {
 		return err
 	}
 	return nil
@@ -312,11 +321,11 @@ func checkDockerStorageDriver() error {
 }
 
 var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {
-	BeforeEach(func() {
-		framework.RunIfSystemSpecNameIs("gke")
+	ginkgo.BeforeEach(func() {
+		e2eskipper.RunIfSystemSpecNameIs("gke")
 	})
 
-	It("The required processes should be running", func() {
+	ginkgo.It("The required processes should be running", func() {
 		cmdToProcessMap, err := getCmdToProcessMap()
 		framework.ExpectNoError(err)
 		for _, p := range []struct {
@@ -330,28 +339,28 @@ var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Featur
 			framework.ExpectNoError(checkProcess(p.cmd, p.ppid, cmdToProcessMap))
 		}
 	})
-	It("The iptable rules should work (required by kube-proxy)", func() {
+	ginkgo.It("The iptable rules should work (required by kube-proxy)", func() {
 		framework.ExpectNoError(checkIPTables())
 	})
-	It("The GCR is accessible", func() {
+	ginkgo.It("The GCR is accessible", func() {
 		framework.ExpectNoError(checkPublicGCR())
 	})
-	It("The docker configuration validation should pass", func() {
-		framework.RunIfContainerRuntimeIs("docker")
+	ginkgo.It("The docker configuration validation should pass", func() {
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 		framework.ExpectNoError(checkDockerConfig())
 	})
-	It("The docker container network should work", func() {
-		framework.RunIfContainerRuntimeIs("docker")
+	ginkgo.It("The docker container network should work", func() {
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 		framework.ExpectNoError(checkDockerNetworkServer())
 		framework.ExpectNoError(checkDockerNetworkClient())
 	})
-	It("The docker daemon should support AppArmor and seccomp", func() {
-		framework.RunIfContainerRuntimeIs("docker")
+	ginkgo.It("The docker daemon should support AppArmor and seccomp", func() {
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 		framework.ExpectNoError(checkDockerAppArmor())
 		framework.ExpectNoError(checkDockerSeccomp())
 	})
-	It("The docker storage driver should work", func() {
-		framework.Skipf("GKE does not currently require overlay")
+	ginkgo.It("The docker storage driver should work", func() {
+		e2eskipper.Skipf("GKE does not currently require overlay")
 		framework.ExpectNoError(checkDockerStorageDriver())
 	})
 })

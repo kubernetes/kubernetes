@@ -1,7 +1,3 @@
-**This package is currently in development and the API may not be stable.**
-
-The API will become stable with v1.
-
 # uuid ![build status](https://travis-ci.org/google/uuid.svg?branch=master)
 The uuid package generates and inspects UUIDs based on
 [RFC 4122](http://tools.ietf.org/html/rfc4122)

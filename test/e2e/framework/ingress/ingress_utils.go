@@ -18,6 +18,7 @@ package ingress
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -25,6 +26,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -34,47 +36,53 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
-
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/klog"
+
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
 const (
 	rsaBits  = 2048
 	validFor = 365 * 24 * time.Hour
 
-	// Ingress class annotation defined in ingress repository.
+	// IngressClassKey is ingress class annotation defined in ingress repository.
 	// TODO: All these annotations should be reused from
 	// ingress-gce/pkg/annotations instead of duplicating them here.
 	IngressClassKey = "kubernetes.io/ingress.class"
 
-	// Ingress class annotation value for multi cluster ingress.
+	// MulticlusterIngressClassValue is ingress class annotation value for multi cluster ingress.
 	MulticlusterIngressClassValue = "gce-multi-cluster"
 
-	// Static IP annotation defined in ingress repository.
+	// IngressStaticIPKey is static IP annotation defined in ingress repository.
 	IngressStaticIPKey = "kubernetes.io/ingress.global-static-ip-name"
 
-	// Allow HTTP annotation defined in ingress repository.
+	// IngressAllowHTTPKey is Allow HTTP annotation defined in ingress repository.
 	IngressAllowHTTPKey = "kubernetes.io/ingress.allow-http"
 
-	// Pre-shared-cert annotation defined in ingress repository.
+	// IngressPreSharedCertKey is Pre-shared-cert annotation defined in ingress repository.
 	IngressPreSharedCertKey = "ingress.gcp.kubernetes.io/pre-shared-cert"
 
 	// ServiceApplicationProtocolKey annotation defined in ingress repository.
@@ -86,54 +94,61 @@ const (
 	// IngressManifestPath is the parent path to yaml test manifests.
 	IngressManifestPath = "test/e2e/testing-manifests/ingress"
 
+	// GCEIngressManifestPath is the parent path to GCE-specific yaml test manifests.
+	GCEIngressManifestPath = IngressManifestPath + "/gce"
+
 	// IngressReqTimeout is the timeout on a single http request.
 	IngressReqTimeout = 10 * time.Second
 
-	// healthz port used to verify glbc restarted correctly on the master.
-	glbcHealthzPort = 8086
+	// NEGAnnotation is NEG annotation.
+	NEGAnnotation = "cloud.google.com/neg"
 
-	// General cloud resource poll timeout (eg: create static ip, firewall etc)
-	cloudResourcePollTimeout = 5 * time.Minute
-
-	NEGAnnotation       = "cloud.google.com/neg"
+	// NEGStatusAnnotation is NEG status annotation.
 	NEGStatusAnnotation = "cloud.google.com/neg-status"
-	NEGUpdateTimeout    = 2 * time.Minute
 
-	InstanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
-
-	// Prefix for annotation keys used by the ingress controller to specify the
+	// StatusPrefix is prefix for annotation keys used by the ingress controller to specify the
 	// names of GCP resources such as forwarding rules, url maps, target proxies, etc
 	// that it created for the corresponding ingress.
 	StatusPrefix = "ingress.kubernetes.io"
+
+	// poll is how often to Poll pods, nodes and claims.
+	poll = 2 * time.Second
 )
 
+// TestLogger is an interface for log.
 type TestLogger interface {
 	Infof(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 }
 
+// GLogger is test logger.
 type GLogger struct{}
 
+// Infof outputs log with info level.
 func (l *GLogger) Infof(format string, args ...interface{}) {
-	glog.Infof(format, args...)
+	klog.Infof(format, args...)
 }
 
+// Errorf outputs log with error level.
 func (l *GLogger) Errorf(format string, args ...interface{}) {
-	glog.Errorf(format, args...)
+	klog.Errorf(format, args...)
 }
 
+// E2ELogger is test logger.
 type E2ELogger struct{}
 
+// Infof outputs log.
 func (l *E2ELogger) Infof(format string, args ...interface{}) {
 	framework.Logf(format, args...)
 }
 
+// Errorf outputs log.
 func (l *E2ELogger) Errorf(format string, args ...interface{}) {
 	framework.Logf(format, args...)
 }
 
-// IngressConformanceTests contains a closure with an entry and exit log line.
-type IngressConformanceTests struct {
+// ConformanceTests contains a closure with an entry and exit log line.
+type ConformanceTests struct {
 	EntryLog string
 	Execute  func()
 	ExitLog  string
@@ -149,10 +164,55 @@ type NegStatus struct {
 	Zones                 []string         `json:"zones,omitempty"`
 }
 
+// SimpleGET executes a get on the given url, returns error if non-200 returned.
+func SimpleGET(c *http.Client, url, host string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Host = host
+	res, err := c.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	rawBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	body := string(rawBody)
+	if res.StatusCode != http.StatusOK {
+		err = fmt.Errorf(
+			"GET returned http error %v", res.StatusCode)
+	}
+	return body, err
+}
+
+// PollURL polls till the url responds with a healthy http code. If
+// expectUnreachable is true, it breaks on first non-healthy http code instead.
+func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+	var lastBody string
+	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		var err error
+		lastBody, err = SimpleGET(httpClient, route, host)
+		if err != nil {
+			framework.Logf("host %v path %v: %v unreachable", host, route, err)
+			return expectUnreachable, nil
+		}
+		framework.Logf("host %v path %v: reached", host, route)
+		return !expectUnreachable, nil
+	})
+	if pollErr != nil {
+		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
+			timeout, route, host, lastBody, pollErr)
+	}
+	return nil
+}
+
 // CreateIngressComformanceTests generates an slice of sequential test cases:
 // a simple http ingress, ingress with HTTPS, ingress HTTPS with a modified hostname,
 // ingress https with a modified URLMap
-func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations map[string]string) []IngressConformanceTests {
+func CreateIngressComformanceTests(jig *TestJig, ns string, annotations map[string]string) []ConformanceTests {
 	manifestPath := filepath.Join(IngressManifestPath, "http")
 	// These constants match the manifests used in IngressManifestPath
 	tlsHost := "foo.bar.com"
@@ -161,7 +221,7 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 	updateURLMapHost := "bar.baz.com"
 	updateURLMapPath := "/testurl"
 	// Platform agnostic list of tests that must be satisfied by all controllers
-	tests := []IngressConformanceTests{
+	tests := []ConformanceTests{
 		{
 			fmt.Sprintf("should create a basic HTTP ingress"),
 			func() { jig.CreateIngress(manifestPath, ns, annotations, annotations) },
@@ -176,8 +236,8 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 			fmt.Sprintf("should update url map for host %v to expose a single url: %v", updateURLMapHost, updateURLMapPath),
 			func() {
 				var pathToFail string
-				jig.Update(func(ing *extensions.Ingress) {
-					newRules := []extensions.IngressRule{}
+				jig.Update(func(ing *networkingv1beta1.Ingress) {
+					newRules := []networkingv1beta1.IngressRule{}
 					for _, rule := range ing.Spec.Rules {
 						if rule.Host != updateURLMapHost {
 							newRules = append(newRules, rule)
@@ -185,11 +245,11 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 						}
 						existingPath := rule.IngressRuleValue.HTTP.Paths[0]
 						pathToFail = existingPath.Path
-						newRules = append(newRules, extensions.IngressRule{
+						newRules = append(newRules, networkingv1beta1.IngressRule{
 							Host: updateURLMapHost,
-							IngressRuleValue: extensions.IngressRuleValue{
-								HTTP: &extensions.HTTPIngressRuleValue{
-									Paths: []extensions.HTTPIngressPath{
+							IngressRuleValue: networkingv1beta1.IngressRuleValue{
+								HTTP: &networkingv1beta1.HTTPIngressRuleValue{
+									Paths: []networkingv1beta1.HTTPIngressPath{
 										{
 											Path:    updateURLMapPath,
 											Backend: existingPath.Backend,
@@ -201,26 +261,26 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 					}
 					ing.Spec.Rules = newRules
 				})
-				By("Checking that " + pathToFail + " is not exposed by polling for failure")
+				ginkgo.By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.Address, pathToFail)
-				framework.ExpectNoError(framework.PollURL(route, updateURLMapHost, framework.LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
+				framework.ExpectNoError(PollURL(route, updateURLMapHost, e2eservice.LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
 	}
 	// Skip the Update TLS cert test for kubemci: https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/141.
 	if jig.Class != MulticlusterIngressClassValue {
-		tests = append(tests, IngressConformanceTests{
+		tests = append(tests, ConformanceTests{
 			fmt.Sprintf("should update SSL certificate with modified hostname %v", updatedTLSHost),
 			func() {
-				jig.Update(func(ing *extensions.Ingress) {
-					newRules := []extensions.IngressRule{}
+				jig.Update(func(ing *networkingv1beta1.Ingress) {
+					newRules := []networkingv1beta1.IngressRule{}
 					for _, rule := range ing.Spec.Rules {
 						if rule.Host != tlsHost {
 							newRules = append(newRules, rule)
 							continue
 						}
-						newRules = append(newRules, extensions.IngressRule{
+						newRules = append(newRules, networkingv1beta1.IngressRule{
 							Host:             updatedTLSHost,
 							IngressRuleValue: rule.IngressRuleValue,
 						})
@@ -291,7 +351,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("Failed creating cert: %v", err)
 	}
 	if err := pem.Encode(&keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return nil, nil, fmt.Errorf("Failed creating keay: %v", err)
+		return nil, nil, fmt.Errorf("Failed creating key: %v", err)
 	}
 	return certOut.Bytes(), keyOut.Bytes(), nil
 }
@@ -339,26 +399,25 @@ func createTLSSecret(kubeClient clientset.Interface, namespace, secretName strin
 		},
 	}
 	var s *v1.Secret
-	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{}); err == nil {
-		// TODO: Retry the update. We don't really expect anything to conflict though.
+	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{}); err == nil {
 		framework.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		s.Data = secret.Data
-		_, err = kubeClient.CoreV1().Secrets(namespace).Update(s)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Update(context.TODO(), s, metav1.UpdateOptions{})
 	} else {
 		framework.Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
-		_, err = kubeClient.CoreV1().Secrets(namespace).Create(secret)
+		_, err = kubeClient.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	}
 	return host, cert, key, err
 }
 
-// IngressTestJig holds the relevant state and parameters of the ingress test.
-type IngressTestJig struct {
+// TestJig holds the relevant state and parameters of the ingress test.
+type TestJig struct {
 	Client clientset.Interface
 	Logger TestLogger
 
 	RootCAs map[string][]byte
 	Address string
-	Ingress *extensions.Ingress
+	Ingress *networkingv1beta1.Ingress
 	// class is the value of the annotation keyed under
 	// `kubernetes.io/ingress.class`. It's added to all ingresses created by
 	// this jig.
@@ -369,11 +428,11 @@ type IngressTestJig struct {
 }
 
 // NewIngressTestJig instantiates struct with client
-func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
-	return &IngressTestJig{
+func NewIngressTestJig(c clientset.Interface) *TestJig {
+	return &TestJig{
 		Client:       c,
 		RootCAs:      map[string][]byte{},
-		PollInterval: framework.LoadBalancerPollInterval,
+		PollInterval: e2eservice.LoadBalancerPollInterval,
 		Logger:       &E2ELogger{},
 	}
 }
@@ -383,37 +442,37 @@ func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
 // Optional: secret.yaml, ingAnnotations
 // If ingAnnotations is specified it will overwrite any annotations in ing.yaml
 // If svcAnnotations is specified it will overwrite any annotations in svc.yaml
-func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[string]string, svcAnnotations map[string]string) {
+func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[string]string, svcAnnotations map[string]string) {
 	var err error
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file), Fail))
+		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file)))
 	}
 	exists := func(file string) bool {
-		return testfiles.Exists(filepath.Join(manifestPath, file), Fail)
+		return testfiles.Exists(filepath.Join(manifestPath, file))
 	}
 
 	j.Logger.Infof("creating replication controller")
-	framework.RunKubectlOrDieInput(read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+	framework.RunKubectlOrDieInput(ns, read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 
 	j.Logger.Infof("creating service")
-	framework.RunKubectlOrDieInput(read("svc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+	framework.RunKubectlOrDieInput(ns, read("svc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 	if len(svcAnnotations) > 0 {
-		svcList, err := j.Client.CoreV1().Services(ns).List(metav1.ListOptions{})
+		svcList, err := j.Client.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, svc := range svcList.Items {
 			svc.Annotations = svcAnnotations
-			_, err = j.Client.CoreV1().Services(ns).Update(&svc)
+			_, err = j.Client.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 		}
 	}
 
 	if exists("secret.yaml") {
 		j.Logger.Infof("creating secret")
-		framework.RunKubectlOrDieInput(read("secret.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+		framework.RunKubectlOrDieInput(ns, read("secret.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 	}
 	j.Logger.Infof("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
 
-	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
+	j.Ingress, err = ingressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
 	framework.ExpectNoError(err)
 	j.Ingress.Namespace = ns
 	j.Ingress.Annotations = map[string]string{IngressClassKey: j.Class}
@@ -425,14 +484,58 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	framework.ExpectNoError(err)
 }
 
+// marshalToYaml marshals an object into YAML for a given GroupVersion.
+// The object must be known in SupportedMediaTypes() for the Codecs under "client-go/kubernetes/scheme".
+func marshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
+	}
+	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, gv)
+	return runtime.Encode(encoder, obj)
+}
+
+// ingressFromManifest reads a .json/yaml file and returns the ingress in it.
+func ingressFromManifest(fileName string) (*networkingv1beta1.Ingress, error) {
+	var ing networkingv1beta1.Ingress
+	data, err := testfiles.Read(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
+		return nil, err
+	}
+	return &ing, nil
+}
+
+// ingressToManifest generates a yaml file in the given path with the given ingress.
+// Assumes that a directory exists at the given path.
+func ingressToManifest(ing *networkingv1beta1.Ingress, path string) error {
+	serialized, err := marshalToYaml(ing, networkingv1beta1.SchemeGroupVersion)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
+	}
+
+	if err := ioutil.WriteFile(path, serialized, 0600); err != nil {
+		return fmt.Errorf("error in writing ingress to file: %s", err)
+	}
+	return nil
+}
+
 // runCreate runs the required command to create the given ingress.
-func (j *IngressTestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Create(ing)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Create(context.TODO(), ing, metav1.CreateOptions{})
 	}
 	// Use kubemci to create a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
-	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
 	_, err := framework.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
@@ -440,14 +543,14 @@ func (j *IngressTestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress
 }
 
 // runUpdate runs the required command to update the given ingress.
-func (j *IngressTestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Update(ing)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Update(context.TODO(), ing, metav1.UpdateOptions{})
 	}
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
-	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
 	_, err := framework.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
@@ -455,11 +558,11 @@ func (j *IngressTestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress
 }
 
 // Update retrieves the ingress, performs the passed function, and then updates it.
-func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
+func (j *TestJig) Update(update func(ing *networkingv1beta1.Ingress)) {
 	var err error
 	ns, name := j.Ingress.Namespace, j.Ingress.Name
 	for i := 0; i < 3; i++ {
-		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+		j.Ingress, err = j.Client.NetworkingV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get ingress %s/%s: %v", ns, name, err)
 		}
@@ -469,7 +572,7 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 			framework.DescribeIng(j.Ingress.Namespace)
 			return
 		}
-		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
+		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			framework.Failf("failed to update ingress %s/%s: %v", ns, name, err)
 		}
 	}
@@ -477,47 +580,47 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 }
 
 // AddHTTPS updates the ingress to add this secret for these hosts.
-func (j *IngressTestJig) AddHTTPS(secretName string, hosts ...string) {
+func (j *TestJig) AddHTTPS(secretName string, hosts ...string) {
 	// TODO: Just create the secret in GetRootCAs once we're watching secrets in
 	// the ingress controller.
 	_, cert, _, err := createTLSSecret(j.Client, j.Ingress.Namespace, secretName, hosts...)
 	framework.ExpectNoError(err)
 	j.Logger.Infof("Updating ingress %v to also use secret %v for TLS termination", j.Ingress.Name, secretName)
-	j.Update(func(ing *extensions.Ingress) {
-		ing.Spec.TLS = append(ing.Spec.TLS, extensions.IngressTLS{Hosts: hosts, SecretName: secretName})
+	j.Update(func(ing *networkingv1beta1.Ingress) {
+		ing.Spec.TLS = append(ing.Spec.TLS, networkingv1beta1.IngressTLS{Hosts: hosts, SecretName: secretName})
 	})
 	j.RootCAs[secretName] = cert
 }
 
 // SetHTTPS updates the ingress to use only this secret for these hosts.
-func (j *IngressTestJig) SetHTTPS(secretName string, hosts ...string) {
+func (j *TestJig) SetHTTPS(secretName string, hosts ...string) {
 	_, cert, _, err := createTLSSecret(j.Client, j.Ingress.Namespace, secretName, hosts...)
 	framework.ExpectNoError(err)
 	j.Logger.Infof("Updating ingress %v to only use secret %v for TLS termination", j.Ingress.Name, secretName)
-	j.Update(func(ing *extensions.Ingress) {
-		ing.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
+	j.Update(func(ing *networkingv1beta1.Ingress) {
+		ing.Spec.TLS = []networkingv1beta1.IngressTLS{{Hosts: hosts, SecretName: secretName}}
 	})
 	j.RootCAs = map[string][]byte{secretName: cert}
 }
 
 // RemoveHTTPS updates the ingress to not use this secret for TLS.
 // Note: Does not delete the secret.
-func (j *IngressTestJig) RemoveHTTPS(secretName string) {
-	newTLS := []extensions.IngressTLS{}
+func (j *TestJig) RemoveHTTPS(secretName string) {
+	newTLS := []networkingv1beta1.IngressTLS{}
 	for _, ingressTLS := range j.Ingress.Spec.TLS {
 		if secretName != ingressTLS.SecretName {
 			newTLS = append(newTLS, ingressTLS)
 		}
 	}
 	j.Logger.Infof("Updating ingress %v to not use secret %v for TLS termination", j.Ingress.Name, secretName)
-	j.Update(func(ing *extensions.Ingress) {
+	j.Update(func(ing *networkingv1beta1.Ingress) {
 		ing.Spec.TLS = newTLS
 	})
 	delete(j.RootCAs, secretName)
 }
 
 // PrepareTLSSecret creates a TLS secret and caches the cert.
-func (j *IngressTestJig) PrepareTLSSecret(namespace, secretName string, hosts ...string) error {
+func (j *TestJig) PrepareTLSSecret(namespace, secretName string, hosts ...string) error {
 	_, cert, _, err := createTLSSecret(j.Client, namespace, secretName, hosts...)
 	if err != nil {
 		return err
@@ -527,7 +630,7 @@ func (j *IngressTestJig) PrepareTLSSecret(namespace, secretName string, hosts ..
 }
 
 // GetRootCA returns a rootCA from the ingress test jig.
-func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
+func (j *TestJig) GetRootCA(secretName string) (rootCA []byte) {
 	var ok bool
 	rootCA, ok = j.RootCAs[secretName]
 	if !ok {
@@ -537,31 +640,24 @@ func (j *IngressTestJig) GetRootCA(secretName string) (rootCA []byte) {
 }
 
 // TryDeleteIngress attempts to delete the ingress resource and logs errors if they occur.
-func (j *IngressTestJig) TryDeleteIngress() {
-	j.TryDeleteGivenIngress(j.Ingress)
+func (j *TestJig) TryDeleteIngress() {
+	j.tryDeleteGivenIngress(j.Ingress)
 }
 
-func (j *IngressTestJig) TryDeleteGivenIngress(ing *extensions.Ingress) {
+func (j *TestJig) tryDeleteGivenIngress(ing *networkingv1beta1.Ingress) {
 	if err := j.runDelete(ing); err != nil {
 		j.Logger.Infof("Error while deleting the ingress %v/%v with class %s: %v", ing.Namespace, ing.Name, j.Class, err)
 	}
 }
 
-func (j *IngressTestJig) TryDeleteGivenService(svc *v1.Service) {
-	err := j.Client.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
-	if err != nil {
-		j.Logger.Infof("Error while deleting the service %v/%v: %v", svc.Namespace, svc.Name, err)
-	}
-}
-
 // runDelete runs the required command to delete the given ingress.
-func (j *IngressTestJig) runDelete(ing *extensions.Ingress) error {
+func (j *TestJig) runDelete(ing *networkingv1beta1.Ingress) error {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Delete(context.TODO(), ing.Name, metav1.DeleteOptions{})
 	}
 	// Use kubemci to delete a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
-	if err := manifest.IngressToManifest(ing, filePath); err != nil {
+	if err := ingressToManifest(ing, filePath); err != nil {
 		return err
 	}
 	_, err := framework.RunKubemciWithKubeconfig("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
@@ -597,7 +693,7 @@ func getIngressAddress(client clientset.Interface, ns, name, class string) ([]st
 	if class == MulticlusterIngressClassValue {
 		return getIngressAddressFromKubemci(name)
 	}
-	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+	ing, err := client.NetworkingV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -614,7 +710,7 @@ func getIngressAddress(client clientset.Interface, ns, name, class string) ([]st
 }
 
 // WaitForIngressAddress waits for the Ingress to acquire an address.
-func (j *IngressTestJig) WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
+func (j *TestJig) WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		ipOrNameList, err := getIngressAddress(c, ns, ingName, j.Class)
@@ -632,7 +728,7 @@ func (j *IngressTestJig) WaitForIngressAddress(c clientset.Interface, ns, ingNam
 	return address, err
 }
 
-func (j *IngressTestJig) pollIngressWithCert(ing *extensions.Ingress, address string, knownHosts []string, cert []byte, waitForNodePort bool, timeout time.Duration) error {
+func (j *TestJig) pollIngressWithCert(ing *networkingv1beta1.Ingress, address string, knownHosts []string, cert []byte, waitForNodePort bool, timeout time.Duration) error {
 	// Check that all rules respond to a simple GET.
 	knownHostsSet := sets.NewString(knownHosts...)
 	for _, rules := range ing.Spec.Rules {
@@ -657,7 +753,7 @@ func (j *IngressTestJig) pollIngressWithCert(ing *extensions.Ingress, address st
 			}
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			j.Logger.Infof("Testing route %v host %v with simple GET", route, rules.Host)
-			if err := framework.PollURL(route, rules.Host, timeout, j.PollInterval, timeoutClient, false); err != nil {
+			if err := PollURL(route, rules.Host, timeout, j.PollInterval, timeoutClient, false); err != nil {
 				return err
 			}
 		}
@@ -666,9 +762,24 @@ func (j *IngressTestJig) pollIngressWithCert(ing *extensions.Ingress, address st
 	return nil
 }
 
-func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
-	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, framework.LoadBalancerPollTimeout); err != nil {
+// WaitForIngress waits for the Ingress to get an address.
+// WaitForIngress returns when it gets the first 200 response
+func (j *TestJig) WaitForIngress(waitForNodePort bool) {
+	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, e2eservice.LoadBalancerPollTimeout); err != nil {
 		framework.Failf("error in waiting for ingress to get an address: %s", err)
+	}
+}
+
+// WaitForIngressToStable waits for the LB return 100 consecutive 200 responses.
+func (j *TestJig) WaitForIngressToStable() {
+	if err := wait.Poll(10*time.Second, e2eservice.LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
+		_, err := j.GetDistinctResponseFromIngress()
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		framework.Failf("error in waiting for ingress to stablize: %v", err)
 	}
 }
 
@@ -677,7 +788,7 @@ func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
 // http or https). If waitForNodePort is true, the NodePort of the Service
 // is verified before verifying the Ingress. NodePort is currently a
 // requirement for cloudprovider Ingress.
-func (j *IngressTestJig) WaitForGivenIngressWithTimeout(ing *extensions.Ingress, waitForNodePort bool, timeout time.Duration) error {
+func (j *TestJig) WaitForGivenIngressWithTimeout(ing *networkingv1beta1.Ingress, waitForNodePort bool, timeout time.Duration) error {
 	// Wait for the loadbalancer IP.
 	address, err := j.WaitForIngressAddress(j.Client, ing.Namespace, ing.Name, timeout)
 	if err != nil {
@@ -693,57 +804,106 @@ func (j *IngressTestJig) WaitForGivenIngressWithTimeout(ing *extensions.Ingress,
 	return j.pollIngressWithCert(ing, address, knownHosts, cert, waitForNodePort, timeout)
 }
 
-// WaitForIngress waits till the ingress acquires an IP, then waits for its
+// WaitForIngressWithCert waits till the ingress acquires an IP, then waits for its
 // hosts/urls to respond to a protocol check (either http or https). If
 // waitForNodePort is true, the NodePort of the Service is verified before
 // verifying the Ingress. NodePort is currently a requirement for cloudprovider
 // Ingress. Hostnames and certificate need to be explicitly passed in.
-func (j *IngressTestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) error {
+func (j *TestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) error {
 	// Wait for the loadbalancer IP.
-	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, framework.LoadBalancerPollTimeout)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, e2eservice.LoadBalancerPollTimeout)
 	if err != nil {
-		return fmt.Errorf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
+		return fmt.Errorf("Ingress failed to acquire an IP address within %v", e2eservice.LoadBalancerPollTimeout)
 	}
 
-	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, framework.LoadBalancerPollTimeout)
+	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, e2eservice.LoadBalancerPollTimeout)
 }
 
 // VerifyURL polls for the given iterations, in intervals, and fails if the
 // given url returns a non-healthy http code even once.
-func (j *IngressTestJig) VerifyURL(route, host string, iterations int, interval time.Duration, httpClient *http.Client) error {
+func (j *TestJig) VerifyURL(route, host string, iterations int, interval time.Duration, httpClient *http.Client) error {
 	for i := 0; i < iterations; i++ {
-		b, err := framework.SimpleGET(httpClient, route, host)
+		b, err := SimpleGET(httpClient, route, host)
 		if err != nil {
 			framework.Logf(b)
 			return err
 		}
-		j.Logger.Infof("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
+		j.Logger.Infof("Verified %v with host %v %d times, sleeping for %v", route, host, i, interval)
 		time.Sleep(interval)
 	}
 	return nil
 }
 
-func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) error {
+func (j *TestJig) pollServiceNodePort(ns, name string, port int) error {
 	// TODO: Curl all nodes?
-	u, err := framework.GetNodePortURL(j.Client, ns, name, port)
+	u, err := getPortURL(j.Client, ns, name, port)
 	if err != nil {
 		return err
 	}
-	return framework.PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false)
+	return PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false)
 }
 
-func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {
-	defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
+// getSvcNodePort returns the node port for the given service:port.
+func getSvcNodePort(client clientset.Interface, ns, name string, svcPort int) (int, error) {
+	svc, err := client.CoreV1().Services(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
-	return defaultSvc.Spec.Ports[0].NodePort, nil
+	for _, p := range svc.Spec.Ports {
+		if p.Port == int32(svcPort) {
+			if p.NodePort != 0 {
+				return int(p.NodePort), nil
+			}
+		}
+	}
+	return 0, fmt.Errorf(
+		"no node port found for service %v, port %v", name, svcPort)
+}
+
+// getPortURL returns the url to a nodeport Service.
+func getPortURL(client clientset.Interface, ns, name string, svcPort int) (string, error) {
+	nodePort, err := getSvcNodePort(client, ns, name, svcPort)
+	if err != nil {
+		return "", err
+	}
+	// This list of nodes must not include the master, which is marked
+	// unschedulable, since the master doesn't run kube-proxy. Without
+	// kube-proxy NodePorts won't work.
+	var nodes *v1.NodeList
+	if wait.PollImmediate(poll, framework.SingleCallTimeout, func() (bool, error) {
+		nodes, err = client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector().String()})
+		if err != nil {
+			if testutils.IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	}) != nil {
+		return "", err
+	}
+	if len(nodes.Items) == 0 {
+		return "", fmt.Errorf("Unable to list nodes in cluster")
+	}
+	for _, node := range nodes.Items {
+		for _, address := range node.Status.Addresses {
+			if address.Type == v1.NodeExternalIP {
+				if address.Address != "" {
+					host := net.JoinHostPort(address.Address, fmt.Sprint(nodePort))
+					return fmt.Sprintf("http://%s", host), nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("failed to find external address for service %v", name)
 }
 
 // GetIngressNodePorts returns related backend services' nodePorts.
 // Current GCE ingress controller allows traffic to the default HTTP backend
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
-func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []string {
+func (j *TestJig) GetIngressNodePorts(includeDefaultBackend bool) []string {
 	nodePorts := []string{}
 	svcPorts := j.GetServicePorts(includeDefaultBackend)
 	for _, svcPort := range svcPorts {
@@ -752,14 +912,14 @@ func (j *IngressTestJig) GetIngressNodePorts(includeDefaultBackend bool) []strin
 	return nodePorts
 }
 
-// GetIngressNodePorts returns related backend services' svcPorts.
+// GetServicePorts returns related backend services' svcPorts.
 // Current GCE ingress controller allows traffic to the default HTTP backend
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
-func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]v1.ServicePort {
+func (j *TestJig) GetServicePorts(includeDefaultBackend bool) map[string]v1.ServicePort {
 	svcPorts := make(map[string]v1.ServicePort)
 	if includeDefaultBackend {
-		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(context.TODO(), defaultBackendName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
 		svcPorts[defaultBackendName] = defaultSvc.Spec.Ports[0]
 	}
 
@@ -773,15 +933,15 @@ func (j *IngressTestJig) GetServicePorts(includeDefaultBackend bool) map[string]
 		}
 	}
 	for _, svcName := range backendSvcs {
-		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(svcName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		svc, err := j.Client.CoreV1().Services(j.Ingress.Namespace).Get(context.TODO(), svcName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
 		svcPorts[svcName] = svc.Spec.Ports[0]
 	}
 	return svcPorts
 }
 
 // ConstructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
-func (j *IngressTestJig) ConstructFirewallForIngress(firewallRuleName string, nodeTags []string) *compute.Firewall {
+func (j *TestJig) ConstructFirewallForIngress(firewallRuleName string, nodeTags []string) *compute.Firewall {
 	nodePorts := j.GetIngressNodePorts(true)
 
 	fw := compute.Firewall{}
@@ -798,18 +958,18 @@ func (j *IngressTestJig) ConstructFirewallForIngress(firewallRuleName string, no
 }
 
 // GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.
-func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
+func (j *TestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 	// Wait for the loadbalancer IP.
-	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, framework.LoadBalancerPollTimeout)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, e2eservice.LoadBalancerPollTimeout)
 	if err != nil {
-		framework.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", e2eservice.LoadBalancerPollTimeout)
 	}
 	responses := sets.NewString()
 	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
 
 	for i := 0; i < 100; i++ {
 		url := fmt.Sprintf("http://%v", address)
-		res, err := framework.SimpleGET(timeoutClient, url, "")
+		res, err := SimpleGET(timeoutClient, url, "")
 		if err != nil {
 			j.Logger.Errorf("Failed to GET %q. Got responses: %q: %v", url, res, err)
 			return responses, err
@@ -821,48 +981,72 @@ func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 
 // NginxIngressController manages implementation details of Ingress on Nginx.
 type NginxIngressController struct {
-	Ns         string
-	rc         *v1.ReplicationController
-	pod        *v1.Pod
-	Client     clientset.Interface
-	externalIP string
+	Ns     string
+	rc     *v1.ReplicationController
+	pod    *v1.Pod
+	Client clientset.Interface
+	lbSvc  *v1.Service
 }
 
 // Init initializes the NginxIngressController
 func (cont *NginxIngressController) Init() {
+	// Set up a LoadBalancer service in front of nginx ingress controller and pass it via
+	// --publish-service flag (see <IngressManifestPath>/nginx/rc.yaml) to make it work in private
+	// clusters, i.e. clusters where nodes don't have public IPs.
+	framework.Logf("Creating load balancer service for nginx ingress controller")
+	serviceJig := e2eservice.NewTestJig(cont.Client, cont.Ns, "nginx-ingress-lb")
+	_, err := serviceJig.CreateTCPService(func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc.Spec.Selector = map[string]string{"k8s-app": "nginx-ingress-lb"}
+		svc.Spec.Ports = []v1.ServicePort{
+			{Name: "http", Port: 80},
+			{Name: "https", Port: 443},
+			{Name: "stats", Port: 18080}}
+	})
+	framework.ExpectNoError(err)
+	cont.lbSvc, err = serviceJig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cont.Client))
+	framework.ExpectNoError(err)
+
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file), Fail))
+		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file)))
 	}
 	framework.Logf("initializing nginx ingress controller")
-	framework.RunKubectlOrDieInput(read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))
+	framework.RunKubectlOrDieInput(cont.Ns, read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))
 
-	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
+	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get(context.TODO(), "nginx-ingress-controller", metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	cont.rc = rc
 
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
-	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(metav1.ListOptions{LabelSelector: sel.String()})
+	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
 	framework.ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)
 	}
 	cont.pod = &pods.Items[0]
-	cont.externalIP, err = framework.GetHostExternalAddress(cont.Client, cont.pod)
-	framework.ExpectNoError(err)
-	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
+	framework.Logf("ingress controller running in pod %v", cont.pod.Name)
 }
 
-func generateBacksideHTTPSIngressSpec(ns string) *extensions.Ingress {
-	return &extensions.Ingress{
+// TearDown cleans up the NginxIngressController.
+func (cont *NginxIngressController) TearDown() {
+	if cont.lbSvc == nil {
+		framework.Logf("No LoadBalancer service created, no cleanup necessary")
+		return
+	}
+	e2eservice.WaitForServiceDeletedWithFinalizer(cont.Client, cont.Ns, cont.lbSvc.Name)
+}
+
+func generateBacksideHTTPSIngressSpec(ns string) *networkingv1beta1.Ingress {
+	return &networkingv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "echoheaders-https",
 			Namespace: ns,
 		},
-		Spec: extensions.IngressSpec{
-			// Note kubemci requres a default backend.
-			Backend: &extensions.IngressBackend{
+		Spec: networkingv1beta1.IngressSpec{
+			// Note kubemci requires a default backend.
+			Backend: &networkingv1beta1.IngressBackend{
 				ServiceName: "echoheaders-https",
 				ServicePort: intstr.IntOrString{
 					Type:   intstr.Int,
@@ -896,12 +1080,12 @@ func generateBacksideHTTPSServiceSpec() *v1.Service {
 	}
 }
 
-func generateBacksideHTTPSDeploymentSpec() *extensions.Deployment {
-	return &extensions.Deployment{
+func generateBacksideHTTPSDeploymentSpec() *appsv1.Deployment {
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "echoheaders-https",
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"app": "echoheaders-https",
 			}},
@@ -915,7 +1099,7 @@ func generateBacksideHTTPSDeploymentSpec() *extensions.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  "echoheaders-https",
-							Image: "k8s.gcr.io/echoserver:1.10",
+							Image: imageutils.GetE2EImage(imageutils.EchoServer),
 							Ports: []v1.ContainerPort{{
 								ContainerPort: 8443,
 								Name:          "echo-443",
@@ -929,12 +1113,12 @@ func generateBacksideHTTPSDeploymentSpec() *extensions.Deployment {
 }
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
-func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*extensions.Deployment, *v1.Service, *extensions.Ingress, error) {
-	deployCreated, err := cs.ExtensionsV1beta1().Deployments(namespace).Create(generateBacksideHTTPSDeploymentSpec())
+func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*appsv1.Deployment, *v1.Service, *networkingv1beta1.Ingress, error) {
+	deployCreated, err := cs.AppsV1().Deployments(namespace).Create(context.TODO(), generateBacksideHTTPSDeploymentSpec(), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	svcCreated, err := cs.CoreV1().Services(namespace).Create(generateBacksideHTTPSServiceSpec())
+	svcCreated, err := cs.CoreV1().Services(namespace).Create(context.TODO(), generateBacksideHTTPSServiceSpec(), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -953,7 +1137,7 @@ func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, names
 }
 
 // DeleteTestResource deletes given deployment, service and ingress.
-func (j *IngressTestJig) DeleteTestResource(cs clientset.Interface, deploy *extensions.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
+func (j *TestJig) DeleteTestResource(cs clientset.Interface, deploy *appsv1.Deployment, svc *v1.Service, ing *networkingv1beta1.Ingress) []error {
 	var errs []error
 	if ing != nil {
 		if err := j.runDelete(ing); err != nil {
@@ -961,12 +1145,12 @@ func (j *IngressTestJig) DeleteTestResource(cs clientset.Interface, deploy *exte
 		}
 	}
 	if svc != nil {
-		if err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil); err != nil {
+		if err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{}); err != nil {
 			errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
 		}
 	}
 	if deploy != nil {
-		if err := cs.ExtensionsV1beta1().Deployments(deploy.Namespace).Delete(deploy.Name, nil); err != nil {
+		if err := cs.AppsV1().Deployments(deploy.Namespace).Delete(context.TODO(), deploy.Name, metav1.DeleteOptions{}); err != nil {
 			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", deploy.Namespace, deploy.Name, err))
 		}
 	}

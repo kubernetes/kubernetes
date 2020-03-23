@@ -70,7 +70,11 @@ func IsQualifiedName(value string) []string {
 	return errs
 }
 
-// IsFullyQualifiedName checks if the name is fully qualified.
+// IsFullyQualifiedName checks if the name is fully qualified. This is similar
+// to IsFullyQualifiedDomainName but requires a minimum of 3 segments instead of
+// 2 and does not accept a trailing . as valid.
+// TODO: This function is deprecated and preserved until all callers migrate to
+// IsFullyQualifiedDomainName; please don't add new callers.
 func IsFullyQualifiedName(fldPath *field.Path, name string) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(name) == 0 {
@@ -85,8 +89,68 @@ func IsFullyQualifiedName(fldPath *field.Path, name string) field.ErrorList {
 	return allErrors
 }
 
+// IsFullyQualifiedDomainName checks if the domain name is fully qualified. This
+// is similar to IsFullyQualifiedName but only requires a minimum of 2 segments
+// instead of 3 and accepts a trailing . as valid.
+func IsFullyQualifiedDomainName(fldPath *field.Path, name string) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(name) == 0 {
+		return append(allErrors, field.Required(fldPath, ""))
+	}
+	if strings.HasSuffix(name, ".") {
+		name = name[:len(name)-1]
+	}
+	if errs := IsDNS1123Subdomain(name); len(errs) > 0 {
+		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ",")))
+	}
+	if len(strings.Split(name, ".")) < 2 {
+		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least two segments separated by dots"))
+	}
+	return allErrors
+}
+
+// Allowed characters in an HTTP Path as defined by RFC 3986. A HTTP path may
+// contain:
+// * unreserved characters (alphanumeric, '-', '.', '_', '~')
+// * percent-encoded octets
+// * sub-delims ("!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "=")
+// * a colon character (":")
+const httpPathFmt string = `[A-Za-z0-9/\-._~%!$&'()*+,;=:]+`
+
+var httpPathRegexp = regexp.MustCompile("^" + httpPathFmt + "$")
+
+// IsDomainPrefixedPath checks if the given string is a domain-prefixed path
+// (e.g. acme.io/foo). All characters before the first "/" must be a valid
+// subdomain as defined by RFC 1123. All characters trailing the first "/" must
+// be valid HTTP Path characters as defined by RFC 3986.
+func IsDomainPrefixedPath(fldPath *field.Path, dpPath string) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(dpPath) == 0 {
+		return append(allErrs, field.Required(fldPath, ""))
+	}
+
+	segments := strings.SplitN(dpPath, "/", 2)
+	if len(segments) != 2 || len(segments[0]) == 0 || len(segments[1]) == 0 {
+		return append(allErrs, field.Invalid(fldPath, dpPath, "must be a domain-prefixed path (such as \"acme.io/foo\")"))
+	}
+
+	host := segments[0]
+	for _, err := range IsDNS1123Subdomain(host) {
+		allErrs = append(allErrs, field.Invalid(fldPath, host, err))
+	}
+
+	path := segments[1]
+	if !httpPathRegexp.MatchString(path) {
+		return append(allErrs, field.Invalid(fldPath, path, RegexError("Invalid path", httpPathFmt)))
+	}
+
+	return allErrs
+}
+
 const labelValueFmt string = "(" + qualifiedNameFmt + ")?"
 const labelValueErrMsg string = "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
+
+// LabelValueMaxLength is a label's max length
 const LabelValueMaxLength int = 63
 
 var labelValueRegexp = regexp.MustCompile("^" + labelValueFmt + "$")
@@ -107,6 +171,8 @@ func IsValidLabelValue(value string) []string {
 
 const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
 const dns1123LabelErrMsg string = "a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+
+// DNS1123LabelMaxLength is a label's max length in DNS (RFC 1123)
 const DNS1123LabelMaxLength int = 63
 
 var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
@@ -126,6 +192,8 @@ func IsDNS1123Label(value string) []string {
 
 const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
 const dns1123SubdomainErrorMsg string = "a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character"
+
+// DNS1123SubdomainMaxLength is a subdomain's max length in DNS (RFC 1123)
 const DNS1123SubdomainMaxLength int = 253
 
 var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
@@ -145,6 +213,8 @@ func IsDNS1123Subdomain(value string) []string {
 
 const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
+
+// DNS1035LabelMaxLength is a label's max length in DNS (RFC 1035)
 const DNS1035LabelMaxLength int = 63
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
@@ -277,11 +347,32 @@ func IsValidIP(value string) []string {
 	return nil
 }
 
+// IsValidIPv4Address tests that the argument is a valid IPv4 address.
+func IsValidIPv4Address(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	ip := net.ParseIP(value)
+	if ip == nil || ip.To4() == nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address"))
+	}
+	return allErrors
+}
+
+// IsValidIPv6Address tests that the argument is a valid IPv6 address.
+func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	ip := net.ParseIP(value)
+	if ip == nil || ip.To4() != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
+	}
+	return allErrors
+}
+
 const percentFmt string = "[0-9]+%"
 const percentErrMsg string = "a valid percent string must be a numeric string followed by an ending '%'"
 
 var percentRegexp = regexp.MustCompile("^" + percentFmt + "$")
 
+// IsValidPercent checks that string is in the form of a percentage
 func IsValidPercent(percent string) []string {
 	if !percentRegexp.MatchString(percent) {
 		return []string{RegexError(percentErrMsg, percentFmt, "1%", "93%")}
@@ -391,13 +482,13 @@ func hasChDirPrefix(value string) []string {
 	return errs
 }
 
-// IsSocketAddr checks that a string conforms is a valid socket address
+// IsValidSocketAddr checks that string represents a valid socket address
 // as defined in RFC 789. (e.g 0.0.0.0:10254 or [::]:10254))
 func IsValidSocketAddr(value string) []string {
 	var errs []string
 	ip, port, err := net.SplitHostPort(value)
 	if err != nil {
-		return append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
+		errs = append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
 		return errs
 	}
 	portInt, _ := strconv.Atoi(port)

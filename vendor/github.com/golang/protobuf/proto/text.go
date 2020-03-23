@@ -353,7 +353,7 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 						return err
 					}
 				}
-				if err := tm.writeAny(w, key, props.mkeyprop); err != nil {
+				if err := tm.writeAny(w, key, props.MapKeyProp); err != nil {
 					return err
 				}
 				if err := w.WriteByte('\n'); err != nil {
@@ -370,7 +370,7 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 							return err
 						}
 					}
-					if err := tm.writeAny(w, val, props.mvalprop); err != nil {
+					if err := tm.writeAny(w, val, props.MapValProp); err != nil {
 						return err
 					}
 					if err := w.WriteByte('\n'); err != nil {

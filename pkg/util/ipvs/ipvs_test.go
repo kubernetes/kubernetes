@@ -18,7 +18,11 @@ package ipvs
 
 import (
 	"net"
+	"reflect"
+	"sort"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestVirtualServerEqual(t *testing.T) {
@@ -378,5 +382,34 @@ func TestFrontendDestinationString(t *testing.T) {
 		if Tests[i].expected != Tests[i].svc.String() {
 			t.Errorf("case: %d got %v, expected %v", i, Tests[i].svc.String(), Tests[i].expected)
 		}
+	}
+}
+
+func TestGetRequiredIPVSModules(t *testing.T) {
+	Tests := []struct {
+		name          string
+		kernelVersion *version.Version
+		want          []string
+	}{
+		{
+			name:          "kernel version < 4.19",
+			kernelVersion: version.MustParseGeneric("4.18"),
+			want:          []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4},
+		},
+		{
+			name:          "kernel version 4.19",
+			kernelVersion: version.MustParseGeneric("4.19"),
+			want:          []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack},
+		},
+	}
+	for _, test := range Tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := GetRequiredIPVSModules(test.kernelVersion)
+			sort.Strings(got)
+			sort.Strings(test.want)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("GetRequiredIPVSMods() = %v for kenel version: %s, want %v", got, test.kernelVersion, test.want)
+			}
+		})
 	}
 }

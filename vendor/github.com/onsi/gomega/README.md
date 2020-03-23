@@ -1,10 +1,10 @@
 ![Gomega: Ginkgo's Preferred Matcher Library](http://onsi.github.io/gomega/images/gomega.png)
 
-[![Build Status](https://travis-ci.org/onsi/gomega.png)](https://travis-ci.org/onsi/gomega)
+[![Build Status](https://travis-ci.org/onsi/gomega.svg?branch=master)](https://travis-ci.org/onsi/gomega)
 
 Jump straight to the [docs](http://onsi.github.io/gomega/) to learn about Gomega, including a list of [all available matchers](http://onsi.github.io/gomega/#provided-matchers).
 
-To discuss Gomega and get updates, join the [google group](https://groups.google.com/d/forum/ginkgo-and-gomega).
+If you have a question, comment, bug report, feature request, etc. please open a GitHub issue.
 
 ## [Ginkgo](http://github.com/onsi/ginkgo): a BDD Testing Framework for Golang
 

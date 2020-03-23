@@ -1,19 +1,19 @@
-![Ginkgo: A Golang BDD Testing Framework](http://onsi.github.io/ginkgo/images/ginkgo.png)
+![Ginkgo: A Go BDD Testing Framework](http://onsi.github.io/ginkgo/images/ginkgo.png)
 
-[![Build Status](https://travis-ci.org/onsi/ginkgo.svg)](https://travis-ci.org/onsi/ginkgo)
+[![Build Status](https://travis-ci.org/onsi/ginkgo.svg?branch=master)](https://travis-ci.org/onsi/ginkgo)
 
 Jump to the [docs](http://onsi.github.io/ginkgo/) to learn more.  To start rolling your Ginkgo tests *now* [keep reading](#set-me-up)!
 
-To discuss Ginkgo and get updates, join the [google group](https://groups.google.com/d/forum/ginkgo-and-gomega).
+If you have a question, comment, bug report, feature request, etc. please open a GitHub issue.
 
 ## Feature List
 
 - Ginkgo uses Go's `testing` package and can live alongside your existing `testing` tests.  It's easy to [bootstrap](http://onsi.github.io/ginkgo/#bootstrapping-a-suite) and start writing your [first tests](http://onsi.github.io/ginkgo/#adding-specs-to-a-suite)
 
 - Structure your BDD-style tests expressively:
-    - Nestable [`Describe` and `Context` container blocks](http://onsi.github.io/ginkgo/#organizing-specs-with-containers-describe-and-context)
+    - Nestable [`Describe`, `Context` and `When` container blocks](http://onsi.github.io/ginkgo/#organizing-specs-with-containers-describe-and-context)
     - [`BeforeEach` and `AfterEach` blocks](http://onsi.github.io/ginkgo/#extracting-common-setup-beforeeach) for setup and teardown
-    - [`It` blocks](http://onsi.github.io/ginkgo/#individual-specs-) that hold your assertions
+    - [`It` and `Specify` blocks](http://onsi.github.io/ginkgo/#individual-specs-) that hold your assertions
     - [`JustBeforeEach` blocks](http://onsi.github.io/ginkgo/#separating-creation-and-configuration-justbeforeeach) that separate creation from configuration (also known as the subject action pattern).
     - [`BeforeSuite` and `AfterSuite` blocks](http://onsi.github.io/ginkgo/#global-setup-and-teardown-beforesuite-and-aftersuite) to prep for and cleanup after a suite.
 
@@ -25,7 +25,7 @@ To discuss Ginkgo and get updates, join the [google group](https://groups.google
 
 - `ginkgo`: a command line interface with plenty of handy command line arguments for [running your tests](http://onsi.github.io/ginkgo/#running-tests) and [generating](http://onsi.github.io/ginkgo/#generators) test files.  Here are a few choice examples:
     - `ginkgo -nodes=N` runs your tests in `N` parallel processes and print out coherent output in realtime
-    - `ginkgo -cover` runs your tests using Golang's code coverage tool
+    - `ginkgo -cover` runs your tests using Go's code coverage tool
     - `ginkgo convert` converts an XUnit-style `testing` package to a Ginkgo-style package
     - `ginkgo -focus="REGEXP"` and `ginkgo -skip="REGEXP"` allow you to specify a subset of tests to run via regular expression
     - `ginkgo -r` runs all tests suites under the current directory
@@ -43,6 +43,8 @@ To discuss Ginkgo and get updates, join the [google group](https://groups.google
 
 - [Completions for Sublime Text](https://github.com/onsi/ginkgo-sublime-completions): just use [Package Control](https://sublime.wbond.net/) to install `Ginkgo Completions`.
 
+- [Completions for VSCode](https://github.com/onsi/vscode-ginkgo): just use VSCode's extension installer to install `vscode-ginkgo`.
+
 - Straightforward support for third-party testing libraries such as [Gomock](https://code.google.com/p/gomock/) and [Testify](https://github.com/stretchr/testify).  Check out the [docs](http://onsi.github.io/ginkgo/#third-party-integrations) for details.
 
 - A modular architecture that lets you easily:
@@ -53,18 +55,18 @@ To discuss Ginkgo and get updates, join the [google group](https://groups.google
 
 Ginkgo is best paired with Gomega.  Learn more about Gomega [here](http://onsi.github.io/gomega/)
 
-## [Agouti](http://github.com/sclevine/agouti): A Golang Acceptance Testing Framework
+## [Agouti](http://github.com/sclevine/agouti): A Go Acceptance Testing Framework
 
 Agouti allows you run WebDriver integration tests.  Learn more about Agouti [here](http://agouti.org)
 
 ## Set Me Up!
 
-You'll need Golang v1.3+ (Ubuntu users: you probably have Golang v1.0 -- you'll need to upgrade!)
+You'll need the Go command-line tools. Ginkgo is tested with Go 1.6+, but preferably you should get the latest. Follow the [installation instructions](https://golang.org/doc/install) if you don't have it installed.
 
 ```bash
 
-go get github.com/onsi/ginkgo/ginkgo  # installs the ginkgo CLI
-go get github.com/onsi/gomega         # fetches the matcher library
+go get -u github.com/onsi/ginkgo/ginkgo  # installs the ginkgo CLI
+go get -u github.com/onsi/gomega/...     # fetches the matcher library
 
 cd path/to/package/you/want/to/test
 
@@ -83,11 +85,11 @@ Of course, I heartily recommend [Ginkgo](https://github.com/onsi/ginkgo) and [Go
 
 With that said, it's great to know what your options are :)
 
-### What Golang gives you out of the box
+### What Go gives you out of the box
 
-Testing is a first class citizen in Golang, however Go's built-in testing primitives are somewhat limited: The [testing](http://golang.org/pkg/testing) package provides basic XUnit style tests and no assertion library.
+Testing is a first class citizen in Go, however Go's built-in testing primitives are somewhat limited: The [testing](http://golang.org/pkg/testing) package provides basic XUnit style tests and no assertion library.
 
-### Matcher libraries for Golang's XUnit style tests
+### Matcher libraries for Go's XUnit style tests
 
 A number of matcher libraries have been written to augment Go's built-in XUnit style tests.  Here are two that have gained traction:
 
@@ -98,7 +100,7 @@ You can also use Ginkgo's matcher library [Gomega](https://github.com/onsi/gomeg
 
 ### BDD style testing frameworks
 
-There are a handful of BDD-style testing frameworks written for Golang.  Here are a few:
+There are a handful of BDD-style testing frameworks written for Go.  Here are a few:
 
 - [Ginkgo](https://github.com/onsi/ginkgo) ;)
 - [GoConvey](https://github.com/smartystreets/goconvey) 
@@ -106,10 +108,14 @@ There are a handful of BDD-style testing frameworks written for Golang.  Here ar
 - [Mao](https://github.com/azer/mao)
 - [Zen](https://github.com/pranavraja/zen)
 
-Finally, @shageman has [put together](https://github.com/shageman/gotestit) a comprehensive comparison of golang testing libraries.
+Finally, @shageman has [put together](https://github.com/shageman/gotestit) a comprehensive comparison of Go testing libraries.
 
 Go explore!
 
 ## License
 
 Ginkgo is MIT-Licensed
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md)

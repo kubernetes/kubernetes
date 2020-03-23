@@ -1,14 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - saad-ali
 - rootfs
-- gnufied 
+- gnufied
 - jingxu97
 - jsafrane
 - msau42
+- davidz627
 reviewers:
 - saad-ali
 - rootfs
-- gnufied 
+- gnufied
 - jingxu97
 - jsafrane
 - msau42
@@ -16,3 +19,5 @@ reviewers:
 - copejon
 - verult
 - davidz627
+labels:
+- sig/storage

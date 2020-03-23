@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "2q.go",
         "arc.go",
+        "doc.go",
         "lru.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/hashicorp/golang-lru",

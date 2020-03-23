@@ -12,7 +12,7 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/util/uuid",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
     ],
 )
 

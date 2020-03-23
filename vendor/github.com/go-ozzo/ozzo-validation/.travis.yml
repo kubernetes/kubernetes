@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - 1.8
+  - 1.9
+  - tip
+
+install:
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/mattn/goveralls
+  - go list -f '{{range .Imports}}{{.}} {{end}}' ./... | xargs go get -v
+  - go list -f '{{range .TestImports}}{{.}} {{end}}' ./... | xargs go get -v
+
+script:
+  - go test -v -covermode=count -coverprofile=coverage.out
+  - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci

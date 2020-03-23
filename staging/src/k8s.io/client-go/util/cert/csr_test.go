@@ -23,6 +23,8 @@ import (
 	"io/ioutil"
 	"net"
 	"testing"
+
+	"k8s.io/client-go/util/keyutil"
 )
 
 func TestMakeCSR(t *testing.T) {
@@ -37,7 +39,7 @@ func TestMakeCSR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := ParsePrivateKeyPEM(keyData)
+	key, err := keyutil.ParsePrivateKeyPEM(keyData)
 	if err != nil {
 		t.Fatal(err)
 	}

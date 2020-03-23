@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +26,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -39,7 +39,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against priority classes.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &scheduling.PriorityClass{} },
 		NewListFunc:              func() runtime.Object { return &scheduling.PriorityClassList{} },
@@ -49,14 +49,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: priorityclass.Strategy,
 		DeleteStrategy: priorityclass.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
-	return &REST{store}
+	return &REST{store}, nil
 }
 
 // Implement ShortNamesProvider
@@ -68,12 +68,12 @@ func (r *REST) ShortNames() []string {
 }
 
 // Delete ensures that system priority classes are not deleted.
-func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	for _, spc := range scheduling.SystemPriorityClasses() {
+func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	for _, spc := range schedulingapiv1.SystemPriorityClasses() {
 		if name == spc.Name {
 			return nil, false, apierrors.NewForbidden(scheduling.Resource("priorityclasses"), spc.Name, errors.New("this is a system priority class and cannot be deleted"))
 		}
 	}
 
-	return r.Store.Delete(ctx, name, options)
+	return r.Store.Delete(ctx, name, deleteValidation, options)
 }

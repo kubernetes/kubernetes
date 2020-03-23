@@ -23,13 +23,13 @@ import (
 	"github.com/google/cadvisor/storage"
 	"github.com/google/cadvisor/utils"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ErrDataNotFound is the error resulting if failed to find a container in memory cache.
 var ErrDataNotFound = errors.New("unable to find data in memory cache")
 
-// TODO(vmarmol): See about refactoring this class, we have an unecessary redirection of containerCache and InMemoryCache.
+// TODO(vmarmol): See about refactoring this class, we have an unnecessary redirection of containerCache and InMemoryCache.
 // containerCache is used to store per-container information
 type containerCache struct {
 	ref         info.ContainerReference
@@ -70,7 +70,7 @@ type InMemoryCache struct {
 	lock              sync.RWMutex
 	containerCacheMap map[string]*containerCache
 	maxAge            time.Duration
-	backend           storage.StorageDriver
+	backend           []storage.StorageDriver
 }
 
 func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.ContainerStats) error {
@@ -86,12 +86,12 @@ func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.Conta
 		}
 	}()
 
-	if self.backend != nil {
+	for _, backend := range self.backend {
 		// TODO(monnand): To deal with long delay write operations, we
 		// may want to start a pool of goroutines to do write
 		// operations.
-		if err := self.backend.AddStats(cInfo, stats); err != nil {
-			glog.Error(err)
+		if err := backend.AddStats(cInfo, stats); err != nil {
+			klog.Error(err)
 		}
 	}
 	return cstore.AddStats(stats)
@@ -131,7 +131,7 @@ func (self *InMemoryCache) RemoveContainer(containerName string) error {
 
 func New(
 	maxAge time.Duration,
-	backend storage.StorageDriver,
+	backend []storage.StorageDriver,
 ) *InMemoryCache {
 	ret := &InMemoryCache{
 		containerCacheMap: make(map[string]*containerCache, 32),

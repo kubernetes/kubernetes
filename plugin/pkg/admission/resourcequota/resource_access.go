@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 )
@@ -78,7 +79,7 @@ func newQuotaAccessor() (*quotaAccessor, error) {
 }
 
 func (e *quotaAccessor) UpdateQuotaStatus(newQuota *corev1.ResourceQuota) error {
-	updatedQuota, err := e.client.CoreV1().ResourceQuotas(newQuota.Namespace).UpdateStatus(newQuota)
+	updatedQuota, err := e.client.CoreV1().ResourceQuotas(newQuota.Namespace).UpdateStatus(context.TODO(), newQuota, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func (e *quotaAccessor) UpdateQuotaStatus(newQuota *corev1.ResourceQuota) error 
 	return nil
 }
 
-var etcdVersioner = etcd.APIObjectVersioner{}
+var etcdVersioner = etcd3.APIObjectVersioner{}
 
 // checkCache compares the passed quota against the value in the look-aside cache and returns the newer
 // if the cache is out of date, it deletes the stale entry.  This only works because of etcd resourceVersions
@@ -125,7 +126,7 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := e.client.Core().ResourceQuotas(namespace).List(metav1.ListOptions{})
+			liveList, err := e.client.CoreV1().ResourceQuotas(namespace).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}

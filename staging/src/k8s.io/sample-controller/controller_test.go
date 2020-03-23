@@ -34,8 +34,8 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	samplecontroller "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	"k8s.io/sample-controller/pkg/client/clientset/versioned/fake"
-	informers "k8s.io/sample-controller/pkg/client/informers/externalversions"
+	"k8s.io/sample-controller/pkg/generated/clientset/versioned/fake"
+	informers "k8s.io/sample-controller/pkg/generated/informers/externalversions"
 )
 
 var (
@@ -175,33 +175,36 @@ func checkAction(expected, actual core.Action, t *testing.T) {
 	}
 
 	switch a := actual.(type) {
-	case core.CreateAction:
-		e, _ := expected.(core.CreateAction)
+	case core.CreateActionImpl:
+		e, _ := expected.(core.CreateActionImpl)
 		expObject := e.GetObject()
 		object := a.GetObject()
 
 		if !reflect.DeepEqual(expObject, object) {
 			t.Errorf("Action %s %s has wrong object\nDiff:\n %s",
-				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintDiff(expObject, object))
+				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintSideBySide(expObject, object))
 		}
-	case core.UpdateAction:
-		e, _ := expected.(core.UpdateAction)
+	case core.UpdateActionImpl:
+		e, _ := expected.(core.UpdateActionImpl)
 		expObject := e.GetObject()
 		object := a.GetObject()
 
 		if !reflect.DeepEqual(expObject, object) {
 			t.Errorf("Action %s %s has wrong object\nDiff:\n %s",
-				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintDiff(expObject, object))
+				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintSideBySide(expObject, object))
 		}
-	case core.PatchAction:
-		e, _ := expected.(core.PatchAction)
+	case core.PatchActionImpl:
+		e, _ := expected.(core.PatchActionImpl)
 		expPatch := e.GetPatch()
 		patch := a.GetPatch()
 
 		if !reflect.DeepEqual(expPatch, patch) {
 			t.Errorf("Action %s %s has wrong patch\nDiff:\n %s",
-				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintDiff(expPatch, patch))
+				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintSideBySide(expPatch, patch))
 		}
+	default:
+		t.Errorf("Uncaptured Action %s %s, you should explicitly add a case to capture it",
+			actual.GetVerb(), actual.GetResource().Resource)
 	}
 }
 

@@ -19,6 +19,7 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -40,6 +41,7 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
+// Builds new Scheme of known types
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
@@ -49,16 +51,15 @@ var (
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Deployment{},
-		&DeploymentList{},
-		&DeploymentRollback{},
-		&ReplicationControllerDummy{},
-		&DaemonSetList{},
-		&DaemonSet{},
-		&Ingress{},
-		&IngressList{},
-		&ReplicaSet{},
-		&ReplicaSetList{},
+		&apps.Deployment{},
+		&apps.DeploymentList{},
+		&apps.DeploymentRollback{},
+		&apps.DaemonSetList{},
+		&apps.DaemonSet{},
+		&networking.Ingress{},
+		&networking.IngressList{},
+		&apps.ReplicaSet{},
+		&apps.ReplicaSetList{},
 		&policy.PodSecurityPolicy{},
 		&policy.PodSecurityPolicyList{},
 		&autoscaling.Scale{},

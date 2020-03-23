@@ -31,9 +31,10 @@ import (
 
 type RESTStorageProvider struct {
 	Authenticator authenticator.Request
+	APIAudiences  authenticator.Audiences
 }
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	// TODO figure out how to make the swagger generation stable, while allowing this endpoint to be disabled.
 	// if p.Authenticator == nil {
 	// 	return genericapiserver.APIGroupInfo{}, false
@@ -50,13 +51,13 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
 
-	return apiGroupInfo, true
+	return apiGroupInfo, true, nil
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// tokenreviews
-	tokenReviewStorage := tokenreview.NewREST(p.Authenticator)
+	tokenReviewStorage := tokenreview.NewREST(p.Authenticator, p.APIAudiences)
 	storage["tokenreviews"] = tokenReviewStorage
 
 	return storage
@@ -65,7 +66,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// tokenreviews
-	tokenReviewStorage := tokenreview.NewREST(p.Authenticator)
+	tokenReviewStorage := tokenreview.NewREST(p.Authenticator, p.APIAudiences)
 	storage["tokenreviews"] = tokenReviewStorage
 
 	return storage

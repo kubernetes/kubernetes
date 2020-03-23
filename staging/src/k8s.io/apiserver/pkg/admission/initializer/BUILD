@@ -15,11 +15,11 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/initializer",
     importpath = "k8s.io/apiserver/pkg/admission/initializer",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
     ],
 )
 
@@ -28,7 +28,6 @@ go_test(
     srcs = ["initializer_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",

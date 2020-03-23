@@ -20,7 +20,7 @@ import (
 	"fmt"
 )
 
-const VERSION = "1.2.0"
+const VERSION = "1.11.0"
 
 type GinkgoConfigType struct {
 	RandomSeed         int64
@@ -34,6 +34,7 @@ type GinkgoConfigType struct {
 	FlakeAttempts      int
 	EmitSpecProgress   bool
 	DryRun             bool
+	DebugParallel      bool
 
 	ParallelNode  int
 	ParallelTotal int
@@ -47,16 +48,19 @@ type DefaultReporterConfigType struct {
 	NoColor           bool
 	SlowSpecThreshold float64
 	NoisyPendings     bool
+	NoisySkippings    bool
 	Succinct          bool
 	Verbose           bool
 	FullTrace         bool
+	ReportPassed      bool
+	ReportFile        string
 }
 
 var DefaultReporterConfig = DefaultReporterConfigType{}
 
 func processPrefix(prefix string) string {
 	if prefix != "" {
-		prefix = prefix + "."
+		prefix += "."
 	}
 	return prefix
 }
@@ -64,7 +68,7 @@ func processPrefix(prefix string) string {
 func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 	prefix = processPrefix(prefix)
 	flagSet.Int64Var(&(GinkgoConfig.RandomSeed), prefix+"seed", time.Now().Unix(), "The seed used to randomize the spec suite.")
-	flagSet.BoolVar(&(GinkgoConfig.RandomizeAllSpecs), prefix+"randomizeAllSpecs", false, "If set, ginkgo will randomize all specs together.  By default, ginkgo only randomizes the top level Describe/Context groups.")
+	flagSet.BoolVar(&(GinkgoConfig.RandomizeAllSpecs), prefix+"randomizeAllSpecs", false, "If set, ginkgo will randomize all specs together.  By default, ginkgo only randomizes the top level Describe, Context and When groups.")
 	flagSet.BoolVar(&(GinkgoConfig.SkipMeasurements), prefix+"skipMeasurements", false, "If set, ginkgo will skip any measurement specs.")
 	flagSet.BoolVar(&(GinkgoConfig.FailOnPending), prefix+"failOnPending", false, "If set, ginkgo will mark the test suite as failed if any specs are pending.")
 	flagSet.BoolVar(&(GinkgoConfig.FailFast), prefix+"failFast", false, "If set, ginkgo will stop running a test suite after a failure occurs.")
@@ -80,6 +84,8 @@ func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 
 	flagSet.BoolVar(&(GinkgoConfig.EmitSpecProgress), prefix+"progress", false, "If set, ginkgo will emit progress information as each spec runs to the GinkgoWriter.")
 
+	flagSet.BoolVar(&(GinkgoConfig.DebugParallel), prefix+"debug", false, "If set, ginkgo will emit node output to files when running in parallel.")
+
 	if includeParallelFlags {
 		flagSet.IntVar(&(GinkgoConfig.ParallelNode), prefix+"parallel.node", 1, "This worker node's (one-indexed) node number.  For running specs in parallel.")
 		flagSet.IntVar(&(GinkgoConfig.ParallelTotal), prefix+"parallel.total", 1, "The total number of worker nodes.  For running specs in parallel.")
@@ -90,9 +96,13 @@ func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 	flagSet.BoolVar(&(DefaultReporterConfig.NoColor), prefix+"noColor", false, "If set, suppress color output in default reporter.")
 	flagSet.Float64Var(&(DefaultReporterConfig.SlowSpecThreshold), prefix+"slowSpecThreshold", 5.0, "(in seconds) Specs that take longer to run than this threshold are flagged as slow by the default reporter.")
 	flagSet.BoolVar(&(DefaultReporterConfig.NoisyPendings), prefix+"noisyPendings", true, "If set, default reporter will shout about pending tests.")
+	flagSet.BoolVar(&(DefaultReporterConfig.NoisySkippings), prefix+"noisySkippings", true, "If set, default reporter will shout about skipping tests.")
 	flagSet.BoolVar(&(DefaultReporterConfig.Verbose), prefix+"v", false, "If set, default reporter print out all specs as they begin.")
 	flagSet.BoolVar(&(DefaultReporterConfig.Succinct), prefix+"succinct", false, "If set, default reporter prints out a very succinct report")
 	flagSet.BoolVar(&(DefaultReporterConfig.FullTrace), prefix+"trace", false, "If set, default reporter prints out the full stack trace when a failure occurs")
+	flagSet.BoolVar(&(DefaultReporterConfig.ReportPassed), prefix+"reportPassed", false, "If set, default reporter prints out captured output of passed tests.")
+	flagSet.StringVar(&(DefaultReporterConfig.ReportFile), prefix+"reportFile", "", "Override the default reporter output file path.")
+
 }
 
 func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultReporterConfigType) []string {
@@ -139,6 +149,10 @@ func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultRepor
 		result = append(result, fmt.Sprintf("--%sprogress", prefix))
 	}
 
+	if ginkgo.DebugParallel {
+		result = append(result, fmt.Sprintf("--%sdebug", prefix))
+	}
+
 	if ginkgo.ParallelNode != 0 {
 		result = append(result, fmt.Sprintf("--%sparallel.node=%d", prefix, ginkgo.ParallelNode))
 	}
@@ -171,6 +185,10 @@ func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultRepor
 		result = append(result, fmt.Sprintf("--%snoisyPendings=false", prefix))
 	}
 
+	if !reporter.NoisySkippings {
+		result = append(result, fmt.Sprintf("--%snoisySkippings=false", prefix))
+	}
+
 	if reporter.Verbose {
 		result = append(result, fmt.Sprintf("--%sv", prefix))
 	}
@@ -181,6 +199,14 @@ func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultRepor
 
 	if reporter.FullTrace {
 		result = append(result, fmt.Sprintf("--%strace", prefix))
+	}
+
+	if reporter.ReportPassed {
+		result = append(result, fmt.Sprintf("--%sreportPassed", prefix))
+	}
+
+	if reporter.ReportFile != "" {
+		result = append(result, fmt.Sprintf("--%sreportFile=%s", prefix, reporter.ReportFile))
 	}
 
 	return result

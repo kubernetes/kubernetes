@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // EtcdMigrateServer manages starting and stopping a versioned etcd server binary.
@@ -75,10 +75,10 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 		case <-interval.C:
 			err := r.client.SetEtcdVersionKeyValue(version)
 			if err != nil {
-				glog.Infof("Still waiting for etcd to start, current error: %v", err)
+				klog.Infof("Still waiting for etcd to start, current error: %v", err)
 				// keep waiting
 			} else {
-				glog.Infof("Etcd on port %d is up.", r.cfg.port)
+				klog.Infof("Etcd on port %d is up.", r.cfg.port)
 				r.cmd = etcdCmd
 				return nil
 			}
@@ -87,7 +87,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 			if err != nil {
 				return fmt.Errorf("error killing etcd: %v", err)
 			}
-			return fmt.Errorf("Timed out waiting for etcd on port %d", r.cfg.port)
+			return fmt.Errorf("timed out waiting for etcd on port %d", r.cfg.port)
 		}
 	}
 }
@@ -114,7 +114,7 @@ func (r *EtcdMigrateServer) Stop() error {
 		case <-stopped:
 			return
 		case <-timedout:
-			glog.Infof("etcd server has not terminated gracefully after %s, killing it.", gracefulWait)
+			klog.Infof("etcd server has not terminated gracefully after %s, killing it.", gracefulWait)
 			r.cmd.Process.Kill()
 			return
 		}
@@ -122,11 +122,11 @@ func (r *EtcdMigrateServer) Stop() error {
 	err = r.cmd.Wait()
 	stopped <- true
 	if exiterr, ok := err.(*exec.ExitError); ok {
-		glog.Infof("etcd server stopped (signal: %s)", exiterr.Error())
+		klog.Infof("etcd server stopped (signal: %s)", exiterr.Error())
 		// stopped
 	} else if err != nil {
 		return fmt.Errorf("error waiting for etcd to stop: %v", err)
 	}
-	glog.Infof("Stopped etcd server %s", r.cfg.name)
+	klog.Infof("Stopped etcd server %s", r.cfg.name)
 	return nil
 }

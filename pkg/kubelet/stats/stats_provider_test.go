@@ -607,13 +607,13 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 
 	assert.EqualValues(t, 2, len(stats.Interfaces), "network interfaces should contain 2 elements")
 
-	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is ont eth0")
+	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is not eth0")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.Interfaces[0].RxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.Interfaces[0].RxErrors, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.Interfaces[0].TxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.Interfaces[0].TxErrors, label+".Net.TxErrors")
 
-	assert.EqualValues(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is ont cbr0")
+	assert.EqualValues(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is not cbr0")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].RxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].RxErrors, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
@@ -621,7 +621,32 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 
 }
 
+// container which had no stats should have zero-valued CPU usage
+func checkEmptyCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {
+	require.NotNil(t, stats.Time, label+".CPU.Time")
+	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageNanoCores")
+	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageCoreSeconds")
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
+	assert.EqualValues(t, 0, *stats.UsageNanoCores, label+".CPU.UsageCores")
+	assert.EqualValues(t, 0, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
+}
+
+// container which had no stats should have zero-valued Memory usage
+func checkEmptyMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.MemoryStats) {
+	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
+	require.NotNil(t, stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
+	assert.EqualValues(t, 0, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
+	assert.Nil(t, stats.UsageBytes, label+".Mem.UsageBytes")
+	assert.Nil(t, stats.RSSBytes, label+".Mem.RSSBytes")
+	assert.Nil(t, stats.PageFaults, label+".Mem.PageFaults")
+	assert.Nil(t, stats.MajorPageFaults, label+".Mem.MajorPageFaults")
+	assert.Nil(t, stats.AvailableBytes, label+".Mem.AvailableBytes")
+}
+
 func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {
+	require.NotNil(t, stats.Time, label+".CPU.Time")
+	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageNanoCores")
+	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageCoreSeconds")
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
 	assert.EqualValues(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
 	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
@@ -679,6 +704,10 @@ type fakeContainerStatsProvider struct {
 }
 
 func (p fakeContainerStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (p fakeContainerStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

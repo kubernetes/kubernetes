@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from an HTTP GET response.
 package config
 
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -29,8 +27,9 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
+	utilio "k8s.io/utils/io"
 )
 
 type sourceURL struct {
@@ -43,6 +42,7 @@ type sourceURL struct {
 	client      *http.Client
 }
 
+// NewSourceURL specifies the URL where to read the Pod configuration from, then watches it for changes.
 func NewSourceURL(url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
@@ -54,7 +54,7 @@ func NewSourceURL(url string, header http.Header, nodeName types.NodeName, perio
 		// read the manifest URL passed to kubelet.
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
-	glog.V(1).Infof("Watching URL %s", url)
+	klog.V(1).Infof("Watching URL %s", url)
 	go wait.Until(config.run, period, wait.NeverStop)
 }
 
@@ -63,16 +63,16 @@ func (s *sourceURL) run() {
 		// Don't log this multiple times per minute. The first few entries should be
 		// enough to get the point across.
 		if s.failureLogs < 3 {
-			glog.Warningf("Failed to read pods from URL: %v", err)
+			klog.Warningf("Failed to read pods from URL: %v", err)
 		} else if s.failureLogs == 3 {
-			glog.Warningf("Failed to read pods from URL. Dropping verbosity of this message to V(4): %v", err)
+			klog.Warningf("Failed to read pods from URL. Dropping verbosity of this message to V(4): %v", err)
 		} else {
-			glog.V(4).Infof("Failed to read pods from URL: %v", err)
+			klog.V(4).Infof("Failed to read pods from URL: %v", err)
 		}
 		s.failureLogs++
 	} else {
 		if s.failureLogs > 0 {
-			glog.Info("Successfully read pods from URL.")
+			klog.Info("Successfully read pods from URL.")
 			s.failureLogs = 0
 		}
 	}
@@ -93,7 +93,7 @@ func (s *sourceURL) extractFromURL() error {
 		return err
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := utilio.ReadAtMost(resp.Body, maxConfigLength)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (s *sourceURL) extractFromURL() error {
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the data has not changed since the last time it was read.
-	if bytes.Compare(data, s.data) == 0 {
+	if bytes.Equal(data, s.data) {
 		return nil
 	}
 	s.data = data
@@ -138,6 +138,6 @@ func (s *sourceURL) extractFromURL() error {
 	}
 
 	return fmt.Errorf("%v: received '%v', but couldn't parse as "+
-		"single (%v) or multiple pods (%v).\n",
+		"single (%v) or multiple pods (%v)",
 		s.url, string(data), singlePodErr, multiPodErr)
 }

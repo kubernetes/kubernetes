@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -21,36 +23,36 @@ import (
 	"encoding/json"
 	"net"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/legacy-cloud-providers/gce"
 	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 type adapter struct {
 	k8s   clientset.Interface
-	cloud *gce.GCECloud
+	cloud *gce.Cloud
 
 	recorder record.EventRecorder
 }
 
-func newAdapter(k8s clientset.Interface, cloud *gce.GCECloud) *adapter {
+func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
 	ret := &adapter{
 		k8s:   k8s,
 		cloud: cloud,
 	}
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(glog.Infof)
+	broadcaster.StartLogging(klog.Infof)
 	ret.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloudCIDRAllocator"})
-	glog.V(0).Infof("Sending events to api server.")
+	klog.V(0).Infof("Sending events to api server.")
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{
 		Interface: k8s.CoreV1().Events(""),
 	})
@@ -70,7 +72,7 @@ func (a *adapter) Alias(ctx context.Context, nodeName string) (*net.IPNet, error
 	case 1:
 		break
 	default:
-		glog.Warningf("Node %q has more than one alias assigned (%v), defaulting to the first", nodeName, cidrs)
+		klog.Warningf("Node %q has more than one alias assigned (%v), defaulting to the first", nodeName, cidrs)
 	}
 
 	_, cidrRange, err := net.ParseCIDR(cidrs[0])
@@ -86,7 +88,7 @@ func (a *adapter) AddAlias(ctx context.Context, nodeName string, cidrRange *net.
 }
 
 func (a *adapter) Node(ctx context.Context, name string) (*v1.Node, error) {
-	return a.k8s.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	return a.k8s.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (a *adapter) UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRange *net.IPNet) error {
@@ -101,7 +103,7 @@ func (a *adapter) UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRang
 		return err
 	}
 
-	_, err = a.k8s.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, bytes)
+	_, err = a.k8s.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	return err
 }
 

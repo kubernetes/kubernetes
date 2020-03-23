@@ -155,6 +155,7 @@ func DirectionString(s string) bidi.Direction {
 		e, sz := bidi.LookupString(s[i:])
 		if sz == 0 {
 			i++
+			continue
 		}
 		c := e.Class()
 		if c == bidi.R || c == bidi.AL || c == bidi.AN {
@@ -200,13 +201,6 @@ type Transformer struct {
 func (t *Transformer) isRTL() bool {
 	const isRTL = 1<<bidi.R | 1<<bidi.AL | 1<<bidi.AN
 	return t.seen&isRTL != 0
-}
-
-func (t *Transformer) isFinal() bool {
-	if !t.isRTL() {
-		return true
-	}
-	return t.state == ruleLTRFinal || t.state == ruleRTLFinal || t.state == ruleInitial
 }
 
 // Reset implements transform.Transformer.

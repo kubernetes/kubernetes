@@ -23,27 +23,50 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 )
 
-// Store is a generic object storage interface. Reflector knows how to watch a server
-// and update a store. A generic store is provided, which allows Reflector to be used
-// as a local caching system, and an LRU store, which allows Reflector to work like a
-// queue of items yet to be processed.
+// Store is a generic object storage and processing interface.  A
+// Store holds a map from string keys to accumulators, and has
+// operations to add, update, and delete a given object to/from the
+// accumulator currently associated with a given key.  A Store also
+// knows how to extract the key from a given object, so many operations
+// are given only the object.
 //
-// Store makes no assumptions about stored object identity; it is the responsibility
-// of a Store implementation to provide a mechanism to correctly key objects and to
-// define the contract for obtaining objects by some arbitrary key type.
+// In the simplest Store implementations each accumulator is simply
+// the last given object, or empty after Delete, and thus the Store's
+// behavior is simple storage.
+//
+// Reflector knows how to watch a server and update a Store.  This
+// package provides a variety of implementations of Store.
 type Store interface {
+
+	// Add adds the given object to the accumulator associated with the given object's key
 	Add(obj interface{}) error
+
+	// Update updates the given object in the accumulator associated with the given object's key
 	Update(obj interface{}) error
+
+	// Delete deletes the given object from the accumulator associated with the given object's key
 	Delete(obj interface{}) error
+
+	// List returns a list of all the currently non-empty accumulators
 	List() []interface{}
+
+	// ListKeys returns a list of all the keys currently associated with non-empty accumulators
 	ListKeys() []string
+
+	// Get returns the accumulator associated with the given object's key
 	Get(obj interface{}) (item interface{}, exists bool, err error)
+
+	// GetByKey returns the accumulator associated with the given key
 	GetByKey(key string) (item interface{}, exists bool, err error)
 
 	// Replace will delete the contents of the store, using instead the
 	// given list. Store takes ownership of the list, you should not reference
 	// it after calling this function.
 	Replace([]interface{}, string) error
+
+	// Resync is meaningless in the terms appearing here but has
+	// meaning in some implementations that have non-trivial
+	// additional behavior (e.g., DeltaFIFO).
 	Resync() error
 }
 
@@ -106,9 +129,8 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 	return "", "", fmt.Errorf("unexpected key format: %q", key)
 }
 
-// cache responsibilities are limited to:
-//	1. Computing keys for objects via keyFunc
-//  2. Invoking methods of a ThreadSafeStorage interface
+// `*cache` implements Indexer in terms of a ThreadSafeStore and an
+// associated KeyFunc.
 type cache struct {
 	// cacheStorage bears the burden of thread safety for the cache
 	cacheStorage ThreadSafeStore
@@ -210,7 +232,7 @@ func (c *cache) GetByKey(key string) (item interface{}, exists bool, err error) 
 // 'c' takes ownership of the list, you should not reference the list again
 // after calling this function.
 func (c *cache) Replace(list []interface{}, resourceVersion string) error {
-	items := map[string]interface{}{}
+	items := make(map[string]interface{}, len(list))
 	for _, item := range list {
 		key, err := c.keyFunc(item)
 		if err != nil {
@@ -222,9 +244,9 @@ func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 	return nil
 }
 
-// Resync touches all items in the store to force processing
+// Resync is meaningless for one of these
 func (c *cache) Resync() error {
-	return c.cacheStorage.Resync()
+	return nil
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.

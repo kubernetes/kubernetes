@@ -5,14 +5,13 @@
 package gensupport
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 const (

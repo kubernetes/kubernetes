@@ -44,21 +44,24 @@ func (RealClock) Since(ts time.Time) time.Duration {
 	return time.Since(ts)
 }
 
-// Same as time.After(d).
+// After is the same as time.After(d).
 func (RealClock) After(d time.Duration) <-chan time.Time {
 	return time.After(d)
 }
 
+// NewTimer is the same as time.NewTimer(d)
 func (RealClock) NewTimer(d time.Duration) Timer {
 	return &realTimer{
 		timer: time.NewTimer(d),
 	}
 }
 
+// Tick is the same as time.Tick(d)
 func (RealClock) Tick(d time.Duration) <-chan time.Time {
 	return time.Tick(d)
 }
 
+// Sleep is the same as time.Sleep(d)
 func (RealClock) Sleep(d time.Duration) {
 	time.Sleep(d)
 }

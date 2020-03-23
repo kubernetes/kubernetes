@@ -24,7 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/errors"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -76,7 +76,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
 		apiclient.PrintBytesWithLinePrefix(w, fileBytes, "\t")
 	}
-	return errors.NewAggregate(errs)
+	return errorsutil.NewAggregate(errs)
 }
 
 // Waiter is an implementation of apiclient.Waiter that should be used for dry-running
@@ -108,6 +108,11 @@ func (w *Waiter) WaitForPodToDisappear(podName string) error {
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *Waiter) WaitForHealthyKubelet(_ time.Duration, healthzEndpoint string) error {
 	fmt.Printf("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
+	return nil
+}
+
+// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
+func (w *Waiter) WaitForKubeletAndFunc(f func() error) error {
 	return nil
 }
 

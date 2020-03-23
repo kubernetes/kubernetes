@@ -66,7 +66,7 @@ func (f formatter) Format(fs fmt.State, c rune) {
 }
 
 // format prints a pretty representation of m to the fs io.Writer. The format character c
-// specifies the numerical representation of of elements; valid values are those for float64
+// specifies the numerical representation of elements; valid values are those for float64
 // specified in the fmt package, with their associated flags. In addition to this, a space
 // preceding a verb indicates that zero values should be represented by the dot character.
 // The printed range of the matrix can be limited by specifying a positive value for margin;

@@ -1,10 +1,10 @@
-apiVersion: apiregistration.k8s.io/v1beta1
+apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
-  name: v1alpha1.wardle.k8s.io
+  name: v1alpha1.wardle.example.com
 spec:
   insecureSkipTLSVerify: true
-  group: wardle.k8s.io
+  group: wardle.example.com
   groupPriorityMinimum: 1000
   versionPriority: 15
   service:

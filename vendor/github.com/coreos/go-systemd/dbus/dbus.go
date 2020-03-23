@@ -16,6 +16,7 @@
 package dbus
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -60,6 +61,27 @@ func PathBusEscape(path string) string {
 	return string(n)
 }
 
+// pathBusUnescape is the inverse of PathBusEscape.
+func pathBusUnescape(path string) string {
+	if path == "_" {
+		return ""
+	}
+	n := []byte{}
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		if c == '_' && i+2 < len(path) {
+			res, err := hex.DecodeString(path[i+1 : i+3])
+			if err == nil {
+				n = append(n, res...)
+			}
+			i += 2
+		} else {
+			n = append(n, c)
+		}
+	}
+	return string(n)
+}
+
 // Conn is a connection to systemd's dbus endpoint.
 type Conn struct {
 	// sysconn/sysobj are only used to call dbus methods
@@ -74,12 +96,17 @@ type Conn struct {
 		jobs map[dbus.ObjectPath]chan<- string
 		sync.Mutex
 	}
-	subscriber struct {
+	subStateSubscriber struct {
 		updateCh chan<- *SubStateUpdate
 		errCh    chan<- error
 		sync.Mutex
 		ignore      map[dbus.ObjectPath]int64
 		cleanIgnore int64
+	}
+	propertiesSubscriber struct {
+		updateCh chan<- *PropertiesUpdate
+		errCh    chan<- error
+		sync.Mutex
 	}
 }
 
@@ -116,7 +143,7 @@ func NewUserConnection() (*Conn, error) {
 func NewSystemdConnection() (*Conn, error) {
 	return NewConnection(func() (*dbus.Conn, error) {
 		// We skip Hello when talking directly to systemd.
-		return dbusAuthConnection(func() (*dbus.Conn, error) {
+		return dbusAuthConnection(func(opts ...dbus.ConnOption) (*dbus.Conn, error) {
 			return dbus.Dial("unix:path=/run/systemd/private")
 		})
 	})
@@ -152,7 +179,7 @@ func NewConnection(dialBus func() (*dbus.Conn, error)) (*Conn, error) {
 		sigobj:  systemdObject(sigconn),
 	}
 
-	c.subscriber.ignore = make(map[dbus.ObjectPath]int64)
+	c.subStateSubscriber.ignore = make(map[dbus.ObjectPath]int64)
 	c.jobListener.jobs = make(map[dbus.ObjectPath]chan<- string)
 
 	// Setup the listeners on jobs so that we can get completions
@@ -174,7 +201,7 @@ func (c *Conn) GetManagerProperty(prop string) (string, error) {
 	return variant.String(), nil
 }
 
-func dbusAuthConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error) {
+func dbusAuthConnection(createBus func(opts ...dbus.ConnOption) (*dbus.Conn, error)) (*dbus.Conn, error) {
 	conn, err := createBus()
 	if err != nil {
 		return nil, err
@@ -194,7 +221,7 @@ func dbusAuthConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error
 	return conn, nil
 }
 
-func dbusAuthHelloConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error) {
+func dbusAuthHelloConnection(createBus func(opts ...dbus.ConnOption) (*dbus.Conn, error)) (*dbus.Conn, error) {
 	conn, err := dbusAuthConnection(createBus)
 	if err != nil {
 		return nil, err

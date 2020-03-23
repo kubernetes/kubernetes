@@ -39,19 +39,22 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 	limits := core.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
-	for _, container := range pod.Spec.Containers {
+	allContainers := []core.Container{}
+	allContainers = append(allContainers, pod.Spec.Containers...)
+	allContainers = append(allContainers, pod.Spec.InitContainers...)
+	for _, container := range allContainers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
 			if !isSupportedQoSComputeResource(name) {
 				continue
 			}
 			if quantity.Cmp(zeroQuantity) == 1 {
-				delta := quantity.Copy()
+				delta := quantity.DeepCopy()
 				if _, exists := requests[name]; !exists {
-					requests[name] = *delta
+					requests[name] = delta
 				} else {
 					delta.Add(requests[name])
-					requests[name] = *delta
+					requests[name] = delta
 				}
 			}
 		}
@@ -63,12 +66,12 @@ func GetPodQOS(pod *core.Pod) core.PodQOSClass {
 			}
 			if quantity.Cmp(zeroQuantity) == 1 {
 				qosLimitsFound.Insert(string(name))
-				delta := quantity.Copy()
+				delta := quantity.DeepCopy()
 				if _, exists := limits[name]; !exists {
-					limits[name] = *delta
+					limits[name] = delta
 				} else {
 					delta.Add(limits[name])
-					limits[name] = *delta
+					limits[name] = delta
 				}
 			}
 		}

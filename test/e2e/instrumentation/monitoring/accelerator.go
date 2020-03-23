@@ -21,17 +21,21 @@ import (
 	"os"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	"golang.org/x/oauth2/google"
-	gcm "google.golang.org/api/monitoring/v3"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
+	"golang.org/x/oauth2/google"
+	gcm "google.golang.org/api/monitoring/v3"
+	"google.golang.org/api/option"
 )
 
 // Stackdriver container accelerator metrics, as described here:
@@ -43,25 +47,26 @@ var acceleratorMetrics = []string{
 }
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
-	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 
-	It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
+	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
 		testStackdriverAcceleratorMonitoring(f)
 	})
 
 })
 
 func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 
 	framework.ExpectNoError(err)
 
@@ -88,7 +93,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 					Args:    []string{"nvidia-smi && sleep infinity"},
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							framework.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+							gpu.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
 						},
 					},
 				},
@@ -97,7 +102,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	})
 
 	metricsMap := map[string]bool{}
-	pollingFunction := checkForAcceleratorMetrics(projectId, gcmService, time.Now(), metricsMap)
+	pollingFunction := checkForAcceleratorMetrics(projectID, gcmService, time.Now(), metricsMap)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
 		framework.Logf("Missing metrics: %+v", metricsMap)
@@ -105,7 +110,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	framework.ExpectNoError(err)
 }
 
-func checkForAcceleratorMetrics(projectId string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
+func checkForAcceleratorMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
 	return func() (bool, error) {
 		counter := 0
 		for _, metric := range acceleratorMetrics {
@@ -113,7 +118,7 @@ func checkForAcceleratorMetrics(projectId string, gcmService *gcm.Service, start
 		}
 		for _, metric := range acceleratorMetrics {
 			// TODO: check only for metrics from this cluster
-			ts, err := fetchTimeSeries(projectId, gcmService, metric, start, time.Now())
+			ts, err := fetchTimeSeries(projectID, gcmService, metric, start, time.Now())
 			framework.ExpectNoError(err)
 			if len(ts) > 0 {
 				counter = counter + 1
