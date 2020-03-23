@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -223,13 +222,6 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 			return framework.NewStatus(framework.Error, err.Error())
 		}
 		node := nodeInfo.Node()
-		// Debugging purpose: print the score for each node.
-		// Score must be a pointer here, otherwise it's always 0.
-		if klog.V(10) {
-			defer func(score *int64, nodeName string) {
-				klog.Infof("%v -> %v: PodTopologySpread NormalizeScore, Score: (%d)", pod.Name, nodeName, *score)
-			}(&scores[i].Score, node.Name)
-		}
 
 		if maxMinDiff == 0 {
 			scores[i].Score = framework.MaxNodeScore

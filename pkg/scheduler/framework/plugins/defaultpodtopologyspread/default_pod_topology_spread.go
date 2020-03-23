@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/klog"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -163,11 +161,6 @@ func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *f
 			}
 		}
 		scores[i].Score = int64(fScore)
-		if klog.V(10) {
-			klog.Infof(
-				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, scores[i].Name, int64(fScore),
-			)
-		}
 	}
 	return nil
 }
