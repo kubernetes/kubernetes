@@ -166,13 +166,13 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	}
 
 	// Run "prefilter" plugins.
+	startPredicateEvalTime := time.Now()
 	preFilterStatus := prof.RunPreFilterPlugins(ctx, state, pod)
 	if !preFilterStatus.IsSuccess() {
 		return result, preFilterStatus.AsError()
 	}
 	trace.Step("Running prefilter plugins done")
 
-	startPredicateEvalTime := time.Now()
 	filteredNodes, filteredNodesStatuses, err := g.findNodesThatFitPod(ctx, prof, state, pod)
 	if err != nil {
 		return result, err
@@ -187,13 +187,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 		}
 	}
 
-	// Run "prescore" plugins.
-	prescoreStatus := prof.RunPreScorePlugins(ctx, state, pod, filteredNodes)
-	if !prescoreStatus.IsSuccess() {
-		return result, prescoreStatus.AsError()
-	}
-	trace.Step("Running prescore plugins done")
-
 	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 
@@ -207,6 +200,13 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 			FeasibleNodes:  1,
 		}, nil
 	}
+
+	// Run "prescore" plugins.
+	prescoreStatus := prof.RunPreScorePlugins(ctx, state, pod, filteredNodes)
+	if !prescoreStatus.IsSuccess() {
+		return result, prescoreStatus.AsError()
+	}
+	trace.Step("Running prescore plugins done")
 
 	priorityList, err := g.prioritizeNodes(ctx, prof, state, pod, filteredNodes)
 	if err != nil {
