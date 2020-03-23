@@ -872,7 +872,7 @@ func (nc *Controller) processTaintBaseEviction(node *v1.Node, observedReadyCondi
 			if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
 				klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
 			}
-		} else if nc.markNodeForTainting(node) {
+		} else if nc.markNodeForTainting(node, v1.ConditionFalse) {
 			klog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 				node.Name,
 				decisionTimestamp,
@@ -885,7 +885,7 @@ func (nc *Controller) processTaintBaseEviction(node *v1.Node, observedReadyCondi
 			if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
 				klog.Errorf("Failed to instantly swap NotReadyTaint to UnreachableTaint. Will try again in the next cycle.")
 			}
-		} else if nc.markNodeForTainting(node) {
+		} else if nc.markNodeForTainting(node, v1.ConditionUnknown) {
 			klog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
 				node.Name,
 				decisionTimestamp,
@@ -1476,9 +1476,21 @@ func (nc *Controller) evictPods(node *v1.Node, pods []*v1.Pod) (bool, error) {
 	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID)), nil
 }
 
-func (nc *Controller) markNodeForTainting(node *v1.Node) bool {
+func (nc *Controller) markNodeForTainting(node *v1.Node, status v1.ConditionStatus) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
+	if status == v1.ConditionFalse {
+		if !taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].SetRemove(node.Name)
+		}
+	}
+
+	if status == v1.ConditionUnknown {
+		if !taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].SetRemove(node.Name)
+		}
+	}
+
 	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
 
