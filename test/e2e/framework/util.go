@@ -1583,27 +1583,6 @@ func DescribeIng(ns string) {
 	Logf(desc)
 }
 
-// NewTestPod returns a pod that has the specified requests and limits
-func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.ResourceList) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "pause",
-					Image: imageutils.GetPauseImageName(),
-					Resources: v1.ResourceRequirements{
-						Requests: requests,
-						Limits:   limits,
-					},
-				},
-			},
-		},
-	}
-}
-
 // NewAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
 // that behave the same, no matter the underlying OS.
 func (f *Framework) NewAgnhostPod(name string, args ...string) *v1.Pod {
