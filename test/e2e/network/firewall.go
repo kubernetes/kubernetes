@@ -146,7 +146,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			podName := fmt.Sprintf("netexec%v", i)
 
 			framework.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, ns)
-			pod := f.NewAgnhostPod(podName,
+			pod := newAgnhostPod(podName,
 				"netexec",
 				fmt.Sprintf("--http-port=%d", firewallTestHTTPPort),
 				fmt.Sprintf("--udp-port=%d", firewallTestUDPPort))

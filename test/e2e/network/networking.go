@@ -60,7 +60,7 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 			Containers: []v1.Container{
 				{
 					Name:    contName,
-					Image:   framework.AgnHostImage,
+					Image:   agnHostImage,
 					Command: command,
 				},
 			},
