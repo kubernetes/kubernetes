@@ -144,6 +144,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
 			podStats.CPU = cpu
 			podStats.Memory = memory
+			podStats.ProcessStats = cadvisorInfoToProcessStats(podInfo)
 		}
 
 		status, found := p.statusProvider.GetPodStatus(podUID)

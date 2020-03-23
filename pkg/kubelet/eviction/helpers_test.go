@@ -958,6 +958,32 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 	}
 }
 
+// TestOrderedByPriorityProcess ensures we order by priority and then process consumption relative to request.
+func TestOrderedByPriorityProcess(t *testing.T) {
+	pod1 := newPod("low-priority-high-usage", lowPriority, nil, nil)
+	pod2 := newPod("low-priority-low-usage", lowPriority, nil, nil)
+	pod3 := newPod("high-priority-high-usage", highPriority, nil, nil)
+	pod4 := newPod("high-priority-low-usage", highPriority, nil, nil)
+	stats := map[*v1.Pod]statsapi.PodStats{
+		pod1: newPodProcessStats(pod1, 20),
+		pod2: newPodProcessStats(pod2, 6),
+		pod3: newPodProcessStats(pod3, 20),
+		pod4: newPodProcessStats(pod4, 5),
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{pod4, pod3, pod2, pod1}
+	expected := []*v1.Pod{pod1, pod2, pod3, pod4}
+	orderedBy(priority, process(statsFn)).Sort(pods)
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
 func TestSortByEvictionPriority(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -1880,6 +1906,17 @@ func newPodMemoryStats(pod *v1.Pod, workingSet resource.Quantity) statsapi.PodSt
 		},
 		Memory: &statsapi.MemoryStats{
 			WorkingSetBytes: &workingSetBytes,
+		},
+	}
+}
+
+func newPodProcessStats(pod *v1.Pod, num uint64) statsapi.PodStats {
+	return statsapi.PodStats{
+		PodRef: statsapi.PodReference{
+			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+		},
+		ProcessStats: &statsapi.ProcessStats{
+			ProcessCount: &num,
 		},
 	}
 }

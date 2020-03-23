@@ -422,15 +422,20 @@ var _ = framework.KubeDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Dis
 		})
 		specs := []podEvictSpec{
 			{
-				evictionPriority: 1,
-				pod:              pidConsumingPod("fork-bomb-container", 12000),
+				evictionPriority: 2,
+				pod:              pidConsumingPod("fork-bomb-container-with-low-priority", 12000),
 			},
 			{
 				evictionPriority: 0,
 				pod:              innocentPod(),
 			},
+			{
+				evictionPriority: 1,
+				pod:              pidConsumingPod("fork-bomb-container-with-high-priority", 12000),
+			},
 		}
 		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
+		specs[2].pod.Spec.PriorityClassName = highPriorityClassName
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 	})
 })
