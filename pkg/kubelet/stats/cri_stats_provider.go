@@ -426,7 +426,7 @@ func (p *criStatsProvider) addPodNetworkStats(
 	caPodSandbox, found := caInfos[podSandboxID]
 	// try get network stats from cadvisor first.
 	if found {
-		networkStats := cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
+		networkStats := cadvisorInfoToNetworkStats(&caPodSandbox)
 		if networkStats != nil {
 			ps.Network = networkStats
 			return
