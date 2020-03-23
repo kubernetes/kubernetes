@@ -22,12 +22,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +37,7 @@ import (
 	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 func TestGetNotFound(t *testing.T) {
@@ -117,6 +120,41 @@ func TestCreateOrUpdate(t *testing.T) {
 	vmssClient := getTestVMSSClient(armClient)
 	rerr := vmssClient.CreateOrUpdate(context.TODO(), "rg", "vmss1", vmss)
 	assert.Nil(t, rerr)
+}
+
+func TestCreateOrUpdateAsync(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vmss := getTestVMSS("vmss1")
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	future := &azure.Future{}
+
+	armClient.EXPECT().PutResourceAsync(gomock.Any(), to.String(vmss.ID), vmss).Return(future, nil).Times(1)
+	vmssClient := getTestVMSSClient(armClient)
+	_, rerr := vmssClient.CreateOrUpdateAsync(context.TODO(), "rg", "vmss1", vmss)
+	assert.Nil(t, rerr)
+
+	retryErr := &retry.Error{RawError: fmt.Errorf("error")}
+	armClient.EXPECT().PutResourceAsync(gomock.Any(), to.String(vmss.ID), vmss).Return(future, retryErr).Times(1)
+	_, rerr = vmssClient.CreateOrUpdateAsync(context.TODO(), "rg", "vmss1", vmss)
+	assert.Equal(t, retryErr, rerr)
+}
+
+func TestWaitForAsyncOperationResult(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+	}
+
+	armClient.EXPECT().WaitForAsyncOperationResult(gomock.Any(), &azure.Future{}, "VMSSWaitForAsyncOperationResult").Return(response, nil)
+	vmssClient := getTestVMSSClient(armClient)
+	_, err := vmssClient.WaitForAsyncOperationResult(context.TODO(), &azure.Future{})
+	assert.Nil(t, err)
 }
 
 func TestDeleteInstances(t *testing.T) {
