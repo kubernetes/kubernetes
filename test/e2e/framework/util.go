@@ -1687,27 +1687,6 @@ func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
 	return &ds, nil
 }
 
-// GetFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.
-// If the given mask is nil, then the regex will contain the default OS file modes, which are 0644 for Linux and 0775 for Windows.
-func GetFileModeRegex(filePath string, mask *int32) string {
-	var (
-		linuxMask   int32
-		windowsMask int32
-	)
-	if mask == nil {
-		linuxMask = int32(0644)
-		windowsMask = int32(0775)
-	} else {
-		linuxMask = *mask
-		windowsMask = *mask
-	}
-
-	linuxOutput := fmt.Sprintf("mode of file \"%s\": %v", filePath, os.FileMode(linuxMask))
-	windowsOutput := fmt.Sprintf("mode of Windows file \"%v\": %s", filePath, os.FileMode(windowsMask))
-
-	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
-}
-
 // PrettyPrintJSON converts metrics to JSON format.
 func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
