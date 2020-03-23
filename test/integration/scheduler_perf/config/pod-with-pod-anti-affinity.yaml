@@ -4,7 +4,6 @@ metadata:
   generateName: anti-affinity-pod-
   labels:
     color: green
-    name: test
 spec:
   affinity:
     podAntiAffinity:

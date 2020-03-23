@@ -65,7 +65,7 @@ type testCase struct {
 	// configures nodes in the cluster
 	Nodes nodeCase
 	// configures pods in the cluster before running the tests
-	InitPods podCase
+	InitPods []podCase
 	// pods to be scheduled during the test.
 	PodsToSchedule podCase
 	// optional, feature gates to set before running the test
@@ -100,7 +100,7 @@ type simpleTestCases struct {
 
 type testParams struct {
 	NumNodes          int
-	NumInitPods       int
+	NumInitPods       []int
 	NumPodsToSchedule int
 }
 
@@ -117,7 +117,11 @@ func BenchmarkPerfScheduling(b *testing.B) {
 	}
 
 	for _, test := range tests {
-		name := fmt.Sprintf("%v/%vNodes/%vInitPods/%vPodsToSchedule", test.Desc, test.Nodes.Num, test.InitPods.Num, test.PodsToSchedule.Num)
+		initPods := 0
+		for _, p := range test.InitPods {
+			initPods += p.Num
+		}
+		name := fmt.Sprintf("%v/%vNodes/%vInitPods/%vPodsToSchedule", test.Desc, test.Nodes.Num, initPods, test.PodsToSchedule.Num)
 		b.Run(name, func(b *testing.B) {
 			for feature, flag := range test.FeatureGates {
 				defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
@@ -143,10 +147,14 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 	}
 	defer nodePreparer.CleanupNodes()
 
-	if err := createPods(setupNamespace, test.InitPods, clientset); err != nil {
-		b.Fatal(err)
+	total := 0
+	for _, p := range test.InitPods {
+		if err := createPods(setupNamespace, p, clientset); err != nil {
+			b.Fatal(err)
+		}
+		total += p.Num
 	}
-	if err := waitNumPodsScheduled(b, test.InitPods.Num, podInformer); err != nil {
+	if err := waitNumPodsScheduled(b, total, podInformer); err != nil {
 		b.Fatal(err)
 	}
 
@@ -164,7 +172,7 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 	if err := createPods(testNamespace, test.PodsToSchedule, clientset); err != nil {
 		b.Fatal(err)
 	}
-	if err := waitNumPodsScheduled(b, test.InitPods.Num+test.PodsToSchedule.Num, podInformer); err != nil {
+	if err := waitNumPodsScheduled(b, total+test.PodsToSchedule.Num, podInformer); err != nil {
 		b.Fatal(err)
 	}
 
@@ -278,7 +286,10 @@ func parseTestCases(path string) ([]testCase, error) {
 		testCase := s.Template
 		for _, p := range s.Params {
 			testCase.Nodes.Num = p.NumNodes
-			testCase.InitPods.Num = p.NumInitPods
+			testCase.InitPods = append([]podCase(nil), testCase.InitPods...)
+			for i, v := range p.NumInitPods {
+				testCase.InitPods[i].Num = v
+			}
 			testCase.PodsToSchedule.Num = p.NumPodsToSchedule
 			testCases = append(testCases, testCase)
 		}
