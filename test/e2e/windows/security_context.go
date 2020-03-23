@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -47,7 +48,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
 		podInvalid := f.PodClient().Create(runAsUserNamePod(toPtr("FooLish")))
 
 		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
-		framework.ExpectNoError(f.WaitForPodTerminated(podInvalid.Name, ""))
+		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podInvalid.Name, "", f.Namespace.Name))
 
 		podInvalid, _ = f.PodClient().Get(context.TODO(), podInvalid.Name, metav1.GetOptions{})
 		podTerminatedReason := testutils.TerminatedContainers(podInvalid)[runAsUserNameContainerName]

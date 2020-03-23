@@ -53,7 +53,6 @@ import (
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
@@ -508,11 +507,6 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
 
 	}
-}
-
-// WaitForPodTerminated waits for the pod to be terminated with the given reason.
-func (f *Framework) WaitForPodTerminated(podName, reason string) error {
-	return e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
 }
 
 // ClientConfig an externally accessible method for reading the kube client config.
