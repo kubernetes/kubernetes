@@ -107,6 +107,37 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	w = newStatusResponseWriter(w, req)
+	errRsp := newHijackResponder(&responder{w: w}, req)
+	// TODO: to builder pattern
+	retryManager := newHijackProtector(w.(*statusResponseWriter), newMaxRetries(newRetryDetector(errRsp), 3))
+
+	for {
+		// TODO: do we have to clone the req ?
+		// TODO: detect disconnected client
+		// TODO: pick up a different EP on retry
+		// TODO: always report the status to the service resolver - this will influence available EPs pool
+		// TODO: what to report ?
+		//   - success, failure
+		//   - response time
+		r.serveHTTP(w, req, errRsp)
+
+		// TODO: add logs
+		// TODO: backoff, jitter
+		if !retryManager.ShouldRetry(){
+			break
+		}
+		retryManager.Reset()
+	}
+
+	if w.(*statusResponseWriter).statusCode == 0 && !w.(*statusResponseWriter).wasHijacked{
+		// TODO: send HTTP 503 if the error is retriable
+		//       otherwise send HTTP 500
+		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
+	}
+}
+
+func (r *proxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, errResponder proxy.ErrorResponder) {
 	value := r.handlingInfo.Load()
 	if value == nil {
 		r.localDelegate.ServeHTTP(w, req)
@@ -123,6 +154,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if !handlingInfo.serviceAvailable {
+		// TODO: retry
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -144,6 +176,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
+		// TODO: retry
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -175,7 +208,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		transport.SetAuthProxyHeaders(newReq, user.GetName(), user.GetGroups(), user.GetExtra())
 	}
 
-	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
+	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, errResponder)
 	handler.ServeHTTP(w, newReq)
 }
 
