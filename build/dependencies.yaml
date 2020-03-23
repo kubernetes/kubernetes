@@ -35,8 +35,6 @@ dependencies:
     version: 1.13.9
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: build/root/WORKSPACE
-      match: go_version
     - path: test/images/Makefile
       match: GOLANG_VERSION
 
