@@ -432,7 +432,7 @@ replace (
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common => github.com/prometheus/common v0.4.1
-	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.2
+	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.5
 	github.com/quasilyte/go-consistent => github.com/quasilyte/go-consistent v0.0.0-20190521200055-c6f3937de18c
 	github.com/quobyte/api => github.com/quobyte/api v0.1.2
 	github.com/rcrowley/go-metrics => github.com/rcrowley/go-metrics v0.0.0-20190826022208-cac0b30c2563
