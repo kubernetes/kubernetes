@@ -1179,53 +1179,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	return nil
 }
 
-// RestartKubelet restarts kubelet on the given host.
-func RestartKubelet(host string) error {
-	// TODO: Make it work for all providers and distros.
-	supportedProviders := []string{"gce", "aws", "vsphere"}
-	if !ProviderIs(supportedProviders...) {
-		return fmt.Errorf("unsupported provider for RestartKubelet: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
-	}
-	if ProviderIs("gce") && !NodeOSDistroIs("debian", "gci") {
-		return fmt.Errorf("unsupported node OS distro: %s", TestContext.NodeOSDistro)
-	}
-	var cmd string
-
-	if ProviderIs("gce") && NodeOSDistroIs("debian") {
-		cmd = "sudo /etc/init.d/kubelet restart"
-	} else if ProviderIs("vsphere") {
-		var sudoPresent bool
-		sshResult, err := e2essh.SSH("sudo --version", host, TestContext.Provider)
-		if err != nil {
-			return fmt.Errorf("Unable to ssh to host %s with error %v", host, err)
-		}
-		if !strings.Contains(sshResult.Stderr, "command not found") {
-			sudoPresent = true
-		}
-		sshResult, err = e2essh.SSH("systemctl --version", host, TestContext.Provider)
-		if err != nil {
-			return fmt.Errorf("Failed to execute command 'systemctl' on host %s with error %v", host, err)
-		}
-		if !strings.Contains(sshResult.Stderr, "command not found") {
-			cmd = "systemctl restart kubelet"
-		} else {
-			cmd = "service kubelet restart"
-		}
-		if sudoPresent {
-			cmd = fmt.Sprintf("sudo %s", cmd)
-		}
-	} else {
-		cmd = "sudo systemctl restart kubelet"
-	}
-	Logf("Restarting kubelet via ssh on host %s with command %s", host, cmd)
-	result, err := e2essh.SSH(cmd, host, TestContext.Provider)
-	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart kubelet: %v", err)
-	}
-	return nil
-}
-
 // RestartApiserver restarts the kube-apiserver.
 func RestartApiserver(namespace string, cs clientset.Interface) error {
 	// TODO: Make it work for all providers.

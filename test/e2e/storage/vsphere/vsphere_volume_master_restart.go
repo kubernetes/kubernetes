@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -51,6 +52,40 @@ func waitForKubeletUp(host string) error {
 		}
 	}
 	return fmt.Errorf("waiting for kubelet timed out")
+}
+
+// restartKubelet restarts kubelet on the given host.
+func restartKubelet(host string) error {
+	var cmd string
+
+	var sudoPresent bool
+	sshResult, err := e2essh.SSH("sudo --version", host, framework.TestContext.Provider)
+	if err != nil {
+		return fmt.Errorf("Unable to ssh to host %s with error %v", host, err)
+	}
+	if !strings.Contains(sshResult.Stderr, "command not found") {
+		sudoPresent = true
+	}
+	sshResult, err = e2essh.SSH("systemctl --version", host, framework.TestContext.Provider)
+	if err != nil {
+		return fmt.Errorf("Failed to execute command 'systemctl' on host %s with error %v", host, err)
+	}
+	if !strings.Contains(sshResult.Stderr, "command not found") {
+		cmd = "systemctl restart kubelet"
+	} else {
+		cmd = "service kubelet restart"
+	}
+	if sudoPresent {
+		cmd = fmt.Sprintf("sudo %s", cmd)
+	}
+
+	framework.Logf("Restarting kubelet via ssh on host %s with command %s", host, cmd)
+	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+	if err != nil || result.Code != 0 {
+		e2essh.LogResult(result)
+		return fmt.Errorf("couldn't restart kubelet: %v", err)
+	}
+	return nil
 }
 
 /*
@@ -134,7 +169,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 
 		ginkgo.By("Restarting kubelet on master node")
 		masterAddress := framework.GetMasterHost() + ":22"
-		err := framework.RestartKubelet(masterAddress)
+		err := restartKubelet(masterAddress)
 		framework.ExpectNoError(err, "Unable to restart kubelet on master node")
 
 		ginkgo.By("Verifying the kubelet on master node is up")
