@@ -37,8 +37,6 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/net/websocket"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
@@ -1338,59 +1336,6 @@ func WaitForControllerManagerUp() error {
 		}
 	}
 	return fmt.Errorf("waiting for controller-manager timed out")
-}
-
-type extractRT struct {
-	http.Header
-}
-
-func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
-	rt.Header = req.Header
-	return &http.Response{}, nil
-}
-
-// headersForConfig extracts any http client logic necessary for the provided
-// config.
-func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
-	extract := &extractRT{}
-	rt, err := restclient.HTTPWrappersForConfig(c, extract)
-	if err != nil {
-		return nil, err
-	}
-	request, err := http.NewRequest("GET", url.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := rt.RoundTrip(request); err != nil {
-		return nil, err
-	}
-	return extract.Header, nil
-}
-
-// OpenWebSocketForURL constructs a websocket connection to the provided URL, using the client
-// config, with the specified protocols.
-func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
-	tlsConfig, err := restclient.TLSConfigFor(config)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create tls config: %v", err)
-	}
-	if url.Scheme == "https" {
-		url.Scheme = "wss"
-	} else {
-		url.Scheme = "ws"
-	}
-	headers, err := headersForConfig(config, url)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to load http headers: %v", err)
-	}
-	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
-	}
-	cfg.Header = headers
-	cfg.TlsConfig = tlsConfig
-	cfg.Protocol = protocols
-	return websocket.DialConfig(cfg)
 }
 
 // LookForStringInLog looks for the given string in the log of a specific pod container

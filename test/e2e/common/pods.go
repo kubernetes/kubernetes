@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -588,7 +589,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			Param("command", "remote execution test")
 
 		url := req.URL()
-		ws, err := framework.OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
+		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
 		if err != nil {
 			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 		}
@@ -667,7 +668,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		url := req.URL()
 
-		ws, err := framework.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
+		ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"binary.k8s.io"})
 		if err != nil {
 			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 		}

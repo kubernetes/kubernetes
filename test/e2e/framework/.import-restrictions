@@ -258,6 +258,7 @@
 				"k8s.io/kubernetes/test/e2e/framework/service",
 				"k8s.io/kubernetes/test/e2e/framework/ssh",
 				"k8s.io/kubernetes/test/e2e/framework/testfiles",
+				"k8s.io/kubernetes/test/e2e/framework/websocket",
 				"k8s.io/kubernetes/test/e2e/manifest",
 				"k8s.io/kubernetes/test/e2e/perftype",
 				"k8s.io/kubernetes/test/e2e/storage/utils",

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -378,7 +379,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		Param("ports", "80")
 
 	url := req.URL()
-	ws, err := framework.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
+	ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
 	if err != nil {
 		framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 	}
