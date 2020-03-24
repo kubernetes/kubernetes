@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
@@ -47,6 +48,13 @@ const (
 
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"
+)
+
+var volumeZoneLabels = sets.NewString(
+	v1.LabelZoneFailureDomain,
+	v1.LabelZoneRegion,
+	v1.LabelZoneFailureDomainStable,
+	v1.LabelZoneRegionStable,
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -82,7 +90,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 	}
 	nodeConstraints := make(map[string]string)
 	for k, v := range node.ObjectMeta.Labels {
-		if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
+		if !volumeZoneLabels.Has(k) {
 			continue
 		}
 		nodeConstraints[k] = v
@@ -145,7 +153,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		}
 
 		for k, v := range pv.ObjectMeta.Labels {
-			if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
+			if !volumeZoneLabels.Has(k) {
 				continue
 			}
 			nodeV, _ := nodeConstraints[k]
