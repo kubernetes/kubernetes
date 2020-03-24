@@ -19,8 +19,11 @@ package common
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -177,9 +180,11 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 
 var _ = framework.KubeDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
+	var dc dynamic.Interface
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
+		dc = f.DynamicClient
 	})
 
 	/*
@@ -869,6 +874,121 @@ var _ = framework.KubeDescribe("Pods", func() {
 		ginkgo.By("waiting for all pods to be deleted")
 		err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 0))
 		framework.ExpectNoError(err, "found a pod(s)")
+	})
+
+	ginkgo.It("should run through the lifecycle of Pods and PodStatus", func() {
+		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+		testNs := "default"
+		testPodName := "pod-test"
+		testPodImage := "nginx"
+		testPodImage2 := "nginx"
+		testPod := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testPodName,
+				Labels: map[string]string{
+					"test-pod-static": "true",
+				},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  testPodName,
+						Image: testPodImage,
+					},
+				},
+			},
+		}
+		ginkgo.By("creating a Pod with a static label")
+		_, err := f.ClientSet.CoreV1().Pods(testNs).Create(context.TODO(), &testPod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Pod")
+
+		ginkgo.By("setting up a watch for the Pod")
+		podWatchTimeoutSeconds := int64(180)
+		podWatch, err := f.ClientSet.CoreV1().Pods(testNs).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-pod-static=true", TimeoutSeconds: &podWatchTimeoutSeconds})
+		framework.ExpectNoError(err, "failed to set up watch")
+
+		podWatchChan := podWatch.ResultChan()
+		ginkgo.By("watching for Pod to be ready")
+		for watchEvent := range podWatchChan {
+			podWatchEvent, ok := watchEvent.Object.(*v1.Pod)
+			framework.ExpectEqual(ok, true, "unable to fix type")
+			if podWatchEvent.Status.Phase == "Running" {
+				break
+			}
+		}
+
+		ginkgo.By("patching the Pod with a new Label and updated data")
+		podPatch, err := json.Marshal(map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{
+					"podtemplate": "patched",
+				},
+			},
+			"spec": map[string]interface{}{
+				"containers": []map[string]interface{}{
+					{
+						"name":  testPodName,
+						"image": testPodImage2,
+					},
+				},
+			},
+		})
+		framework.ExpectNoError(err, "failed to marshal JSON patch for Pod")
+		_, err = f.ClientSet.CoreV1().Pods(testNs).Patch(context.TODO(), testPodName, types.StrategicMergePatchType, []byte(podPatch), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch Pod")
+
+		ginkgo.By("getting the Pod and ensure it's patched")
+		pod, err := f.ClientSet.CoreV1().Pods(testNs).Get(context.TODO(), testPodName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to fetch Pod")
+		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod-static"], "true", "failed to patch Pod - missing label")
+		framework.ExpectEqual(pod.Spec.Containers[0].Image, testPodImage2, "failed to patch Pod - wrong image")
+
+		ginkgo.By("getting the PodStatus")
+		podStatusUnstructured, err := dc.Resource(podResource).Namespace(testNs).Get(context.TODO(), testPodName, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err, "failed to fetch PodStatus")
+		podStatusUjson, err := json.Marshal(podStatusUnstructured)
+		framework.ExpectNoError(err, "failed to marshal unstructured response")
+		var podStatus v1.Pod
+		json.Unmarshal(podStatusUjson, &podStatus)
+
+		ginkgo.By("replacing the Pod's status Ready condition to False")
+		podStatusUpdated := podStatus
+		podStatusFieldPatchCount := 0
+		podStatusFieldPatchCountTotal := 2
+		for pos, cond := range podStatusUpdated.Status.Conditions {
+			if (cond.Type == "Ready" && cond.Status == "True") || (cond.Type == "ContainersReady" && cond.Status == "True") {
+				podStatusUpdated.Status.Conditions[pos].Status = "False"
+				podStatusFieldPatchCount++
+			}
+		}
+		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
+		_, err = f.ClientSet.CoreV1().Pods(testNs).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "failed to update PodStatus")
+
+		ginkgo.By("list all Pods and get their status to ensure it's Ready condition is False")
+		podsList, err := f.ClientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-pod-static=true"})
+		framework.ExpectNoError(err, "failed to list Pods")
+		podStatusFieldPatchCount = 0
+		podStatusFieldPatchCountTotal = 2
+		for _, podItem := range podsList.Items {
+			for _, cond := range podItem.Status.Conditions {
+				if (cond.Type == "Ready" && cond.Status == "False") || (cond.Type == "ContainersReady" && cond.Status == "False") {
+					podStatusFieldPatchCount++
+				}
+			}
+		}
+		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
+
+		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
+		err = f.ClientSet.CoreV1().Pods(testNs).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-pod-static=true"})
+		framework.ExpectNoError(err, "failed to delete Pod by collection")
+
+		ginkgo.By("watching for Pod to be deleted")
+		for watchEvent := range podWatchChan {
+			if watchEvent.Type == "DELETED" {
+				break
+			}
+		}
 	})
 })
 
