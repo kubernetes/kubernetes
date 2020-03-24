@@ -822,7 +822,7 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 		return fmt.Errorf("one of the two arguments must be non-nil: runningPod, status")
 	}
 
-	if len(pod.Finalizers) > 0 {
+	if pod != nil && len(pod.Finalizers) > 0 {
 		klog.V(2).Infof("pod's finalizers not empty, skip killing pod")
 		return nil
 	}
