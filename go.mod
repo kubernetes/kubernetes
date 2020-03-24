@@ -212,7 +212,7 @@ replace (
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
 	github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
 	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.2.0
-	github.com/containerd/console => github.com/containerd/console v0.0.0-20170925154832-84eeaae905fa
+	github.com/containerd/console => github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1
 	github.com/containerd/containerd => github.com/containerd/containerd v1.3.3
 	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20200228182428-0f16d7a0959c
 	github.com/containerd/fifo => github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00

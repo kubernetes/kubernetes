@@ -167,7 +167,7 @@ github.com/client9/misspell/cmd/misspell
 github.com/clusterhq/flocker-go
 # github.com/container-storage-interface/spec v1.2.0 => github.com/container-storage-interface/spec v1.2.0
 github.com/container-storage-interface/spec/lib/go/csi
-# github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1 => github.com/containerd/console v0.0.0-20170925154832-84eeaae905fa
+# github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1 => github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1
 github.com/containerd/console
 # github.com/containerd/containerd v1.3.3 => github.com/containerd/containerd v1.3.3
 github.com/containerd/containerd/api/services/containers/v1

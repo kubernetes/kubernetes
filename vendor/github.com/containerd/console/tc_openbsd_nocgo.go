@@ -1,3 +1,5 @@
+// +build openbsd,!cgo
+
 /*
    Copyright The containerd Authors.
 
@@ -14,10 +16,18 @@
    limitations under the License.
 */
 
+//
+// Implementing the functions below requires cgo support.  Non-cgo stubs
+// versions are defined below to enable cross-compilation of source code
+// that depends on these functions, but the resultant cross-compiled
+// binaries cannot actually be used.  If the stub function(s) below are
+// actually invoked they will display an error message and cause the
+// calling process to exit.
+//
+
 package console
 
 import (
-	"fmt"
 	"os"
 
 	"golang.org/x/sys/unix"
@@ -28,18 +38,10 @@ const (
 	cmdTcSet = unix.TIOCSETA
 )
 
-// unlockpt unlocks the slave pseudoterminal device corresponding to the master pseudoterminal referred to by f.
-// unlockpt should be called before opening the slave side of a pty.
-// This does not exist on FreeBSD, it does not allocate controlling terminals on open
-func unlockpt(f *os.File) error {
-	return nil
+func ptsname(f *os.File) (string, error) {
+	panic("ptsname() support requires cgo.")
 }
 
-// ptsname retrieves the name of the first available pts for the given master.
-func ptsname(f *os.File) (string, error) {
-	n, err := unix.IoctlGetInt(int(f.Fd()), unix.TIOCGPTN)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("/dev/pts/%d", n), nil
+func unlockpt(f *os.File) error {
+	panic("unlockpt() support requires cgo.")
 }
