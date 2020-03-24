@@ -73,16 +73,16 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 // creates a unique path for disks (even if they share the same *.vhd name)
-func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (string, error) {
-	diskUri = libstrings.ToLower(diskUri) // always lower uri because users may enter it in caps.
+func makeGlobalPDPath(host volume.VolumeHost, diskURI string, isManaged bool) (string, error) {
+	diskURI = libstrings.ToLower(diskURI) // always lower uri because users may enter it in caps.
 	uniqueDiskNameTemplate := "%s%s"
-	hashedDiskUri := azure.MakeCRC32(diskUri)
+	hashedDiskURI := azure.MakeCRC32(diskURI)
 	prefix := "b"
 	if isManaged {
 		prefix = "m"
 	}
-	// "{m for managed b for blob}{hashed diskUri or DiskId depending on disk kind }"
-	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
+	// "{m for managed b for blob}{hashed diskURI or DiskId depending on disk kind }"
+	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskURI)
 	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), util.MountsInGlobalPDPath, diskName)
 
 	return pdPath, nil
