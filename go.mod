@@ -335,7 +335,7 @@ replace (
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 	github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
 	github.com/gorilla/context => github.com/gorilla/context v1.1.1
-	github.com/gorilla/mux => github.com/gorilla/mux v1.7.0
+	github.com/gorilla/mux => github.com/gorilla/mux v1.7.3
 	github.com/gorilla/websocket => github.com/gorilla/websocket v1.4.0
 	github.com/gostaticanalysis/analysisutil => github.com/gostaticanalysis/analysisutil v0.0.3
 	github.com/gregjones/httpcache => github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
