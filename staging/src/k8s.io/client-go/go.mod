@@ -30,7 +30,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200322164244-327a8059b905
+	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 	sigs.k8s.io/yaml v1.2.0
 )
 
