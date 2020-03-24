@@ -301,7 +301,7 @@ github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
 # github.com/go-stack/stack v1.8.0 => github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
-# github.com/godbus/dbus v0.0.0-20190422162347-ade71ed3457e => github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f
+# github.com/godbus/dbus v0.0.0-20190422162347-ade71ed3457e => github.com/godbus/dbus v0.0.0-20190422162347-ade71ed3457e
 github.com/godbus/dbus
 # github.com/gogo/protobuf v1.3.1 => github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/gogoproto
