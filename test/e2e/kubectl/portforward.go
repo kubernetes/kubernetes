@@ -293,7 +293,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 
 func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
-	pod := pfPod("abc", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
+	pod := pfPod("abc", "1000", "10", "100", fmt.Sprintf("%s", bindAddress))
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
@@ -333,7 +333,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 		framework.Failf("Unexpected error reading data from the server: %v", err)
 	}
 
-	if e, a := strings.Repeat("x", 100), string(fromServer); e != a {
+	if e, a := strings.Repeat("x", 10000), string(fromServer); e != a {
 		podlogs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 		if err != nil {
 			framework.Logf("Failed to get logs of portforwardtester pod: %v", err)
