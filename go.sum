@@ -102,8 +102,8 @@ github.com/containerd/containerd v1.3.3 h1:LoIzb5y9x5l8VKAlyrbusNPXqBY0+kviRloxF
 github.com/containerd/containerd v1.3.3/go.mod h1:bC6axHOhabU15QhwfG7w5PipXdVtMXFTttgp+kVtyUA=
 github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c h1:+RqLdWzn0xFunb+sxXaEzHOg8NuEG/eaI+9C1xXX8Mw=
 github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c/go.mod h1:LPm1u0xBw8r8NOKoOdNMeVHSawSsltak+Ihv+etqsE8=
-github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20 h1:14r0i3IeJj6zkNLigAJiv/TWSR8EY+pxIjv5tFiT+n8=
-github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20/go.mod h1:Cm3kwCdlkCfMSHURc+r6fwoGH6/F1hH3S4sg0rLFWPc=
+github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd h1:bRLyitWw3PT/2YuVaCKTPg0cA5dOFKFwKtkfcP2dLsA=
+github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd/go.mod h1:GeKYzf2pQcqv7tJ0AoCuuhtnqhva5LNU3U+OyKxxJpk=
 github.com/containernetworking/cni v0.7.1 h1:fE3r16wpSEyaqY4Z4oFrLMmIGfBYIKpPrHK31EJ9FzE=
 github.com/containernetworking/cni v0.7.1/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
 github.com/coredns/corefile-migration v1.0.6 h1:hB6vclp2g/KeXe9n1oz/PafgieUahsOYeHMQA+RJ4Hg=

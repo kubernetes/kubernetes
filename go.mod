@@ -217,7 +217,7 @@ replace (
 	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20200228182428-0f16d7a0959c
 	github.com/containerd/fifo => github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00
 	github.com/containerd/ttrpc => github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c
-	github.com/containerd/typeurl => github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20
+	github.com/containerd/typeurl => github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.6
 	github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
