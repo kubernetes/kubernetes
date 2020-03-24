@@ -203,44 +203,6 @@ func TestSafeFormatAndMount(t *testing.T) {
 			expErrorType: GetDiskFormatFailed,
 		},
 		{
-			description: "Test that 'xfs_repair' is called only once, no need to repair the filesystem",
-			fstype:      "xfs",
-			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=xfs\n", nil},
-				{"xfs_repair", []string{"-n", "/dev/foo"}, "", nil},
-			},
-		},
-		{
-			description: "Test that 'xfs_repair' is called twice and repair the filesystem",
-			fstype:      "xfs",
-			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=xfs\n", nil},
-				{"xfs_repair", []string{"-n", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 1}},
-				{"xfs_repair", []string{"/dev/foo"}, "\ndone\n", nil},
-			},
-		},
-		{
-			description: "Test that 'xfs_repair' is called twice and repair the filesystem, but mount failed",
-			fstype:      "xfs",
-			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'")},
-			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=xfs\n", nil},
-				{"xfs_repair", []string{"-n", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 1}},
-				{"xfs_repair", []string{"/dev/foo"}, "\ndone\n", nil},
-			},
-			expErrorType: UnknownMountError,
-		},
-		{
-			description: "Test that 'xfs_repair' is called twice but could not repair the filesystem",
-			fstype:      "xfs",
-			execScripts: []ExecArgs{
-				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=xfs\n", nil},
-				{"xfs_repair", []string{"-n", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 1}},
-				{"xfs_repair", []string{"/dev/foo"}, "\nAn error occurred\n", &testingexec.FakeExitError{Status: 1}},
-			},
-			expErrorType: HasFilesystemErrors,
-		},
-		{
 			description:           "Test that 'blkid' is called and confirms unformatted disk, format fails with sensitive options",
 			fstype:                "ext4",
 			sensitiveMountOptions: []string{"mySecret"},
