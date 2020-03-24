@@ -75,7 +75,6 @@ func maxResourceList(list, new corev1.ResourceList) {
 	for name, quantity := range new {
 		if value, ok := list[name]; !ok {
 			list[name] = quantity.DeepCopy()
-			continue
 		} else {
 			if quantity.Cmp(value) > 0 {
 				list[name] = quantity.DeepCopy()
