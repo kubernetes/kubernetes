@@ -42,6 +42,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -872,7 +873,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 		// separately, but I prefer to stay on the safe side).
 		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
 		for _, masterAddress := range masterAddresses {
-			framework.UnblockNetwork(host, masterAddress)
+			UnblockNetwork(host, masterAddress)
 		}
 	}()
 
@@ -881,7 +882,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 	for _, masterAddress := range masterAddresses {
-		framework.BlockNetwork(host, masterAddress)
+		BlockNetwork(host, masterAddress)
 	}
 
 	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
@@ -891,4 +892,60 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 
 	testFunc()
 	// network traffic is unblocked in a deferred function
+}
+
+// BlockNetwork blocks network between the given from value and the given to value.
+// The following helper functions can block/unblock network from source
+// host to destination host by manipulating iptable rules.
+// This function assumes it can ssh to the source host.
+//
+// Caution:
+// Recommend to input IP instead of hostnames. Using hostnames will cause iptables to
+// do a DNS lookup to resolve the name to an IP address, which will
+// slow down the test and cause it to fail if DNS is absent or broken.
+//
+// Suggested usage pattern:
+// func foo() {
+//	...
+//	defer UnblockNetwork(from, to)
+//	BlockNetwork(from, to)
+//	...
+// }
+//
+func BlockNetwork(from string, to string) {
+	framework.Logf("block network traffic from %s to %s", from, to)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
+	if result, err := e2essh.SSH(dropCmd, from, framework.TestContext.Provider); result.Code != 0 || err != nil {
+		e2essh.LogResult(result)
+		framework.Failf("Unexpected error: %v", err)
+	}
+}
+
+// UnblockNetwork unblocks network between the given from value and the given to value.
+func UnblockNetwork(from string, to string) {
+	framework.Logf("Unblock network traffic from %s to %s", from, to)
+	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
+	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
+	// Undrop command may fail if the rule has never been created.
+	// In such case we just lose 30 seconds, but the cluster is healthy.
+	// But if the rule had been created and removing it failed, the node is broken and
+	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
+	// may fail). Manual intervention is required in such case (recreating the
+	// cluster solves the problem too).
+	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
+		result, err := e2essh.SSH(undropCmd, from, framework.TestContext.Provider)
+		if result.Code == 0 && err == nil {
+			return true, nil
+		}
+		e2essh.LogResult(result)
+		if err != nil {
+			framework.Logf("Unexpected error: %v", err)
+		}
+		return false, nil
+	})
+	if err != nil {
+		framework.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
+			"required on host %s: remove rule %s, if exists", from, iptablesRule)
+	}
 }
