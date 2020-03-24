@@ -48,6 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -90,7 +91,8 @@ type Server struct {
 	auth                       AuthInterface
 	host                       HostInterface
 	restfulCont                containerInterface
-	metricsBuckets             map[string]bool
+	metricsBuckets             sets.String
+	metricsMethodBuckets       sets.String
 	resourceAnalyzer           stats.ResourceAnalyzer
 	redirectContainerStreaming bool
 }
@@ -227,7 +229,8 @@ func NewServer(
 		resourceAnalyzer:           resourceAnalyzer,
 		auth:                       auth,
 		restfulCont:                &filteringContainer{Container: restful.NewContainer()},
-		metricsBuckets:             make(map[string]bool),
+		metricsBuckets:             sets.NewString(),
+		metricsMethodBuckets:       sets.NewString("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
 		redirectContainerStreaming: redirectContainerStreaming,
 	}
 	if auth != nil {
@@ -286,16 +289,24 @@ func (s *Server) InstallAuthFilter() {
 // addMetricsBucketMatcher adds a regexp matcher and the relevant bucket to use when
 // it matches. Please be aware this is not thread safe and should not be used dynamically
 func (s *Server) addMetricsBucketMatcher(bucket string) {
-	s.metricsBuckets[bucket] = true
+	s.metricsBuckets.Insert(bucket)
 }
 
 // getMetricBucket find the appropriate metrics reporting bucket for the given path
 func (s *Server) getMetricBucket(path string) string {
 	root := getURLRootPath(path)
-	if s.metricsBuckets[root] == true {
+	if s.metricsBuckets.Has(root) {
 		return root
 	}
-	return "Invalid path"
+	return "other"
+}
+
+// getMetricMethodBucket checks for unknown or invalid HTTP verbs
+func (s *Server) getMetricMethodBucket(method string) string {
+	if s.metricsMethodBuckets.Has(method) {
+		return method
+	}
+	return "other"
 }
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
@@ -909,7 +920,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		serverType = "readwrite"
 	}
 
-	method, path := req.Method, s.getMetricBucket(req.URL.Path)
+	method, path := s.getMetricMethodBucket(req.Method), s.getMetricBucket(req.URL.Path)
 
 	longRunning := strconv.FormatBool(isLongRunningRequest(path))
 
