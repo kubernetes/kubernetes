@@ -2708,14 +2708,15 @@ var _ = SIGDescribe("Services", func() {
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Endpoint")
 
-		// setup a watch for the Endpoint
+		// set up a watch for the Endpoint
+		// this timeout was chosen as there was timeout failure from the CI
 		endpointWatchTimeoutSeconds := int64(180)
 		endpointWatch, err := f.ClientSet.CoreV1().Endpoints(ns).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "testendpoint-static=true", TimeoutSeconds: &endpointWatchTimeoutSeconds})
 		framework.ExpectNoError(err, "failed to setup watch on newly created Endpoint")
 		endpointWatchChan := endpointWatch.ResultChan()
 		ginkgo.By("waiting for available Endpoint")
-		for event := range endpointWatchChan {
-			if event.Type == "ADDED" {
+		for watchEvent := range endpointWatchChan {
+			if watchEvent.Type == "ADDED" {
 				break
 			}
 		}
@@ -2766,7 +2767,7 @@ var _ = SIGDescribe("Services", func() {
 				},
 			},
 		})
-		framework.ExpectNoError(err, "failed to marshal JSON for Event patch")
+		framework.ExpectNoError(err, "failed to marshal JSON for WatchEvent patch")
 		ginkgo.By("patching the Endpoint")
 		_, err = f.ClientSet.CoreV1().Endpoints(ns).Patch(context.TODO(), testEndpointName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Endpoint")
@@ -2787,8 +2788,8 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to delete Endpoint by Collection")
 
 		ginkgo.By("waiting for Endpoint deletion")
-		for event := range endpointWatchChan {
-			if event.Type == "DELETED" {
+		for watchEvent := range endpointWatchChan {
+			if watchEvent.Type == "DELETED" {
 				break
 			}
 		}
