@@ -166,12 +166,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	}
 
 	// Run "prefilter" plugins.
-	preFilterStatus := prof.RunPreFilterPlugins(ctx, state, pod)
-	if !preFilterStatus.IsSuccess() {
-		return result, preFilterStatus.AsError()
-	}
-	trace.Step("Running prefilter plugins done")
-
 	startPredicateEvalTime := time.Now()
 	filteredNodes, filteredNodesStatuses, err := g.findNodesThatFitPod(ctx, prof, state, pod)
 	if err != nil {
@@ -186,13 +180,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 			FilteredNodesStatuses: filteredNodesStatuses,
 		}
 	}
-
-	// Run "prescore" plugins.
-	prescoreStatus := prof.RunPreScorePlugins(ctx, state, pod, filteredNodes)
-	if !prescoreStatus.IsSuccess() {
-		return result, prescoreStatus.AsError()
-	}
-	trace.Step("Running prescore plugins done")
 
 	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
@@ -412,6 +399,11 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
 func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.NodeToStatusMap, error) {
+	s := prof.RunPreFilterPlugins(ctx, state, pod)
+	if !s.IsSuccess() {
+		return nil, nil, s.AsError()
+	}
+
 	filteredNodesStatuses := make(framework.NodeToStatusMap)
 	filtered, err := g.findNodesThatPassFilters(ctx, prof, state, pod, filteredNodesStatuses)
 	if err != nil {
@@ -643,10 +635,16 @@ func (g *genericScheduler) prioritizeNodes(
 		return result, nil
 	}
 
+	// Run PreScore plugins.
+	preScoreStatus := prof.RunPreScorePlugins(ctx, state, pod, nodes)
+	if !preScoreStatus.IsSuccess() {
+		return nil, preScoreStatus.AsError()
+	}
+
 	// Run the Score plugins.
 	scoresMap, scoreStatus := prof.RunScorePlugins(ctx, state, pod, nodes)
 	if !scoreStatus.IsSuccess() {
-		return framework.NodeScoreList{}, scoreStatus.AsError()
+		return nil, scoreStatus.AsError()
 	}
 
 	// Summarize all scores.
