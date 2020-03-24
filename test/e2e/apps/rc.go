@@ -256,7 +256,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		// Delete ReplicationController
 		ginkgo.By("deleting ReplicationControllers by collection")
-		err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+		err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 		framework.ExpectNoError(err, "Failed to delete ReplicationControllers")
 
 		ginkgo.By("waiting for ReplicationController to have a DELETED watchEvent")
