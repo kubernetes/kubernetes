@@ -49,8 +49,9 @@ func (ms *MapSpec) Copy() *MapSpec {
 // Implement encoding.BinaryMarshaler or encoding.BinaryUnmarshaler
 // if you require custom encoding.
 type Map struct {
-	fd  *bpfFD
-	abi MapABI
+	name string
+	fd   *bpfFD
+	abi  MapABI
 	// Per CPU maps return values larger than the size in the spec
 	fullValueSize int
 }
@@ -64,12 +65,12 @@ func NewMapFromFD(fd int) (*Map, error) {
 	}
 	bpfFd := newBPFFD(uint32(fd))
 
-	abi, err := newMapABIFromFd(bpfFd)
+	name, abi, err := newMapABIFromFd(bpfFd)
 	if err != nil {
 		bpfFd.forget()
 		return nil, err
 	}
-	return newMap(bpfFd, abi)
+	return newMap(bpfFd, name, abi)
 }
 
 // NewMap creates a new Map.
@@ -155,11 +156,12 @@ func createMap(spec *MapSpec, inner *bpfFD) (*Map, error) {
 		return nil, errors.Wrap(err, "map create")
 	}
 
-	return newMap(fd, newMapABIFromSpec(spec))
+	return newMap(fd, spec.Name, newMapABIFromSpec(spec))
 }
 
-func newMap(fd *bpfFD, abi *MapABI) (*Map, error) {
+func newMap(fd *bpfFD, name string, abi *MapABI) (*Map, error) {
 	m := &Map{
+		name,
 		fd,
 		*abi,
 		int(abi.ValueSize),
@@ -179,7 +181,10 @@ func newMap(fd *bpfFD, abi *MapABI) (*Map, error) {
 }
 
 func (m *Map) String() string {
-	return fmt.Sprintf("%s#%d", m.abi.Type, m.fd)
+	if m.name != "" {
+		return fmt.Sprintf("%s(%s)#%v", m.abi.Type, m.name, m.fd)
+	}
+	return fmt.Sprintf("%s#%v", m.abi.Type, m.fd)
 }
 
 // ABI gets the ABI of the Map
@@ -424,7 +429,7 @@ func (m *Map) Clone() (*Map, error) {
 		return nil, errors.Wrap(err, "can't clone map")
 	}
 
-	return newMap(dup, &m.abi)
+	return newMap(dup, m.name, &m.abi)
 }
 
 // Pin persists the map past the lifetime of the process that created it.
@@ -436,19 +441,19 @@ func (m *Map) Pin(fileName string) error {
 
 // LoadPinnedMap load a Map from a BPF file.
 //
-// Requires at least Linux 4.13, and is not compatible with
-// nested maps. Use LoadPinnedMapExplicit in these situations.
+// The function is not compatible with nested maps.
+// Use LoadPinnedMapExplicit in these situations.
 func LoadPinnedMap(fileName string) (*Map, error) {
 	fd, err := bpfGetObject(fileName)
 	if err != nil {
 		return nil, err
 	}
-	abi, err := newMapABIFromFd(fd)
+	name, abi, err := newMapABIFromFd(fd)
 	if err != nil {
 		_ = fd.close()
 		return nil, err
 	}
-	return newMap(fd, abi)
+	return newMap(fd, name, abi)
 }
 
 // LoadPinnedMapExplicit loads a map with explicit parameters.
@@ -457,7 +462,7 @@ func LoadPinnedMapExplicit(fileName string, abi *MapABI) (*Map, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newMap(fd, abi)
+	return newMap(fd, "", abi)
 }
 
 func unmarshalMap(buf []byte) (*Map, error) {
@@ -473,13 +478,13 @@ func unmarshalMap(buf []byte) (*Map, error) {
 		return nil, err
 	}
 
-	abi, err := newMapABIFromFd(fd)
+	name, abi, err := newMapABIFromFd(fd)
 	if err != nil {
 		_ = fd.close()
 		return nil, err
 	}
 
-	return newMap(fd, abi)
+	return newMap(fd, name, abi)
 }
 
 // MarshalBinary implements BinaryMarshaler.

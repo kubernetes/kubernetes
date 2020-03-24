@@ -206,7 +206,7 @@ replace (
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu => github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48 // 17b0214f6c48 is the SHA for git tag 3.11
 	github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
-	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20191025125908-95b36a581eed
+	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20191113100448-d9fb101ca1fb
 	github.com/client9/misspell => github.com/client9/misspell v0.3.4
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
