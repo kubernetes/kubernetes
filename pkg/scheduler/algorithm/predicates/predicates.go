@@ -140,6 +140,13 @@ var (
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 		EvenPodsSpreadPred, MatchInterPodAffinityPred}
+
+	volumeZoneLabels = sets.NewString(
+		v1.LabelZoneFailureDomain,
+		v1.LabelZoneRegion,
+		v1.LabelZoneFailureDomainStable,
+		v1.LabelZoneRegionStable,
+	)
 )
 
 // Ordering returns the ordering of predicates.
@@ -650,7 +657,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *sche
 
 	nodeConstraints := make(map[string]string)
 	for k, v := range node.ObjectMeta.Labels {
-		if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
+		if !volumeZoneLabels.Has(k) {
 			continue
 		}
 		nodeConstraints[k] = v
@@ -709,7 +716,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *sche
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
-				if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
+				if !volumeZoneLabels.Has(k) {
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]
