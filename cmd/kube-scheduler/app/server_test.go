@@ -147,6 +147,19 @@ profiles:
 		t.Fatal(err)
 	}
 
+	// policy config file
+	policyConfigFile := filepath.Join(tmpDir, "policy-config.yaml")
+	if err := ioutil.WriteFile(policyConfigFile, []byte(`{
+		"kind": "Policy",
+		"apiVersion": "v1",
+		"predicates": [
+		  {"name": "MatchInterPodAffinity"}
+		],"priorities": [
+		  {"name": "InterPodAffinityPriority",   "weight": 2}
+		]}`), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	defaultPlugins := map[string][]kubeschedulerconfig.Plugin{
 		"QueueSortPlugin": {
 			{Name: "PrioritySort"},
@@ -257,6 +270,98 @@ profiles:
 			},
 			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
 				"my-scheduler": defaultPlugins,
+			},
+		},
+		{
+			name: "default algorithm provider",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--algorithm-provider", "DefaultProvider",
+			},
+			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
+				"default-scheduler": defaultPlugins,
+			},
+		},
+		{
+			name: "cluster autoscaler provider",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--algorithm-provider", "ClusterAutoscalerProvider",
+			},
+			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
+				"default-scheduler": {
+					"QueueSortPlugin": {
+						{Name: "PrioritySort"},
+					},
+					"PreFilterPlugin": {
+						{Name: "NodeResourcesFit"},
+						{Name: "NodePorts"},
+						{Name: "InterPodAffinity"},
+						{Name: "PodTopologySpread"},
+					},
+					"FilterPlugin": {
+						{Name: "NodeUnschedulable"},
+						{Name: "NodeResourcesFit"},
+						{Name: "NodeName"},
+						{Name: "NodePorts"},
+						{Name: "NodeAffinity"},
+						{Name: "VolumeRestrictions"},
+						{Name: "TaintToleration"},
+						{Name: "EBSLimits"},
+						{Name: "GCEPDLimits"},
+						{Name: "NodeVolumeLimits"},
+						{Name: "AzureDiskLimits"},
+						{Name: "VolumeBinding"},
+						{Name: "VolumeZone"},
+						{Name: "InterPodAffinity"},
+						{Name: "PodTopologySpread"},
+					},
+					"PreScorePlugin": {
+						{Name: "InterPodAffinity"},
+						{Name: "DefaultPodTopologySpread"},
+						{Name: "TaintToleration"},
+						{Name: "PodTopologySpread"},
+					},
+					"ScorePlugin": {
+						{Name: "NodeResourcesBalancedAllocation", Weight: 1},
+						{Name: "ImageLocality", Weight: 1},
+						{Name: "InterPodAffinity", Weight: 1},
+						{Name: "NodeResourcesMostAllocated", Weight: 1},
+						{Name: "NodeAffinity", Weight: 1},
+						{Name: "NodePreferAvoidPods", Weight: 10000},
+						{Name: "DefaultPodTopologySpread", Weight: 1},
+						{Name: "TaintToleration", Weight: 1},
+						{Name: "PodTopologySpread", Weight: 1},
+					},
+					"BindPlugin": {{Name: "DefaultBinder"}},
+				},
+			},
+		},
+		{
+			name: "policy config file",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--policy-config-file", policyConfigFile,
+			},
+			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
+				"default-scheduler": {
+					"QueueSortPlugin": {{Name: "PrioritySort"}},
+					"PreFilterPlugin": {
+						{Name: "InterPodAffinity"},
+					},
+					"FilterPlugin": {
+						{Name: "NodeUnschedulable"},
+						{Name: "TaintToleration"},
+						{Name: "InterPodAffinity"},
+					},
+					"PreScorePlugin": {
+						{Name: "InterPodAffinity"},
+					},
+					"ScorePlugin": {
+						{Name: "InterPodAffinity", Weight: 2},
+					},
+					"BindPlugin": {{Name: "DefaultBinder"}},
+				},
 			},
 		},
 	}
