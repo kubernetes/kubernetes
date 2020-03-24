@@ -72,10 +72,10 @@ const (
 
 	// labelNodeRolePrefix is a label prefix for node roles
 	// It's copied over to here until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	labelNodeRolePrefix = "node-role.kubernetes.io/"
+	labelNodeRolePrefix = "role.node.kubernetes.io/"
 
 	// nodeLabelRole specifies the role of a node
-	nodeLabelRole = "kubernetes.io/role"
+	nodeLabelRole = "kubelet.kubernetes.io/role"
 )
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
@@ -1538,8 +1538,8 @@ func getNodeInternalIP(node *api.Node) string {
 
 // findNodeRoles returns the roles of a given node.
 // The roles are determined by looking for:
-// * a node-role.kubernetes.io/<role>="" label
-// * a kubernetes.io/role="<role>" label
+// * a role.node.kubernetes.io/<role>="" label
+// * a kubelet.kubernetes.io/role="<role>" label
 func findNodeRoles(node *api.Node) []string {
 	roles := sets.NewString()
 	for k, v := range node.Labels {
