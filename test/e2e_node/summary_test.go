@@ -260,6 +260,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Inodes":         bounded(1e4, 1e8),
 					"InodesUsed":     bounded(0, 1e8),
 				}),
+				"ProcessStats": ptrMatchAllFields(gstruct.Fields{
+					"ProcessCount": bounded(0, 1e8),
+				}),
 			})
 
 			matchExpectations := ptrMatchAllFields(gstruct.Fields{
