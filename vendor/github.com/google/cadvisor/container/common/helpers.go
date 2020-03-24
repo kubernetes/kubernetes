@@ -109,8 +109,9 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 				val, err := strconv.ParseUint(quota, 10, 64)
 				if err != nil {
 					klog.Errorf("GetSpec: Failed to parse CPUQuota from %q: %s", path.Join(cpuRoot, "cpu.cfs_quota_us"), err)
+				} else {
+					spec.Cpu.Quota = val
 				}
-				spec.Cpu.Quota = val
 			}
 		}
 	}
@@ -152,6 +153,14 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 				spec.Memory.Limit = readUInt64(memoryRoot, "memory.max")
 				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.swap.max")
 			}
+		}
+	}
+
+	// Hugepage
+	hugepageRoot, ok := cgroupPaths["hugetlb"]
+	if ok {
+		if utils.FileExists(hugepageRoot) {
+			spec.HasHugetlb = true
 		}
 	}
 

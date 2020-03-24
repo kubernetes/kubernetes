@@ -29,12 +29,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/cadvisor/accelerators"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/stats"
 	"github.com/google/cadvisor/summary"
 	"github.com/google/cadvisor/utils/cpuload"
 
@@ -81,7 +81,7 @@ type containerData struct {
 	logUsage bool
 
 	// Tells the container to stop.
-	stop chan bool
+	stop chan struct{}
 
 	// Tells the container to immediately collect stats
 	onDemandChan chan chan struct{}
@@ -90,7 +90,7 @@ type containerData struct {
 	collectorManager collector.CollectorManager
 
 	// nvidiaCollector updates stats for Nvidia GPUs attached to the container.
-	nvidiaCollector accelerators.AcceleratorCollector
+	nvidiaCollector stats.Collector
 }
 
 // jitter returns a time.Duration between duration and duration + maxFactor * duration,
@@ -114,7 +114,7 @@ func (c *containerData) Stop() error {
 	if err != nil {
 		return err
 	}
-	c.stop <- true
+	close(c.stop)
 	return nil
 }
 
@@ -383,7 +383,7 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		allowDynamicHousekeeping: allowDynamicHousekeeping,
 		logUsage:                 logUsage,
 		loadAvg:                  -1.0, // negative value indicates uninitialized.
-		stop:                     make(chan bool, 1),
+		stop:                     make(chan struct{}),
 		collectorManager:         collectorManager,
 		onDemandChan:             make(chan chan struct{}, 100),
 		clock:                    clock,

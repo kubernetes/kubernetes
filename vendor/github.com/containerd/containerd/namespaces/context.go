@@ -1,11 +1,27 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package namespaces
 
 import (
+	"context"
 	"os"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -20,10 +36,9 @@ type namespaceKey struct{}
 // WithNamespace sets a given namespace on the context
 func WithNamespace(ctx context.Context, namespace string) context.Context {
 	ctx = context.WithValue(ctx, namespaceKey{}, namespace) // set our key for namespace
-
-	// also store on the grpc headers so it gets picked up by any clients that
+	// also store on the grpc and ttrpc headers so it gets picked up by any clients that
 	// are using this.
-	return withGRPCNamespaceHeader(ctx, namespace)
+	return withTTRPCNamespaceHeader(withGRPCNamespaceHeader(ctx, namespace), namespace)
 }
 
 // NamespaceFromEnv uses the namespace defined in CONTAINERD_NAMESPACE or
@@ -42,22 +57,21 @@ func NamespaceFromEnv(ctx context.Context) context.Context {
 func Namespace(ctx context.Context) (string, bool) {
 	namespace, ok := ctx.Value(namespaceKey{}).(string)
 	if !ok {
-		return fromGRPCHeader(ctx)
+		if namespace, ok = fromGRPCHeader(ctx); !ok {
+			return fromTTRPCHeader(ctx)
+		}
 	}
-
 	return namespace, ok
 }
 
-// NamespaceRequired returns the valid namepace from the context or an error.
+// NamespaceRequired returns the valid namespace from the context or an error.
 func NamespaceRequired(ctx context.Context) (string, error) {
 	namespace, ok := Namespace(ctx)
 	if !ok || namespace == "" {
 		return "", errors.Wrapf(errdefs.ErrFailedPrecondition, "namespace is required")
 	}
-
 	if err := Validate(namespace); err != nil {
 		return "", errors.Wrap(err, "namespace validation")
 	}
-
 	return namespace, nil
 }

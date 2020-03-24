@@ -68,7 +68,8 @@ type MetricValBasic struct {
 // An exported metric.
 type MetricVal struct {
 	// Label associated with a metric
-	Label string `json:"label,omitempty"`
+	Label  string            `json:"label,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// Time at which the metric was queried
 	Timestamp time.Time `json:"timestamp"`

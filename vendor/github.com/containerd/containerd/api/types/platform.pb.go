@@ -3,37 +3,94 @@
 
 package types
 
-import proto "github.com/gogo/protobuf/proto"
-import fmt "fmt"
-import math "math"
-
-// skipping weak import gogoproto "github.com/gogo/protobuf/gogoproto"
-
-import strings "strings"
-import reflect "reflect"
-
-import io "io"
+import (
+	fmt "fmt"
+	proto "github.com/gogo/protobuf/proto"
+	io "io"
+	math "math"
+	reflect "reflect"
+	strings "strings"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+
 // Platform follows the structure of the OCI platform specification, from
 // descriptors.
 type Platform struct {
-	OS           string `protobuf:"bytes,1,opt,name=os,proto3" json:"os,omitempty"`
-	Architecture string `protobuf:"bytes,2,opt,name=architecture,proto3" json:"architecture,omitempty"`
-	Variant      string `protobuf:"bytes,3,opt,name=variant,proto3" json:"variant,omitempty"`
+	OS                   string   `protobuf:"bytes,1,opt,name=os,proto3" json:"os,omitempty"`
+	Architecture         string   `protobuf:"bytes,2,opt,name=architecture,proto3" json:"architecture,omitempty"`
+	Variant              string   `protobuf:"bytes,3,opt,name=variant,proto3" json:"variant,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Platform) Reset()                    { *m = Platform{} }
-func (*Platform) ProtoMessage()               {}
-func (*Platform) Descriptor() ([]byte, []int) { return fileDescriptorPlatform, []int{0} }
+func (m *Platform) Reset()      { *m = Platform{} }
+func (*Platform) ProtoMessage() {}
+func (*Platform) Descriptor() ([]byte, []int) {
+	return fileDescriptor_24ba7a4b83e2367e, []int{0}
+}
+func (m *Platform) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Platform) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Platform.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalTo(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Platform) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Platform.Merge(m, src)
+}
+func (m *Platform) XXX_Size() int {
+	return m.Size()
+}
+func (m *Platform) XXX_DiscardUnknown() {
+	xxx_messageInfo_Platform.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Platform proto.InternalMessageInfo
 
 func init() {
 	proto.RegisterType((*Platform)(nil), "containerd.types.Platform")
 }
+
+func init() {
+	proto.RegisterFile("github.com/containerd/containerd/api/types/platform.proto", fileDescriptor_24ba7a4b83e2367e)
+}
+
+var fileDescriptor_24ba7a4b83e2367e = []byte{
+	// 205 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xb2, 0x4c, 0xcf, 0x2c, 0xc9,
+	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xce, 0xcf, 0x2b, 0x49, 0xcc, 0xcc, 0x4b, 0x2d,
+	0x4a, 0x41, 0x66, 0x26, 0x16, 0x64, 0xea, 0x97, 0x54, 0x16, 0xa4, 0x16, 0xeb, 0x17, 0xe4, 0x24,
+	0x96, 0xa4, 0xe5, 0x17, 0xe5, 0xea, 0x15, 0x14, 0xe5, 0x97, 0xe4, 0x0b, 0x09, 0x20, 0x14, 0xe9,
+	0x81, 0x15, 0x48, 0x89, 0xa4, 0xe7, 0xa7, 0xe7, 0x83, 0x25, 0xf5, 0x41, 0x2c, 0x88, 0x3a, 0xa5,
+	0x04, 0x2e, 0x8e, 0x00, 0xa8, 0x4e, 0x21, 0x31, 0x2e, 0xa6, 0xfc, 0x62, 0x09, 0x46, 0x05, 0x46,
+	0x0d, 0x4e, 0x27, 0xb6, 0x47, 0xf7, 0xe4, 0x99, 0xfc, 0x83, 0x83, 0x98, 0xf2, 0x8b, 0x85, 0x94,
+	0xb8, 0x78, 0x12, 0x8b, 0x92, 0x33, 0x32, 0x4b, 0x52, 0x93, 0x4b, 0x4a, 0x8b, 0x52, 0x25, 0x98,
+	0x40, 0x2a, 0x82, 0x50, 0xc4, 0x84, 0x24, 0xb8, 0xd8, 0xcb, 0x12, 0x8b, 0x32, 0x13, 0xf3, 0x4a,
+	0x24, 0x98, 0xc1, 0xd2, 0x30, 0xae, 0x93, 0xd7, 0x89, 0x87, 0x72, 0x0c, 0x37, 0x1e, 0xca, 0x31,
+	0x34, 0x3c, 0x92, 0x63, 0x3c, 0xf1, 0x48, 0x8e, 0xf1, 0xc2, 0x23, 0x39, 0xc6, 0x07, 0x8f, 0xe4,
+	0x18, 0xa3, 0x0c, 0x88, 0xf7, 0x9e, 0x35, 0x98, 0x8c, 0x60, 0x48, 0x62, 0x03, 0x3b, 0xdb, 0x18,
+	0x10, 0x00, 0x00, 0xff, 0xff, 0x05, 0xaa, 0xda, 0xa1, 0x1b, 0x01, 0x00, 0x00,
+}
+
 func (m *Platform) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -67,6 +124,9 @@ func (m *Platform) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintPlatform(dAtA, i, uint64(len(m.Variant)))
 		i += copy(dAtA[i:], m.Variant)
 	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
 	return i, nil
 }
 
@@ -80,6 +140,9 @@ func encodeVarintPlatform(dAtA []byte, offset int, v uint64) int {
 	return offset + 1
 }
 func (m *Platform) Size() (n int) {
+	if m == nil {
+		return 0
+	}
 	var l int
 	_ = l
 	l = len(m.OS)
@@ -93,6 +156,9 @@ func (m *Platform) Size() (n int) {
 	l = len(m.Variant)
 	if l > 0 {
 		n += 1 + l + sovPlatform(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
 	}
 	return n
 }
@@ -118,6 +184,7 @@ func (this *Platform) String() string {
 		`OS:` + fmt.Sprintf("%v", this.OS) + `,`,
 		`Architecture:` + fmt.Sprintf("%v", this.Architecture) + `,`,
 		`Variant:` + fmt.Sprintf("%v", this.Variant) + `,`,
+		`XXX_unrecognized:` + fmt.Sprintf("%v", this.XXX_unrecognized) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -145,7 +212,7 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 			}
 			b := dAtA[iNdEx]
 			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
+			wire |= uint64(b&0x7F) << shift
 			if b < 0x80 {
 				break
 			}
@@ -173,7 +240,7 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -183,6 +250,9 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 				return ErrInvalidLengthPlatform
 			}
 			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthPlatform
+			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
@@ -202,7 +272,7 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -212,6 +282,9 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 				return ErrInvalidLengthPlatform
 			}
 			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthPlatform
+			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
@@ -231,7 +304,7 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -241,6 +314,9 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 				return ErrInvalidLengthPlatform
 			}
 			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthPlatform
+			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
@@ -255,9 +331,13 @@ func (m *Platform) Unmarshal(dAtA []byte) error {
 			if skippy < 0 {
 				return ErrInvalidLengthPlatform
 			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthPlatform
+			}
 			if (iNdEx + skippy) > l {
 				return io.ErrUnexpectedEOF
 			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
 			iNdEx += skippy
 		}
 	}
@@ -321,8 +401,11 @@ func skipPlatform(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			iNdEx += length
 			if length < 0 {
+				return 0, ErrInvalidLengthPlatform
+			}
+			iNdEx += length
+			if iNdEx < 0 {
 				return 0, ErrInvalidLengthPlatform
 			}
 			return iNdEx, nil
@@ -353,6 +436,9 @@ func skipPlatform(dAtA []byte) (n int, err error) {
 					return 0, err
 				}
 				iNdEx = start + next
+				if iNdEx < 0 {
+					return 0, ErrInvalidLengthPlatform
+				}
 			}
 			return iNdEx, nil
 		case 4:
@@ -371,24 +457,3 @@ var (
 	ErrInvalidLengthPlatform = fmt.Errorf("proto: negative length found during unmarshaling")
 	ErrIntOverflowPlatform   = fmt.Errorf("proto: integer overflow")
 )
-
-func init() {
-	proto.RegisterFile("github.com/containerd/containerd/api/types/platform.proto", fileDescriptorPlatform)
-}
-
-var fileDescriptorPlatform = []byte{
-	// 205 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xb2, 0x4c, 0xcf, 0x2c, 0xc9,
-	0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xce, 0xcf, 0x2b, 0x49, 0xcc, 0xcc, 0x4b, 0x2d,
-	0x4a, 0x41, 0x66, 0x26, 0x16, 0x64, 0xea, 0x97, 0x54, 0x16, 0xa4, 0x16, 0xeb, 0x17, 0xe4, 0x24,
-	0x96, 0xa4, 0xe5, 0x17, 0xe5, 0xea, 0x15, 0x14, 0xe5, 0x97, 0xe4, 0x0b, 0x09, 0x20, 0x14, 0xe9,
-	0x81, 0x15, 0x48, 0x89, 0xa4, 0xe7, 0xa7, 0xe7, 0x83, 0x25, 0xf5, 0x41, 0x2c, 0x88, 0x3a, 0xa5,
-	0x04, 0x2e, 0x8e, 0x00, 0xa8, 0x4e, 0x21, 0x31, 0x2e, 0xa6, 0xfc, 0x62, 0x09, 0x46, 0x05, 0x46,
-	0x0d, 0x4e, 0x27, 0xb6, 0x47, 0xf7, 0xe4, 0x99, 0xfc, 0x83, 0x83, 0x98, 0xf2, 0x8b, 0x85, 0x94,
-	0xb8, 0x78, 0x12, 0x8b, 0x92, 0x33, 0x32, 0x4b, 0x52, 0x93, 0x4b, 0x4a, 0x8b, 0x52, 0x25, 0x98,
-	0x40, 0x2a, 0x82, 0x50, 0xc4, 0x84, 0x24, 0xb8, 0xd8, 0xcb, 0x12, 0x8b, 0x32, 0x13, 0xf3, 0x4a,
-	0x24, 0x98, 0xc1, 0xd2, 0x30, 0xae, 0x93, 0xd7, 0x89, 0x87, 0x72, 0x0c, 0x37, 0x1e, 0xca, 0x31,
-	0x34, 0x3c, 0x92, 0x63, 0x3c, 0xf1, 0x48, 0x8e, 0xf1, 0xc2, 0x23, 0x39, 0xc6, 0x07, 0x8f, 0xe4,
-	0x18, 0xa3, 0x0c, 0x88, 0xf7, 0x9e, 0x35, 0x98, 0x8c, 0x60, 0x48, 0x62, 0x03, 0x3b, 0xdb, 0x18,
-	0x10, 0x00, 0x00, 0xff, 0xff, 0x05, 0xaa, 0xda, 0xa1, 0x1b, 0x01, 0x00, 0x00,
-}
