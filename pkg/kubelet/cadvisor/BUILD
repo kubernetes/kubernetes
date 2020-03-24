@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cadvisor_linux.go",
+        "cadvisor_linux_docker.go",
         "cadvisor_unsupported.go",
         "cadvisor_windows.go",
         "doc.go",
