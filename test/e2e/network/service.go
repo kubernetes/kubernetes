@@ -2784,7 +2784,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectEqual(endpointSubsetOnePorts.Port, int32(8080), "failed to patch Endpoint")
 
 		ginkgo.By("deleting the Endpoint by Collection")
-		err = f.ClientSet.CoreV1().Endpoints(ns).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "testendpoint-static=true"})
+		err = f.ClientSet.CoreV1().Endpoints(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "testendpoint-static=true"})
 		framework.ExpectNoError(err, "failed to delete Endpoint by Collection")
 
 		ginkgo.By("waiting for Endpoint deletion")
