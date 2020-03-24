@@ -1406,62 +1406,6 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
-// BlockNetwork blocks network between the given from value and the given to value.
-// The following helper functions can block/unblock network from source
-// host to destination host by manipulating iptable rules.
-// This function assumes it can ssh to the source host.
-//
-// Caution:
-// Recommend to input IP instead of hostnames. Using hostnames will cause iptables to
-// do a DNS lookup to resolve the name to an IP address, which will
-// slow down the test and cause it to fail if DNS is absent or broken.
-//
-// Suggested usage pattern:
-// func foo() {
-//	...
-//	defer UnblockNetwork(from, to)
-//	BlockNetwork(from, to)
-//	...
-// }
-//
-func BlockNetwork(from string, to string) {
-	Logf("block network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := e2essh.SSH(dropCmd, from, TestContext.Provider); result.Code != 0 || err != nil {
-		e2essh.LogResult(result)
-		Failf("Unexpected error: %v", err)
-	}
-}
-
-// UnblockNetwork unblocks network between the given from value and the given to value.
-func UnblockNetwork(from string, to string) {
-	Logf("Unblock network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
-	// Undrop command may fail if the rule has never been created.
-	// In such case we just lose 30 seconds, but the cluster is healthy.
-	// But if the rule had been created and removing it failed, the node is broken and
-	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
-	// may fail). Manual intervention is required in such case (recreating the
-	// cluster solves the problem too).
-	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-		result, err := e2essh.SSH(undropCmd, from, TestContext.Provider)
-		if result.Code == 0 && err == nil {
-			return true, nil
-		}
-		e2essh.LogResult(result)
-		if err != nil {
-			Logf("Unexpected error: %v", err)
-		}
-		return false, nil
-	})
-	if err != nil {
-		Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
-			"required on host %s: remove rule %s, if exists", from, iptablesRule)
-	}
-}
-
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
