@@ -2070,6 +2070,26 @@ func TestPrintJob(t *testing.T) {
 			// Columns: Name, Completions, Duration, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "0/1", "20m", "10y"}}},
 		},
+		// Job with FailureTime
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job5",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded:      0,
+					StartTime:      &metav1.Time{Time: now.Add(time.Minute)},
+					FailureTime:    &metav1.Time{Time: now.Add(time.Minute).Add(10 * time.Second)},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job5", "0/1", "10s", "10y"}}},
+		},
 	}
 
 	for i, test := range tests {

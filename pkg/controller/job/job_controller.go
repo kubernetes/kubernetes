@@ -532,7 +532,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		active = 0
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, failureReason, failureMessage))
 		now := metav1.Now()
-		job.Status.CompletionTime = &now
+		job.Status.FailureTime = &now
 		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {

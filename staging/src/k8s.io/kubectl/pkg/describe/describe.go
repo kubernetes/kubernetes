@@ -2128,6 +2128,9 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 		if job.Status.CompletionTime != nil {
 			w.Write(LEVEL_0, "Completed At:\t%s\n", job.Status.CompletionTime.Time.Format(time.RFC1123Z))
 		}
+		if job.Status.FailureTime != nil {
+			w.Write(LEVEL_0, "Failed At:\t%s\n", job.Status.FailureTime.Time.Format(time.RFC1123Z))
+		}
 		if job.Status.StartTime != nil && job.Status.CompletionTime != nil {
 			w.Write(LEVEL_0, "Duration:\t%s\n", duration.HumanDuration(job.Status.CompletionTime.Sub(job.Status.StartTime.Time)))
 		}

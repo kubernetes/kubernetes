@@ -170,6 +170,12 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time
 
+	// Represents time when the job was failed. It is not guaranteed to
+	// be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	// +optional
+	FailureTime *metav1.Time
+
 	// The number of actively running pods.
 	// +optional
 	Active int32

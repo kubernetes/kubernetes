@@ -149,17 +149,23 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
 
+	// Represents time when the job was failed. It is not guaranteed to
+	// be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	// +optional
+	FailureTime *metav1.Time `json:"failureTime,omitempty" protobuf:"bytes,4,opt,name=failureTime"`
+
 	// The number of actively running pods.
 	// +optional
-	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
+	Active int32 `json:"active,omitempty" protobuf:"varint,5,opt,name=active"`
 
 	// The number of pods which reached phase Succeeded.
 	// +optional
-	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
+	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,6,opt,name=succeeded"`
 
 	// The number of pods which reached phase Failed.
 	// +optional
-	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
+	Failed int32 `json:"failed,omitempty" protobuf:"varint,7,opt,name=failed"`
 }
 
 type JobConditionType string
