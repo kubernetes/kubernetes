@@ -266,7 +266,7 @@ func (rc *reconciler) mountAttachVolumes() {
 			}
 			if err == nil {
 				if remountingLogStr == "" {
-					klog.V(1).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
+					klog.Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
 				} else {
 					klog.V(5).Infof(volumeToMount.GenerateMsgDetailed("operationExecutor.MountVolume started", remountingLogStr))
 				}
