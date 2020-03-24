@@ -304,24 +304,6 @@ func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace st
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
-// WaitForPersistentVolumeDeleted waits for a PersistentVolume to get deleted or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, timeout time.Duration) error {
-	Logf("Waiting up to %v for PersistentVolume %s to get deleted", timeout, pvName)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
-		if err == nil {
-			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
-			continue
-		}
-		if apierrors.IsNotFound(err) {
-			Logf("PersistentVolume %s was removed", pvName)
-			return nil
-		}
-		Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
-	}
-	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
-}
-
 // findAvailableNamespaceName random namespace name starting with baseName.
 func findAvailableNamespaceName(baseName string, c clientset.Interface) (string, error) {
 	var name string
