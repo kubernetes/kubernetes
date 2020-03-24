@@ -12,7 +12,6 @@ require (
 )
 
 replace (
-	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 	github.com/kr/pretty => github.com/kr/pretty v0.1.0
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.2
