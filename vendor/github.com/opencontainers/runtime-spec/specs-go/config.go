@@ -4,7 +4,7 @@ import "os"
 
 // Spec is the base configuration for the container.
 type Spec struct {
-	// Version of the Open Container Runtime Specification with which the bundle complies.
+	// Version of the Open Container Initiative Runtime Specification with which the bundle complies.
 	Version string `json:"ociVersion"`
 	// Process configures the container process.
 	Process *Process `json:"process,omitempty"`
