@@ -12,7 +12,6 @@ require (
 )
 
 replace (
-	github.com/kr/pretty => github.com/kr/pretty v0.1.0
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.1
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.2
 	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9

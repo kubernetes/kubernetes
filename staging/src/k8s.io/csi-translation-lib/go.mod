@@ -11,7 +11,6 @@ require (
 )
 
 replace (
-	github.com/kr/pretty => github.com/kr/pretty v0.1.0
 	golang.org/x/net => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/time => golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
