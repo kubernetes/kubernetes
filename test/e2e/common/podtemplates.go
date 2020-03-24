@@ -32,7 +32,7 @@ import (
 var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
 	/*
-	   Release : v1.18
+	   Release : v1.19
 	   Testname: PodTemplate lifecycle
 	   Description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching the PodTemplate MUST reflect changes.
 	          By fetching all the PodTemplates via a Label selector it MUST find the PodTemplate by it's static label and updated value. The PodTemplate must be deleted.
