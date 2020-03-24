@@ -185,13 +185,13 @@ func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod co
 			return nil, err
 		}
 
-		// should fail when localPort is empty (=> use random local port)
-		localportnum, err := strconv.Atoi(localPort)
+		// convert the resolved target port back to a string
+		remotePort = strconv.Itoa(int(containerPort))
 
-		if int32(portnum) != containerPort || localPort == "" || (int32(localportnum) != containerPort && err == nil) {
-			translated = append(translated, fmt.Sprintf("%s:%d", localPort, containerPort))
+		if localPort != remotePort {
+			translated = append(translated, fmt.Sprintf("%s:%s", localPort, remotePort))
 		} else {
-			translated = append(translated, fmt.Sprintf("%d", containerPort))
+			translated = append(translated, remotePort)
 		}
 	}
 	return translated, nil
