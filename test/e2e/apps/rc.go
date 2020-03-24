@@ -141,9 +141,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		rcWatchChan := rcWatch.ResultChan()
 
 		ginkgo.By("waiting for available Replicas")
-		for event := range rcWatchChan {
-			rc, ok := event.Object.(*v1.ReplicationController)
-			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
+		for watchEvent := range rcWatchChan {
+			rc, ok := watchEvent.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch watchEvent")
 			if rc.Status.Replicas == testRcInitialReplicaCount && rc.Status.ReadyReplicas == testRcInitialReplicaCount {
 				break
 			}
@@ -198,9 +198,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		var rcFromWatch *v1.ReplicationController
 		ginkgo.By("waiting for ReplicationController's scale to be the max amount")
 		foundRcWithMaxScale := false
-		for event := range rcWatchChan {
-			rc, ok := event.Object.(*v1.ReplicationController)
-			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch event")
+		for watchEvent := range rcWatchChan {
+			rc, ok := watchEvent.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch watchEvent")
 			if rc.ObjectMeta.Name == testRcName && rc.ObjectMeta.Namespace == testRcNamespace && rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
 				foundRcWithMaxScale = true
 				rcFromWatch = rc
@@ -227,9 +227,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(1), "ReplicationControllerStatus readyReplicas does not equal 1")
 
 		ginkgo.By(fmt.Sprintf("waiting for ReplicationController readyReplicas to be equal to %v", testRcMaxReplicaCount))
-		for event := range rcWatchChan {
-			rc, ok := event.Object.(*v1.ReplicationController)
-			framework.ExpectEqual(ok, true, "unable to convert type of ReplicationController watch event")
+		for watchEvent := range rcWatchChan {
+			rc, ok := watchEvent.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "unable to convert type of ReplicationController watch watchEvent")
 			if rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
 				break
 			}
@@ -259,9 +259,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 		framework.ExpectNoError(err, "Failed to delete ReplicationControllers")
 
-		ginkgo.By("waiting for ReplicationController to have a DELETED event")
-		for event := range rcWatchChan {
-			if event.Type == "DELETED" {
+		ginkgo.By("waiting for ReplicationController to have a DELETED watchEvent")
+		for watchEvent := range rcWatchChan {
+			if watchEvent.Type == "DELETED" {
 				break
 			}
 		}
