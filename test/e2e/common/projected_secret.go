@@ -196,7 +196,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 			},
 		}
 
-		fileModeRegexp := framework.GetFileModeRegex("/etc/projected-secret-volume/data-1", nil)
+		fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/data-1", nil)
 		f.TestContainerOutputRegexp("consume secrets", pod, 0, []string{
 			"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 			fileModeRegexp,
@@ -494,7 +494,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 		}
 	}
 
-	fileModeRegexp := framework.GetFileModeRegex("/etc/projected-secret-volume/data-1", defaultMode)
+	fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/data-1", defaultMode)
 	expectedOutput := []string{
 		"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 		fileModeRegexp,
@@ -570,7 +570,7 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = mode
 	}
 
-	fileModeRegexp := framework.GetFileModeRegex("/etc/projected-secret-volume/new-path-data-1", mode)
+	fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/new-path-data-1", mode)
 	expectedOutput := []string{
 		"content of file \"/etc/projected-secret-volume/new-path-data-1\": value-1",
 		fileModeRegexp,

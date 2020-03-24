@@ -585,7 +585,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool,
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
 	}
 
-	fileModeRegexp := framework.GetFileModeRegex("/etc/projected-configmap-volume/data-1", defaultMode)
+	fileModeRegexp := getFileModeRegex("/etc/projected-configmap-volume/data-1", defaultMode)
 	output := []string{
 		"content of file \"/etc/projected-configmap-volume/data-1\": value-1",
 		fileModeRegexp,
@@ -678,7 +678,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 		"content of file \"/etc/projected-configmap-volume/path/to/data-2\": value-2",
 	}
 	if fsGroup == 0 {
-		fileModeRegexp := framework.GetFileModeRegex("/etc/projected-configmap-volume/path/to/data-2", itemMode)
+		fileModeRegexp := getFileModeRegex("/etc/projected-configmap-volume/path/to/data-2", itemMode)
 		output = append(output, fileModeRegexp)
 	}
 	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
