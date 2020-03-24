@@ -35,7 +35,6 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/apiserver/pkg/apis/example2/v1",
     ],
     "true": [
-        "cmd/cloud-controller-manager/app/apis/config/v1alpha1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",
         "pkg/apis/auditregistration",
@@ -96,12 +95,6 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/client-go/pkg/version",
         "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
         "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
-        "staging/src/k8s.io/kube-controller-manager/config/v1alpha1",
-        "staging/src/k8s.io/kube-proxy/config/v1alpha1",
-        "staging/src/k8s.io/kube-scheduler/config/v1",
-        "staging/src/k8s.io/kube-scheduler/config/v1alpha1",
-        "staging/src/k8s.io/kube-scheduler/config/v1alpha2",
-        "staging/src/k8s.io/kubelet/config/v1beta1",
         "staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1",
         "staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2",
         "staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1",
@@ -114,7 +107,6 @@ tags_values_pkgs = {"openapi-gen": {
 
 # tags_pkgs_values is a dictionary mapping {k8s build tag: {pkg: [tag values in pkg]}}
 tags_pkgs_values = {"openapi-gen": {
-    "cmd/cloud-controller-manager/app/apis/config/v1alpha1": ["true"],
     "pkg/apis/abac/v0": ["true"],
     "pkg/apis/abac/v1beta1": ["true"],
     "pkg/apis/auditregistration": ["true"],
@@ -183,12 +175,6 @@ tags_pkgs_values = {"openapi-gen": {
     "staging/src/k8s.io/client-go/pkg/version": ["true"],
     "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1": ["true"],
     "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1": ["true"],
-    "staging/src/k8s.io/kube-controller-manager/config/v1alpha1": ["true"],
-    "staging/src/k8s.io/kube-proxy/config/v1alpha1": ["true"],
-    "staging/src/k8s.io/kube-scheduler/config/v1": ["true"],
-    "staging/src/k8s.io/kube-scheduler/config/v1alpha1": ["true"],
-    "staging/src/k8s.io/kube-scheduler/config/v1alpha2": ["true"],
-    "staging/src/k8s.io/kubelet/config/v1beta1": ["true"],
     "staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1": ["true"],
     "staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2": ["true"],
     "staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1": ["true"],

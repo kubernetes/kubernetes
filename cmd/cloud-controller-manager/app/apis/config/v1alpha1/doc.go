@@ -24,7 +24,6 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/component-base/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/service/config/v1alpha1
-// +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=cloudcontrollermanager.config.k8s.io
 
