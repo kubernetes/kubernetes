@@ -1380,8 +1380,6 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 		existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				klog.Errorf("Pod %s has NodeName %q but node is not found",
-					podName(existingPod), existingPod.Spec.NodeName)
 				continue
 			}
 			return nil, err
