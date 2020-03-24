@@ -185,10 +185,13 @@ func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod co
 			return nil, err
 		}
 
-		if int32(portnum) != containerPort || localPort == "" {
-			translated = append(translated, fmt.Sprintf("%s:%d", localPort, containerPort))
+		// convert the resolved target port back to a string
+		remotePort = strconv.Itoa(int(containerPort))
+
+		if localPort != remotePort {
+			translated = append(translated, fmt.Sprintf("%s:%s", localPort, remotePort))
 		} else {
-			translated = append(translated, fmt.Sprintf("%d", containerPort))
+			translated = append(translated, remotePort)
 		}
 	}
 	return translated, nil
