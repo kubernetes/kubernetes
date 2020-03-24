@@ -553,17 +553,6 @@ func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
 }
 
-// Cleanup stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
-func Cleanup(filePath, ns string, selectors ...string) {
-	ginkgo.By("using delete to clean up resources")
-	var nsArg string
-	if ns != "" {
-		nsArg = fmt.Sprintf("--namespace=%s", ns)
-	}
-	RunKubectlOrDie(ns, "delete", "--grace-period=0", "-f", filePath, nsArg)
-	AssertCleanup(ns, selectors...)
-}
-
 // AssertCleanup asserts that cleanup of a namespace wrt selectors occurred.
 func AssertCleanup(ns string, selectors ...string) {
 	var nsArg string
