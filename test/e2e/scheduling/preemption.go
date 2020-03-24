@@ -500,7 +500,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		})
 
 		/*
-			Release: v1.18
+			Release: v1.19
 			Testname: Pod preemption verification
 			Description: Four levels of Pods in ReplicaSets with different levels of Priority, restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected number of Replicas.
 		*/
