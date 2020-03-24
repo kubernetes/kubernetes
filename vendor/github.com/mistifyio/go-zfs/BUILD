@@ -5,12 +5,15 @@ go_library(
     srcs = [
         "error.go",
         "utils.go",
+        "utils_notsolaris.go",
+        "utils_solaris.go",
         "zfs.go",
         "zpool.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/mistifyio/go-zfs",
     importpath = "github.com/mistifyio/go-zfs",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/google/uuid:go_default_library"],
 )
 
 filegroup(
