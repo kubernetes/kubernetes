@@ -24,10 +24,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -267,7 +267,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			addTopologyPairMatchNum(pair, matchTotal)
 		}
 	}
-	workqueue.ParallelizeUntil(context.Background(), 16, len(allNodes), processNode)
+	parallelize.Until(context.Background(), len(allNodes), processNode)
 
 	// calculate min match for each topology pair
 	for i := 0; i < len(constraints); i++ {

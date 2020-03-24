@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -513,7 +513,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 	errCh := schedutil.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
-	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {
+	parallelize.Until(ctx, len(nodes), func(index int) {
 		for _, pl := range f.scorePlugins {
 			nodeName := nodes[index].Name
 			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
@@ -534,7 +534,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
-	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
+	parallelize.Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		nodeScoreList := pluginToNodeScores[pl.Name()]
 		if pl.ScoreExtensions() == nil {
@@ -554,7 +554,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 	}
 
 	// Apply score defaultWeights for each ScorePlugin in parallel.
-	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
+	parallelize.Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		// Score plugins' weight has been checked when they are initialized.
 		weight := f.pluginNameToWeightMap[pl.Name()]
