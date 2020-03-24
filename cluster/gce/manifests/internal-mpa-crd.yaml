@@ -26,7 +26,7 @@ spec:
         properties:
           spec:
             type: object
-            required: ["scaleTargetRef"]
+            required: ["scaleTargetRef", "goals"]
             properties:
               scaleTargetRef:
                 type: object
@@ -39,17 +39,20 @@ spec:
                     type: string
               goals:
                 type: object
+                required: ["metrics"]
                 properties:
                   metrics:
                     type: array
                     items:
                       type: object
+                      required: ["type", "resource"]
                       properties:
                         type:
                           type: string
                           enum: ["Resource"]
                         resource:
                           type: object
+                          required: ["name", "target"]
                           properties:
                             name:
                               type: string
