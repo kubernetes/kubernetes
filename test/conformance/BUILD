@@ -33,8 +33,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/conformance/behaviors:all-srcs",
-        "//test/conformance/kubetestgen:all-srcs",
-        "//test/conformance/kubetestlink:all-srcs",
+        "//test/conformance/kubeconform:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

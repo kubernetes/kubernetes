@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,24 +28,7 @@ import (
 	"k8s.io/kubernetes/test/conformance/behaviors"
 )
 
-type options struct {
-	behaviorsDir string
-	testdata     string
-	listMissing  bool
-}
-
-func parseFlags() *options {
-	o := &options{}
-	flag.StringVar(&o.behaviorsDir, "behaviors", "../behaviors/", "Path to the behaviors directory")
-	flag.StringVar(&o.testdata, "testdata", "../testdata/conformance.yaml", "YAML file containing test linkage data")
-	flag.BoolVar(&o.listMissing, "missing", true, "Only list behaviors missing tests")
-	flag.Parse()
-	return o
-}
-
-func main() {
-	o := parseFlags()
-
+func link(o *options) {
 	var behaviorFiles []string
 	behaviorsMapping := make(map[string][]string)
 	var conformanceDataList []behaviors.ConformanceData
@@ -66,6 +48,7 @@ func main() {
 		fmt.Printf("%v", err)
 		return
 	}
+	fmt.Printf("%v", behaviorFiles)
 
 	for _, behaviorFile := range behaviorFiles {
 		var suite behaviors.Suite
@@ -87,6 +70,10 @@ func main() {
 	}
 
 	conformanceYaml, err := ioutil.ReadFile(o.testdata)
+	if err != nil {
+		fmt.Printf("%v", err)
+		return
+	}
 
 	err = yaml.Unmarshal(conformanceYaml, &conformanceDataList)
 	if err != nil {
