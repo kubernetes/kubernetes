@@ -385,7 +385,6 @@ func TestPlugin(t *testing.T) {
 					RBDPool:      "pool1",
 					RBDImage:     "image1",
 					FSType:       "ext4",
-					ReadOnly:     true,
 				},
 			},
 		}),
