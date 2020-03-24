@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/system"
@@ -46,6 +45,22 @@ const (
 
 	// ssh port
 	sshPort = "22"
+)
+
+var (
+	// unreachableTaintTemplate is the taint for when a node becomes unreachable.
+	// Copied from pkg/controller/nodelifecycle to avoid pulling extra dependencies
+	unreachableTaintTemplate = &v1.Taint{
+		Key:    v1.TaintNodeUnreachable,
+		Effect: v1.TaintEffectNoExecute,
+	}
+
+	// notReadyTaintTemplate is the taint for when a node is not ready for executing pods.
+	// Copied from pkg/controller/nodelifecycle to avoid pulling extra dependencies
+	notReadyTaintTemplate = &v1.Taint{
+		Key:    v1.TaintNodeNotReady,
+		Effect: v1.TaintEffectNoExecute,
+	}
 )
 
 // PodNode is a pod-node pair indicating which node a given pod is running on
@@ -79,7 +94,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				// For NodeReady we need to check if Taints are gone as well
 				taints := node.Spec.Taints
 				for _, taint := range taints {
-					if taint.MatchTaint(nodectlr.UnreachableTaintTemplate) || taint.MatchTaint(nodectlr.NotReadyTaintTemplate) {
+					if taint.MatchTaint(unreachableTaintTemplate) || taint.MatchTaint(notReadyTaintTemplate) {
 						hasNodeControllerTaints = true
 						break
 					}
