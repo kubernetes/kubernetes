@@ -619,6 +619,11 @@ func (g *genericScheduler) podFitsOnNode(
 	var failedPredicates []predicates.PredicateFailureReason
 	var status *framework.Status
 
+	// In the case where a node delete event is received before all pods on the node are deleted, a NodeInfo may have
+	// a nil Node(). This should not be an issue in 1.18 and later, but we need to check it here. See https://github.com/kubernetes/kubernetes/issues/89006
+	if info.Node() == nil {
+		return false, []predicates.PredicateFailureReason{}, framework.NewStatus(framework.UnschedulableAndUnresolvable, "node being deleted"), nil
+	}
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
 	// nominated pods, we run them when those pods are added to meta and nodeInfo.
