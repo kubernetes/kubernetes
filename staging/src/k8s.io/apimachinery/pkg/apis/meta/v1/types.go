@@ -1145,9 +1145,14 @@ const (
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type FieldsV1 struct {
 	// Raw is the underlying serialization of this object.
 	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=Raw"`
+}
+
+func (f FieldsV1) String() string {
+	return string(f.Raw)
 }
 
 // TODO: Table does not generate to protobuf because of the interface{} - fix protobuf
