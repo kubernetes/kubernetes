@@ -480,7 +480,7 @@ replace (
 	github.com/valyala/tcplisten => github.com/valyala/tcplisten v0.0.0-20161114210144-ceec8f93295a
 	github.com/vektah/gqlparser => github.com/vektah/gqlparser v1.1.2
 	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.0.0
-	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
+	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.3
 	github.com/xdg/scram => github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
 	github.com/xdg/stringprep => github.com/xdg/stringprep v1.0.0
