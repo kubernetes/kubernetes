@@ -22,16 +22,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/google/cadvisor/container"
+	dockerutil "github.com/google/cadvisor/container/docker/utils"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
-	dockerutil "github.com/google/cadvisor/utils/docker"
 	"github.com/google/cadvisor/watcher"
 	"github.com/google/cadvisor/zfs"
 
@@ -49,11 +50,17 @@ var ArgDockerCA = flag.String("docker-tls-ca", "ca.pem", "path to trusted CA")
 // The namespace under which Docker aliases are unique.
 const DockerNamespace = "docker"
 
+// The retry times for getting docker root dir
+const rootDirRetries = 5
+
+//The retry period for getting docker root dir, Millisecond
+const rootDirRetryPeriod time.Duration = 1000 * time.Millisecond
+
 // Regexp that identifies docker cgroups, containers started with
 // --cgroup-parent have another prefix than 'docker'
 var dockerCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
-var dockerEnvWhitelist = flag.String("docker_env_metadata_whitelist", "", "a comma-separated list of environment variable keys that needs to be collected for docker containers")
+var dockerEnvWhitelist = flag.String("docker_env_metadata_whitelist", "", "a comma-separated list of environment variable keys matched with specified prefix that needs to be collected for docker containers")
 
 var (
 	// Basepath to all container specific information that libcontainer stores.
@@ -72,10 +79,16 @@ var (
 
 func RootDir() string {
 	dockerRootDirOnce.Do(func() {
-		status, err := Status()
-		if err == nil && status.RootDir != "" {
-			dockerRootDir = status.RootDir
-		} else {
+		for i := 0; i < rootDirRetries; i++ {
+			status, err := Status()
+			if err == nil && status.RootDir != "" {
+				dockerRootDir = status.RootDir
+				break
+			} else {
+				time.Sleep(rootDirRetryPeriod)
+			}
+		}
+		if dockerRootDir == "" {
 			dockerRootDir = *dockerRootDirFlag
 		}
 	})

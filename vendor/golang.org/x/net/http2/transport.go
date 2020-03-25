@@ -93,7 +93,7 @@ type Transport struct {
 	// send in the initial settings frame. It is how many bytes
 	// of response headers are allowed. Unlike the http2 spec, zero here
 	// means to use a default limit (currently 10MB). If you actually
-	// want to advertise an ulimited value to the peer, Transport
+	// want to advertise an unlimited value to the peer, Transport
 	// interprets the highest possible value here (0xffffffff or 1<<32-1)
 	// to mean no limit.
 	MaxHeaderListSize uint32
@@ -227,6 +227,7 @@ type ClientConn struct {
 	br              *bufio.Reader
 	fr              *Framer
 	lastActive      time.Time
+	lastIdle        time.Time // time last idle
 	// Settings from peer: (also guarded by mu)
 	maxFrameSize          uint32
 	maxConcurrentStreams  uint32
@@ -603,7 +604,7 @@ func (t *Transport) expectContinueTimeout() time.Duration {
 }
 
 func (t *Transport) NewClientConn(c net.Conn) (*ClientConn, error) {
-	return t.newClientConn(c, false)
+	return t.newClientConn(c, t.disableKeepAlives())
 }
 
 func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, error) {
@@ -736,7 +737,8 @@ func (cc *ClientConn) idleStateLocked() (st clientConnIdleState) {
 	}
 
 	st.canTakeNewRequest = cc.goAway == nil && !cc.closed && !cc.closing && maxConcurrentOkay &&
-		int64(cc.nextStreamID)+2*int64(cc.pendingRequests) < math.MaxInt32
+		int64(cc.nextStreamID)+2*int64(cc.pendingRequests) < math.MaxInt32 &&
+		!cc.tooIdleLocked()
 	st.freshConn = cc.nextStreamID == 1 && st.canTakeNewRequest
 	return
 }
@@ -744,6 +746,16 @@ func (cc *ClientConn) idleStateLocked() (st clientConnIdleState) {
 func (cc *ClientConn) canTakeNewRequestLocked() bool {
 	st := cc.idleStateLocked()
 	return st.canTakeNewRequest
+}
+
+// tooIdleLocked reports whether this connection has been been sitting idle
+// for too much wall time.
+func (cc *ClientConn) tooIdleLocked() bool {
+	// The Round(0) strips the monontonic clock reading so the
+	// times are compared based on their wall time. We don't want
+	// to reuse a connection that's been sitting idle during
+	// VM/laptop suspend if monotonic time was also frozen.
+	return cc.idleTimeout != 0 && !cc.lastIdle.IsZero() && time.Since(cc.lastIdle.Round(0)) > cc.idleTimeout
 }
 
 // onIdleTimeout is called from a time.AfterFunc goroutine. It will
@@ -1150,6 +1162,7 @@ func (cc *ClientConn) awaitOpenSlotForRequest(req *http.Request) error {
 			}
 			return errClientConnUnusable
 		}
+		cc.lastIdle = time.Time{}
 		if int64(len(cc.streams))+1 <= int64(cc.maxConcurrentStreams) {
 			if waitingForConn != nil {
 				close(waitingForConn)
@@ -1216,6 +1229,8 @@ var (
 
 	// abort request body write, but send stream reset of cancel.
 	errStopReqBodyWriteAndCancel = errors.New("http2: canceling request")
+
+	errReqBodyTooLong = errors.New("http2: request body larger than specified content length")
 )
 
 func (cs *clientStream) writeRequestBody(body io.Reader, bodyCloser io.Closer) (err error) {
@@ -1238,10 +1253,32 @@ func (cs *clientStream) writeRequestBody(body io.Reader, bodyCloser io.Closer) (
 
 	req := cs.req
 	hasTrailers := req.Trailer != nil
+	remainLen := actualContentLength(req)
+	hasContentLen := remainLen != -1
 
 	var sawEOF bool
 	for !sawEOF {
-		n, err := body.Read(buf)
+		n, err := body.Read(buf[:len(buf)-1])
+		if hasContentLen {
+			remainLen -= int64(n)
+			if remainLen == 0 && err == nil {
+				// The request body's Content-Length was predeclared and
+				// we just finished reading it all, but the underlying io.Reader
+				// returned the final chunk with a nil error (which is one of
+				// the two valid things a Reader can do at EOF). Because we'd prefer
+				// to send the END_STREAM bit early, double-check that we're actually
+				// at EOF. Subsequent reads should return (0, EOF) at this point.
+				// If either value is different, we return an error in one of two ways below.
+				var n1 int
+				n1, err = body.Read(buf[n:])
+				remainLen -= int64(n1)
+			}
+			if remainLen < 0 {
+				err = errReqBodyTooLong
+				cc.writeStreamReset(cs.ID, ErrCodeCancel, err)
+				return err
+			}
+		}
 		if err == io.EOF {
 			sawEOF = true
 			err = nil
@@ -1454,7 +1491,29 @@ func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trail
 				if vv[0] == "" {
 					continue
 				}
-
+			} else if strings.EqualFold(k, "cookie") {
+				// Per 8.1.2.5 To allow for better compression efficiency, the
+				// Cookie header field MAY be split into separate header fields,
+				// each with one or more cookie-pairs.
+				for _, v := range vv {
+					for {
+						p := strings.IndexByte(v, ';')
+						if p < 0 {
+							break
+						}
+						f("cookie", v[:p])
+						p++
+						// strip space after semicolon if any.
+						for p+1 <= len(v) && v[p] == ' ' {
+							p++
+						}
+						v = v[p:]
+					}
+					if len(v) > 0 {
+						f("cookie", v)
+					}
+				}
+				continue
 			}
 
 			for _, v := range vv {
@@ -1592,6 +1651,7 @@ func (cc *ClientConn) streamByID(id uint32, andRemove bool) *clientStream {
 		delete(cc.streams, id)
 		if len(cc.streams) == 0 && cc.idleTimer != nil {
 			cc.idleTimer.Reset(cc.idleTimeout)
+			cc.lastIdle = time.Now()
 		}
 		close(cs.done)
 		// Wake up checkResetOrDone via clientStream.awaitFlowControl and

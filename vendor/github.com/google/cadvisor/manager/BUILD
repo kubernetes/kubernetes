@@ -22,6 +22,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/google/cadvisor/machine:go_default_library",
+        "//vendor/github.com/google/cadvisor/stats:go_default_library",
         "//vendor/github.com/google/cadvisor/summary:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/cpuload:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/oomparser:go_default_library",

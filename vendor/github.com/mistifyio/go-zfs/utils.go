@@ -2,12 +2,16 @@ package zfs
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type command struct {
@@ -34,16 +38,17 @@ func (c *command) Run(arg ...string) ([][]string, error) {
 	}
 	cmd.Stderr = &stderr
 
-	debug := strings.Join([]string{cmd.Path, strings.Join(cmd.Args, " ")}, " ")
-	if logger != nil {
-		logger.Log(cmd.Args)
-	}
+	id := uuid.New().String()
+	joinedArgs := strings.Join(cmd.Args, " ")
+
+	logger.Log([]string{"ID:" + id, "START", joinedArgs})
 	err := cmd.Run()
+	logger.Log([]string{"ID:" + id, "FINISH"})
 
 	if err != nil {
 		return nil, &Error{
 			Err:    err,
-			Debug:  debug,
+			Debug:  strings.Join([]string{cmd.Path, joinedArgs[1:]}, " "),
 			Stderr: stderr.String(),
 		}
 	}
@@ -88,34 +93,50 @@ func setUint(field *uint64, value string) error {
 }
 
 func (ds *Dataset) parseLine(line []string) error {
-	prop := line[1]
-	val := line[2]
-
 	var err error
 
-	switch prop {
-	case "available":
-		err = setUint(&ds.Avail, val)
-	case "compression":
-		setString(&ds.Compression, val)
-	case "mountpoint":
-		setString(&ds.Mountpoint, val)
-	case "quota":
-		err = setUint(&ds.Quota, val)
-	case "type":
-		setString(&ds.Type, val)
-	case "origin":
-		setString(&ds.Origin, val)
-	case "used":
-		err = setUint(&ds.Used, val)
-	case "volsize":
-		err = setUint(&ds.Volsize, val)
-	case "written":
-		err = setUint(&ds.Written, val)
-	case "logicalused":
-		err = setUint(&ds.Logicalused, val)
+	if len(line) != len(dsPropList) {
+		return errors.New("Output does not match what is expected on this platform")
 	}
-	return err
+	setString(&ds.Name, line[0])
+	setString(&ds.Origin, line[1])
+
+	if err = setUint(&ds.Used, line[2]); err != nil {
+		return err
+	}
+	if err = setUint(&ds.Avail, line[3]); err != nil {
+		return err
+	}
+
+	setString(&ds.Mountpoint, line[4])
+	setString(&ds.Compression, line[5])
+	setString(&ds.Type, line[6])
+
+	if err = setUint(&ds.Volsize, line[7]); err != nil {
+		return err
+	}
+	if err = setUint(&ds.Quota, line[8]); err != nil {
+		return err
+	}
+	if err = setUint(&ds.Referenced, line[9]); err != nil {
+		return err
+	}
+
+	if runtime.GOOS == "solaris" {
+		return nil
+	}
+
+	if err = setUint(&ds.Written, line[10]); err != nil {
+		return err
+	}
+	if err = setUint(&ds.Logicalused, line[11]); err != nil {
+		return err
+	}
+	if err = setUint(&ds.Usedbydataset, line[12]); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 /*
@@ -264,7 +285,8 @@ func parseInodeChanges(lines [][]string) ([]*InodeChange, error) {
 }
 
 func listByType(t, filter string) ([]*Dataset, error) {
-	args := []string{"get", "-rHp", "-t", t, "all"}
+	args := []string{"list", "-rHp", "-t", t, "-o", dsPropListOptions}
+
 	if filter != "" {
 		args = append(args, filter)
 	}
@@ -307,6 +329,8 @@ func (z *Zpool) parseLine(line []string) error {
 	var err error
 
 	switch prop {
+	case "name":
+		setString(&z.Name, val)
 	case "health":
 		setString(&z.Health, val)
 	case "allocated":
@@ -315,6 +339,22 @@ func (z *Zpool) parseLine(line []string) error {
 		err = setUint(&z.Size, val)
 	case "free":
 		err = setUint(&z.Free, val)
+	case "fragmentation":
+		// Trim trailing "%" before parsing uint
+		i := strings.Index(val, "%")
+		if i < 0 {
+			i = len(val)
+		}
+		err = setUint(&z.Fragmentation, val[:i])
+	case "readonly":
+		z.ReadOnly = val == "on"
+	case "freeing":
+		err = setUint(&z.Freeing, val)
+	case "leaked":
+		err = setUint(&z.Leaked, val)
+	case "dedupratio":
+		// Trim trailing "x" before parsing float64
+		z.DedupRatio, err = strconv.ParseFloat(val[:len(val)-1], 64)
 	}
 	return err
 }

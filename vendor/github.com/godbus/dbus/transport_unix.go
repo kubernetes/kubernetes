@@ -203,7 +203,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 		}
 	} else {
 		if err := msg.EncodeTo(t, nativeEndian); err != nil {
-			return nil
+			return err
 		}
 	}
 	return nil

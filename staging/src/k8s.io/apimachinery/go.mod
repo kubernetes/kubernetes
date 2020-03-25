@@ -12,23 +12,23 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/protobuf v1.3.2
-	github.com/google/go-cmp v0.3.1
+	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.1.0
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/json-iterator/go v1.1.8
-	github.com/kr/pretty v0.1.0 // indirect
+	github.com/kr/pretty v0.2.0 // indirect
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/onsi/ginkgo v1.11.0 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
+	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
 	golang.org/x/text v0.3.2 // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/klog v1.0.0

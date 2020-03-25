@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/docker/docker/pkg/parsers/operatingsystem"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils/cloudinfo"
@@ -34,6 +33,7 @@ import (
 )
 
 const hugepagesDirectory = "/sys/kernel/mm/hugepages/"
+const memoryControllerPath = "/sys/devices/system/edac/mc/"
 
 var machineIdFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
 var bootIdFilePath = flag.String("boot_id_file", "/proc/sys/kernel/random/boot_id", "Comma-separated list of files to check for boot-id. Use the first one that exists.")
@@ -72,7 +72,17 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		return nil, err
 	}
 
-	hugePagesInfo, err := GetHugePagesInfo(hugepagesDirectory)
+	memoryByType, err := GetMachineMemoryByType(memoryControllerPath)
+	if err != nil {
+		return nil, err
+	}
+
+	nvmInfo, err := GetNVMInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	hugePagesInfo, err := sysinfo.GetHugePagesInfo(sysFs, hugepagesDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +102,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		klog.Errorf("Failed to get network devices: %v", err)
 	}
 
-	topology, numCores, err := GetTopology(sysFs, string(cpuinfo))
+	topology, numCores, err := GetTopology(sysFs)
 	if err != nil {
 		klog.Errorf("Failed to get topology information: %v", err)
 	}
@@ -108,19 +118,23 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 	instanceID := realCloudInfo.GetInstanceID()
 
 	machineInfo := &info.MachineInfo{
-		NumCores:       numCores,
-		CpuFrequency:   clockSpeed,
-		MemoryCapacity: memoryCapacity,
-		HugePages:      hugePagesInfo,
-		DiskMap:        diskMap,
-		NetworkDevices: netDevices,
-		Topology:       topology,
-		MachineID:      getInfoFromFiles(filepath.Join(rootFs, *machineIdFilePath)),
-		SystemUUID:     systemUUID,
-		BootID:         getInfoFromFiles(filepath.Join(rootFs, *bootIdFilePath)),
-		CloudProvider:  cloudProvider,
-		InstanceType:   instanceType,
-		InstanceID:     instanceID,
+		NumCores:         numCores,
+		NumPhysicalCores: GetPhysicalCores(cpuinfo),
+		NumSockets:       GetSockets(cpuinfo),
+		CpuFrequency:     clockSpeed,
+		MemoryCapacity:   memoryCapacity,
+		MemoryByType:     memoryByType,
+		NVMInfo:          nvmInfo,
+		HugePages:        hugePagesInfo,
+		DiskMap:          diskMap,
+		NetworkDevices:   netDevices,
+		Topology:         topology,
+		MachineID:        getInfoFromFiles(filepath.Join(rootFs, *machineIdFilePath)),
+		SystemUUID:       systemUUID,
+		BootID:           getInfoFromFiles(filepath.Join(rootFs, *bootIdFilePath)),
+		CloudProvider:    cloudProvider,
+		InstanceType:     instanceType,
+		InstanceID:       instanceID,
 	}
 
 	for i := range filesystems {
@@ -136,7 +150,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 }
 
 func ContainerOsVersion() string {
-	os, err := operatingsystem.GetOperatingSystem()
+	os, err := getOperatingSystem()
 	if err != nil {
 		os = "Unknown"
 	}

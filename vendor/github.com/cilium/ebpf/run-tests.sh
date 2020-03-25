@@ -50,7 +50,7 @@ test -e "${tmp_dir}/${kernel}" || {
 }
 
 echo Testing on ${kernel_version}
-$sudo virtme-run --kimg "${tmp_dir}/${kernel}" --memory 256M --pwd --rwdir=/run/output="${output}" --script-sh "$(realpath "$0") --in-vm /run/output"
+$sudo virtme-run --kimg "${tmp_dir}/${kernel}" --memory 256M --pwd --rwdir=/run/output="${output}" --script-sh "$(realpath "$0") --in-vm /run/output" --qemu-opts -smp 2
 
 if [[ ! -e "${output}/success" ]]; then
   echo "Test failed on ${kernel_version}"

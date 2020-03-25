@@ -1,0 +1,23 @@
+language: go
+
+go:
+  - "1.12.x"
+
+install:
+  # Don't change local go.{mod, sum} by go get tools.
+  #
+  # ref: https://github.com/golang/go/issues/27643
+  - pushd ..; go get -u github.com/vbatts/git-validation; popd
+  - pushd ..; go get -u github.com/kunalkushwaha/ltag; popd
+
+before_script:
+  - pushd ..; git clone https://github.com/containerd/project; popd
+
+env:
+  GO111MODULE=on
+
+script:
+  - DCO_VERBOSITY=-q ../project/script/validate/dco
+  - ../project/script/validate/fileheader ../project/
+  - ../project/script/validate/vendor
+  - go test -race -v ./...

@@ -321,6 +321,60 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 			},
 		}...)
 	}
+	if includedMetrics.Has(container.HugetlbUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
+				name:        "container_hugetlb_failcnt",
+				help:        "Number of hugepage usage hits limits",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"pagesize"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Hugetlb))
+					for k, v := range s.Hugetlb {
+						values = append(values, metricValue{
+							value:     float64(v.Failcnt),
+							labels:    []string{k},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			}, {
+				name:        "container_hugetlb_usage_bytes",
+				help:        "Current hugepage usage in bytes",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"pagesize"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Hugetlb))
+					for k, v := range s.Hugetlb {
+						values = append(values, metricValue{
+							value:     float64(v.Usage),
+							labels:    []string{k},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
+			{
+				name:        "container_hugetlb_max_usage_bytes",
+				help:        "Maximum hugepage usage recorded in bytes",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"pagesize"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Hugetlb))
+					for k, v := range s.Hugetlb {
+						values = append(values, metricValue{
+							value:     float64(v.MaxUsage),
+							labels:    []string{k},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
+				},
+			},
+		}...)
+	}
 	if includedMetrics.Has(container.MemoryUsageMetrics) {
 		c.containerMetrics = append(c.containerMetrics, []containerMetric{
 			{
@@ -961,6 +1015,417 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 			},
 		}...)
 	}
+	if includedMetrics.Has(container.NetworkAdvancedTcpUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
+				name:        "container_network_advance_tcp_stats_total",
+				help:        "advance tcp connections statistic for container",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"tcp_state"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:     float64(s.Network.TcpAdvanced.RtoAlgorithm),
+							labels:    []string{"rtoalgorithm"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RtoMin),
+							labels:    []string{"rtomin"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RtoMax),
+							labels:    []string{"rtomax"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.MaxConn),
+							labels:    []string{"maxconn"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.ActiveOpens),
+							labels:    []string{"activeopens"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PassiveOpens),
+							labels:    []string{"passiveopens"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.AttemptFails),
+							labels:    []string{"attemptfails"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.EstabResets),
+							labels:    []string{"estabresets"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.CurrEstab),
+							labels:    []string{"currestab"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.InSegs),
+							labels:    []string{"insegs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OutSegs),
+							labels:    []string{"outsegs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RetransSegs),
+							labels:    []string{"retranssegs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.InErrs),
+							labels:    []string{"inerrs"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OutRsts),
+							labels:    []string{"outrsts"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.InCsumErrors),
+							labels:    []string{"incsumerrors"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.EmbryonicRsts),
+							labels:    []string{"embryonicrsts"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.SyncookiesSent),
+							labels:    []string{"syncookiessent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.SyncookiesRecv),
+							labels:    []string{"syncookiesrecv"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.SyncookiesFailed),
+							labels:    []string{"syncookiesfailed"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PruneCalled),
+							labels:    []string{"prunecalled"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.RcvPruned),
+							labels:    []string{"rcvpruned"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OfoPruned),
+							labels:    []string{"ofopruned"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.OutOfWindowIcmps),
+							labels:    []string{"outofwindowicmps"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.LockDroppedIcmps),
+							labels:    []string{"lockdroppedicmps"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TW),
+							labels:    []string{"tw"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TWRecycled),
+							labels:    []string{"twrecycled"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TWKilled),
+							labels:    []string{"twkilled"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPTimeWaitOverflow),
+							labels:    []string{"tcptimewaitoverflow"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPTimeouts),
+							labels:    []string{"tcptimeouts"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSpuriousRTOs),
+							labels:    []string{"tcpspuriousrtos"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossProbes),
+							labels:    []string{"tcplossprobes"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossProbeRecovery),
+							labels:    []string{"tcplossproberecovery"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoRecoveryFail),
+							labels:    []string{"tcprenorecoveryfail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackRecoveryFail),
+							labels:    []string{"tcpsackrecoveryfail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoFailures),
+							labels:    []string{"tcprenofailures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackFailures),
+							labels:    []string{"tcpsackfailures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossFailures),
+							labels:    []string{"tcplossfailures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.DelayedACKs),
+							labels:    []string{"delayedacks"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.DelayedACKLocked),
+							labels:    []string{"delayedacklocked"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.DelayedACKLost),
+							labels:    []string{"delayedacklost"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.ListenOverflows),
+							labels:    []string{"listenoverflows"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.ListenDrops),
+							labels:    []string{"listendrops"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPHPHits),
+							labels:    []string{"tcphphits"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPPureAcks),
+							labels:    []string{"tcppureacks"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPHPAcks),
+							labels:    []string{"tcphpacks"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoRecovery),
+							labels:    []string{"tcprenorecovery"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackRecovery),
+							labels:    []string{"tcpsackrecovery"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSACKReneging),
+							labels:    []string{"tcpsackreneging"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFACKReorder),
+							labels:    []string{"tcpfackreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSACKReorder),
+							labels:    []string{"tcpsackreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRenoReorder),
+							labels:    []string{"tcprenoreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPTSReorder),
+							labels:    []string{"tcptsreorder"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFullUndo),
+							labels:    []string{"tcpfullundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPPartialUndo),
+							labels:    []string{"tcppartialundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKUndo),
+							labels:    []string{"tcpdsackundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLossUndo),
+							labels:    []string{"tcplossundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastRetrans),
+							labels:    []string{"tcpfastretrans"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSlowStartRetrans),
+							labels:    []string{"tcpslowstartretrans"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPLostRetransmit),
+							labels:    []string{"tcplostretransmit"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRetransFail),
+							labels:    []string{"tcpretransfail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPRcvCollapsed),
+							labels:    []string{"tcprcvcollapsed"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKOldSent),
+							labels:    []string{"tcpdsackoldsent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKOfoSent),
+							labels:    []string{"tcpdsackofosent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKRecv),
+							labels:    []string{"tcpdsackrecv"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKOfoRecv),
+							labels:    []string{"tcpdsackoforecv"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnData),
+							labels:    []string{"tcpabortondata"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnClose),
+							labels:    []string{"tcpabortonclose"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnMemory),
+							labels:    []string{"tcpabortonmemory"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnTimeout),
+							labels:    []string{"tcpabortontimeout"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortOnLinger),
+							labels:    []string{"tcpabortonlinger"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPAbortFailed),
+							labels:    []string{"tcpabortfailed"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMemoryPressures),
+							labels:    []string{"tcpmemorypressures"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMemoryPressuresChrono),
+							labels:    []string{"tcpmemorypressureschrono"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSACKDiscard),
+							labels:    []string{"tcpsackdiscard"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKIgnoredOld),
+							labels:    []string{"tcpdsackignoredold"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDSACKIgnoredNoUndo),
+							labels:    []string{"tcpdsackignorednoundo"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMD5NotFound),
+							labels:    []string{"tcpmd5notfound"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMD5Unexpected),
+							labels:    []string{"tcpmd5unexpected"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMD5Failure),
+							labels:    []string{"tcpmd5failure"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackShifted),
+							labels:    []string{"tcpsackshifted"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackMerged),
+							labels:    []string{"tcpsackmerged"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSackShiftFallback),
+							labels:    []string{"tcpsackshiftfallback"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPBacklogDrop),
+							labels:    []string{"tcpbacklogdrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PFMemallocDrop),
+							labels:    []string{"pfmemallocdrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPMinTTLDrop),
+							labels:    []string{"tcpminttldrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPDeferAcceptDrop),
+							labels:    []string{"tcpdeferacceptdrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.IPReversePathFilter),
+							labels:    []string{"ipreversepathfilter"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPReqQFullDoCookies),
+							labels:    []string{"tcpreqqfulldocookies"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPReqQFullDrop),
+							labels:    []string{"tcpreqqfulldrop"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenActive),
+							labels:    []string{"tcpfastopenactive"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenActiveFail),
+							labels:    []string{"tcpfastopenactivefail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenPassive),
+							labels:    []string{"tcpfastopenpassive"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenPassiveFail),
+							labels:    []string{"tcpfastopenpassivefail"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenListenOverflow),
+							labels:    []string{"tcpfastopenlistenoverflow"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPFastOpenCookieReqd),
+							labels:    []string{"tcpfastopencookiereqd"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPSynRetrans),
+							labels:    []string{"tcpsynretrans"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.TCPOrigDataSent),
+							labels:    []string{"tcporigdatasent"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PAWSActive),
+							labels:    []string{"pawsactive"},
+							timestamp: s.Timestamp,
+						}, {
+							value:     float64(s.Network.TcpAdvanced.PAWSEstab),
+							labels:    []string{"pawsestab"},
+							timestamp: s.Timestamp,
+						},
+					}
+				},
+			},
+		}...)
+	}
 	if includedMetrics.Has(container.NetworkUdpUsageMetrics) {
 		c.containerMetrics = append(c.containerMetrics, []containerMetric{
 			{
@@ -1077,6 +1542,23 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 							timestamp: s.Timestamp,
 						},
 					}
+				},
+			},
+			{
+				name:        "container_ulimits_soft",
+				help:        "Soft ulimit values for the container root process. Unlimited if -1, except priority and nice",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"ulimit"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Processes.Ulimits))
+					for _, ulimit := range s.Processes.Ulimits {
+						values = append(values, metricValue{
+							value:     float64(ulimit.SoftLimit),
+							labels:    []string{ulimit.Name},
+							timestamp: s.Timestamp,
+						})
+					}
+					return values
 				},
 			},
 		}...)
@@ -1246,7 +1728,24 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 				)
 			}
 		}
+		if c.includedMetrics.Has(container.AppMetrics) {
+			for metricLabel, v := range stats.CustomMetrics {
+				for _, metric := range v {
+					clabels := make([]string, len(rawLabels), len(rawLabels)+len(metric.Labels))
+					cvalues := make([]string, len(rawLabels), len(rawLabels)+len(metric.Labels))
+					copy(clabels, labels)
+					copy(cvalues, values)
+					for label, value := range metric.Labels {
+						clabels = append(clabels, sanitizeLabelName("app_"+label))
+						cvalues = append(cvalues, value)
+					}
+					desc := prometheus.NewDesc(metricLabel, "Custom application metric.", clabels, nil)
+					ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(metric.FloatValue), cvalues...)
+				}
+			}
+		}
 	}
+
 }
 
 func (c *PrometheusCollector) collectVersionInfo(ch chan<- prometheus.Metric) {

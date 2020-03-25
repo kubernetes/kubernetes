@@ -116,6 +116,9 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 		if spec.HasMemory {
 			stat.Memory = &val.Memory
 		}
+		if spec.HasHugetlb {
+			stat.Hugetlb = &val.Hugetlb
+		}
 		if spec.HasNetwork {
 			// TODO: Handle TcpStats
 			stat.Network = &NetworkStats{
@@ -259,6 +262,7 @@ func ContainerSpecFromV1(specV1 *v1.ContainerSpec, aliases []string, namespace s
 		CreationTime:     specV1.CreationTime,
 		HasCpu:           specV1.HasCpu,
 		HasMemory:        specV1.HasMemory,
+		HasHugetlb:       specV1.HasHugetlb,
 		HasFilesystem:    specV1.HasFilesystem,
 		HasNetwork:       specV1.HasNetwork,
 		HasProcesses:     specV1.HasProcesses,
