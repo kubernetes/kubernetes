@@ -821,3 +821,21 @@ func SkipIfNoDefaultStorageClass(c clientset.Interface) {
 		e2eskipper.Skipf("error finding default storageClass : %v", err)
 	}
 }
+
+// WaitForPersistentVolumeDeleted waits for a PersistentVolume to get deleted or until timeout occurs, whichever comes first.
+func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for PersistentVolume %s to get deleted", timeout, pvName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
+		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		if err == nil {
+			framework.Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
+			continue
+		}
+		if apierrors.IsNotFound(err) {
+			framework.Logf("PersistentVolume %s was removed", pvName)
+			return nil
+		}
+		framework.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
+	}
+	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
+}

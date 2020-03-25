@@ -332,6 +332,6 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 		e2epv.DeletePersistentVolume(c, pv.Name)
 		return
 	}
-	err := framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, 5*time.Minute)
+	err := e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, 5*time.Minute)
 	framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", pv.Name)
 }

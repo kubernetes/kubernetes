@@ -85,7 +85,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			pvc = nil
 
 			ginkgo.By("verify pv is deleted")
-			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, 300*time.Second)
+			err = e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, 300*time.Second)
 			framework.ExpectNoError(err)
 
 			pv = nil
@@ -143,7 +143,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Verify PV should be deleted automatically")
-			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
+			framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
 			pv = nil
 			volumePath = ""
 		})

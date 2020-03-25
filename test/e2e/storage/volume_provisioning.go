@@ -415,7 +415,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			ginkgo.By(fmt.Sprintf("deleting the PV %q", pv.Name))
 			framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
-			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
+			framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
 		})
 
 		ginkgo.It("should not provision a volume in an unmanaged GCE zone.", func() {
@@ -587,7 +587,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for the PV to get deleted")
-			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, e2epv.PVDeletingTimeout)
+			err = e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, e2epv.PVDeletingTimeout)
 			framework.ExpectNoError(err)
 		})
 	})

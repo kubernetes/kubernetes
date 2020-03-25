@@ -97,7 +97,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvcSsd.Name, ns), "Failed to delete PVC ", pvcSsd.Name)
 
 			ginkgo.By("verify pvSsd is deleted")
-			err = framework.WaitForPersistentVolumeDeleted(c, pvSsd.Name, 3*time.Second, 300*time.Second)
+			err = e2epv.WaitForPersistentVolumeDeleted(c, pvSsd.Name, 3*time.Second, 300*time.Second)
 			framework.ExpectNoError(err)
 			volumePath = ""
 

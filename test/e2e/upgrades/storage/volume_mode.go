@@ -129,5 +129,5 @@ func (t *VolumeModeDowngradeTest) Teardown(f *framework.Framework) {
 	framework.ExpectNoError(f.ClientSet.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Delete(context.TODO(), t.pvc.Name, metav1.DeleteOptions{}))
 
 	ginkgo.By("Waiting for the PV to be deleted")
-	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(f.ClientSet, t.pv.Name, 5*time.Second, 20*time.Minute))
+	framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, t.pv.Name, 5*time.Second, 20*time.Minute))
 }
