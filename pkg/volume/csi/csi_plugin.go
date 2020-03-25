@@ -457,10 +457,15 @@ func (p *csiPlugin) NewMounter(
 	volData[volDataKey.attachmentID] = attachID
 
 	if err := saveVolumeData(dataDir, volDataFileName, volData); err != nil {
-		if removeErr := os.RemoveAll(dataDir); removeErr != nil {
-			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, removeErr))
+		errorMsg := log("csi.NewMounter failed to save volume info data: %v", err)
+		klog.Error(errorMsg)
+
+		// attempt to cleanup volume mount dir.
+		if removeMountDirErr := removeMountDir(p, dir); removeMountDirErr != nil {
+			klog.Error(log("csi.NewMounter failed to remove mount dir [%s]: %v", dir, removeMountDirErr))
 		}
-		return nil, errors.New(log("failed to save volume info data: %v", err))
+
+		return nil, errors.New(errorMsg)
 	}
 
 	klog.V(4).Info(log("mounter created successfully"))
