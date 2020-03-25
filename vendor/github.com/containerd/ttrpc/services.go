@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"unsafe"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
@@ -96,10 +95,6 @@ func (s *serviceSet) dispatch(ctx context.Context, serviceName, methodName strin
 		return nil, err
 	}
 
-	if isNil(resp) {
-		return nil, errors.New("ttrpc: marshal called with nil")
-	}
-
 	switch v := resp.(type) {
 	case proto.Message:
 		r, err := proto.Marshal(v)
@@ -158,8 +153,4 @@ func convertCode(err error) codes.Code {
 
 func fullPath(service, method string) string {
 	return "/" + path.Join(service, method)
-}
-
-func isNil(resp interface{}) bool {
-	return (*[2]uintptr)(unsafe.Pointer(&resp))[1] == 0
 }
