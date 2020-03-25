@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apicore "k8s.io/kubernetes/pkg/apis/core"
 	"reflect"
 	"strings"
 	"testing"
@@ -318,8 +320,13 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
+
+	nodeBar, nodeFoo :=
+		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+
 	testPodInfo := &framework.PodInfo{Pod: testPod}
-	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{*nodeBar}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
@@ -328,12 +335,51 @@ func TestDefaultErrorFunc(t *testing.T) {
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache)
 
-	// Trigger error handling again to put the pod in unschedulable queue
-	errFunc(testPodInfo, nil)
+	_ = schedulerCache.AddNode(nodeFoo)
+
+	// assume nodeFoo was not found
+	err := apierrors.NewNotFound(apicore.Resource("node"), nodeFoo.Name)
+	errFunc(testPodInfo, err)
+	dump := schedulerCache.Dump()
+	for _, n := range dump.Nodes {
+		if e, a := nodeFoo, n.Node(); reflect.DeepEqual(e, a) {
+			t.Errorf("Node %s is still in schedulerCache", e.Name)
+			break
+		}
+	}
 
 	// Try up to a minute to retrieve the error pod from priority queue
 	foundPodFlag := false
 	maxIterations := 10 * 60
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
+			continue
+		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
+		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+
+		foundPodFlag = true
+		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the unschedulable queue after waiting for a minute: %v", testPod)
+	}
+
+	_ = queue.Delete(testPod)
+
+	// Trigger error handling again to put the pod in unschedulable queue
+	errFunc(testPodInfo, nil)
+
+	// Try up to a minute to retrieve the error pod from priority queue
+	foundPodFlag = false
+	maxIterations = 10 * 60
 	for i := 0; i < maxIterations; i++ {
 		time.Sleep(100 * time.Millisecond)
 		got := getPodfromPriorityQueue(queue, testPod)
@@ -423,7 +469,7 @@ func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string,
 	requestReceived := false
 	actions := client.Actions()
 	for _, a := range actions {
-		if a.GetVerb() == "get" {
+		if a.GetVerb() == "get" && a.GetResource().Resource == "pods" {
 			getAction, ok := a.(clienttesting.GetAction)
 			if !ok {
 				t.Errorf("Can't cast action object to GetAction interface")
