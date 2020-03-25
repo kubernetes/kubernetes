@@ -93,7 +93,7 @@ endif
 	docker build --pull -t $(BUILD_IMAGE) -f $(TEMP_DIR)/Dockerfile.build $(TEMP_DIR)
 	docker create --name $(BUILD_IMAGE) $(BUILD_IMAGE)
 	docker export $(BUILD_IMAGE) > $(TEMP_DIR)/$(TAR_FILE)
-	docker build -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --load --platform linux/$(ARCH) -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
 
 push: build
