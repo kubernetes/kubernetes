@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -698,8 +699,8 @@ func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	defer cache.mu.RUnlock()
 
 	n, ok := cache.nodes[nodeName]
-	if !ok {
-		return nil, fmt.Errorf("node %q not found in cache", nodeName)
+	if !ok || n.info.Node() == nil {
+		return nil, errors.NewNotFound(v1.Resource("node"), nodeName)
 	}
 
 	return n.info.Node(), nil
