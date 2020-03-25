@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -61,6 +62,23 @@ func (nodeStrategy) NamespaceScoped() bool {
 // AllowCreateOnUpdate is false for nodes.
 func (nodeStrategy) AllowCreateOnUpdate() bool {
 	return false
+}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (nodeStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersion[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersion = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+		// TODO: add fields reset by dropDisabledFields
+	),
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
@@ -162,6 +180,22 @@ type nodeStatusStrategy struct {
 }
 
 var StatusStrategy = nodeStatusStrategy{Strategy}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (nodeStatusStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersionForStatus[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersionForStatus = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("spec"),
+	),
+}
 
 func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)

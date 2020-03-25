@@ -37,6 +37,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/node"
 	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // NodeStorage includes storage for nodes and all sub resources.
@@ -77,6 +78,14 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// ResetFieldsFor implements rest.ResetFieldsProvider.
+func (r *StatusREST) ResetFieldsFor(version string) *fieldpath.Set {
+	if r.store.ResetFieldsProvider != nil {
+		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
+	}
+	return nil
+}
+
 // NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
@@ -89,6 +98,8 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		UpdateStrategy: node.Strategy,
 		DeleteStrategy: node.Strategy,
 		ExportStrategy: node.Strategy,
+
+		ResetFieldsProvider: node.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -103,6 +114,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 
 	statusStore := *store
 	statusStore.UpdateStrategy = node.StatusStrategy
+	statusStore.ResetFieldsProvider = node.StatusStrategy
 
 	// Set up REST handlers
 	nodeREST := &REST{Store: store, proxyTransport: proxyTransport}

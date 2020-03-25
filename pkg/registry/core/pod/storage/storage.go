@@ -81,6 +81,8 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		DeleteStrategy:      registrypod.Strategy,
 		ReturnDeletedObject: true,
 
+		ResetFieldsProvider: registrypod.Strategy,
+
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
@@ -95,6 +97,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	statusStore := *store
 	statusStore.UpdateStrategy = registrypod.StatusStrategy
+	statusStore.ResetFieldsProvider = registrypod.StatusStrategy
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 

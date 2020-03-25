@@ -76,15 +76,8 @@ func TestApplyResetFields(t *testing.T) {
 		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
 	}
 
-	// for _, resourreList := range resourceLists {
-	// 	for _, resource := range resourceList.APIResources {
-
-	// 	}
-	// }
-
 	for _, resourceList := range resourceLists {
 		for _, resource := range resourceList.APIResources {
-			fmt.Println(resourceList.GroupVersion, resource.Group, resource.Version, resource.Name)
 			if !strings.HasSuffix(resource.Name, "/status") {
 				continue
 			}
@@ -165,6 +158,7 @@ func TestApplyResetFields(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				// TODO: test for full object applies to status (~~status~~/spec wiping on status strategies)
 				for field := range createFields {
 					if _, exists := statusFields[field]; exists {
 						t.Errorf("found overlapping field ownership: %v", field)

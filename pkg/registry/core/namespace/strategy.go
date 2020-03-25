@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // namespaceStrategy implements behavior for Namespaces
@@ -45,6 +46,22 @@ var Strategy = namespaceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 // NamespaceScoped is false for namespaces.
 func (namespaceStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (namespaceStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersion[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersion = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+	),
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
@@ -110,6 +127,22 @@ type namespaceStatusStrategy struct {
 }
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (namespaceStatusStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersionForStatus[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersionForStatus = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("spec"),
+	),
+}
 
 func (namespaceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
