@@ -28,7 +28,6 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
@@ -48,6 +47,8 @@ type resettableCollector interface {
 
 const (
 	APIServerComponent string = "apiserver"
+	OtherContentType   string = "other"
+	OtherRequestMethod string = "other"
 )
 
 /*
@@ -172,6 +173,37 @@ var (
 		currentInflightRequests,
 		requestTerminationsTotal,
 	}
+
+	// these are the known (e.g. whitelisted/known) content types which we will report for
+	// request metrics. Any other RFC compliant content types will be aggregated under 'unknown'
+	knownMetricContentTypes = utilsets.NewString(
+		"application/apply-patch+yaml",
+		"application/json",
+		"application/json-patch+json",
+		"application/merge-patch+json",
+		"application/strategic-merge-patch+json",
+		"application/vnd.kubernetes.protobuf",
+		"application/vnd.kubernetes.protobuf;stream=watch",
+		"application/yaml",
+		"text/plain",
+		"text/plain;charset=utf-8")
+	// these are the valid request methods which we report in our metrics. Any other request methods
+	// will be aggregated under 'unknown'
+	validRequestMethods = utilsets.NewString(
+		"APPLY",
+		"CONNECT",
+		"CREATE",
+		"DELETE",
+		"DELETECOLLECTION",
+		"GET",
+		"LIST",
+		"PATCH",
+		"POST",
+		"PROXY",
+		"PUT",
+		"UPDATE",
+		"WATCH",
+		"WATCHLIST")
 )
 
 const (
@@ -219,6 +251,10 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
+	// set verbs to a bounded set of known and expected verbs
+	if !validRequestMethods.Has(verb) {
+		verb = OtherRequestMethod
+	}
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
@@ -256,7 +292,8 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	reportedVerb := cleanVerb(verb, req)
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
-	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, contentType, codeToString(httpCode)).Inc()
+	cleanContentType := cleanContentType(contentType)
+	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
@@ -311,6 +348,19 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 	}
 }
 
+// cleanContentType binds the contentType (for metrics related purposes) to a
+// bounded set of known/expected content-types.
+func cleanContentType(contentType string) string {
+	normalizedContentType := strings.ToLower(contentType)
+	if strings.HasSuffix(contentType, " stream=watch") || strings.HasSuffix(contentType, " charset=utf-8") {
+		normalizedContentType = strings.ReplaceAll(contentType, " ", "")
+	}
+	if knownMetricContentTypes.Has(normalizedContentType) {
+		return normalizedContentType
+	}
+	return OtherContentType
+}
+
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
 	if requestInfo.Namespace != "" {
@@ -355,7 +405,10 @@ func cleanVerb(verb string, request *http.Request) string {
 	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reportedVerb = "APPLY"
 	}
-	return reportedVerb
+	if validRequestMethods.Has(reportedVerb) {
+		return reportedVerb
+	}
+	return OtherRequestMethod
 }
 
 func cleanDryRun(u *url.URL) string {
