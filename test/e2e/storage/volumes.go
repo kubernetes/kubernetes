@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -46,7 +46,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 
 	ginkgo.Describe("ConfigMap", func() {
 		ginkgo.It("should be mountable", func() {
-			config := volume.TestConfig{
+			config := e2evolume.TestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "configmap",
 			}
@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502
-			tests := []volume.Test{
+			tests := []e2evolume.Test{
 				{
 					Volume: v1.VolumeSource{
 						ConfigMap: &v1.ConfigMapVolumeSource{
@@ -108,7 +108,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 					ExpectedContent: "this is the second file",
 				},
 			}
-			volume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

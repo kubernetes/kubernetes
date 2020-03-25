@@ -43,7 +43,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -926,7 +926,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.ExpectNoError(err, "Failed to delete deployment %s", deployment.Name)
 		}()
 
-		framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(cs, deployment), "Failed to complete pause pod deployment")
+		framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(cs, deployment), "Failed to complete pause pod deployment")
 
 		deployment, err = cs.AppsV1().Deployments(ns).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Error in retrieving pause pod deployment")
@@ -2874,7 +2874,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 
 		ginkgo.By("Creating pause pod deployment to make sure, pausePods are in desired state")
 		deployment := createPausePodDeployment(cs, "pause-pod-deployment", namespace, 1)
-		framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(cs, deployment), "Failed to complete pause pod deployment")
+		framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(cs, deployment), "Failed to complete pause pod deployment")
 
 		defer func() {
 			framework.Logf("Deleting deployment")
@@ -3242,7 +3242,7 @@ func createAndGetExternalServiceFQDN(cs clientset.Interface, ns, serviceName str
 
 func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas int) *appsv1.Deployment {
 	labels := map[string]string{"deployment": "agnhost-pause"}
-	pauseDeployment := e2edeploy.NewDeployment(name, int32(replicas), labels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
+	pauseDeployment := e2edeployment.NewDeployment(name, int32(replicas), labels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
 
 	pauseDeployment.Spec.Template.Spec.Containers[0] = v1.Container{
 		Name:  "agnhost-pause",

@@ -36,8 +36,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -204,7 +204,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
-		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "agnhost", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RecreateDeploymentStrategyType)
+		d := e2edeployment.NewDeployment("audit-deployment", int32(1), podLabels, "agnhost", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RecreateDeploymentStrategyType)
 
 		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create audit-deployment")
@@ -656,7 +656,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	// test authorizer annotations, RBAC is required.
 	ginkgo.It("should audit API calls to get a pod with unauthorized user.", func() {
-		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+		if !e2eauth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			e2eskipper.Skipf("RBAC not enabled.")
 		}
 

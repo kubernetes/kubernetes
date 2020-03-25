@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -74,7 +74,7 @@ func InitVolumesTestSuite() TestSuite {
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 		},
@@ -156,11 +156,11 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		init()
 		defer func() {
-			volume.TestServerCleanup(f, convertTestConfig(l.config))
+			e2evolume.TestServerCleanup(f, convertTestConfig(l.config))
 			cleanup()
 		}()
 
-		tests := []volume.Test{
+		tests := []e2evolume.Test{
 			{
 				Volume: *l.resource.VolSource,
 				Mode:   pattern.VolMode,
@@ -180,9 +180,9 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		volume.InjectContent(f, config, fsGroup, pattern.FsType, tests)
+		e2evolume.InjectContent(f, config, fsGroup, pattern.FsType, tests)
 		if driver.GetDriverInfo().Capabilities[CapPersistence] {
-			volume.TestVolumeClient(f, config, fsGroup, pattern.FsType, tests)
+			e2evolume.TestVolumeClient(f, config, fsGroup, pattern.FsType, tests)
 		} else {
 			ginkgo.By("Skipping persistence check for non-persistent volume")
 		}
@@ -228,7 +228,7 @@ func testScriptInPod(
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("exec-container-%s", suffix),
-					Image:   volume.GetTestImage(imageutils.GetE2EImage(imageutils.Nginx)),
+					Image:   e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.Nginx)),
 					Command: command,
 					VolumeMounts: []v1.VolumeMount{
 						{

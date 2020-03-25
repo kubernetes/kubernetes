@@ -39,7 +39,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -99,7 +99,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ginkgo.BeforeEach(func() {
 			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts = []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ss = e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
 
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
@@ -112,7 +112,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
-			e2esset.DeleteAllStatefulSets(c, ns)
+			e2estatefulset.DeleteAllStatefulSets(c, ns)
 		})
 
 		// This can't be Conformance yet because it depends on a default
@@ -121,37 +121,37 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
-			e2esset.PauseNewPods(ss)
+			e2estatefulset.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
-			e2esset.Saturate(c, ss)
+			e2estatefulset.Saturate(c, ss)
 
 			ginkgo.By("Verifying statefulset mounted data directory is usable")
-			framework.ExpectNoError(e2esset.CheckMount(c, ss, "/data"))
+			framework.ExpectNoError(e2estatefulset.CheckMount(c, ss, "/data"))
 
 			ginkgo.By("Verifying statefulset provides a stable hostname for each pod")
-			framework.ExpectNoError(e2esset.CheckHostname(c, ss))
+			framework.ExpectNoError(e2estatefulset.CheckHostname(c, ss))
 
 			ginkgo.By("Verifying statefulset set proper service name")
-			framework.ExpectNoError(e2esset.CheckServiceName(ss, headlessSvcName))
+			framework.ExpectNoError(e2estatefulset.CheckServiceName(ss, headlessSvcName))
 
 			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
-			framework.ExpectNoError(e2esset.ExecInStatefulPods(c, ss, cmd))
+			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(c, ss, cmd))
 
 			ginkgo.By("Restarting statefulset " + ss.Name)
-			e2esset.Restart(c, ss)
-			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			e2estatefulset.Restart(c, ss)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 
 			ginkgo.By("Verifying statefulset mounted data directory is usable")
-			framework.ExpectNoError(e2esset.CheckMount(c, ss, "/data"))
+			framework.ExpectNoError(e2estatefulset.CheckMount(c, ss, "/data"))
 
 			cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
-			framework.ExpectNoError(e2esset.ExecInStatefulPods(c, ss, cmd))
+			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(c, ss, cmd))
 		})
 
 		// This can't be Conformance yet because it depends on a default
@@ -160,7 +160,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 1
-			e2esset.PauseNewPods(ss)
+			e2estatefulset.PauseNewPods(ss)
 
 			// Replace ss with the one returned from Create() so it has the UID.
 			// Save Kind since it won't be populated in the returned ss.
@@ -170,8 +170,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Kind = kind
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
-			e2esset.Saturate(c, ss)
-			pods := e2esset.GetPodList(c, ss)
+			e2estatefulset.Saturate(c, ss)
+			pods := e2estatefulset.GetPodList(c, ss)
 			gomega.Expect(pods.Items).To(gomega.HaveLen(int(*ss.Spec.Replicas)))
 
 			ginkgo.By("Checking that stateful set pods are created with ControllerRef")
@@ -245,18 +245,18 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 2
-			e2esset.PauseNewPods(ss)
+			e2estatefulset.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			e2esset.WaitForRunning(c, 1, 0, ss)
+			e2estatefulset.WaitForRunning(c, 1, 0, ss)
 
 			ginkgo.By("Resuming stateful pod at index 0.")
-			e2esset.ResumeNextPod(c, ss)
+			e2estatefulset.ResumeNextPod(c, ss)
 
 			ginkgo.By("Waiting for stateful pod at index 1 to enter running.")
-			e2esset.WaitForRunning(c, 2, 1, ss)
+			e2estatefulset.WaitForRunning(c, 2, 1, ss)
 
 			// Now we have 1 healthy and 1 unhealthy stateful pod. Deleting the healthy stateful pod should *not*
 			// create a new stateful pod till the remaining stateful pod becomes healthy, which won't happen till
@@ -266,13 +266,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deleteStatefulPodAtIndex(c, 0, ss)
 
 			ginkgo.By("Confirming stateful pod at index 0 is recreated.")
-			e2esset.WaitForRunning(c, 2, 1, ss)
+			e2estatefulset.WaitForRunning(c, 2, 1, ss)
 
 			ginkgo.By("Resuming stateful pod at index 1.")
-			e2esset.ResumeNextPod(c, ss)
+			e2estatefulset.ResumeNextPod(c, ss)
 
 			ginkgo.By("Confirming all stateful pods in statefulset are created.")
-			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 		})
 
 		// This can't be Conformance yet because it depends on a default
@@ -291,7 +291,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		*/
 		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func() {
 			ginkgo.By("Creating a new StatefulSet")
-			ss := e2esset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			rollbackTest(c, ns, ss)
 		})
 
@@ -302,7 +302,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		*/
 		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func() {
 			ginkgo.By("Creating a new StatefulSet")
-			ss := e2esset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			setHTTPProbe(ss)
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -316,12 +316,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision))
-			pods := e2esset.GetPodList(c, ss)
+			pods := e2estatefulset.GetPodList(c, ss)
 			for i := range pods.Items {
 				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to currentRevision %s",
 					pods.Items[i].Namespace,
@@ -412,9 +412,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Restoring Pods to the correct revision when they are deleted")
 			deleteStatefulPodAtIndex(c, 0, ss)
 			deleteStatefulPodAtIndex(c, 2, ss)
-			e2esset.WaitForRunningAndReady(c, 3, ss)
+			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
 			ss = getStatefulSet(c, ss.Namespace, ss.Name)
-			pods = e2esset.GetPodList(c, ss)
+			pods = e2estatefulset.GetPodList(c, ss)
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
 					framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, oldImage, fmt.Sprintf("Pod %s/%s has image %s not equal to current image %s",
@@ -494,19 +494,19 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// The legacy OnDelete strategy only exists for backward compatibility with pre-v1 APIs.
 		ginkgo.It("should implement legacy replacement when the update strategy is OnDelete", func() {
 			ginkgo.By("Creating a new StatefulSet")
-			ss := e2esset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			setHTTPProbe(ss)
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision))
-			pods := e2esset.GetPodList(c, ss)
+			pods := e2estatefulset.GetPodList(c, ss)
 			for i := range pods.Items {
 				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
 					pods.Items[i].Namespace,
@@ -519,9 +519,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deleteStatefulPodAtIndex(c, 0, ss)
 			deleteStatefulPodAtIndex(c, 1, ss)
 			deleteStatefulPodAtIndex(c, 2, ss)
-			e2esset.WaitForRunningAndReady(c, 3, ss)
+			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
 			ss = getStatefulSet(c, ss.Namespace, ss.Name)
-			pods = e2esset.GetPodList(c, ss)
+			pods = e2estatefulset.GetPodList(c, ss)
 			for i := range pods.Items {
 				framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
 					pods.Items[i].Namespace,
@@ -548,9 +548,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			deleteStatefulPodAtIndex(c, 0, ss)
 			deleteStatefulPodAtIndex(c, 1, ss)
 			deleteStatefulPodAtIndex(c, 2, ss)
-			e2esset.WaitForRunningAndReady(c, 3, ss)
+			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
 			ss = getStatefulSet(c, ss.Namespace, ss.Name)
-			pods = e2esset.GetPodList(c, ss)
+			pods = e2estatefulset.GetPodList(c, ss)
 			for i := range pods.Items {
 				framework.ExpectEqual(pods.Items[i].Spec.Containers[0].Image, newImage, fmt.Sprintf("Pod %s/%s has image %s not equal to new image %s",
 					pods.Items[i].Namespace,
@@ -579,24 +579,24 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
-			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			setHTTPProbe(ss)
 			ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
-			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 
 			ginkgo.By("Confirming that stateful set scale up will halt with unhealthy stateful pod")
 			breakHTTPProbe(c, ss)
 			waitForRunningAndNotReady(c, *ss.Spec.Replicas, ss)
-			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
-			e2esset.UpdateReplicas(c, ss, 3)
+			e2estatefulset.WaitForStatusReadyReplicas(c, ss, 0)
+			e2estatefulset.UpdateReplicas(c, ss, 3)
 			confirmStatefulPodCount(c, 1, ss, 10*time.Second, true)
 
 			ginkgo.By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
 			restoreHTTPProbe(c, ss)
-			e2esset.WaitForRunningAndReady(c, 3, ss)
+			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled up in order")
 			expectedOrder := []string{ssName + "-0", ssName + "-1", ssName + "-2"}
@@ -622,14 +622,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			breakHTTPProbe(c, ss)
-			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
+			e2estatefulset.WaitForStatusReadyReplicas(c, ss, 0)
 			waitForRunningAndNotReady(c, 3, ss)
-			e2esset.UpdateReplicas(c, ss, 0)
+			e2estatefulset.UpdateReplicas(c, ss, 0)
 			confirmStatefulPodCount(c, 3, ss, 10*time.Second, true)
 
 			ginkgo.By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			restoreHTTPProbe(c, ss)
-			e2esset.Scale(c, ss, 0)
+			e2estatefulset.Scale(c, ss, 0)
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled down in reverse order")
 			expectedOrder = []string{ssName + "-2", ssName + "-1", ssName + "-0"}
@@ -658,37 +658,37 @@ var _ = SIGDescribe("StatefulSet", func() {
 			psLabels := klabels.Set(labels)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
-			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
-			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 
 			ginkgo.By("Confirming that stateful set scale up will not halt with unhealthy stateful pod")
 			breakHTTPProbe(c, ss)
 			waitForRunningAndNotReady(c, *ss.Spec.Replicas, ss)
-			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
-			e2esset.UpdateReplicas(c, ss, 3)
+			e2estatefulset.WaitForStatusReadyReplicas(c, ss, 0)
+			e2estatefulset.UpdateReplicas(c, ss, 3)
 			confirmStatefulPodCount(c, 3, ss, 10*time.Second, false)
 
 			ginkgo.By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
 			restoreHTTPProbe(c, ss)
-			e2esset.WaitForRunningAndReady(c, 3, ss)
+			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
 
 			ginkgo.By("Scale down will not halt with unhealthy stateful pod")
 			breakHTTPProbe(c, ss)
-			e2esset.WaitForStatusReadyReplicas(c, ss, 0)
+			e2estatefulset.WaitForStatusReadyReplicas(c, ss, 0)
 			waitForRunningAndNotReady(c, 3, ss)
-			e2esset.UpdateReplicas(c, ss, 0)
+			e2estatefulset.UpdateReplicas(c, ss, 0)
 			confirmStatefulPodCount(c, 0, ss, 10*time.Second, false)
 
 			ginkgo.By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			restoreHTTPProbe(c, ss)
-			e2esset.Scale(c, ss, 0)
-			e2esset.WaitForStatusReplicas(c, ss, 0)
+			e2estatefulset.Scale(c, ss, 0)
+			e2estatefulset.WaitForStatusReplicas(c, ss, 0)
 		})
 
 		/*
@@ -724,7 +724,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
-			ss := e2esset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
 			statefulPodContainer := &ss.Spec.Template.Spec.Containers[0]
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
@@ -791,11 +791,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 		*/
 		framework.ConformanceIt("should have a working scale subresource", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			ss := e2esset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(c, ss)
 
 			ginkgo.By("getting scale subresource")
@@ -836,7 +836,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
-			e2esset.DeleteAllStatefulSets(c, ns)
+			e2estatefulset.DeleteAllStatefulSets(c, ns)
 		})
 
 		// Do not mark this as Conformance.
@@ -907,8 +907,8 @@ func (c *clusterAppTester) run() {
 	default:
 		if restartCluster {
 			ginkgo.By("Restarting stateful set " + ss.Name)
-			e2esset.Restart(c.client, ss)
-			e2esset.WaitForRunningAndReady(c.client, *ss.Spec.Replicas, ss)
+			e2estatefulset.Restart(c.client, ss)
+			e2estatefulset.WaitForRunningAndReady(c.client, *ss.Spec.Replicas, ss)
 		}
 	}
 
@@ -928,7 +928,7 @@ func (z *zookeeperTester) name() string {
 }
 
 func (z *zookeeperTester) deploy(ns string) *appsv1.StatefulSet {
-	z.ss = e2esset.CreateStatefulSet(z.client, zookeeperManifestPath, ns)
+	z.ss = e2estatefulset.CreateStatefulSet(z.client, zookeeperManifestPath, ns)
 	return z.ss
 }
 
@@ -966,7 +966,7 @@ func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
 }
 
 func (m *mysqlGaleraTester) deploy(ns string) *appsv1.StatefulSet {
-	m.ss = e2esset.CreateStatefulSet(m.client, mysqlGaleraManifestPath, ns)
+	m.ss = e2estatefulset.CreateStatefulSet(m.client, mysqlGaleraManifestPath, ns)
 
 	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
 	for _, cmd := range []string{
@@ -1006,7 +1006,7 @@ func (m *redisTester) redisExec(cmd, ns, podName string) string {
 }
 
 func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
-	m.ss = e2esset.CreateStatefulSet(m.client, redisManifestPath, ns)
+	m.ss = e2estatefulset.CreateStatefulSet(m.client, redisManifestPath, ns)
 	return m.ss
 }
 
@@ -1037,7 +1037,7 @@ func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 }
 
 func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {
-	c.ss = e2esset.CreateStatefulSet(c.client, cockroachDBManifestPath, ns)
+	c.ss = e2estatefulset.CreateStatefulSet(c.client, cockroachDBManifestPath, ns)
 	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
 	for _, cmd := range []string{
 		"CREATE DATABASE IF NOT EXISTS foo;",
@@ -1088,12 +1088,12 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	setHTTPProbe(ss)
 	ss, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+	e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 	ss = waitForStatus(c, ss)
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	framework.ExpectEqual(currentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 		ss.Namespace, ss.Name, updateRevision, currentRevision))
-	pods := e2esset.GetPodList(c, ss)
+	pods := e2estatefulset.GetPodList(c, ss)
 	for i := range pods.Items {
 		framework.ExpectEqual(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel], currentRevision, fmt.Sprintf("Pod %s/%s revision %s is not equal to current revision %s",
 			pods.Items[i].Namespace,
@@ -1101,7 +1101,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 			pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 			currentRevision))
 	}
-	e2esset.SortStatefulPods(pods)
+	e2estatefulset.SortStatefulPods(pods)
 	err = breakPodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
 	ss, pods = waitForPodNotReady(c, ss, pods.Items[1].Name)
@@ -1121,11 +1121,11 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during rolling update")
 
 	ginkgo.By("Updating Pods in reverse ordinal order")
-	pods = e2esset.GetPodList(c, ss)
-	e2esset.SortStatefulPods(pods)
+	pods = e2estatefulset.GetPodList(c, ss)
+	e2estatefulset.SortStatefulPods(pods)
 	err = restorePodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
-	ss, pods = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
+	ss, pods = e2estatefulset.WaitForPodReady(c, ss, pods.Items[1].Name)
 	ss, pods = waitForRollingUpdate(c, ss)
 	framework.ExpectEqual(ss.Status.CurrentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
 		ss.Namespace,
@@ -1161,10 +1161,10 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during roll back")
 
 	ginkgo.By("Rolling back update in reverse ordinal order")
-	pods = e2esset.GetPodList(c, ss)
-	e2esset.SortStatefulPods(pods)
+	pods = e2estatefulset.GetPodList(c, ss)
+	e2estatefulset.SortStatefulPods(pods)
 	restorePodHTTPProbe(ss, &pods.Items[1])
-	ss, pods = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
+	ss, pods = e2estatefulset.WaitForPodReady(c, ss, pods.Items[1].Name)
 	ss, pods = waitForRollingUpdate(c, ss)
 	framework.ExpectEqual(ss.Status.CurrentRevision, priorRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal prior revision %s on rollback completion",
 		ss.Namespace,
@@ -1192,7 +1192,7 @@ func confirmStatefulPodCount(c clientset.Interface, count int, ss *appsv1.Statef
 	start := time.Now()
 	deadline := start.Add(timeout)
 	for t := time.Now(); t.Before(deadline); t = time.Now() {
-		podList := e2esset.GetPodList(c, ss)
+		podList := e2estatefulset.GetPodList(c, ss)
 		statefulPodCount := len(podList.Items)
 		if statefulPodCount != count {
 			e2epod.LogPodStates(podList.Items)
@@ -1224,7 +1224,7 @@ func breakHTTPProbe(c clientset.Interface, ss *appsv1.StatefulSet) error {
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
-	return e2esset.ExecInStatefulPods(c, ss, cmd)
+	return e2estatefulset.ExecInStatefulPods(c, ss, cmd)
 }
 
 // breakPodHTTPProbe breaks the readiness probe for Nginx StatefulSet containers in one pod.
@@ -1248,7 +1248,7 @@ func restoreHTTPProbe(c clientset.Interface, ss *appsv1.StatefulSet) error {
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
-	return e2esset.ExecInStatefulPods(c, ss, cmd)
+	return e2estatefulset.ExecInStatefulPods(c, ss, cmd)
 }
 
 // restorePodHTTPProbe restores the readiness probe for Nginx StatefulSet containers in pod.

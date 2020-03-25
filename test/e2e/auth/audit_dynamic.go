@@ -36,7 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -347,7 +347,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			},
 		}
 
-		if auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+		if e2eauth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			testCases = append(testCases, annotationTestCases...)
 		}
 		expectedEvents := []utils.AuditEvent{}

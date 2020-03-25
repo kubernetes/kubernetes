@@ -24,7 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
 
 func nowStamp() string {
@@ -50,5 +50,5 @@ func Failf(format string, args ...interface{}) {
 func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("FAIL", msg)
-	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
+	e2eginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
