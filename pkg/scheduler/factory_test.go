@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	apicore "k8s.io/kubernetes/pkg/apis/core"
 	"reflect"
 	"strings"
 	"testing"
@@ -338,7 +338,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	_ = schedulerCache.AddNode(nodeFoo)
 
 	// assume nodeFoo was not found
-	err := apierrors.NewNotFound(api.Resource("node"), nodeFoo.Name)
+	err := apierrors.NewNotFound(apicore.Resource("node"), nodeFoo.Name)
 	errFunc(testPodInfo, err)
 	dump := schedulerCache.Dump()
 	for _, n := range dump.Nodes {

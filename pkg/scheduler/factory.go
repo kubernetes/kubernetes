@@ -455,13 +455,11 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.PodInfo, error) {
 	return func(podInfo *framework.PodInfo, err error) {
 		pod := podInfo.Pod
-		_, isFitError := err.(*core.FitError)
-		resourceNotFound := apierrors.IsNotFound(err)
 		if err == core.ErrNoNodesAvailable {
 			klog.V(2).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
-		} else if isFitError {
+		} else if _, ok := err.(*core.FitError); ok {
 			klog.V(2).Infof("Unable to schedule %v/%v: no fit: %v; waiting", pod.Namespace, pod.Name, err)
-		} else if resourceNotFound {
+		} else if apierrors.IsNotFound(err) {
 			klog.V(2).Infof("Unable to schedule %v/%v: possibly due to node not found: %v; waiting", pod.Namespace, pod.Name, err)
 			if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 				nodeName := errStatus.Status().Details.Name
