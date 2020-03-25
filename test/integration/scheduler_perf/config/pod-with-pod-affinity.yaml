@@ -3,14 +3,14 @@ kind: Pod
 metadata:
   generateName: affinity-pod-
   labels:
-    foo: ""
+    color: blue
 spec:
   affinity:
     podAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
       - labelSelector:
           matchLabels:
-            foo: ""
+            color: blue
         topologyKey: failure-domain.beta.kubernetes.io/zone
         namespaces: ["sched-test", "sched-setup"]
   containers:
