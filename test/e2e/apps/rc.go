@@ -175,7 +175,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(0), "ReplicationControllerStatus's readyReplicas does not equal 0")
 
 		ginkgo.By("fetching ReplicationController status")
-		rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(testRcName, metav1.GetOptions{}, "status")
+		rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{}, "status")
 		framework.ExpectNoError(err, "Failed to fetch ReplicationControllerStatus")
 
 		rcStatusUjson, err := json.Marshal(rcStatusUnstructured)
