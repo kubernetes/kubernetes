@@ -174,7 +174,37 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	// support backward compatibility : file paths or raw json - since we are removing file path
 	// dependencies from this test.
 	framework.RunKubectlOrDieInput(ns, fileContents, "delete", "--grace-period=0", "--force", "-f", "-", nsArg)
-	framework.AssertCleanup(ns, selectors...)
+	assertCleanup(ns, selectors...)
+}
+
+// assertCleanup asserts that cleanup of a namespace wrt selectors occurred.
+func assertCleanup(ns string, selectors ...string) {
+	var nsArg string
+	if ns != "" {
+		nsArg = fmt.Sprintf("--namespace=%s", ns)
+	}
+
+	var e error
+	verifyCleanupFunc := func() (bool, error) {
+		e = nil
+		for _, selector := range selectors {
+			resources := framework.RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers", nsArg)
+			if resources != "" {
+				e = fmt.Errorf("Resources left running after stop:\n%s", resources)
+				return false, nil
+			}
+			pods := framework.RunKubectlOrDie(ns, "get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+			if pods != "" {
+				e = fmt.Errorf("Pods left unterminated after stop:\n%s", pods)
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
+	if err != nil {
+		framework.Failf(e.Error())
+	}
 }
 
 func readTestFileOrDie(file string) []byte {
