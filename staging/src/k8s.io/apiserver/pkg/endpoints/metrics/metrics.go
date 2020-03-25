@@ -47,7 +47,9 @@ type resettableCollector interface {
 }
 
 const (
-	APIServerComponent string = "apiserver"
+	APIServerComponent   string = "apiserver"
+	OtherContentType     string = "other"
+	UnknownRequestMethod string = "unknown"
 )
 
 /*
@@ -59,6 +61,19 @@ const (
  * the metric stability policy.
  */
 var (
+	// these are the valid content types which we will report in request metrics. Any other content types
+	// will be aggregated under 'unknown'
+	validMetricContentTypes = utilsets.NewString("application/vnd.kubernetes.protobuf",
+		"application/json",
+		"application/vnd.kubernetes.protobuf;stream=watch",
+		"text/plain",
+		"text/plain; charset=utf-8")
+	// these are the valid request methods which we report in our metrics. Any other request methods
+	// will be aggregated under 'unknown'
+	validRequestMethods = utilsets.NewString("LIST", "WATCH", "GET", "PUT", "POST", "DELETE", "PATCH")
+	// these are the valid termination request verbs as specified from installer.go
+	validTerminationVerbs = utilsets.NewString("CONNECT", "DELETE", "DELETECOLLECTION", "GET", "LIST", "PATCH", "POST", "PROXY", "PUT", "WATCH", "WATCHLIST")
+
 	// TODO(a-robinson): Add unit tests for the handling of these metrics once
 	// the upstream library supports it.
 	requestCounter = compbasemetrics.NewCounterVec(
@@ -219,6 +234,10 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
+	// set verbs to a bounded set of known and expected verbs
+	if !validTerminationVerbs.Has(verb) {
+		verb = UnknownRequestMethod
+	}
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
@@ -256,7 +275,8 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	reportedVerb := cleanVerb(verb, req)
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
-	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, contentType, codeToString(httpCode)).Inc()
+	cleanContentType := cleanContentType(contentType)
+	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
@@ -311,6 +331,15 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 	}
 }
 
+// cleanContentType binds the contentType (for metrics related purposes) to a
+// bounded set of known/expected content-types.
+func cleanContentType(contentType string) string {
+	if validMetricContentTypes.Has(contentType) {
+		return contentType
+	}
+	return OtherContentType
+}
+
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
 	if requestInfo.Namespace != "" {
@@ -355,7 +384,10 @@ func cleanVerb(verb string, request *http.Request) string {
 	if verb == "PATCH" && request.Header.Get("Content-Type") == string(types.ApplyPatchType) && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reportedVerb = "APPLY"
 	}
-	return reportedVerb
+	if validRequestMethods.Has(reportedVerb) {
+		return reportedVerb
+	}
+	return UnknownRequestMethod
 }
 
 func cleanDryRun(u *url.URL) string {
