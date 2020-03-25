@@ -72,10 +72,12 @@ const (
 
 	// labelNodeRolePrefix is a label prefix for node roles
 	// It's copied over to here until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	labelNodeRolePrefix = "role.node.kubernetes.io/"
+	labelNodeRolePrefix           = "role.node.kubernetes.io/"
+	deprecatedLabelNodeRolePrefix = "node-role.kubernetes.io/"
 
 	// nodeLabelRole specifies the role of a node
-	nodeLabelRole = "kubelet.kubernetes.io/role"
+	nodeLabelRole           = "kubelet.kubernetes.io/role"
+	deprecatedNodeLabelRole = "kubernetes.io/role"
 )
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
@@ -1540,6 +1542,9 @@ func getNodeInternalIP(node *api.Node) string {
 // The roles are determined by looking for:
 // * a role.node.kubernetes.io/<role>="" label
 // * a kubelet.kubernetes.io/role="<role>" label
+// Compatible for old kubelet version:
+// * a node-role.kubernetes.io/<role>="" label
+// * a kubernetes.io/role="<role>" label
 func findNodeRoles(node *api.Node) []string {
 	roles := sets.NewString()
 	for k, v := range node.Labels {
@@ -1549,7 +1554,15 @@ func findNodeRoles(node *api.Node) []string {
 				roles.Insert(role)
 			}
 
+		case strings.HasPrefix(k, deprecatedLabelNodeRolePrefix):
+			if role := strings.TrimPrefix(k, deprecatedLabelNodeRolePrefix); len(role) > 0 {
+				roles.Insert(role)
+			}
+
 		case k == nodeLabelRole && v != "":
+			roles.Insert(v)
+
+		case k == deprecatedNodeLabelRole && v != "":
 			roles.Insert(v)
 		}
 	}
