@@ -347,3 +347,12 @@ func GetHistogramMetricValue(m metrics.ObserverMetric) (float64, error) {
 	}
 	return metricProto.Histogram.GetSampleSum(), nil
 }
+
+// GetHistogramMetricSampleCount extract sample count from ObserverMetric
+func GetHistogramMetricSampleCount(m metrics.ObserverMetric) (uint64, error) {
+	metricProto := &dto.Metric{}
+	if err := m.(metrics.Metric).Write(metricProto); err != nil {
+		return 0, fmt.Errorf("Error writing m: %v", err)
+	}
+	return metricProto.Histogram.GetSampleCount(), nil
+}

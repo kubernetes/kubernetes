@@ -24,12 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -1810,93 +1809,74 @@ func injectNormalizeRes(inj injectedResult, scores NodeScoreList) *Status {
 
 func collectAndComparePluginMetrics(t *testing.T, wantExtensionPoint, wantPlugin string, wantStatus Code) {
 	t.Helper()
-	m := collectHistogramMetric(metrics.PluginExecutionDuration)
-	if len(m.Label) != 3 {
-		t.Fatalf("Unexpected number of label pairs, got: %v, want: 2", len(m.Label))
-	}
+	m := metrics.PluginExecutionDuration.WithLabelValues(wantPlugin, wantExtensionPoint, wantStatus.String())
 
-	if *m.Label[0].Value != wantExtensionPoint {
-		t.Errorf("Unexpected extension point label, got: %q, want %q", *m.Label[0].Value, wantExtensionPoint)
+	count, err := testutil.GetHistogramMetricSampleCount(m)
+	if err != nil {
+		t.Errorf("Failed to get %s sampleCount, err: %v", metrics.PluginExecutionDuration.Name, err)
 	}
-
-	if *m.Label[1].Value != wantPlugin {
-		t.Errorf("Unexpected plugin label, got: %q, want %q", *m.Label[1].Value, wantPlugin)
-	}
-
-	if *m.Label[2].Value != wantStatus.String() {
-		t.Errorf("Unexpected status code label, got: %q, want %q", *m.Label[2].Value, wantStatus)
-	}
-
-	if *m.Histogram.SampleCount == 0 {
+	if count == 0 {
 		t.Error("Expect at least 1 sample")
 	}
 
-	if *m.Histogram.SampleSum <= 0 {
-		t.Errorf("Expect latency to be greater than 0, got: %v", *m.Histogram.SampleSum)
+	value, err := testutil.GetHistogramMetricValue(m)
+	if err != nil {
+		t.Errorf("Failed to get %s value, err: %v", metrics.PluginExecutionDuration.Name, err)
+	}
+	if value <= 0 {
+		t.Errorf("Expect latency to be greater than 0, got: %v", value)
 	}
 }
 
 func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, wantStatus Code) {
 	t.Helper()
-	m := collectHistogramMetric(metrics.FrameworkExtensionPointDuration)
+	m := metrics.FrameworkExtensionPointDuration.WithLabelValues(wantExtensionPoint, wantStatus.String())
 
-	if len(m.Label) != 2 {
-		t.Fatalf("Unexpected number of label pairs, got: %v, want: 2", len(m.Label))
+	count, err := testutil.GetHistogramMetricSampleCount(m)
+	if err != nil {
+		t.Errorf("Failed to get %s sampleCount, err: %v", metrics.FrameworkExtensionPointDuration.Name, err)
+	}
+	if count != 1 {
+		t.Errorf("Expect 1 sample, got: %v", count)
 	}
 
-	if *m.Label[0].Value != wantExtensionPoint {
-		t.Errorf("Unexpected extension point label, got: %q, want %q", *m.Label[0].Value, wantExtensionPoint)
+	value, err := testutil.GetHistogramMetricValue(m)
+	if err != nil {
+		t.Errorf("Failed to get %s value, err: %v", metrics.FrameworkExtensionPointDuration.Name, err)
 	}
-
-	if *m.Label[1].Value != wantStatus.String() {
-		t.Errorf("Unexpected status code label, got: %q, want %q", *m.Label[1].Value, wantStatus)
-	}
-
-	if *m.Histogram.SampleCount != 1 {
-		t.Errorf("Expect 1 sample, got: %v", *m.Histogram.SampleCount)
-	}
-
-	if *m.Histogram.SampleSum <= 0 {
-		t.Errorf("Expect latency to be greater than 0, got: %v", *m.Histogram.SampleSum)
+	if value <= 0 {
+		t.Errorf("Expect latency to be greater than 0, got: %v", value)
 	}
 }
 
 func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
-	m := collectHistogramMetric(metrics.PermitWaitDuration)
+	m := metrics.PermitWaitDuration.WithLabelValues(wantRes)
+
 	if wantRes == "" {
-		if m != nil {
-			t.Errorf("PermitWaitDuration shouldn't be recorded but got %+v", m)
+		count, err := testutil.GetHistogramMetricSampleCount(m)
+		if err != nil {
+			t.Errorf("Failed to get %s sampleCount, err: %v", metrics.PermitWaitDuration.Name, err)
+		}
+		if count != 0 {
+			t.Errorf("Expect 0 sample, got: %v", count)
 		}
 		return
 	}
 	if wantRes != "" {
-		if len(m.Label) != 1 {
-			t.Fatalf("Unexpected number of label pairs, got: %v, want: 1", len(m.Label))
+		count, err := testutil.GetHistogramMetricSampleCount(m)
+		if err != nil {
+			t.Errorf("Failed to get %s sampleCount, err: %v", metrics.PermitWaitDuration.Name, err)
+		}
+		if count != 1 {
+			t.Errorf("Expect 1 sample, got: %v", count)
 		}
 
-		if *m.Label[0].Value != wantRes {
-			t.Errorf("Unexpected result label, got: %q, want %q", *m.Label[0].Value, wantRes)
+		value, err := testutil.GetHistogramMetricValue(m)
+		if err != nil {
+			t.Errorf("Failed to get %s value, err: %v", metrics.PermitWaitDuration.Name, err)
 		}
-
-		if *m.Histogram.SampleCount != 1 {
-			t.Errorf("Expect 1 sample, got: %v", *m.Histogram.SampleCount)
+		if value <= 0 {
+			t.Errorf("Expect latency to be greater than 0, got: %v", value)
 		}
-
-		if *m.Histogram.SampleSum <= 0 {
-			t.Errorf("Expect latency to be greater than 0, got: %v", *m.Histogram.SampleSum)
-		}
-	}
-}
-
-func collectHistogramMetric(metric prometheus.Collector) *dto.Metric {
-	ch := make(chan prometheus.Metric, 100)
-	metric.Collect(ch)
-	select {
-	case got := <-ch:
-		m := &dto.Metric{}
-		got.Write(m)
-		return m
-	default:
-		return nil
 	}
 }
