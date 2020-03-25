@@ -177,7 +177,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	assertCleanup(ns, selectors...)
 }
 
-// AssertCleanup asserts that cleanup of a namespace wrt selectors occurred.
+// assertCleanup asserts that cleanup of a namespace wrt selectors occurred.
 func assertCleanup(ns string, selectors ...string) {
 	var nsArg string
 	if ns != "" {
