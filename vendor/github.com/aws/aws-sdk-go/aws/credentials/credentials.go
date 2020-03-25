@@ -50,9 +50,10 @@ package credentials
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"sync"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 // AnonymousCredentials is an empty Credential object that can be used as
@@ -81,6 +82,12 @@ type Value struct {
 
 	// Provider used to get credentials
 	ProviderName string
+}
+
+// HasKeys returns if the credentials Value has both AccessKeyID and
+// SecretAccessKey value set.
+func (v Value) HasKeys() bool {
+	return len(v.AccessKeyID) != 0 && len(v.SecretAccessKey) != 0
 }
 
 // A Provider is the interface for any component which will provide credentials

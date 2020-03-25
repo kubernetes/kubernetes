@@ -36,6 +36,10 @@ const (
 	// API request that was canceled. Requests given a aws.Context may
 	// return this error when canceled.
 	CanceledErrorCode = "RequestCanceled"
+
+	// ErrCodeRequestError is an error preventing the SDK from continuing to
+	// process the request.
+	ErrCodeRequestError = "RequestError"
 )
 
 // A Request is the service request to be made.
@@ -51,6 +55,7 @@ type Request struct {
 	HTTPRequest            *http.Request
 	HTTPResponse           *http.Response
 	Body                   io.ReadSeeker
+	streamingBody          io.ReadCloser
 	BodyStart              int64 // offset from beginning of Body that the request body starts
 	Params                 interface{}
 	Error                  error
@@ -63,6 +68,15 @@ type Request struct {
 	SignedHeaderVals       http.Header
 	LastSignedAt           time.Time
 	DisableFollowRedirects bool
+
+	// Additional API error codes that should be retried. IsErrorRetryable
+	// will consider these codes in addition to its built in cases.
+	RetryErrorCodes []string
+
+	// Additional API error codes that should be retried with throttle backoff
+	// delay. IsErrorThrottle will consider these codes in addition to its
+	// built in cases.
+	ThrottleErrorCodes []string
 
 	// A value greater than 0 instructs the request to be signed as Presigned URL
 	// You should not set this field directly. Instead use Request's
@@ -90,14 +104,22 @@ type Operation struct {
 	BeforePresignFn func(r *Request) error
 }
 
-// New returns a new Request pointer for the service API
-// operation and parameters.
+// New returns a new Request pointer for the service API operation and
+// parameters.
+//
+// A Retryer should be provided to direct how the request is retried. If
+// Retryer is nil, a default no retry value will be used. You can use
+// NoOpRetryer in the Client package to disable retry behavior directly.
 //
 // Params is any value of input parameters to be the request payload.
 // Data is pointer value to an object which the request's response
 // payload will be deserialized to.
 func New(cfg aws.Config, clientInfo metadata.ClientInfo, handlers Handlers,
 	retryer Retryer, operation *Operation, params interface{}, data interface{}) *Request {
+
+	if retryer == nil {
+		retryer = noOpRetryer{}
+	}
 
 	method := operation.HTTPMethod
 	if method == "" {
@@ -231,6 +253,10 @@ func (r *Request) WillRetry() bool {
 	return r.Error != nil && aws.BoolValue(r.Retryable) && r.RetryCount < r.MaxRetries()
 }
 
+func fmtAttemptCount(retryCount, maxRetries int) string {
+	return fmt.Sprintf("attempt %v/%v", retryCount, maxRetries)
+}
+
 // ParamsFilled returns if the request's parameters have been populated
 // and the parameters are valid. False is returned if no parameters are
 // provided or invalid.
@@ -259,8 +285,26 @@ func (r *Request) SetStringBody(s string) {
 // SetReaderBody will set the request's body reader.
 func (r *Request) SetReaderBody(reader io.ReadSeeker) {
 	r.Body = reader
-	r.BodyStart, _ = reader.Seek(0, sdkio.SeekCurrent) // Get the Bodies current offset.
+
+	if aws.IsReaderSeekable(reader) {
+		var err error
+		// Get the Bodies current offset so retries will start from the same
+		// initial position.
+		r.BodyStart, err = reader.Seek(0, sdkio.SeekCurrent)
+		if err != nil {
+			r.Error = awserr.New(ErrCodeSerialization,
+				"failed to determine start of request body", err)
+			return
+		}
+	}
 	r.ResetBody()
+}
+
+// SetStreamingBody set the reader to be used for the request that will stream
+// bytes to the server. Request's Body must not be set to any reader.
+func (r *Request) SetStreamingBody(reader io.ReadCloser) {
+	r.streamingBody = reader
+	r.SetReaderBody(aws.ReadSeekCloser(reader))
 }
 
 // Presign returns the request's signed URL. Error will be returned
@@ -330,14 +374,13 @@ func getPresignedURL(r *Request, expire time.Duration) (string, http.Header, err
 	return r.HTTPRequest.URL.String(), r.SignedHeaderVals, nil
 }
 
-func debugLogReqError(r *Request, stage string, retrying bool, err error) {
+const (
+	notRetrying = "not retrying"
+)
+
+func debugLogReqError(r *Request, stage, retryStr string, err error) {
 	if !r.Config.LogLevel.Matches(aws.LogDebugWithRequestErrors) {
 		return
-	}
-
-	retryStr := "not retrying"
-	if retrying {
-		retryStr = "will retry"
 	}
 
 	r.Config.Logger.Log(fmt.Sprintf("DEBUG: %s %s/%s failed, %s, error %v",
@@ -358,12 +401,12 @@ func (r *Request) Build() error {
 	if !r.built {
 		r.Handlers.Validate.Run(r)
 		if r.Error != nil {
-			debugLogReqError(r, "Validate Request", false, r.Error)
+			debugLogReqError(r, "Validate Request", notRetrying, r.Error)
 			return r.Error
 		}
 		r.Handlers.Build.Run(r)
 		if r.Error != nil {
-			debugLogReqError(r, "Build Request", false, r.Error)
+			debugLogReqError(r, "Build Request", notRetrying, r.Error)
 			return r.Error
 		}
 		r.built = true
@@ -379,7 +422,7 @@ func (r *Request) Build() error {
 func (r *Request) Sign() error {
 	r.Build()
 	if r.Error != nil {
-		debugLogReqError(r, "Build Request", false, r.Error)
+		debugLogReqError(r, "Build Request", notRetrying, r.Error)
 		return r.Error
 	}
 
@@ -387,12 +430,20 @@ func (r *Request) Sign() error {
 	return r.Error
 }
 
-func (r *Request) getNextRequestBody() (io.ReadCloser, error) {
+func (r *Request) getNextRequestBody() (body io.ReadCloser, err error) {
+	if r.streamingBody != nil {
+		return r.streamingBody, nil
+	}
+
 	if r.safeBody != nil {
 		r.safeBody.Close()
 	}
 
-	r.safeBody = newOffsetReader(r.Body, r.BodyStart)
+	r.safeBody, err = newOffsetReader(r.Body, r.BodyStart)
+	if err != nil {
+		return nil, awserr.New(ErrCodeSerialization,
+			"failed to get next request body reader", err)
+	}
 
 	// Go 1.8 tightened and clarified the rules code needs to use when building
 	// requests with the http package. Go 1.8 removed the automatic detection
@@ -409,10 +460,10 @@ func (r *Request) getNextRequestBody() (io.ReadCloser, error) {
 	// Related golang/go#18257
 	l, err := aws.SeekerLen(r.Body)
 	if err != nil {
-		return nil, awserr.New(ErrCodeSerialization, "failed to compute request body size", err)
+		return nil, awserr.New(ErrCodeSerialization,
+			"failed to compute request body size", err)
 	}
 
-	var body io.ReadCloser
 	if l == 0 {
 		body = NoBody
 	} else if l > 0 {
@@ -473,29 +524,28 @@ func (r *Request) Send() error {
 		r.AttemptTime = time.Now()
 
 		if err := r.Sign(); err != nil {
-			debugLogReqError(r, "Sign Request", false, err)
+			debugLogReqError(r, "Sign Request", notRetrying, err)
 			return err
 		}
 
 		if err := r.sendRequest(); err == nil {
 			return nil
-		} else if !shouldRetryCancel(r.Error) {
+		}
+		r.Handlers.Retry.Run(r)
+		r.Handlers.AfterRetry.Run(r)
+
+		if r.Error != nil || !aws.BoolValue(r.Retryable) {
+			return r.Error
+		}
+
+		if err := r.prepareRetry(); err != nil {
+			r.Error = err
 			return err
-		} else {
-			r.Handlers.Retry.Run(r)
-			r.Handlers.AfterRetry.Run(r)
-
-			if r.Error != nil || !aws.BoolValue(r.Retryable) {
-				return r.Error
-			}
-
-			r.prepareRetry()
-			continue
 		}
 	}
 }
 
-func (r *Request) prepareRetry() {
+func (r *Request) prepareRetry() error {
 	if r.Config.LogLevel.Matches(aws.LogDebugWithRequestRetries) {
 		r.Config.Logger.Log(fmt.Sprintf("DEBUG: Retrying Request %s/%s, attempt %d",
 			r.ClientInfo.ServiceName, r.Operation.Name, r.RetryCount))
@@ -506,12 +556,19 @@ func (r *Request) prepareRetry() {
 	// the request's body even though the Client's Do returned.
 	r.HTTPRequest = copyHTTPRequest(r.HTTPRequest, nil)
 	r.ResetBody()
+	if err := r.Error; err != nil {
+		return awserr.New(ErrCodeSerialization,
+			"failed to prepare body for retry", err)
+
+	}
 
 	// Closing response body to ensure that no response body is leaked
 	// between retry attempts.
 	if r.HTTPResponse != nil && r.HTTPResponse.Body != nil {
 		r.HTTPResponse.Body.Close()
 	}
+
+	return nil
 }
 
 func (r *Request) sendRequest() (sendErr error) {
@@ -520,7 +577,9 @@ func (r *Request) sendRequest() (sendErr error) {
 	r.Retryable = nil
 	r.Handlers.Send.Run(r)
 	if r.Error != nil {
-		debugLogReqError(r, "Send Request", r.WillRetry(), r.Error)
+		debugLogReqError(r, "Send Request",
+			fmtAttemptCount(r.RetryCount, r.MaxRetries()),
+			r.Error)
 		return r.Error
 	}
 
@@ -528,13 +587,17 @@ func (r *Request) sendRequest() (sendErr error) {
 	r.Handlers.ValidateResponse.Run(r)
 	if r.Error != nil {
 		r.Handlers.UnmarshalError.Run(r)
-		debugLogReqError(r, "Validate Response", r.WillRetry(), r.Error)
+		debugLogReqError(r, "Validate Response",
+			fmtAttemptCount(r.RetryCount, r.MaxRetries()),
+			r.Error)
 		return r.Error
 	}
 
 	r.Handlers.Unmarshal.Run(r)
 	if r.Error != nil {
-		debugLogReqError(r, "Unmarshal Response", r.WillRetry(), r.Error)
+		debugLogReqError(r, "Unmarshal Response",
+			fmtAttemptCount(r.RetryCount, r.MaxRetries()),
+			r.Error)
 		return r.Error
 	}
 
@@ -559,48 +622,6 @@ func AddToUserAgent(r *Request, s string) {
 		s = curUA + " " + s
 	}
 	r.HTTPRequest.Header.Set("User-Agent", s)
-}
-
-type temporary interface {
-	Temporary() bool
-}
-
-func shouldRetryCancel(err error) bool {
-	switch err := err.(type) {
-	case awserr.Error:
-		if err.Code() == CanceledErrorCode {
-			return false
-		}
-		return shouldRetryCancel(err.OrigErr())
-	case *url.Error:
-		if strings.Contains(err.Error(), "connection refused") {
-			// Refused connections should be retried as the service may not yet
-			// be running on the port. Go TCP dial considers refused
-			// connections as not temporary.
-			return true
-		}
-		// *url.Error only implements Temporary after golang 1.6 but since
-		// url.Error only wraps the error:
-		return shouldRetryCancel(err.Err)
-	case temporary:
-		// If the error is temporary, we want to allow continuation of the
-		// retry process
-		return err.Temporary()
-	case nil:
-		// `awserr.Error.OrigErr()` can be nil, meaning there was an error but
-		// because we don't know the cause, it is marked as retriable. See
-		// TestRequest4xxUnretryable for an example.
-		return true
-	default:
-		switch err.Error() {
-		case "net/http: request canceled",
-			"net/http: request canceled while waiting for connection":
-			// known 1.5 error case when an http request is cancelled
-			return false
-		}
-		// here we don't know the error; so we allow a retry.
-		return true
-	}
 }
 
 // SanitizeHostForHeader removes default port from host and updates request.Host

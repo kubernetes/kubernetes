@@ -952,6 +952,57 @@ func (c *EC2) WaitUntilPasswordDataAvailableWithContext(ctx aws.Context, input *
 	return w.WaitWithContext(ctx)
 }
 
+// WaitUntilSecurityGroupExists uses the Amazon EC2 API operation
+// DescribeSecurityGroups to wait for a condition to be met before returning.
+// If the condition is not met within the max attempt window, an error will
+// be returned.
+func (c *EC2) WaitUntilSecurityGroupExists(input *DescribeSecurityGroupsInput) error {
+	return c.WaitUntilSecurityGroupExistsWithContext(aws.BackgroundContext(), input)
+}
+
+// WaitUntilSecurityGroupExistsWithContext is an extended version of WaitUntilSecurityGroupExists.
+// With the support for passing in a context and options to configure the
+// Waiter and the underlying request options.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *EC2) WaitUntilSecurityGroupExistsWithContext(ctx aws.Context, input *DescribeSecurityGroupsInput, opts ...request.WaiterOption) error {
+	w := request.Waiter{
+		Name:        "WaitUntilSecurityGroupExists",
+		MaxAttempts: 6,
+		Delay:       request.ConstantWaiterDelay(5 * time.Second),
+		Acceptors: []request.WaiterAcceptor{
+			{
+				State:   request.SuccessWaiterState,
+				Matcher: request.PathWaiterMatch, Argument: "length(SecurityGroups[].GroupId) > `0`",
+				Expected: true,
+			},
+			{
+				State:    request.RetryWaiterState,
+				Matcher:  request.ErrorWaiterMatch,
+				Expected: "InvalidGroupNotFound",
+			},
+		},
+		Logger: c.Config.Logger,
+		NewRequest: func(opts []request.Option) (*request.Request, error) {
+			var inCpy *DescribeSecurityGroupsInput
+			if input != nil {
+				tmp := *input
+				inCpy = &tmp
+			}
+			req, _ := c.DescribeSecurityGroupsRequest(inCpy)
+			req.SetContext(ctx)
+			req.ApplyOptions(opts...)
+			return req, nil
+		},
+	}
+	w.ApplyOptions(opts...)
+
+	return w.WaitWithContext(ctx)
+}
+
 // WaitUntilSnapshotCompleted uses the Amazon EC2 API operation
 // DescribeSnapshots to wait for a condition to be met before returning.
 // If the condition is not met within the max attempt window, an error will
