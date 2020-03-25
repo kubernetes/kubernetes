@@ -532,36 +532,6 @@ func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
 }
 
-// AssertCleanup asserts that cleanup of a namespace wrt selectors occurred.
-func AssertCleanup(ns string, selectors ...string) {
-	var nsArg string
-	if ns != "" {
-		nsArg = fmt.Sprintf("--namespace=%s", ns)
-	}
-
-	var e error
-	verifyCleanupFunc := func() (bool, error) {
-		e = nil
-		for _, selector := range selectors {
-			resources := RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers", nsArg)
-			if resources != "" {
-				e = fmt.Errorf("Resources left running after stop:\n%s", resources)
-				return false, nil
-			}
-			pods := RunKubectlOrDie(ns, "get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
-			if pods != "" {
-				e = fmt.Errorf("Pods left unterminated after stop:\n%s", pods)
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
-	if err != nil {
-		Failf(e.Error())
-	}
-}
-
 // LookForStringInPodExec looks for the given string in the output of a command
 // executed in a specific pod container.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
