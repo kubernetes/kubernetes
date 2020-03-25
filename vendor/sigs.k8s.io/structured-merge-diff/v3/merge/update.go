@@ -213,6 +213,7 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 		return nil, fmt.Errorf("failed to convert merged object to last applied version: %v", err)
 	}
 
+	// pruned is the value *after* pruning
 	pruned := convertedMerged.RemoveItems(lastSet.Set())
 	pruned, err = s.addBackOwnedItems(convertedMerged, pruned, managers, applyingManager)
 	if err != nil {
@@ -261,7 +262,11 @@ func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFie
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field set from pruned object at version %v: %v", version, err)
 		}
-		pruned = merged.RemoveItems(mergedSet.Difference(prunedSet.Union(managed)))
+
+		newOrManaged := prunedSet.Union(managed)
+		oldAndUnmanaged := mergedSet.Difference(newOrManaged)
+		// a value containing only new or previously managed fields
+		pruned = merged.RemoveItems(oldAndUnmanaged)
 	}
 	return pruned, nil
 }
@@ -285,5 +290,9 @@ func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field set from merged object in last applied version: %v", err)
 	}
-	return merged.RemoveItems(mergedSet.Difference(prunedSet).Intersection(lastSet.Set())), nil
+
+	oldOrUnmanaged := mergedSet.Difference(prunedSet)
+	onlyOld := oldOrUnmanaged.Intersection(lastSet.Set())
+
+	return merged.RemoveItems(onlyOld), nil
 }

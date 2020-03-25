@@ -25,14 +25,16 @@ type removingWalker struct {
 	schema    *schema.Schema
 	toRemove  *fieldpath.Set
 	allocator value.Allocator
+	onlyItems bool
 }
 
-func removeItemsWithSchema(val value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef) value.Value {
+func removeWithSchema(val value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef, onlyItems bool) value.Value {
 	w := &removingWalker{
 		value:     val,
 		schema:    schema,
 		toRemove:  toRemove,
 		allocator: value.NewFreelistAllocator(),
+		onlyItems: onlyItems,
 	}
 	resolveSchema(schema, typeRef, val, w)
 	return value.NewValueInterface(w.out)
@@ -46,8 +48,10 @@ func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors {
 func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 	l := w.value.AsListUsing(w.allocator)
 	defer w.allocator.Free(l)
-	// If list is null, empty, or atomic just return
-	if l == nil || l.Length() == 0 || t.ElementRelationship == schema.Atomic {
+
+	// If list is null or empty just return
+	if l == nil || l.Length() == 0 {
+		w.out = w.value.Unstructured()
 		return nil
 	}
 
@@ -63,13 +67,11 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 			continue
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			item = removeItemsWithSchema(item, subset, w.schema, t.ElementType)
+			item = removeWithSchema(item, subset, w.schema, t.ElementType, w.onlyItems)
 		}
 		newItems = append(newItems, item.Unstructured())
 	}
-	if len(newItems) > 0 {
-		w.out = newItems
-	}
+	w.out = newItems
 	return nil
 }
 
@@ -78,8 +80,9 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 	if m != nil {
 		defer w.allocator.Free(m)
 	}
-	// If map is null, empty, or atomic just return
-	if m == nil || m.Empty() || t.ElementRelationship == schema.Atomic {
+	// If map is null or empty just return
+	if m == nil || m.Empty() {
+		w.out = w.value.Unstructured()
 		return nil
 	}
 
@@ -92,6 +95,11 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 	m.Iterate(func(k string, val value.Value) bool {
 		pe := fieldpath.PathElement{FieldName: &k}
 		path, _ := fieldpath.MakePath(pe)
+
+		if !w.onlyItems && w.toRemove.Has(path) {
+			return true
+		}
+
 		fieldType := t.ElementType
 		if ft, ok := fieldTypes[k]; ok {
 			fieldType = ft
@@ -101,13 +109,11 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 			}
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			val = removeItemsWithSchema(val, subset, w.schema, fieldType)
+			val = removeWithSchema(val, subset, w.schema, fieldType, w.onlyItems)
 		}
 		newMap[k] = val.Unstructured()
 		return true
 	})
-	if len(newMap) > 0 {
-		w.out = newMap
-	}
+	w.out = newMap
 	return nil
 }

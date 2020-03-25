@@ -138,9 +138,16 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 	return c, nil
 }
 
+// Remove recursively removes each provided path, including its sub-paths.
+// For example `.a` would also remove `.a.b` as it's a sub-path.
+func (tv TypedValue) Remove(items *fieldpath.Set) *TypedValue {
+	tv.value = removeWithSchema(tv.value, items, tv.schema, tv.typeRef, false)
+	return &tv
+}
+
 // RemoveItems removes each provided list or map item from the value.
 func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
-	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef)
+	tv.value = removeWithSchema(tv.value, items, tv.schema, tv.typeRef, true)
 	return &tv
 }
 

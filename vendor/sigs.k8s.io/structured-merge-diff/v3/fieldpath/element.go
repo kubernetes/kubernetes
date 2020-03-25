@@ -47,6 +47,16 @@ type PathElement struct {
 	Index *int
 }
 
+// NewValuePathElement creates a PathElement from the provided value.Value
+func NewValuePathElement(v value.Value) PathElement {
+	return PathElement{Value: &v}
+}
+
+// NewIndexPathElement creates a PathElement with the given index
+func NewIndexPathElement(index int) PathElement {
+	return PathElement{Index: &index}
+}
+
 // Less provides an order for path elements.
 func (e PathElement) Less(rhs PathElement) bool {
 	return e.Compare(rhs) < 0
