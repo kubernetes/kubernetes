@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	libipvs "github.com/docker/libnetwork/ipvs"
+	libipvs "github.com/moby/ipvs"
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
