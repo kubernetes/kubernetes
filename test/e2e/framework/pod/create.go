@@ -46,6 +46,7 @@ type Config struct {
 	SeLinuxLabel        *v1.SELinuxOptions
 	FsGroup             *int64
 	NodeSelection       NodeSelection
+	ReadOnly            bool
 }
 
 // CreateUnschedulablePod with given claims based on node selector
@@ -221,16 +222,16 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
 			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
 		} else {
-			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
+			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename, ReadOnly: podConfig.ReadOnly})
 		}
 
-		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: podConfig.ReadOnly}}}
 		volumeIndex++
 	}
 	for _, src := range podConfig.InlineVolumeSources {
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		// In-line volumes can be only filesystem, not block.
-		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
+		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename, ReadOnly: podConfig.ReadOnly})
 		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: *src}
 		volumeIndex++
 	}

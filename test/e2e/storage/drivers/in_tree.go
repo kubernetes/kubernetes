@@ -91,6 +91,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &nfsDriver{}
 var _ testsuites.InlineVolumeTestDriver = &nfsDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &nfsDriver{}
 var _ testsuites.DynamicPVTestDriver = &nfsDriver{}
+var _ testsuites.ReadOnlyPVTestDriver = &nfsDriver{}
 
 // InitNFSDriver returns nfsDriver that implements TestDriver interface
 func InitNFSDriver() testsuites.TestDriver {
@@ -155,6 +156,12 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 	suffix := fmt.Sprintf("%s-sc", n.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (n *nfsDriver) UpdateReadOnlyInPVSource(pvSource *v1.PersistentVolumeSource, readOnly bool) {
+	source := pvSource.NFS
+	framework.ExpectNotEqual(source, nil, "Failed to get NFS volume source from the PV")
+	source.ReadOnly = readOnly
 }
 
 func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1051,6 +1058,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &cinderDriver{}
 var _ testsuites.InlineVolumeTestDriver = &cinderDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &cinderDriver{}
 var _ testsuites.DynamicPVTestDriver = &cinderDriver{}
+var _ testsuites.ReadOnlyPVTestDriver = &cinderDriver{}
 
 // InitCinderDriver returns cinderDriver that implements TestDriver interface
 func InitCinderDriver() testsuites.TestDriver {
@@ -1133,6 +1141,12 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTes
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
+func (c *cinderDriver) UpdateReadOnlyInPVSource(pvSource *v1.PersistentVolumeSource, readOnly bool) {
+	source := pvSource.Cinder
+	framework.ExpectNotEqual(source, nil, "Failed to get Cinder volume source from the PV")
+	source.ReadOnly = readOnly
+}
+
 func (c *cinderDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	return &testsuites.PerTestConfig{
 		Driver:    c,
@@ -1213,6 +1227,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &gcePdDriver{}
 var _ testsuites.InlineVolumeTestDriver = &gcePdDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &gcePdDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
+var _ testsuites.ReadOnlyPVTestDriver = &gcePdDriver{}
 
 // InitGcePdDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver() testsuites.TestDriver {
@@ -1308,6 +1323,12 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+}
+
+func (g *gcePdDriver) UpdateReadOnlyInPVSource(pvSource *v1.PersistentVolumeSource, readOnly bool) {
+	source := pvSource.GCEPersistentDisk
+	framework.ExpectNotEqual(source, nil, "Failed to get GCE PD volume source from the PV")
+	source.ReadOnly = readOnly
 }
 
 func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1488,6 +1509,7 @@ var _ testsuites.PreprovisionedVolumeTestDriver = &azureDiskDriver{}
 var _ testsuites.InlineVolumeTestDriver = &azureDiskDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &azureDiskDriver{}
 var _ testsuites.DynamicPVTestDriver = &azureDiskDriver{}
+var _ testsuites.ReadOnlyPVTestDriver = &azureDiskDriver{}
 
 // InitAzureDiskDriver returns azureDiskDriver that implements TestDriver interface
 func InitAzureDiskDriver() testsuites.TestDriver {
@@ -1580,6 +1602,12 @@ func (a *azureDiskDriver) GetDynamicProvisionStorageClass(config *testsuites.Per
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (a *azureDiskDriver) UpdateReadOnlyInPVSource(pvSource *v1.PersistentVolumeSource, readOnly bool) {
+	source := pvSource.AzureDisk
+	framework.ExpectNotEqual(source, nil, "Failed to get AzureDisk volume source from the PV")
+	source.ReadOnly = &readOnly
 }
 
 func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1705,6 +1733,12 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+}
+
+func (a *awsDriver) UpdateReadOnlyInPVSource(pvSource *v1.PersistentVolumeSource, readOnly bool) {
+	source := pvSource.AWSElasticBlockStore
+	framework.ExpectNotEqual(source, nil, "Failed to get AWS volume source from the PV")
+	source.ReadOnly = readOnly
 }
 
 func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {

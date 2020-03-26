@@ -129,6 +129,14 @@ type SnapshottableTestDriver interface {
 	GetSnapshotClass(config *PerTestConfig) *unstructured.Unstructured
 }
 
+// ReadOnlyPVTestDriver represents an interface for a TestDriver that supports read-only PVs.
+type ReadOnlyPVTestDriver interface {
+	TestDriver
+
+	// Updates the read-only field in the PersistentVolumeSource in place.
+	UpdateReadOnlyInPVSource(pvSource *v1.PersistentVolumeSource, readOnly bool)
+}
+
 // Capability represents a feature that a volume plugin supports
 type Capability string
 
