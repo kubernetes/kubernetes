@@ -167,7 +167,7 @@ github.com/client9/misspell/cmd/misspell
 github.com/clusterhq/flocker-go
 # github.com/container-storage-interface/spec v1.2.0 => github.com/container-storage-interface/spec v1.2.0
 github.com/container-storage-interface/spec/lib/go/csi
-# github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1 => github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1
+# github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
 github.com/containerd/console
 # github.com/containerd/containerd v1.3.3 => github.com/containerd/containerd v1.3.3
 github.com/containerd/containerd/api/services/containers/v1
@@ -179,7 +179,7 @@ github.com/containerd/containerd/containers
 github.com/containerd/containerd/errdefs
 github.com/containerd/containerd/namespaces
 github.com/containerd/containerd/pkg/dialer
-# github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c => github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c
+# github.com/containerd/ttrpc v1.0.0 => github.com/containerd/ttrpc v1.0.0
 github.com/containerd/ttrpc
 # github.com/containernetworking/cni v0.7.1 => github.com/containernetworking/cni v0.7.1
 github.com/containernetworking/cni/libcni

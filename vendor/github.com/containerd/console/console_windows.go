@@ -198,7 +198,7 @@ func makeInputRaw(fd windows.Handle, mode uint32) error {
 	return nil
 }
 
-func checkConsole(f *os.File) error {
+func checkConsole(f File) error {
 	var mode uint32
 	if err := windows.GetConsoleMode(windows.Handle(f.Fd()), &mode); err != nil {
 		return err
@@ -206,7 +206,7 @@ func checkConsole(f *os.File) error {
 	return nil
 }
 
-func newMaster(f *os.File) (Console, error) {
+func newMaster(f File) (Console, error) {
 	if f != os.Stdin && f != os.Stdout && f != os.Stderr {
 		return nil, errors.New("creating a console from a file is not supported on windows")
 	}

@@ -30,6 +30,9 @@ require (
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/codegangsta/negroni v1.0.0 // indirect
 	github.com/container-storage-interface/spec v1.2.0
+	github.com/containerd/console v1.0.0 // indirect
+	github.com/containerd/ttrpc v1.0.0 // indirect
+	github.com/containerd/typeurl v1.0.0 // indirect
 	github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration v1.0.6
 	github.com/coreos/go-oidc v2.1.0+incompatible
@@ -207,10 +210,10 @@ replace (
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
 	github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
 	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.2.0
-	github.com/containerd/console => github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1
+	github.com/containerd/console => github.com/containerd/console v1.0.0
 	github.com/containerd/containerd => github.com/containerd/containerd v1.3.3
-	github.com/containerd/ttrpc => github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c
-	github.com/containerd/typeurl => github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd
+	github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.0
+	github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.0
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.6
 	github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
