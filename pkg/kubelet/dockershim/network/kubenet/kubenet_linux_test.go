@@ -18,6 +18,8 @@ package kubenet
 
 import (
 	"fmt"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnitypescurrent "github.com/containernetworking/cni/pkg/types/current"
 	"net"
 	"strings"
 	"testing"
@@ -384,6 +386,116 @@ func TestGetRangesConfig(t *testing.T) {
 		}
 		fakeKubenet := &kubenetNetworkPlugin{podCIDRs: cidrs}
 		assert.Equal(t, test.ranges, fakeKubenet.getRangesConfig())
+	}
+}
+
+func TestTrackPodIPs(t *testing.T) {
+	ipv4Gateway := "192.168.0.1"
+	ipv4Address := "192.168.0.2/24"
+	ipv4, _ := cnitypes.ParseCIDR(ipv4Address)
+	_, ipv4Net, _ := net.ParseCIDR(ipv4Address)
+
+	ipv6Gateway := "abcd:1234:ffff::1"
+	ipv6Address := "abcd:1234:ffff::cdde/64"
+	ipv6, _ := cnitypes.ParseCIDR(ipv6Address)
+	_, ipv6Net, _ := net.ParseCIDR(ipv6Address)
+
+	ipv4conf := &cnitypescurrent.IPConfig{
+		Version:   "4",
+		Interface: cnitypescurrent.Int(0),
+		Address:   *ipv4,
+		Gateway:   net.ParseIP(ipv4Gateway),
+	}
+	ipv6conf := &cnitypescurrent.IPConfig{
+		Version:   "6",
+		Interface: cnitypescurrent.Int(0),
+		Address:   *ipv6,
+		Gateway:   net.ParseIP(ipv6Gateway),
+	}
+	badconf := &cnitypescurrent.IPConfig{
+		Version:   "6",
+		Interface: nil,
+		Address:   *ipv6,
+		Gateway:   net.ParseIP(ipv6Gateway),
+	}
+
+	for _, test := range []struct {
+		cniResult           *cnitypescurrent.Result
+		expectedPodGateways []net.IP
+		expectedPodCIDRs    []net.IPNet
+		expectedIPs         []string
+	}{
+		{
+			&cnitypescurrent.Result{
+				CNIVersion: "0.3.1",
+				Interfaces: []*cnitypescurrent.Interface{
+					{
+						Name:    network.DefaultInterfaceName,
+						Mac:     "00:11:22:33:44:55",
+						Sandbox: "/proc/1234/ns/net",
+					},
+				},
+				IPs: []*cnitypescurrent.IPConfig{ipv4conf},
+			},
+			[]net.IP{net.ParseIP(ipv4Gateway)},
+			[]net.IPNet{*ipv4Net},
+			[]string{"192.168.0.2"},
+		},
+		{
+			&cnitypescurrent.Result{
+				CNIVersion: "0.3.1",
+				Interfaces: []*cnitypescurrent.Interface{
+					{
+						Name:    network.DefaultInterfaceName,
+						Mac:     "00:11:22:33:44:55",
+						Sandbox: "/proc/1234/ns/net",
+					},
+				},
+				IPs: []*cnitypescurrent.IPConfig{ipv6conf},
+			},
+			[]net.IP{net.ParseIP(ipv6Gateway)},
+			[]net.IPNet{*ipv6Net},
+			[]string{"abcd:1234:ffff::cdde"},
+		},
+		{
+			&cnitypescurrent.Result{
+				CNIVersion: "0.3.1",
+				Interfaces: []*cnitypescurrent.Interface{
+					{
+						Name:    network.DefaultInterfaceName,
+						Mac:     "00:11:22:33:44:55",
+						Sandbox: "/proc/1234/ns/net",
+					},
+				},
+				IPs: []*cnitypescurrent.IPConfig{ipv4conf, ipv6conf},
+			},
+			[]net.IP{net.ParseIP(ipv4Gateway), net.ParseIP(ipv6Gateway)},
+			[]net.IPNet{*ipv4Net, *ipv6Net},
+			[]string{"192.168.0.2", "abcd:1234:ffff::cdde"},
+		},
+		{
+			&cnitypescurrent.Result{
+				CNIVersion: "0.3.1",
+				Interfaces: []*cnitypescurrent.Interface{},
+				IPs:        []*cnitypescurrent.IPConfig{badconf},
+			},
+			*new([]net.IP),
+			*new([]net.IPNet),
+			*new([]string),
+		},
+	} {
+		fakeKubenet := &kubenetNetworkPlugin{podCIDRs: []*net.IPNet{ipv4}, podIPs: map[kubecontainer.ContainerID]utilsets.String{}}
+		testID := kubecontainer.ContainerID{
+			Type: "fake",
+			ID:   "1234",
+		}
+		podGateways, podCIDRs := fakeKubenet.trackPodIPs(testID, test.cniResult)
+
+		cachedIPs, _ := fakeKubenet.getCachedPodIPs(testID)
+
+		assert.Equal(t, cachedIPs, test.expectedIPs)
+		assert.Equal(t, podCIDRs, test.expectedPodCIDRs)
+		assert.Equal(t, podGateways, test.expectedPodGateways)
 	}
 }
 

@@ -328,11 +328,31 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt()
 }
 
-// setup sets up networking through CNI using the given ns/name and sandbox ID.
-func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
+// adds IP addresses to the plugin and return the Pods gateway and cidr
+func (plugin *kubenetNetworkPlugin) trackPodIPs(id kubecontainer.ContainerID, res *cnitypescurrent.Result) ([]net.IP, []net.IPNet) {
 	var podGateways []net.IP
 	var podCIDRs []net.IPNet
 
+	// Logic taken from: https://github.com/kubernetes/kubernetes/pull/69821
+	for _, ip := range res.IPs {
+		if ip.Interface == nil || *ip.Interface > len(res.Interfaces) {
+			continue
+		}
+
+		intf := res.Interfaces[*ip.Interface]
+		if intf.Sandbox != "" && intf.Name == network.DefaultInterfaceName {
+			// Found our sandbox interface, use the IP
+			podGateways = append(podGateways, ip.Gateway)
+			podCIDRs = append(podCIDRs, net.IPNet{IP: ip.Address.IP.Mask(ip.Address.Mask), Mask: ip.Address.Mask})
+			plugin.addPodIP(id, ip.Address.IP.String())
+		}
+	}
+
+	return podGateways, podCIDRs
+}
+
+// setup sets up networking through CNI using the given ns/name and sandbox ID.
+func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
 	// Disable DAD so we skip the kernel delay on bringing up new interfaces.
 	if err := plugin.disableContainerDAD(id); err != nil {
 		klog.V(3).Infof("Failed to disable DAD in container: %v", err)
@@ -358,21 +378,8 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		return fmt.Errorf("cni didn't report any IPs")
 	}
 
-	// Logic taken from: https://github.com/kubernetes/kubernetes/pull/69821
-	for _, ip := range res.IPs {
-		if ip.Interface == nil || *ip.Interface > len(res.Interfaces) {
-			continue
-		}
-
-		intf := res.Interfaces[*ip.Interface]
-		if intf.Sandbox != "" && intf.Name == network.DefaultInterfaceName {
-			// Found our sandbox interface, use the IP
-			podGateways = append(podGateways, ip.Gateway)
-			podCIDRs = append(podCIDRs, net.IPNet{IP: ip.Address.IP.Mask(ip.Address.Mask), Mask: ip.Address.Mask})
-			// Add the IP to tracked IPs
-			plugin.addPodIP(id, ip.Address.IP.String())
-		}
-	}
+	// Add IPs to the plugin cache
+	podGateways, podCIDRs := plugin.trackPodIPs(id, res)
 
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
