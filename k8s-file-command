@@ -241,5 +241,26 @@ kubectl run --generator=run-pod/v1 test-np --image=busybox:1.28 --rm -it -- sh
   
 replace string in file:
 sed -i 's/old-string/new-string/g' filename
+
+Certificate Authority:
+openssl genrsa -out ca.key 2048
+openssl req -new -key ca.key -subj "/CN=KUBERNETES-CA" -out ca.csr
+openssl x509 -req -in -in ca.csr -signkey ca.key -out ca.crt
+
+openssl req -new -key apiserver.key -subj "/CN=Kube-apiserver" -out apiserver.csr -config openssl.cnf
+openssl x509 -req -in apiserver.csr -CA ca.crt -CAkey ca.key -out apiserver.crt
+
+4. Generate a private key then Certiﬁcate Signing Request (CSR) for DevDan.
+student@lfs458-node-1a0a:~$ openssl genrsa -out DevDan.key 2048
+student@lfs458-node-1a0a:~$ openssl req -new -key DevDan.key \ -out DevDan.csr -subj "/CN=DevDan/O=development"
+5. Using the newly created request generate a self-signed certiﬁcate using the x509 protocol.
+Use the CA keys for the Kubernetes cluster and set a 45 day expiration.
+student@lfs458-node-1a0a:~$ sudo openssl x509 -req -in DevDan.csr \ -CA /etc/kubernetes/pki/ca.crt \
+-CAkey /etc/kubernetes/pki/ca.key \-CAcreateserial \-out DevDan.crt -days 45
+
+
+
+
+
   
 
