@@ -52,7 +52,7 @@ func MasterUpgrade(f *Framework, v string) error {
 	case "gce":
 		return masterUpgradeGCE(v, false)
 	case "gke":
-		return masterUpgradeGKE(f.Namespace.Name, v)
+		return MasterUpgradeGKE(f.Namespace.Name, v)
 	case "kubernetes-anywhere":
 		return masterUpgradeKubernetesAnywhere(v)
 	default:
@@ -113,7 +113,8 @@ func appendContainerCommandGroupIfNeeded(args []string) []string {
 	return args
 }
 
-func masterUpgradeGKE(namespace string, v string) error {
+// MasterUpgradeGKE upgrades master node to the specified version on GKE.
+func MasterUpgradeGKE(namespace string, v string) error {
 	Logf("Upgrading master to %q", v)
 	args := []string{
 		"container",
