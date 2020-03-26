@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -371,53 +372,78 @@ func (o *ApplyOptions) Run() error {
 
 	// Generates the objects using the resource builder if they have not
 	// already been stored by calling "SetObjects()" in the pre-processor.
+	errs := []error{}
 	infos, err := o.GetObjects()
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
-	if len(infos) == 0 {
+	if len(infos) == 0 && len(errs) == 0 {
 		return fmt.Errorf("no objects passed to apply")
 	}
+	// Iterate through all objects, applying each one.
 	for _, info := range infos {
+		if err := o.applyOneObject(info); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	// If any errors occurred during apply, then return error (or
+	// aggregate of errors).
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	if len(errs) > 1 {
+		return utilerrors.NewAggregate(errs)
+	}
 
-		o.MarkNamespaceVisited(info)
+	if o.PostProcessorFn != nil {
+		klog.V(4).Infof("Running apply post-processor function")
+		if err := o.PostProcessorFn(); err != nil {
+			return err
+		}
+	}
 
-		if err := o.Recorder.Record(info.Object); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+	return nil
+}
+
+func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
+	o.MarkNamespaceVisited(info)
+
+	if err := o.Recorder.Record(info.Object); err != nil {
+		klog.V(4).Infof("error recording current command: %v", err)
+	}
+
+	if o.ServerSideApply {
+		// Send the full object to be applied on the server side.
+		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
+		if err != nil {
+			return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 		}
 
-		if o.ServerSideApply {
-			// Send the full object to be applied on the server side.
-			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
-			if err != nil {
-				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
-			}
+		options := metav1.PatchOptions{
+			Force:        &o.ForceConflicts,
+			FieldManager: o.FieldManager,
+		}
 
-			options := metav1.PatchOptions{
-				Force:        &o.ForceConflicts,
-				FieldManager: o.FieldManager,
+		helper := resource.NewHelper(info.Client, info.Mapping)
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
 			}
-
-			helper := resource.NewHelper(info.Client, info.Mapping)
-			if o.DryRunStrategy == cmdutil.DryRunServer {
-				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return err
-				}
-				helper.DryRun(true)
+			helper.DryRun(true)
+		}
+		obj, err := helper.Patch(
+			info.Namespace,
+			info.Name,
+			types.ApplyPatchType,
+			data,
+			&options,
+		)
+		if err != nil {
+			if isIncompatibleServerError(err) {
+				err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
 			}
-			obj, err := helper.Patch(
-				info.Namespace,
-				info.Name,
-				types.ApplyPatchType,
-				data,
-				&options,
-			)
-			if err != nil {
-				if isIncompatibleServerError(err) {
-					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
-				}
-				if errors.IsConflict(err) {
-					err = fmt.Errorf(`%v
+			if errors.IsConflict(err) {
+				err = fmt.Errorf(`%v
 Please review the fields above--they currently have other managers. Here
 are the ways you can resolve this warning:
 * If you intend to manage all of these fields, please re-run the apply
@@ -429,136 +455,128 @@ are the ways you can resolve this warning:
   value; in this case, you'll become the manager if the other manager(s)
   stop managing the field (remove it from their configuration).
 See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
-				}
-				return err
 			}
-
-			info.Refresh(obj, true)
-
-			if err := o.MarkObjectVisited(info); err != nil {
-				return err
-			}
-
-			if o.shouldPrintObject() {
-				continue
-			}
-
-			printer, err := o.ToPrinter("serverside-applied")
-			if err != nil {
-				return err
-			}
-
-			if err = printer.PrintObj(info.Object, o.Out); err != nil {
-				return err
-			}
-			continue
+			return err
 		}
 
-		// Get the modified configuration of the object. Embed the result
-		// as an annotation in the modified configuration, so that it will appear
-		// in the patch sent to the server.
-		modified, err := util.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
+		info.Refresh(obj, true)
+
+		if err := o.MarkObjectVisited(info); err != nil {
+			return err
+		}
+
+		if o.shouldPrintObject() {
+			return nil
+		}
+
+		printer, err := o.ToPrinter("serverside-applied")
 		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
+			return err
 		}
 
-		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
-			}
+		if err = printer.PrintObj(info.Object, o.Out); err != nil {
+			return err
+		}
+		return nil
+	}
 
-			// Create the resource if it doesn't exist
-			// First, update the annotation used by kubectl apply
-			if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
-				return cmdutil.AddSourceToErr("creating", info.Source, err)
-			}
+	// Get the modified configuration of the object. Embed the result
+	// as an annotation in the modified configuration, so that it will appear
+	// in the patch sent to the server.
+	modified, err := util.GetModifiedConfiguration(info.Object, true, unstructured.UnstructuredJSONScheme)
+	if err != nil {
+		return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
+	}
 
-			if o.DryRunStrategy != cmdutil.DryRunClient {
-				// Then create the resource and skip the three-way merge
-				helper := resource.NewHelper(info.Client, info.Mapping)
-				if o.DryRunStrategy == cmdutil.DryRunServer {
-					if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-						return cmdutil.AddSourceToErr("creating", info.Source, err)
-					}
-					helper.DryRun(true)
-				}
-				obj, err := helper.Create(info.Namespace, true, info.Object)
-				if err != nil {
+	if err := info.Get(); err != nil {
+		if !errors.IsNotFound(err) {
+			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
+		}
+
+		// Create the resource if it doesn't exist
+		// First, update the annotation used by kubectl apply
+		if err := util.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+			return cmdutil.AddSourceToErr("creating", info.Source, err)
+		}
+
+		if o.DryRunStrategy != cmdutil.DryRunClient {
+			// Then create the resource and skip the three-way merge
+			helper := resource.NewHelper(info.Client, info.Mapping)
+			if o.DryRunStrategy == cmdutil.DryRunServer {
+				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
-				info.Refresh(obj, true)
+				helper.DryRun(true)
 			}
-
-			if err := o.MarkObjectVisited(info); err != nil {
-				return err
-			}
-
-			if o.shouldPrintObject() {
-				continue
-			}
-
-			printer, err := o.ToPrinter("created")
+			obj, err := helper.Create(info.Namespace, true, info.Object)
 			if err != nil {
-				return err
+				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
-			if err = printer.PrintObj(info.Object, o.Out); err != nil {
-				return err
-			}
-			continue
+			info.Refresh(obj, true)
 		}
 
 		if err := o.MarkObjectVisited(info); err != nil {
 			return err
 		}
 
-		if o.DryRunStrategy != cmdutil.DryRunClient {
-			metadata, _ := meta.Accessor(info.Object)
-			annotationMap := metadata.GetAnnotations()
-			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
-				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
-			}
-
-			patcher, err := newPatcher(o, info)
-			if err != nil {
-				return err
-			}
-			patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
-			if err != nil {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
-			}
-
-			info.Refresh(patchedObject, true)
-
-			if string(patchBytes) == "{}" && !o.shouldPrintObject() {
-				printer, err := o.ToPrinter("unchanged")
-				if err != nil {
-					return err
-				}
-				if err = printer.PrintObj(info.Object, o.Out); err != nil {
-					return err
-				}
-				continue
-			}
-		}
-
 		if o.shouldPrintObject() {
-			continue
+			return nil
 		}
 
-		printer, err := o.ToPrinter("configured")
+		printer, err := o.ToPrinter("created")
 		if err != nil {
 			return err
 		}
 		if err = printer.PrintObj(info.Object, o.Out); err != nil {
 			return err
 		}
+		return nil
 	}
 
-	if o.PostProcessorFn != nil {
-		klog.V(4).Infof("Running apply post-processor function")
-		if err := o.PostProcessorFn(); err != nil {
+	if err := o.MarkObjectVisited(info); err != nil {
+		return err
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		metadata, _ := meta.Accessor(info.Object)
+		annotationMap := metadata.GetAnnotations()
+		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
+			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
+		}
+
+		patcher, err := newPatcher(o, info)
+		if err != nil {
 			return err
 		}
+		patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
+		if err != nil {
+			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+		}
+
+		info.Refresh(patchedObject, true)
+
+		if string(patchBytes) == "{}" && !o.shouldPrintObject() {
+			printer, err := o.ToPrinter("unchanged")
+			if err != nil {
+				return err
+			}
+			if err = printer.PrintObj(info.Object, o.Out); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+
+	if o.shouldPrintObject() {
+		return nil
+	}
+
+	printer, err := o.ToPrinter("configured")
+	if err != nil {
+		return err
+	}
+	if err = printer.PrintObj(info.Object, o.Out); err != nil {
+		return err
 	}
 
 	return nil
