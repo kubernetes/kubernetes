@@ -192,7 +192,7 @@ HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 NUM_ADDITIONAL_NODES="${NUM_ADDITIONAL_NODES:-}"
 ADDITIONAL_MACHINE_TYPE="${ADDITIONAL_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.4.3-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.4.4-0) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"

@@ -216,7 +216,7 @@ func initImageConfigs() map[int]Config {
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
-	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.3"}
+	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.4"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
