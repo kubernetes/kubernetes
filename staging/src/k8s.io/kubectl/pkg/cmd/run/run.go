@@ -597,7 +597,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 	}
 	selector, found := params["labels"]
 	if !found || len(selector.(string)) == 0 {
-		selector = fmt.Sprintf("run=%s", name.(string))
+		selector = fmt.Sprintf("run=%s,app=%s", name.(string), name.(string))
 	}
 	params["selector"] = selector
 
