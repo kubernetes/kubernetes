@@ -2,8 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["kubetestgen.go"],
-    importpath = "k8s.io/kubernetes/test/conformance/kubetestgen",
+    srcs = [
+        "gen.go",
+        "kubeconform.go",
+        "link.go",
+    ],
+    importpath = "k8s.io/kubernetes/test/conformance/kubeconform",
     visibility = ["//visibility:private"],
     deps = [
         "//test/conformance/behaviors:go_default_library",
@@ -29,7 +33,7 @@ filegroup(
 )
 
 go_binary(
-    name = "kubetestgen",
+    name = "kubeconform",
     data = ["//api/openapi-spec"],
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],

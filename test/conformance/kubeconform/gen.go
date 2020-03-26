@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -30,29 +29,10 @@ import (
 	"k8s.io/kubernetes/test/conformance/behaviors"
 )
 
-type options struct {
-	schemaPath   string
-	resource     string
-	area         string
-	behaviorsDir string
-}
-
-func parseFlags() *options {
-	o := &options{}
-	flag.StringVar(&o.schemaPath, "schema", "", "Path to the OpenAPI schema")
-	flag.StringVar(&o.resource, "resource", ".*", "Resource name")
-	flag.StringVar(&o.area, "area", "default", "Area name to use")
-	flag.StringVar(&o.behaviorsDir, "dir", "../behaviors/", "Path to the behaviors directory")
-	flag.Parse()
-	return o
-}
-
 var defMap map[string]analysis.SchemaRef
 
-func main() {
+func gen(o *options) {
 	defMap = make(map[string]analysis.SchemaRef)
-	o := parseFlags()
-
 	d, err := loads.JSONSpec(o.schemaPath)
 	if err != nil {
 		fmt.Printf("ERROR: %s\n", err.Error())
