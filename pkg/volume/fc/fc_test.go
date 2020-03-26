@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/utils/exec/testing"
+	testingexec "k8s.io/utils/exec/testing"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
@@ -122,10 +122,6 @@ func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Simulate the global mount so that the fakeMounter returns the
-	// expected number of mounts for the attached disk.
-	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
-
 	fake.attachCalled = true
 	return "", nil
 }
