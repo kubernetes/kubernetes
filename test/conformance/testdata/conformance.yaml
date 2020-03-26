@@ -1241,7 +1241,7 @@
     the PodTemplate MUST reflect changes. By fetching all the PodTemplates via a Label
     selector it MUST find the PodTemplate by it's static label and updated value.
     The PodTemplate must be deleted.
-  release: v1.18
+  release: v1.19
   file: test/e2e/common/podtemplates.go
 - testname: Service account tokens auto mount optionally
   codename: '[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance]'
