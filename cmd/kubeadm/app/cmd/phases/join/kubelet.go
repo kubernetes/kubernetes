@@ -68,6 +68,7 @@ func NewKubeletStartPhase() workflow.Phase {
 			options.NodeCRISocket,
 			options.NodeName,
 			options.FileDiscovery,
+			options.ForceJoin,
 			options.TokenDiscovery,
 			options.TokenDiscoveryCAHash,
 			options.TokenDiscoverySkipCAHash,
@@ -77,28 +78,30 @@ func NewKubeletStartPhase() workflow.Phase {
 	}
 }
 
-func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
+func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, bool, error) {
 	data, ok := c.(JoinData)
 	if !ok {
-		return nil, nil, nil, errors.New("kubelet-start phase invoked with an invalid data struct")
+		return nil, nil, nil, false, errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
 	initCfg, err := data.InitCfg()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, false, err
 	}
 	tlsBootstrapCfg, err := data.TLSBootstrapCfg()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, false, err
 	}
-	return cfg, initCfg, tlsBootstrapCfg, nil
+	forceJoin := data.ForceJoin()
+
+	return cfg, initCfg, tlsBootstrapCfg, forceJoin, nil
 }
 
 // runKubeletStartJoinPhase executes the kubelet TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer
 func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
-	cfg, initCfg, tlsBootstrapCfg, err := getKubeletStartJoinData(c)
+	cfg, initCfg, tlsBootstrapCfg, forceJoin, err := getKubeletStartJoinData(c)
 	if err != nil {
 		return err
 	}
@@ -132,25 +135,27 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
 	}
 
-	// Obtain the name of this Node.
-	nodeName, _, err := kubeletphase.GetNodeNameAndHostname(&cfg.NodeRegistration)
-	if err != nil {
-		klog.Warning(err)
-	}
+	if !forceJoin {
+		// Obtain the name of this Node.
+		nodeName, _, err := kubeletphase.GetNodeNameAndHostname(&cfg.NodeRegistration)
+		if err != nil {
+			klog.Warning(err)
+		}
 
-	// Make sure to exit before TLS bootstrap if a Node with the same name exist in the cluster
-	// and it has the "Ready" status.
-	// A new Node with the same name as an existing control-plane Node can cause undefined
-	// behavior and ultimately control-plane failure.
-	klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
-	node, err := bootstrapClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "cannot get Node %q", nodeName)
-	}
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == v1.NodeReady {
-			return errors.Errorf("a Node with name %q and status %q already exists in the cluster. "+
-				"You must delete the existing Node or change the name of this new joining Node", nodeName, v1.NodeReady)
+		// Make sure to exit before TLS bootstrap if a Node with the same name exist in the cluster
+		// and it has the "Ready" status.
+		// A new Node with the same name as an existing control-plane Node can cause undefined
+		// behavior and ultimately control-plane failure.
+		klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
+		node, err := bootstrapClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "cannot get Node %q", nodeName)
+		}
+		for _, cond := range node.Status.Conditions {
+			if cond.Type == v1.NodeReady {
+				return errors.Errorf("a Node with name %q and status %q already exists in the cluster. "+
+					"You must delete the existing Node or change the name of this new joining Node", nodeName, v1.NodeReady)
+			}
 		}
 	}
 

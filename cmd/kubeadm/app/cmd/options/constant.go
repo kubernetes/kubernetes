@@ -122,6 +122,9 @@ const (
 	// FileDiscovery flag sets the file or URL from which to load cluster information (for file-based discovery)
 	FileDiscovery = "discovery-file"
 
+	// ForceJoin flag instruct kubeadm to skip check for existing Node in the cluster.",
+	ForceJoin = "force"
+
 	// ControlPlane flag instruct kubeadm to create a new control plane instance on this node
 	ControlPlane = "control-plane"
 

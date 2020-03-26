@@ -128,6 +128,7 @@ type joinOptions struct {
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
 	kustomizeDir          string
+	forceJoin             bool
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -143,6 +144,7 @@ type joinData struct {
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
 	kustomizeDir          string
+	forceJoin             bool
 }
 
 // NewCmdJoin returns "kubeadm join" command.
@@ -267,6 +269,10 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfig
 
 // addJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
 func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
+	flagSet.BoolVarP(
+		&joinOptions.forceJoin, options.ForceJoin, "f", false,
+		"Skip check for existing Node in the cluster.",
+	)
 	flagSet.StringVar(
 		&joinOptions.cfgPath, options.CfgPath, joinOptions.cfgPath,
 		"Path to kubeadm config file.",
@@ -417,6 +423,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
 		kustomizeDir:          opt.kustomizeDir,
+		forceJoin:             opt.forceJoin,
 	}, nil
 }
 
@@ -485,6 +492,11 @@ func (j *joinData) OutputWriter() io.Writer {
 // KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
 func (j *joinData) KustomizeDir() string {
 	return j.kustomizeDir
+}
+
+// ForceJoin returns the forceJoin flag.
+func (j *joinData) ForceJoin() bool {
+	return j.forceJoin
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
