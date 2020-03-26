@@ -366,10 +366,10 @@ func (kl *Kubelet) syncNodeStatus() {
 		return
 	}
 	if kl.registerNode {
+		kl.updateRuntimeUp()
 		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithAPIServer()
 	}
-	kl.updateRuntimeUp()
 	if err := kl.updateNodeStatus(); err != nil {
 		klog.Errorf("Unable to update node status: %v", err)
 	}
