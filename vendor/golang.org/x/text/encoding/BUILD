@@ -25,6 +25,7 @@ filegroup(
         ":package-srcs",
         "//vendor/golang.org/x/text/encoding/charmap:all-srcs",
         "//vendor/golang.org/x/text/encoding/htmlindex:all-srcs",
+        "//vendor/golang.org/x/text/encoding/ianaindex:all-srcs",
         "//vendor/golang.org/x/text/encoding/internal:all-srcs",
         "//vendor/golang.org/x/text/encoding/japanese:all-srcs",
         "//vendor/golang.org/x/text/encoding/korean:all-srcs",

@@ -17,31 +17,93 @@ limitations under the License.
 package metrics
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 )
 
 func TestCleanVerb(t *testing.T) {
 	testCases := []struct {
+		desc         string
 		initialVerb  string
+		request      *http.Request
 		expectedVerb string
 	}{
 		{
-			"",
-			"unknown",
+			desc:         "An empty string should be designated as unknown",
+			initialVerb:  "",
+			request:      nil,
+			expectedVerb: "unknown",
 		},
 		{
-			"WATCHLIST",
-			"WATCH",
+			desc:         "LIST should normally map to LIST",
+			initialVerb:  "LIST",
+			request:      nil,
+			expectedVerb: "LIST",
 		},
 		{
-			"notValid",
-			"unknown",
+			desc:        "LIST should be transformed to WATCH if we have the right query param on the request",
+			initialVerb: "LIST",
+			request: &http.Request{
+				URL: &url.URL{
+					RawQuery: "watch=true",
+				},
+			},
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:        "LIST isn't transformed to WATCH if we have query params that do not include watch",
+			initialVerb: "LIST",
+			request: &http.Request{
+				URL: &url.URL{
+					RawQuery: "blah=asdf&something=else",
+				},
+			},
+			expectedVerb: "LIST",
+		},
+		{
+			desc:         "WATCHLIST should be transformed to WATCH",
+			initialVerb:  "WATCHLIST",
+			request:      nil,
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:        "PATCH should be transformed to APPLY with the right content type",
+			initialVerb: "PATCH",
+			request: &http.Request{
+				Header: http.Header{
+					"Content-Type": []string{"application/apply-patch+yaml"},
+				},
+			},
+			expectedVerb: "APPLY",
+		},
+		{
+			desc:         "PATCH shouldn't be transformed to APPLY without the right content type",
+			initialVerb:  "PATCH",
+			request:      nil,
+			expectedVerb: "PATCH",
+		},
+		{
+			desc:         "WATCHLIST should be transformed to WATCH",
+			initialVerb:  "WATCHLIST",
+			request:      nil,
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:         "unexpected verbs should be designated as unknown",
+			initialVerb:  "notValid",
+			request:      nil,
+			expectedVerb: "unknown",
 		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.initialVerb, func(t *testing.T) {
-			cleansedVerb := cleanVerb(tt.initialVerb, &http.Request{})
+			req := &http.Request{URL: &url.URL{}}
+			if tt.request != nil {
+				req = tt.request
+			}
+			cleansedVerb := cleanVerb(tt.initialVerb, req)
 			if cleansedVerb != tt.expectedVerb {
 				t.Errorf("Got %s, but expected %s", cleansedVerb, tt.expectedVerb)
 			}
@@ -55,20 +117,37 @@ func TestContentType(t *testing.T) {
 		expectedContentType string
 	}{
 		{
-			"application/json",
-			"application/json",
+			rawContentType:      "application/json",
+			expectedContentType: "application/json",
 		},
 		{
-			"",
-			"other",
+			rawContentType:      "image/svg+xml",
+			expectedContentType: "image/svg+xml",
 		},
 		{
-			"notValid",
-			"other",
+			rawContentType:      "application/json;charset=utf-8",
+			expectedContentType: "application/json; charset=utf-8",
+		},
+		{
+			rawContentType:      "application/json;charset=hancoding",
+			expectedContentType: "application/json; charset=invalid-iana-charset",
+		},
+		{
+			rawContentType:      "",
+			expectedContentType: "invalid-content-type",
+		},
+		{
+			rawContentType:      "///",
+			expectedContentType: "invalid-content-type",
+		},
+		{
+			rawContentType:      "unknownbutvalidtype",
+			expectedContentType: "unknown",
 		},
 	}
+
 	for _, tt := range testCases {
-		t.Run(tt.rawContentType, func(t *testing.T) {
+		t.Run(fmt.Sprintf("parse %s", tt.rawContentType), func(t *testing.T) {
 			cleansedContentType := cleanContentType(tt.rawContentType)
 			if cleansedContentType != tt.expectedContentType {
 				t.Errorf("Got %s, but expected %s", cleansedContentType, tt.expectedContentType)

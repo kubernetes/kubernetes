@@ -18,6 +18,9 @@ package metrics
 
 import (
 	"bufio"
+	"fmt"
+	"golang.org/x/text/encoding/ianaindex"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -48,7 +51,9 @@ type resettableCollector interface {
 
 const (
 	APIServerComponent   string = "apiserver"
-	OtherContentType     string = "other"
+	InvalidContentType   string = "invalid-content-type"
+	InvalidIanaCharset   string = "invalid-iana-charset"
+	UnknownContentType   string = "unknown"
 	UnknownRequestMethod string = "unknown"
 )
 
@@ -61,19 +66,6 @@ const (
  * the metric stability policy.
  */
 var (
-	// these are the valid content types which we will report in request metrics. Any other content types
-	// will be aggregated under 'unknown'
-	validMetricContentTypes = utilsets.NewString("application/vnd.kubernetes.protobuf",
-		"application/json",
-		"application/vnd.kubernetes.protobuf;stream=watch",
-		"text/plain",
-		"text/plain; charset=utf-8")
-	// these are the valid request methods which we report in our metrics. Any other request methods
-	// will be aggregated under 'unknown'
-	validRequestMethods = utilsets.NewString("LIST", "WATCH", "GET", "PUT", "POST", "DELETE", "PATCH")
-	// these are the valid termination request verbs as specified from installer.go
-	validTerminationVerbs = utilsets.NewString("CONNECT", "DELETE", "DELETECOLLECTION", "GET", "LIST", "PATCH", "POST", "PROXY", "PUT", "WATCH", "WATCHLIST")
-
 	// TODO(a-robinson): Add unit tests for the handling of these metrics once
 	// the upstream library supports it.
 	requestCounter = compbasemetrics.NewCounterVec(
@@ -187,6 +179,67 @@ var (
 		currentInflightRequests,
 		requestTerminationsTotal,
 	}
+
+	// these are the known (e.g. whitelisted/known) content types which we will report for
+	// request metrics. Any other RFC compliant content types will be aggregated under 'unknown'
+	knownMetricContentTypes = utilsets.NewString(
+		"application/apply-patch+yaml",
+		"application/font-ttf",
+		"application/font-woff",
+		"application/font-woff2",
+		"application/javascript",
+		"application/json",
+		"application/json-patch+json",
+		"application/merge-patch+json",
+		"application/octet-stream",
+		"application/pdf",
+		"application/strategic-merge-patch+json",
+		"application/vnd.google.protobuf",
+		"application/vnd.kubernetes.protobuf",
+		"application/vnd.ms-fontobject",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"application/vnd.schemaregistry.v1+json",
+		"application/x-font-woff",
+		"application/x-gzip",
+		"application/x-javascript",
+		"application/x-pem-file",
+		"application/xml",
+		"application/yaml",
+		"cluster",
+		"font/ttf",
+		"font/woff",
+		"font/woff2",
+		"image/gif",
+		"image/jpeg",
+		"image/png",
+		"image/svg+xml",
+		"image/vnd.microsoft.icon",
+		"image/x-icon",
+		"namespace",
+		"resource",
+		"text/css",
+		"text/event-stream",
+		"text/html",
+		"text/javascript",
+		"text/plain",
+		"text/xml")
+	// these are the valid request methods which we report in our metrics. Any other request methods
+	// will be aggregated under 'unknown'
+	validRequestMethods = utilsets.NewString(
+		"APPLY",
+		"CONNECT",
+		"CREATE",
+		"DELETE",
+		"DELETECOLLECTION",
+		"GET",
+		"LIST",
+		"PATCH",
+		"POST",
+		"PROXY",
+		"PUT",
+		"UPDATE",
+		"WATCH",
+		"WATCHLIST")
 )
 
 const (
@@ -235,7 +288,7 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	// set verbs to a bounded set of known and expected verbs
-	if !validTerminationVerbs.Has(verb) {
+	if !validRequestMethods.Has(verb) {
 		verb = UnknownRequestMethod
 	}
 	if requestInfo.IsResourceRequest {
@@ -332,12 +385,26 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 }
 
 // cleanContentType binds the contentType (for metrics related purposes) to a
-// bounded set of known/expected content-types.
+// bounded set of known/expected content-types. We retain the charset param only if it is
+// RFC compliant (e.g. https://www.iana.org/assignments/character-sets/character-sets.xhtml)
 func cleanContentType(contentType string) string {
-	if validMetricContentTypes.Has(contentType) {
-		return contentType
+	parsedContentType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return InvalidContentType
 	}
-	return OtherContentType
+	if knownMetricContentTypes.Has(parsedContentType) {
+		cs, ok := params["charset"]
+		if ok {
+			_, err := ianaindex.MIME.Encoding(cs)
+			if err != nil {
+				cs = InvalidIanaCharset
+			}
+			return fmt.Sprintf("%s; charset=%s", parsedContentType, cs)
+		}
+		return parsedContentType
+	}
+	// valid according to our parser but not in our well-defined whitelist of content-types
+	return UnknownContentType
 }
 
 // CleanScope returns the scope of the request.

@@ -21,6 +21,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
+        "//vendor/golang.org/x/text/encoding/ianaindex:go_default_library",
     ],
 )
 
