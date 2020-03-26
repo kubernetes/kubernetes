@@ -68,6 +68,7 @@ var kubeletMarshalCases = []struct {
 			kind: KubeletConfiguration
 			nodeStatusReportFrequency: 0s
 			nodeStatusUpdateFrequency: 0s
+			podCleanUpGracePeriod: 0s
 			runtimeRequestTimeout: 0s
 			streamingConnectionIdleTimeout: 0s
 			syncFrequency: 0s
@@ -103,6 +104,7 @@ var kubeletMarshalCases = []struct {
 			kind: KubeletConfiguration
 			nodeStatusReportFrequency: 0s
 			nodeStatusUpdateFrequency: 0s
+			podCleanUpGracePeriod: 0s
 			port: 12345
 			rotateCertificates: true
 			runtimeRequestTimeout: 0s

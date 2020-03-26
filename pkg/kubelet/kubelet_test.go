@@ -1169,6 +1169,51 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFilterOutTerminatedPodsWithGracePeriod(t *testing.T) {
+        testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+        defer testKubelet.Cleanup()
+        kubelet := testKubelet.kubelet
+        // intentionally set duration high to avoid tests failing because of timing issues
+        kubelet.kubeletConfiguration.PodCleanUpGracePeriod = metav1.Duration { Duration: 100 * time.Second }
+        pods := newTestPods(5)
+        now := metav1.NewTime(time.Now())
+        // this pod terminated just now. This should filter out.
+        pods[0].Status.Phase = v1.PodFailed
+        pods[0].Status.ContainerStatuses = []v1.ContainerStatus{
+                {State: v1.ContainerState{
+                        Terminated: &v1.ContainerStateTerminated{
+                                FinishedAt: now,
+                        },
+                }},
+        }
+        // this pod terminated 200 sec ago, more than PodCleanUpGracePeriod. This should not filter out.
+        pods[1].Status.Phase = v1.PodSucceeded
+        pods[1].Status.ContainerStatuses = []v1.ContainerStatus{
+                {State: v1.ContainerState{
+                        Terminated: &v1.ContainerStateTerminated{
+                                FinishedAt: metav1.NewTime(time.Now().Add((-200)*time.Second)),
+                        },
+                }},
+        }
+        // The pod is terminating, should not filter out.
+        pods[2].Status.Phase = v1.PodRunning
+        pods[2].DeletionTimestamp = &now
+        pods[2].Status.ContainerStatuses = []v1.ContainerStatus{
+                {State: v1.ContainerState{
+                        Running: &v1.ContainerStateRunning{
+                                StartedAt: now,
+                        },
+                }},
+        }
+        pods[3].Status.Phase = v1.PodPending
+        pods[4].Status.Phase = v1.PodRunning
+
+        expected := []*v1.Pod{pods[0], pods[2], pods[3], pods[4]}
+        kubelet.podManager.SetPods(pods)
+        actual := kubelet.filterOutTerminatedPods(pods)
+        assert.Equal(t, expected, actual)
+}
+
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()

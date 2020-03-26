@@ -341,6 +341,9 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
 	ShowHiddenMetricsForVersion string
+	// Duration for which the kubelet has to wait after pod reaches terminated state and before killing all pod containers including pause container.
+	// This ensures pause container stays long enough for network plugin to release devices from pause container.
+	PodCleanUpGracePeriod metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

@@ -223,4 +223,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}
+	if obj.PodCleanUpGracePeriod == zeroDuration {
+		obj.PodCleanUpGracePeriod = metav1.Duration{Duration: 0 * time.Second}
+	}
 }

@@ -755,6 +755,11 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// Duration for which the kubelet has to wait after pod reaches terminated state and before killing all pod containers including pause container.
+	// This ensures pause container stays long enough for network plugin to release devices from pause container.
+	// Default: "0s"
+	// +optional
+	PodCleanUpGracePeriod metav1.Duration `json:"podCleanUpGracePeriod,omitempty"`
 }
 
 type KubeletAuthorizationMode string

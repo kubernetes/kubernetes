@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2383,5 +2384,91 @@ func TestTruncatePodHostname(t *testing.T) {
 		output, err := truncatePodHostnameIfNeeded("test-pod", test.input)
 		assert.NoError(t, err)
 		assert.Equal(t, test.output, output)
+	}
+}
+
+func TestPodIsInTerminatedStateBeyondGracePeriod(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	// intentionally set duration high to avoid tests failing because of timing issues
+	kubelet.kubeletConfiguration.PodCleanUpGracePeriod = metav1.Duration { Duration: 100 * time.Second }
+	tests := []struct {
+		pod    *v1.Pod
+		status bool
+		test   string
+	}{
+		{
+			&v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState {
+								Terminated: &v1.ContainerStateTerminated {
+									FinishedAt: metav1.Now(),
+								},
+							},
+						},
+					},
+					Phase: v1.PodSucceeded,
+				},
+			},
+			false,
+			"Pod finished just now. Returning false",
+		},
+		{
+			&v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState {
+								Terminated: &v1.ContainerStateTerminated {
+									FinishedAt: metav1.Now(),
+								},
+							},
+						},
+						{
+							State: v1.ContainerState {
+								Terminated: &v1.ContainerStateTerminated {
+									FinishedAt: metav1.NewTime(time.Now().Add(time.Second * (-1000))),
+								},
+							},
+						},
+					},
+					Phase: v1.PodSucceeded,
+				},
+			},
+			false,
+			"One of the container in the pod finished just now. Returning false",
+		},
+		{
+			&v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState {
+								Terminated: &v1.ContainerStateTerminated {
+									FinishedAt: metav1.NewTime(time.Now().Add(time.Second * (-500))),
+								},
+							},
+						},
+						{
+							State: v1.ContainerState {
+								Terminated: &v1.ContainerStateTerminated {
+									FinishedAt: metav1.NewTime(time.Now().Add(time.Second * (-1000))),
+								},
+							},
+						},
+					},
+					Phase: v1.PodSucceeded,
+				},
+			},
+			true,
+			"All containers in the pod are in finished state for more than PodCleanUpGracePeriod seconds. Returning true",
+		},
+	}
+	for _, test := range tests {
+		status := kubelet.podIsInTerminatedStateBeyondGracePeriod(test.pod)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
