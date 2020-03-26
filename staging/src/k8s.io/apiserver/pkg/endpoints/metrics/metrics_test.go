@@ -34,7 +34,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:         "An empty string should be designated as unknown",
 			initialVerb:  "",
 			request:      nil,
-			expectedVerb: "unknown",
+			expectedVerb: "other",
 		},
 		{
 			desc:         "LIST should normally map to LIST",
@@ -94,7 +94,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:         "unexpected verbs should be designated as unknown",
 			initialVerb:  "notValid",
 			request:      nil,
-			expectedVerb: "unknown",
+			expectedVerb: "other",
 		},
 	}
 	for _, tt := range testCases {
@@ -129,6 +129,10 @@ func TestContentType(t *testing.T) {
 			expectedContentType: "application/json; charset=utf-8",
 		},
 		{
+			rawContentType:      "application/json;foo=bar",
+			expectedContentType: "application/json",
+		},
+		{
 			rawContentType:      "application/json;charset=hancoding",
 			expectedContentType: "application/json; charset=invalid-iana-charset",
 		},
@@ -142,7 +146,7 @@ func TestContentType(t *testing.T) {
 		},
 		{
 			rawContentType:      "unknownbutvalidtype",
-			expectedContentType: "unknown",
+			expectedContentType: "other",
 		},
 	}
 

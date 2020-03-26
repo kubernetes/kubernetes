@@ -19,7 +19,6 @@ package metrics
 import (
 	"bufio"
 	"fmt"
-	"golang.org/x/text/encoding/ianaindex"
 	"mime"
 	"net"
 	"net/http"
@@ -31,6 +30,7 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
+	"golang.org/x/text/encoding/ianaindex"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,11 +50,11 @@ type resettableCollector interface {
 }
 
 const (
-	APIServerComponent   string = "apiserver"
-	InvalidContentType   string = "invalid-content-type"
-	InvalidIanaCharset   string = "invalid-iana-charset"
-	UnknownContentType   string = "unknown"
-	UnknownRequestMethod string = "unknown"
+	APIServerComponent string = "apiserver"
+	InvalidContentType string = "invalid-content-type"
+	InvalidIanaCharset string = "invalid-iana-charset"
+	OtherContentType   string = "other"
+	OtherRequestMethod string = "other"
 )
 
 /*
@@ -289,7 +289,7 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	// set verbs to a bounded set of known and expected verbs
 	if !validRequestMethods.Has(verb) {
-		verb = UnknownRequestMethod
+		verb = OtherRequestMethod
 	}
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
@@ -404,7 +404,7 @@ func cleanContentType(contentType string) string {
 		return parsedContentType
 	}
 	// valid according to our parser but not in our well-defined whitelist of content-types
-	return UnknownContentType
+	return OtherContentType
 }
 
 // CleanScope returns the scope of the request.
@@ -454,7 +454,7 @@ func cleanVerb(verb string, request *http.Request) string {
 	if validRequestMethods.Has(reportedVerb) {
 		return reportedVerb
 	}
-	return UnknownRequestMethod
+	return OtherRequestMethod
 }
 
 func cleanDryRun(u *url.URL) string {
