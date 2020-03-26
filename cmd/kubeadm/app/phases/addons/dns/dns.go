@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 
 	"github.com/caddyserver/caddy/caddyfile"
@@ -397,6 +398,11 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 	return isMigrationRequired, nil
 }
 
+var (
+	// imageDigestMatcher is used to match the SHA256 digest from the ImageID of the CoreDNS pods
+	imageDigestMatcher = regexp.MustCompile(`^.*(?i:sha256:([[:alnum:]]{64}))$`)
+)
+
 func isCoreDNSVersionSupported(client clientset.Interface) (bool, error) {
 	isValidVersion := true
 	coreDNSPodList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
@@ -410,8 +416,12 @@ func isCoreDNSVersionSupported(client clientset.Interface) (bool, error) {
 	}
 
 	for _, pod := range coreDNSPodList.Items {
-		imageID := strings.Split(pod.Status.ContainerStatuses[0].ImageID, ":")
-		if !migration.Released(imageID[2]) {
+		imageID := imageDigestMatcher.FindStringSubmatch(pod.Status.ContainerStatuses[0].ImageID)
+		if len(imageID) != 2 {
+			return false, errors.Errorf("unable to match SHA256 digest ID in %q", pod.Status.ContainerStatuses[0].ImageID)
+		}
+		// The actual digest should be at imageID[1]
+		if !migration.Released(imageID[1]) {
 			isValidVersion = false
 		}
 	}
