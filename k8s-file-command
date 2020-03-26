@@ -1,0 +1,245 @@
+Practice Tests Pods:
+Run the command 'kubectl describe pod newpod-<id>' or 'kubectl get pods -o wide' and look under the containers section.
+Get a pod: kubectl get pods --all-namespaces
+Delete Pod: kubectl delete pod webapp
+Edit a pod: kubectl edit pod redis
+
+Practice Tests ReplicaSets:
+scale replicaSets: kubectl scale deployment.v1.apps/nginx-deployment --replicas=10 (scaling a deployment)
+
+Create an NGINX Pod
+kubectl run --generator=run-pod/v1 nginx --image=nginx
+
+Generate POD Manifest YAML file (-o yaml). Don't create it(--dry-run)
+kubectl run --generator=run-pod/v1 nginx --image=nginx --dry-run -o yaml
+kubectl run --generator=run-pod/v1 redis --image=redis:alpine -l tier=db (with label)
+
+Create a deployment
+kubectl create deployment --image=nginx nginx
+
+Generate Deployment YAML file (-o yaml). Don't create it(--dry-run)
+kubectl create deployment --image=nginx nginx --dry-run -o yaml
+
+Generate Deployment YAML file (-o yaml). Don't create it(--dry-run) with 4 Replicas (--replicas=4)
+kubectl create deployment --image=nginx nginx --dry-run -o yaml > nginx-deployment.yaml
+
+Certification Tips - Imperative Commands with Kubectl
+While you would be working mostly the declarative way - using definition files, imperative commands can help in getting one time tasks done quickly, as well as generate a definition template easily. This would help save considerable amount of time during your exams.
+
+Before we begin, familiarize with the two options that can come in handy while working with the below commands:
+
+--dry-run: By default as soon as the command is run, the resource will be created. If you simply want to test your command , use the --dry-run option. This will not create the resource, instead, tell you weather the resource can be created and if your command is right.
+
+-o yaml: This will output the resource definition in YAML format on screen.
+
+Use the above two in combination to generate a resource definition file quickly, that you can then modify and create resources as required, instead of creating the files from scratch.
+
+POD
+Create an NGINX Pod:
+kubectl run --generator=run-pod/v1 nginx --image=nginx
+
+Generate POD Manifest YAML file (-o yaml). Don't create it(--dry-run)
+
+kubectl run --generator=run-pod/v1 nginx --image=nginx --dry-run -o yaml
+
+Deployment
+Create a deployment
+
+kubectl create deployment --image=nginx nginx
+
+Generate Deployment YAML file (-o yaml). Don't create it(--dry-run)
+
+kubectl create deployment --image=nginx nginx --dry-run -o yaml
+
+Generate Deployment YAML file (-o yaml). Don't create it(--dry-run) with 4 Replicas (--replicas=4)
+
+kubectl run --generator=deployment/v1beta1 nginx --image=nginx --dry-run --replicas=4 -o yaml
+
+The usage --generator=deployment/v1beta1 is deprecated as of Kubernetes 1.16. The recommended way is to use the kubectl create option instead.
+
+IMPORTANT:
+
+kubectl create deployment does not have a --replicas option. You could first create it and then scale it using the kubectl scale command.
+
+Save it to a file - (If you need to modify or add some other details)
+
+kubectl run --generator=deployment/v1beta1 nginx --image=nginx --dry-run --replicas=4 -o yaml > nginx-deployment.yaml
+
+OR
+
+kubectl create deployment --image=nginx nginx --dry-run -o yaml > nginx-deployment.yaml
+
+You can then update the YAML file with the replicas or any other field before creating the deployment.
+
+Service
+Create a Service named redis-service of type ClusterIP to expose pod redis on port 6379
+
+kubectl expose pod redis --port=6379 --name redis-service --dry-run -o yaml
+kubectl expose deployment webapp --type=NodePort --port=8080 --name=webapp-service --dry-run -o yaml > webapp-service.yaml (add spec.ports.nodePort: number)
+
+(This will automatically use the pod's labels as selectors)
+
+Or
+
+kubectl create service clusterip redis --tcp=6379:6379 --dry-run -o yaml  (This will not use the pods labels as selectors, instead it will assume selectors as app=redis. You cannot pass in selectors as an option. So it does not work very well if your pod has a different label set. So generate the file and modify the selectors before creating the service)
+
+Create a Service named nginx of type NodePort to expose pod nginx's port 80 on port 30080 on the nodes:
+
+kubectl expose pod nginx --port=80 --name nginx-service --dry-run -o yaml
+
+(This will automatically use the pod's labels as selectors, but you cannot specify the node port. You have to generate a definition file and then add the node port in manually before creating the service with the pod.)
+
+Or
+
+kubectl create service nodeport nginx --tcp=80:80 --node-port=30080 --dry-run -o yaml
+
+(This will not use the pods labels as selectors)
+
+Both the above commands have their own challenges. While one of it cannot accept a selector the other cannot accept a node port. I would recommend going with the `kubectl expose` command. If you need to specify a node port, generate a definition file using the same command and manually input the nodeport before creating the service.
+
+Reference:
+
+https://kubernetes.io/docs/reference/kubectl/conventions/
+
+kubectl taint nodes master node-role.kubernetes.io/master:NoSchedule-
+
+https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/cpu-default-namespace/
+https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/memory-default-namespace/
+https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/
+
+Kubectl label node {{node-name}} {{key}}={{value}}
+
+ps -aux | grep kubelet and identify the config file - --config=/var/lib/kubelet/config.yaml
+
+Create a static Pod:
+kubectl run --restart=Never --image=busybox static-busybox --dry-run -o yaml --command -- sleep 1000 > /etc/kubernetes/manifests/static-busybox.yaml
+Create a POD in the finance namespace:
+kubectl run temp-bus --image=redis:alpine --namespace=finance --restart=Never
+
+InitContainers:
+https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#using-init-containers
+
+Restore etcd:
+https://github.com/mmumshad/kubernetes-the-hard-way/blob/master/practice-questions-answers/cluster-maintenance/backup-etcd/etcd-backup-and-restore.md
+https://github.com/etcd-io/etcd/blob/master/Documentation/op-guide/recovery.md
+https://kubernetes.io/docs/concepts/services-networking/network-policies/
+https://kubernetes.io/docs/concepts/storage/persistent-volumes/#claims-as-volumes
+https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#create-a-persistentvolume
+https://kubernetes.io/docs/concepts/services-networking/ingress/
+https://kubernetes.io/docs/concepts/cluster-administration/networking/#how-to-implement-the-kubernetes-networking-model
+https://www.objectif-libre.com/en/blog/2018/07/05/k8s-network-solutions-comparison/
+https://kubernetes.io/docs/tasks/debug-application-cluster/debug-application/
+https://kubernetes.io/docs/tasks/debug-application-cluster/debug-cluster/
+https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+
+Run the command 'kubectl exec webapp cat /log/app.log'
+
+Check Nodes:
+top
+df -h
+
+Check Kubelet status:
+service kubelet status
+sudo journalctl -u kubelet -> Start the stopped services. ssh node01 "service kubelet start"
+journalctl -u kubelet -f -> fix the issue in the file
+kubectl cluster-info (on Master Node) -> Check the kubelet.conf file at /etc/kubernetes/kubelet.conf (for server ip, stop and restart kubelet)
+
+Check Certificates:
+openssl x509 -in /var/lib/kubelet/worker.crt -text -noout
+
+JSON Path Criteria:
+$[?( @ > 40 | @ in [40,41,42] | @ nin [40,41] )]
+
+JSON Path Examples:
+kubectl get nodes -o=jsonpath='{.items[*].metadata.name} {"\n"} {"\t"}'
+kubectl get nodes -o=jsonpath='{.items[*].status.addresses[0].address}{"\t"}'
+
+JSON Path for Sort:
+kubectl get node -o json
+kubectl get nodes -o=custom-columns=NODE:.metadata.name,CPU:.status.capacity.cpu
+kubectl get nodes --sort-by=.metadata.name
+
+Loop Ranges:
+kubectl get nodes -o=jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.capacity.cpu}{"\n"}{end}'
+
+kubectl config view --kubeconfig=/root/my-kube-config
+
+Take the backup of ETCD at the location /opt/etcd-backup.db on the master node:
+export ETCDCTL_API=3
+etcdctl snapshot save --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt
+--key=/etc/kubernetes/pki/etcd/server.key --endpoints=127.0.0.1:2379 /opt/etcd-backup.db
+
+Upgrade Node:
+(
+Upgrade Node: 
+kubectl drain node (mark it as unschedulable)
+Run the command apt install kubeadm=1.17.0-00
+and then kubeadm upgrade apply v1.17.0 (for master, but try on worker)
+and then apt install kubelet=1.17.0-00 to upgrade the kubelet on the master node
+kubectl uncordon node
+)
+- Master Node:
+kubectl drain node master --ignore-daemonsets
+apt install kubeadm=1.17.0-00
+kubeadm upgrade plan v1.17.0
+kubeadm upgrade apply v1.17.0
+apt-get install kubelet=1.17.0-00
+kubectl uncordon master
+kubectl drain node01 --ignore-daemonsets
+- Node01 Node:
+apt install kubeadm=1.17.0-00
+kubeadm upgrade node --kubelet-version v1.17.0
+apt-get install kubelet=1.17.0-00
+- Back on Master:
+kubectl uncordon node01
+kubectl get pods -o wide | grep gold (make sure it is scheduled on master)
+
+Another resources:
+kubectl exec -it ubuntu-sleeper -- date -s '19 APR 2012 11:14:00’
+kubectl create serviceaccount ingress-serviceaccount --namespace ingress-space
+kubectl expose deployment -n ingress-space ingress-controller --type=NodePort --port=80 --name=ingress --dry-run -o yaml > ingress.yaml
+kubectl api-resources --namespace=true 
+
+
+Check for rollout history:
+kubectl rollout history deployment nginx-deploy
+
+Create a user, grant him access with private key and csr:
+https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/#create-a-certificate-signing-request
+Check certificate api version: kubectl api-versions | grep certif
+create yaml file for cert: vi john.yaml
+copy csr without the master node name and put it under request from john.yaml: (cat john.csr | base64 | tr -d "\n")
+create csr cert: kubectl create -f john.yaml
+Verify csr cert: kubectl get csr
+Approve it: kubectl certificate approve john-developer
+Create role: kubectl create role developer --resource=pods --verb=create,list,get --namespace=development
+Create rolebinding: kubectl create rolebinding developer-role-binding --role=developer --user=john --namespace=development
+Verify access: kubectl auth can-i update pods --namespace=development --as=john
+
+Create a pod, service, test for dns lookup the services and pods:
+Create pod: Command at the top
+Expose pod (nginx always on port 80): kubectl expose pod nginx --port=80 --target-port=80 --type=ClusterIP --name nginx-service
+Test dnslookup for service: kubectl run --generator=run-pod/v1 test-nslookup --image=busybox:1.28 --rm -it -- nslookup nginx-resolver-service > /root/nginx.svc
+Test dnslookup for pod (ip of pod hyphen separated): kubectl run --generator=run-pod/v1 test-nslookup --image=busybox:1.28 --rm -it -- nslookup 10-12-13-23.default.pod > /root/nginx.pod
+
+Create a static pod on node01:
+Ssh into node01: ssh node01
+  Check kubelet status: service kubelet status | systemctl status kubelet
+  Enter config file: vi /var/lib/kubelet/config.yaml
+  Check for staticPodPath or add it
+Ssh into master: 
+  create nginx-critical and copy content: kubectl run --generator=run-pod/v1 nginx-critical --image=nginx --dry-run -o yaml > nginx-critical.yaml
+SSh into node01:
+  Go to staticPodPath and paste the content of yaml file. It will automatically create the pod
+  
+  
+Test pod Connectivity:
+kubectl run --generator=run-pod/v1 test-np --image=busybox:1.28 --rm -it -- sh
+... nc -z -v -w 2 np-test-service 80
+  
+replace string in file:
+sed -i 's/old-string/new-string/g' filename
+  
+
