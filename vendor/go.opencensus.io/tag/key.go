@@ -29,6 +29,16 @@ func NewKey(name string) (Key, error) {
 	return Key{name: name}, nil
 }
 
+// MustNewKey creates or retrieves a string key identified by name.
+// An invalid key name raises a panic.
+func MustNewKey(name string) Key {
+	k, err := NewKey(name)
+	if err != nil {
+		panic(err)
+	}
+	return k
+}
+
 // Name returns the name of the key.
 func (k Key) Name() string {
 	return k.name

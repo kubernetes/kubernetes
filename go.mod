@@ -472,7 +472,7 @@ replace (
 	go.etcd.io/bbolt => go.etcd.io/bbolt v1.3.3
 	go.etcd.io/etcd => go.etcd.io/etcd v0.5.0-alpha.5.0.20200224211402-c65a9e2dd1fd // c65a9e2dd1fd is the SHA for git tag v3.4.4
 	go.mongodb.org/mongo-driver => go.mongodb.org/mongo-driver v1.1.2
-	go.opencensus.io => go.opencensus.io v0.21.0
+	go.opencensus.io => go.opencensus.io v0.22.0
 	go.uber.org/atomic => go.uber.org/atomic v1.3.2
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	go.uber.org/zap => go.uber.org/zap v1.10.0

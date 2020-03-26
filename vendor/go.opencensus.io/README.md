@@ -253,10 +253,10 @@ release in which the functionality was marked *Deprecated*.
 [new-ex]: https://godoc.org/go.opencensus.io/tag#example-NewMap
 [new-replace-ex]: https://godoc.org/go.opencensus.io/tag#example-NewMap--Replace
 
-[exporter-prom]: https://godoc.org/go.opencensus.io/exporter/prometheus
+[exporter-prom]: https://godoc.org/contrib.go.opencensus.io/exporter/prometheus
 [exporter-stackdriver]: https://godoc.org/contrib.go.opencensus.io/exporter/stackdriver
-[exporter-zipkin]: https://godoc.org/go.opencensus.io/exporter/zipkin
-[exporter-jaeger]: https://godoc.org/go.opencensus.io/exporter/jaeger
+[exporter-zipkin]: https://godoc.org/contrib.go.opencensus.io/exporter/zipkin
+[exporter-jaeger]: https://godoc.org/contrib.go.opencensus.io/exporter/jaeger
 [exporter-xray]: https://github.com/census-ecosystem/opencensus-go-exporter-aws
 [exporter-datadog]: https://github.com/DataDog/opencensus-go-exporter-datadog
 [exporter-graphite]: https://github.com/census-ecosystem/opencensus-go-exporter-graphite
