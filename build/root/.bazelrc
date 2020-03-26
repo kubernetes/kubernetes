@@ -40,19 +40,18 @@ build:cross:darwin_amd64 --platforms=@io_bazel_rules_go//go/toolchain:darwin_amd
 build:cross:windows_386 --platforms=@io_bazel_rules_go//go/toolchain:windows_386
 build:cross:windows_amd64 --platforms=@io_bazel_rules_go//go/toolchain:windows_amd64
 
-# We enable cgo cross-compilation for Linux, but need to use our custom crosstool.
-build:repo_infra_crosstool --crosstool_top=@io_k8s_repo_infra//tools:toolchain --compiler=gcc
-build:cross:linux_386 --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_386
-build:cross:linux_amd64 --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 --cpu=amd64
-build:cross:linux_arm --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_arm --cpu=arm
-build:cross:linux_arm64 --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_arm64 --cpu=arm64
-build:cross:linux_ppc64le --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_ppc64le --cpu=ppc64le
-build:cross:linux_s390x --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_s390x --cpu=s390x
+# These cross-compilation targets are most likely non-functional.
+build:crosstool --compiler=gcc
+build:cross:linux_386 --config=crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_386
+build:cross:linux_amd64 --config=crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 --cpu=amd64
+build:cross:linux_arm --config=crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_arm --cpu=arm
+build:cross:linux_arm64 --config=crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_arm64 --cpu=arm64
+build:cross:linux_ppc64le --config=crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_ppc64le --cpu=ppc64le
+build:cross:linux_s390x --config=crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_s390x --cpu=s390x
 
 # --config=remote-cache enables a remote bazel cache
 # Note needs a --remote_instance_name=projects/PROJ/instances/default_instance flag
 build:remote-cache --remote_cache=remotebuildexecution.googleapis.com
-build:remote-cache --tls_enabled=true
 build:remote-cache --remote_timeout=3600
 build:remote-cache --auth_enabled=true
 
