@@ -647,6 +647,12 @@ func (g *genericScheduler) prioritizeNodes(
 		return nil, scoreStatus.AsError()
 	}
 
+	if klog.V(10) {
+		for plugin, nodeScoreList := range scoresMap {
+			klog.Infof("Plugin %s scores on %v/%v => %v", plugin, pod.Namespace, pod.Name, nodeScoreList)
+		}
+	}
+
 	// Summarize all scores.
 	result := make(framework.NodeScoreList, 0, len(nodes))
 
