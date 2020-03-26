@@ -1857,7 +1857,7 @@
     the ConfigMap MUST reflect changes. By fetching all the ConfigMaps via a Label
     selector it MUST find the ConfigMap by it's static label and updated value. The
     ConfigMap must be deleted by Collection.
-  release: v1.18
+  release: v1.19
   file: test/e2e/common/configmap.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide container''s limits.cpu/memory
