@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -142,10 +143,14 @@ func (sp SyncPodType) String() string {
 	}
 }
 
-// IsCriticalPod returns true if the pod bears the critical pod annotation key or if pod's priority is greater than
-// or equal to SystemCriticalPriority. Both the default scheduler and the kubelet use this function
-// to make admission and scheduling decisions.
+// IsCriticalPod returns true if pod's priority is greater than or equal to SystemCriticalPriority.
 func IsCriticalPod(pod *v1.Pod) bool {
+	if kubepod.IsStaticPod(pod) {
+		return true
+	}
+	if kubepod.IsMirrorPod(pod) {
+		return true
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		if pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
 			return true
