@@ -47,9 +47,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 	testTime := metav1.NewTime(time.Unix(2, 0)) // a static timestamp: 2000
 	interestedMetrics := []string{
 		"scrape_error",
-		"node_cpu_usage_seconds",
+		"node_cpu_usage_seconds_total",
 		"node_memory_working_set_bytes",
-		"container_cpu_usage_seconds",
+		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
 	}
 
@@ -85,9 +85,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 			},
 			summaryErr: nil,
 			expectedMetrics: `
-				# HELP node_cpu_usage_seconds [ALPHA] Cumulative cpu time consumed by the node in core-seconds
-				# TYPE node_cpu_usage_seconds gauge
-				node_cpu_usage_seconds 10 2000
+				# HELP node_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the node in core-seconds
+				# TYPE node_cpu_usage_seconds_total counter
+				node_cpu_usage_seconds_total 10 2000
 				# HELP node_memory_working_set_bytes [ALPHA] Current working set of the node in bytes
 				# TYPE node_memory_working_set_bytes gauge
 				node_memory_working_set_bytes 1000 2000
@@ -156,11 +156,11 @@ func TestCollectResourceMetrics(t *testing.T) {
 				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
 				# TYPE scrape_error gauge
 				scrape_error 0
-				# HELP container_cpu_usage_seconds [ALPHA] Cumulative cpu time consumed by the container in core-seconds
-				# TYPE container_cpu_usage_seconds gauge
-				container_cpu_usage_seconds{container="container_a",namespace="namespace_a",pod="pod_a"} 10 2000
-				container_cpu_usage_seconds{container="container_a",namespace="namespace_b",pod="pod_b"} 10 2000
-				container_cpu_usage_seconds{container="container_b",namespace="namespace_a",pod="pod_a"} 10 2000
+				# HELP container_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the container in core-seconds
+				# TYPE container_cpu_usage_seconds_total counter
+				container_cpu_usage_seconds_total{container="container_a",namespace="namespace_a",pod="pod_a"} 10 2000
+				container_cpu_usage_seconds_total{container="container_a",namespace="namespace_b",pod="pod_b"} 10 2000
+				container_cpu_usage_seconds_total{container="container_b",namespace="namespace_a",pod="pod_a"} 10 2000
 				# HELP container_memory_working_set_bytes [ALPHA] Current working set of the container in bytes
 				# TYPE container_memory_working_set_bytes gauge
 				container_memory_working_set_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 2000
