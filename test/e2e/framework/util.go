@@ -63,7 +63,6 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
-	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -1008,7 +1007,7 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
 	nodeUpdated, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
-	if taintutils.TaintExists(nodeUpdated.Spec.Taints, taint) {
+	if taintExists(nodeUpdated.Spec.Taints, taint) {
 		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
@@ -1031,7 +1030,7 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 
 	nodeTaints := node.Spec.Taints
 
-	if len(nodeTaints) == 0 || !taintutils.TaintExists(nodeTaints, taint) {
+	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
 		return false, nil
 	}
 	return true, nil
@@ -1360,4 +1359,14 @@ func PrettyPrintJSON(metrics interface{}) string {
 		return ""
 	}
 	return string(formatted.Bytes())
+}
+
+// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
+func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
 }
