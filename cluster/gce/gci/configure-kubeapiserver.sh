@@ -274,8 +274,8 @@ function start-kube-apiserver {
   local webhook_authn_config_volume=""
   if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
     params+=" --authentication-token-webhook-config-file=/etc/gcp_authn.config"
-    webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": false},"
-    webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\", \"type\": \"FileOrCreate\"}},"
+    webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": true},"
+    webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\", \"type\": \"File\"}},"
     if [[ -n "${GCP_AUTHN_CACHE_TTL:-}" ]]; then
       params+=" --authentication-token-webhook-cache-ttl=${GCP_AUTHN_CACHE_TTL}"
     fi
@@ -307,8 +307,8 @@ function start-kube-apiserver {
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
     authorization_mode="${authorization_mode},Webhook"
     params+=" --authorization-webhook-config-file=/etc/gcp_authz.config"
-    webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
-    webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\", \"type\": \"FileOrCreate\"}},"
+    webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": true},"
+    webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\", \"type\": \"File\"}},"
     if [[ -n "${GCP_AUTHZ_CACHE_AUTHORIZED_TTL:-}" ]]; then
       params+=" --authorization-webhook-cache-authorized-ttl=${GCP_AUTHZ_CACHE_AUTHORIZED_TTL}"
     fi
