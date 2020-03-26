@@ -50,37 +50,66 @@ func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
 }
 
+// ContainerType signifies container type
+type ContainerType int
+
+const (
+	// Containers is for normal containers
+	Containers ContainerType = 1 << iota
+	// InitContainers is for init containers
+	InitContainers
+	// EphemeralContainers is for ephemeral containers
+	EphemeralContainers
+)
+
+// AllContainers specifies that all containers be visited
+const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+
+// AllFeatureEnabledContainers returns a ContainerType mask which includes all container
+// types except for the ones guarded by feature gate.
+func AllFeatureEnabledContainers() ContainerType {
+	containerType := AllContainers
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		containerType &= ^EphemeralContainers
+	}
+	return containerType
+}
+
 // ContainerVisitor is called with each container spec, and returns true
 // if visiting should continue.
-type ContainerVisitor func(container *v1.Container) (shouldContinue bool)
+type ContainerVisitor func(container *v1.Container, containerType ContainerType) (shouldContinue bool)
 
-// VisitContainers invokes the visitor function with a pointer to the container
-// spec of every container in the given pod spec. If visitor returns false,
+// Visitor is called with each object name, and returns true if visiting should continue
+type Visitor func(name string) (shouldContinue bool)
+
+// VisitContainers invokes the visitor function with a pointer to every container
+// spec in the given pod spec with type set in mask. If visitor returns false,
 // visiting is short-circuited. VisitContainers returns true if visiting completes,
 // false if visiting was short-circuited.
-func VisitContainers(podSpec *v1.PodSpec, visitor ContainerVisitor) bool {
-	for i := range podSpec.InitContainers {
-		if !visitor(&podSpec.InitContainers[i]) {
-			return false
+func VisitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
+	if mask&InitContainers != 0 {
+		for i := range podSpec.InitContainers {
+			if !visitor(&podSpec.InitContainers[i], InitContainers) {
+				return false
+			}
 		}
 	}
-	for i := range podSpec.Containers {
-		if !visitor(&podSpec.Containers[i]) {
-			return false
+	if mask&Containers != 0 {
+		for i := range podSpec.Containers {
+			if !visitor(&podSpec.Containers[i], Containers) {
+				return false
+			}
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if mask&EphemeralContainers != 0 {
 		for i := range podSpec.EphemeralContainers {
-			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon)) {
+			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
 				return false
 			}
 		}
 	}
 	return true
 }
-
-// Visitor is called with each object name, and returns true if visiting should continue
-type Visitor func(name string) (shouldContinue bool)
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
 // referenced by the pod spec. If visitor returns false, visiting is short-circuited.
@@ -92,7 +121,7 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 			return false
 		}
 	}
-	VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+	VisitContainers(&pod.Spec, AllContainers, func(c *v1.Container, containerType ContainerType) bool {
 		return visitContainerSecretNames(c, visitor)
 	})
 	var source *v1.VolumeSource
@@ -176,7 +205,7 @@ func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
-	VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+	VisitContainers(&pod.Spec, AllContainers, func(c *v1.Container, containerType ContainerType) bool {
 		return visitContainerConfigmapNames(c, visitor)
 	})
 	var source *v1.VolumeSource

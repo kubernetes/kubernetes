@@ -387,7 +387,7 @@ func LogLocation(
 
 func podHasContainerWithName(pod *api.Pod, containerName string) bool {
 	var hasContainer bool
-	podutil.VisitContainers(&pod.Spec, podutil.DefaultContainers, func(c *api.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *api.Container, containerType podutil.ContainerType) bool {
 		if c.Name == containerName {
 			hasContainer = true
 			return false
@@ -554,7 +554,7 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 			return "", errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", pod.Name))
 		default:
 			var containerNames []string
-			podutil.VisitContainers(&pod.Spec, podutil.DefaultContainers, func(c *api.Container, containerType podutil.ContainerType) bool {
+			podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *api.Container, containerType podutil.ContainerType) bool {
 				containerNames = append(containerNames, c.Name)
 				return true
 			})
