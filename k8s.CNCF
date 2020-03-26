@@ -1,0 +1,322 @@
+Install K8s:
+2. Become root and update and upgrade the system, install docker.
+  student@lfs458-node-1a0a:~$ sudo -i
+  root@lfs458-node-1a0a:~# apt-get update && apt-get upgrade -y
+  root@lfs458-node-1a0a:~# apt-get install -y docker.io
+3. Add new Repo for k8s:
+  root@lfs458-node-1a0a:~# vim /etc/apt/sources.list.d/kubernetes.list
+  deb http://apt.kubernetes.io/ kubernetes-xenial main  
+5. Add a GPG key for the packages. The command spans three lines. You can omit the backslash when you type. The OK is the expected output, not part of the command.
+  root@lfs458-node-1a0a:~# curl -s \
+  https://packages.cloud.google.com/apt/doc/apt-key.gpg \ | apt-key add -  
+6. Update with the new repo declared, which will download updated repo information.
+   root@lfs458-node-1a0a:~# apt-get update
+7. Install the software.
+   root@lfs458-node-1a0a:~# apt-get install -y \ kubeadm=1.15.1-00 kubelet=1.15.1-00 kubectl=1.15.1-00   
+8. Download pod network:
+   root@lfs458-node-1a0a:~# wget https://tinyurl.com/yb4xturm -O rbac-kdd.yaml 
+   root@lfs459-node-1a0a:~# wget https://tinyurl.com/y8lvqc9g -O calico.yaml
+11. Add an local DNS alias for our master server.
+    root@lfs458-node-1a0a:~# vim /etc/hosts
+    10.128.0.3 k8smaster #<-- Add this line    
+12. Create a conﬁguration ﬁle for the cluster.
+    vim kubeadm-config.yaml
+    apiVersion: kubeadm.k8s.io/v1beta2 
+    kind: ClusterConfiguration 
+    kubernetesVersion: 1.15.1 
+    controlPlaneEndpoint: "k8smaster:6443" 
+    networking:
+      podSubnet: 192.168.0.0/16 #<-- Match the IP range from the Calico config file (use less calico.yaml, value under - name: CALICO_IPV4POOL_CIDR)
+13. Initialize the master.
+    root@lfs458-node-1a0a:~# kubeadm init --config=kubeadm-config.yaml --upload-certs \ | tee kubeadm-init.out    
+14. allow a non-root user admin level access to the cluster.
+    root@lfs458-node-1a0a:~# exit
+      logout
+    student@lfs458-node-1a0a:~$ mkdir -p $HOME/.kube
+    student@lfs458-node-1a0a:~$ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    student@lfs458-node-1a0a:~$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
+    student@lfs458-node-1a0a:~$ less .kube/config    
+15. Apply the network plugin conﬁguration to your cluster.
+    student@lfs458-node-1a0a:~$ sudo cp /root/rbac-kdd.yaml .
+    student@lfs458-node-1a0a:~$ kubectl apply -f rbac-kdd.yaml
+    student@lfs458-node-1a0a:~$ sudo cp /root/calico.yaml .
+    student@lfs458-node-1a0a:~$ kubectl apply -f calico.yaml    
+18. View other values we could have included in the kubeadm-config.yaml ﬁle when creating the cluster.
+    student@lfs458-node-1a0a:~$ sudo kubeadm config print init-defaults
+
+
+Grow the cluster:
+1. Using the same process as before connect to a second node.
+  student@lfs458-worker:~$ sudo -i 
+  root@lfs458-worker:~# apt-get update && apt-get upgrade -y 
+  root@lfs458-worker:~# apt-get install -y docker.io 
+  root@lfs458-worker:~# vim /etc/apt/sources.list.d/kubernetes.list 
+      deb http://apt.kubernetes.io/ kubernetes-xenial main
+  root@lfs458-worker:~# curl -s \ https://packages.cloud.google.com/apt/doc/apt-key.gpg \ | apt-key add -
+  root@lfs458-worker:~# apt-get update root@lfs458-worker:~# apt-get install -y \ kubeadm=1.15.1-00 kubelet=1.15.1-00 kubectl=1.15.1-00 
+  root@lfs458-worker:~# exit  
+3. At this point we could copy and paste the join command from the master node.
+   student@lfs458-node-1a0a:~$ sudo kubeadm token list
+4. Only if the token has expired, you can create a new token, to use as part of the join command.
+   student@lfs458-node-1a0a:~$ sudo kubeadm token create   
+5. Starting in v1.9 you should create and use a Discovery Token CA Cert Hash (ca cert hash) created from the master to ensure the node joins the cluster in a secure manner.
+   student@lfs458-node-1a0a:~$ openssl x509 -pubkey \
+   -in /etc/kubernetes/pki/ca.crt | openssl rsa \
+   -pubin -outform der 2>/dev/null | openssl dgst \
+   -sha256 -hex | sed 's/^.* //'
+6. On the worker node add a local DNS alias for the master server.
+   root@lfs458-worker:~# vim /etc/hosts
+   10.128.0.3 k8smaster #<-- Add this line   
+7. Use the token and hash, in this case as sha256:long-hash to join the cluster from the second/worker node.
+   root@lfs458-worker:~# kubeadm join \
+   --token {{token}} \ k8smaster:6443 \
+   --discovery-token-ca-cert-hash \ sha256:{{ca cert hash}}
+   
+Finish Cluster Setup:
+1. Note the minus sign (-) at the end, which is the syntax to remove a taint.
+(from Taints: node-role.kubernetes.io/master:NoSchedule)
+    student@lfs458-node-1a0a:~$ kubectl taint nodes --all node-role.kubernetes.io/master-
+    
+Deploy A Simple Application:
+1. Create a new deployment, which is an Kubernetes object
+    student@lfs458-node-1a0a:~$ kubectl [--namespace={{namespace-name}}] create deployment nginx --image=nginx
+3. View the basic steps the cluster took in order to pull and deploy the new application.
+   student@lfs458-node-1a0a:~$ kubectl get events
+7. Create the deployment:
+   student@lfs458-node-1a0a:~$ kubectl create -f first.yaml
+   student@lfs458-node-1a0a:~$ kubectl create deployment two --image=nginx --dry-run -o yaml
+   student@lfs458-node-1a0a:~$ kubectl replace -f first.yaml (replace the deployment)
+13. Now try to gain access to the web server.
+    student@lfs458-node-1a0a:~$ kubectl expose deployment/nginx
+18. Verify the service conﬁguration.
+    student@lfs458-node-1a0a:~$ kubectl get svc,ep
+21. Now scale up the deployment from one to three web servers.
+    student@lfs458-node-1a0a:~$ kubectl scale deployment nginx --replicas=3
+    
+Access from Outside the Cluster:
+2. use the exec command to run printenv inside the pod.
+   student@lfs458-node-1a0a:~$ kubectl exec {{pod-name}} -- printenv |grep KUBERNETES
+5. Create the service again, but this time pass the LoadBalancer type.
+   student@lfs458-node-1a0a:~$ kubectl expose deployment nginx --type=LoadBalancer
+    
+Working with CPU and Memory Constraints:
+1. set limit for a deployment
+resources:
+  limits:
+    memory: 4Gi
+  requests:
+    memory: 2500Mi
+args:
+- -cpus
+- "2"
+- -mem-total
+- "950Mi"
+- -mem-alloc-size
+- "100Mi"
+- -mem-alloc-sleep
+- "1s"
+
+2. Begin by creating a new namespace .
+student@lfs458-node-1a0a:~$ kubectl create namespace {{namespace-name}}
+
+3. get a count of the current docker containers.
+student@lfs458-node-1a0a:~$ sudo docker ps | wc -l
+
+4.One way to do this is to drain, or cordon
+student@lfs458-node-1a0a:~$ kubectl drain {{node-name}} --ignore-daemonsets --delete-local-data
+student@lfs458-node-1a0a:~$ kubectl uncordon {{node-name}}
+
+Conﬁguring TLS Access:
+student@lfs458-node-1a0a:~$ less ~/.kube/config
+student@lfs458-node-1a0a:~$ export client=$(grep client-certificate-data ~/.kube/config |cut -d" " -f 6)
+student@lfs458-node-1a0a:~$ export key=$(grep client-key-data ~/.kube/config |cut -d " " -f 6)
+student@lfs458-node-1a0a:~$ export auth=$(grep certificate-authority-data ~/.kube/config |cut -d " " -f 6)
+student@lfs458-node-1a0a:~$ echo $client | base64 -d - > ./client.pem
+student@lfs458-node-1a0a:~$ echo $key | base64 -d - > ./client-key.pem 
+student@lfs458-node-1a0a:~$ echo $auth | base64 -d - > ./ca.pem
+student@lfs458-node-1a0a:~$ kubectl config view |grep server (get the server name: https://k8smaster:6443 for example)
+student@lfs458-node-1a0a:~$ curl --cert ./client.pem --key ./client-key.pem --cacert ./ca.pem https://k8smaster:6443/{{uri}}
+
+2. view file in json format:
+student@lfs458-node-1a0a:.$ python -m json.tool v1/serverresources.json
+
+RESTful API Access:
+1.Use kubectl conﬁg view to get overall cluster conﬁguration
+student@lfs458-node-1a0a:~$ kubectl config view
+
+2. Using your mouse to cut and paste,
+student@lfs458-node-1a0a:~$ export token=$(kubectl describe \ secret {{secret-name}} |grep ^token |cut -f7 -d ' ')    
+
+3. Test to see if you can get basic API information from your cluster. The token and use the -k option to avoid using a cert.
+student@lfs458-node-1a0a:~$ curl https://k8smaster:6443/apis --header "Authorization: Bearer $token" -k
+
+4. Start the proxy while setting the API preﬁx, and put it in the background.
+student@lfs458-node-1a0a:~$ kubectl proxy --api-prefix=/ &
+student@lfs458-node-1a0a:~$ curl http://{{localhost:port}}/api/
+
+Working with jobs:
+1.completions: 5 (how many pods are started)
+  parallelism: 2 (how many pods in parallel)
+  activeDeadlineSeconds: 15 (parameter which will stop the job after a certain number of seconds)
+  
+Working with ReplicaSets
+12. Now view the pods with the label key of system
+student@lfs458-node-1a0a:~$ kubectl get po -L system
+
+15. Delete or get the remaining Pod using the label.
+student@lfs458-node-1a0a:~$ kubectl [delete|get] po -l system=IsolatedPod
+
+Rolling Updates and Rollbacks
+updateStrategy.type: [RollingUpdate | OnDelete]
+
+3. update the ds to use a newer version
+student@lfs458-node-1a0a:~$ kubectl set image ds ds-one nginx=nginx:1.12.1-alpine
+
+7. View the history of changes and status for the DaemonSet.
+student@lfs458-node-1a0a:~$ kubectl rollout history ds {{ds-name}}
+student@lfs458-node-1a0a:~$ kubectl rollout status ds ds-two
+
+8. View the settings for the various versions of the DaemonSet.
+student@lfs458-node-1a0a:~$ kubectl rollout history ds ds-one --revision=1
+
+9. Use kubectl rollout undo to change the DaemonSet back to an earlier version.
+student@lfs458-node-1a0a:~$ kubectl rollout undo ds ds-one --to-revision=1
+
+2. View the existing labels on the nodes in the cluster.
+student@lfs458-node-1a0a:~$ kubectl get nodes --show-labels
+
+7. Label the secondary node.
+student@lfs458-node-1a0a:~$ kubectl label node lfs458-worker {{key}}={{value}}
+
+5. Remove the label from the secondary node.
+student@lfs458-node-1a0a:~$ kubectl label node lfs458-worker {{key}}-
+
+6. get into pod
+student@lfs458-node-1a0a:~$ kubectl exec -it {{pod-name}} -- /bin/bash
+
+7. ConfigMap available to pod as env, envFrom, mounted Volumes
+
+Using a ResourceQuota to Limit PVC Count and Usage:
+19. We will use kubectl patch to change the retention policy to Delete.
+student@lfs458-node-1a0a:~$ kubectl patch pv pvvol-1 -p \ '{"spec":{"persistentVolumeReclaimPolicy":"Delete"}}'
+
+20. persistentVolumeReclaimPolicy: Retain, Delete, Recycle
+
+21. As we have RBAC conﬁgured we need to make sure the controller will run and be able to work with all necessary ports,
+endpoints and resources. (see clusterrole and clusterrolebinding)
+student@lfs458-node-1a0a:~$ find . -name {{file-name}}
+
+Assign Pods Using Labels
+nodeSelector: 
+   key: value
+   
+student@lfs458-node-1a0a:~$ sed -i s/vip/other/g other.yaml: change all occurences of vip to other in the file other.yaml
+
+Using Taints to Control Pod Deployment
+There are three taints, NoSchedule, PreferNoSchedule and NoExecute.
+student@lfs458-node-1a0a:~$ kubectl taint nodes lfs458-worker {{key}}=value:PreferNoSchedule
+
+8. Remove the taint, then verify it was removed
+student@lfs458-node-1a0a:~$ kubectl taint nodes lfs458-worker {{key}}-
+student@lfs458-node-1a0a:~$ kubectl describe node |grep Taint
+
+Review Log File Locations
+1. If using a systemd.based Kubernetes cluster, view the node level logs for kubelet, the local Kubernetes agent.
+student@lfs458-node-1a0a:~$ journalctl -u kubelet |less
+
+2. Use the ﬁnd command to locate the kube-apiserver log.
+student@lfs458-node-1a0a:~$ sudo find / -name "*apiserver*log"
+
+5. If not on a Kubernetes cluster using systemd which collects logs via journalctl y
+ls /var/log/ <Tab> <Tab>
+
+Viewing Logs Output
+2. View the logs associated with various infrastructure pods.
+student@lfs458-node-1a0a:~$ kubectl -n kube-system logs <Tab><Tab>
+
+3. viewing pod and node metrics.
+student@lfs458-node-1a0a:~$ kubectl top pod --all-namespaces
+student@lfs458-node-1a0a:~$ kubectl top nodes
+
+Create a Custom Resource Deﬁnition:
+
+Working with TLS:
+1. The kube-apiserver also shows security information such as certiﬁcates and authorization mode
+student@lfs458-node-1a0a:~$ systemctl status kubelet.service
+
+4. Other agents on the master node interact with the kube-apiserver.
+student@lfs458-node-1a0a:~$ sudo ls /etc/kubernetes/manifests/
+
+5. view an object as yaml file:
+kubectl -n {{namespace}} get {{object}} {{object-name}} -o yaml
+
+7. The kubectl conﬁg command can also be used to view and update parameters.
+student@lfs458-node-1a0a:~$ kubectl config view
+
+8. kubectl config -h: modify kubeconfig files using subcommands.
+
+9. sudo kubeadm config -h / sudo kubeadm token -h
+
+11. Review the cluster default conﬁguration settings.
+student@lfs458-node-1a0a:~$ sudo kubeadm config print init-defaults
+
+Authentication and Authorization
+3. Create a new user DevDan and assign a password (DevDan is the username)
+student@lfs458-node-1a0a:~$ sudo useradd -s /bin/bash DevDan
+student@lfs458-node-1a0a:~$ sudo passwd DevDan
+
+4. Generate a private key then Certiﬁcate Signing Request (CSR) for DevDan.
+student@lfs458-node-1a0a:~$ openssl genrsa -out DevDan.key 2048
+student@lfs458-node-1a0a:~$ openssl req -new -key DevDan.key \ -out DevDan.csr -subj "/CN=DevDan/O=development"
+
+5. Using the newly created request generate a self-signed certiﬁcate using the x509 protocol.
+Use the CA keys for the Kubernetes cluster and set a 45 day expiration.
+student@lfs458-node-1a0a:~$ sudo openssl x509 -req -in DevDan.csr \ -CA /etc/kubernetes/pki/ca.crt \
+-CAkey /etc/kubernetes/pki/ca.key \-CAcreateserial \-out DevDan.crt -days 45
+
+6. Update the access conﬁg ﬁle to reference the new key and certiﬁcate. 
+Normally we would move them to a safe directory instead of a non-root user’s home.
+student@lfs458-node-1a0a:~$ kubectl config set-credentials DevDan \
+--client-certificate=/home/student/DevDan.crt \--client-key=/home/student/DevDan.key
+
+8. We will now create a context. For this we will need the name of the cluster, namespace 
+and CN of the user we set or saw in previous steps.
+student@lfs458-node-1a0a:~$ kubectl config set-context DevDan-context \--cluster=kubernetes \--namespace=development \
+--user=DevDan
+
+9. Attempt to view the Pods inside the DevDan-context
+student@lfs458-node-1a0a:~$ kubectl --context=DevDan-context get pods
+16. Create a new pod inside a context
+student@lfs458-node-1a0a:~$ kubectl --context=DevDan-context \ create deployment nginx --image=nginx
+
+12. We will now create a YAML ﬁle to associate RBAC rights to a particular namespace and Role.
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  namespace: development
+  name: developer
+rules:
+- apiGroups: ["", "extensions", "apps"]
+  resources: ["deployments", "replicasets", "pods"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"] # You can also use ["*"]
+
+14. Now we create a RoleBinding to associate the Role we just created with a user.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: developer-role-binding
+  namespace: development
+subjects:
+- kind: User
+  name: DevDan
+  apiGroup: ""
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: ""
+
+Admission Controllers
+View the current admission controller settings. Unlike earlier versions of Kubernetes 
+the controllers are now compiled into the server, instead of being passed at run-time. 
+student@lfs458-node-1a0a:~$ sudo grep admission \ /etc/kubernetes/manifests/kube-apiserver.yaml
+
