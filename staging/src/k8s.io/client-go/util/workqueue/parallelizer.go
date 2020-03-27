@@ -43,14 +43,12 @@ func WithChunkSize(c int) func(*options) {
 
 // ParallelizeUntil is a framework that allows for parallelizing N
 // independent pieces of work until done or the context is canceled.
-func ParallelizeUntil(ctx context.Context, workers, pieces int, doWorkPiece DoWorkPieceFunc, opts ...Options) {
+func ParallelizeUntil(ctx context.Context, workers, pieces int, doWorkPiece DoWorkPieceFunc, opt Options) {
 	if pieces == 0 {
 		return
 	}
 	o := options{}
-	for _, opt := range opts {
-		opt(&o)
-	}
+	opt(&o)
 	chunkSize := o.chunkSize
 	if chunkSize < 1 {
 		chunkSize = 1
