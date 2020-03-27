@@ -1870,7 +1870,7 @@ func (f *fakeVolumeHost) WaitForCacheSync() error {
 }
 
 func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
-	return wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+	return wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 		f.mux.Lock()
 		defer f.mux.Unlock()
 		return f.kubeletErr == nil, nil
