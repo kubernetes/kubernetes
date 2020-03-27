@@ -576,6 +576,23 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	return client, eventClient.CoreV1(), nil
 }
 
+func serveHealthz(hz healthcheck.ProxierHealthUpdater) {
+	if hz == nil {
+		return
+	}
+	fn := func() {
+		err := hz.Run()
+		if err != nil {
+			// For historical reasons we do not abort on errors here.  We may
+			// change that in the future.
+			klog.Errorf("healthz server failed: %v", err)
+		} else {
+			klog.Errorf("healthz server returned without error")
+		}
+	}
+	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+}
+
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 // TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
 func (s *ProxyServer) Run() error {
@@ -595,10 +612,10 @@ func (s *ProxyServer) Run() error {
 		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
 	}
 
+	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
+
 	// Start up a healthz server if requested
-	if s.HealthzServer != nil {
-		s.HealthzServer.Run()
-	}
+	serveHealthz(s.HealthzServer)
 
 	// Start up a metrics server if requested
 	if len(s.MetricsBindAddress) > 0 {
