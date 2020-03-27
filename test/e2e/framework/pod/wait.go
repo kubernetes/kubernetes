@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -302,7 +301,7 @@ func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, d
 				return fmt.Errorf("Unexpected error: %v", err)
 			}
 			if !done {
-				conditionNotMatch = append(conditionNotMatch, format.Pod(&pod))
+				conditionNotMatch = append(conditionNotMatch, fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.UID))
 			}
 		}
 		if len(conditionNotMatch) <= 0 {
