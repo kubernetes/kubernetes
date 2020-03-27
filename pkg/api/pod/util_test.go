@@ -1479,7 +1479,6 @@ func TestDropSubPathExpr(t *testing.T) {
 			}
 
 			t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, enabled)()
 
 				var oldPodSpec *api.PodSpec
 				if oldPod != nil {
