@@ -1101,6 +1101,9 @@ func (ss *scaleSet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, bac
 
 	// Update VMs with best effort that have already been added to nodeUpdates.
 	for meta, update := range nodeUpdates {
+		// create new instance of meta and update for passing to anonymous function
+		meta := meta
+		update := update
 		hostUpdates = append(hostUpdates, func() error {
 			ctx, cancel := getContextWithCancel()
 			defer cancel()
@@ -1401,6 +1404,9 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID,
 
 	// Update VMs with best effort that have already been added to nodeUpdates.
 	for meta, update := range nodeUpdates {
+		// create new instance of meta and update for passing to anonymous function
+		meta := meta
+		update := update
 		hostUpdates = append(hostUpdates, func() error {
 			ctx, cancel := getContextWithCancel()
 			defer cancel()
