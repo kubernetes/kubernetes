@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -37,7 +37,7 @@ var loggingSoak struct {
 	Scale            int           `default:"1" usage:"number of waves of pods"`
 	TimeBetweenWaves time.Duration `default:"5000ms" usage:"time to wait before dumping the next wave of pods"`
 }
-var _ = config.AddOptions(&loggingSoak, "instrumentation.logging.soak")
+var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 

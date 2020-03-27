@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 )
 
 const (
@@ -128,7 +128,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 		}
 
-		if auth.IsRBACEnabled(kubeClient.RbacV1()) {
+		if e2eauth.IsRBACEnabled(kubeClient.RbacV1()) {
 			// Create the Role to bind it to the namespace.
 			_, err = kubeClient.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{Name: podSecurityPolicyPrivileged},
@@ -145,10 +145,10 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 		}
 	})
 
-	if auth.IsRBACEnabled(kubeClient.RbacV1()) {
+	if e2eauth.IsRBACEnabled(kubeClient.RbacV1()) {
 		ginkgo.By(fmt.Sprintf("Binding the %s PodSecurityPolicy to the default service account in %s",
 			podSecurityPolicyPrivileged, namespace))
-		err := auth.BindClusterRoleInNamespace(kubeClient.RbacV1(),
+		err := e2eauth.BindClusterRoleInNamespace(kubeClient.RbacV1(),
 			podSecurityPolicyPrivileged,
 			namespace,
 			rbacv1.Subject{
@@ -157,7 +157,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 				Name:      "default",
 			})
 		ExpectNoError(err)
-		ExpectNoError(auth.WaitForNamedAuthorizationUpdate(kubeClient.AuthorizationV1(),
+		ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(kubeClient.AuthorizationV1(),
 			serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,
 			schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
 	}

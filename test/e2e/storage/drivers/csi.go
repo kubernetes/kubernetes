@@ -54,7 +54,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -83,7 +83,7 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 			Capabilities: capabilities,
@@ -363,7 +363,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			Name:        GCEPDCSIDriverName,
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -56,7 +56,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
 			e2eskipper.Skipf("PodSecurityPolicy not enabled")
 		}
-		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+		if !e2eauth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			e2eskipper.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
@@ -72,7 +72,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Binding the edit role to the default SA")
-		err = auth.BindClusterRole(f.ClientSet.RbacV1(), "edit", ns,
+		err = e2eauth.BindClusterRole(f.ClientSet.RbacV1(), "edit", ns,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns, Name: "default"})
 		framework.ExpectNoError(err)
 	})
@@ -233,14 +233,14 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policyv1beta1.PodSecu
 	framework.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.
-	err = auth.BindRoleInNamespace(f.ClientSet.RbacV1(), name, ns, rbacv1.Subject{
+	err = e2eauth.BindRoleInNamespace(f.ClientSet.RbacV1(), name, ns, rbacv1.Subject{
 		Kind:      rbacv1.ServiceAccountKind,
 		Namespace: ns,
 		Name:      "default",
 	})
 	framework.ExpectNoError(err)
 
-	framework.ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
+	framework.ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns, "default"), ns, "use", name,
 		schema.GroupResource{Group: "policy", Resource: "podsecuritypolicies"}, true))
 

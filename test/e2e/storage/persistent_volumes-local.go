@@ -44,7 +44,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -1194,12 +1194,12 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(context.TODO(), spec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	e2esset.WaitForRunningAndReady(config.client, ssReplicas, ss)
+	e2estatefulset.WaitForRunningAndReady(config.client, ssReplicas, ss)
 	return ss
 }
 
 func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti bool) {
-	pods := e2esset.GetPodList(config.client, ss)
+	pods := e2estatefulset.GetPodList(config.client, ss)
 
 	nodes := sets.NewString()
 	for _, pod := range pods.Items {
