@@ -50,6 +50,7 @@ spec:
         - --gcloud-auth-file-path=/etc/service-account/service-account.json
         - --enable-hollow-node-logs={{.EnableHollowNodeLogs}}
         - --dump-systemd-journal={{.DumpSystemdJournal}}
+        - --extra-log-files={{.ExtraLogFiles}}
         - --sleep-duration=24h
         volumeMounts:
         - mountPath: /etc/service-account
