@@ -75,9 +75,9 @@ func TestList(t *testing.T) {
 	}
 
 	expected := []unstructured.Unstructured{
-		*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 		*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
 		*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+		*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 	}
 	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
 		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))
