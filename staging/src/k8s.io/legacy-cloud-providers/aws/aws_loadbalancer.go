@@ -452,13 +452,14 @@ var invalidELBV2NameRegex = regexp.MustCompile("[^[:alnum:]]")
 
 // buildTargetGroupName will build unique name for targetGroup of service & port.
 // the name is in format k8s-{namespace:8}-{name:8}-{uuid:10} (chosen to benefit most common use cases).
-// Note: targetProtocol & targetType are included since they cannot be modified on existing targetGroup.
-func (c *Cloud) buildTargetGroupName(serviceName types.NamespacedName, servicePort int64, targetProtocol string, targetType string) string {
+// Note: nodePort & targetProtocol & targetType are included since they cannot be modified on existing targetGroup.
+func (c *Cloud) buildTargetGroupName(serviceName types.NamespacedName, servicePort int64, nodePort int64, targetProtocol string, targetType string) string {
 	hasher := sha1.New()
 	_, _ = hasher.Write([]byte(c.tagging.clusterID()))
 	_, _ = hasher.Write([]byte(serviceName.Namespace))
 	_, _ = hasher.Write([]byte(serviceName.Name))
 	_, _ = hasher.Write([]byte(strconv.FormatInt(servicePort, 10)))
+	_, _ = hasher.Write([]byte(strconv.FormatInt(nodePort, 10)))
 	_, _ = hasher.Write([]byte(targetProtocol))
 	_, _ = hasher.Write([]byte(targetType))
 	tgUUID := hex.EncodeToString(hasher.Sum(nil))
@@ -527,7 +528,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 	dirty := false
 	if targetGroup == nil {
 		targetType := "instance"
-		name := c.buildTargetGroupName(serviceName, mapping.FrontendPort, mapping.TrafficProtocol, targetType)
+		name := c.buildTargetGroupName(serviceName, mapping.FrontendPort, mapping.TrafficPort, mapping.TrafficProtocol, targetType)
 		klog.Infof("Creating load balancer target group for %v with name: %s", serviceName, name)
 		input := &elbv2.CreateTargetGroupInput{
 			VpcId:                      aws.String(vpcID),
