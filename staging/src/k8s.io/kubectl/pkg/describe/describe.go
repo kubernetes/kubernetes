@@ -2116,7 +2116,9 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 		if controlledBy := printController(job); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
-		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
+		if job.Spec.Parallelism != nil {
+			w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
+		}
 		if job.Spec.Completions != nil {
 			w.Write(LEVEL_0, "Completions:\t%d\n", *job.Spec.Completions)
 		} else {
