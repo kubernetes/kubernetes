@@ -38,9 +38,23 @@ func (fs *fakeStreamer) StreamOoms(outStream chan<- *oomparser.OomInstance) {
 	}
 }
 
+var skipTest bool
+
+func init() {
+	// NOTE: this test module requires root to run, so if the watcher errors out then
+	// skip the entire module
+	fakeRecorder := &record.FakeRecorder{}
+	if _, err := NewWatcher(fakeRecorder); err != nil {
+		skipTest = true
+	}
+}
+
 // TestStartingWatcher tests that the watcher, using the actual streamer
 // and not the fake, starts successfully.
 func TestStartingWatcher(t *testing.T) {
+	if skipTest {
+		t.Skip("skipping TestStartingWatcher")
+	}
 	fakeRecorder := &record.FakeRecorder{}
 	node := &v1.ObjectReference{}
 
@@ -52,6 +66,9 @@ func TestStartingWatcher(t *testing.T) {
 // TestWatcherRecordsEventsForOomEvents ensures that our OomInstances coming
 // from `StreamOoms` are translated into events in our recorder.
 func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
+	if skipTest {
+		t.Skip("skipping TestWatcherRecordsEventsForOomEvents")
+	}
 	oomInstancesToStream := []*oomparser.OomInstance{
 		{
 			Pid:                 1000,
@@ -101,6 +118,9 @@ func getRecordedEvents(fakeRecorder *record.FakeRecorder, numExpectedOomEvents i
 // only record OOM events when the container name is the one for which we want
 // to record events (i.e. /).
 func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
+	if skipTest {
+		t.Skip("skipping TestWatcherRecordsEventsForOomEventsCorrectContainerName")
+	}
 	// By "incorrect" container name, we mean a container name for which we
 	// don't want to record an oom event.
 	numOomEventsWithIncorrectContainerName := 1
@@ -142,6 +162,9 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 // TestWatcherRecordsEventsForOomEventsWithAdditionalInfo verifies that our the
 // emitted event has the proper pid/process data when appropriate.
 func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
+	if skipTest {
+		t.Skip("skipping TestWatcherRecordsEventsForOomEventsWithAdditionalInfo")
+	}
 	// The process and event info should appear in the event message.
 	eventPid := 1000
 	processName := "fakeProcess"
