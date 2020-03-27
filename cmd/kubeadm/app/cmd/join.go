@@ -213,7 +213,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	joinRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newJoinData(cmd, args, joinOptions, out)
+		return newJoinData(cmd, args, joinOptions, out, kubeadmconstants.GetAdminKubeConfigPath())
 	})
 
 	// binds the Runner to kubeadm join command by altering
@@ -315,7 +315,7 @@ func newJoinOptions() *joinOptions {
 // newJoinData returns a new joinData struct to be used for the execution of the kubeadm join workflow.
 // This func takes care of validating joinOptions passed to the command, and then it converts
 // options into the internal JoinConfiguration type that is used as input all the phases in the kubeadm join workflow
-func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Writer) (*joinData, error) {
+func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Writer, adminKubeConfigPath string) (*joinData, error) {
 
 	// Validate the mixed arguments with --config and return early on errors
 	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
@@ -379,7 +379,6 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 
 	// if the admin.conf file already exists, use it for skipping the discovery process.
 	// NB. this case can happen when we are joining a control-plane node only (and phases are invoked atomically)
-	var adminKubeConfigPath = kubeadmconstants.GetAdminKubeConfigPath()
 	var tlsBootstrapCfg *clientcmdapi.Config
 	if _, err := os.Stat(adminKubeConfigPath); err == nil && opt.controlPlane {
 		// use the admin.conf as tlsBootstrapCfg, that is the kubeconfig file used for reading the kubeadm-config during discovery
