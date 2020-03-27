@@ -161,6 +161,19 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	if buf.String() != "secret/mysecret\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+
+	// Test that delete options should be set to foreground when foreground is true.
+	foregroundPolicy := metav1.DeletePropagationForeground
+	policy = &foregroundPolicy
+	streams, _, buf, _ = genericclioptions.NewTestIOStreams()
+	cmd = NewCmdDelete(tf, streams)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("foreground", "true")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"secrets/mysecret"})
+	if buf.String() != "secret/mysecret\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
 }
 
 func TestDeleteNamedObject(t *testing.T) {
