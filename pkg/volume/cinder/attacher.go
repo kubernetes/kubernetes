@@ -102,7 +102,7 @@ func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+		err = fmt.Errorf("Volume %q is %s, can't finish within the allotted time", volumeID, volumeStatus)
 	}
 
 	return err
