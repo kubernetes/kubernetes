@@ -853,12 +853,19 @@ EOF
 }
 
 function start_kubescheduler {
-
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
+
+    cat <<EOF > /tmp/kube-scheduler.yaml
+apiVersion: kubescheduler.config.k8s.io/v1alpha2
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
+leaderElection:
+  leaderElect: false
+EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
-      --leader-elect=false \
-      --kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
+      --config=/tmp/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
