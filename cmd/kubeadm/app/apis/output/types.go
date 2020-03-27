@@ -40,3 +40,20 @@ type Images struct {
 
 	Images []string
 }
+
+// ComponentUpgradePlan represents information about upgrade plan for one component
+type ComponentUpgradePlan struct {
+	Name           string
+	CurrentVersion string
+	NewVersion     string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UpgradePlan represents information about upgrade plan for the output
+// produced by 'kubeadm upgrade plan'
+type UpgradePlan struct {
+	metav1.TypeMeta
+
+	Components []ComponentUpgradePlan
+}
