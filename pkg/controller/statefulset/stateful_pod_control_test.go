@@ -20,9 +20,11 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -194,6 +196,41 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 	} else if !strings.Contains(events[1], v1.EventTypeWarning) {
 		t.Errorf("Found unexpected non-warning event %s", events[1])
 
+	}
+}
+
+func TestStatefulPodControlCreatePodPVCDeleting(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(1)
+	pod := newStatefulSetPod(set, 0)
+	pvcs := getPersistentVolumeClaims(set, pod)
+	fakeClient := &fake.Clientset{}
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	deleteTime := metav1.NewTime(time.Now())
+	for k := range pvcs {
+		pvc := pvcs[k]
+		pvc.DeletionTimestamp = &deleteTime
+		pvcIndexer.Add(&pvc)
+	}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
+	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
+	})
+	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, nil
+	})
+	if err := control.CreateStatefulPod(set, pod); err == nil {
+		t.Error("Failed to produce error on Pod creation failure")
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 2 {
+		t.Errorf("Pod create failed: got %d events, but want 2", eventCount)
+	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
+		t.Errorf("Found unexpected non-normal event %s", events[0])
+	} else if !strings.Contains(events[1], v1.EventTypeWarning) {
+		t.Errorf("Found unexpected non-warning event %s", events[1])
 	}
 }
 
