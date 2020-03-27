@@ -70,6 +70,11 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, errors.Wrap(err, "error uploading crisocket"))
 	}
 
+	// Create RBAC rules that makes the bootstrap tokens able to get nodes
+	if err := nodebootstraptoken.AllowBoostrapTokensToGetNodes(client); err != nil {
+		errs = append(errs, err)
+	}
+
 	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
 	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client); err != nil {
 		errs = append(errs, err)
