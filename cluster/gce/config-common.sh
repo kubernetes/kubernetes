@@ -159,4 +159,4 @@ export WINDOWS_BOOTSTRAP_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.bootstrap-k
 # Path for kube-proxy kubeconfig file on Windows nodes.
 export WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfig"
 # Pause container image for Windows container.
-export WINDOWS_INFRA_CONTAINER="gcr.io/gke-release/pause-win:1.1.0"
+export WINDOWS_INFRA_CONTAINER="gcr.io/gke-release/pause-win:1.2.0"
