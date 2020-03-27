@@ -50,8 +50,6 @@ var (
 		{nodes: 600, existingPods: 10000, minPods: 1000},
 		{nodes: 5000, existingPods: 5000, minPods: 1000},
 	}
-	testNamespace  = "sched-test"
-	setupNamespace = "sched-setup"
 )
 
 // BenchmarkScheduling benchmarks the scheduling rate when the cluster has
@@ -521,17 +519,6 @@ func makeBasePodWithSecret() *v1.Pod {
 		},
 	}
 	basePod.Spec.Volumes = volumes
-	return basePod
-}
-
-// makeBasePod creates a Pod object to be used as a template.
-func makeBasePod() *v1.Pod {
-	basePod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pod-",
-		},
-		Spec: testutils.MakePodSpec(),
-	}
 	return basePod
 }
 
