@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
@@ -60,6 +59,11 @@ const (
 	// betaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
 	// TODO: remove Beta when no longer used
 	betaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+
+	// volumeGidAnnotationKey is the of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	// it is copied from k8s.io/kubernetes/pkg/volume/util VolumeGidAnnotationKey
+	volumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
 )
 
 var (
@@ -577,7 +581,7 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
 			Annotations: map[string]string{
-				util.VolumeGidAnnotationKey: "777",
+				volumeGidAnnotationKey: "777",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
