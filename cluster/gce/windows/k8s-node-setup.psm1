@@ -1115,7 +1115,7 @@ function Start-WorkerServices {
   $kubelet_args = $kubelet_args_str.Split(" ")
   Log-Output "kubelet_args from metadata: ${kubelet_args}"
   $default_kubelet_args = @(`
-      "--pod-infra-container-image=${INFRA_CONTAINER}"
+      "--pod-infra-container-image=${env:INFRA_CONTAINER}"
   )
   $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
   if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
@@ -1253,14 +1253,14 @@ function Configure-Crictl {
 # node startup steps!
 # Pull-InfraContainer must be called AFTER Verify-WorkerServices.
 function Pull-InfraContainer {
-  $name, $label = $INFRA_CONTAINER -split ':',2
+  $name, $label = ${env:INFRA_CONTAINER} -split ':',2
   if (-not ("$(& crictl images)" -match "$name.*$label")) {
-    & crictl pull $INFRA_CONTAINER
+    & crictl pull ${env:INFRA_CONTAINER}
     if (!$?) {
-      throw "Error running 'crictl pull $INFRA_CONTAINER'"
+      throw "Error running 'crictl pull ${env:INFRA_CONTAINER}'"
     }
   }
-  $inspect = "$(& crictl inspecti $INFRA_CONTAINER | Out-String)"
+  $inspect = "$(& crictl inspecti ${env:INFRA_CONTAINER} | Out-String)"
   Log-Output "Infra/pause container:`n$inspect"
 }
 
@@ -1473,7 +1473,7 @@ function Configure_Containerd {
 [plugins.cri.cni]
   bin_dir = 'CNI_BIN_DIR'
   conf_dir = 'CNI_CONF_DIR'
-"@.replace('INFRA_CONTAINER_IMAGE', $INFRA_CONTAINER).`
+"@.replace('INFRA_CONTAINER_IMAGE', ${env:INFRA_CONTAINER}).`
     replace('CNI_BIN_DIR', ${env:CNI_DIR}).`
     replace('CNI_CONF_DIR', ${env:CNI_CONFIG_DIR})
 }
