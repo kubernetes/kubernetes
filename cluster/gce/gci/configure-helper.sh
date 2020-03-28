@@ -445,9 +445,6 @@ function mount-master-pd {
   mkdir -p "${mount_point}/srv/sshproxy"
   ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
 
-  if ! id etcd &>/dev/null; then
-    useradd -s /sbin/nologin -d /var/etcd etcd
-  fi
   chown -R etcd "${mount_point}/var/etcd"
   chgrp -R etcd "${mount_point}/var/etcd"
 }
