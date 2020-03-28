@@ -980,22 +980,27 @@ func (*TrivialNodePrepareStrategy) CleanupDependentObjects(nodeName string, clie
 }
 
 type LabelNodePrepareStrategy struct {
-	LabelKey   string
-	LabelValue string
+	LabelKey      string
+	LabelValues   []string
+	roundRobinIdx int
 }
 
 var _ PrepareNodeStrategy = &LabelNodePrepareStrategy{}
 
-func NewLabelNodePrepareStrategy(labelKey string, labelValue string) *LabelNodePrepareStrategy {
+func NewLabelNodePrepareStrategy(labelKey string, labelValues ...string) *LabelNodePrepareStrategy {
 	return &LabelNodePrepareStrategy{
-		LabelKey:   labelKey,
-		LabelValue: labelValue,
+		LabelKey:    labelKey,
+		LabelValues: labelValues,
 	}
 }
 
 func (s *LabelNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
-	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, s.LabelValue)
+	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, s.LabelValues[s.roundRobinIdx])
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
+	s.roundRobinIdx++
+	if s.roundRobinIdx == len(s.LabelValues) {
+		s.roundRobinIdx = 0
+	}
 	return []byte(patch)
 }
 
