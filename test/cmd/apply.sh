@@ -274,6 +274,19 @@ __EOF__
   # cleanup
   kubectl delete --kustomize hack/testdata/kustomize
 
+  ## kubectl apply multiple resources with initial failure.
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # First pass, namespace is created, but pod is not (since namespace does not exist yet).
+  kubectl apply -f hack/testdata/multi-resource.yaml "${kube_flags[@]:?}"
+  output_message=$(! kubectl get pods test-pod 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'pods "test-pod" not found'
+  # Second pass, pod is created (now that namespace exists).
+  kubectl apply -f hack/testdata/multi-resource.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'pod test-pod' "{{${id_field}}}" 'test-pod'
+  # cleanup
+  kubectl delete -f hack/testdata/multi-resource.yaml
+
   set +o nounset
   set +o errexit
 }
