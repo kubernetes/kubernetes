@@ -116,7 +116,7 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 			scope = "cluster-wide"
 		}
 
-		klog.Infof("RBAC DENY: user %q groups %q cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
+		klog.Infof("RBAC NO OPINION: user %q groups %q cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
 	}
 
 	reason := ""
