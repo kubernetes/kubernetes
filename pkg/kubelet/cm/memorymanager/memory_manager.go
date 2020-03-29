@@ -254,7 +254,6 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	return m.policy.GetTopologyHints(m.state, pod, container)
 }
 
-// TODO: consider to move this method to manager interface, the only difference between CPU manager is assignments, we can send it to the method
 func (m *manager) removeStaleState() {
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
