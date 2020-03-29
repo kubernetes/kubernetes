@@ -105,8 +105,8 @@ func TestViewHistory(t *testing.T) {
 			t.Fatalf("error getting ViewHistory for a StatefulSets moons: %v", err)
 		}
 
-		expected := `REVISION
-1
+		expected := `REVISION  CHANGE-CAUSE
+1         <none>
 `
 
 		if result != expected {

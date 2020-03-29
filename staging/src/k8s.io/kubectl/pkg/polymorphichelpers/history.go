@@ -183,6 +183,16 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 	if err != nil {
 		return "", err
 	}
+	return printHistory(history, revision, func(history *appsv1.ControllerRevision) (*corev1.PodTemplateSpec, error) {
+		dsOfHistory, err := applyDaemonSetHistory(ds, history)
+		if err != nil {
+			return nil, err
+		}
+		return &dsOfHistory.Spec.Template, err
+	})
+}
+
+func printHistory(history []*appsv1.ControllerRevision, revision int64, getPodTemplate func(history *appsv1.ControllerRevision) (*corev1.PodTemplateSpec, error)) (string, error) {
 	historyInfo := make(map[int64]*appsv1.ControllerRevision)
 	for _, history := range history {
 		// TODO: for now we assume revisions don't overlap, we may need to handle it
@@ -198,11 +208,11 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		if !ok {
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
-		dsOfHistory, err := applyDaemonSetHistory(ds, history)
+		podTemplate, err := getPodTemplate(history)
 		if err != nil {
 			return "", fmt.Errorf("unable to parse history %s", history.Name)
 		}
-		return printTemplate(&dsOfHistory.Spec.Template)
+		return printTemplate(podTemplate)
 	}
 
 	// Print an overview of all Revisions
@@ -238,39 +248,12 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 	if err != nil {
 		return "", err
 	}
-
-	if len(history) <= 0 {
-		return "No rollout history found.", nil
-	}
-
-	historyInfo := make(map[int64]*appsv1.ControllerRevision)
-	for _, h := range history {
-		historyInfo[h.Revision] = h
-	}
-	if revision != 0 {
-		value, ok := historyInfo[revision]
-		if !ok {
-			return "", fmt.Errorf("unable to find the specified revision")
-		}
-		sts, err := applyStatefulSetHistory(sts, value)
+	return printHistory(history, revision, func(history *appsv1.ControllerRevision) (*corev1.PodTemplateSpec, error) {
+		stsOfHistory, err := applyStatefulSetHistory(sts, history)
 		if err != nil {
-			return "", fmt.Errorf("error unmarshelling sts: %w", err)
+			return nil, err
 		}
-		return printTemplate(&sts.Spec.Template)
-	}
-
-	revisions := make([]int64, 0, len(historyInfo))
-	for revision := range historyInfo {
-		revisions = append(revisions, revision)
-	}
-	sliceutil.SortInts64(revisions)
-
-	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "REVISION\n")
-		for _, r := range revisions {
-			fmt.Fprintf(out, "%d\n", r)
-		}
-		return nil
+		return &stsOfHistory.Spec.Template, err
 	})
 }
 
