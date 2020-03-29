@@ -58,8 +58,8 @@ func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
 }
 
 // addResourceList adds the resources in newList to list
-func addResourceList(list, new corev1.ResourceList) {
-	for name, quantity := range new {
+func addResourceList(list, newList corev1.ResourceList) {
+	for name, quantity := range newList {
 		if value, ok := list[name]; !ok {
 			list[name] = quantity.DeepCopy()
 		} else {
@@ -71,8 +71,8 @@ func addResourceList(list, new corev1.ResourceList) {
 
 // maxResourceList sets list to the greater of list/newList for every resource
 // either list
-func maxResourceList(list, new corev1.ResourceList) {
-	for name, quantity := range new {
+func maxResourceList(list, newList corev1.ResourceList) {
+	for name, quantity := range newList {
 		if value, ok := list[name]; !ok {
 			list[name] = quantity.DeepCopy()
 			continue

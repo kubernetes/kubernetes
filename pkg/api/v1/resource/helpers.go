@@ -41,8 +41,8 @@ func addResourceList(list, newList v1.ResourceList) {
 
 // maxResourceList sets list to the greater of list/newList for every resource
 // either list
-func maxResourceList(list, new v1.ResourceList) {
-	for name, quantity := range new {
+func maxResourceList(list, newList v1.ResourceList) {
+	for name, quantity := range newList {
 		if value, ok := list[name]; !ok {
 			list[name] = quantity.DeepCopy()
 			continue
