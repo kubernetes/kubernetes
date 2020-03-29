@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (
@@ -144,10 +144,11 @@ type containerLogManager struct {
 	runtimeService internalapi.RuntimeService
 	policy         LogRotatePolicy
 	clock          clock.Clock
+	podCache       kubecontainer.Cache
 }
 
 // NewContainerLogManager creates a new container log manager.
-func NewContainerLogManager(runtimeService internalapi.RuntimeService, maxSize string, maxFiles int) (ContainerLogManager, error) {
+func NewContainerLogManager(runtimeService internalapi.RuntimeService, podCache kubecontainer.Cache, maxSize string, maxFiles int) (ContainerLogManager, error) {
 	if maxFiles <= 1 {
 		return nil, fmt.Errorf("invalid MaxFiles %d, must be > 1", maxFiles)
 	}
@@ -157,6 +158,7 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, maxSize s
 	}
 	// policy LogRotatePolicy
 	return &containerLogManager{
+		podCache: podCache,
 		runtimeService: runtimeService,
 		policy: LogRotatePolicy{
 			MaxSize:  parsedMaxSize,
@@ -177,26 +179,22 @@ func (c *containerLogManager) Start() {
 }
 
 func (c *containerLogManager) rotateLogs() error {
-	// TODO(#59998): Use kubelet pod cache.
-	containers, err := c.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
-	if err != nil {
-		return fmt.Errorf("failed to list containers: %v", err)
+	podStatuses := c.podCache.GetAll()
+	var containerStatuses []*kubecontainer.ContainerStatus
+	for _, podStatus := range podStatuses {
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			containerStatuses = append(containerStatuses, containerStatus)
+		}
 	}
 	// NOTE(random-liu): Figure out whether we need to rotate container logs in parallel.
-	for _, container := range containers {
+	for _, containerStatus := range containerStatuses {
 		// Only rotate logs for running containers. Non-running containers won't
 		// generate new output, it doesn't make sense to keep an empty latest log.
-		if container.GetState() != runtimeapi.ContainerState_CONTAINER_RUNNING {
+		if containerStatus.State != kubecontainer.ContainerStateRunning {
 			continue
 		}
-		id := container.GetId()
-		// Note that we should not block log rotate for an error of a single container.
-		status, err := c.runtimeService.ContainerStatus(id)
-		if err != nil {
-			klog.Errorf("Failed to get container status for %q: %v", id, err)
-			continue
-		}
-		path := status.GetLogPath()
+		id := containerStatus.ID.ID
+		path := containerStatus.LogPath
 		info, err := os.Stat(path)
 		if err != nil {
 			if !os.IsNotExist(err) {

@@ -509,6 +509,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		RestartCount: annotatedInfo.RestartCount,
 		State:        toKubeContainerState(status.State),
 		CreatedAt:    time.Unix(0, status.CreatedAt),
+		LogPath:      status.LogPath,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {

@@ -36,6 +36,7 @@ import (
 // cache entries.
 type Cache interface {
 	Get(types.UID) (*PodStatus, error)
+	GetAll() []*PodStatus
 	Set(types.UID, *PodStatus, error, time.Time)
 	// GetNewerThan is a blocking call that only returns the status
 	// when it is newer than the given time.
@@ -87,6 +88,17 @@ func (c *cache) Get(id types.UID) (*PodStatus, error) {
 	return d.status, d.err
 }
 
+// GetAll gets all PodStatus in the cache
+func (c *cache) GetAll() []*PodStatus {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	var podStatuses []*PodStatus
+	for _, pod := range c.pods {
+		podStatuses = append(podStatuses, pod.status)
+	}
+	return podStatuses
+}
+
 func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error) {
 	ch := c.subscribe(id, minTime)
 	d := <-ch
@@ -119,6 +131,7 @@ func (c *cache) UpdateTime(timestamp time.Time) {
 		c.notify(id, *c.timestamp)
 	}
 }
+
 
 func makeDefaultData(id types.UID) *data {
 	return &data{status: &PodStatus{ID: id}, err: nil}

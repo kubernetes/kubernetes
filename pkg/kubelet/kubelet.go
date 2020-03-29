@@ -762,6 +762,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		// setup containerLogManager for CRI container runtime
 		containerLogManager, err := logs.NewContainerLogManager(
 			klet.runtimeService,
+			klet.podCache,
 			kubeCfg.ContainerLogMaxSize,
 			int(kubeCfg.ContainerLogMaxFiles),
 		)

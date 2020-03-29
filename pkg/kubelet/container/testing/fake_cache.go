@@ -47,3 +47,7 @@ func (c *fakeCache) Delete(id types.UID) {
 
 func (c *fakeCache) UpdateTime(_ time.Time) {
 }
+
+func (c *fakeCache) GetAll() []*container.PodStatus {
+	return []*container.PodStatus{}
+}

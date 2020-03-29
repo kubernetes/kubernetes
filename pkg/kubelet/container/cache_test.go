@@ -139,14 +139,18 @@ func TestCacheSetAndGet(t *testing.T) {
 		{numContainers: 2, error: fmt.Errorf("unable to get status")},
 		{numContainers: 0, error: nil},
 	}
+	var allStatus []*PodStatus
 	for i, c := range cases {
 		podID, status := getTestPodIDAndStatus(c.numContainers)
 		cache.Set(podID, status, c.error, time.Time{})
 		// Read back the status and error stored in cache and make sure they
 		// match the original ones.
 		actualStatus, actualErr := cache.Get(podID)
+		allStatus = append(allStatus, status)
+		actualAllStatus := cache.GetAll()
 		assert.Equal(t, status, actualStatus, "test[%d]", i)
 		assert.Equal(t, c.error, actualErr, "test[%d]", i)
+		assert.Equal(t, allStatus, actualAllStatus, "test[%d]", i)
 	}
 }
 
