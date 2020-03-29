@@ -158,6 +158,11 @@ func (hu *HostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return filepath.EvalSymlinks(pathname)
 }
 
+// FindMountInfo returns the mount info on the given path.
+func (hu *HostUtil) FindMountInfo(path string) (mount.MountInfo, error) {
+	return findMountInfo(path, procMountInfoPath)
+}
+
 // isShared returns true, if given path is on a mount point that has shared
 // mount propagation.
 func isShared(mount string, mountInfoPath string) (bool, error) {
