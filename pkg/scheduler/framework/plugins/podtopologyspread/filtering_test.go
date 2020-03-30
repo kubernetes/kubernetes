@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -1065,7 +1066,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 	}
 }
 
-func BenchmarkTestCalPreFilterState(b *testing.B) {
+func BenchmarkFilter(b *testing.B) {
 	tests := []struct {
 		name             string
 		pod              *v1.Pod
@@ -1103,17 +1104,30 @@ func BenchmarkTestCalPreFilterState(b *testing.B) {
 		},
 	}
 	for _, tt := range tests {
+		var state *framework.CycleState
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			pl := PodTopologySpread{
 				sharedLister: cache.NewSnapshot(existingPods, allNodes),
 			}
+			ctx := context.Background()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				s := pl.PreFilter(context.Background(), framework.NewCycleState(), tt.pod)
+				state = framework.NewCycleState()
+				s := pl.PreFilter(ctx, state, tt.pod)
 				if !s.IsSuccess() {
 					b.Fatal(s.AsError())
 				}
+				filterNode := func(i int) {
+					n, _ := pl.sharedLister.NodeInfos().Get(allNodes[i].Name)
+					pl.Filter(ctx, state, tt.pod, n)
+				}
+				parallelize.Until(ctx, len(allNodes), filterNode)
+			}
+		})
+		b.Run(tt.name+"/Clone", func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				state.Clone()
 			}
 		})
 	}
