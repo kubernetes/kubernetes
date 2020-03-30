@@ -63,3 +63,11 @@ func TestAddAnnotation(t *testing.T) {
 		"unexpected final annotations",
 	)
 }
+
+func TestAddAnnotationWithLevel(t *testing.T) {
+	attr := &attributesRecord{}
+
+	// test AddAnnotationWithLevel
+	err := attr.AddAnnotationWithLevel("podsecuritypolicy.admission.k8s.io/validate-policy", "privileged", auditinternal.LevelNone)
+	assert.Error(t, err)
+}
