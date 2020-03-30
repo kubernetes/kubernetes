@@ -45,7 +45,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: quay.io/k8scsi/mock-driver:v2.1.0
+          image: quay.io/k8scsi/mock-driver:v3.1.0
           args:
             - "--name=mock.storage.k8s.io"
             - "--permissive-target-path" # because of https://github.com/kubernetes/kubernetes/issues/75535
