@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1566,9 +1567,14 @@ func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, pod
 func collectPodsAndNetworkPolicies(f *framework.Framework, podClient *v1.Pod) ([]string, *networkingv1.NetworkPolicyList, string) {
 	// Collect pod logs when we see a failure.
 	logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, "client")
+	if logErr != nil && apierrors.IsNotFound(logErr) {
+		// Pod may have already been removed; try to get previous pod logs
+		logs, logErr = e2epod.GetPreviousPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, fmt.Sprintf("%s-container", podClient.Name))
+	}
 	if logErr != nil {
 		framework.Failf("Error getting container logs: %s", logErr)
 	}
+
 	// Collect current NetworkPolicies applied in the test namespace.
 	policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
