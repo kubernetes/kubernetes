@@ -135,11 +135,24 @@ function Add_GceMetadataServerRoute {
   }
 }
 
+# Returns a PowerShell object representing the Windows version.
+function Get_WindowsVersion {
+  # Unlike checking `[System.Environment]::OSVersion.Version`, this long-winded
+  # approach gets the OS revision/patch number correctly
+  # (https://superuser.com/a/1160428/652018).
+  $win_ver = New-Object -TypeName PSObject
+  $win_ver | Add-Member -MemberType NoteProperty -Name Major -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' CurrentMajorVersionNumber).CurrentMajorVersionNumber
+  $win_ver | Add-Member -MemberType NoteProperty -Name Minor -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' CurrentMinorVersionNumber).CurrentMinorVersionNumber
+  $win_ver | Add-Member -MemberType NoteProperty -Name Build -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' CurrentBuild).CurrentBuild
+  $win_ver | Add-Member -MemberType NoteProperty -Name Revision -Value $(Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion' UBR).UBR
+  return $win_ver
+}
+
 # Writes debugging information, such as Windows version and patch info, to the
 # console.
 function Dump-DebugInfoToConsole {
   Try {
-    $version = "$([System.Environment]::OSVersion.Version | Out-String)"
+    $version = Get_WindowsVersion | Out-String
     $hotfixes = "$(Get-Hotfix | Out-String)"
     $image = "$(Get-InstanceMetadata 'image' | Out-String)"
     Log-Output "Windows version:`n$version"
