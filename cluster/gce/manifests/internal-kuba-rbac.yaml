@@ -158,6 +158,38 @@ subjects:
   name: system:vpa-recommender
   namespace: kube-system
 ---
+# HPA watches Services for autoscaling on GCLB utilization.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:gke-hpa-service-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-hpa-service-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:gke-hpa-service-reader
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+---
 # The Stackdriver Custom Metrics Adapter creates the
 # external-metrics-reader cluster role and binds it to the
 # horizontal-pod-autoscaler service account.  But HPA is now running in
