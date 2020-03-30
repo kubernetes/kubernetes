@@ -15,12 +15,13 @@ approvers:
   - bowei
   - cjcullen
   - gmarek
-  - vishh
-  - mwielgus
-  - MaciekPytel
   - jingax10
-  - yujuhong
+  - MaciekPytel
   - mtaufen
+  - mwielgus
+  - pjh
   - sig-scalability-approvers
+  - vishh
+  - yujuhong
 emeritus_approvers:
   - jszczepkowski
