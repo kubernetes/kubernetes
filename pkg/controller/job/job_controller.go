@@ -476,9 +476,31 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		return false, err
 	}
 
+	needAllocationCompletionsIndex := job.Spec.Completions != nil && *job.Spec.Completions > 0
+
 	activePods := controller.FilterActivePods(pods)
-	active := int32(len(activePods))
-	succeeded, failed := getStatus(pods)
+
+	succeededPods, failedPods := getStatusPods(pods)
+
+	// ensure that running pods are not duplicated
+	// find need stop active pods & delete these active pods
+	// this handle ensure all activePods don`t repeat and activePods don`t has succeeded index
+	if duplicateIndexActivePods := getNeedStopActivePods(activePods, succeededPods); needAllocationCompletionsIndex && len(duplicateIndexActivePods) > 0 {
+		jm.deleteJobPods(&job, duplicateIndexActivePods, make(chan error, len(duplicateIndexActivePods)))
+		klog.Infof("find duplicate index active pods: %+v ; stop this pods", duplicateIndexActivePods)
+		jm.recorder.Event(&job, v1.EventTypeWarning, "FindDuplicateIndexActivePods", fmt.Sprintf("%+v", duplicateIndexActivePods))
+		klog.Flush()
+		return false, fmt.Errorf("find duplicate index active pods, we must ensure uniq index pod in avtive and succeeded index can't rerun \n duplicateIndexActivePods: %+v \n activePods: %+v \n succeededPods: %+v", duplicateIndexActivePods, activePods, succeededPods)
+	}
+
+	// we ensure active pods must distinct, so `getLen(activePods, needAllocationCompletionsIndex)` == `int32(len(activePods))` forever
+	active := getLen(activePods, false)
+	// failed number not distinct by CompletionsIndex
+	// because BackoffLimit need know fact failed pod && failed number
+	// and The failed number does not affect the allocation of completions index
+	failed := getLen(failedPods, false)
+	succeeded := getLen(succeededPods, needAllocationCompletionsIndex)
+
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -534,7 +556,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
+			active, manageJobErr = jm.manageJob(activePods, succeededPods, &job)
 		}
 		completions := succeeded
 		complete := false
@@ -673,20 +695,15 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 	}
 }
 
-// getStatus returns no of succeeded and failed pods running a job
-func getStatus(pods []*v1.Pod) (succeeded, failed int32) {
-	succeeded = int32(filterPods(pods, v1.PodSucceeded))
-	failed = int32(filterPods(pods, v1.PodFailed))
-	return
-}
-
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
 // Does NOT modify <activePods>.
-func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *batch.Job) (int32, error) {
+func (jm *JobController) manageJob(activePods []*v1.Pod, succeededPods []*v1.Pod, job *batch.Job) (int32, error) {
 	var activeLock sync.Mutex
-	active := int32(len(activePods))
+	needAllocationCompletionsIndex := job.Spec.Completions != nil && *job.Spec.Completions > 0
 	parallelism := *job.Spec.Parallelism
+	active := getLen(activePods, false)
+	succeeded := getLen(succeededPods, needAllocationCompletionsIndex)
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
@@ -755,6 +772,13 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 		errCh = make(chan error, diff)
 		klog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
 
+		allocation := sync.Mutex{}
+		availableCompletionsIndexes := make([]int32, 0)
+		if needAllocationCompletionsIndex {
+			// find available completions indexes in now
+			availableCompletionsIndexes = getAvailableCompletionsIndexes(activePods, succeededPods, *job.Spec.Completions)
+		}
+
 		active += diff
 		wait := sync.WaitGroup{}
 
@@ -772,7 +796,22 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 			for i := int32(0); i < batchSize; i++ {
 				go func() {
 					defer wait.Done()
-					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
+					completionsIndex := int32(0)
+					if needAllocationCompletionsIndex {
+						// allocation completions index
+						allocation.Lock()
+						if len(availableCompletionsIndexes) > 0 {
+							completionsIndex = availableCompletionsIndexes[0]
+							availableCompletionsIndexes = availableCompletionsIndexes[1:]
+						}
+						allocation.Unlock()
+						if completionsIndex == 0 {
+							klog.Warningf("not has available completions index to create pod, activePods: %+v, succeededPods: %+v", activePods, succeededPods)
+							return
+						}
+					}
+					podTemplateSpec := addCompletionsIndexToPodTemplate(job, completionsIndex)
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &podTemplateSpec, job, metav1.NewControllerRef(job, controllerKind))
 					if err != nil {
 						if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 							// If the namespace is being torn down, we can safely ignore
@@ -860,13 +899,20 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 	return calculated
 }
 
+// getStatusPods returns no of succeeded and failed pods running a job
+func getStatusPods(pods []*v1.Pod) (succeededPods, failedPods []*v1.Pod) {
+	succeededPods = filterPods(pods, v1.PodSucceeded)
+	failedPods = filterPods(pods, v1.PodFailed)
+	return
+}
+
 // filterPods returns pods based on their phase.
-func filterPods(pods []*v1.Pod, phase v1.PodPhase) int {
-	result := 0
+func filterPods(pods []*v1.Pod, phase v1.PodPhase) []*v1.Pod {
+	resultPods := make([]*v1.Pod, 0, len(pods)/2)
 	for i := range pods {
 		if phase == pods[i].Status.Phase {
-			result++
+			resultPods = append(resultPods, pods[i])
 		}
 	}
-	return result
+	return resultPods
 }
