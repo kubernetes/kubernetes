@@ -34,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
@@ -42,6 +41,18 @@ import (
 const (
 	// timeout for proxy requests.
 	proxyTimeout = 2 * time.Minute
+
+	// dockerOperationsKey is the key for docker operation metrics.
+	// copied from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
+	dockerOperationsKey = "docker_operations_total"
+
+	// dockerOperationsErrorsKey is the key for the operation error metrics.
+	// copied from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
+	dockerOperationsErrorsKey = "docker_operations_errors_total"
+
+	// dockerOperationsTimeoutKey is the key for the operation timeout metrics.
+	// copied from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
+	dockerOperationsTimeoutKey = "docker_operations_timeout_total"
 )
 
 // ContainerResourceUsage is a structure for gathering container resource usage.
@@ -190,9 +201,9 @@ func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeR
 	}
 	// If no corresponding metrics are found, the returned samples will be empty. Then the following
 	// loop will be skipped automatically.
-	allOps := ms[dockermetrics.DockerOperationsKey]
-	errOps := ms[dockermetrics.DockerOperationsErrorsKey]
-	timeoutOps := ms[dockermetrics.DockerOperationsTimeoutKey]
+	allOps := ms[dockerOperationsKey]
+	errOps := ms[dockerOperationsErrorsKey]
+	timeoutOps := ms[dockerOperationsTimeoutKey]
 	for _, sample := range allOps {
 		operation := string(sample.Metric["operation_type"])
 		result[operation] = &RuntimeOperationErrorRate{TotalNumber: float64(sample.Value)}
