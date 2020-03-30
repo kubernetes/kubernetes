@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"os"
 	"path/filepath"
 	"sort"
@@ -42,6 +43,8 @@ import (
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	apitest "k8s.io/cri-api/pkg/apis/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -2383,5 +2386,83 @@ func TestTruncatePodHostname(t *testing.T) {
 		output, err := truncatePodHostnameIfNeeded("test-pod", test.input)
 		assert.NoError(t, err)
 		assert.Equal(t, test.output, output)
+	}
+}
+
+func TestKubelet_PodResourcesAreReclaimed(t *testing.T) {
+
+	type args struct {
+		pod           *v1.Pod
+		status        v1.PodStatus
+		runtimeStatus kubecontainer.PodStatus
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			"pod with running containers",
+			args{
+				pod: &v1.Pod{},
+				status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			false,
+		},
+		{
+			"pod with containers in runtime cache",
+			args{
+				pod:    &v1.Pod{},
+				status: v1.PodStatus{},
+				runtimeStatus: kubecontainer.PodStatus{
+					ContainerStatuses: []*kubecontainer.ContainerStatus{
+						{},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"pod with sandbox present",
+			args{
+				pod: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						UID: types.UID("fakesandbox"),
+					},
+				},
+				status: v1.PodStatus{},
+			},
+			false,
+		},
+	}
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	runtimeService := apitest.NewFakeRuntimeService()
+	runtimeService.SetFakeSandboxes([]*apitest.FakePodSandbox{
+		{
+			PodSandboxStatus: runtimeapi.PodSandboxStatus{
+				Id: "fakesandbox",
+				Labels: map[string]string{
+					kubetypes.KubernetesPodUIDLabel: "fakesandbox",
+				},
+			},
+		},
+	})
+	kl.runtimeService = runtimeService
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testKubelet.fakeRuntime.PodStatus = tt.args.runtimeStatus
+			if got := kl.PodResourcesAreReclaimed(tt.args.pod, tt.args.status); got != tt.want {
+				t.Errorf("PodResourcesAreReclaimed() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
