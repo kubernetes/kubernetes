@@ -41,7 +41,7 @@ func (h *Handle) LinkGetProtinfo(link Link) (Protinfo, error) {
 			if err != nil {
 				return pi, err
 			}
-			pi = *parseProtinfo(infos)
+			pi = parseProtinfo(infos)
 
 			return pi, nil
 		}
@@ -49,8 +49,7 @@ func (h *Handle) LinkGetProtinfo(link Link) (Protinfo, error) {
 	return pi, fmt.Errorf("Device with index %d not found", base.Index)
 }
 
-func parseProtinfo(infos []syscall.NetlinkRouteAttr) *Protinfo {
-	var pi Protinfo
+func parseProtinfo(infos []syscall.NetlinkRouteAttr) (pi Protinfo) {
 	for _, info := range infos {
 		switch info.Attr.Type {
 		case nl.IFLA_BRPORT_MODE:
@@ -71,5 +70,5 @@ func parseProtinfo(infos []syscall.NetlinkRouteAttr) *Protinfo {
 			pi.ProxyArpWiFi = byteToBool(info.Value[0])
 		}
 	}
-	return &pi
+	return
 }
