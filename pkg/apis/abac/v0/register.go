@@ -40,7 +40,7 @@ var (
 	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
 	SchemeBuilder runtime.SchemeBuilder
-	// localSchemeBuilder ïs a pointer to SchemeBuilder instance. Using localSchemeBuilder
+	// localSchemeBuilder is a pointer to SchemeBuilder instance. Using localSchemeBuilder
 	// defaulting and conversion init funcs are registered as well.
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
 	localSchemeBuilder = &SchemeBuilder
