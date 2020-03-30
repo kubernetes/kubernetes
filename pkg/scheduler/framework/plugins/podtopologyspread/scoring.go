@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -73,6 +72,10 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 			continue
 		}
 		for _, constraint := range s.Constraints {
+			// per-node counts are calculated during Score.
+			if constraint.TopologyKey == v1.LabelHostname {
+				continue
+			}
 			pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
 			if s.TopologyPairToPodCounts[pair] == nil {
 				s.TopologyPairToPodCounts[pair] = new(int64)
@@ -103,7 +106,7 @@ func (pl *PodTopologySpread) PreScore(
 	}
 
 	state := &preScoreState{
-		NodeNameSet:             sets.String{},
+		NodeNameSet:             make(sets.String, len(filteredNodes)),
 		TopologyPairToPodCounts: make(map[topologyPair]*int64),
 	}
 	err = pl.initPreScoreState(state, pod, filteredNodes)
@@ -134,22 +137,13 @@ func (pl *PodTopologySpread) PreScore(
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			// If current topology pair is not associated with any candidate node,
 			// continue to avoid unnecessary calculation.
-			if state.TopologyPairToPodCounts[pair] == nil {
+			// Per-node counts are also skipped, as they are done during Score.
+			tpCount := state.TopologyPairToPodCounts[pair]
+			if tpCount == nil {
 				continue
 			}
-
-			// <matchSum> indicates how many pods (on current node) match the <constraint>.
-			matchSum := int64(0)
-			for _, existingPod := range nodeInfo.Pods() {
-				// Bypass terminating Pod (see #87621).
-				if existingPod.DeletionTimestamp != nil || existingPod.Namespace != pod.Namespace {
-					continue
-				}
-				if c.Selector.Matches(labels.Set(existingPod.Labels)) {
-					matchSum++
-				}
-			}
-			atomic.AddInt64(state.TopologyPairToPodCounts[pair], matchSum)
+			count := countPodsMatchSelector(nodeInfo.Pods(), c.Selector, pod.Namespace)
+			atomic.AddInt64(tpCount, int64(count))
 		}
 	}
 	parallelize.Until(ctx, len(allNodes), processAllNode)
@@ -183,9 +177,14 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 	var score int64
 	for _, c := range s.Constraints {
 		if tpVal, ok := node.Labels[c.TopologyKey]; ok {
-			pair := topologyPair{key: c.TopologyKey, value: tpVal}
-			matchSum := *s.TopologyPairToPodCounts[pair]
-			score += matchSum
+			if c.TopologyKey == v1.LabelHostname {
+				count := countPodsMatchSelector(nodeInfo.Pods(), c.Selector, pod.Namespace)
+				score += int64(count)
+			} else {
+				pair := topologyPair{key: c.TopologyKey, value: tpVal}
+				matchSum := *s.TopologyPairToPodCounts[pair]
+				score += matchSum
+			}
 		}
 	}
 	return score, nil

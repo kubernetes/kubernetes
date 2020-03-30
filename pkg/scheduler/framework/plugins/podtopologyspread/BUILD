@@ -41,6 +41,7 @@ go_test(
     deps = [
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
+        "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
