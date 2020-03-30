@@ -223,7 +223,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 	s := preFilterState{
 		Constraints:          constraints,
 		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
-		TpPairToMatchNum:     make(map[topologyPair]*int32),
+		TpPairToMatchNum:     make(map[topologyPair]*int32, sizeHeuristic(len(allNodes), constraints)),
 	}
 	for _, n := range allNodes {
 		node := n.Node()
@@ -327,4 +327,13 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	}
 
 	return nil
+}
+
+func sizeHeuristic(nodes int, constraints []topologySpreadConstraint) int {
+	for _, c := range constraints {
+		if c.TopologyKey == v1.LabelHostname {
+			return nodes
+		}
+	}
+	return 0
 }
