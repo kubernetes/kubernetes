@@ -49,7 +49,9 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 )
 
 // Options has all the params needed to run a Scheduler
@@ -72,6 +74,7 @@ type Options struct {
 	Master string
 
 	ShowHiddenMetricsForVersion string
+	Kubelet noderesources.KubeletConfig
 }
 
 // NewOptions returns default scheduler app options.
@@ -171,6 +174,25 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
 			"rather than being surprised when they are permanently removed in the release after that.")
 
+	// kube-apiserver marked it as deprecated option
+	fs.UintVar(&o.Kubelet.Port, "kubelet-port", o.Kubelet.Port,
+		"kubelet port.")
+
+	fs.UintVar(&o.Kubelet.InsecurePort, "kubelet-insecure-port", o.Kubelet.InsecurePort,
+		"kubelet insecure port.")
+
+	fs.DurationVar(&o.Kubelet.HTTPTimeout, "kubelet-timeout", o.Kubelet.HTTPTimeout,
+		"Timeout for kubelet operations.")
+
+	fs.StringVar(&o.Kubelet.CertFile, "kubelet-client-certificate", o.Kubelet.CertFile,
+		"Path to a client cert file for TLS.")
+
+	fs.StringVar(&o.Kubelet.KeyFile, "kubelet-client-key", o.Kubelet.KeyFile,
+		"Path to a client key file for TLS.")
+
+	fs.StringVar(&o.Kubelet.CAFile, "kubelet-certificate-authority", o.Kubelet.CAFile,
+		"Path to a cert file for the certificate authority.")
+
 	return nfs
 }
 
@@ -240,6 +262,11 @@ func (o *Options) Validate() []error {
 	return errs
 }
 
+func checkKubeletConfig(conf noderesources.KubeletConfig) bool {
+	return conf.Port != 0 || conf.InsecurePort != 0 || conf.HTTPTimeout == 0 ||
+		len(conf.CertFile) != 0 || len(conf.KeyFile) != 0 || len(conf.CAFile) != 0
+}
+
 // Config return a scheduler config object
 func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	if o.SecureServing != nil {
@@ -269,6 +296,16 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, leaderElectionClient, coreRecorder)
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	if checkKubeletConfig(o.Kubelet) {
+		//try to set PluginConfig for topology plugin, looks like a hack
+		topologyPluginConfig := plugins.NewPluginConfig(noderesources.TopologyMatchName, o.Kubelet)
+
+		//it increases coupling
+		for _, profile := range c.ComponentConfig.Profiles {
+			profile.PluginConfig = append(profile.PluginConfig, topologyPluginConfig)
 		}
 	}
 

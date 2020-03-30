@@ -72,5 +72,6 @@ func NewInTreeRegistry() framework.Registry {
 		serviceaffinity.Name:                       serviceaffinity.New,
 		queuesort.Name:                             queuesort.New,
 		defaultbinder.Name:                         defaultbinder.New,
+		noderesources.TopologyMatchName:            noderesources.NewTopologyMatch,
 	}
 }

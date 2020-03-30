@@ -11,6 +11,7 @@ go_library(
         "resource_allocation.go",
         "resource_limits.go",
         "test_util.go",
+        "topology_match.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources",
     visibility = ["//visibility:public"],
