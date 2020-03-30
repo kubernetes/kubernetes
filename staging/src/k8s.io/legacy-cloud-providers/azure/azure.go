@@ -262,7 +262,7 @@ type Cloud struct {
 	// routeCIDRs holds cache for route CIDRs.
 	routeCIDRs map[string]string
 
-	kubeClient       clientset.Interface
+	KubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
 	routeUpdater     *delayedRouteUpdater
@@ -639,9 +639,9 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
-	az.kubeClient = clientBuilder.ClientOrDie("azure-cloud-provider")
+	az.KubeClient = clientBuilder.ClientOrDie("azure-cloud-provider")
 	az.eventBroadcaster = record.NewBroadcaster()
-	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.kubeClient.CoreV1().Events("")})
+	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.KubeClient.CoreV1().Events("")})
 	az.eventRecorder = az.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "azure-cloud-provider"})
 	az.InitializeCloudFromSecret()
 }

@@ -134,7 +134,7 @@ func TestGetConfigFromSecret(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			az := &Cloud{
-				kubeClient: fakeclient.NewSimpleClientset(),
+				KubeClient: fakeclient.NewSimpleClientset(),
 			}
 			if test.existingConfig != nil {
 				az.Config = *test.existingConfig
@@ -154,7 +154,7 @@ func TestGetConfigFromSecret(t *testing.T) {
 						"cloud-config": secretData,
 					}
 				}
-				_, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+				_, err := az.KubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 				assert.NoError(t, err, test.name)
 			}
 
