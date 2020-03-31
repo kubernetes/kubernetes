@@ -8,7 +8,6 @@ go_library(
         "expect.go",
         "flake_reporting_util.go",
         "framework.go",
-        "google_compute.go",
         "log.go",
         "log_size_monitoring.go",
         "nodes_util.go",
