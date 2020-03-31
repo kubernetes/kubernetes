@@ -314,7 +314,6 @@ type IngressClassList struct {
 	metav1.ListMeta
 
 	// Items is the list of IngressClasses.
-	// +listType=set
 	Items []IngressClass
 }
 

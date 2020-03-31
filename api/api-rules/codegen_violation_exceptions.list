@@ -11,11 +11,9 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,Delet
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,FieldsV1,Raw
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelector,MatchExpressions
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelectorRequirement,Values
-API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,List,Items
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,Finalizers
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,ManagedFields
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,OwnerReferences
-API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,PartialObjectMetadataList,Items
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,PatchOptions,DryRun
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,RootPaths,Paths
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,StatusDetails,Causes
@@ -26,9 +24,6 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,Table
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,UpdateOptions,DryRun
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,RawExtension,Raw
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
-API rule violation: list_type_missing,k8s.io/code-generator/_examples/apiserver/apis/example/v1,TestTypeList,Items
-API rule violation: list_type_missing,k8s.io/code-generator/_examples/apiserver/apis/example2/v1,TestTypeList,Items
-API rule violation: list_type_missing,k8s.io/code-generator/_examples/apiserver/apis/example3.io/v1,TestTypeList,Items
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,APIResourceList,APIResources
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Duration
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object

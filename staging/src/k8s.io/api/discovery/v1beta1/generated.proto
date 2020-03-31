@@ -152,7 +152,6 @@ message EndpointSliceList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of endpoint slices
-  // +listType=set
   repeated EndpointSlice items = 2;
 }
 
