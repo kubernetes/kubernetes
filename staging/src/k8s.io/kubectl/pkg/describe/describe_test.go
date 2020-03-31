@@ -1780,6 +1780,38 @@ func TestDescribeStorageClass(t *testing.T) {
 	}
 }
 
+func TestDescribeCSINode(t *testing.T) {
+	limit := utilpointer.Int32Ptr(int32(2))
+	f := fake.NewSimpleClientset(&storagev1.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storagev1.CSINodeSpec{
+			Drivers: []storagev1.CSINodeDriver{
+				{
+					Name:   "driver1",
+					NodeID: "node1",
+				},
+				{
+					Name:        "driver2",
+					NodeID:      "node2",
+					Allocatable: &storagev1.VolumeNodeResources{Count: limit},
+				},
+			},
+		},
+	})
+	s := CSINodeDescriber{f}
+	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") ||
+		!strings.Contains(out, "driver1") ||
+		!strings.Contains(out, "node1") ||
+		!strings.Contains(out, "driver2") ||
+		!strings.Contains(out, "node2") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribePodDisruptionBudget(t *testing.T) {
 	minAvailable := intstr.FromInt(22)
 	f := fake.NewSimpleClientset(&policyv1beta1.PodDisruptionBudget{
