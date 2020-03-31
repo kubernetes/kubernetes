@@ -30,8 +30,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/utils/pointer"
 )
 
 var cmpOpts = []cmp.Option{
@@ -86,9 +88,9 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 0}, {"zone2", 0}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 0,
-					{key: "zone", value: "zone2"}: 0,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(0),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(0),
 				},
 			},
 		},
@@ -121,9 +123,9 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 2}, {"zone1", 3}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 3,
-					{key: "zone", value: "zone2"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -158,10 +160,10 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone3", 0}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 3,
-					{key: "zone", value: "zone2"}: 2,
-					{key: "zone", value: "zone3"}: 0,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
+					{key: "zone", value: "zone3"}: pointer.Int32Ptr(0),
 				},
 			},
 		},
@@ -194,9 +196,9 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 2,
-					{key: "zone", value: "zone2"}: 1,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(2),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -238,13 +240,13 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-x", 0}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  3,
-					{key: "zone", value: "zone2"}:  4,
-					{key: "node", value: "node-a"}: 2,
-					{key: "node", value: "node-b"}: 1,
-					{key: "node", value: "node-x"}: 0,
-					{key: "node", value: "node-y"}: 4,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-x"}: pointer.Int32Ptr(0),
+					{key: "node", value: "node-y"}: pointer.Int32Ptr(4),
 				},
 			},
 		},
@@ -287,12 +289,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 1}, {"node-a", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  3,
-					{key: "zone", value: "zone2"}:  4,
-					{key: "node", value: "node-a"}: 2,
-					{key: "node", value: "node-b"}: 1,
-					{key: "node", value: "node-y"}: 4,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-y"}: pointer.Int32Ptr(4),
 				},
 			},
 		},
@@ -328,12 +330,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone2", 0}, {"zone1", 1}},
 					"node": {{"node-a", 0}, {"node-y", 0}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  1,
-					{key: "zone", value: "zone2"}:  0,
-					{key: "node", value: "node-a"}: 0,
-					{key: "node", value: "node-b"}: 1,
-					{key: "node", value: "node-y"}: 0,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(0),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-y"}: pointer.Int32Ptr(0),
 				},
 			},
 		},
@@ -374,12 +376,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 0}, {"node-a", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  3,
-					{key: "zone", value: "zone2"}:  4,
-					{key: "node", value: "node-a"}: 1,
-					{key: "node", value: "node-b"}: 0,
-					{key: "node", value: "node-y"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(0),
+					{key: "node", value: "node-y"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -422,12 +424,12 @@ func TestPreFilterState(t *testing.T) {
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 1}, {"node-a", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  3,
-					{key: "zone", value: "zone2"}:  4,
-					{key: "node", value: "node-a"}: 2,
-					{key: "node", value: "node-b"}: 1,
-					{key: "node", value: "node-y"}: 4,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(4),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-y"}: pointer.Int32Ptr(4),
 				},
 			},
 		},
@@ -459,7 +461,7 @@ func TestPreFilterState(t *testing.T) {
 					"node": newCriticalPaths(),
 					"rack": newCriticalPaths(),
 				},
-				TpPairToMatchNum: make(map[topologyPair]int32),
+				TpPairToMatchNum: make(map[topologyPair]*int32),
 			},
 		},
 		{
@@ -495,7 +497,7 @@ func TestPreFilterState(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": newCriticalPaths(),
 				},
-				TpPairToMatchNum: make(map[topologyPair]int32),
+				TpPairToMatchNum: make(map[topologyPair]*int32),
 			},
 		},
 		{
@@ -572,9 +574,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-b", 0}, {"node-a", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "node", value: "node-a"}: 1,
-					{key: "node", value: "node-b"}: 0,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(0),
 				},
 			},
 		},
@@ -597,9 +599,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 1}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "node", value: "node-a"}: 1,
-					{key: "node", value: "node-b"}: 1,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -622,9 +624,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "node", value: "node-a"}: 0,
-					{key: "node", value: "node-b"}: 1,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -647,9 +649,9 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "node", value: "node-a"}: 0,
-					{key: "node", value: "node-b"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -672,11 +674,11 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone2", 0}, {"zone1", 1}},
 					"node": {{"node-x", 0}, {"node-a", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  1,
-					{key: "zone", value: "zone2"}:  0,
-					{key: "node", value: "node-a"}: 1,
-					{key: "node", value: "node-x"}: 0,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(0),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-x"}: pointer.Int32Ptr(0),
 				},
 			},
 		},
@@ -701,11 +703,11 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 					"node": {{"node-a", 1}, {"node-x", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  1,
-					{key: "zone", value: "zone2"}:  1,
-					{key: "node", value: "node-a"}: 1,
-					{key: "node", value: "node-x"}: 1,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-x"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -733,12 +735,12 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone2", 1}, {"zone1", 3}},
 					"node": {{"node-a", 1}, {"node-x", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  3,
-					{key: "zone", value: "zone2"}:  1,
-					{key: "node", value: "node-a"}: 1,
-					{key: "node", value: "node-b"}: 2,
-					{key: "node", value: "node-x"}: 1,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(2),
+					{key: "node", value: "node-x"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -773,12 +775,12 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone2", 1}, {"zone1", 2}},
 					"node": {{"node-a", 0}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  2,
-					{key: "zone", value: "zone2"}:  1,
-					{key: "node", value: "node-a"}: 0,
-					{key: "node", value: "node-b"}: 1,
-					{key: "node", value: "node-x"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(2),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(0),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-x"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -813,12 +815,12 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 					"node": {{"node-a", 1}, {"node-b", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  1,
-					{key: "zone", value: "zone2"}:  1,
-					{key: "node", value: "node-a"}: 1,
-					{key: "node", value: "node-b"}: 1,
-					{key: "node", value: "node-x"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(1),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-x"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -894,9 +896,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 1,
-					{key: "zone", value: "zone2"}: 1,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(1),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -924,9 +926,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 1,
-					{key: "zone", value: "zone2"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(1),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -955,9 +957,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 2,
-					{key: "zone", value: "zone2"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(2),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -986,9 +988,9 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 				TpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}: 2,
-					{key: "zone", value: "zone2"}: 2,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}: pointer.Int32Ptr(2),
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(2),
 				},
 			},
 		},
@@ -1018,12 +1020,12 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 					"zone": {{"zone2", 1}, {"zone1", 3}},
 					"node": {{"node-b", 1}, {"node-x", 1}},
 				},
-				TpPairToMatchNum: map[topologyPair]int32{
-					{key: "zone", value: "zone1"}:  3,
-					{key: "zone", value: "zone2"}:  1,
-					{key: "node", value: "node-a"}: 2,
-					{key: "node", value: "node-b"}: 1,
-					{key: "node", value: "node-x"}: 1,
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone1"}:  pointer.Int32Ptr(3),
+					{key: "zone", value: "zone2"}:  pointer.Int32Ptr(1),
+					{key: "node", value: "node-a"}: pointer.Int32Ptr(2),
+					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
+					{key: "node", value: "node-x"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -1065,7 +1067,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 	}
 }
 
-func BenchmarkTestCalPreFilterState(b *testing.B) {
+func BenchmarkFilter(b *testing.B) {
 	tests := []struct {
 		name             string
 		pod              *v1.Pod
@@ -1103,17 +1105,30 @@ func BenchmarkTestCalPreFilterState(b *testing.B) {
 		},
 	}
 	for _, tt := range tests {
+		var state *framework.CycleState
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			pl := PodTopologySpread{
 				sharedLister: cache.NewSnapshot(existingPods, allNodes),
 			}
+			ctx := context.Background()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				s := pl.PreFilter(context.Background(), framework.NewCycleState(), tt.pod)
+				state = framework.NewCycleState()
+				s := pl.PreFilter(ctx, state, tt.pod)
 				if !s.IsSuccess() {
 					b.Fatal(s.AsError())
 				}
+				filterNode := func(i int) {
+					n, _ := pl.sharedLister.NodeInfos().Get(allNodes[i].Name)
+					pl.Filter(ctx, state, tt.pod, n)
+				}
+				parallelize.Until(ctx, len(allNodes), filterNode)
+			}
+		})
+		b.Run(tt.name+"/Clone", func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				state.Clone()
 			}
 		})
 	}
