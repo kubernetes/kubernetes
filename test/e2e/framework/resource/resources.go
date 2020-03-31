@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -159,7 +158,7 @@ func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration
 	var activePods []*v1.Pod
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods := ps.List()
-		activePods = controller.FilterActivePods(pods)
+		activePods = e2epod.FilterActivePods(pods)
 		if len(activePods) != 0 {
 			return false, nil
 		}
