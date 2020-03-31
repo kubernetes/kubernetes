@@ -29,7 +29,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
+var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
 	/*
 	   Release : v1.19
