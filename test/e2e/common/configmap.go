@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -161,6 +162,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		testNamespaceName := f.Namespace.Name
 		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
 
+		ginkgo.By("creating a ConfigMap")
 		_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testConfigMapName,
@@ -174,6 +176,20 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ConfigMap")
 
+		ginkgo.By("setting a watch for the ConfigMap")
+		// setup a watch for the ConfigMap
+		resourceWatchTimeoutSeconds := int64(60)
+		resourceWatch, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-configmap-static=true", TimeoutSeconds: &resourceWatchTimeoutSeconds})
+		framework.ExpectNoError(err, "Failed to setup watch on newly created ConfigMap")
+
+		resourceWatchChan := resourceWatch.ResultChan()
+		ginkgo.By("waiting for the ConfigMap to be added")
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Added {
+				break
+			}
+		}
+
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -186,15 +202,23 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		})
 		framework.ExpectNoError(err, "failed to marshal patch data")
 
+		ginkgo.By("patching the ConfigMap")
 		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ConfigMap")
+		ginkgo.By("waiting for the ConfigMap to be modified")
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Modified {
+				break
+			}
+		}
 
+		ginkgo.By("fetching the ConfigMap")
 		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get ConfigMap")
 		framework.ExpectEqual(configMap.Data["valueName"], "value1", "failed to patch ConfigMap")
 		framework.ExpectEqual(configMap.Labels["test-configmap"], "patched", "failed to patch ConfigMap")
 
-		// listing in all namespaces to hit the endpoint
+		ginkgo.By("listing all ConfigMaps in all namespaces")
 		configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
@@ -212,10 +236,17 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		}
 		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap in list")
 
+		ginkgo.By("deleting the ConfigMap by a collection")
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
 		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
+		ginkgo.By("waiting for the ConfigMap to be deleted")
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Deleted {
+				break
+			}
+		}
 	})
 })
 
