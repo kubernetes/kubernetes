@@ -23,7 +23,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -46,7 +46,7 @@ type resourceToValueMap map[v1.ResourceName]int64
 // score will use `scorer` function to calculate the score.
 func (r *resourceAllocationScorer) score(
 	pod *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo) (int64, *framework.Status) {
+	nodeInfo *schedulertypes.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return 0, framework.NewStatus(framework.Error, "node not found")
@@ -90,7 +90,7 @@ func (r *resourceAllocationScorer) score(
 }
 
 // calculateResourceAllocatableRequest returns resources Allocatable and Requested values
-func calculateResourceAllocatableRequest(nodeInfo *schedulernodeinfo.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
+func calculateResourceAllocatableRequest(nodeInfo *schedulertypes.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
 	allocatable := nodeInfo.AllocatableResource()
 	requested := nodeInfo.RequestedResource()
 	podRequest := calculatePodResourceRequest(pod, resource)

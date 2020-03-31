@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 var (
@@ -62,7 +62,7 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 	}
 }
 
-func newResourcePod(usage ...schedulernodeinfo.Resource) *v1.Pod {
+func newResourcePod(usage ...schedulertypes.Resource) *v1.Pod {
 	containers := []v1.Container{}
 	for _, req := range usage {
 		containers = append(containers, v1.Container{
@@ -76,7 +76,7 @@ func newResourcePod(usage ...schedulernodeinfo.Resource) *v1.Pod {
 	}
 }
 
-func newResourceInitPod(pod *v1.Pod, usage ...schedulernodeinfo.Resource) *v1.Pod {
+func newResourceInitPod(pod *v1.Pod, usage ...schedulertypes.Resource) *v1.Pod {
 	pod.Spec.InitContainers = newResourcePod(usage...).Spec.Containers
 	return pod
 }
@@ -93,7 +93,7 @@ func getErrReason(rn v1.ResourceName) string {
 func TestEnoughRequests(t *testing.T) {
 	enoughPodsTests := []struct {
 		pod                       *v1.Pod
-		nodeInfo                  *schedulernodeinfo.NodeInfo
+		nodeInfo                  *schedulertypes.NodeInfo
 		name                      string
 		ignoredResources          []byte
 		wantInsufficientResources []InsufficientResource
@@ -101,266 +101,266 @@ func TestEnoughRequests(t *testing.T) {
 	}{
 		{
 			pod: &v1.Pod{},
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 10, Memory: 20})),
 			name:                      "no resources requested always fits",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
+			pod: newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 10, Memory: 20})),
 			name:                      "too many resources fails",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU), getErrReason(v1.ResourceMemory)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceCPU, getErrReason(v1.ResourceCPU), 1, 10, 10}, {v1.ResourceMemory, getErrReason(v1.ResourceMemory), 1, 20, 20}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 3, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 8, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}), schedulertypes.Resource{MilliCPU: 3, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 8, Memory: 19})),
 			name:                      "too many resources fails due to init container cpu",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceCPU, getErrReason(v1.ResourceCPU), 3, 8, 10}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 3, Memory: 1}, schedulernodeinfo.Resource{MilliCPU: 2, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 8, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}), schedulertypes.Resource{MilliCPU: 3, Memory: 1}, schedulertypes.Resource{MilliCPU: 2, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 8, Memory: 19})),
 			name:                      "too many resources fails due to highest init container cpu",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceCPU, getErrReason(v1.ResourceCPU), 3, 8, 10}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 3}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}), schedulertypes.Resource{MilliCPU: 1, Memory: 3}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 9, Memory: 19})),
 			name:                      "too many resources fails due to init container memory",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceMemory, getErrReason(v1.ResourceMemory), 3, 19, 20}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 3}, schedulernodeinfo.Resource{MilliCPU: 1, Memory: 2}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}), schedulertypes.Resource{MilliCPU: 1, Memory: 3}, schedulertypes.Resource{MilliCPU: 1, Memory: 2}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 9, Memory: 19})),
 			name:                      "too many resources fails due to highest init container memory",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceMemory, getErrReason(v1.ResourceMemory), 3, 19, 20}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}), schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 9, Memory: 19})),
 			name:                      "init container fits because it's the max, not sum, of containers and init containers",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}, schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}), schedulertypes.Resource{MilliCPU: 1, Memory: 1}, schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 9, Memory: 19})),
 			name:                      "multiple init containers fit because it's the max, not sum, of containers and init containers",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
+			pod: newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 5})),
 			name:                      "both resources fit",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 5})),
+			pod: newResourcePod(schedulertypes.Resource{MilliCPU: 2, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 9, Memory: 5})),
 			name:                      "one resource memory fits",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceCPU, getErrReason(v1.ResourceCPU), 2, 9, 10}},
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 2}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 2}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 19})),
 			name:                      "one resource cpu fits",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceMemory, getErrReason(v1.ResourceMemory), 2, 19, 20}},
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 19})),
 			name:                      "equal edge case",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 4, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 4, Memory: 1}), schedulertypes.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 19})),
 			name:                      "equal edge case for init container",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod:                       newResourcePod(schedulernodeinfo.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo:                  schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{})),
+			pod:                       newResourcePod(schedulertypes.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo:                  schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{})),
 			name:                      "extended resource fits",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod:                       newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}), schedulernodeinfo.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo:                  schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{})),
+			pod:                       newResourceInitPod(newResourcePod(schedulertypes.Resource{}), schedulertypes.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo:                  schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{})),
 			name:                      "extended resource fits for init container",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
 			name:                      "extended resource capacity enforced",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceA)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceA, getErrReason(extendedResourceA), 10, 0, 5}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{}),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
 			name:                      "extended resource capacity enforced for init container",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceA)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceA, getErrReason(extendedResourceA), 10, 0, 5}},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
 			name:                      "extended resource allocatable enforced",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceA)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceA, getErrReason(extendedResourceA), 1, 5, 5}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{}),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
 			name:                      "extended resource allocatable enforced for init container",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceA)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceA, getErrReason(extendedResourceA), 1, 5, 5}},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
 			name:                      "extended resource allocatable enforced for multiple containers",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceA)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceA, getErrReason(extendedResourceA), 6, 2, 5}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{}),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
 			name:                      "extended resource allocatable admits multiple init containers",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 6}},
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{}),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 6}},
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
 			name:                      "extended resource allocatable enforced for multiple init containers",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceA)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceA, getErrReason(extendedResourceA), 6, 2, 5}},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0})),
 			name:                      "extended resource allocatable enforced for unknown resource",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceB)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceB, getErrReason(extendedResourceB), 1, 0, 0}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{}),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0})),
 			name:                      "extended resource allocatable enforced for unknown resource for init container",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(extendedResourceB)),
 			wantInsufficientResources: []InsufficientResource{{extendedResourceB, getErrReason(extendedResourceB), 1, 0, 0}},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceA: 10}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceA: 10}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0})),
 			name:                      "kubernetes.io resource capacity enforced",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(kubernetesIOResourceA)),
 			wantInsufficientResources: []InsufficientResource{{kubernetesIOResourceA, getErrReason(kubernetesIOResourceA), 10, 0, 0}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceB: 10}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{}),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceB: 10}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0})),
 			name:                      "kubernetes.io resource capacity enforced for init container",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(kubernetesIOResourceB)),
 			wantInsufficientResources: []InsufficientResource{{kubernetesIOResourceB, getErrReason(kubernetesIOResourceB), 10, 0, 0}},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
 			name:                      "hugepages resource capacity enforced",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(hugePageResourceA)),
 			wantInsufficientResources: []InsufficientResource{{hugePageResourceA, getErrReason(hugePageResourceA), 10, 0, 5}},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+			pod: newResourceInitPod(newResourcePod(schedulertypes.Resource{}),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
 			name:                      "hugepages resource capacity enforced for init container",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(hugePageResourceA)),
 			wantInsufficientResources: []InsufficientResource{{hugePageResourceA, getErrReason(hugePageResourceA), 10, 0, 5}},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}},
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}},
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
 			name:                      "hugepages resource allocatable enforced for multiple containers",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(hugePageResourceA)),
 			wantInsufficientResources: []InsufficientResource{{hugePageResourceA, getErrReason(hugePageResourceA), 6, 2, 5}},
 		},
 		{
 			pod: newResourcePod(
-				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
-			nodeInfo:                  schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
+				schedulertypes.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo:                  schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{MilliCPU: 0, Memory: 0})),
 			ignoredResources:          []byte(`{"IgnoredResources" : ["example.com/bbb"]}`),
 			name:                      "skip checking ignored extended resource",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
 			pod: newResourceOverheadPod(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+				newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
 				v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("13")},
 			),
-			nodeInfo:                  schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
+			nodeInfo:                  schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 5})),
 			name:                      "resources + pod overhead fits",
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
 			pod: newResourceOverheadPod(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+				newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
 				v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m"), v1.ResourceMemory: resource.MustParse("15")},
 			),
-			nodeInfo:                  schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
+			nodeInfo:                  schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 5})),
 			name:                      "requests + overhead does not fit for memory",
 			wantStatus:                framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
 			wantInsufficientResources: []InsufficientResource{{v1.ResourceMemory, getErrReason(v1.ResourceMemory), 16, 5, 20}},
@@ -395,7 +395,7 @@ func TestEnoughRequests(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	nodeInfo := schedulertypes.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p, _ := NewFit(nil, nil)
@@ -410,32 +410,32 @@ func TestPreFilterDisabled(t *testing.T) {
 func TestNotEnoughRequests(t *testing.T) {
 	notEnoughPodsTests := []struct {
 		pod        *v1.Pod
-		nodeInfo   *schedulernodeinfo.NodeInfo
+		nodeInfo   *schedulertypes.NodeInfo
 		fits       bool
 		name       string
 		wantStatus *framework.Status
 	}{
 		{
 			pod:        &v1.Pod{},
-			nodeInfo:   schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
+			nodeInfo:   schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{MilliCPU: 10, Memory: 20})),
 			name:       "even without specified resources predicate fails when there's no space for additional pod",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
 		{
-			pod:        newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo:   schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
+			pod:        newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo:   schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 5})),
 			name:       "even if both resources fit predicate fails when there's no space for additional pod",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
 		{
-			pod:        newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo:   schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
+			pod:        newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo:   schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 19})),
 			name:       "even for equal edge case predicate fails when there's no space for additional pod",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
 		{
-			pod:        newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo:   schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
+			pod:        newResourceInitPod(newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 1}), schedulertypes.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo:   schedulertypes.NewNodeInfo(newResourcePod(schedulertypes.Resource{MilliCPU: 5, Memory: 19})),
 			name:       "even for equal edge case predicate fails when there's no space for additional pod due to init container",
 			wantStatus: framework.NewStatus(framework.Unschedulable, "Too many pods"),
 		},
@@ -464,34 +464,34 @@ func TestNotEnoughRequests(t *testing.T) {
 func TestStorageRequests(t *testing.T) {
 	storagePodsTests := []struct {
 		pod        *v1.Pod
-		nodeInfo   *schedulernodeinfo.NodeInfo
+		nodeInfo   *schedulertypes.NodeInfo
 		name       string
 		wantStatus *framework.Status
 	}{
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 10})),
+			pod: newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 10, Memory: 10})),
 			name:       "due to container scratch disk",
 			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 10})),
+			pod: newResourcePod(schedulertypes.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 2, Memory: 10})),
 			name: "pod fit",
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{EphemeralStorage: 25}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 2})),
+			pod: newResourcePod(schedulertypes.Resource{EphemeralStorage: 25}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 2, Memory: 2})),
 			name:       "storage ephemeral local storage request exceeds allocatable",
 			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceEphemeralStorage)),
 		},
 		{
-			pod: newResourcePod(schedulernodeinfo.Resource{EphemeralStorage: 10}),
-			nodeInfo: schedulernodeinfo.NewNodeInfo(
-				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 2})),
+			pod: newResourcePod(schedulertypes.Resource{EphemeralStorage: 10}),
+			nodeInfo: schedulertypes.NewNodeInfo(
+				newResourcePod(schedulertypes.Resource{MilliCPU: 2, Memory: 2})),
 			name: "pod fits",
 		},
 	}

@@ -27,7 +27,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 var _ framework.PreFilterPlugin = &Fit{}
@@ -56,7 +56,7 @@ type FitArgs struct {
 
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
-	schedulernodeinfo.Resource
+	schedulertypes.Resource
 }
 
 // Clone the prefilter state.
@@ -69,7 +69,7 @@ func (f *Fit) Name() string {
 	return FitName
 }
 
-// computePodResourceRequest returns a schedulernodeinfo.Resource that covers the largest
+// computePodResourceRequest returns a schedulertypes.Resource that covers the largest
 // width in each resource dimension. Because init-containers run sequentially, we collect
 // the max in each dimension iteratively. In contrast, we sum the resource vectors for
 // regular containers since they run simultaneously.
@@ -143,7 +143,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 // Filter invoked at the filter extension point.
 // Checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 // It returns a list of insufficient resources, if empty, then the node has all the resources requested by the pod.
-func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
@@ -174,11 +174,11 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
+func Fits(pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
 	return fitsRequest(computePodResourceRequest(pod), nodeInfo, ignoredExtendedResources)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo *schedulernodeinfo.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo *schedulertypes.NodeInfo, ignoredExtendedResources sets.String) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.AllowedPodNumber()

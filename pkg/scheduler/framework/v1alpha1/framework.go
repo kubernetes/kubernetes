@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -353,7 +353,7 @@ func (f *framework) RunPreFilterExtensionAddPod(
 	state *CycleState,
 	podToSchedule *v1.Pod,
 	podToAdd *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo,
+	nodeInfo *schedulertypes.NodeInfo,
 ) (status *Status) {
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
@@ -371,7 +371,7 @@ func (f *framework) RunPreFilterExtensionAddPod(
 	return nil
 }
 
-func (f *framework) runPreFilterExtensionAddPod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (f *framework) runPreFilterExtensionAddPod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podToAdd, nodeInfo)
 	}
@@ -389,7 +389,7 @@ func (f *framework) RunPreFilterExtensionRemovePod(
 	state *CycleState,
 	podToSchedule *v1.Pod,
 	podToRemove *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo,
+	nodeInfo *schedulertypes.NodeInfo,
 ) (status *Status) {
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
@@ -407,7 +407,7 @@ func (f *framework) RunPreFilterExtensionRemovePod(
 	return nil
 }
 
-func (f *framework) runPreFilterExtensionRemovePod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (f *framework) runPreFilterExtensionRemovePod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podToAdd, nodeInfo)
 	}
@@ -425,7 +425,7 @@ func (f *framework) RunFilterPlugins(
 	ctx context.Context,
 	state *CycleState,
 	pod *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo,
+	nodeInfo *schedulertypes.NodeInfo,
 ) PluginToStatus {
 	var firstFailedStatus *Status
 	statuses := make(PluginToStatus)
@@ -452,7 +452,7 @@ func (f *framework) RunFilterPlugins(
 	return statuses
 }
 
-func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state *CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Filter(ctx, state, pod, nodeInfo)
 	}

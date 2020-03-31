@@ -191,6 +191,7 @@
 				"k8s.io/kubernetes/pkg/scheduler/listers",
 				"k8s.io/kubernetes/pkg/scheduler/metrics",
 				"k8s.io/kubernetes/pkg/scheduler/nodeinfo",
+				"k8s.io/kubernetes/pkg/scheduler/types",
 				"k8s.io/kubernetes/pkg/scheduler/util",
 				"k8s.io/kubernetes/pkg/scheduler/volumebinder",
 				"k8s.io/kubernetes/pkg/security/apparmor",

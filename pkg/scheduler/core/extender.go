@@ -31,7 +31,7 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 const (
@@ -287,7 +287,7 @@ func (h *HTTPExtender) convertToNodeToVictims(
 // and extender, i.e. when the pod is not found in nodeInfo.Pods.
 func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *extenderv1.MetaPod,
-	nodeInfo *schedulernodeinfo.NodeInfo) (*v1.Pod, error) {
+	nodeInfo *schedulertypes.NodeInfo) (*v1.Pod, error) {
 	for _, pod := range nodeInfo.Pods() {
 		if string(pod.UID) == metaPod.UID {
 			return pod, nil

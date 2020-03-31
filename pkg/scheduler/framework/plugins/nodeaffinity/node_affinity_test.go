@@ -26,7 +26,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
@@ -694,7 +694,7 @@ func TestNodeAffinity(t *testing.T) {
 				Name:   test.nodeName,
 				Labels: test.labels,
 			}}
-			nodeInfo := schedulernodeinfo.NewNodeInfo()
+			nodeInfo := schedulertypes.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
 			p, _ := New(nil, nil)

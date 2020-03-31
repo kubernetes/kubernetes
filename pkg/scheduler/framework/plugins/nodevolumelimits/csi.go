@@ -29,8 +29,7 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog"
@@ -69,7 +68,7 @@ func (pl *CSILimits) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
@@ -286,7 +285,7 @@ func NewCSI(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plu
 	}, nil
 }
 
-func getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1.CSINode) map[v1.ResourceName]int64 {
+func getVolumeLimits(nodeInfo *schedulertypes.NodeInfo, csiNode *storagev1.CSINode) map[v1.ResourceName]int64 {
 	// TODO: stop getting values from Node object in v1.18
 	nodeVolumeLimits := nodeInfo.VolumeLimits()
 	if csiNode != nil {
