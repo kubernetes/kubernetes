@@ -467,9 +467,10 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 			tokenVolumeName = s.generateName(ServiceAccountVolumeName + "-")
 		} else {
 			// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
-			tokenVolumeName = serviceAccountToken
+			// Replace dots because volumeMountName can't contain it
+			tokenVolumeName = strings.Replace(serviceAccountToken, ".", "-", -1)
 			if allVolumeNames.Has(tokenVolumeName) {
-				tokenVolumeName = s.generateName(fmt.Sprintf("%s-", serviceAccountToken))
+				tokenVolumeName = s.generateName(fmt.Sprintf("%s-", tokenVolumeName))
 			}
 		}
 	}
