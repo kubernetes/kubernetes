@@ -31,8 +31,9 @@ import (
 )
 
 const (
-	// NodePublishTimeout_VolumeID is volume id that will result in NodePublish operation to timeout
+	// NodePublishTimeOut_VolumeID is volume id that will result in NodePublish operation to timeout
 	NodePublishTimeOut_VolumeID = "node-publish-timeout"
+
 	// NodeStageTimeOut_VolumeID is a volume id that will result in NodeStage operation to timeout
 	NodeStageTimeOut_VolumeID = "node-stage-timeout"
 )

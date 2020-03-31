@@ -36,7 +36,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
-// interface exposed by the cloud provider implementing Disk functionality
+// DiskController interface exposed by the cloud provider implementing Disk functionality
 type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error
