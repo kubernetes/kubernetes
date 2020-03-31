@@ -98,7 +98,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 
 		ginkgo.By("deleting the test event")
 		// delete original event
-		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Delete(context.TODO(), eventCreatedName, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Delete(context.TODO(), eventCreatedName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete the test event")
 
 		ginkgo.By("listing all events in all namespaces")
