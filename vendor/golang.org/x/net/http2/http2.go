@@ -19,7 +19,6 @@ package http2 // import "golang.org/x/net/http2"
 import (
 	"bufio"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -172,11 +171,6 @@ func (s SettingID) String() string {
 	}
 	return fmt.Sprintf("UNKNOWN_SETTING_%d", uint16(s))
 }
-
-var (
-	errInvalidHeaderFieldName  = errors.New("http2: invalid header field name")
-	errInvalidHeaderFieldValue = errors.New("http2: invalid header field value")
-)
 
 // validWireHeaderFieldName reports whether v is a valid header field
 // name (key). See httpguts.ValidHeaderName for the base rules.

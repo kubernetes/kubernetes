@@ -165,6 +165,11 @@ type wkt interface {
 	XXX_WellKnownType() string
 }
 
+var (
+	wktType     = reflect.TypeOf((*wkt)(nil)).Elem()
+	messageType = reflect.TypeOf((*proto.Message)(nil)).Elem()
+)
+
 // marshalObject writes a struct to the Writer.
 func (m *Marshaler) marshalObject(out *errWriter, v proto.Message, indent, typeURL string) error {
 	if jsm, ok := v.(JSONPBMarshaler); ok {
@@ -531,7 +536,8 @@ func (m *Marshaler) marshalValue(out *errWriter, prop *proto.Properties, v refle
 
 	// Handle well-known types.
 	// Most are handled up in marshalObject (because 99% are messages).
-	if wkt, ok := v.Interface().(wkt); ok {
+	if v.Type().Implements(wktType) {
+		wkt := v.Interface().(wkt)
 		switch wkt.XXX_WellKnownType() {
 		case "NullValue":
 			out.write("null")
@@ -1277,8 +1283,8 @@ func checkRequiredFields(pb proto.Message) error {
 }
 
 func checkRequiredFieldsInValue(v reflect.Value) error {
-	if pm, ok := v.Interface().(proto.Message); ok {
-		return checkRequiredFields(pm)
+	if v.Type().Implements(messageType) {
+		return checkRequiredFields(v.Interface().(proto.Message))
 	}
 	return nil
 }
