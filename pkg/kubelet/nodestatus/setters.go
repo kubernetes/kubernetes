@@ -82,7 +82,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				if node.ObjectMeta.Annotations == nil {
 					node.ObjectMeta.Annotations = make(map[string]string)
 				}
-				node.ObjectMeta.Annotations[cloudproviderapi.AnnotationProvidedIPAddr] = nodeIP.String()
+				node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = nodeIP.String()
 			}
 
 			// If --cloud-provider=external and node address is already set,
