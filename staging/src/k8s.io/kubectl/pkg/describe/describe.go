@@ -4032,7 +4032,7 @@ func describeCSINode(csi *storagev1.CSINode, events *corev1.EventList) (output s
 			for _, driver := range csi.Spec.Drivers {
 				w.Write(LEVEL_2, "%s:\n", driver.Name)
 				w.Write(LEVEL_3, "Node ID:\t%s\n", driver.NodeID)
-				if driver.Allocatable.Count != nil {
+				if driver.Allocatable != nil && driver.Allocatable.Count != nil {
 					w.Write(LEVEL_3, "Allocatables:\n")
 					w.Write(LEVEL_4, "Count:\t%d\n", *driver.Allocatable.Count)
 				}
