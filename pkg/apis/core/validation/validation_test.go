@@ -5903,6 +5903,24 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
+		{
+			Name:                     "different-port-name-same-port-number",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			Ports: []core.ContainerPort{
+				{
+					Name:          "port-1",
+					ContainerPort: 1234,
+					Protocol:      core.ProtocolTCP,
+				},
+				{
+					Name:          "port-2",
+					ContainerPort: 1234,
+					Protocol:      core.ProtocolTCP,
+				},
+			},
+		},
 	}
 	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -6138,6 +6156,26 @@ func TestValidateContainers(t *testing.T) {
 								Name: "$%^&*#",
 							},
 						},
+					},
+				},
+			},
+		},
+		"duplicate port names": {
+			{
+				Name:                     "container-name",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-1",
+						ContainerPort: 1235,
+						Protocol:      core.ProtocolTCP,
 					},
 				},
 			},
@@ -6712,6 +6750,68 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 		},
+		{
+			// Duplicate port names in containers and init containers
+			// It should be valid since init container are executed sequentially
+			// and pod containers are only executed after init containers
+			// terminate
+			Containers: []core.Container{{
+				Name:                     "container",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-2",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+				},
+			}},
+			InitContainers: []core.Container{{
+				Name:                     "init-container-1",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-2",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+				},
+			}, {
+				Name:                     "init-container-2",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-2",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+				},
+			},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -6912,6 +7012,86 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
 			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"duplicate ports in the same init container":{
+			Containers: []core.Container{{
+				Name:                     "container",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-2",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+				},
+			}},
+			InitContainers: []core.Container{{
+				Name:                     "init-container-1",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+				},
+			}, {
+				Name:                     "init-container-2",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-2",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+				},
+			},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"duplicate ports in pod container":{
+			Containers: []core.Container{{
+				Name:                     "container",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Ports: []core.ContainerPort{
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+					{
+						Name:          "port-1",
+						ContainerPort: 1234,
+						Protocol:      core.ProtocolTCP,
+					},
+				},
+			}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 		},

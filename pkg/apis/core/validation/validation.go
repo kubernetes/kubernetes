@@ -2496,6 +2496,37 @@ func checkHostPortConflicts(containers []core.Container, fldPath *field.Path) fi
 	return AccumulateUniqueHostPorts(containers, &allPorts, fldPath)
 }
 
+// AccumulateUniqueHostPorts extracts each PortName of each Container,
+// accumulating the results and returning an error if any port names conflict.
+func AccumulateUniquePortNames(containers []core.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for ci, ctr := range containers {
+		idxPath := fldPath.Index(ci)
+		portsPath := idxPath.Child("ports")
+		for pi := range ctr.Ports {
+			idxPath := portsPath.Index(pi)
+			portName := ctr.Ports[pi].Name
+			if portName == "" {
+				continue
+			}
+			if accumulator.Has(portName) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), portName))
+			} else {
+				accumulator.Insert(portName)
+			}
+		}
+	}
+	return allErrs
+}
+
+// checkPortNamesConflicts checks for colliding Port.Name values across
+// a slice of containers.
+func checkPortNamesConflicts(containers []core.Container, fldPath *field.Path) field.ErrorList {
+	allPorts := sets.String{}
+	return AccumulateUniquePortNames(containers, &allPorts, fldPath)
+}
+
 func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(exec.Command) == 0 {
@@ -2769,10 +2800,12 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 		// check initContainers one by one since they are running in sequential order.
 		for _, initContainer := range containers {
 			allErrs = append(allErrs, checkHostPortConflicts([]core.Container{initContainer}, fldPath)...)
+			allErrs = append(allErrs, checkPortNamesConflicts([]core.Container{initContainer}, fldPath)...)
 		}
 	} else {
 		// Check for colliding ports across all containers.
 		allErrs = append(allErrs, checkHostPortConflicts(containers, fldPath)...)
+		allErrs = append(allErrs, checkPortNamesConflicts(containers, fldPath)...)
 	}
 
 	return allErrs
