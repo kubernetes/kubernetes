@@ -6,6 +6,7 @@ go 1.13
 
 require (
 	github.com/blang/semver v3.5.0+incompatible
+	github.com/go-logr/logr v0.1.0
 	github.com/google/go-cmp v0.4.0
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
