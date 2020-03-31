@@ -576,6 +576,57 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	return client, eventClient.CoreV1(), nil
 }
 
+func serveHealthz(hz healthcheck.ProxierHealthUpdater) {
+	if hz == nil {
+		return
+	}
+
+	fn := func() {
+		err := hz.Run()
+		if err != nil {
+			// For historical reasons we do not abort on errors here.  We may
+			// change that in the future.
+			klog.Errorf("healthz server failed: %v", err)
+		} else {
+			klog.Errorf("healthz server returned without error")
+		}
+	}
+	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+}
+
+func serveMetrics(bindAddress string, proxyMode string, enableProfiling bool) {
+	if len(bindAddress) == 0 {
+		return
+	}
+
+	proxyMux := mux.NewPathRecorderMux("kube-proxy")
+	healthz.InstallHandler(proxyMux)
+	proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		fmt.Fprintf(w, "%s", proxyMode)
+	})
+
+	//lint:ignore SA1019 See the Metrics Stability Migration KEP
+	proxyMux.Handle("/metrics", legacyregistry.Handler())
+
+	if enableProfiling {
+		routes.Profiling{}.Install(proxyMux)
+	}
+
+	configz.InstallHandler(proxyMux)
+
+	fn := func() {
+		err := http.ListenAndServe(bindAddress, proxyMux)
+		if err != nil {
+			// For historical reasons we do not abort on errors here.  We may
+			// change that in the future.
+			utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
+		}
+	}
+	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+}
+
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 // TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
 func (s *ProxyServer) Run() error {
@@ -595,33 +646,13 @@ func (s *ProxyServer) Run() error {
 		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
 	}
 
+	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
+
 	// Start up a healthz server if requested
-	if s.HealthzServer != nil {
-		s.HealthzServer.Run()
-	}
+	serveHealthz(s.HealthzServer)
 
 	// Start up a metrics server if requested
-	if len(s.MetricsBindAddress) > 0 {
-		proxyMux := mux.NewPathRecorderMux("kube-proxy")
-		healthz.InstallHandler(proxyMux)
-		proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-			fmt.Fprintf(w, "%s", s.ProxyMode)
-		})
-		//lint:ignore SA1019 See the Metrics Stability Migration KEP
-		proxyMux.Handle("/metrics", legacyregistry.Handler())
-		if s.EnableProfiling {
-			routes.Profiling{}.Install(proxyMux)
-		}
-		configz.InstallHandler(proxyMux)
-		go wait.Until(func() {
-			err := http.ListenAndServe(s.MetricsBindAddress, proxyMux)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
-			}
-		}, 5*time.Second, wait.NeverStop)
-	}
+	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling)
 
 	// Tune conntrack, if requested
 	// Conntracker is always nil for windows
