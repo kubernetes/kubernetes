@@ -45,11 +45,11 @@ import (
 type OperationExecutor interface {
 	// RegisterPlugin registers the given plugin using the a handler in the plugin handler map.
 	// It then updates the actual state of the world to reflect that.
-	RegisterPlugin(socketPath string, timestamp time.Time, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
+	RegisterPlugin(socketPath string, timestamp time.Time, pluginHandlers map[string]cache.PluginHandler, pathToHandlers *cache.SocketPluginHandlers, actualStateOfWorld ActualStateOfWorldUpdater) error
 
 	// UnregisterPlugin deregisters the given plugin using a handler in the given plugin handler map.
 	// It then updates the actual state of the world to reflect that.
-	UnregisterPlugin(socketPath string, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
+	UnregisterPlugin(socketPath string, pluginHandlers map[string]cache.PluginHandler, pathToHandlers *cache.SocketPluginHandlers, actualStateOfWorld ActualStateOfWorldUpdater) error
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -96,9 +96,10 @@ func (oe *operationExecutor) RegisterPlugin(
 	socketPath string,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
+	pathToHandlers *cache.SocketPluginHandlers,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
 	generatedOperation :=
-		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, actualStateOfWorld)
+		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, pathToHandlers, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		socketPath, generatedOperation)
@@ -107,9 +108,10 @@ func (oe *operationExecutor) RegisterPlugin(
 func (oe *operationExecutor) UnregisterPlugin(
 	socketPath string,
 	pluginHandlers map[string]cache.PluginHandler,
+	pathToHandlers *cache.SocketPluginHandlers,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
 	generatedOperation :=
-		oe.operationGenerator.GenerateUnregisterPluginFunc(socketPath, pluginHandlers, actualStateOfWorld)
+		oe.operationGenerator.GenerateUnregisterPluginFunc(socketPath, pluginHandlers, pathToHandlers, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		socketPath, generatedOperation)
