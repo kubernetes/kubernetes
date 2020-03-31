@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedEvent, false, "failed to find test event")
+		framework.ExpectEqual(foundCreatedEvent, false, "should not have found test event after deletion")
 	})
 })
 
