@@ -65,6 +65,21 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 	storage["networkpolicies"] = networkPolicyStorage
 
+	// ingresses
+	ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingresses"] = ingressStorage
+	storage["ingresses/status"] = ingressStatusStorage
+
+	// ingressclasses
+	ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["ingressclasses"] = ingressClassStorage
+
 	return storage, nil
 }
 
