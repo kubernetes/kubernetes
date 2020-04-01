@@ -71,7 +71,6 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/events:go_default_library",
-        "//test/e2e/framework/kubelet:go_default_library",
         "//test/e2e/framework/network:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
