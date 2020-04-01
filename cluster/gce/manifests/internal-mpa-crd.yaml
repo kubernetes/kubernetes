@@ -26,7 +26,7 @@ spec:
         properties:
           spec:
             type: object
-            required: ["scaleTargetRef", "goals"]
+            required: ["scaleTargetRef", "goals", "constraints"]
             properties:
               scaleTargetRef:
                 type: object
@@ -59,8 +59,21 @@ spec:
                               enum: ["cpu"]
                             target:
                               type: object
+                              properties:
+                                type:
+                                  type: string
+                                  enum: ["Utilization", "Value", "AverageValue"]
+                                value:
+                                  x-kubernetes-int-or-string: true
+                                averageValue:
+                                  x-kubernetes-int-or-string: true
+                                averageUtilization:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 100
               constraints:
                 type: object
+                required: ["containerControlledResources"]
                 properties:
                   global:
                     type: object
@@ -68,6 +81,7 @@ spec:
                       minReplicas:
                         type: integer
                         minimum: 0
+                        default: 1
                       maxReplicas:
                         type: integer
                         minimum: 0
@@ -76,8 +90,10 @@ spec:
                         properties:
                           minAllowed:
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                           maxAllowed:
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                   pod:
                     type: object
                     properties:
@@ -86,8 +102,10 @@ spec:
                         properties:
                           minAllowed:
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                           maxAllowed:
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                   containerControlledResources:
                     type: array
                     items:
@@ -105,8 +123,10 @@ spec:
                           properties:
                             minAllowed:
                               type: object
+                              x-kubernetes-preserve-unknown-fields: true
                             maxAllowed:
                               type: object
+                              x-kubernetes-preserve-unknown-fields: true
               policy:
                 type: object
                 properties:
