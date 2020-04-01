@@ -88,24 +88,34 @@ func TestGetZone(t *testing.T) {
 	testcases := []struct {
 		name        string
 		zone        string
+		location    string
 		faultDomain string
 		expected    string
 	}{
 		{
 			name:     "GetZone should get real zone if only node's zone is set",
 			zone:     "1",
+			location: "eastus",
 			expected: "eastus-1",
 		},
 		{
 			name:        "GetZone should get real zone if both node's zone and FD are set",
 			zone:        "1",
+			location:    "eastus",
 			faultDomain: "99",
 			expected:    "eastus-1",
 		},
 		{
 			name:        "GetZone should get faultDomain if node's zone isn't set",
+			location:    "eastus",
 			faultDomain: "99",
 			expected:    "99",
+		},
+		{
+			name:     "GetZone should get availability zone in lower cases",
+			location: "EastUS",
+			zone:     "1",
+			expected: "eastus-1",
 		},
 	}
 
@@ -117,7 +127,7 @@ func TestGetZone(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s", "location":"eastus"}}`, test.zone, test.faultDomain))
+			fmt.Fprint(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s", "location":"%s"}}`, test.zone, test.faultDomain, test.location))
 		}))
 		go func() {
 			http.Serve(listener, mux)

@@ -468,8 +468,8 @@ func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, e
 	}
 
 	zone := cloudprovider.Zone{
-		FailureDomain: failureDomain,
-		Region:        to.String(vm.Location),
+		FailureDomain: strings.ToLower(failureDomain),
+		Region:        strings.ToLower(to.String(vm.Location)),
 	}
 	return zone, nil
 }
