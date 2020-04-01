@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -186,6 +186,7 @@ type Instances interface {
 	// This method should still return true for instances that exist but are stopped/sleeping.
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
+	// If the instance is deleted, this method should return false, or throw an error.
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
 }
 
