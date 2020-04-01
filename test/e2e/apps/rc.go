@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/replication"
@@ -139,6 +140,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		rcWatchChan := rcWatch.ResultChan()
 
+		ginkgo.By("waiting for RC to be added")
+		for watchEvent := range rcWatchChan {
+			if watchEvent.Type == watch.Added {
+				break
+			}
+		}
 		ginkgo.By("waiting for available Replicas")
 		for watchEvent := range rcWatchChan {
 			rc, ok := watchEvent.Object.(*v1.ReplicationController)
@@ -158,6 +165,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		ginkgo.By("patching ReplicationController")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "Failed to patch ReplicationController")
+		ginkgo.By("waiting for RC to be modified")
+		for watchEvent := range rcWatchChan {
+			if watchEvent.Type == watch.Modified {
+				break
+			}
+		}
 
 		rcStatusPatchPayload, err := json.Marshal(map[string]interface{}{
 			"status": map[string]interface{}{
@@ -172,6 +185,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		rcStatus, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcStatusPatchPayload), metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err, "Failed to patch ReplicationControllerStatus")
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(0), "ReplicationControllerStatus's readyReplicas does not equal 0")
+		ginkgo.By("waiting for RC to be modified")
+		for watchEvent := range rcWatchChan {
+			if watchEvent.Type == watch.Modified {
+				break
+			}
+		}
 
 		ginkgo.By("fetching ReplicationController status")
 		rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{}, "status")
@@ -193,6 +212,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		ginkgo.By("patching ReplicationController scale")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcScalePatchPayload), metav1.PatchOptions{}, "scale")
 		framework.ExpectNoError(err, "Failed to patch ReplicationControllerScale")
+		ginkgo.By("waiting for RC to be modified")
+		for watchEvent := range rcWatchChan {
+			if watchEvent.Type == watch.Modified {
+				break
+			}
+		}
 
 		var rcFromWatch *v1.ReplicationController
 		ginkgo.By("waiting for ReplicationController's scale to be the max amount")
@@ -224,12 +249,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		rcStatus, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).UpdateStatus(context.TODO(), rcStatusUpdatePayload, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update ReplicationControllerStatus")
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(1), "ReplicationControllerStatus readyReplicas does not equal 1")
-
-		ginkgo.By(fmt.Sprintf("waiting for ReplicationController readyReplicas to be equal to %v", testRcMaxReplicaCount))
+		ginkgo.By("waiting for RC to be modified")
 		for watchEvent := range rcWatchChan {
-			rc, ok := watchEvent.Object.(*v1.ReplicationController)
-			framework.ExpectEqual(ok, true, "unable to convert type of ReplicationController watch watchEvent")
-			if rc.Status.Replicas == testRcMaxReplicaCount && rc.Status.ReadyReplicas == testRcMaxReplicaCount {
+			if watchEvent.Type == watch.Modified {
 				break
 			}
 		}
@@ -245,9 +267,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			if rcItem.ObjectMeta.Name == testRcName &&
 				rcItem.ObjectMeta.Namespace == testRcNamespace &&
 				rcItem.ObjectMeta.Labels["test-rc-static"] == "true" &&
-				rcItem.ObjectMeta.Labels["test-rc"] == "patched" &&
-				rcItem.Status.Replicas == testRcMaxReplicaCount &&
-				rcItem.Status.ReadyReplicas == testRcMaxReplicaCount {
+				rcItem.ObjectMeta.Labels["test-rc"] == "patched" {
 				foundRc = true
 			}
 		}
@@ -260,7 +280,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		ginkgo.By("waiting for ReplicationController to have a DELETED watchEvent")
 		for watchEvent := range rcWatchChan {
-			if watchEvent.Type == "DELETED" {
+			if watchEvent.Type == watch.Deleted {
 				break
 			}
 		}
