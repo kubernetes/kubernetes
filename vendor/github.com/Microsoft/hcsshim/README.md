@@ -2,7 +2,7 @@
 
 [![Build status](https://ci.appveyor.com/api/projects/status/nbcw28mnkqml0loa/branch/master?svg=true)](https://ci.appveyor.com/project/WindowsVirtualization/hcsshim/branch/master)
 
-This package contains the Golang interface for using the Windows [Host Compute Service](https://blogs.technet.microsoft.com/virtualization/2017/01/27/introducing-the-host-compute-service-hcs/) (HCS) to launch and manage [Windows Containers](https://docs.microsoft.com/en-us/virtualization/windowscontainers/about/). It also contains other helpers and functions for managing Windows Containers such as the Golang interface for the Host Network Service (HNS).
+This package contains the Golang interface for using the Windows [Host Compute Service](https://techcommunity.microsoft.com/t5/containers/introducing-the-host-compute-service-hcs/ba-p/382332) (HCS) to launch and manage [Windows Containers](https://docs.microsoft.com/en-us/virtualization/windowscontainers/about/). It also contains other helpers and functions for managing Windows Containers such as the Golang interface for the Host Network Service (HNS).
 
 It is primarily used in the [Moby Project](https://github.com/moby/moby), but it can be freely used by other projects as well.
 

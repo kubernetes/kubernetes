@@ -3,7 +3,7 @@ package cni
 import (
 	"errors"
 
-	"github.com/Microsoft/hcsshim/internal/guid"
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/regstate"
 )
 

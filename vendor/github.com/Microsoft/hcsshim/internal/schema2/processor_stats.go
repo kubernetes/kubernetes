@@ -11,10 +11,9 @@ package hcsschema
 
 //  CPU runtime statistics
 type ProcessorStats struct {
+	TotalRuntime100ns uint64 `json:"TotalRuntime100ns,omitempty"`
 
-	TotalRuntime100ns int32 `json:"TotalRuntime100ns,omitempty"`
+	RuntimeUser100ns uint64 `json:"RuntimeUser100ns,omitempty"`
 
-	RuntimeUser100ns int32 `json:"RuntimeUser100ns,omitempty"`
-
-	RuntimeKernel100ns int32 `json:"RuntimeKernel100ns,omitempty"`
+	RuntimeKernel100ns uint64 `json:"RuntimeKernel100ns,omitempty"`
 }

@@ -43,25 +43,30 @@ github.com/MakeNowJust/heredoc
 # github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5 => github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
-# github.com/Microsoft/hcsshim v0.0.0-20190417211021-672e52e9209d => github.com/Microsoft/hcsshim v0.0.0-20190417211021-672e52e9209d
+github.com/Microsoft/go-winio/vhd
+# github.com/Microsoft/hcsshim v0.8.8-0.20200331235606-8def383c2b18 => github.com/Microsoft/hcsshim v0.8.8-0.20200331235606-8def383c2b18
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/hcn
 github.com/Microsoft/hcsshim/internal/cni
-github.com/Microsoft/hcsshim/internal/guid
+github.com/Microsoft/hcsshim/internal/cow
 github.com/Microsoft/hcsshim/internal/hcs
 github.com/Microsoft/hcsshim/internal/hcserror
 github.com/Microsoft/hcsshim/internal/hns
 github.com/Microsoft/hcsshim/internal/interop
+github.com/Microsoft/hcsshim/internal/log
 github.com/Microsoft/hcsshim/internal/logfields
 github.com/Microsoft/hcsshim/internal/longpath
 github.com/Microsoft/hcsshim/internal/mergemaps
+github.com/Microsoft/hcsshim/internal/oc
 github.com/Microsoft/hcsshim/internal/regstate
 github.com/Microsoft/hcsshim/internal/runhcs
 github.com/Microsoft/hcsshim/internal/safefile
 github.com/Microsoft/hcsshim/internal/schema1
 github.com/Microsoft/hcsshim/internal/schema2
 github.com/Microsoft/hcsshim/internal/timeout
+github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
+github.com/Microsoft/hcsshim/osversion
 # github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46 => github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
 github.com/NYTimes/gziphandler
 # github.com/PuerkitoBio/purell v1.1.1 => github.com/PuerkitoBio/purell v1.1.1
@@ -167,6 +172,8 @@ github.com/client9/misspell/cmd/misspell
 github.com/clusterhq/flocker-go
 # github.com/container-storage-interface/spec v1.2.0 => github.com/container-storage-interface/spec v1.2.0
 github.com/container-storage-interface/spec/lib/go/csi
+# github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f => github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f
+github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
 github.com/containerd/console
 # github.com/containerd/containerd v1.3.3 => github.com/containerd/containerd v1.3.3
@@ -824,7 +831,7 @@ go.mongodb.org/mongo-driver/bson/bsonrw
 go.mongodb.org/mongo-driver/bson/bsontype
 go.mongodb.org/mongo-driver/bson/primitive
 go.mongodb.org/mongo-driver/x/bsonx/bsoncore
-# go.opencensus.io v0.21.0 => go.opencensus.io v0.21.0
+# go.opencensus.io v0.22.0 => go.opencensus.io v0.21.0
 go.opencensus.io
 go.opencensus.io/internal
 go.opencensus.io/internal/tagencoding
