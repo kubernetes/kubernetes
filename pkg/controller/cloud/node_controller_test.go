@@ -34,7 +34,6 @@ import (
 	"k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -462,7 +461,7 @@ func Test_AddCloudNode(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Annotations: map[string]string{
-						kubeletapis.AnnotationProvidedIPAddr: "10.0.0.1",
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
 					},
 				},
 				Spec: v1.NodeSpec{
@@ -502,7 +501,7 @@ func Test_AddCloudNode(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Annotations: map[string]string{
-						kubeletapis.AnnotationProvidedIPAddr: "10.0.0.1",
+						cloudproviderapi.AnnotationAlphaProvidedIPAddr: "10.0.0.1",
 					},
 				},
 				Spec: v1.NodeSpec{
