@@ -231,7 +231,7 @@ func (pl *InterPodAffinity) PreScore(
 		antiAffinityTerms: antiAffinityTerms,
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	errCh := parallelize.NewErrorChannel()
 	ctx, cancel := context.WithCancel(pCtx)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
