@@ -79,7 +79,7 @@ run_kubectl_apply_tests() {
   ! grep -q emptyDir <<< "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}")" || exit 1
   # Clean up
   kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]:?}"
-
+  kubectl wait deployment --for=delete test-deployment-retainkeys || true
 
   ## kubectl apply -f with label selector should only apply matching objects
   # Pre-Condition: no POD exists
