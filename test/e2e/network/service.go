@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
+	e2ekubesystem "k8s.io/kubernetes/test/e2e/framework/kubesystem"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -2345,11 +2346,11 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("restart kube-controller-manager")
-		if err := framework.RestartControllerManager(); err != nil {
-			framework.Failf("framework.RestartControllerManager() = %v; want nil", err)
+		if err := e2ekubesystem.RestartControllerManager(); err != nil {
+			framework.Failf("e2ekubesystem.RestartControllerManager() = %v; want nil", err)
 		}
-		if err := framework.WaitForControllerManagerUp(); err != nil {
-			framework.Failf("framework.WaitForControllerManagerUp() = %v; want nil", err)
+		if err := e2ekubesystem.WaitForControllerManagerUp(); err != nil {
+			framework.Failf("e2ekubesystem.WaitForControllerManagerUp() = %v; want nil", err)
 		}
 
 		ginkgo.By("health check should be reconciled")
