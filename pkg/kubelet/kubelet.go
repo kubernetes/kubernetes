@@ -2077,8 +2077,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			}
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 		kl.probeManager.AddPod(pod)
+		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 	}
 }
 
