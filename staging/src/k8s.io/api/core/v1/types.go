@@ -1093,7 +1093,9 @@ type SecretVolumeSource struct {
 	// +optional
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// Optional: mode bits used to set permissions on created files by default. 
-	// Must be an octal value between 0 and 0777. Defaults to 0644.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values
+	// for mode bits. Defaults to 0644.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -1519,7 +1521,9 @@ type ConfigMapVolumeSource struct {
 	// +optional
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
 	// Optional: mode bits used to set permissions on created files by default. 
-	// Must be an octal value between 0 and 0777. Defaults to 0644.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -1585,7 +1589,9 @@ type ServiceAccountTokenProjection struct {
 type ProjectedVolumeSource struct {
 	// list of volume projections
 	Sources []VolumeProjection `json:"sources" protobuf:"bytes,1,rep,name=sources"`
-	// Mode bits used to set permissions on created files by default. Must be a octal value between 0 and 0777.
+	// Mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -1626,7 +1632,8 @@ type KeyToPath struct {
 	// May not start with the string '..'.
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
 	// Optional: mode bits used to set permissions on this file.
-	// Must be an octal value between 0 and 0777.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 	// If not specified, the volume defaultMode will be used.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -5730,8 +5737,10 @@ type DownwardAPIVolumeSource struct {
 	// +optional
 	Items []DownwardAPIVolumeFile `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
 	// Optional: mode bits to use on created files by default. Must be a
-      // Optional: mode bits used to set permissions on created files by default. Must be an
-	// octal value between 0 and 0777. Defaults to 0644.
+	// Optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -5754,8 +5763,10 @@ type DownwardAPIVolumeFile struct {
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	// +optional
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
-	// Optional: mode bits used to set permissions on this file, must be an octal value between 0
-	// and 0777. If not specified, the volume defaultMode will be used.
+	// Optional: mode bits used to set permissions on this file, must be an octal value
+	// between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// If not specified, the volume defaultMode will be used.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
