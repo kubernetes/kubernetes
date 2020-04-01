@@ -32,6 +32,11 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
+var (
+	// tests which use this appear to all pass within the given time
+	generalWatchTimeout = int64(60)
+)
+
 var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
@@ -178,8 +183,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 
 		ginkgo.By("setting a watch for the ConfigMap")
 		// setup a watch for the ConfigMap
-		resourceWatchTimeoutSeconds := int64(60)
-		resourceWatch, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-configmap-static=true", TimeoutSeconds: &resourceWatchTimeoutSeconds})
+		resourceWatch, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-configmap-static=true", TimeoutSeconds: &generalWatchTimeout})
 		framework.ExpectNoError(err, "Failed to setup watch on newly created ConfigMap")
 
 		resourceWatchChan := resourceWatch.ResultChan()
@@ -246,6 +250,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 			if watchEvent.Type == watch.Deleted {
 				break
 			}
+			fmt.Println("failed to find Deleted watchEvent")
 		}
 	})
 })
