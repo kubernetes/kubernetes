@@ -34,7 +34,7 @@ import (
 	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -1161,7 +1161,7 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 	// error
 	errorSamples := model.Samples{mkErrorSample(len(tc.expectConfigStatus.err) > 0)}
 	// expected metrics
-	expect := frameworkmetrics.KubeletMetrics(map[string]model.Samples{
+	expect := e2emetrics.KubeletMetrics(map[string]model.Samples{
 		assignedConfigKey:      assignedSamples,
 		activeConfigKey:        activeSamples,
 		lastKnownGoodConfigKey: lastKnownGoodSamples,

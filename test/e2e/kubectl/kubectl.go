@@ -62,12 +62,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
@@ -208,7 +208,7 @@ func assertCleanup(ns string, selectors ...string) {
 }
 
 func readTestFileOrDie(file string) []byte {
-	return testfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+	return e2etestfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file))
 }
 
 func runKubectlRetryOrDie(ns string, args ...string) string {
@@ -300,7 +300,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		var nautilus string
 		ginkgo.BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
+			nautilus = commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
 		})
 		/*
 			Release : v1.9
@@ -348,7 +348,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"agnhost-master-deployment.yaml.in",
 				"agnhost-slave-deployment.yaml.in",
 			} {
-				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
+				contents := commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
 			}
 		}
@@ -621,11 +621,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		ginkgo.It("should handle in-cluster config", func() {
 			ginkgo.By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-			err := auth.BindClusterRole(f.ClientSet.RbacV1(), "view", f.Namespace.Name,
+			err := e2eauth.BindClusterRole(f.ClientSet.RbacV1(), "view", f.Namespace.Name,
 				rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 			framework.ExpectNoError(err)
 
-			err = auth.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
+			err = e2eauth.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
 				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
 			framework.ExpectNoError(err)

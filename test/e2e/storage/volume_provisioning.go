@@ -45,7 +45,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
@@ -603,7 +603,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Name:      serviceAccountName,
 			}
 
-			err := auth.BindClusterRole(c.RbacV1(), "system:persistent-volume-provisioner", ns, subject)
+			err := e2eauth.BindClusterRole(c.RbacV1(), "system:persistent-volume-provisioner", ns, subject)
 			framework.ExpectNoError(err)
 
 			roleName := "leader-locking-nfs-provisioner"
@@ -619,10 +619,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Failed to create leader-locking role")
 
-			err = auth.BindRoleInNamespace(c.RbacV1(), roleName, ns, subject)
+			err = e2eauth.BindRoleInNamespace(c.RbacV1(), roleName, ns, subject)
 			framework.ExpectNoError(err)
 
-			err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
+			err = e2eauth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
 				serviceaccount.MakeUsername(ns, serviceAccountName),
 				"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
 			framework.ExpectNoError(err, "Failed to update authorization")

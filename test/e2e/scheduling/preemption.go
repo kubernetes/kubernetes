@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -686,7 +686,7 @@ func createPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSe
 
 func runPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSet {
 	rs := createPauseRS(f, conf)
-	framework.ExpectNoError(replicaset.WaitForReplicaSetTargetAvailableReplicasWithTimeout(f.ClientSet, rs, conf.Replicas, framework.PodGetTimeout))
+	framework.ExpectNoError(e2ereplicaset.WaitForReplicaSetTargetAvailableReplicasWithTimeout(f.ClientSet, rs, conf.Replicas, framework.PodGetTimeout))
 	return rs
 }
 

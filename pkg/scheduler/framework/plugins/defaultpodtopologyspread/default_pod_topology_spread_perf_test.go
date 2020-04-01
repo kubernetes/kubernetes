@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -76,15 +77,14 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 				if !status.IsSuccess() {
 					b.Fatalf("unexpected error: %v", status)
 				}
-				var gotList framework.NodeScoreList
-				for _, node := range filteredNodes {
-					score, status := plugin.Score(ctx, state, pod, node.Name)
-					if !status.IsSuccess() {
-						b.Errorf("unexpected error: %v", status)
-					}
-					gotList = append(gotList, framework.NodeScore{Name: node.Name, Score: score})
+				gotList := make(framework.NodeScoreList, len(filteredNodes))
+				scoreNode := func(i int) {
+					n := filteredNodes[i]
+					score, _ := plugin.Score(ctx, state, pod, n.Name)
+					gotList[i] = framework.NodeScore{Name: n.Name, Score: score}
 				}
-				status = plugin.NormalizeScore(context.Background(), state, pod, gotList)
+				parallelize.Until(ctx, len(filteredNodes), scoreNode)
+				status = plugin.NormalizeScore(ctx, state, pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)
 				}

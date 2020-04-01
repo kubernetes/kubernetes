@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -71,7 +71,7 @@ func InitVolumeIOTestSuite() TestSuite {
 				testpatterns.DefaultFsPreprovisionedPV,
 				testpatterns.DefaultFsDynamicPV,
 			},
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 		},
@@ -180,7 +180,7 @@ func createFileSizes(maxFileSize int64) []int64 {
 }
 
 // Return the plugin's client pod spec. Use an InitContainer to setup the file i/o test env.
-func makePodSpec(config volume.TestConfig, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
+func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
 	var gracePeriod int64 = 1
 	volName := fmt.Sprintf("io-volume-%s", config.Namespace)
 	pod := &v1.Pod{
@@ -305,7 +305,7 @@ func deleteFile(f *framework.Framework, pod *v1.Pod, fpath string) {
 // Note: nil can be passed for the podSecContext parm, in which case it is ignored.
 // Note: `fsizes` values are enforced to each be at least `MinFileSize` and a multiple of `MinFileSize`
 //   bytes.
-func testVolumeIO(f *framework.Framework, cs clientset.Interface, config volume.TestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
+func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolume.TestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
 	ddInput := filepath.Join(mountPath, fmt.Sprintf("%s-%s-dd_if", config.Prefix, config.Namespace))
 	writeBlk := strings.Repeat("abcdefghijklmnopqrstuvwxyz123456", 32) // 1KiB value
 	loopCnt := testpatterns.MinFileSize / int64(len(writeBlk))
@@ -333,7 +333,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config volume.
 			}
 		} else {
 			framework.Logf("sleeping a bit so kubelet can unmount and detach the volume")
-			time.Sleep(volume.PodCleanupTimeout)
+			time.Sleep(e2evolume.PodCleanupTimeout)
 		}
 	}()
 

@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -294,8 +294,8 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			Containers: []v1.Container{
 				{
 					Name:    "csi-volume-tester",
-					Image:   volume.GetTestImage(framework.BusyBoxImage),
-					Command: volume.GenerateScriptCmd(command),
+					Image:   e2evolume.GetTestImage(framework.BusyBoxImage),
+					Command: e2evolume.GenerateScriptCmd(command),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,

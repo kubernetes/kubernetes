@@ -34,7 +34,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -63,7 +63,7 @@ func InitVolumeExpandTestSuite() TestSuite {
 				testpatterns.DefaultFsDynamicPVAllowExpansion,
 				testpatterns.BlockVolModeDynamicPVAllowExpansion,
 			},
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 		},

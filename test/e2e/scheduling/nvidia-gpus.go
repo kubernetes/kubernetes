@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -133,7 +133,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	} else {
 		dsYamlURL = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
 	}
-	gpuResourceName = gpu.NVIDIAGPUResourceName
+	gpuResourceName = e2egpu.NVIDIAGPUResourceName
 
 	framework.Logf("Using %v", dsYamlURL)
 	// Creates the DaemonSet that installs Nvidia Drivers.

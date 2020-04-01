@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["well_known_taints.go"],
+    srcs = [
+        "well_known_annotations.go",
+        "well_known_taints.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/api",
     importpath = "k8s.io/cloud-provider/api",
     visibility = ["//visibility:public"],

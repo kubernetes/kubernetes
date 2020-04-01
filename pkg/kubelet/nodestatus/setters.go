@@ -33,10 +33,10 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -82,7 +82,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				if node.ObjectMeta.Annotations == nil {
 					node.ObjectMeta.Annotations = make(map[string]string)
 				}
-				node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = nodeIP.String()
+				node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = nodeIP.String()
 			}
 
 			// If --cloud-provider=external and node address is already set,

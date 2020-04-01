@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	replicasetutil "k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -229,7 +229,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
-	rs, err = replicasetutil.UpdateReplicaSetWithRetries(c, namespace, name, func(update *appsv1.ReplicaSet) {
+	rs, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, namespace, name, func(update *appsv1.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})

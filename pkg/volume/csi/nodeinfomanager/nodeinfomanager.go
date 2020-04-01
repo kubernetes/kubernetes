@@ -397,16 +397,16 @@ func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
 		return goerrors.New("error getting CSI client")
 	}
 
-	var updateErrs []error
+	var lastErr error
 	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if err := nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); err != nil {
-			updateErrs = append(updateErrs, err)
+		if lastErr = nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); lastErr != nil {
+			klog.V(2).Infof("Failed to publish CSINode: %v", lastErr)
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("error updating CSINode annotation: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+		return fmt.Errorf("error updating CSINode annotation: %v; caused by: %v", err, lastErr)
 	}
 
 	return nil

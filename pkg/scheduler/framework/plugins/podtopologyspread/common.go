@@ -82,3 +82,17 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 	}
 	return result, nil
 }
+
+func countPodsMatchSelector(pods []*v1.Pod, selector labels.Selector, ns string) int {
+	count := 0
+	for _, p := range pods {
+		// Bypass terminating Pod (see #87621).
+		if p.DeletionTimestamp != nil || p.Namespace != ns {
+			continue
+		}
+		if selector.Matches(labels.Set(p.Labels)) {
+			count++
+		}
+	}
+	return count
+}

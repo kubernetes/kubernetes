@@ -57,7 +57,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -445,10 +445,10 @@ func NewIngressTestJig(c clientset.Interface) *TestJig {
 func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[string]string, svcAnnotations map[string]string) {
 	var err error
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file)))
+		return string(e2etestfiles.ReadOrDie(filepath.Join(manifestPath, file)))
 	}
 	exists := func(file string) bool {
-		return testfiles.Exists(filepath.Join(manifestPath, file))
+		return e2etestfiles.Exists(filepath.Join(manifestPath, file))
 	}
 
 	j.Logger.Infof("creating replication controller")
@@ -499,7 +499,7 @@ func marshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
 // ingressFromManifest reads a .json/yaml file and returns the ingress in it.
 func ingressFromManifest(fileName string) (*networkingv1beta1.Ingress, error) {
 	var ing networkingv1beta1.Ingress
-	data, err := testfiles.Read(fileName)
+	data, err := e2etestfiles.Read(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -1008,7 +1008,7 @@ func (cont *NginxIngressController) Init() {
 	framework.ExpectNoError(err)
 
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file)))
+		return string(e2etestfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file)))
 	}
 	framework.Logf("initializing nginx ingress controller")
 	framework.RunKubectlOrDieInput(cont.Ns, read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))

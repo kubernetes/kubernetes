@@ -279,6 +279,12 @@ const (
 	KubeProxy = "kube-proxy"
 	// HyperKube defines variable used internally when referring to the hyperkube image
 	HyperKube = "hyperkube"
+	// CoreDNS defines variable used internally when referring to the CoreDNS component
+	CoreDNS = "CoreDNS"
+	// KubeDNS defines variable used internally when referring to the KubeDNS component
+	KubeDNS = "kube-dns"
+	// Kubelet defines variable used internally when referring to the Kubelet
+	Kubelet = "kubelet"
 
 	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
 	SelfHostingPrefix = "self-hosted-"

@@ -92,6 +92,15 @@ func ParseMetrics(data string, output *Metrics) error {
 	}
 }
 
+// TextToMetricFamilies reads 'in' as the simple and flat text-based exchange
+// format and creates MetricFamily proto messages. It returns the MetricFamily
+// proto messages in a map where the metric names are the keys, along with any
+// error encountered.
+func TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricFamily, error) {
+	var textParser expfmt.TextParser
+	return textParser.TextToMetricFamilies(in)
+}
+
 // ExtractMetricSamples parses the prometheus metric samples from the input string.
 func ExtractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	dec := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)

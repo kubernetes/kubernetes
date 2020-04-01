@@ -1,5 +1,11 @@
 #cloud-config
 
+users:
+- name: etcd
+  homedir: /var/etcd
+  lock_passwd: true
+  ssh_redirect_user: true
+
 write_files:
   - path: /etc/systemd/system/kube-master-installation.service
     permissions: 0644

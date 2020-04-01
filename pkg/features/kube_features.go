@@ -288,15 +288,6 @@ const (
 	// while making decisions.
 	BalanceAttachedNodeVolumes featuregate.Feature = "BalanceAttachedNodeVolumes"
 
-	// owner: @kevtaylor
-	// alpha: v1.14
-	// beta: v1.15
-	// ga: v1.17
-	//
-	// Allow subpath environment variable substitution
-	// Only applicable if the VolumeSubpath feature is also enabled
-	VolumeSubpathEnvExpansion featuregate.Feature = "VolumeSubpathEnvExpansion"
-
 	// owner: @vladimirvivien
 	// alpha: v1.11
 	// beta:  v1.14
@@ -646,7 +637,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
 	ConfigurableFSGroupPolicy:      {Default: false, PreRelease: featuregate.Alpha},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSubpathEnvExpansion:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19,
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},

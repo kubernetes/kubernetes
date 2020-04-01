@@ -79,9 +79,9 @@ func TestList(t *testing.T) {
 	}
 
 	expected := []metav1.PartialObjectMetadata{
-		*newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-foo"),
 		*newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-bar"),
 		*newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-baz"),
+		*newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-foo"),
 	}
 	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
 		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))

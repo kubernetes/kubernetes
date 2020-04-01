@@ -4,11 +4,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "constants.go",
+        "doc.go",
         "ipvs.go",
         "netlink.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/docker/libnetwork/ipvs",
-    importpath = "github.com/docker/libnetwork/ipvs",
+    importmap = "k8s.io/kubernetes/vendor/github.com/moby/ipvs",
+    importpath = "github.com/moby/ipvs",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [

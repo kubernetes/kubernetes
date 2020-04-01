@@ -51,9 +51,10 @@ readonly kern_logfile="kern.log"
 readonly initd_logfiles="docker/log"
 readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
 readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly extra_log_files="${LOG_DUMP_EXTRA_FILES:-}"
 readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
 # Log files found in WINDOWS_LOGS_DIR on Windows nodes:
-readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log"
+readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log docker_images.log"
 # Log files found in other directories on Windows nodes:
 readonly windows_node_otherfiles="C:\\Windows\\MEMORY.dmp"
 
@@ -140,6 +141,7 @@ function save-logs() {
     local opt_systemd_services="${4:-""}"
     local on_master="${5:-"false"}"
 
+    files="${files} ${extra_log_files}"
     if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
@@ -496,6 +498,7 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
   sed -i'' -e "s@{{.DumpSystemdJournal}}@${dump_systemd_journal}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  sed -i'' -e "s@{{.ExtraLogFiles}}@${extra_log_files}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
   KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"

@@ -202,8 +202,8 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 	return makeGlobalPDPath(a.plugin.host, volumeSource.DataDiskURI, isManagedDisk)
 }
 
-func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.plugin.host.GetMounter(azureDataDiskPluginName)
+func (a *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	mounter := a.plugin.host.GetMounter(azureDataDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 
 	if err != nil {
@@ -242,7 +242,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 
 	options := []string{}
 	if notMnt {
-		diskMounter := util.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
+		diskMounter := util.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, a.plugin.host)
 		mountOptions := util.MountOptionFromSpec(spec, options...)
 		if runtime.GOOS == "windows" {
 			// only parse devicePath on Windows node
@@ -284,8 +284,8 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 }
 
 // UnmountDevice unmounts the volume on the node
-func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := mount.CleanupMountPoint(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()), false)
+func (d *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
+	err := mount.CleanupMountPoint(deviceMountPath, d.plugin.host.GetMounter(d.plugin.GetPluginName()), false)
 	if err == nil {
 		klog.V(2).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {

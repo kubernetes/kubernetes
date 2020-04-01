@@ -30,14 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-const (
-	// StatusTooManyRequests means the server experienced too many requests within a
-	// given window and that the client must wait to perform the action again.
-	// DEPRECATED: please use http.StatusTooManyRequests, this will be removed in
-	// the future version.
-	StatusTooManyRequests = http.StatusTooManyRequests
-)
-
 // StatusError is an error intended for consumption by a REST API server; it can also be
 // reconstructed by clients from a REST response. Public to allow easy type switches.
 type StatusError struct {

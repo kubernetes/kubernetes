@@ -5053,8 +5053,7 @@ func TestValidateDisabledSubpath(t *testing.T) {
 }
 
 func TestValidateSubpathMutuallyExclusive(t *testing.T) {
-	// Enable feature VolumeSubpathEnvExpansion and VolumeSubpath
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, true)()
+	// Enable feature VolumeSubpath
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, true)()
 
 	volumes := []core.Volume{
@@ -5137,8 +5136,6 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 }
 
 func TestValidateDisabledSubpathExpr(t *testing.T) {
-	// Enable feature VolumeSubpathEnvExpansion
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, true)()
 
 	volumes := []core.Volume{
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},

@@ -24,13 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 // PodFromManifest reads a .json/yaml file and returns the pod in it.
 func PodFromManifest(filename string) (*v1.Pod, error) {
 	var pod v1.Pod
-	data, err := testfiles.Read(filename)
+	data, err := e2etestfiles.Read(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func PodFromManifest(filename string) (*v1.Pod, error) {
 // RcFromManifest reads a .json/yaml file and returns the rc in it.
 func RcFromManifest(fileName string) (*v1.ReplicationController, error) {
 	var controller v1.ReplicationController
-	data, err := testfiles.Read(fileName)
+	data, err := e2etestfiles.Read(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func RcFromManifest(fileName string) (*v1.ReplicationController, error) {
 // SvcFromManifest reads a .json/yaml file and returns the service in it.
 func SvcFromManifest(fileName string) (*v1.Service, error) {
 	var svc v1.Service
-	data, err := testfiles.Read(fileName)
+	data, err := e2etestfiles.Read(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func SvcFromManifest(fileName string) (*v1.Service, error) {
 // StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.
 func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
 	var ss appsv1.StatefulSet
-	data, err := testfiles.Read(fileName)
+	data, err := e2etestfiles.Read(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
 // DaemonSetFromManifest returns a DaemonSet from a manifest stored in fileName in the Namespace indicated by ns.
 func DaemonSetFromManifest(fileName, ns string) (*appsv1.DaemonSet, error) {
 	var ds appsv1.DaemonSet
-	data, err := testfiles.Read(fileName)
+	data, err := e2etestfiles.Read(fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func DaemonSetFromManifest(fileName, ns string) (*appsv1.DaemonSet, error) {
 // RoleFromManifest returns a Role from a manifest stored in fileName in the Namespace indicated by ns.
 func RoleFromManifest(fileName, ns string) (*rbacv1.Role, error) {
 	var role rbacv1.Role
-	data, err := testfiles.Read(fileName)
+	data, err := e2etestfiles.Read(fileName)
 	if err != nil {
 		return nil, err
 	}

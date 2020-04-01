@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -64,7 +64,7 @@ func InitSnapshottableTestSuite() TestSuite {
 			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DynamicSnapshot,
 			},
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 		},
