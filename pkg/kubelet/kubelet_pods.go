@@ -941,18 +941,10 @@ func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bo
 		return false
 	}
 	// pod's sandboxes should be deleted
-	filter := &runtimeapi.PodSandboxFilter{
-		LabelSelector: map[string]string{kubetypes.KubernetesPodUIDLabel: string(pod.UID)},
-	}
-	sandboxes, err := kl.runtimeService.ListPodSandbox(filter)
-	if err != nil {
-		klog.V(3).Infof("Pod %q is terminated, Error getting pod sandboxes from the runtime service: %s", format.Pod(pod), err)
-		return false
-	}
-	if len(sandboxes) > 0 {
+	if len(runtimeStatus.SandboxStatuses) > 0 {
 		var sandboxStr string
-		for _, sandbox := range sandboxes {
-			sandboxStr += fmt.Sprintf("%+v ", sandbox)
+		for _, sandbox := range runtimeStatus.SandboxStatuses {
+			sandboxStr += fmt.Sprintf("%+v ", *sandbox)
 		}
 		klog.V(3).Infof("Pod %q is terminated, but some pod sandboxes have not been cleaned up: %s", format.Pod(pod), sandboxStr)
 		return false

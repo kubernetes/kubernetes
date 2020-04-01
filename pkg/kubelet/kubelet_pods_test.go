@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"os"
 	"path/filepath"
 	"sort"
@@ -44,7 +43,6 @@ import (
 	// to "v1"?
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	apitest "k8s.io/cri-api/pkg/apis/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -2389,7 +2387,7 @@ func TestTruncatePodHostname(t *testing.T) {
 	}
 }
 
-func TestKubelet_PodResourcesAreReclaimed(t *testing.T) {
+func TestPodResourcesAreReclaimed(t *testing.T) {
 
 	type args struct {
 		pod           *v1.Pod
@@ -2430,12 +2428,13 @@ func TestKubelet_PodResourcesAreReclaimed(t *testing.T) {
 		{
 			"pod with sandbox present",
 			args{
-				pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						UID: types.UID("fakesandbox"),
+				pod:    &v1.Pod{},
+				status: v1.PodStatus{},
+				runtimeStatus: kubecontainer.PodStatus{
+					SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+						{},
 					},
 				},
-				status: v1.PodStatus{},
 			},
 			false,
 		},
@@ -2445,18 +2444,6 @@ func TestKubelet_PodResourcesAreReclaimed(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
-	runtimeService := apitest.NewFakeRuntimeService()
-	runtimeService.SetFakeSandboxes([]*apitest.FakePodSandbox{
-		{
-			PodSandboxStatus: runtimeapi.PodSandboxStatus{
-				Id: "fakesandbox",
-				Labels: map[string]string{
-					kubetypes.KubernetesPodUIDLabel: "fakesandbox",
-				},
-			},
-		},
-	})
-	kl.runtimeService = runtimeService
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testKubelet.fakeRuntime.PodStatus = tt.args.runtimeStatus
