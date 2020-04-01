@@ -28,8 +28,8 @@ DEFAULT_CNI_VERSION="v0.8.5"
 DEFAULT_CNI_SHA1="677d218b62c0ef941c1d0b606d6570faa5277ffd"
 DEFAULT_NPD_VERSION="v0.8.0"
 DEFAULT_NPD_SHA1="9406c975b1b035995a137029a004622b905b4e7f"
-DEFAULT_CRICTL_VERSION="v1.17.0"
-DEFAULT_CRICTL_SHA1="5c18f4e52ab524d429063b78d086dd18b894aae7"
+DEFAULT_CRICTL_VERSION="v1.18.0"
+DEFAULT_CRICTL_SHA1="f384f594bd0a7e558a827363f54f58b45e670075"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -280,7 +280,7 @@ function install-crictl {
     local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
     local -r crictl_sha1="${DEFAULT_CRICTL_SHA1}"
   fi
-  local -r crictl="crictl-${crictl_version}-linux-amd64"
+  local -r crictl="crictl-${crictl_version}-linux-amd64.tar.gz"
 
   # Create crictl config file.
   cat > /etc/crictl.yaml <<EOF
@@ -293,10 +293,10 @@ EOF
   fi
 
   echo "Downloading crictl"
-  local -r crictl_path="https://storage.googleapis.com/kubernetes-release/crictl"
+  local -r crictl_path="https://github.com/kubernetes-sigs/cri-tools/releases/download/${crictl_version}"
   download-or-bust "${crictl_sha1}" "${crictl_path}/${crictl}"
-  mv "${KUBE_HOME}/${crictl}" "${KUBE_BIN}/crictl"
-  chmod a+x "${KUBE_BIN}/crictl"
+  tar xf "${crictl}"
+  mv crictl "${KUBE_BIN}/crictl"
 }
 
 function install-exec-auth-plugin {

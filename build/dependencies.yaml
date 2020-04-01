@@ -28,7 +28,7 @@ dependencies:
       match: CoreDNSVersion =
 
   - name: "crictl"
-    version: 1.17.0
+    version: 1.18.0
     refPaths:
     - path: build/workspace.bzl
       match: CRI_TOOLS_VERSION =
