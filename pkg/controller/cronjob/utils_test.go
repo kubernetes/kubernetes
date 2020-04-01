@@ -382,6 +382,27 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 			t.Errorf("unexpected error")
 		}
 	}
+	{
+		// Case 8: now is just after deadline has passed, deadline expired with no jobs invoked
+		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-5 * time.Minute)}
+		sj.Status.LastScheduleTime = &metav1.Time{Time: T1}
+		// Deadline is 30 seconds
+		deadline := int64(30)
+		// Now is 10 seconds past the deadline, T2 was an unmet schedule
+		now := T2.Add(time.Duration(deadline+10) * time.Second)
+		sj.Spec.StartingDeadlineSeconds = &deadline
+		times, err := getRecentUnmetScheduleTimes(sj, now)
+		if err != nil {
+			t.Errorf("unexpected error")
+		}
+		if len(times) != 1 {
+			t.Errorf("expected 1 start time, got %v", times)
+		} else {
+			if !times[len(times)-1].Equal(T2) {
+				t.Errorf("expected %v, got: %v", T2, times[len(times)-1])
+			}
+		}
+	}
 }
 
 func TestByJobStartTime(t *testing.T) {

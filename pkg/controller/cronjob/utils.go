@@ -108,14 +108,6 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 		// CronJob as last known start time.
 		earliestTime = sj.ObjectMeta.CreationTimestamp.Time
 	}
-	if sj.Spec.StartingDeadlineSeconds != nil {
-		// Controller is not going to schedule anything below this point
-		schedulingDeadline := now.Add(-time.Second * time.Duration(*sj.Spec.StartingDeadlineSeconds))
-
-		if schedulingDeadline.After(earliestTime) {
-			earliestTime = schedulingDeadline
-		}
-	}
 	if earliestTime.After(now) {
 		return []time.Time{}, nil
 	}
