@@ -962,19 +962,15 @@ var _ = framework.KubeDescribe("Pods", func() {
 			}
 		}
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to patch all relevant Pod conditions")
-		_, err = f.ClientSet.CoreV1().Pods(testNs).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
+		podStatusUpdate, err := f.ClientSet.CoreV1().Pods(testNs).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update PodStatus")
 
-		ginkgo.By("list all Pods and get their status to ensure it's Ready condition is False")
-		podsList, err := f.ClientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-pod-static=true"})
-		framework.ExpectNoError(err, "failed to list Pods")
+		ginkgo.By("check the PodStatus updates's return status to ensure it's Ready condition is False")
 		podStatusFieldPatchCount = 0
 		podStatusFieldPatchCountTotal = 2
-		for _, podItem := range podsList.Items {
-			for _, cond := range podItem.Status.Conditions {
-				if (cond.Type == "Ready" && cond.Status == "False") || (cond.Type == "ContainersReady" && cond.Status == "False") {
-					podStatusFieldPatchCount++
-				}
+		for _, cond := range podStatusUpdate.Status.Conditions {
+			if (cond.Type == "Ready" && cond.Status == "False") || (cond.Type == "ContainersReady" && cond.Status == "False") {
+				podStatusFieldPatchCount++
 			}
 		}
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
