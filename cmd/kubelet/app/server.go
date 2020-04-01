@@ -1101,7 +1101,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	podCfg := kubeDeps.PodConfig
 
 	if err := rlimit.RlimitNumFiles(uint64(kubeServer.MaxOpenFiles)); err != nil {
-		klog.Warningf("Failed to set open file handler limit: %v", err)
+		klog.Errorf("Failed to set rlimit on max file handles: %v", err)
 	}
 
 	// process pods and exit.
