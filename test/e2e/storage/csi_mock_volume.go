@@ -944,7 +944,6 @@ func parseMockLogs(cs clientset.Interface, namespace, driverPodName, driverConta
 	if err != nil {
 		return nil, fmt.Errorf("could not load CSI driver logs: %s", err)
 	}
-	framework.Logf("CSI driver logs:\n%s", log)
 
 	logLines := strings.Split(log, "\n")
 	var calls []mockCSICall
