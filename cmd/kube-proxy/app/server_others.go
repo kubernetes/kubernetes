@@ -257,6 +257,10 @@ func newProxyServer(
 		proxymetrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
+		// fast-fail if ipvsInterface is nil
+		if ipvsInterface == nil {
+			return nil, fmt.Errorf("unable to initialize IPVS interface")
+		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 			klog.V(0).Info("creating dualStackProxier for ipvs.")
 
