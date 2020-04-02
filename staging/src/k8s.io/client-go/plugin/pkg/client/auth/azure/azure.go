@@ -307,8 +307,9 @@ func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 	if expiresOn == "" {
 		return nil, fmt.Errorf("no expiresOn in cfg: %s", cfgExpiresOn)
 	}
+	tokenAudience := resourceID
 	if ts.configMode == configModeDefault {
-		resourceID = fmt.Sprintf("spn:%s", resourceID)
+		tokenAudience = fmt.Sprintf("spn:%s", resourceID)
 	}
 
 	return &azureToken{
@@ -318,7 +319,7 @@ func (ts *azureTokenSource) retrieveTokenFromCfg() (*azureToken, error) {
 			ExpiresIn:    json.Number(expiresIn),
 			ExpiresOn:    json.Number(expiresOn),
 			NotBefore:    json.Number(expiresOn),
-			Resource:     resourceID,
+			Resource:     tokenAudience,
 			Type:         tokenType,
 		},
 		environment: environment,
