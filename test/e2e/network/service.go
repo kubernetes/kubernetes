@@ -68,16 +68,6 @@ const (
 	defaultServeHostnameServicePort = 80
 	defaultServeHostnameServiceName = "svc-hostname"
 
-	// KubeProxyLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
-	// to not notice a Service update, such as type=NodePort.
-	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
-	// liberal. Fix tracked in #20567.
-	KubeProxyLagTimeout = 5 * time.Minute
-
-	// LoadBalancerPollTimeout is the time required by the loadbalancer to poll.
-	// On average it takes ~6 minutes for a single backend to come online in GCE.
-	LoadBalancerPollTimeout = 22 * time.Minute
-
 	// AffinityTimeout is the maximum time that CheckAffinity is allowed to take; this
 	// needs to be more than long enough for AffinityConfirmCount HTTP requests to
 	// complete in a busy CI cluster, but shouldn't be too long since we will end up
@@ -124,7 +114,7 @@ func checkAffinity(execPod *v1.Pod, serviceIP string, servicePort int, shouldHol
 	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
 	timeout := AffinityTimeout
 	if execPod == nil {
-		timeout = LoadBalancerPollTimeout
+		timeout = e2eservice.LoadBalancerPollTimeout
 	}
 	var tracker affinityTracker
 	// interval considering a maximum of 2 seconds per connection
@@ -316,7 +306,7 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 		gotEndpoints := sets.NewString()
 
 		// Retry cmdFunc for a while
-		for start := time.Now(); time.Since(start) < KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
+		for start := time.Now(); time.Since(start) < e2eservice.KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
 			for _, endpoint := range strings.Split(cmdFunc(), "\n") {
 				trimmedEp := strings.TrimSpace(endpoint)
 				if trimmedEp != "" {
