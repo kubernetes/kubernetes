@@ -57,14 +57,14 @@ const (
 	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
 	// be targeted by load balancers.
 	LoadBalancerPropagationTimeoutDefault = 10 * time.Minute
+	// LoadBalancerPropagationTimeoutLarge is the maximum time to wait for pods to
+	// be targeted by load balancers.
+	LoadBalancerPropagationTimeoutLarge = time.Hour
 
 	// LoadBalancerCleanupTimeout is the time required by the loadbalancer to cleanup, proportional to numApps/Ing.
 	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
 	LoadBalancerCleanupTimeout = 15 * time.Minute
 
-	// LoadBalancerPollTimeout is the time required by the loadbalancer to poll.
-	// On average it takes ~6 minutes for a single backend to come online in GCE.
-	LoadBalancerPollTimeout = 22 * time.Minute
 	// LoadBalancerPollInterval is the interval value in which the loadbalancer polls.
 	LoadBalancerPollInterval = 30 * time.Second
 

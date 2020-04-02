@@ -172,7 +172,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}, map[string]string{})
 
 			ginkgo.By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
-			pollErr := wait.Poll(2*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
+			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
+			pollErr := wait.Poll(2*time.Second, propagationTimeout, func() (bool, error) {
 				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
@@ -287,6 +288,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should be able to switch between IG and NEG modes", func() {
 			var err error
+			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
 			ginkgo.By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
@@ -301,7 +303,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
-			err = wait.Poll(5*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
+			err = wait.Poll(5*time.Second, propagationTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false)); err != nil {
 					framework.Logf("ginkgo.Failed to verify IG backend service: %v", err)
 					return false, nil
@@ -319,7 +321,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 			}
-			err = wait.Poll(5*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
+			err = wait.Poll(5*time.Second, propagationTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false)); err != nil {
 					framework.Logf("ginkgo.Failed to verify NEG backend service: %v", err)
 					return false, nil
@@ -406,7 +408,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(context.TODO(), name, scale, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 
-			err = wait.Poll(10*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
+			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
+			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				if err != nil {
 					return false, nil
@@ -423,7 +426,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
 			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(context.TODO(), deploy, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
-			err = wait.Poll(10*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
+			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				framework.ExpectNoError(err)
 				deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
@@ -832,12 +835,14 @@ func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *e2eingress.TestJi
 		e2eingress.IngressAllowHTTPKey: "false",
 	}, map[string]string{})
 
+	propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
+
 	ginkgo.By("waiting for Ingress to come up with ip: " + ip)
 	httpClient := e2eingress.BuildInsecureClient(e2eingress.IngressReqTimeout)
-	framework.ExpectNoError(e2eingress.PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
+	framework.ExpectNoError(e2eingress.PollURL(fmt.Sprintf("https://%s/", ip), "", propagationTimeout, jig.PollInterval, httpClient, false))
 
 	ginkgo.By("should reject HTTP traffic")
-	framework.ExpectNoError(e2eingress.PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
+	framework.ExpectNoError(e2eingress.PollURL(fmt.Sprintf("http://%s/", ip), "", propagationTimeout, jig.PollInterval, httpClient, true))
 }
 
 func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *e2eingress.TestJig, staticIPName string) {
@@ -850,14 +855,15 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *e2eingress.Te
 		}
 	}()
 	framework.ExpectNoError(err, "ginkgo.Failed to create re-encryption ingress")
+	propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
 
 	ginkgo.By(fmt.Sprintf("Waiting for ingress %s to come up", ingCreated.Name))
-	ingIP, err := jig.WaitForIngressAddress(f.ClientSet, f.Namespace.Name, ingCreated.Name, e2eservice.LoadBalancerPollTimeout)
+	ingIP, err := jig.WaitForIngressAddress(f.ClientSet, f.Namespace.Name, ingCreated.Name, propagationTimeout)
 	framework.ExpectNoError(err, "ginkgo.Failed to wait for ingress IP")
 
 	ginkgo.By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
 	timeoutClient := &http.Client{Timeout: e2eingress.IngressReqTimeout}
-	err = wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
+	err = wait.PollImmediate(e2eservice.LoadBalancerPollInterval, propagationTimeout, func() (bool, error) {
 		resp, err := e2eingress.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
 		if err != nil {
 			framework.Logf("SimpleGET failed: %v", err)

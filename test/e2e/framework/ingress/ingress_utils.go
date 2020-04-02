@@ -765,14 +765,14 @@ func (j *TestJig) pollIngressWithCert(ing *networkingv1beta1.Ingress, address st
 // WaitForIngress waits for the Ingress to get an address.
 // WaitForIngress returns when it gets the first 200 response
 func (j *TestJig) WaitForIngress(waitForNodePort bool) {
-	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, e2eservice.LoadBalancerPollTimeout); err != nil {
+	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, e2eservice.GetServiceLoadBalancerPropagationTimeout(j.Client)); err != nil {
 		framework.Failf("error in waiting for ingress to get an address: %s", err)
 	}
 }
 
 // WaitForIngressToStable waits for the LB return 100 consecutive 200 responses.
 func (j *TestJig) WaitForIngressToStable() {
-	if err := wait.Poll(10*time.Second, e2eservice.LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
+	if err := wait.Poll(10*time.Second, e2eservice.GetServiceLoadBalancerPropagationTimeout(j.Client), func() (bool, error) {
 		_, err := j.GetDistinctResponseFromIngress()
 		if err != nil {
 			return false, nil
@@ -811,12 +811,13 @@ func (j *TestJig) WaitForGivenIngressWithTimeout(ing *networkingv1beta1.Ingress,
 // Ingress. Hostnames and certificate need to be explicitly passed in.
 func (j *TestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) error {
 	// Wait for the loadbalancer IP.
-	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, e2eservice.LoadBalancerPollTimeout)
+	propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(j.Client)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, propagationTimeout)
 	if err != nil {
-		return fmt.Errorf("Ingress failed to acquire an IP address within %v", e2eservice.LoadBalancerPollTimeout)
+		return fmt.Errorf("Ingress failed to acquire an IP address within %v", propagationTimeout)
 	}
 
-	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, e2eservice.LoadBalancerPollTimeout)
+	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, propagationTimeout)
 }
 
 // VerifyURL polls for the given iterations, in intervals, and fails if the
@@ -960,9 +961,10 @@ func (j *TestJig) ConstructFirewallForIngress(firewallRuleName string, nodeTags 
 // GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.
 func (j *TestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 	// Wait for the loadbalancer IP.
-	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, e2eservice.LoadBalancerPollTimeout)
+	propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(j.Client)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, propagationTimeout)
 	if err != nil {
-		framework.Failf("Ingress failed to acquire an IP address within %v", e2eservice.LoadBalancerPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", propagationTimeout)
 	}
 	responses := sets.NewString()
 	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
