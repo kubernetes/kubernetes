@@ -609,7 +609,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceNodeExclusion:           {Default: false, PreRelease: featuregate.Alpha},
 	NodeDisruptionExclusion:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
+	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA},
 	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	ResourceLimitsPriorityFunction: {Default: false, PreRelease: featuregate.Alpha},

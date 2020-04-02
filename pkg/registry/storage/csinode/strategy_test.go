@@ -71,7 +71,7 @@ func TestPrepareForCreate(t *testing.T) {
 func testPrepareForCreate(t *testing.T, obj, expected *storage.CSINode) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
-		APIVersion: "v1beta1",
+		APIVersion: "v1",
 		Resource:   "csinodes",
 	})
 	Strategy.PrepareForCreate(ctx, obj)
@@ -148,7 +148,7 @@ func TestPrepareForUpdate(t *testing.T) {
 func testPrepareForUpdate(t *testing.T, obj, old, expected *storage.CSINode) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
-		APIVersion: "v1beta1",
+		APIVersion: "v1",
 		Resource:   "csinodes",
 	})
 	Strategy.PrepareForUpdate(ctx, obj, old)
@@ -160,7 +160,7 @@ func testPrepareForUpdate(t *testing.T, obj, old, expected *storage.CSINode) {
 func TestCSINodeStrategy(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
-		APIVersion: "v1beta1",
+		APIVersion: "v1",
 		Resource:   "csinodes",
 	})
 	if Strategy.NamespaceScoped() {
@@ -323,18 +323,18 @@ func TestCSINodeValidation(t *testing.T) {
 			testValidation := func(csiNode *storage.CSINode, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 					APIGroup:   "storage.k8s.io",
-					APIVersion: "v1beta1",
+					APIVersion: "v1",
 					Resource:   "csinodes",
 				})
 				return Strategy.Validate(ctx, csiNode)
 			}
 
-			betaErr := testValidation(test.csiNode, "v1beta1")
-			if len(betaErr) > 0 && !test.expectError {
-				t.Errorf("Validation of v1beta1 object failed: %+v", betaErr)
+			err := testValidation(test.csiNode, "v1")
+			if len(err) > 0 && !test.expectError {
+				t.Errorf("Validation of v1 object failed: %+v", err)
 			}
-			if len(betaErr) == 0 && test.expectError {
-				t.Errorf("Validation of v1beta1 object unexpectedly succeeded")
+			if len(err) == 0 && test.expectError {
+				t.Errorf("Validation of v1 object unexpectedly succeeded")
 			}
 		})
 	}
