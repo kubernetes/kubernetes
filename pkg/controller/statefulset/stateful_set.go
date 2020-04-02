@@ -106,6 +106,14 @@ func NewStatefulSetController(
 		revListerSynced: revInformer.Informer().HasSynced,
 	}
 
+	setInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    ssc.addSS,
+		UpdateFunc: ssc.updateSS,
+		DeleteFunc: ssc.deleteSS,
+	})
+	ssc.setLister = setInformer.Lister()
+	ssc.setListerSynced = setInformer.Informer().HasSynced
+
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		// lookup the statefulset and enqueue
 		AddFunc: ssc.addPod,
@@ -116,23 +124,6 @@ func NewStatefulSetController(
 	})
 	ssc.podLister = podInformer.Lister()
 	ssc.podListerSynced = podInformer.Informer().HasSynced
-
-	setInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: ssc.enqueueStatefulSet,
-			UpdateFunc: func(old, cur interface{}) {
-				oldPS := old.(*apps.StatefulSet)
-				curPS := cur.(*apps.StatefulSet)
-				if oldPS.Status.Replicas != curPS.Status.Replicas {
-					klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
-				}
-				ssc.enqueueStatefulSet(cur)
-			},
-			DeleteFunc: ssc.enqueueStatefulSet,
-		},
-	)
-	ssc.setLister = setInformer.Lister()
-	ssc.setListerSynced = setInformer.Informer().HasSynced
 
 	// TODO: Watch volumes
 	return ssc
@@ -155,6 +146,28 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
+}
+
+func (ssc *StatefulSetController) addSS(obj interface{}) {
+	ss := obj.(*apps.StatefulSet)
+	klog.V(4).Infof("Adding StatefulSet %s/%s", ss.Namespace, ss.Name)
+	ssc.enqueueStatefulSet(ss)
+}
+
+func (ssc *StatefulSetController) updateSS(old, cur interface{}) {
+	oldSS := old.(*apps.StatefulSet)
+	curSS := cur.(*apps.StatefulSet)
+	klog.V(4).Infof("Updating StatefulSet %s/%s", curSS.Namespace, curSS.Name)
+	if oldSS.Status.Replicas != curSS.Status.Replicas {
+		klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curSS.Name, oldSS.Status.Replicas, curSS.Status.Replicas)
+	}
+	ssc.enqueueStatefulSet(curSS)
+}
+
+func (ssc *StatefulSetController) deleteSS(obj interface{}) {
+	ss := obj.(*apps.StatefulSet)
+	klog.V(4).Infof("Deleting StatefulSet %s/%s", ss.Namespace, ss.Name)
+	ssc.enqueueStatefulSet(ss)
 }
 
 // addPod adds the statefulset for the pod to the sync queue
