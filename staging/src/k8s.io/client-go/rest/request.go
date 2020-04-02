@@ -91,6 +91,7 @@ type Request struct {
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
 	timeout     time.Duration
+	maxRetries  int
 
 	// generic components accessible via method setters
 	verb       string
@@ -139,6 +140,7 @@ func NewRequest(c *RESTClient) *Request {
 		backoff:     backoff,
 		timeout:     timeout,
 		pathPrefix:  pathPrefix,
+		maxRetries:  10,
 	}
 
 	switch {
@@ -388,6 +390,18 @@ func (r *Request) Timeout(d time.Duration) *Request {
 		return r
 	}
 	r.timeout = d
+	return r
+}
+
+// MaxRetries makes the request use the given integer as a ceiling of retrying upon receiving
+// "Retry-After" headers and 429 status-code in the response. The default is 10 unless this
+// function is specifically called with a different value.
+// A zero maxRetries prevent it from doing retires and return an error immediately.
+func (r *Request) MaxRetries(maxRetries int) *Request {
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	r.maxRetries = maxRetries
 	return r
 }
 
@@ -831,7 +845,6 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
-	maxRetries := 10
 	retries := 0
 	for {
 
@@ -894,7 +907,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			}()
 
 			retries++
-			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
+			if seconds, wait := checkWait(resp); wait && retries <= r.maxRetries {
 				if seeker, ok := r.body.(io.Seeker); ok && r.body != nil {
 					_, err := seeker.Seek(0, 0)
 					if err != nil {
