@@ -1659,10 +1659,18 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1.Tabl
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	firstTimestamp := translateTimestampSince(obj.FirstTimestamp)
-	lastTimestamp := translateTimestampSince(obj.LastTimestamp)
+	var firstTimestamp string
+	var lastTimestamp string
+	if obj.FirstTimestamp.IsZero() {
+		firstTimestamp = translateTimestampSince(obj.CreationTimestamp)
+	} else {
+		firstTimestamp = translateTimestampSince(obj.FirstTimestamp)
+	}
+
 	if obj.LastTimestamp.IsZero() {
 		lastTimestamp = firstTimestamp
+	} else {
+		lastTimestamp = translateTimestampSince(obj.LastTimestamp)
 	}
 
 	var target string

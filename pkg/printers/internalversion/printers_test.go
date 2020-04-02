@@ -159,6 +159,28 @@ func TestPrintEvent(t *testing.T) {
 			// Columns: Last Seen, Type, Reason, Object, Subobject, Message, First Seen, Count, Name
 			expected: []metav1.TableRow{{Cells: []interface{}{"3d", "Warning", "Event Reason", "deployment/Deployment Name", "spec.containers{foo}", "kubelet, Node1", "Message Data", "3d", int64(1), "event3"}}},
 		},
+		// Basic event, w/o LastTimestamp FirstTimestamp set
+		{
+			event: api.Event{
+				Source: api.EventSource{
+					Component: "kubelet",
+					Host:      "Node1",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:      "Deployment",
+					Name:      "Deployment Name",
+					FieldPath: "spec.containers{foo}",
+				},
+				Reason:     "Event Reason",
+				Message:    "Message Data",
+				Count:      1,
+				Type:       api.EventTypeWarning,
+				ObjectMeta: metav1.ObjectMeta{Name: "event4", CreationTimestamp: metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -3)}},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Last Seen, Type, Reason, Object, Subobject, Message, First Seen, Count, Name
+			expected: []metav1.TableRow{{Cells: []interface{}{"3d", "Warning", "Event Reason", "deployment/Deployment Name", "spec.containers{foo}", "kubelet, Node1", "Message Data", "3d", int64(1), "event4"}}},
+		},
 	}
 
 	for i, test := range tests {
