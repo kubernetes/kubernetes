@@ -32,6 +32,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
+	nodepkg "k8s.io/kubernetes/pkg/util/node"
 )
 
 var timeForControllerToProgress = 500 * time.Millisecond
@@ -616,6 +617,48 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			fakeClientset.ClearActions()
 		}
 
+		close(stopCh)
+	}
+}
+
+func TestPodNodeLostStatus(t *testing.T) {
+	testCases := []struct {
+		description     string
+		pods            []v1.Pod
+		oldNode         *v1.Node
+		newNode         *v1.Node
+		expectDelete    bool
+		additionalSleep time.Duration
+	}{
+		{
+			description: "TestPodNodeLostStatus",
+			pods: []v1.Pod{
+				*addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			},
+			oldNode: testutil.NewNode("node1"),
+			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+		},
+	}
+	for _, item := range testCases {
+		stopCh := make(chan struct{})
+		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller.recorder = testutil.NewFakeRecorder()
+		go controller.Run(stopCh)
+		controller.NodeUpdated(item.oldNode, item.newNode)
+		// wait a bit
+		time.Sleep(timeForControllerToProgress)
+		if item.additionalSleep > 0 {
+			time.Sleep(item.additionalSleep)
+		}
+
+		if pod, err := fakeClientset.CoreV1().Pods("default").Get(context.TODO(), "pod1", metav1.GetOptions{}); err != nil {
+			t.Errorf("Get pod err: %v", err)
+		} else {
+			if pod.Status.Reason != nodepkg.NodeUnreachablePodReason {
+				t.Error("pod's status reason is not NodeUnreachablePodReason")
+			}
+		}
 		close(stopCh)
 	}
 }

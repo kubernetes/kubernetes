@@ -37,6 +37,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
 	"k8s.io/klog"
 )
@@ -338,16 +340,24 @@ func (tc *NoExecuteTaintManager) cancelWorkWithEvent(nsName types.NamespacedName
 }
 
 func (tc *NoExecuteTaintManager) processPodOnNode(
-	podNamespacedName types.NamespacedName,
+	pod *v1.Pod,
 	nodeName string,
-	tolerations []v1.Toleration,
 	taints []v1.Taint,
 	now time.Time,
 ) {
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 	if len(taints) == 0 {
 		tc.cancelWorkWithEvent(podNamespacedName)
 	}
-	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
+	// Pod will be modified, so making copy is required.
+	podCopy := pod.DeepCopy()
+	// Set reason and message in the pod object.
+	if _, err := nodeutil.SetPodTerminationReason(tc.client, podCopy, nodeName); err != nil {
+		if apierrors.IsConflict(err) {
+			klog.Errorf("update status failed for pod %q: %v", format.Pod(pod), err)
+		}
+	}
+	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, pod.Spec.Tolerations)
 	if !allTolerated {
 		klog.V(2).Infof("Not all taints are tolerated after update for Pod %v on %v", podNamespacedName.String(), nodeName)
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
@@ -412,7 +422,7 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
 	if !ok {
 		return
 	}
-	tc.processPodOnNode(podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
+	tc.processPodOnNode(pod, nodeName, taints, time.Now())
 }
 
 func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
@@ -466,8 +476,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 
 	now := time.Now()
 	for _, pod := range pods {
-		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-		tc.processPodOnNode(podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
+		tc.processPodOnNode(pod, node.Name, taints, now)
 	}
 }
 
