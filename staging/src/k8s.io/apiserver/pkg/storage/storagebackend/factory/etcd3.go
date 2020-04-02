@@ -44,6 +44,9 @@ import (
 )
 
 const (
+	// autoSyncInterval is the interval for syncing etcd endpoints from the etcd Cluster itself
+	autoSyncInterval = 60 * time.Second
+
 	// The short keepalive timeout and interval have been chosen to aggressively
 	// detect a failed etcd server without introducing much overhead.
 	keepaliveTime    = 30 * time.Second
@@ -141,6 +144,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
 	}
 	cfg := clientv3.Config{
+		AutoSyncInterval:     autoSyncInterval,
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,
