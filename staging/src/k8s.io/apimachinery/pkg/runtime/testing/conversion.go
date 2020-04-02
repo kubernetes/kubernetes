@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,106 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+func convertEmbeddedTestToEmbeddedTestExternal(in *EmbeddedTest, out *EmbeddedTestExternal, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	out.ID = in.ID
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Object, &out.Object, s); err != nil {
+		return err
+	}
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.EmptyObject, &out.EmptyObject, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convertEmbeddedTestExternalToEmbeddedTest(in *EmbeddedTestExternal, out *EmbeddedTest, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	out.ID = in.ID
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Object, &out.Object, s); err != nil {
+		return err
+	}
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.EmptyObject, &out.EmptyObject, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convertObjectTestToObjectTestExternal(in *ObjectTest, out *ObjectTestExternal, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	out.ID = in.ID
+	if in.Items != nil {
+		out.Items = make([]runtime.RawExtension, len(in.Items))
+		for i := range in.Items {
+			if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convertObjectTestExternalToObjectTest(in *ObjectTestExternal, out *ObjectTest, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	out.ID = in.ID
+	if in.Items != nil {
+		out.Items = make([]runtime.Object, len(in.Items))
+		for i := range in.Items {
+			if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Items[i], &out.Items[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func convertInternalSimpleToExternalSimple(in *InternalSimple, out *ExternalSimple, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	out.TestString = in.TestString
+	return nil
+}
+
+func convertExternalSimpleToInternalSimple(in *ExternalSimple, out *InternalSimple, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	out.TestString = in.TestString
+	return nil
+}
+
+func convertInternalExtensionTypeToExternalExtensionType(in *InternalExtensionType, out *ExternalExtensionType, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Extension, &out.Extension, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convertExternalExtensionTypeToInternalExtensionType(in *ExternalExtensionType, out *InternalExtensionType, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Extension, &out.Extension, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convertInternalOptionalExtensionTypeToExternalOptionalExtensionType(in *InternalOptionalExtensionType, out *ExternalOptionalExtensionType, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Extension, &out.Extension, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convertExternalOptionalExtensionTypeToInternalOptionalExtensionType(in *ExternalOptionalExtensionType, out *InternalOptionalExtensionType, s conversion.Scope) error {
+	out.TypeMeta = in.TypeMeta
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Extension, &out.Extension, s); err != nil {
+		return err
+	}
+	return nil
+}
 
 func convertTestType1ToExternalTestType1(in *TestType1, out *ExternalTestType1, s conversion.Scope) error {
 	out.MyWeirdCustomEmbeddedVersionKindField = in.MyWeirdCustomEmbeddedVersionKindField
@@ -126,6 +226,56 @@ func convertExternalTestType2ToTestType2(in *ExternalTestType2, out *TestType2, 
 }
 
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddConversionFunc((*EmbeddedTest)(nil), (*EmbeddedTestExternal)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertEmbeddedTestToEmbeddedTestExternal(a.(*EmbeddedTest), b.(*EmbeddedTestExternal), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*EmbeddedTestExternal)(nil), (*EmbeddedTest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertEmbeddedTestExternalToEmbeddedTest(a.(*EmbeddedTestExternal), b.(*EmbeddedTest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ObjectTest)(nil), (*ObjectTestExternal)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertObjectTestToObjectTestExternal(a.(*ObjectTest), b.(*ObjectTestExternal), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ObjectTestExternal)(nil), (*ObjectTest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertObjectTestExternalToObjectTest(a.(*ObjectTestExternal), b.(*ObjectTest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*InternalSimple)(nil), (*ExternalSimple)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertInternalSimpleToExternalSimple(a.(*InternalSimple), b.(*ExternalSimple), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ExternalSimple)(nil), (*InternalSimple)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertExternalSimpleToInternalSimple(a.(*ExternalSimple), b.(*InternalSimple), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*InternalExtensionType)(nil), (*ExternalExtensionType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertInternalExtensionTypeToExternalExtensionType(a.(*InternalExtensionType), b.(*ExternalExtensionType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ExternalExtensionType)(nil), (*InternalExtensionType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertExternalExtensionTypeToInternalExtensionType(a.(*ExternalExtensionType), b.(*InternalExtensionType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*InternalOptionalExtensionType)(nil), (*ExternalOptionalExtensionType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertInternalOptionalExtensionTypeToExternalOptionalExtensionType(a.(*InternalOptionalExtensionType), b.(*ExternalOptionalExtensionType), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*ExternalOptionalExtensionType)(nil), (*InternalOptionalExtensionType)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return convertExternalOptionalExtensionTypeToInternalOptionalExtensionType(a.(*ExternalOptionalExtensionType), b.(*InternalOptionalExtensionType), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*TestType1)(nil), (*ExternalTestType1)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return convertTestType1ToExternalTestType1(a.(*TestType1), b.(*ExternalTestType1), scope)
 	}); err != nil {

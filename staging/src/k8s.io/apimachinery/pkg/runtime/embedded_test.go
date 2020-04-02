@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
@@ -37,6 +38,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypes(internalGV, &runtimetesting.ObjectTest{})
 	s.AddKnownTypeWithName(externalGVK, &runtimetesting.ObjectTestExternal{})
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
 
 	codec := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
 
@@ -74,6 +76,7 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	s.AddKnownTypeWithName(externalGV.WithKind("EmbeddedTest"), &runtimetesting.EmbeddedTestExternal{})
 	s.AddKnownTypes(internalGV, &runtimetesting.ObjectTest{})
 	s.AddKnownTypeWithName(externalGV.WithKind("ObjectTest"), &runtimetesting.ObjectTestExternal{})
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
 
 	codec := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
 
@@ -148,6 +151,7 @@ func TestNestedObject(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypes(internalGV, &runtimetesting.EmbeddedTest{})
 	s.AddKnownTypeWithName(embeddedTestExternalGVK, &runtimetesting.EmbeddedTestExternal{})
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
 
 	codec := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
 
@@ -227,6 +231,7 @@ func TestDeepCopyOfRuntimeObject(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypes(internalGV, &runtimetesting.EmbeddedTest{})
 	s.AddKnownTypeWithName(embeddedTestExternalGVK, &runtimetesting.EmbeddedTestExternal{})
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
 
 	original := &runtimetesting.EmbeddedTest{
 		ID: "outer",
