@@ -26,11 +26,6 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
-const (
-	// ssh port
-	sshPort = "22"
-)
-
 // RestartControllerManager restarts the kube-controller-manager.
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
@@ -42,7 +37,7 @@ func RestartControllerManager() error {
 	}
 	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	framework.Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetMasterHost(), sshPort), framework.TestContext.Provider)
+	result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetMasterHost(), e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -54,7 +49,7 @@ func RestartControllerManager() error {
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(framework.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetMasterHost(), sshPort), framework.TestContext.Provider)
+		result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetMasterHost(), e2essh.SSHPort), framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 		}
