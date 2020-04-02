@@ -382,6 +382,8 @@ func (kl *Kubelet) syncNodeStatus() {
 		return
 	}
 	if kl.registerNode {
+		// When kubelet start first time, ensure runtime state is in real state.
+		kl.updateRuntimeUp()
 		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithAPIServer()
 	}
