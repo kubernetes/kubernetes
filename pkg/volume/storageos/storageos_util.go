@@ -128,8 +128,9 @@ func (u *storageosUtil) CreateVolume(p *storageosProvisioner) (*storageosVolume,
 
 	vol, err := u.api.VolumeCreate(opts)
 	if err != nil {
-		klog.Errorf("volume create failed for volume %q (%v)", opts.Name, err)
-		return nil, err
+		// don't log error details from client calls in events
+		klog.V(4).Infof("volume create failed for volume %q (%v)", opts.Name, err)
+		return nil, errors.New("volume create failed: see kube-controller-manager.log for details")
 	}
 	return &storageosVolume{
 		ID:          vol.ID,
@@ -294,7 +295,12 @@ func (u *storageosUtil) DeleteVolume(d *storageosDeleter) error {
 		Namespace: d.volNamespace,
 		Force:     true,
 	}
-	return u.api.VolumeDelete(opts)
+	if err := u.api.VolumeDelete(opts); err != nil {
+		// don't log error details from client calls in events
+		klog.V(4).Infof("volume deleted failed for volume %q in namespace %q: %v", d.volName, d.volNamespace, err)
+		return errors.New("volume delete failed: see kube-controller-manager.log for details")
+	}
+	return nil
 }
 
 // Get the node's device path from the API, falling back to the default if not
