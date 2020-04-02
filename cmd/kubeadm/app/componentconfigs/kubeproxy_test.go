@@ -50,6 +50,7 @@ var kubeProxyMarshalCases = []struct {
 		yaml: dedent.Dedent(`
 			apiVersion: kubeproxy.config.k8s.io/v1alpha1
 			bindAddress: ""
+			bindAddressHardFail: false
 			clientConnection:
 			  acceptContentTypes: ""
 			  burst: 0
@@ -106,6 +107,7 @@ var kubeProxyMarshalCases = []struct {
 		yaml: dedent.Dedent(`
 			apiVersion: kubeproxy.config.k8s.io/v1alpha1
 			bindAddress: 1.2.3.4
+			bindAddressHardFail: false
 			clientConnection:
 			  acceptContentTypes: ""
 			  burst: 0
