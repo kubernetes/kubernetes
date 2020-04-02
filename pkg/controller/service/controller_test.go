@@ -41,6 +41,7 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -346,23 +347,19 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 					t.Errorf("Got no create call for load balancer, expected one")
 				}
 
-				var isFound bool
-				for _, balancer := range cloud.Balancers {
-					if !reflect.DeepEqual(balancer, fakecloud.Balancer{}) {
-						isFound = true
-						if balancer.Name != controller.balancer.GetLoadBalancerName(context.Background(), "", tc.service) ||
-							balancer.Region != region ||
-							balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
-							t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
-						}
-						break
-					}
-				}
-
-				if !isFound {
+				if len(cloud.Balancers) == 0 {
 					t.Errorf("Got no load balancer: %v, expected one to be created", cloud.Balancers)
 				}
+
+				for _, balancer := range cloud.Balancers {
+					if balancer.Name != controller.balancer.GetLoadBalancerName(context.Background(), "", tc.service) ||
+						balancer.Region != region ||
+						balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
+						t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
+					}
+				}
 			}
+
 			if tc.expectDeleteAttempt {
 				deleteCallFound := false
 				for _, call := range cloud.Calls {
