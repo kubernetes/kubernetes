@@ -1945,8 +1945,14 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 
 	// curEndpoints represents IPVS destinations listed from current system.
 	curEndpoints := sets.NewString()
-	// newEndpoints represents Endpoints watched from API Server.
+	// newEndpoints represents ready Endpoints watched from API Server.
 	newEndpoints := sets.NewString()
+	// localReadyTermintaingEndpoints includes local terminating endpoints
+	// passing readiness
+	localReadyTerminatingEndpoints := sets.NewString()
+	// localNotReadyTermintaingEndpoints includes local terminating endpoints
+	// that fail readiness
+	localNotReadyTerminatingEndpoints := sets.NewString()
 
 	curDests, err := proxier.ipvs.GetRealServers(appliedVirtualServer)
 	if err != nil {
@@ -1969,10 +1975,36 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	for _, epInfo := range endpoints {
+		if epInfo.GetIsLocal() && epInfo.IsTerminating() {
+			if epInfo.IsNotReady() {
+				localNotReadyTerminatingEndpoints.Insert(epInfo.String())
+			} else {
+				localReadyTerminatingEndpoints.Insert(epInfo.String())
+
+			}
+		}
+
+		// skip adding endpoint to "all ready endpoints" if not ready or terminating
+		if epInfo.IsNotReady() || epInfo.IsTerminating() {
+			continue
+		}
+
+		// skip adding endpoint to "all ready endpoints" if service requests node local and endpoint is not local
 		if onlyNodeLocalEndpoints && !epInfo.GetIsLocal() {
 			continue
 		}
+
 		newEndpoints.Insert(epInfo.String())
+	}
+
+	// if node local only and there are no ready endpoints, fall back to any
+	// ready/unready terminating endpoints
+	if onlyNodeLocalEndpoints && newEndpoints.Len() == 0 {
+		if localReadyTerminatingEndpoints.Len() > 0 {
+			newEndpoints = localReadyTerminatingEndpoints
+		} else if localNotReadyTerminatingEndpoints.Len() > 0 {
+			newEndpoints = localNotReadyTerminatingEndpoints
+		}
 	}
 
 	// Create new endpoints
@@ -1982,6 +2014,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			klog.Errorf("Failed to parse endpoint: %v, error: %v", ep, err)
 			continue
 		}
+
 		portNum, err := strconv.Atoi(port)
 		if err != nil {
 			klog.Errorf("Failed to parse endpoint port %s, error: %v", port, err)
