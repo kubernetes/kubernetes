@@ -2,28 +2,35 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["image_locality.go"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality",
+    srcs = [
+        "host_ports.go",
+        "node_info.go",
+    ],
+    importpath = "k8s.io/kubernetes/pkg/scheduler/types",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
-        "//pkg/scheduler/types:go_default_library",
-        "//pkg/util/parsers:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/features:go_default_library",
+        "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["image_locality_test.go"],
+    srcs = [
+        "host_ports_test.go",
+        "node_info_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
-        "//pkg/scheduler/internal/cache:go_default_library",
-        "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 

@@ -23,18 +23,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // Snapshot is a snapshot of cache NodeInfo and NodeTree order. The scheduler takes a
 // snapshot at the beginning of each scheduling cycle and uses it for its operations in that cycle.
 type Snapshot struct {
 	// nodeInfoMap a map of node name to a snapshot of its NodeInfo.
-	nodeInfoMap map[string]*schedulernodeinfo.NodeInfo
+	nodeInfoMap map[string]*schedulertypes.NodeInfo
 	// nodeInfoList is the list of nodes as ordered in the cache's nodeTree.
-	nodeInfoList []*schedulernodeinfo.NodeInfo
+	nodeInfoList []*schedulertypes.NodeInfo
 	// havePodsWithAffinityNodeInfoList is the list of nodes with at least one pod declaring affinity terms.
-	havePodsWithAffinityNodeInfoList []*schedulernodeinfo.NodeInfo
+	havePodsWithAffinityNodeInfoList []*schedulertypes.NodeInfo
 	generation                       int64
 }
 
@@ -43,15 +43,15 @@ var _ schedulerlisters.SharedLister = &Snapshot{}
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
-		nodeInfoMap: make(map[string]*schedulernodeinfo.NodeInfo),
+		nodeInfoMap: make(map[string]*schedulertypes.NodeInfo),
 	}
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
 func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	nodeInfoMap := createNodeInfoMap(pods, nodes)
-	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
-	havePodsWithAffinityNodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
+	nodeInfoList := make([]*schedulertypes.NodeInfo, 0, len(nodeInfoMap))
+	havePodsWithAffinityNodeInfoList := make([]*schedulertypes.NodeInfo, 0, len(nodeInfoMap))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity()) > 0 {
@@ -70,12 +70,12 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 // createNodeInfoMap obtains a list of pods and pivots that list into a map
 // where the keys are node names and the values are the aggregated information
 // for that node.
-func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*schedulernodeinfo.NodeInfo {
-	nodeNameToInfo := make(map[string]*schedulernodeinfo.NodeInfo)
+func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*schedulertypes.NodeInfo {
+	nodeNameToInfo := make(map[string]*schedulertypes.NodeInfo)
 	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
 		if _, ok := nodeNameToInfo[nodeName]; !ok {
-			nodeNameToInfo[nodeName] = schedulernodeinfo.NewNodeInfo()
+			nodeNameToInfo[nodeName] = schedulertypes.NewNodeInfo()
 		}
 		nodeNameToInfo[nodeName].AddPod(pod)
 	}
@@ -83,7 +83,7 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*schedulerno
 
 	for _, node := range nodes {
 		if _, ok := nodeNameToInfo[node.Name]; !ok {
-			nodeNameToInfo[node.Name] = schedulernodeinfo.NewNodeInfo()
+			nodeNameToInfo[node.Name] = schedulertypes.NewNodeInfo()
 		}
 		nodeInfo := nodeNameToInfo[node.Name]
 		nodeInfo.SetNode(node)
@@ -93,12 +93,12 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*schedulerno
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
-func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*schedulernodeinfo.ImageStateSummary {
-	imageStates := make(map[string]*schedulernodeinfo.ImageStateSummary)
+func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*schedulertypes.ImageStateSummary {
+	imageStates := make(map[string]*schedulertypes.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
-			imageStates[name] = &schedulernodeinfo.ImageStateSummary{
+			imageStates[name] = &schedulertypes.ImageStateSummary{
 				Size:     image.SizeBytes,
 				NumNodes: len(imageExistenceMap[name]),
 			}
@@ -139,7 +139,7 @@ func (s *Snapshot) NumNodes() int {
 	return len(s.nodeInfoList)
 }
 
-type podLister []*schedulernodeinfo.NodeInfo
+type podLister []*schedulertypes.NodeInfo
 
 // List returns the list of pods in the snapshot.
 func (p podLister) List(selector labels.Selector) ([]*v1.Pod, error) {
@@ -168,17 +168,17 @@ func (p podLister) FilteredList(filter schedulerlisters.PodFilter, selector labe
 }
 
 // List returns the list of nodes in the snapshot.
-func (s *Snapshot) List() ([]*schedulernodeinfo.NodeInfo, error) {
+func (s *Snapshot) List() ([]*schedulertypes.NodeInfo, error) {
 	return s.nodeInfoList, nil
 }
 
 // HavePodsWithAffinityList returns the list of nodes with at least one pods with inter-pod affinity
-func (s *Snapshot) HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
+func (s *Snapshot) HavePodsWithAffinityList() ([]*schedulertypes.NodeInfo, error) {
 	return s.havePodsWithAffinityNodeInfoList, nil
 }
 
 // Get returns the NodeInfo of the given node name.
-func (s *Snapshot) Get(nodeName string) (*schedulernodeinfo.NodeInfo, error) {
+func (s *Snapshot) Get(nodeName string) (*schedulertypes.NodeInfo, error) {
 	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node() != nil {
 		return v, nil
 	}

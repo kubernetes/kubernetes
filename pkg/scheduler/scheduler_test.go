@@ -58,9 +58,9 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 type fakePodConditionUpdater struct{}
@@ -401,7 +401,7 @@ func (s *fakeNodeSelector) Name() string {
 	return "FakeNodeSelector"
 }
 
-func (s *fakeNodeSelector) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (s *fakeNodeSelector) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	if nodeInfo.Node().Name != s.NodeName {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable)
 	}

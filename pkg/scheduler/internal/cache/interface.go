@@ -19,7 +19,7 @@ package cache
 import (
 	v1 "k8s.io/api/core/v1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -108,5 +108,5 @@ type Cache interface {
 // Dump is a dump of the cache state.
 type Dump struct {
 	AssumedPods map[string]bool
-	Nodes       map[string]*schedulernodeinfo.NodeInfo
+	Nodes       map[string]*schedulertypes.NodeInfo
 }

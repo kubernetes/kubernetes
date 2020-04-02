@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 func TestValidateNodeLabelArgs(t *testing.T) {
@@ -133,7 +133,7 @@ func TestNodeLabelFilter(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: label}}
-			nodeInfo := schedulernodeinfo.NewNodeInfo()
+			nodeInfo := schedulertypes.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
 			args := &runtime.Unknown{Raw: []byte(test.rawArgs)}
@@ -248,7 +248,7 @@ func TestNodeLabelScore(t *testing.T) {
 func TestNodeLabelFilterWithoutNode(t *testing.T) {
 	var pod *v1.Pod
 	t.Run("node does not exist", func(t *testing.T) {
-		nodeInfo := schedulernodeinfo.NewNodeInfo()
+		nodeInfo := schedulertypes.NewNodeInfo()
 		p, err := New(nil, nil)
 		if err != nil {
 			t.Fatalf("Failed to create plugin: %v", err)

@@ -43,8 +43,8 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -524,7 +524,7 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, filtered []*v
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
-func (g *genericScheduler) addNominatedPods(ctx context.Context, prof *profile.Profile, pod *v1.Pod, state *framework.CycleState, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.CycleState, *schedulernodeinfo.NodeInfo, error) {
+func (g *genericScheduler) addNominatedPods(ctx context.Context, prof *profile.Profile, pod *v1.Pod, state *framework.CycleState, nodeInfo *schedulertypes.NodeInfo) (bool, *framework.CycleState, *schedulertypes.NodeInfo, error) {
 	if g.schedulingQueue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
@@ -564,7 +564,7 @@ func (g *genericScheduler) podPassesFiltersOnNode(
 	prof *profile.Profile,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	info *schedulernodeinfo.NodeInfo,
+	info *schedulertypes.NodeInfo,
 ) (bool, *framework.Status, error) {
 	var status *framework.Status
 
@@ -856,7 +856,7 @@ func (g *genericScheduler) selectNodesForPreemption(
 	prof *profile.Profile,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	potentialNodes []*schedulernodeinfo.NodeInfo,
+	potentialNodes []*schedulertypes.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget,
 ) (map[*v1.Node]*extenderv1.Victims, error) {
 	nodeToVictims := map[*v1.Node]*extenderv1.Victims{}
@@ -946,7 +946,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 	prof *profile.Profile,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo,
+	nodeInfo *schedulertypes.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, bool) {
 	var potentialVictims []*v1.Pod
@@ -1034,8 +1034,8 @@ func (g *genericScheduler) selectVictimsOnNode(
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(nodes []*schedulernodeinfo.NodeInfo, fitErr *FitError) []*schedulernodeinfo.NodeInfo {
-	var potentialNodes []*schedulernodeinfo.NodeInfo
+func nodesWherePreemptionMightHelp(nodes []*schedulertypes.NodeInfo, fitErr *FitError) []*schedulertypes.NodeInfo {
+	var potentialNodes []*schedulertypes.NodeInfo
 	for _, node := range nodes {
 		name := node.Node().Name
 		// We reply on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'

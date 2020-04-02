@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/system"
 )
@@ -391,7 +391,7 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		},
 	}
 
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	nodeInfo := schedulertypes.NewNodeInfo()
 
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}

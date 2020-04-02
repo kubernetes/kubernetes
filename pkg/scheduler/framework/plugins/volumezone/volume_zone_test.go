@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
@@ -208,7 +208,7 @@ func TestSingleZone(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulernodeinfo.NodeInfo{}
+			node := &schedulertypes.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,
@@ -330,7 +330,7 @@ func TestMultiZone(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulernodeinfo.NodeInfo{}
+			node := &schedulertypes.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,
@@ -439,7 +439,7 @@ func TestWithBinding(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulernodeinfo.NodeInfo{}
+			node := &schedulertypes.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,

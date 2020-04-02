@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	utils "k8s.io/kubernetes/test/utils"
@@ -84,7 +84,7 @@ func (fp *tokenFilter) Name() string {
 }
 
 func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	if fp.Tokens > 0 {
 		fp.Tokens--
 		return nil
@@ -101,13 +101,13 @@ func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleStat
 }
 
 func (fp *tokenFilter) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	fp.Tokens--
 	return nil
 }
 
 func (fp *tokenFilter) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	podToRemove *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	fp.Tokens++
 	return nil
 }

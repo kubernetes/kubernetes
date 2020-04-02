@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -196,7 +196,7 @@ func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin
 }
 
 // countMatchingPods counts pods based on namespace and matching all selectors
-func countMatchingPods(namespace string, selector labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) int {
+func countMatchingPods(namespace string, selector labels.Selector, nodeInfo *schedulertypes.NodeInfo) int {
 	if len(nodeInfo.Pods()) == 0 || selector.Empty() {
 		return 0
 	}
