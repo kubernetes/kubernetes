@@ -968,7 +968,46 @@ func (proxier *Proxier) syncProxyRules() {
 
 		allEndpoints := proxier.endpointsMap[svcName]
 
-		hasEndpoints := len(allEndpoints) > 0
+		readyEndpoints := []proxy.Endpoint{}
+		localNotReadyTerminatingEndpoints := []proxy.Endpoint{}
+		localReadyTerminatingEndpoints := []proxy.Endpoint{}
+
+		for _, endpoint := range allEndpoints {
+			if endpoint.GetIsLocal() && endpoint.IsTerminating() {
+				if endpoint.IsNotReady() {
+					localNotReadyTerminatingEndpoints = append(localNotReadyTerminatingEndpoints, endpoint)
+				} else {
+					localReadyTerminatingEndpoints = append(localReadyTerminatingEndpoints, endpoint)
+				}
+			}
+
+			// skip adding endpoint to "all ready endpoints" if not ready or terminating
+			if endpoint.IsNotReady() || endpoint.IsTerminating() {
+				continue
+			}
+
+			// skip adding endpoint to "all ready endpoints" if service requests node local and endpoint is not local
+			if svcInfo.OnlyNodeLocalEndpoints() && !endpoint.GetIsLocal() {
+				continue
+			}
+
+			readyEndpoints = append(readyEndpoints, endpoint)
+		}
+
+		hasEndpoints := len(readyEndpoints) > 0
+
+		// if node local only and there are no ready endpoints, fall back to any
+		// ready/unready terminating endpoints
+		if svcInfo.OnlyNodeLocalEndpoints() && len(readyEndpoints) == 0 {
+			if len(localReadyTerminatingEndpoints) > 0 {
+				readyEndpoints = localReadyTerminatingEndpoints
+				hasEndpoints = true
+			} else if len(localNotReadyTerminatingEndpoints) > 0 {
+				readyEndpoints = localNotReadyTerminatingEndpoints
+				hasEndpoints = true
+			}
+
+		}
 
 		// Service Topology will not be enabled in the following cases:
 		// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
@@ -976,8 +1015,8 @@ func (proxier *Proxier) syncProxyRules() {
 		// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
 		// to get topology information).
 		if !svcInfo.OnlyNodeLocalEndpoints() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
-			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
-			hasEndpoints = len(allEndpoints) > 0
+			readyEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
+			hasEndpoints = len(readyEndpoints) > 0
 		}
 
 		svcChain := svcInfo.servicePortChainName
@@ -1291,7 +1330,7 @@ func (proxier *Proxier) syncProxyRules() {
 		endpoints = endpoints[:0]
 		endpointChains = endpointChains[:0]
 		var endpointChain utiliptables.Chain
-		for _, ep := range allEndpoints {
+		for _, ep := range readyEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
 				klog.Errorf("Failed to cast endpointsInfo %q", ep.String())
