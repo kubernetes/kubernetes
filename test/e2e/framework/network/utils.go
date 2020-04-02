@@ -50,12 +50,16 @@ const (
 	// EndpointHTTPPort is an endpoint HTTP port for testing.
 	EndpointHTTPPort = 8080
 	// EndpointUDPPort is an endpoint UDP port for testing.
-	EndpointUDPPort       = 8081
+	EndpointUDPPort = 8081
+	// EndpointSCTPPort is an endpoint SCTP port for testing.
+	EndpointSCTPPort      = 8082
 	testContainerHTTPPort = 8080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
 	ClusterHTTPPort = 80
 	// ClusterUDPPort is a cluster UDP port for testing.
-	ClusterUDPPort             = 90
+	ClusterUDPPort = 90
+	// ClusterSCTPPort is a cluster SCTP port for testing.
+	ClusterSCTPPort            = 95
 	testPodName                = "test-container-pod"
 	hostTestPodName            = "host-test-container-pod"
 	nodePortServiceName        = "node-port-service"
@@ -85,8 +89,8 @@ const (
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
-func NewNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
+func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
+	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -119,6 +123,9 @@ type NetworkingTestConfig struct {
 	HostTestContainerPod *v1.Pod
 	// if the HostTestContainerPod is running with HostNetwork=true.
 	HostNetwork bool
+	// if the test pods are listening on sctp port. We need this as sctp tests
+	// are marked as disruptive as they may load the sctp module.
+	SCTPEnabled bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
@@ -142,9 +149,10 @@ type NetworkingTestConfig struct {
 	ClusterIP string
 	// External ip of first node for use in nodePort testing.
 	NodeIP string
-	// The http/udp nodePorts of the Service.
+	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
+	NodeSCTPPort int
 	// The kubernetes namespace within which all resources for this
 	// config are created
 	Namespace string
@@ -484,6 +492,15 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 			},
 		},
 	}
+	// we want sctp to be optional as it will load the sctp kernel module
+	if config.SCTPEnabled {
+		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
+		pod.Spec.Containers[0].Ports = append(pod.Spec.Containers[0].Ports, v1.ContainerPort{
+			Name:          "sctp",
+			ContainerPort: EndpointSCTPPort,
+			Protocol:      v1.ProtocolSCTP,
+		})
+	}
 	return pod
 }
 
@@ -518,6 +535,10 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 			},
 		},
 	}
+	// we want sctp to be optional as it will load the sctp kernel module
+	if config.SCTPEnabled {
+		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
+	}
 	return pod
 }
 
@@ -526,7 +547,7 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 	if enableSessionAffinity {
 		sessionAffinity = v1.ServiceAffinityClientIP
 	}
-	return &v1.Service{
+	res := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: svcName,
 		},
@@ -540,6 +561,11 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 			SessionAffinity: sessionAffinity,
 		},
 	}
+
+	if config.SCTPEnabled {
+		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt(EndpointSCTPPort)})
+	}
+	return res
 }
 
 func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
@@ -633,6 +659,8 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 			config.NodeUDPPort = int(p.NodePort)
 		case v1.ProtocolTCP:
 			config.NodeHTTPPort = int(p.NodePort)
+		case v1.ProtocolSCTP:
+			config.NodeSCTPPort = int(p.NodePort)
 		default:
 			continue
 		}
