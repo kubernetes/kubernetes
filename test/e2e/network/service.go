@@ -68,16 +68,6 @@ const (
 	defaultServeHostnameServicePort = 80
 	defaultServeHostnameServiceName = "svc-hostname"
 
-	// KubeProxyLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
-	// to not notice a Service update, such as type=NodePort.
-	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
-	// liberal. Fix tracked in #20567.
-	KubeProxyLagTimeout = 5 * time.Minute
-
-	// LoadBalancerPollTimeout is the time required by the loadbalancer to poll.
-	// On average it takes ~6 minutes for a single backend to come online in GCE.
-	LoadBalancerPollTimeout = 22 * time.Minute
-
 	// AffinityTimeout is the maximum time that CheckAffinity is allowed to take; this
 	// needs to be more than long enough for AffinityConfirmCount HTTP requests to
 	// complete in a busy CI cluster, but shouldn't be too long since we will end up
@@ -118,13 +108,13 @@ type portsByPodName map[string][]int
 // number of same response observed in a row. If affinity is not expected, the
 // test will keep observe until different responses observed. The function will
 // return false only in case of unexpected errors.
-func checkAffinity(execPod *v1.Pod, serviceIP string, servicePort int, shouldHold bool) bool {
+func checkAffinity(cs clientset.Interface, execPod *v1.Pod, serviceIP string, servicePort int, shouldHold bool) bool {
 	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
 	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
 	timeout := AffinityTimeout
 	if execPod == nil {
-		timeout = LoadBalancerPollTimeout
+		timeout = e2eservice.GetServiceLoadBalancerPropagationTimeout(cs)
 	}
 	var tracker affinityTracker
 	// interval considering a maximum of 2 seconds per connection
@@ -316,7 +306,7 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 		gotEndpoints := sets.NewString()
 
 		// Retry cmdFunc for a while
-		for start := time.Now(); time.Since(start) < KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
+		for start := time.Now(); time.Since(start) < e2eservice.KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
 			for _, endpoint := range strings.Split(cmdFunc(), "\n") {
 				trimmedEp := strings.TrimSpace(endpoint)
 				if trimmedEp != "" {
@@ -2355,7 +2345,8 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("health check should be reconciled")
 		pollInterval := framework.Poll * 10
-		if pollErr := wait.PollImmediate(pollInterval, e2eservice.LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
+		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(cs)
+		if pollErr := wait.PollImmediate(pollInterval, loadBalancerPropagationTimeout, func() (bool, error) {
 			hc, err := gceCloud.GetHTTPHealthCheck(hcName)
 			if err != nil {
 				framework.Logf("ginkgo.Failed to get HttpHealthCheck(%q): %v", hcName, err)
@@ -3014,8 +3005,9 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %v`, path)
 
 		var srcIP string
+		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(cs)
 		ginkgo.By(fmt.Sprintf("Hitting external lb %v from pod %v on node %v", ingressIP, pausePod.Name, pausePod.Spec.NodeName))
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
+		if pollErr := wait.PollImmediate(framework.Poll, loadBalancerPropagationTimeout, func() (bool, error) {
 			stdout, err := framework.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
 			if err != nil {
 				framework.Logf("got err: %v, retry until timeout", err)
@@ -3220,7 +3212,7 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 	framework.ExpectNoError(err)
 
 	// the service should be sticky until the timeout expires
-	framework.ExpectEqual(checkAffinity(execPod, svcIP, servicePort, true), true)
+	framework.ExpectEqual(checkAffinity(cs, execPod, svcIP, servicePort, true), true)
 	// but it should return different hostnames after the timeout expires
 	// try several times to avoid the probability that we hit the same pod twice
 	hosts := sets.NewString()
@@ -3287,19 +3279,19 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	framework.ExpectNoError(err)
 
 	if !isTransitionTest {
-		framework.ExpectEqual(checkAffinity(execPod, svcIP, servicePort, true), true)
+		framework.ExpectEqual(checkAffinity(cs, execPod, svcIP, servicePort, true), true)
 	}
 	if isTransitionTest {
 		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(execPod, svcIP, servicePort, false), true)
+		framework.ExpectEqual(checkAffinity(cs, execPod, svcIP, servicePort, false), true)
 		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(execPod, svcIP, servicePort, true), true)
+		framework.ExpectEqual(checkAffinity(cs, execPod, svcIP, servicePort, true), true)
 	}
 }
 
@@ -3337,19 +3329,19 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	port := int(svc.Spec.Ports[0].Port)
 
 	if !isTransitionTest {
-		framework.ExpectEqual(checkAffinity(nil, ingressIP, port, true), true)
+		framework.ExpectEqual(checkAffinity(cs, nil, ingressIP, port, true), true)
 	}
 	if isTransitionTest {
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(nil, ingressIP, port, false), true)
+		framework.ExpectEqual(checkAffinity(cs, nil, ingressIP, port, false), true)
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(checkAffinity(nil, ingressIP, port, true), true)
+		framework.ExpectEqual(checkAffinity(cs, nil, ingressIP, port, true), true)
 	}
 }
 

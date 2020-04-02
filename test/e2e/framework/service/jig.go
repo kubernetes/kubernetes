@@ -300,7 +300,7 @@ func (j *TestJig) GetEndpointNodeNames() (sets.String, error) {
 
 // WaitForEndpointOnNode waits for a service endpoint on the given node.
 func (j *TestJig) WaitForEndpointOnNode(nodeName string) error {
-	return wait.PollImmediate(framework.Poll, LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
+	return wait.PollImmediate(framework.Poll, KubeProxyLagTimeout, func() (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
