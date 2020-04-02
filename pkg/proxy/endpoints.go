@@ -48,7 +48,9 @@ var supportedEndpointSliceAddressTypes = sets.NewString(
 type BaseEndpointInfo struct {
 	Endpoint string // TODO: should be an endpointString type
 	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
-	IsLocal  bool
+	IsLocal bool
+	// NotReady indicates whether an endpoint is not ready to serve traffic
+	NotReady bool
 	Topology map[string]string
 }
 
@@ -57,6 +59,11 @@ var _ Endpoint = &BaseEndpointInfo{}
 // String is part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) String() string {
 	return info.Endpoint
+}
+
+// IsNotReady returns true if the endpoint is not ready to serve traffic
+func (info *BaseEndpointInfo) IsNotReady() bool {
+	return info.NotReady
 }
 
 // GetIsLocal is part of proxy.Endpoint interface.
@@ -84,9 +91,10 @@ func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string) *BaseEndpointInfo {
+func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string, notReady bool) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
+		NotReady: notReady,
 		IsLocal:  isLocal,
 		Topology: topology,
 	}
@@ -369,7 +377,31 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil)
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, false)
+				if ect.makeEndpointInfo != nil {
+					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
+				} else {
+					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], baseEndpointInfo)
+				}
+			}
+
+			for i := range ss.NotReadyAddresses {
+				addr := &ss.NotReadyAddresses[i]
+				if addr.IP == "" {
+					klog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
+					continue
+				}
+				// Filter out the incorrect IP version case.
+				// Any endpoint port that contains incorrect IP version will be ignored.
+				if ect.isIPv6Mode != nil && utilnet.IsIPv6String(addr.IP) != *ect.isIPv6Mode {
+					// Emit event on the corresponding service which had a different
+					// IP version than the endpoint.
+					utilproxy.LogAndEmitIncorrectIPVersionEvent(ect.recorder, "endpoints", addr.IP, endpoints.Namespace, endpoints.Name, "")
+					continue
+				}
+
+				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, true)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {

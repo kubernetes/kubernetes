@@ -76,6 +76,7 @@ type endpointSliceInfo struct {
 // Addresses and Topology are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
 	Addresses []string
+	NotReady  bool
 	Topology  map[string]string
 }
 
@@ -123,6 +124,13 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
 					Addresses: endpoint.Addresses,
 					Topology:  endpoint.Topology,
+					NotReady:  false,
+				})
+			} else {
+				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
+					Addresses: endpoint.Addresses,
+					Topology:  endpoint.Topology,
+					NotReady:  true,
 				})
 			}
 		}
@@ -242,7 +250,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 	// iterate through endpoints to add them to endpointsByIP.
 	for _, endpoint := range endpoints {
 		if len(endpoint.Addresses) == 0 {
-			klog.Warningf("ignoring invalid endpoint port %s with empty addresses", endpoint)
+			klog.Warningf("ignoring invalid endpoint port %v with empty addresses", endpoint)
 			continue
 		}
 
@@ -256,7 +264,8 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 		}
 
 		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology)
+
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology, endpoint.NotReady)
 
 		// This logic ensures we're deduping potential overlapping endpoints
 		// isLocal should not vary between matching IPs, but if it does, we

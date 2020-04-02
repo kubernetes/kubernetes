@@ -95,6 +95,9 @@ type Endpoint interface {
 	// String returns endpoint string.  An example format can be: `IP:Port`.
 	// We take the returned value as ServiceEndpoint.Endpoint.
 	String() string
+	// IsNotReady returns true if the endpoint came from the NotReadyAddresses list in Endpoints
+	// or any endpoints in EndpointSlice with Ready=false
+	IsNotReady() bool
 	// GetIsLocal returns true if the endpoint is running in same host as kube-proxy, otherwise returns false.
 	GetIsLocal() bool
 	// GetTopology returns the topology information of the endpoint.
