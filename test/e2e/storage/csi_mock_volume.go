@@ -885,13 +885,7 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 		expectedAttributes["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(ephemeralVolume)
 	}
 
-	// Load logs of driver pod
-	log, err := e2epod.GetPodLogs(cs, namespace, driverPodName, driverContainerName)
-	if err != nil {
-		return fmt.Errorf("could not load CSI driver logs: %s", err)
-	}
-	framework.Logf("CSI driver logs:\n%s", log)
-	// Find NodePublish in the logs
+	// Find NodePublish in the GRPC calls.
 	foundAttributes := sets.NewString()
 	numNodePublishVolume := 0
 	numNodeUnpublishVolume := 0
