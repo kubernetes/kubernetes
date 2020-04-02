@@ -24,6 +24,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -63,6 +64,9 @@ func TestCgroupMountValidationSuccess(t *testing.T) {
 }
 
 func TestCgroupMountValidationMemoryMissing(t *testing.T) {
+	if cgroups.IsCgroup2UnifiedMode() {
+		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
+	}
 	mountInt := mount.NewFakeMounter(
 		[]mount.MountPoint{
 			{
@@ -86,6 +90,9 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 }
 
 func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
+	if cgroups.IsCgroup2UnifiedMode() {
+		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
+	}
 	mountInt := mount.NewFakeMounter(
 		[]mount.MountPoint{
 			{
@@ -109,6 +116,9 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 }
 
 func TestSoftRequirementsValidationSuccess(t *testing.T) {
+	if cgroups.IsCgroup2UnifiedMode() {
+		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
+	}
 	req := require.New(t)
 	tempDir, err := ioutil.TempDir("", "")
 	req.NoError(err)
@@ -137,4 +147,29 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	f, err := validateSystemRequirements(mountInt)
 	assert.NoError(t, err)
 	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
+}
+
+func TestGetCpuWeight(t *testing.T) {
+	assert.Equal(t, uint64(0), getCpuWeight(nil))
+
+	v := uint64(2)
+	assert.Equal(t, uint64(1), getCpuWeight(&v))
+
+	v = uint64(262144)
+	assert.Equal(t, uint64(10000), getCpuWeight(&v))
+
+	v = uint64(1000000000)
+	assert.Equal(t, uint64(10000), getCpuWeight(&v))
+}
+
+func TestGetCpuMax(t *testing.T) {
+	assert.Equal(t, getCpuMax(nil, nil), "max 100000")
+
+	quota := int64(50000)
+	period := uint64(200000)
+	assert.Equal(t, "50000 200000", getCpuMax(&quota, &period))
+
+	assert.Equal(t, "max 200000", getCpuMax(nil, &period))
+
+	assert.Equal(t, "50000 100000", getCpuMax(&quota, nil))
 }
