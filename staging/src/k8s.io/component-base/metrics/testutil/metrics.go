@@ -262,6 +262,10 @@ func bucketQuantile(q float64, buckets []bucket) float64 {
 		return buckets[0].upperBound * (rank / buckets[0].count)
 	}
 
+	if b == len(buckets)-1 && math.IsInf(buckets[b].upperBound, 1) {
+		return buckets[len(buckets)-2].upperBound
+	}
+
 	// linear approximation of b-th bucket
 	brank := rank - buckets[b-1].count
 	bSize := buckets[b].upperBound - buckets[b-1].upperBound
