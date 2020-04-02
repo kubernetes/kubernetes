@@ -57,6 +57,9 @@ const (
 	// how long to wait for Resizing Condition on PVC to appear
 	csiResizingConditionWait = 2 * time.Minute
 
+	// Time for starting a pod with a volume.
+	csiPodRunningTimeout = 5 * time.Minute
+
 	// How log to wait for kubelet to unstage a volume after a pod is deleted
 	csiUnstageWaitTimeout = 1 * time.Minute
 
@@ -690,7 +693,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Waiting for expected CSI calls")
 				// Watch for all calls up to deletePod = true
+				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
+				defer cancel()
 				for {
+					if ctx.Err() != nil {
+						framework.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
+					}
 					time.Sleep(1 * time.Second)
 					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, f.Namespace.Name, driverPodName, driverContainerName)
 					framework.ExpectNoError(err, "while waiting for initial CSI calls")
