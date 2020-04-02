@@ -523,8 +523,23 @@ func GetFieldManagerFlag(cmd *cobra.Command) string {
 type DryRunStrategy int
 
 const (
+	// DryRunNone indicates the client will make all mutating calls
 	DryRunNone DryRunStrategy = iota
+
+	// DryRunClient, or client-side dry-run, indicates the client will prevent
+	// making mutating calls such as CREATE, PATCH, and DELETE
 	DryRunClient
+
+	// DryRunServer, or server-side dry-run, indicates the client will send
+	// mutating calls to the APIServer with the dry-run parameter to prevent
+	// persisting changes.
+	//
+	// Note that clients sending server-side dry-run calls should verify that
+	// the APIServer and the resource supports server-side dry-run, and otherwise
+	// clients should fail early.
+	//
+	// If a client sends a server-side dry-run call to an APIServer that doesn't
+	// support server-side dry-run, then the APIServer will persist changes inadvertently.
 	DryRunServer
 )
 

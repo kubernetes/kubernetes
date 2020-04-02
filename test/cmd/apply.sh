@@ -109,10 +109,15 @@ run_kubectl_apply_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # apply non dry-run creates the pod
   kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
+  initialResourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
   # apply changes
+  kubectl apply --dry-run=client -f hack/testdata/pod-apply.yaml "${kube_flags[@]:?}"
   kubectl apply --dry-run=server -f hack/testdata/pod-apply.yaml "${kube_flags[@]:?}"
   # Post-Condition: label still has initial value
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field:?}.name}}" 'test-pod-label'
+  # Ensure dry-run doesn't persist change
+  resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
+  kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
 
   # clean-up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
@@ -377,10 +382,14 @@ run_kubectl_server_side_apply_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # apply non dry-run creates the pod
   kubectl apply --server-side -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
+  initialResourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
   # apply changes
   kubectl apply --server-side --dry-run=server -f hack/testdata/pod-apply.yaml "${kube_flags[@]:?}"
   # Post-Condition: label still has initial value
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field:?}.name}}" 'test-pod-label'
+  # Ensure dry-run doesn't persist change
+  resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
+  kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
 
   # clean-up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]:?}"

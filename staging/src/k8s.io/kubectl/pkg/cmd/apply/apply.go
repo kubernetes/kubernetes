@@ -407,6 +407,20 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 		klog.V(4).Infof("error recording current command: %v", err)
 	}
 
+	helper := resource.NewHelper(info.Client, info.Mapping).
+		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+		WithFieldManager(o.FieldManager)
+
+	if o.DryRunStrategy == cmdutil.DryRunServer {
+		// Ensure the APIServer supports server-side dry-run for the resource,
+		// otherwise fail early.
+		// For APIServers that don't support server-side dry-run will persist
+		// changes.
+		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+			return err
+		}
+	}
+
 	if o.ServerSideApply {
 		// Send the full object to be applied on the server side.
 		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
@@ -416,14 +430,6 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 
 		options := metav1.PatchOptions{
 			Force: &o.ForceConflicts,
-		}
-		helper := resource.NewHelper(info.Client, info.Mapping).
-			WithFieldManager(o.FieldManager)
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
-			helper.DryRun(true)
 		}
 		obj, err := helper.Patch(
 			info.Namespace,
@@ -495,14 +501,6 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 		if o.DryRunStrategy != cmdutil.DryRunClient {
 			// Then create the resource and skip the three-way merge
-			helper := resource.NewHelper(info.Client, info.Mapping).
-				WithFieldManager(o.FieldManager)
-			if o.DryRunStrategy == cmdutil.DryRunServer {
-				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return cmdutil.AddSourceToErr("creating", info.Source, err)
-				}
-				helper.DryRun(true)
-			}
 			obj, err := helper.Create(info.Namespace, true, info.Object)
 			if err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -539,7 +537,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 		}
 
-		patcher, err := newPatcher(o, info)
+		patcher, err := newPatcher(o, info, helper)
 		if err != nil {
 			return err
 		}
