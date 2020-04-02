@@ -134,6 +134,10 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
+	if topologyPolicyName != PolicyNone && len(numaNodes) == 1 {
+		return nil, fmt.Errorf("%s is unsupported on the machine has only single NUMA node", topologyPolicyName)
+	}
+
 	var policy Policy
 	switch topologyPolicyName {
 
