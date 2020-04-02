@@ -704,7 +704,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
+		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
 	}
 	if len(matches) > 1 {
 		matchedPluginNames := []string{}

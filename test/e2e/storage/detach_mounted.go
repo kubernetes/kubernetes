@@ -128,7 +128,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 })
 
 func getUniqueVolumeName(pod *v1.Pod, driverName string) string {
-	return fmt.Sprintf("flexvolume-k8s/%s/%s", driverName, pod.Spec.Volumes[0].Name)
+	return fmt.Sprintf("k8s/%s/%s", driverName, pod.Spec.Volumes[0].Name)
 }
 
 func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName string) error {
