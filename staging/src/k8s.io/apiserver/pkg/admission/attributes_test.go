@@ -69,5 +69,5 @@ func TestAddAnnotationWithLevel(t *testing.T) {
 
 	// test AddAnnotationWithLevel
 	err := attr.AddAnnotationWithLevel("podsecuritypolicy.admission.k8s.io/validate-policy", "privileged", auditinternal.LevelNone)
-	assert.Error(t, err)
+	assert.Error(t, err, "admission annotations should not be allowed to be set at audit level lower than Metadata")
 }
