@@ -726,7 +726,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
 					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, f.Namespace.Name, driverPodName, driverContainerName)
 					if err != nil {
-						return true, fmt.Errorf("error waiting for expected CSI calls: %s", err)
+						return true, err
 					}
 					if index == 0 {
 						// No CSI call received yet
