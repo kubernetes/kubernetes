@@ -419,6 +419,7 @@ function dump_nodes() {
   all_selected_nodes+=( "${windows_node_names[@]}" )
 
   proc=${max_dump_processes}
+  start="$(date +%s)"
   for i in "${!all_selected_nodes[@]}"; do
     node_name="${all_selected_nodes[$i]}"
     node_dir="${report_dir}/${node_name}"
@@ -438,6 +439,10 @@ function dump_nodes() {
     if [[ proc -eq 0 ]]; then
       proc=${max_dump_processes}
       wait
+      now="$(date +%s)"
+      if [[ ! -z "${LOG_DUMP_SSH_TIMEOUT}" && $((now - start)) -gt ${LOG_DUMP_SSH_TIMEOUT} ]]; then
+        break
+      fi
     fi
   done
   # Wait for any remaining processes.
