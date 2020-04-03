@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -153,6 +154,8 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file. Flags override values in this file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
+	fs.Var(cliflag.NewMapStringBool(&o.ComponentConfig.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
 	o.SecureServing.AddFlags(nfs.FlagSet("secure serving"))
 	o.CombinedInsecureServing.AddFlags(nfs.FlagSet("insecure serving"))
@@ -195,7 +198,13 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		if err := validation.ValidateKubeSchedulerConfiguration(cfg).ToAggregate(); err != nil {
 			return err
 		}
-
+		original := o.ComponentConfig.FeatureGates
+		// Add back feature gates that were set in the cfg, but not in flags
+		for k, v := range original {
+			if _, ok := cfg.FeatureGates[k]; !ok {
+				cfg.FeatureGates[k] = v
+			}
+		}
 		// use the loaded config file only, with the exception of --address and --port. This means that
 		// none of the deprecated flags in o.Deprecated are taken into consideration. This is the old
 		// behaviour of the flags we have to keep.
@@ -219,6 +228,11 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 	}
 	if len(o.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
+	}
+
+	// update feature gates based on new config
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(c.ComponentConfig.FeatureGates); err != nil {
+		return err
 	}
 
 	return nil

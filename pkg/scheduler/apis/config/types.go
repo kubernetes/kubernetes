@@ -105,6 +105,9 @@ type KubeSchedulerConfiguration struct {
 	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
 	// with the extender. These extenders are shared by all scheduler profiles.
 	Extenders []Extender
+
+	// FeatureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool
 }
 
 // KubeSchedulerProfile is a scheduling profile.
