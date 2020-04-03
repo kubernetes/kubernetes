@@ -34,9 +34,14 @@ run_kubectl_diff_tests() {
 
     kubectl apply -f hack/testdata/pod.yaml
     kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" 'found:'
+    initialResourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
 
     # Make sure that diffing the resource right after returns nothing (0 exit code).
     kubectl diff -f hack/testdata/pod.yaml
+
+    # Ensure diff only dry-runs and doesn't persist change
+    resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
+    kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
 
     # Make sure that:
     # 1. the exit code for diff is 1 because it found a difference
@@ -44,10 +49,18 @@ run_kubectl_diff_tests() {
     output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
 
+    # Ensure diff only dry-runs and doesn't persist change
+    resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
+    kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
+
     # Test found diff with server-side apply
     kubectl apply -f hack/testdata/pod.yaml
     output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml --server-side --force-conflicts || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
+
+    # Ensure diff --server-side only dry-runs and doesn't persist change
+    resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
+    kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
 
     # Test that we have a return code bigger than 1 if there is an error when diffing
     kubectl diff -f hack/testdata/invalid-pod.yaml || test $? -gt 1

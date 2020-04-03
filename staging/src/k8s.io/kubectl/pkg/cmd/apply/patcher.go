@@ -80,16 +80,9 @@ func newPatcher(o *ApplyOptions, info *resource.Info) (*Patcher, error) {
 		openapiSchema = o.OpenAPISchema
 	}
 
-	helper := resource.NewHelper(info.Client, info.Mapping)
-	if o.DryRunStrategy == cmdutil.DryRunServer {
-		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-			return nil, err
-		}
-		helper.DryRun(true)
-	}
 	return &Patcher{
 		Mapping:       info.Mapping,
-		Helper:        helper,
+		Helper:        resource.NewHelper(info.Client, info.Mapping),
 		DynamicClient: o.DynamicClient,
 		Overwrite:     o.Overwrite,
 		BackOff:       clockwork.NewRealClock(),
@@ -185,7 +178,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		}
 	}
 
-	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
+	patchedObj, err := p.Helper.DryRun(p.ServerDryRun).Patch(namespace, name, patchType, patch, nil)
 	return patch, patchedObj, err
 }
 
@@ -230,11 +223,11 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err != nil {
 		return modified, nil, err
 	}
-	createdObject, err := p.Helper.Create(namespace, true, versionedObject)
+	createdObject, err := p.Helper.DryRun(p.ServerDryRun).Create(namespace, true, versionedObject)
 	if err != nil {
 		// restore the original object if we fail to create the new one
 		// but still propagate and advertise error to user
-		recreated, recreateErr := p.Helper.Create(namespace, true, original)
+		recreated, recreateErr := p.Helper.DryRun(p.ServerDryRun).Create(namespace, true, original)
 		if recreateErr != nil {
 			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v", err, recreateErr)
 		} else {
