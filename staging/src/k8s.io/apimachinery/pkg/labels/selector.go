@@ -869,23 +869,30 @@ func validateLabelValue(k, v string) error {
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil and empty Sets are considered equivalent to Everything().
+// It does not perform any validation, which means the server will reject
+// the request if the Set contains invalid values.
 func SelectorFromSet(ls Set) Selector {
+	return SelectorFromValidatedSet(ls)
+}
+
+// ValidatedSelectorFromSet returns a Selector which will match exactly the given Set. A
+// nil and empty Sets are considered equivalent to Everything().
+// The Set is validated client-side, which allows to catch errors early.
+func ValidatedSelectorFromSet(ls Set) (Selector, error) {
 	if ls == nil || len(ls) == 0 {
-		return internalSelector{}
+		return internalSelector{}, nil
 	}
 	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		r, err := NewRequirement(label, selection.Equals, []string{value})
-		if err == nil {
-			requirements = append(requirements, *r)
-		} else {
-			//TODO: double check errors when input comes from serialization?
-			return internalSelector{}
+		if err != nil {
+			return nil, err
 		}
+		requirements = append(requirements, *r)
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return internalSelector(requirements)
+	return internalSelector(requirements), nil
 }
 
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
