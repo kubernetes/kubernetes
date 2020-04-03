@@ -945,8 +945,8 @@ func waitForAPIServerForever(client clientset.Interface, nodeName types.NodeName
 		// and 2) it has enough permissions. Kubelet may have restricted permissions
 		// when it's bootstrapping TLS.
 		// https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
-		_, lastErr = client.StorageV1().CSINodes().Get(context.TODO(), string(nodeName), meta.GetOptions{})
-		if lastErr == nil || apierrors.IsNotFound(lastErr) {
+		_, lastErr = client.StorageV1().CSINodes().Get(string(nodeName), meta.GetOptions{})
+		if lastErr == nil || apierrs.IsNotFound(lastErr) {
 			// API server contacted
 			return true, nil
 		}
