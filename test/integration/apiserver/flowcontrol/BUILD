@@ -21,7 +21,6 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
-        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 
