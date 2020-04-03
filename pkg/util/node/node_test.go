@@ -201,3 +201,89 @@ func Test_GetZoneKey(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNodeHostIP(t *testing.T) {
+	testcases := map[string]struct {
+		Addresses []v1.NodeAddress
+
+		ExpectErr string
+		ExpectIP  string
+	}{
+		"no addresses": {
+			ExpectErr: "host IP unknown; known addresses: []",
+		},
+		"both internal and external IPs": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeExternalIP, Address: "5.6.7.8"},
+			},
+			ExpectIP: "1.2.3.4",
+		},
+		"only external IP": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "5.6.7.8"},
+			},
+			ExpectIP: "5.6.7.8",
+		},
+		"multiple internal IPs": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeInternalIP, Address: "2.3.4.5"},
+			},
+			ExpectIP: "1.2.3.4",
+		},
+		"multiple external IPs": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "5.6.7.8"},
+				{Type: v1.NodeExternalIP, Address: "6.7.8.9"},
+			},
+			ExpectIP: "5.6.7.8",
+		},
+		"IPv6 IPs": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "2607:f0d0:1002:51::4"},
+			},
+			ExpectIP: "2607:f0d0:1002:51::4",
+		},
+		"both valid and invalid internal IPs": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "invalid"},
+				{Type: v1.NodeInternalIP, Address: "2.3.4.5"},
+			},
+			ExpectIP: "2.3.4.5",
+		},
+		"both valid and invalid external IPs": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "invalid"},
+				{Type: v1.NodeExternalIP, Address: "6.7.8.9"},
+			},
+			ExpectIP: "6.7.8.9",
+		},
+		"all invalid IPs": {
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "invalid"},
+				{Type: v1.NodeExternalIP, Address: "invalid"},
+			},
+			ExpectErr: "host IP unknown; known addresses: [{InternalIP invalid} {ExternalIP invalid}]",
+		},
+	}
+
+	for name, test := range testcases {
+		node := &v1.Node{
+			Status: v1.NodeStatus{Addresses: test.Addresses},
+		}
+		hostIP, err := GetNodeHostIP(node)
+
+		if err != nil {
+			if err.Error() != test.ExpectErr {
+				t.Errorf("test %s fails, expected err=%q but got %q", name, test.ExpectErr, err.Error())
+				return
+			}
+		} else {
+			if hostIP.String() != test.ExpectIP {
+				t.Errorf("test %s fails, expected hostIP=%s but got %s", name, test.ExpectIP, hostIP.String())
+				return
+			}
+		}
+	}
+}
