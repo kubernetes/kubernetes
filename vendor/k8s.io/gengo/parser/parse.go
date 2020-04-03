@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -334,6 +335,12 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 	return nil
 }
 
+var regexErrPackageNotFound = regexp.MustCompile(`^unable to import ".*?": cannot find package ".*?" in any of:`)
+
+func isErrPackageNotFound(err error) bool {
+	return regexErrPackageNotFound.MatchString(err.Error())
+}
+
 // importPackage is a function that will be called by the type check package when it
 // needs to import a go package. 'path' is the import path.
 func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, error) {
@@ -356,6 +363,11 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 
 		// Add it.
 		if err := b.addDir(dir, userRequested); err != nil {
+			if isErrPackageNotFound(err) {
+				klog.V(6).Info(err)
+				return nil, nil
+			}
+
 			return nil, err
 		}
 
@@ -750,7 +762,10 @@ func (b *Builder) walkType(u types.Universe, useName *types.Name, in tc.Type) *t
 			if out.Methods == nil {
 				out.Methods = map[string]*types.Type{}
 			}
-			out.Methods[t.Method(i).Name()] = b.walkType(u, nil, t.Method(i).Type())
+			method := t.Method(i)
+			mt := b.walkType(u, nil, method.Type())
+			mt.CommentLines = splitLines(b.priorCommentLines(method.Pos(), 1).Text())
+			out.Methods[method.Name()] = mt
 		}
 		return out
 	case *tc.Named:
