@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
       - name: logexporter-test
-        image: gcr.io/k8s-testimages/logexporter:v20200327-9ba073aa98
+        image: gcr.io/k8s-testimages/logexporter:v20200401-c3269f485
         env:
         - name: NODE_NAME
           valueFrom:
@@ -51,6 +51,7 @@ spec:
         - --enable-hollow-node-logs={{.EnableHollowNodeLogs}}
         - --dump-systemd-journal={{.DumpSystemdJournal}}
         - --extra-log-files={{.ExtraLogFiles}}
+        - --extra-systemd-services={{.ExtraSystemdServices}}
         - --sleep-duration=24h
         volumeMounts:
         - mountPath: /etc/service-account
