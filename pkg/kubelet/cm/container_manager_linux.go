@@ -162,6 +162,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	}
 
 	if cgroups.IsCgroup2UnifiedMode() {
+		f.cpuHardcapping = true
 		return f, nil
 	}
 
