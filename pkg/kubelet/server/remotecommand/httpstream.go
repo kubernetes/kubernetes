@@ -411,6 +411,7 @@ func (*v1ProtocolHandler) supportsTerminalResizing() bool { return false }
 
 func handleResizeEvents(stream io.Reader, channel chan<- remotecommand.TerminalSize) {
 	defer runtime.HandleCrash()
+	defer close(channel)
 
 	decoder := json.NewDecoder(stream)
 	for {
