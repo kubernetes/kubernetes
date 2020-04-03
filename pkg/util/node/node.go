@@ -93,17 +93,30 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 // GetNodeHostIP returns the provided node's IP, based on the priority:
 // 1. NodeInternalIP
 // 2. NodeExternalIP
+// And this function will do IP format validations and ignore those invalid addresses.
 func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 	addresses := node.Status.Addresses
 	addressMap := make(map[v1.NodeAddressType][]v1.NodeAddress)
 	for i := range addresses {
 		addressMap[addresses[i].Type] = append(addressMap[addresses[i].Type], addresses[i])
 	}
+
+	var hostIP net.IP
 	if addresses, ok := addressMap[v1.NodeInternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
+		for _, address := range addresses {
+			if hostIP = net.ParseIP(address.Address); hostIP != nil {
+				return hostIP, nil
+			}
+			klog.Warningf("skipping invalid internal host IP %s", address.Address)
+		}
 	}
 	if addresses, ok := addressMap[v1.NodeExternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
+		for _, address := range addresses {
+			if hostIP = net.ParseIP(address.Address); hostIP != nil {
+				return hostIP, nil
+			}
+			klog.Warningf("skipping invalid external host IP %s", address.Address)
+		}
 	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
