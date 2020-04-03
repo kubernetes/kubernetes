@@ -554,9 +554,18 @@ run_pod_tests() {
   fi
   rm "${ERROR_FILE}"
 
+  kubectl get "${kube_flags[@]}" pod valid-pod -o json | ${SED} 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > /tmp/tmp-valid-pod.json
+
+  ## --dry-run --force replace
+  initialResourceVersion=$(kubectl get "${kube_flags[@]:?}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
+  kubectl replace --force --dry-run=client "${kube_flags[@]}" -f /tmp/tmp-valid-pod.json
+  kubectl replace --force --dry-run=server "${kube_flags[@]}" -f /tmp/tmp-valid-pod.json
+  # Ensure dry-run doesn't persist change
+  resourceVersion=$(kubectl get "${kube_flags[@]:?}" pod valid-pod -o go-template='{{ .metadata.resourceVersion }}')
+  kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
+
   ## --force replace pod can change other field, e.g., spec.container.name
   # Command
-  kubectl get "${kube_flags[@]}" pod valid-pod -o json | ${SED} 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > /tmp/tmp-valid-pod.json
   kubectl replace "${kube_flags[@]}" --force -f /tmp/tmp-valid-pod.json
   # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
@@ -571,61 +580,6 @@ run_pod_tests() {
 
   #cleaning
   rm /tmp/tmp-valid-pod.json
-
-  ## replace of a cluster scoped resource can succeed
-  # Pre-condition: a node exists
-  kubectl create -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Node",
-  "apiVersion": "v1",
-  "metadata": {
-    "name": "node-v1-test"
-  }
-}
-__EOF__
-  kube::test::get_object_assert "node node-v1-test" "{{range.items}}{{if .metadata.annotations.a}}found{{end}}{{end}}:" ':'
-
-  # Dry-run command
-  kubectl replace --dry-run=server -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Node",
-  "apiVersion": "v1",
-  "metadata": {
-    "name": "node-v1-test",
-    "annotations": {"a":"b"},
-    "resourceVersion": "0"
-  }
-}
-__EOF__
-  kubectl replace --dry-run=client -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Node",
-  "apiVersion": "v1",
-  "metadata": {
-    "name": "node-v1-test",
-    "annotations": {"a":"b"},
-    "resourceVersion": "0"
-  }
-}
-__EOF__
-  kube::test::get_object_assert "node node-v1-test" "{{range.items}}{{if .metadata.annotations.a}}found{{end}}{{end}}:" ':'
-
-  # Command
-  kubectl replace -f - "${kube_flags[@]}" << __EOF__
-{
-  "kind": "Node",
-  "apiVersion": "v1",
-  "metadata": {
-    "name": "node-v1-test",
-    "annotations": {"a":"b"},
-    "resourceVersion": "0"
-  }
-}
-__EOF__
-
-  # Post-condition: the node command succeeds
-  kube::test::get_object_assert "node node-v1-test" "{{.metadata.annotations.a}}" 'b'
-  kubectl delete node node-v1-test "${kube_flags[@]}"
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
   echo -e "#!/usr/bin/env bash\n${SED} -i \"s/nginx/k8s.gcr.io\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
@@ -1518,6 +1472,65 @@ run_nodes_tests() {
   # but it proves that works
   kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview-v1beta1.json --validate=false
   kubectl create -f test/fixtures/pkg/kubectl/cmd/create/tokenreview-v1.json --validate=false
+
+  ## replace of a cluster scoped resource can succeed
+  # Pre-condition: a node exists
+  kubectl create -f - "${kube_flags[@]:?}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-v1-test"
+  }
+}
+__EOF__
+  kube::test::get_object_assert "node node-v1-test" "{{range.items}}{{if .metadata.annotations.a}}found{{end}}{{end}}:" ':'
+  initialResourceVersion=$(kubectl get "${kube_flags[@]:?}" node node-v1-test -o go-template='{{ .metadata.resourceVersion }}')
+
+  # Dry-run command
+  kubectl replace --dry-run=server -f - "${kube_flags[@]:?}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-v1-test",
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
+  }
+}
+__EOF__
+  kubectl replace --dry-run=client -f - "${kube_flags[@]:?}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-v1-test",
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
+  }
+}
+__EOF__
+  kube::test::get_object_assert "node node-v1-test" "{{range.items}}{{if .metadata.annotations.a}}found{{end}}{{end}}:" ':'
+  # Ensure dry-run doesn't persist change
+  resourceVersion=$(kubectl get "${kube_flags[@]:?}" node node-v1-test -o go-template='{{ .metadata.resourceVersion }}')
+  kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
+
+  # Command
+  kubectl replace -f - "${kube_flags[@]:?}" << __EOF__
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "node-v1-test",
+    "annotations": {"a":"b"},
+    "resourceVersion": "0"
+  }
+}
+__EOF__
+
+  # Post-condition: the node command succeeds
+  kube::test::get_object_assert "node node-v1-test" "{{.metadata.annotations.a}}" 'b'
+  kubectl delete node node-v1-test "${kube_flags[@]:?}"
 
   set +o nounset
   set +o errexit

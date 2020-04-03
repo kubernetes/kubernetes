@@ -373,6 +373,7 @@ func (o *ReplaceOptions) forceReplace() error {
 		if err != nil {
 			return err
 		}
+		count++
 
 		if err := util.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return err
@@ -382,12 +383,21 @@ func (o *ReplaceOptions) forceReplace() error {
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+		if o.DryRunStrategy == cmdutil.DryRunClient {
+			return o.PrintObj(info.Object)
+		}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
+		obj, err := resource.NewHelper(info.Client, info.Mapping).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+			Create(info.Namespace, true, info.Object)
 		if err != nil {
 			return err
 		}
 
-		count++
 		info.Refresh(obj, true)
 		return o.PrintObj(info.Object)
 	})
