@@ -35,10 +35,7 @@ func (p *restrictedPolicy) Name() string {
 }
 
 func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
-	if !hint.Preferred {
-		return false
-	}
-	return true
+	return hint.Preferred
 }
 
 func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
