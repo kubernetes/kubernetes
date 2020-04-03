@@ -108,7 +108,11 @@ func newProxyServer(
 	iptInterface = utiliptables.New(execer, protocol)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
-	canUseIPVS, _ := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
+	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
+	if string(config.Mode) == proxyModeIPVS && err != nil {
+		klog.Errorf("Can't use the IPVS proxier: %v", err)
+	}
+
 	if canUseIPVS {
 		ipvsInterface = utilipvs.New(execer)
 	}
