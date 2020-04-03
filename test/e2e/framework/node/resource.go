@@ -416,11 +416,7 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		nodeInfo.SetNode(node)
 	}
 
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		e2elog.Failf("Can't test predicates for node %s: %v", node.Name, err)
-		return false
-	}
+	taints := nodeInfo.Taints()
 
 	return toleratesTaintsWithNoScheduleNoExecuteEffects(taints, fakePod.Spec.Tolerations)
 }

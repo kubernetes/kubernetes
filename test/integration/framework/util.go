@@ -273,11 +273,7 @@ func isNodeUntainted(node *v1.Node) bool {
 		nodeInfo.SetNode(node)
 	}
 
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		klog.Fatalf("Can't test predicates for node %s: %v", node.Name, err)
-		return false
-	}
+	taints := nodeInfo.Taints()
 
 	return v1helper.TolerationsTolerateTaintsWithFilter(fakePod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule

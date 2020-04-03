@@ -690,11 +690,7 @@ func canScheduleOnNode(node v1.Node, ds *appsv1.DaemonSet) bool {
 	newPod := daemon.NewPod(ds, node.Name)
 	nodeInfo := schedfwk.NewNodeInfo()
 	nodeInfo.SetNode(&node)
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		framework.Failf("Can't test DaemonSet predicates for node %s: %v", node.Name, err)
-		return false
-	}
+	taints := nodeInfo.Taints()
 	fitsNodeName, fitsNodeAffinity, fitsTaints := daemon.Predicates(newPod, &node, taints)
 	return fitsNodeName && fitsNodeAffinity && fitsTaints
 }

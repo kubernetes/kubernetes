@@ -1202,11 +1202,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 
 	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(node)
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		klog.Warningf("failed to get node %q taints: %v", node.Name, err)
-		return false, false, err
-	}
+	taints := nodeInfo.Taints()
 
 	fitsNodeName, fitsNodeAffinity, fitsTaints := Predicates(pod, node, taints)
 	if !fitsNodeName || !fitsNodeAffinity {

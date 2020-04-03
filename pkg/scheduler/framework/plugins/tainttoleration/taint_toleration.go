@@ -56,10 +56,7 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 		return framework.NewStatus(framework.Error, "invalid nodeInfo")
 	}
 
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
-	}
+	taints := nodeInfo.Taints()
 
 	filterPredicate := func(t *v1.Taint) bool {
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.

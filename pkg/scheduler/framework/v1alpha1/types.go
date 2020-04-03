@@ -321,11 +321,11 @@ func (n *NodeInfo) Node() *v1.Node {
 
 // Taints returns the taints list on this node.
 // TODO(#89528): Exists only because of kubelet dependency, remove.
-func (n *NodeInfo) Taints() ([]v1.Taint, error) {
+func (n *NodeInfo) Taints() []v1.Taint {
 	if n == nil || n.node.Spec.Taints == nil {
-		return nil, nil
+		return nil
 	}
-	return n.node.Spec.Taints, nil
+	return n.node.Spec.Taints
 }
 
 // AllocatableResource returns allocatable resources on a given node.
