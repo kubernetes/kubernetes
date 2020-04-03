@@ -87,6 +87,9 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 	if err != nil {
 		return err
 	}
+	if cml.cm.Annotations == nil {
+		cml.cm.Annotations = make(map[string]string)
+	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
 	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(cml.cm)
 	return err
