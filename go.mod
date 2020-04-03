@@ -63,7 +63,7 @@ require (
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
-	github.com/googleapis/gnostic v0.1.0
+	github.com/googleapis/gnostic v0.4.1
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
@@ -106,9 +106,9 @@ require (
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200224211402-c65a9e2dd1fd
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
-	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527
+	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
 	gonum.org/v1/gonum v0.6.2
@@ -138,7 +138,7 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
+	k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
@@ -235,6 +235,7 @@ replace (
 	github.com/docker/go-connections => github.com/docker/go-connections v0.3.0
 	github.com/docker/go-units => github.com/docker/go-units v0.4.0
 	github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
+	github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/dustin/go-humanize => github.com/dustin/go-humanize v1.0.0
 	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153 // 947c36da3153 is the SHA for git tag v1.11
 	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.9.5+incompatible
@@ -287,7 +288,7 @@ replace (
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock => github.com/golang/mock v1.3.1
-	github.com/golang/protobuf => github.com/golang/protobuf v1.3.2
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
 	github.com/golangci/check => github.com/golangci/check v0.0.0-20180506172741-cfe4005ccda2
 	github.com/golangci/dupl => github.com/golangci/dupl v0.0.0-20180902072040-3e9179ac440a
 	github.com/golangci/errcheck => github.com/golangci/errcheck v0.0.0-20181223084120-ef45e06d44b6
@@ -319,7 +320,7 @@ replace (
 	github.com/google/renameio => github.com/google/renameio v0.1.0
 	github.com/google/uuid => github.com/google/uuid v1.1.1
 	github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.4
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.1.0
+	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 	github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
 	github.com/gorilla/context => github.com/gorilla/context v1.1.1
@@ -482,7 +483,7 @@ replace (
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6
 	golang.org/x/mod => golang.org/x/mod v0.0.0-20190513183733-4bf6d317e70e
-	golang.org/x/net => golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+	golang.org/x/net => golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/perf => golang.org/x/perf v0.0.0-20180704124530-6e6d33e29852
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
@@ -536,7 +537,7 @@ replace (
 	k8s.io/klog => k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 	k8s.io/kubectl => ./staging/src/k8s.io/kubectl

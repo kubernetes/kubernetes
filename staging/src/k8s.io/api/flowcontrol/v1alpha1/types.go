@@ -84,7 +84,6 @@ type FlowSchemaList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// `items` is a list of FlowSchemas.
-	// +listType=atomic
 	Items []FlowSchema `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -350,7 +349,6 @@ type PriorityLevelConfigurationList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// `items` is a list of request-priorities.
-	// +listType=atomic
 	Items []PriorityLevelConfiguration `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 

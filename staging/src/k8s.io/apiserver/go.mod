@@ -19,7 +19,7 @@ require (
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
-	github.com/googleapis/gnostic v0.1.0
+	github.com/googleapis/gnostic v0.4.1
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/golang-lru v0.5.1
@@ -33,9 +33,9 @@ require (
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200224211402-c65a9e2dd1fd
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527
+	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb // indirect
 	google.golang.org/grpc v1.26.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -46,7 +46,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
+	k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7
 	sigs.k8s.io/structured-merge-diff/v3 v3.0.0

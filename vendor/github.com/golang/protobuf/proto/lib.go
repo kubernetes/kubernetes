@@ -393,7 +393,7 @@ func (p *Buffer) Bytes() []byte { return p.buf }
 // than relying on this API.
 //
 // If deterministic serialization is requested, map entries will be sorted
-// by keys in lexographical order. This is an implementation detail and
+// by keys in lexicographical order. This is an implementation detail and
 // subject to change.
 func (p *Buffer) SetDeterministic(deterministic bool) {
 	p.deterministic = deterministic

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -402,42 +402,44 @@ func TestGetServerResources(t *testing.T) {
 	}
 }
 
-var returnedOpenAPI = openapi_v2.Document{
-	Definitions: &openapi_v2.Definitions{
-		AdditionalProperties: []*openapi_v2.NamedSchema{
-			{
-				Name: "fake.type.1",
-				Value: &openapi_v2.Schema{
-					Properties: &openapi_v2.Properties{
-						AdditionalProperties: []*openapi_v2.NamedSchema{
-							{
-								Name: "count",
-								Value: &openapi_v2.Schema{
-									Type: &openapi_v2.TypeItem{
-										Value: []string{"integer"},
+func returnedOpenAPI() *openapi_v2.Document {
+	return &openapi_v2.Document{
+		Definitions: &openapi_v2.Definitions{
+			AdditionalProperties: []*openapi_v2.NamedSchema{
+				{
+					Name: "fake.type.1",
+					Value: &openapi_v2.Schema{
+						Properties: &openapi_v2.Properties{
+							AdditionalProperties: []*openapi_v2.NamedSchema{
+								{
+									Name: "count",
+									Value: &openapi_v2.Schema{
+										Type: &openapi_v2.TypeItem{
+											Value: []string{"integer"},
+										},
 									},
 								},
 							},
 						},
 					},
 				},
-			},
-			{
-				Name: "fake.type.2",
-				Value: &openapi_v2.Schema{
-					Properties: &openapi_v2.Properties{
-						AdditionalProperties: []*openapi_v2.NamedSchema{
-							{
-								Name: "count",
-								Value: &openapi_v2.Schema{
-									Type: &openapi_v2.TypeItem{
-										Value: []string{"array"},
-									},
-									Items: &openapi_v2.ItemsItem{
-										Schema: []*openapi_v2.Schema{
-											{
-												Type: &openapi_v2.TypeItem{
-													Value: []string{"string"},
+				{
+					Name: "fake.type.2",
+					Value: &openapi_v2.Schema{
+						Properties: &openapi_v2.Properties{
+							AdditionalProperties: []*openapi_v2.NamedSchema{
+								{
+									Name: "count",
+									Value: &openapi_v2.Schema{
+										Type: &openapi_v2.TypeItem{
+											Value: []string{"array"},
+										},
+										Items: &openapi_v2.ItemsItem{
+											Schema: []*openapi_v2.Schema{
+												{
+													Type: &openapi_v2.TypeItem{
+														Value: []string{"string"},
+													},
 												},
 											},
 										},
@@ -449,7 +451,7 @@ var returnedOpenAPI = openapi_v2.Document{
 				},
 			},
 		},
-	},
+	}
 }
 
 func openapiSchemaDeprecatedFakeServer(status int) (*httptest.Server, error) {
@@ -469,7 +471,7 @@ func openapiSchemaDeprecatedFakeServer(status int) (*httptest.Server, error) {
 
 		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
-		output, err := proto.Marshal(&returnedOpenAPI)
+		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
 			sErr = err
 			return
@@ -496,7 +498,7 @@ func openapiSchemaFakeServer() (*httptest.Server, error) {
 
 		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
-		output, err := proto.Marshal(&returnedOpenAPI)
+		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
 			sErr = err
 			return
@@ -519,7 +521,7 @@ func TestGetOpenAPISchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -536,7 +538,7 @@ func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -553,7 +555,7 @@ func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -570,7 +572,7 @@ func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }

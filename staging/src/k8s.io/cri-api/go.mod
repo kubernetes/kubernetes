@@ -7,11 +7,11 @@ go 1.13
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gogo/protobuf v1.3.1
+	github.com/golang/protobuf v1.3.3 // indirect
 	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20200202094626-16171245cfb2 // indirect
-	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
+	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb // indirect
 	google.golang.org/grpc v1.26.0

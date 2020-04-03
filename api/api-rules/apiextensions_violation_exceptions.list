@@ -1,4 +1,3 @@
-API rule violation: list_type_missing,k8s.io/api/autoscaling/v1,HorizontalPodAutoscalerList,Items
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,APIGroup,ServerAddressByClientCIDRs
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,APIGroup,Versions
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,APIGroupList,Groups
@@ -12,11 +11,9 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,Delet
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,FieldsV1,Raw
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelector,MatchExpressions
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelectorRequirement,Values
-API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,List,Items
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,Finalizers
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,ManagedFields
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,OwnerReferences
-API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,PartialObjectMetadataList,Items
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,PatchOptions,DryRun
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,RootPaths,Paths
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,StatusDetails,Causes
