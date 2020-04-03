@@ -608,7 +608,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
 
-	var bmods []string
+	var bmods, lmods []string
 
 	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
 	modulesFile, err := os.Open("/proc/modules")
@@ -650,11 +650,15 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 			if err != nil {
 				klog.Warningf("Failed to load kernel module %v with modprobe. "+
 					"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", module)
+			} else {
+				lmods = append(lmods, module)
 			}
 		}
 	}
 
-	return append(mods, bmods...), nil
+	mods = append(mods, bmods...)
+	mods = append(mods, lmods...)
+	return mods, nil
 }
 
 // getFirstColumn reads all the content from r into memory and return a
