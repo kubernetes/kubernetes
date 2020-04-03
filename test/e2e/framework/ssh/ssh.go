@@ -40,8 +40,8 @@ import (
 )
 
 const (
-	// ssh port
-	sshPort = "22"
+	// SSHPort is tcp port number of SSH
+	SSHPort = "22"
 
 	// pollNodeInterval is how often to Poll pods.
 	pollNodeInterval = 2 * time.Second
@@ -136,7 +136,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 
 	sshHosts := make([]string, 0, len(hosts))
 	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
+		sshHosts = append(sshHosts, net.JoinHostPort(h, SSHPort))
 	}
 	return sshHosts, nil
 }
@@ -155,7 +155,7 @@ type Result struct {
 // eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
 // cloud providers since it involves ssh.
 func NodeExec(nodeName, cmd, provider string) (Result, error) {
-	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), provider)
+	return SSH(cmd, net.JoinHostPort(nodeName, SSHPort), provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -330,7 +330,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
-			host = net.JoinHostPort(a.Address, sshPort)
+			host = net.JoinHostPort(a.Address, SSHPort)
 			break
 		}
 	}
@@ -339,7 +339,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 		// No external IPs were found, let's try to use internal as plan B
 		for _, a := range node.Status.Addresses {
 			if a.Type == v1.NodeInternalIP && a.Address != "" {
-				host = net.JoinHostPort(a.Address, sshPort)
+				host = net.JoinHostPort(a.Address, SSHPort)
 				break
 			}
 		}
