@@ -204,39 +204,6 @@ type Bootstrap interface {
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
 }
 
-// Builder creates and initializes a Kubelet instance
-type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
-	kubeDeps *Dependencies,
-	crOptions *config.ContainerRuntimeOptions,
-	containerRuntime string,
-	runtimeCgroups string,
-	hostnameOverride string,
-	nodeIP string,
-	providerID string,
-	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
-	registerNode bool,
-	registerWithTaints []api.Taint,
-	allowedUnsafeSysctls []string,
-	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
-	experimentalMounterPath string,
-	experimentalKernelMemcgNotification bool,
-	experimentalCheckNodeCapabilitiesBeforeMount bool,
-	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
-	minimumGCAge metav1.Duration,
-	maxPerPodContainerCount int32,
-	maxContainerCount int32,
-	masterServiceNamespace string,
-	registerSchedulable bool,
-	nonMasqueradeCIDR string,
-	keepTerminatedPodVolumes bool,
-	nodeLabels map[string]string,
-	seccompProfileRoot string,
-	bootstrapCheckpointPath string,
-	nodeStatusMaxImages int32) (Bootstrap, error)
-
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
 // these objects while we figure out a more comprehensive dependency injection story for the Kubelet.
