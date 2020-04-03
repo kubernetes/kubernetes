@@ -50,6 +50,7 @@ func NewHealthHandler(hfunc func() Health) http.HandlerFunc {
 		if r.Method != http.MethodGet {
 			w.Header().Set("Allow", http.MethodGet)
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			plog.Warningf("/health error (status code %d)", http.StatusMethodNotAllowed)
 			return
 		}
 		h := hfunc()
@@ -97,11 +98,15 @@ func checkHealth(srv etcdserver.ServerV2) Health {
 	as := srv.Alarms()
 	if len(as) > 0 {
 		h.Health = "false"
+		for _, v := range as {
+			plog.Warningf("/health error due to an alarm %s", v.String())
+		}
 	}
 
 	if h.Health == "true" {
 		if uint64(srv.Leader()) == raft.None {
 			h.Health = "false"
+			plog.Warningf("/health error; no leader (status code %d)", http.StatusServiceUnavailable)
 		}
 	}
 
@@ -111,11 +116,13 @@ func checkHealth(srv etcdserver.ServerV2) Health {
 		cancel()
 		if err != nil {
 			h.Health = "false"
+			plog.Warningf("/health error; QGET failed %v (status code %d)", err, http.StatusServiceUnavailable)
 		}
 	}
 
 	if h.Health == "true" {
 		healthSuccess.Inc()
+		plog.Infof("/health OK (status code %d)", http.StatusOK)
 	} else {
 		healthFailed.Inc()
 	}
