@@ -465,6 +465,25 @@ func (f *TestFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 	return f.Client, nil
 }
 
+// PathOptions returns a new PathOptions with a temp file
+func (f *TestFactory) PathOptions() *clientcmd.PathOptions {
+	pathOptions := clientcmd.NewDefaultPathOptions()
+	pathOptions.GlobalFile = f.tempConfigFile.Name()
+	pathOptions.EnvVar = ""
+	return pathOptions
+}
+
+// PathOptionsWithConfig writes a config to a temp file and returns PathOptions
+func (f *TestFactory) PathOptionsWithConfig(config clientcmdapi.Config) (*clientcmd.PathOptions, error) {
+	pathOptions := f.PathOptions()
+	err := clientcmd.WriteToFile(config, pathOptions.GlobalFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return pathOptions, nil
+}
+
 // UnstructuredClientForMapping is used to get UnstructuredClient from a TestFactory
 func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	if f.UnstructuredClientForMappingFunc != nil {
