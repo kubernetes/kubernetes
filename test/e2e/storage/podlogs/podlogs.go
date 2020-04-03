@@ -170,6 +170,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 							// Same for attempts to read logs from a container that
 							// isn't ready (yet?!).
 							if !strings.HasPrefix(line, "rpc error: code = Unknown desc = Error: No such container:") &&
+								!strings.HasPrefix(line, "unable to retrieve container logs for ") &&
 								!strings.HasPrefix(line, "Unable to retrieve container logs for ") {
 								if first {
 									if to.LogWriter == nil {
