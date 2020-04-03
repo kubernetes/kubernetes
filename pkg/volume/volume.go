@@ -103,8 +103,9 @@ type Attributes struct {
 
 // MounterArgs provides more easily extensible arguments to Mounter
 type MounterArgs struct {
-	FsGroup     *int64
-	DesiredSize *resource.Quantity
+	FsGroup             *int64
+	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
+	DesiredSize         *resource.Quantity
 }
 
 // Mounter interface provides methods to set up/mount the volume.

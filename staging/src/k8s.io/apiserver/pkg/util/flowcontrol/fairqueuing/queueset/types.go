@@ -26,8 +26,9 @@ import (
 // request is a temporary container for "requests" with additional
 // tracking fields required for the functionality FQScheduler
 type request struct {
-	qs  *queueSet
-	ctx context.Context
+	qs     *queueSet
+	fsName string
+	ctx    context.Context
 
 	// The relevant queue.  Is nil if this request did not go through
 	// a queue.

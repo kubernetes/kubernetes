@@ -20,6 +20,7 @@ package dockershim
 
 import (
 	"os"
+	"runtime"
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
@@ -69,11 +70,12 @@ func (ds *dockerService) updateCreateConfig(
 	if wc := config.GetWindows(); wc != nil {
 		rOpts := wc.GetResources()
 		if rOpts != nil {
+			// Precedence and units for these are described at length in kuberuntime_container_windows.go - generateWindowsContainerConfig()
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
-				Memory:     rOpts.MemoryLimitInBytes,
-				CPUShares:  rOpts.CpuShares,
-				CPUCount:   rOpts.CpuCount,
-				CPUPercent: rOpts.CpuMaximum,
+				Memory:    rOpts.MemoryLimitInBytes,
+				CPUShares: rOpts.CpuShares,
+				CPUCount:  rOpts.CpuCount,
+				NanoCPUs:  rOpts.CpuMaximum * int64(runtime.NumCPU()) * (1e9 / 10000),
 			}
 		}
 

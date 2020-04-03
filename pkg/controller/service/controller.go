@@ -804,8 +804,7 @@ func (s *Controller) addFinalizer(service *v1.Service) error {
 	updated.ObjectMeta.Finalizers = append(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer)
 
 	klog.V(2).Infof("Adding finalizer to service %s/%s", updated.Namespace, updated.Name)
-	// TODO(87447) use PatchService from k8s.io/cloud-provider/service/helpers
-	_, err := patch(s.kubeClient.CoreV1(), service, updated)
+	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)
 	return err
 }
 
@@ -820,7 +819,7 @@ func (s *Controller) removeFinalizer(service *v1.Service) error {
 	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer)
 
 	klog.V(2).Infof("Removing finalizer from service %s/%s", updated.Namespace, updated.Name)
-	_, err := patch(s.kubeClient.CoreV1(), service, updated)
+	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)
 	return err
 }
 
@@ -846,7 +845,7 @@ func (s *Controller) patchStatus(service *v1.Service, previousStatus, newStatus 
 	updated.Status.LoadBalancer = *newStatus
 
 	klog.V(2).Infof("Patching status for service %s/%s", updated.Namespace, updated.Name)
-	_, err := patch(s.kubeClient.CoreV1(), service, updated)
+	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)
 	return err
 }
 

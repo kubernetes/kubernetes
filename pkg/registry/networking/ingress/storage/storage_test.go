@@ -57,6 +57,7 @@ var (
 	defaultBackendPort  = intstr.FromInt(80)
 	defaultLoadBalancer = "127.0.0.1"
 	defaultPath         = "/foo"
+	defaultPathType     = networking.PathTypeImplementationSpecific
 	defaultPathMap      = map[string]string{defaultPath: defaultBackendName}
 	defaultTLS          = []networking.IngressTLS{
 		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "fooSecret"},
@@ -69,7 +70,8 @@ func toHTTPIngressPaths(pathMap map[string]string) []networking.HTTPIngressPath 
 	httpPaths := []networking.HTTPIngressPath{}
 	for path, backend := range pathMap {
 		httpPaths = append(httpPaths, networking.HTTPIngressPath{
-			Path: path,
+			Path:     path,
+			PathType: &defaultPathType,
 			Backend: networking.IngressBackend{
 				ServiceName: backend,
 				ServicePort: defaultBackendPort,
@@ -130,16 +132,16 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
 	ingress := validIngress()
-	noDefaultBackendAndRules := validIngress()
-	noDefaultBackendAndRules.Spec.Backend = &networking.IngressBackend{}
-	noDefaultBackendAndRules.Spec.Rules = []networking.IngressRule{}
+	noBackendAndRules := validIngress()
+	noBackendAndRules.Spec.Backend = &networking.IngressBackend{}
+	noBackendAndRules.Spec.Rules = []networking.IngressRule{}
 	badPath := validIngress()
 	badPath.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 		"foo.bar.com": {"/invalid[": "svc"}})
 	test.TestCreate(
 		// valid
 		ingress,
-		noDefaultBackendAndRules,
+		noBackendAndRules,
 		badPath,
 	)
 }
@@ -164,7 +166,7 @@ func TestUpdate(t *testing.T) {
 			})
 			return object
 		},
-		// invalid updateFunc: ObjeceMeta is not to be tampered with.
+		// invalid updateFunc: ObjectMeta is not to be tampered with.
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*networking.Ingress)
 			object.Name = ""

@@ -15,7 +15,7 @@
 REGISTRY ?= gcr.io/kubernetes-e2e-test-images
 GOARM ?= 7
 QEMUVERSION=v2.9.1
-GOLANG_VERSION=1.13.6
+GOLANG_VERSION=1.13.9
 export
 
 ifndef WHAT
@@ -37,4 +37,7 @@ all-container:
 all-push: all-container
 	./image-util.sh push $(WHAT)
 
-.PHONY: all all-push all-container
+all-build-and-push:
+	./image-util.sh build_and_push ${WHAT}
+
+.PHONY: all all-build-and-push all-push all-container

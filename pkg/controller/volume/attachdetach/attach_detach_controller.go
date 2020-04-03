@@ -37,13 +37,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
-	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -111,7 +109,7 @@ func NewAttachDetachController(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	csiNodeInformer storageinformersv1.CSINodeInformer,
-	csiDriverInformer storageinformers.CSIDriverInformer,
+	csiDriverInformer storageinformersv1.CSIDriverInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
@@ -140,10 +138,8 @@ func NewAttachDetachController(
 		adc.csiNodeSynced = csiNodeInformer.Informer().HasSynced
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		adc.csiDriverLister = csiDriverInformer.Lister()
-		adc.csiDriversSynced = csiDriverInformer.Informer().HasSynced
-	}
+	adc.csiDriverLister = csiDriverInformer.Lister()
+	adc.csiDriversSynced = csiDriverInformer.Informer().HasSynced
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
@@ -281,7 +277,7 @@ type attachDetachController struct {
 	// csiDriverLister is the shared CSIDriver lister used to fetch and store
 	// CSIDriver objects from the API server. It is shared with other controllers
 	// and therefore the CSIDriver objects in its store should be treated as immutable.
-	csiDriverLister  storagelisters.CSIDriverLister
+	csiDriverLister  storagelistersv1.CSIDriverLister
 	csiDriversSynced kcache.InformerSynced
 
 	// cloud provider used by volume host
@@ -693,7 +689,7 @@ func (adc *attachDetachController) CSINodeLister() storagelistersv1.CSINodeListe
 	return adc.csiNodeLister
 }
 
-func (adc *attachDetachController) CSIDriverLister() storagelisters.CSIDriverLister {
+func (adc *attachDetachController) CSIDriverLister() storagelistersv1.CSIDriverLister {
 	return adc.csiDriverLister
 }
 
@@ -822,6 +818,6 @@ func (adc *attachDetachController) GetSubpather() subpath.Interface {
 	return nil
 }
 
-func (adc *attachDetachController) GetCSIDriverLister() storagelisters.CSIDriverLister {
+func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {
 	return adc.csiDriverLister
 }

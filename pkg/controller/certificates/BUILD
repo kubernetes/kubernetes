@@ -13,6 +13,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/certificates",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

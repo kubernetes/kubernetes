@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// ResourceMatches returns the result of the rule.Resaurces matching.
+// ResourceMatches returns the result of the rule.Resources matching.
 func ResourceMatches(rule *PolicyRule, combinedRequestedResource, requestedSubresource string) bool {
 	for _, ruleResource := range rule.Resources {
 		// if everything is allowed, we match

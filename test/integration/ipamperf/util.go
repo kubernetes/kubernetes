@@ -63,7 +63,7 @@ func deleteNodes(apiURL string, config *Config) {
 		Burst:         config.CreateQPS,
 	})
 	noGrace := int64(0)
-	if err := clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}, metav1.ListOptions{}); err != nil {
+	if err := clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &noGrace}, metav1.ListOptions{}); err != nil {
 		klog.Errorf("Error deleting node: %v", err)
 	}
 }

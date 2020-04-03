@@ -57,7 +57,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 
 	t.Logf("Creating foo")
 	noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, "foo")
-	_, err = noxuNamespacedResourceClientV1beta1.Create(noxuInstanceToCreate, metav1.CreateOptions{})
+	_, err = noxuNamespacedResourceClientV1beta1.Create(context.TODO(), noxuInstanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta1.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			_, err := noxuNamespacedResourceClientV1beta1.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			if err != nil {
 				// work around "grpc: the client connection is closing" error
 				// TODO: fix the grpc error
@@ -111,7 +111,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta2.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			_, err := noxuNamespacedResourceClientV1beta2.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			assert.NotNil(t, err)
 
 			// work around "grpc: the client connection is closing" error

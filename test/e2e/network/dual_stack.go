@@ -31,8 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
@@ -99,7 +100,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		ginkgo.By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		p, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
@@ -115,7 +116,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		framework.ExpectEqual(isIPv4(p.Status.PodIPs[0].IP) != isIPv4(p.Status.PodIPs[1].IP), true)
 
 		ginkgo.By("deleting the pod")
-		err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(30))
+		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
@@ -135,12 +136,13 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		replicas := int32(len(nodeList.Items))
 
-		serverDeploymentSpec := e2edeploy.NewDeployment(serverDeploymentName,
+		serverDeploymentSpec := e2edeployment.NewDeployment(serverDeploymentName,
 			replicas,
 			map[string]string{"test": "dual-stack-server"},
 			"dualstack-test-server",
-			imageutils.GetE2EImage(imageutils.TestWebserver),
+			imageutils.GetE2EImage(imageutils.Agnhost),
 			appsv1.RollingUpdateDeploymentStrategyType)
+		serverDeploymentSpec.Spec.Template.Spec.Containers[0].Args = []string{"test-webserver"}
 
 		// to ensure all the pods land on different nodes and we can thereby
 		// validate connectivity across all nodes.
@@ -163,7 +165,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			},
 		}
 
-		clientDeploymentSpec := e2edeploy.NewDeployment(clientDeploymentName,
+		clientDeploymentSpec := e2edeployment.NewDeployment(clientDeploymentName,
 			replicas,
 			map[string]string{"test": "dual-stack-client"},
 			"dualstack-test-client",
@@ -196,15 +198,15 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		clientDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(context.TODO(), clientDeploymentSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		err = e2edeploy.WaitForDeploymentComplete(cs, serverDeployment)
+		err = e2edeployment.WaitForDeploymentComplete(cs, serverDeployment)
 		framework.ExpectNoError(err)
-		err = e2edeploy.WaitForDeploymentComplete(cs, clientDeployment)
-		framework.ExpectNoError(err)
-
-		serverPods, err := e2edeploy.GetPodsForDeployment(cs, serverDeployment)
+		err = e2edeployment.WaitForDeploymentComplete(cs, clientDeployment)
 		framework.ExpectNoError(err)
 
-		clientPods, err := e2edeploy.GetPodsForDeployment(cs, clientDeployment)
+		serverPods, err := e2edeployment.GetPodsForDeployment(cs, serverDeployment)
+		framework.ExpectNoError(err)
+
+		clientPods, err := e2edeployment.GetPodsForDeployment(cs, clientDeployment)
 		framework.ExpectNoError(err)
 
 		assertNetworkConnectivity(f, *serverPods, *clientPods, "dualstack-test-client", "80")

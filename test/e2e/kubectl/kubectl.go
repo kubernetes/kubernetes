@@ -48,36 +48,27 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
-	"k8s.io/kubernetes/test/integration/etcd"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -113,7 +104,6 @@ const (
 
 var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
-	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
 	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -184,11 +174,41 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	// support backward compatibility : file paths or raw json - since we are removing file path
 	// dependencies from this test.
 	framework.RunKubectlOrDieInput(ns, fileContents, "delete", "--grace-period=0", "--force", "-f", "-", nsArg)
-	framework.AssertCleanup(ns, selectors...)
+	assertCleanup(ns, selectors...)
+}
+
+// assertCleanup asserts that cleanup of a namespace wrt selectors occurred.
+func assertCleanup(ns string, selectors ...string) {
+	var nsArg string
+	if ns != "" {
+		nsArg = fmt.Sprintf("--namespace=%s", ns)
+	}
+
+	var e error
+	verifyCleanupFunc := func() (bool, error) {
+		e = nil
+		for _, selector := range selectors {
+			resources := framework.RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers", nsArg)
+			if resources != "" {
+				e = fmt.Errorf("Resources left running after stop:\n%s", resources)
+				return false, nil
+			}
+			pods := framework.RunKubectlOrDie(ns, "get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+			if pods != "" {
+				e = fmt.Errorf("Pods left unterminated after stop:\n%s", pods)
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
+	if err != nil {
+		framework.Failf(e.Error())
+	}
 }
 
 func readTestFileOrDie(file string) []byte {
-	return testfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+	return e2etestfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file))
 }
 
 func runKubectlRetryOrDie(ns string, args ...string) string {
@@ -277,11 +297,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 	}
 
 	ginkgo.Describe("Update Demo", func() {
-		var nautilus, kitten string
+		var nautilus string
 		ginkgo.BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
-			kitten = commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
+			nautilus = commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
 		})
 		/*
 			Release : v1.9
@@ -316,22 +335,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.RunKubectlOrDie(ns, "scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
-
-		/*
-			Release : v1.9
-			Testname: Kubectl, rolling update replication controller
-			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Run a rolling update to run a different version of the container. All running instances SHOULD now be running the newer version of the container as part of the rolling update.
-		*/
-		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
-			ginkgo.By("creating the initial replication controller")
-			framework.RunKubectlOrDieInput(ns, string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
-			ginkgo.By("rolling-update to new replication controller")
-			debugDiscovery()
-			framework.RunKubectlOrDieInput(ns, string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
-			// Everything will hopefully be cleaned up when the namespace is deleted.
-		})
 	})
 
 	ginkgo.Describe("Guestbook application", func() {
@@ -345,7 +348,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"agnhost-master-deployment.yaml.in",
 				"agnhost-slave-deployment.yaml.in",
 			} {
-				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
+				contents := commonutils.SubstituteImageName(string(e2etestfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
 			}
 		}
@@ -367,107 +370,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("validating guestbook app")
 			validateGuestbookApp(c, ns)
-		})
-	})
-
-	ginkgo.Describe("kubectl get output", func() {
-		ginkgo.It("should contain custom columns for each resource", func() {
-			randString := rand.String(10)
-
-			ignoredResources := map[string]bool{
-				// ignored for intentionally using standard fields.
-				// This assumption is based on a lack of TableColumnDefinition
-				// in pkg/printers/internalversion/printers.go
-				"ClusterRole": true,
-				"Role":        true,
-				"LimitRange":  true,
-				"PodPreset":   true,
-
-				// ignored for being disruptive in an e2e, and getting automatically deleted by a controller
-				"Node": true,
-
-				// ignored temporarily while waiting for bug fix.
-				"CustomResourceDefinition": true,
-
-				// ignored because no test data exists.
-				// Do not add anything to this list, instead add fixtures in
-				// the test/integration/etcd package.
-				"BackendConfig":         true,
-				"ComponentStatus":       true,
-				"NodeMetrics":           true,
-				"PodMetrics":            true,
-				"VolumeSnapshotClass":   true,
-				"VolumeSnapshotContent": true,
-				"VolumeSnapshot":        true,
-			}
-
-			apiGroups, err := c.Discovery().ServerPreferredResources()
-
-			if discovery.IsGroupDiscoveryFailedError(err) {
-				discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
-				for gv := range discoveryErr.Groups {
-					if strings.Contains(gv.Group, ".") && !strings.HasSuffix(gv.Group, ".k8s.io") {
-						// tolerate discovery errors for non-k8s.io groups (like aggregated/crd groups)
-						continue
-					}
-					if gv.Group == "metrics.k8s.io" {
-						// tolerate discovery errors for known test k8s.io groups like aggregated/metrics groups
-						continue
-					}
-					// otherwise, fail
-					framework.ExpectNoError(err)
-				}
-			} else {
-				// fail immediately if this isn't a discovery error
-				framework.ExpectNoError(err)
-
-			}
-
-			testableResources := etcd.GetEtcdStorageDataForNamespace(f.Namespace.Name)
-
-			for _, group := range apiGroups {
-				// This limits the scope of this test to exclude CRDs. This
-				// assumes that CRDs will not have a .k8s.io group and will have
-				// a . in their name.
-				if !strings.Contains(group.GroupVersion, ".k8s.io") && strings.Contains(group.GroupVersion, ".") {
-					continue
-				}
-
-				for _, resource := range group.APIResources {
-					if !verbsContain(resource.Verbs, "get") || ignoredResources[resource.Kind] || strings.HasPrefix(resource.Name, "e2e-test") {
-						continue
-					}
-
-					// compute gvr
-					gv, err := schema.ParseGroupVersion(group.GroupVersion)
-					framework.ExpectNoError(err)
-					gvr := gv.WithResource(resource.Name)
-
-					// assert test data exists
-					testData := testableResources[gvr]
-					gomega.ExpectWithOffset(1, testData).ToNot(gomega.BeZero(), "No test data available for %s", gvr)
-
-					// create test resource
-					mapping := &meta.RESTMapping{
-						Resource:         gvr,
-						GroupVersionKind: gv.WithKind(resource.Kind),
-					}
-
-					if resource.Namespaced {
-						mapping.Scope = meta.RESTScopeNamespace
-					} else {
-						mapping.Scope = meta.RESTScopeRoot
-					}
-
-					client, obj, err := etcd.JSONToUnstructured(testData.Stub, f.Namespace.Name, mapping, f.DynamicClient)
-					framework.ExpectNoError(err)
-					if resource.Kind != "APIService" && resource.Kind != "CustomResourceDefinition" {
-						obj.SetName(obj.GetName() + randString)
-					}
-
-					createObjValidateOutputAndCleanup(f.Namespace.Name, client, obj, resource)
-				}
-			}
 		})
 	})
 
@@ -646,7 +548,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test", nil)).To(gomega.BeNil())
+			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test", metav1.DeleteOptions{})).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach without stdin")
 			runOutput = framework.NewKubectlCommand(ns, fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -655,7 +557,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-2", nil)).To(gomega.BeNil())
+			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-2", metav1.DeleteOptions{})).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
 			runOutput = framework.NewKubectlCommand(ns, nsFlag, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -681,7 +583,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			})
 			gomega.Expect(err).To(gomega.BeNil())
 
-			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-3", nil)).To(gomega.BeNil())
+			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
 
 		ginkgo.It("should contain last line of the log", func() {
@@ -719,11 +621,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		ginkgo.It("should handle in-cluster config", func() {
 			ginkgo.By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-			err := auth.BindClusterRole(f.ClientSet.RbacV1(), "view", f.Namespace.Name,
+			err := e2eauth.BindClusterRole(f.ClientSet.RbacV1(), "view", f.Namespace.Name,
 				rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 			framework.ExpectNoError(err)
 
-			err = auth.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
+			err = e2eauth.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
 				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
 			framework.ExpectNoError(err)
@@ -1539,42 +1441,6 @@ metadata:
 		})
 	})
 
-	ginkgo.Describe("Kubectl rolling-update", func() {
-		var nsFlag string
-		var rcName string
-		var httpdRC string
-		var c clientset.Interface
-
-		ginkgo.BeforeEach(func() {
-			c = f.ClientSet
-			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			rcName = "httpd-rc"
-			httpdRC = commonutils.SubstituteImageName(string(readTestFileOrDie(httpdRCFilename)))
-
-		})
-
-		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie(ns, "delete", "rc", rcName, nsFlag)
-		})
-
-		/*
-			Release : v1.9
-			Testname: Kubectl, rolling update
-			Description: Command 'kubectl rolling-update' MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
-		*/
-		framework.ConformanceIt("should support rolling-update to same image ", func() {
-			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDieInput(ns, httpdRC, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			waitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
-
-			ginkgo.By("rolling-update to same image controller")
-
-			debugDiscovery()
-			runKubectlRetryOrDie(ns, "rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
-			validateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
-		})
-	})
-
 	ginkgo.Describe("Kubectl run pod", func() {
 		var nsFlag string
 		var podName string
@@ -2167,8 +2033,6 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 	}
 }
 
-func noOpValidatorFn(c clientset.Interface, podID string) error { return nil }
-
 // newBlockingReader returns a reader that allows reading the given string,
 // then blocks until Close() is called on the returned closer.
 //
@@ -2282,85 +2146,4 @@ waitLoop:
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
 	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
-}
-
-// verbsContain returns true if the provided list of verbs contain the provided
-// verb string.
-func verbsContain(verbs metav1.Verbs, str string) bool {
-	for _, v := range verbs {
-		if v == str {
-			return true
-		}
-	}
-	return false
-}
-
-// deleteObj deletes an Object with the provided client and name.
-func deleteObj(client dynamic.ResourceInterface, name string) {
-	err := client.Delete(name, &metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
-}
-
-// createObjValidateOutputAndCleanup creates an object using the provided client
-// and then verifies that the kubectl get output provides custom columns. Once
-// the test has completed, it deletes the object.
-func createObjValidateOutputAndCleanup(namespace string, client dynamic.ResourceInterface, obj *unstructured.Unstructured, resource metav1.APIResource) {
-	_, err := client.Create(obj, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	defer deleteObj(client, obj.GetName())
-
-	// get test resource
-	output := framework.RunKubectlOrDie(namespace, "get", resource.Name, "--all-namespaces")
-	if output == "" {
-		framework.Failf("No stdout from kubectl get for %s (likely need to define test resources)", resource.Name)
-	}
-
-	splitOutput := strings.SplitN(output, "\n", 2)
-	fields := strings.Fields(splitOutput[0])
-
-	defaultColumns := [][]string{
-		// namespaced, server-side
-		{"NAMESPACE", "NAME", "CREATED", "AT"},
-		// namespaced, client-side
-		{"NAMESPACE", "NAME", "AGE"},
-		// cluster-scoped, server-side
-		{"NAME", "CREATED", "AT"},
-		// cluster-scoped, client-side
-		{"NAME", "AGE"},
-	}
-	for _, defaults := range defaultColumns {
-		framework.ExpectNotEqual(fields, defaults, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
-	}
-}
-
-// waitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
-func waitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
-	options := metav1.ListOptions{FieldSelector: fields.Set{
-		"metadata.name":      name,
-		"metadata.namespace": ns,
-	}.AsSelector().String()}
-	w, err := c.CoreV1().ReplicationControllers(ns).Watch(context.TODO(), options)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
-	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Deleted:
-			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
-		}
-		switch rc := event.Object.(type) {
-		case *v1.ReplicationController:
-			if rc.Name == name && rc.Namespace == ns &&
-				rc.Generation <= rc.Status.ObservedGeneration &&
-				*(rc.Spec.Replicas) == rc.Status.Replicas {
-				return true, nil
-			}
-			framework.Logf("Waiting for rc %s to stabilize, generation %v observed generation %v spec.replicas %d status.replicas %d",
-				name, rc.Generation, rc.Status.ObservedGeneration, *(rc.Spec.Replicas), rc.Status.Replicas)
-		}
-		return false, nil
-	})
-	return err
 }

@@ -33,7 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -201,7 +202,7 @@ type Proxier struct {
 	masqueradeAll  bool
 	masqueradeMark string
 	exec           utilexec.Interface
-	clusterCIDR    string
+	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
 	portMapper     utilproxy.PortOpener
@@ -260,7 +261,7 @@ func NewProxier(ipt utiliptables.Interface,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	clusterCIDR string,
+	localDetector proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
@@ -285,12 +286,6 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
-	if len(clusterCIDR) == 0 {
-		klog.Warning("clusterCIDR not specified, unable to distinguish between internal and external traffic")
-	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != ipt.IsIpv6() {
-		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, ipt.IsIpv6())
-	}
-
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
@@ -307,7 +302,7 @@ func NewProxier(ipt utiliptables.Interface,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
 		exec:                     exec,
-		clusterCIDR:              clusterCIDR,
+		localDetector:            localDetector,
 		hostname:                 hostname,
 		nodeIP:                   nodeIP,
 		portMapper:               &listenPortOpener{},
@@ -345,7 +340,7 @@ func NewDualStackProxier(
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	clusterCIDR [2]string,
+	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
 	nodeIP [2]net.IP,
 	recorder record.EventRecorder,
@@ -354,17 +349,15 @@ func NewDualStackProxier(
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod,
-		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
-		recorder, healthzServer, nodePortAddresses)
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
+		nodeIP[0], recorder, healthzServer, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod,
-		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
-		recorder, healthzServer, nodePortAddresses)
+		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
+		nodeIP[1], recorder, healthzServer, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -548,7 +541,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 
 }
 
-// OnServiceSynced is called once all the initial even handlers were
+// OnServiceSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
@@ -670,7 +663,7 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	proxier.syncProxyRules()
 }
 
-// OnNodeDelete is called whever deletion of an existing node
+// OnNodeDelete is called whenever deletion of an existing node
 // object is observed.
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	if node.Name != proxier.hostname {
@@ -729,32 +722,33 @@ func servicePortEndpointChainName(servicePortName string, protocol string, endpo
 	return utiliptables.Chain("KUBE-SEP-" + encoded[:16])
 }
 
-// After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
-// risk sending more traffic to it, all of which will be lost (because UDP).
+// After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
+// risk sending more traffic to it, all of which will be lost.
 // This assumes the proxier mutex is held
 // TODO: move it to util
 func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && svcInfo.Protocol() == v1.ProtocolUDP {
+		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
 			nodePort := svcInfo.NodePort()
+			svcProto := svcInfo.Protocol()
 			var err error
 			if nodePort != 0 {
-				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, v1.ProtocolUDP)
+				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, svcProto)
 			} else {
-				err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, v1.ProtocolUDP)
+				err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			}
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, v1.ProtocolUDP)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
 				}
@@ -815,8 +809,8 @@ func (proxier *Proxier) syncProxyRules() {
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
-			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIP().String())
+		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+			klog.V(2).Infof("Stale %s service %v -> %s", strings.ToLower(string(svcInfo.Protocol())), svcPortName, svcInfo.ClusterIP().String())
 			staleServices.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				staleServices.Insert(extIP)
@@ -915,9 +909,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	if proxier.iptables.HasRandomFully() {
 		masqRule = append(masqRule, "--random-fully")
-		klog.V(3).Info("Using `--random-fully` in the MASQUERADE rule for iptables")
-	} else {
-		klog.V(3).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
 	}
 	writeLine(proxier.natRules, masqRule...)
 
@@ -1014,13 +1005,13 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 			if proxier.masqueradeAll {
 				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-			} else if len(proxier.clusterCIDR) > 0 {
+			} else if proxier.localDetector.IsImplemented() {
 				// This masquerades off-cluster traffic to a service VIP.  The idea
 				// is that you can establish a static route for your Service range,
 				// routing to any node, and that node will bridge into the Service
 				// for you.  Since that might bounce off-node, we masquerade here.
 				// If/when we support "Local" policy for VIPs, we should update this.
-				writeLine(proxier.natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
+				writeLine(proxier.natRules, proxier.localDetector.JumpIfNotLocal(args, string(KubeMarkMasqChain))...)
 			}
 			writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 		} else {
@@ -1077,8 +1068,13 @@ func (proxier *Proxier) syncProxyRules() {
 					"-d", utilproxy.ToCIDR(net.ParseIP(externalIP)),
 					"--dport", strconv.Itoa(svcInfo.Port()),
 				)
-				// We have to SNAT packets to external IPs.
-				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+
+				destChain := svcXlbChain
+				// We have to SNAT packets to external IPs if externalTrafficPolicy is cluster.
+				if !(utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints()) {
+					destChain = svcChain
+					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+				}
 
 				// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
 				// nor from a local process to be forwarded to the service.
@@ -1087,11 +1083,11 @@ func (proxier *Proxier) syncProxyRules() {
 				externalTrafficOnlyArgs := append(args,
 					"-m", "physdev", "!", "--physdev-is-in",
 					"-m", "addrtype", "!", "--src-type", "LOCAL")
-				writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(svcChain))...)
+				writeLine(proxier.natRules, append(externalTrafficOnlyArgs, "-j", string(destChain))...)
 				dstLocalOnlyArgs := append(args, "-m", "addrtype", "--dst-type", "LOCAL")
 				// Allow traffic bound for external IPs that happen to be recognized as local IPs to stay local.
 				// This covers cases like GCE load-balancers which get added to the local routing table.
-				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
+				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(destChain))...)
 			} else {
 				// No endpoints.
 				writeLine(proxier.filterRules,
@@ -1374,16 +1370,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// First rule in the chain redirects all pod -> external VIP traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
-		// endpoints; only if clusterCIDR is specified
-		if len(proxier.clusterCIDR) > 0 {
+		// endpoints; only if localDetector is implemented
+		if proxier.localDetector.IsImplemented() {
 			args = append(args[:0],
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
 				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
-				"-s", proxier.clusterCIDR,
-				"-j", string(svcChain),
 			)
-			writeLine(proxier.natRules, args...)
+			writeLine(proxier.natRules, proxier.localDetector.JumpIfLocal(args, string(svcChain))...)
 		}
 
 		// Next, redirect all src-type=LOCAL -> LB IP to the service chain for externalTrafficPolicy=Local
@@ -1513,29 +1507,23 @@ func (proxier *Proxier) syncProxyRules() {
 		"-j", "ACCEPT",
 	)
 
-	// The following rules can only be set if clusterCIDR has been defined.
-	if len(proxier.clusterCIDR) != 0 {
-		// The following two rules ensure the traffic after the initial packet
-		// accepted by the "kubernetes forwarding rules" rule above will be
-		// accepted, to be as specific as possible the traffic must be sourced
-		// or destined to the clusterCIDR (to/from a pod).
-		writeLine(proxier.filterRules,
-			"-A", string(kubeForwardChain),
-			"-s", proxier.clusterCIDR,
-			"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
-			"-m", "conntrack",
-			"--ctstate", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT",
-		)
-		writeLine(proxier.filterRules,
-			"-A", string(kubeForwardChain),
-			"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
-			"-d", proxier.clusterCIDR,
-			"-m", "conntrack",
-			"--ctstate", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT",
-		)
-	}
+	// The following two rules ensure the traffic after the initial packet
+	// accepted by the "kubernetes forwarding rules" rule above will be
+	// accepted.
+	writeLine(proxier.filterRules,
+		"-A", string(kubeForwardChain),
+		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
+		"-m", "conntrack",
+		"--ctstate", "RELATED,ESTABLISHED",
+		"-j", "ACCEPT",
+	)
+	writeLine(proxier.filterRules,
+		"-A", string(kubeForwardChain),
+		"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
+		"-m", "conntrack",
+		"--ctstate", "RELATED,ESTABLISHED",
+		"-j", "ACCEPT",
+	)
 
 	// Write the end-of-table markers.
 	writeLine(proxier.filterRules, "COMMIT")

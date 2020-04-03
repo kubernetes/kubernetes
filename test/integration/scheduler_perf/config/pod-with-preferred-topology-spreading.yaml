@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: spreading-pod-
+spec:
+  topologySpreadConstraints:
+    - maxSkew: 5
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+  containers:
+  - image: k8s.gcr.io/pause:3.2
+    name: pause
+    ports:
+    - containerPort: 80
+    resources:
+      limits:
+        cpu: 100m
+        memory: 500Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi

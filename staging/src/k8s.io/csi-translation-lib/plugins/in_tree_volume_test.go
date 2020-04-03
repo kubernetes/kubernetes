@@ -129,3 +129,86 @@ func TestTranslateAllowedTopologies(t *testing.T) {
 		}
 	}
 }
+
+func TestAddTopology(t *testing.T) {
+	testCases := []struct {
+		name             string
+		topologyKey      string
+		zones            []string
+		expErr           bool
+		expectedAffinity *v1.VolumeNodeAffinity
+	}{
+		{
+			name:        "empty zones",
+			topologyKey: GCEPDTopologyKey,
+			zones:       nil,
+			expErr:      true,
+		},
+		{
+			name:        "only whitespace-named zones",
+			topologyKey: GCEPDTopologyKey,
+			zones:       []string{" ", "\n", "\t", "  "},
+			expErr:      true,
+		},
+		{
+			name:        "including whitespace-named zones",
+			topologyKey: GCEPDTopologyKey,
+			zones:       []string{" ", "us-central1-a"},
+			expErr:      false,
+			expectedAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      GCEPDTopologyKey,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"us-central1-a"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "unsorted zones",
+			topologyKey: GCEPDTopologyKey,
+			zones:       []string{"us-central1-f", "us-central1-a", "us-central1-c", "us-central1-b"},
+			expErr:      false,
+			expectedAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      GCEPDTopologyKey,
+									Operator: v1.NodeSelectorOpIn,
+									// Values are expected to be ordered
+									Values: []string{"us-central1-a", "us-central1-b", "us-central1-c", "us-central1-f"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test: %v", tc.name)
+		pv := &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{},
+		}
+		err := addTopology(pv, tc.topologyKey, tc.zones)
+		if err != nil && !tc.expErr {
+			t.Errorf("Did not expect an error, got: %v", err)
+		}
+		if err == nil && tc.expErr {
+			t.Errorf("Expected an error but did not get one")
+		}
+		if err == nil && !reflect.DeepEqual(pv.Spec.NodeAffinity, tc.expectedAffinity) {
+			t.Errorf("Expected affinity: %v, but got: %v", tc.expectedAffinity, pv.Spec.NodeAffinity)
+		}
+	}
+}

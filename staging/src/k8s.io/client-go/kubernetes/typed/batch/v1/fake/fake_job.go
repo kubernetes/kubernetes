@@ -115,7 +115,7 @@ func (c *FakeJobs) UpdateStatus(ctx context.Context, job *batchv1.Job, opts v1.U
 }
 
 // Delete takes name of the job and deletes it. Returns an error if one occurs.
-func (c *FakeJobs) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(jobsResource, c.ns, name), &batchv1.Job{})
 
@@ -123,8 +123,8 @@ func (c *FakeJobs) Delete(ctx context.Context, name string, options *v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeJobs) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
+func (c *FakeJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(jobsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &batchv1.JobList{})
 	return err

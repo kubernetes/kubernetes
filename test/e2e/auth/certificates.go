@@ -82,7 +82,7 @@ var _ = SIGDescribe("Certificates API", func() {
 					Message: "Set from an e2e test",
 				},
 			}
-			csr, err = csrs.UpdateApproval(csr)
+			csr, err = csrs.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
 			if err != nil {
 				csr, _ = csrs.Get(context.TODO(), csrName, metav1.GetOptions{})
 				framework.Logf("err updating approval: %v", err)
@@ -119,6 +119,6 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		newClient, err := v1beta1client.NewForConfig(rcfg)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(newClient.CertificateSigningRequests().Delete(context.TODO(), csrName, nil))
+		framework.ExpectNoError(newClient.CertificateSigningRequests().Delete(context.TODO(), csrName, metav1.DeleteOptions{}))
 	})
 })

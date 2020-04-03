@@ -26,15 +26,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type defaultTableConvertor struct {
-	qualifiedResource schema.GroupResource
+	defaultQualifiedResource schema.GroupResource
 }
 
-// NewDefaultTableConvertor creates a default convertor for the provided resource.
-func NewDefaultTableConvertor(resource schema.GroupResource) TableConvertor {
-	return defaultTableConvertor{qualifiedResource: resource}
+// NewDefaultTableConvertor creates a default convertor; the provided resource is used for error messages
+// if no resource info can be determined from the context passed to ConvertToTable.
+func NewDefaultTableConvertor(defaultQualifiedResource schema.GroupResource) TableConvertor {
+	return defaultTableConvertor{defaultQualifiedResource: defaultQualifiedResource}
 }
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
@@ -44,7 +46,11 @@ func (c defaultTableConvertor) ConvertToTable(ctx context.Context, object runtim
 	fn := func(obj runtime.Object) error {
 		m, err := meta.Accessor(obj)
 		if err != nil {
-			return errNotAcceptable{resource: c.qualifiedResource}
+			resource := c.defaultQualifiedResource
+			if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
+				resource = schema.GroupResource{Group: info.APIGroup, Resource: info.Resource}
+			}
+			return errNotAcceptable{resource: resource}
 		}
 		table.Rows = append(table.Rows, metav1.TableRow{
 			Cells:  []interface{}{m.GetName(), m.GetCreationTimestamp().Time.UTC().Format(time.RFC3339)},

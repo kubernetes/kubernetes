@@ -40,12 +40,12 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -92,10 +92,7 @@ func setupScheduler(
 		cs,
 		informerFactory,
 		informerFactory.Core().V1().Pods(),
-		eventBroadcaster.NewRecorder(
-			legacyscheme.Scheme,
-			v1.DefaultSchedulerName,
-		),
+		profile.NewRecorderFactory(eventBroadcaster),
 		ctx.Done(),
 	)
 	if err != nil {
@@ -177,7 +174,7 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	}
 
 	falseVar := false
-	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	deleteOptions := metav1.DeleteOptions{OrphanDependents: &falseVar}
 	if err := cs.AppsV1().DaemonSets(ds.Namespace).Delete(context.TODO(), ds.Name, deleteOptions); err != nil {
 		t.Errorf("Failed to delete DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
 	}

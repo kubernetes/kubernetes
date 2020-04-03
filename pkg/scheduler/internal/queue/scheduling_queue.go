@@ -99,8 +99,8 @@ type SchedulingQueue interface {
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-func NewSchedulingQueue(fwk framework.Framework, opts ...Option) SchedulingQueue {
-	return NewPriorityQueue(fwk, opts...)
+func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) SchedulingQueue {
+	return NewPriorityQueue(lessFn, opts...)
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -200,7 +200,7 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(
-	fwk framework.Framework,
+	lessFn framework.LessFunc,
 	opts ...Option,
 ) *PriorityQueue {
 	options := defaultPriorityQueueOptions
@@ -211,7 +211,7 @@ func NewPriorityQueue(
 	comp := func(podInfo1, podInfo2 interface{}) bool {
 		pInfo1 := podInfo1.(*framework.PodInfo)
 		pInfo2 := podInfo2.(*framework.PodInfo)
-		return fwk.QueueSortFunc()(pInfo1, pInfo2)
+		return lessFn(pInfo1, pInfo2)
 	}
 
 	pq := &PriorityQueue{

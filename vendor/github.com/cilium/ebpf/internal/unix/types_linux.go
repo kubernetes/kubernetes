@@ -30,6 +30,7 @@ const (
 	PerfBitWatermark         = linux.PerfBitWatermark
 	PERF_SAMPLE_RAW          = linux.PERF_SAMPLE_RAW
 	PERF_FLAG_FD_CLOEXEC     = linux.PERF_FLAG_FD_CLOEXEC
+	RLIM_INFINITY            = linux.RLIM_INFINITY
 )
 
 // Statfs_t is a wrapper

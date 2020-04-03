@@ -34,7 +34,7 @@ import (
 	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -929,7 +929,7 @@ func recreateConfigMapFunc(f *framework.Framework, tc *nodeConfigTestCase) error
 
 // deleteConfigMapFunc simply deletes tc.configMap
 func deleteConfigMapFunc(f *framework.Framework, tc *nodeConfigTestCase) error {
-	return f.ClientSet.CoreV1().ConfigMaps(tc.configMap.Namespace).Delete(context.TODO(), tc.configMap.Name, &metav1.DeleteOptions{})
+	return f.ClientSet.CoreV1().ConfigMaps(tc.configMap.Namespace).Delete(context.TODO(), tc.configMap.Name, metav1.DeleteOptions{})
 }
 
 // createConfigMapFunc creates tc.configMap and updates the UID and ResourceVersion on tc.configMap
@@ -1161,7 +1161,7 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 	// error
 	errorSamples := model.Samples{mkErrorSample(len(tc.expectConfigStatus.err) > 0)}
 	// expected metrics
-	expect := frameworkmetrics.KubeletMetrics(map[string]model.Samples{
+	expect := e2emetrics.KubeletMetrics(map[string]model.Samples{
 		assignedConfigKey:      assignedSamples,
 		activeConfigKey:        activeSamples,
 		lastKnownGoodConfigKey: lastKnownGoodSamples,

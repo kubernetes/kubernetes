@@ -126,6 +126,7 @@ func (c *DynamicFileCAContent) loadCABundle() error {
 		return err
 	}
 	c.caBundle.Store(caBundleAndVerifier)
+	klog.V(2).Infof("Loaded a new CA Bundle and Verifier for %q", c.Name())
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()

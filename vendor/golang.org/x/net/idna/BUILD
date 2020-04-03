@@ -8,6 +8,7 @@ go_library(
         "punycode.go",
         "tables10.0.0.go",
         "tables11.0.0.go",
+        "tables12.00.go",
         "tables9.0.0.go",
         "trie.go",
         "trieval.go",

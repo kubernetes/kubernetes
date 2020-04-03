@@ -19,7 +19,7 @@ limitations under the License.
 package clients
 
 import (
-	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -29,15 +29,9 @@ type ClientConfig struct {
 	Location                string
 	SubscriptionID          string
 	ResourceManagerEndpoint string
-	ServicePrincipalToken   *adal.ServicePrincipalToken
+	Authorizer              autorest.Authorizer
 	RateLimitConfig         *RateLimitConfig
 	Backoff                 *retry.Backoff
-
-	// Depracated configures (retry.Backoff is preferred).
-	// Those configurations would be removed after all Azure clients are moved to new implementations.
-	CloudProviderBackoffRetries    int
-	CloudProviderBackoffDuration   int
-	ShouldOmitCloudProviderBackoff bool
 }
 
 // WithRateLimiter returns a new ClientConfig with rateLimitConfig set.

@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/coredns/corefile-migration/migration"
@@ -80,20 +81,21 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	if err != nil {
 		return err
 	}
-	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, kubeadmconstants.CoreDNSVersion, corefile)
+	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, currentInstalledCoreDNSversion, corefile)
 	if err != nil {
 		return err
 	}
-	if unsupportedCoreDNS != nil {
-		var UnsupportedPlugins, UnsupportedVersion string
+	if len(unsupportedCoreDNS) != 0 {
+		var UnsupportedPlugins []string
 		for _, unsup := range unsupportedCoreDNS {
-			UnsupportedPlugins = unsup.Plugin
-			UnsupportedVersion = unsup.Version
-
+			UnsupportedPlugins = append(UnsupportedPlugins, unsup.ToString())
 		}
-		if UnsupportedPlugins != "" || UnsupportedVersion != "" {
-			return errors.New("there are unsupported plugins in the CoreDNS Corefile")
-		}
+		fmt.Println("[preflight] The corefile contains plugins that kubeadm/CoreDNS does not know how to migrate. " +
+			"Each plugin listed should be manually verified for compatibility with the newer version of CoreDNS. " +
+			"Once ready, the upgrade can be initiated by skipping the preflight check. During the upgrade, " +
+			"kubeadm will migrate the configuration while leaving the listed plugin configs untouched, " +
+			"but cannot guarantee that they will work with the newer version of CoreDNS.")
+		return errors.Errorf("CoreDNS cannot migrate the following plugins:\n%s", UnsupportedPlugins)
 	}
 	return nil
 }

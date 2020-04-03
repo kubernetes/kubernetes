@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "fake_csidriver.go",
         "fake_csinode.go",
         "fake_storage_client.go",
         "fake_storageclass.go",

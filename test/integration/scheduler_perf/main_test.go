@@ -17,11 +17,13 @@ limitations under the License.
 package benchmark
 
 import (
+	"flag"
 	"testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {
+	flag.Parse()
 	framework.EtcdMain(m.Run)
 }

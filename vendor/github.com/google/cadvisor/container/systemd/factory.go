@@ -42,7 +42,8 @@ func (f *systemdFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	if strings.HasSuffix(name, ".mount") {
 		return true, false, nil
 	}
-	return false, false, fmt.Errorf("%s not handled by systemd handler", name)
+	klog.V(5).Infof("%s not handled by systemd handler", name)
+	return false, false, nil
 }
 
 func (f *systemdFactory) DebugInfo() map[string][]string {

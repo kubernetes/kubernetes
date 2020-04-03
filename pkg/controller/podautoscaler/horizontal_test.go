@@ -704,7 +704,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		100*time.Millisecond, // we need non-zero resync period to avoid race conditions
 		defaultDownscalestabilizationWindow,
 		defaultTestingTolerance,
-		defaultTestingCpuInitializationPeriod,
+		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
 	)
 	hpaController.hpaListerSynced = alwaysReady
@@ -715,11 +715,11 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	return hpaController, informerFactory
 }
 
-func hotCpuCreationTime() metav1.Time {
+func hotCPUCreationTime() metav1.Time {
 	return metav1.Time{Time: time.Now()}
 }
 
-func coolCpuCreationTime() metav1.Time {
+func coolCPUCreationTime() metav1.Time {
 	return metav1.Time{Time: time.Now().Add(-3 * time.Minute)}
 }
 
@@ -803,7 +803,7 @@ func TestScaleUpHotCpuLessScale(t *testing.T) {
 		verifyCPUCurrent:        true,
 		reportedLevels:          []uint64{300, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		reportedPodStartTime:    []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime()},
+		reportedPodStartTime:    []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
 		useMetricsAPI:           true,
 	}
 	tc.runTest(t)
@@ -845,7 +845,7 @@ func TestScaleUpHotCpuNoScale(t *testing.T) {
 		reportedLevels:          []uint64{400, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
-		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
+		reportedPodStartTime:    []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
 		useMetricsAPI:           true,
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
@@ -989,7 +989,7 @@ func TestScaleUpCMUnreadyAndHotCpuNoLessScale(t *testing.T) {
 		},
 		reportedLevels:       []uint64{50000, 10000, 30000},
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
-		reportedPodStartTime: []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
+		reportedPodStartTime: []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
 	tc.runTest(t)
@@ -1019,7 +1019,7 @@ func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 		},
 		reportedLevels:       []uint64{50000, 15000, 30000},
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
-		reportedPodStartTime: []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
+		reportedPodStartTime: []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
@@ -1058,7 +1058,7 @@ func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
 		},
 		reportedLevels:       []uint64{50000, 15000, 30000},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		reportedPodStartTime: []metav1.Time{hotCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime()},
+		reportedPodStartTime: []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
 			Status: v1.ConditionTrue,
@@ -1679,7 +1679,7 @@ func TestScaleDownIgnoreHotCpuPods(t *testing.T) {
 		reportedLevels:          []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
-		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), coolCpuCreationTime(), coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
+		reportedPodStartTime:    []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
 		recommendations:         []timestampedRecommendation{},
 	}
 	tc.runTest(t)
@@ -2822,7 +2822,7 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 		verifyCPUCurrent:        true,
 		reportedLevels:          []uint64{400, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		reportedPodStartTime:    []metav1.Time{coolCpuCreationTime(), hotCpuCreationTime(), hotCpuCreationTime()},
+		reportedPodStartTime:    []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
 		useMetricsAPI:           true,
 		lastScaleTime:           &now,
 		recommendations:         []timestampedRecommendation{},

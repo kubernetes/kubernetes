@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 )
 
 // Link represents a link device from netlink. Shared link attributes
@@ -41,6 +42,29 @@ type LinkAttrs struct {
 	NetNsID      int
 	NumTxQueues  int
 	NumRxQueues  int
+	GSOMaxSize   uint32
+	GSOMaxSegs   uint32
+	Vfs          []VfInfo // virtual functions available on link
+	Group        uint32
+	Slave        LinkSlave
+}
+
+// LinkSlave represents a slave device.
+type LinkSlave interface {
+	SlaveType() string
+}
+
+// VfInfo represents configuration of virtual function
+type VfInfo struct {
+	ID        int
+	Mac       net.HardwareAddr
+	Vlan      int
+	Qos       int
+	TxRate    int // IFLA_VF_TX_RATE  Max TxRate
+	Spoofchk  bool
+	LinkState uint32
+	MaxTxRate uint32 // IFLA_VF_RATE Max TxRate
+	MinTxRate uint32 // IFLA_VF_RATE Min TxRate
 }
 
 // LinkOperState represents the values of the IFLA_OPERSTATE link
@@ -223,6 +247,7 @@ type Bridge struct {
 	LinkAttrs
 	MulticastSnooping *bool
 	HelloTime         *uint32
+	VlanFiltering     *bool
 }
 
 func (bridge *Bridge) Attrs() *LinkAttrs {
@@ -236,7 +261,8 @@ func (bridge *Bridge) Type() string {
 // Vlan links have ParentIndex set in their Attrs()
 type Vlan struct {
 	LinkAttrs
-	VlanId int
+	VlanId       int
+	VlanProtocol VlanProtocol
 }
 
 func (vlan *Vlan) Attrs() *LinkAttrs {
@@ -290,10 +316,13 @@ type TuntapFlag uint16
 // Tuntap links created via /dev/tun/tap, but can be destroyed via netlink
 type Tuntap struct {
 	LinkAttrs
-	Mode   TuntapMode
-	Flags  TuntapFlag
-	Queues int
-	Fds    []*os.File
+	Mode       TuntapMode
+	Flags      TuntapFlag
+	NonPersist bool
+	Queues     int
+	Fds        []*os.File
+	Owner      uint32
+	Group      uint32
 }
 
 func (tuntap *Tuntap) Attrs() *LinkAttrs {
@@ -307,7 +336,8 @@ func (tuntap *Tuntap) Type() string {
 // Veth devices must specify PeerName on create
 type Veth struct {
 	LinkAttrs
-	PeerName string // veth on create only
+	PeerName         string // veth on create only
+	PeerHardwareAddr net.HardwareAddr
 }
 
 func (veth *Veth) Attrs() *LinkAttrs {
@@ -376,9 +406,18 @@ const (
 	IPVLAN_MODE_MAX
 )
 
+type IPVlanFlag uint16
+
+const (
+	IPVLAN_FLAG_BRIDGE IPVlanFlag = iota
+	IPVLAN_FLAG_PRIVATE
+	IPVLAN_FLAG_VEPA
+)
+
 type IPVlan struct {
 	LinkAttrs
 	Mode IPVlanMode
+	Flag IPVlanFlag
 }
 
 func (ipvlan *IPVlan) Attrs() *LinkAttrs {
@@ -387,6 +426,43 @@ func (ipvlan *IPVlan) Attrs() *LinkAttrs {
 
 func (ipvlan *IPVlan) Type() string {
 	return "ipvlan"
+}
+
+// VlanProtocol type
+type VlanProtocol int
+
+func (p VlanProtocol) String() string {
+	s, ok := VlanProtocolToString[p]
+	if !ok {
+		return fmt.Sprintf("VlanProtocol(%d)", p)
+	}
+	return s
+}
+
+// StringToVlanProtocol returns vlan protocol, or unknown is the s is invalid.
+func StringToVlanProtocol(s string) VlanProtocol {
+	mode, ok := StringToVlanProtocolMap[s]
+	if !ok {
+		return VLAN_PROTOCOL_UNKNOWN
+	}
+	return mode
+}
+
+// VlanProtocol possible values
+const (
+	VLAN_PROTOCOL_UNKNOWN VlanProtocol = 0
+	VLAN_PROTOCOL_8021Q   VlanProtocol = 0x8100
+	VLAN_PROTOCOL_8021AD  VlanProtocol = 0x88A8
+)
+
+var VlanProtocolToString = map[VlanProtocol]string{
+	VLAN_PROTOCOL_8021Q:  "802.1q",
+	VLAN_PROTOCOL_8021AD: "802.1ad",
+}
+
+var StringToVlanProtocolMap = map[string]VlanProtocol{
+	"802.1q":  VLAN_PROTOCOL_8021Q,
+	"802.1ad": VLAN_PROTOCOL_8021AD,
 }
 
 // BondMode type
@@ -400,7 +476,7 @@ func (b BondMode) String() string {
 	return s
 }
 
-// StringToBondMode returns bond mode, or uknonw is the s is invalid.
+// StringToBondMode returns bond mode, or unknown is the s is invalid.
 func StringToBondMode(s string) BondMode {
 	mode, ok := StringToBondModeMap[s]
 	if !ok {
@@ -491,7 +567,7 @@ func (b BondXmitHashPolicy) String() string {
 	return s
 }
 
-// StringToBondXmitHashPolicy returns bond lacp arte, or uknonw is the s is invalid.
+// StringToBondXmitHashPolicy returns bond lacp arte, or unknown is the s is invalid.
 func StringToBondXmitHashPolicy(s string) BondXmitHashPolicy {
 	lacp, ok := StringToBondXmitHashPolicyMap[s]
 	if !ok {
@@ -536,7 +612,7 @@ func (b BondLacpRate) String() string {
 	return s
 }
 
-// StringToBondLacpRate returns bond lacp arte, or uknonw is the s is invalid.
+// StringToBondLacpRate returns bond lacp arte, or unknown is the s is invalid.
 func StringToBondLacpRate(s string) BondLacpRate {
 	lacp, ok := StringToBondLacpRateMap[s]
 	if !ok {
@@ -680,6 +756,67 @@ func (bond *Bond) Type() string {
 	return "bond"
 }
 
+// BondSlaveState represents the values of the IFLA_BOND_SLAVE_STATE bond slave
+// attribute, which contains the state of the bond slave.
+type BondSlaveState uint8
+
+const (
+	BondStateActive = iota // Link is active.
+	BondStateBackup        // Link is backup.
+)
+
+func (s BondSlaveState) String() string {
+	switch s {
+	case BondStateActive:
+		return "ACTIVE"
+	case BondStateBackup:
+		return "BACKUP"
+	default:
+		return strconv.Itoa(int(s))
+	}
+}
+
+// BondSlaveState represents the values of the IFLA_BOND_SLAVE_MII_STATUS bond slave
+// attribute, which contains the status of MII link monitoring
+type BondSlaveMiiStatus uint8
+
+const (
+	BondLinkUp   = iota // link is up and running.
+	BondLinkFail        // link has just gone down.
+	BondLinkDown        // link has been down for too long time.
+	BondLinkBack        // link is going back.
+)
+
+func (s BondSlaveMiiStatus) String() string {
+	switch s {
+	case BondLinkUp:
+		return "UP"
+	case BondLinkFail:
+		return "GOING_DOWN"
+	case BondLinkDown:
+		return "DOWN"
+	case BondLinkBack:
+		return "GOING_BACK"
+	default:
+		return strconv.Itoa(int(s))
+	}
+}
+
+type BondSlave struct {
+	State                  BondSlaveState
+	MiiStatus              BondSlaveMiiStatus
+	LinkFailureCount       uint32
+	PermHardwareAddr       net.HardwareAddr
+	QueueId                uint16
+	AggregatorId           uint16
+	AdActorOperPortState   uint8
+	AdPartnerOperPortState uint16
+}
+
+func (b *BondSlave) SlaveType() string {
+	return "bond"
+}
+
 // Gretap devices must specify LocalIP and RemoteIP on create
 type Gretap struct {
 	LinkAttrs
@@ -734,6 +871,27 @@ func (iptun *Iptun) Type() string {
 	return "ipip"
 }
 
+type Ip6tnl struct {
+	LinkAttrs
+	Link       uint32
+	Local      net.IP
+	Remote     net.IP
+	Ttl        uint8
+	Tos        uint8
+	EncapLimit uint8
+	Flags      uint32
+	Proto      uint8
+	FlowInfo   uint32
+}
+
+func (ip6tnl *Ip6tnl) Attrs() *LinkAttrs {
+	return &ip6tnl.LinkAttrs
+}
+
+func (ip6tnl *Ip6tnl) Type() string {
+	return "ip6tnl"
+}
+
 type Sittun struct {
 	LinkAttrs
 	Link       uint32
@@ -769,7 +927,10 @@ func (vti *Vti) Attrs() *LinkAttrs {
 	return &vti.LinkAttrs
 }
 
-func (iptun *Vti) Type() string {
+func (vti *Vti) Type() string {
+	if vti.Local.To4() == nil {
+		return "vti6"
+	}
 	return "vti"
 }
 
@@ -831,11 +992,68 @@ func (gtp *GTP) Type() string {
 	return "gtp"
 }
 
+// Virtual XFRM Interfaces
+//	Named "xfrmi" to prevent confusion with XFRM objects
+type Xfrmi struct {
+	LinkAttrs
+	Ifid uint32
+}
+
+func (xfrm *Xfrmi) Attrs() *LinkAttrs {
+	return &xfrm.LinkAttrs
+}
+
+func (xfrm *Xfrmi) Type() string {
+	return "xfrm"
+}
+
+// IPoIB interface
+
+type IPoIBMode uint16
+
+func (m *IPoIBMode) String() string {
+	str, ok := iPoIBModeToString[*m]
+	if !ok {
+		return fmt.Sprintf("mode(%d)", *m)
+	}
+	return str
+}
+
+const (
+	IPOIB_MODE_DATAGRAM = iota
+	IPOIB_MODE_CONNECTED
+)
+
+var iPoIBModeToString = map[IPoIBMode]string{
+	IPOIB_MODE_DATAGRAM:  "datagram",
+	IPOIB_MODE_CONNECTED: "connected",
+}
+
+var StringToIPoIBMode = map[string]IPoIBMode{
+	"datagram":  IPOIB_MODE_DATAGRAM,
+	"connected": IPOIB_MODE_CONNECTED,
+}
+
+type IPoIB struct {
+	LinkAttrs
+	Pkey   uint16
+	Mode   IPoIBMode
+	Umcast uint16
+}
+
+func (ipoib *IPoIB) Attrs() *LinkAttrs {
+	return &ipoib.LinkAttrs
+}
+
+func (ipoib *IPoIB) Type() string {
+	return "ipoib"
+}
+
 // iproute2 supported devices;
 // vlan | veth | vcan | dummy | ifb | macvlan | macvtap |
 // bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan |
-// gre | gretap | ip6gre | ip6gretap | vti | nlmon |
-// bond_slave | ipvlan
+// gre | gretap | ip6gre | ip6gretap | vti | vti6 | nlmon |
+// bond_slave | ipvlan | xfrm
 
 // LinkNotFoundError wraps the various not found errors when
 // getting/reading links. This is intended for better error

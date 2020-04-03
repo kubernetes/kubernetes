@@ -116,7 +116,7 @@ func (c *FakeReplicaSets) UpdateStatus(ctx context.Context, replicaSet *appsv1.R
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
-func (c *FakeReplicaSets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeReplicaSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(replicasetsResource, c.ns, name), &appsv1.ReplicaSet{})
 
@@ -124,8 +124,8 @@ func (c *FakeReplicaSets) Delete(ctx context.Context, name string, options *v1.D
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeReplicaSets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOptions)
+func (c *FakeReplicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &appsv1.ReplicaSetList{})
 	return err

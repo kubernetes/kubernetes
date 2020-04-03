@@ -29,22 +29,21 @@ import (
 	"strings"
 	"sync"
 
+	"cloud.google.com/go/compute/metadata"
+
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
-	"encoding/json"
-
-	"cloud.google.com/go/compute/metadata"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	servicehelper "k8s.io/cloud-provider/service/helpers"
 )
 
 func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
@@ -362,8 +361,7 @@ func addFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key st
 	updated := service.DeepCopy()
 	updated.ObjectMeta.Finalizers = append(updated.ObjectMeta.Finalizers, key)
 
-	// TODO(87447) use PatchService from k8s.io/cloud-provider/service/helpers
-	_, err := patchService(kubeClient, service, updated)
+	_, err := servicehelper.PatchService(kubeClient, service, updated)
 	return err
 }
 
@@ -377,7 +375,7 @@ func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key
 	updated := service.DeepCopy()
 	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, key)
 
-	_, err := patchService(kubeClient, service, updated)
+	_, err := servicehelper.PatchService(kubeClient, service, updated)
 	return err
 }
 
@@ -401,36 +399,4 @@ func removeString(slice []string, s string) []string {
 		}
 	}
 	return newSlice
-}
-
-// patchService patches service's Status or ObjectMeta given the origin and
-// updated ones. Change to spec will be ignored.
-func patchService(c v1core.CoreV1Interface, oldSvc *v1.Service, newSvc *v1.Service) (*v1.Service, error) {
-	// Reset spec to make sure only patch for Status or ObjectMeta.
-	newSvc.Spec = oldSvc.Spec
-
-	patchBytes, err := getPatchBytes(oldSvc, newSvc)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.Services(oldSvc.Namespace).Patch(context.TODO(), oldSvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-}
-
-func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {
-	oldData, err := json.Marshal(oldSvc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal oldData for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
-	}
-
-	newData, err := json.Marshal(newSvc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal newData for svc %s/%s: %v", newSvc.Namespace, newSvc.Name, err)
-	}
-
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Service{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
-	}
-	return patchBytes, nil
 }

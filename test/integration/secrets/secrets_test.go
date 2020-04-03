@@ -32,7 +32,7 @@ import (
 )
 
 func deleteSecretOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.CoreV1().Secrets(ns).Delete(context.TODO(), name, nil); err != nil {
+	if err := c.CoreV1().Secrets(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete secret %v: %v", name, err)
 	}
 }

@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -211,7 +212,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Deleting the job")
 		job := cronJob.Status.Active[0]
-		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
+		framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
@@ -364,7 +365,7 @@ func getCronJob(c clientset.Interface, ns, name string) (*batchv1beta1.CronJob, 
 
 func deleteCronJob(c clientset.Interface, ns, name string) error {
 	propagationPolicy := metav1.DeletePropagationBackground // Also delete jobs and pods related to cronjob
-	return c.BatchV1beta1().CronJobs(ns).Delete(context.TODO(), name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy})
+	return c.BatchV1beta1().CronJobs(ns).Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy})
 }
 
 // Wait for at least given amount of active jobs.

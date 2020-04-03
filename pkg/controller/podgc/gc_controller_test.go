@@ -349,7 +349,7 @@ func TestGCOrphaned(t *testing.T) {
 				client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 			}
 			for _, node := range test.deletedClientNodes {
-				client.CoreV1().Nodes().Delete(context.TODO(), node.Name, &metav1.DeleteOptions{})
+				client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
 			}
 			for _, node := range test.addedInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)

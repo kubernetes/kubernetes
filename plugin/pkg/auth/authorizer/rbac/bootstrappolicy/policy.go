@@ -17,10 +17,12 @@ limitations under the License.
 package bootstrappolicy
 
 import (
+	capi "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -168,10 +170,8 @@ func NodeRules() []rbacv1.PolicyRule {
 	}
 
 	// CSI
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
-		nodePolicyRules = append(nodePolicyRules, csiDriverRule)
-	}
+	csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
+	nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
@@ -459,12 +459,34 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:legacy-unknown-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.LegacyUnknownSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kubelet-serving-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeletServingSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kube-apiserver-client-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientSignerName).RuleOrDie(),
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:kube-apiserver-client-kubelet-approver"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientKubeletSignerName).RuleOrDie(),
+			},
+		},
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
 		// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
-		// but do not bind it explicitly. Leave the decision of who can read it up
-		// to cluster admins.
 		roles = append(roles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
 			Rules: []rbacv1.PolicyRule{
@@ -550,6 +572,20 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 			ObjectMeta: metav1.ObjectMeta{Name: systemNodeRoleName},
 			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: systemNodeRoleName},
 		},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+		// Allow all in-cluster workloads (via their service accounts) to read the OIDC discovery endpoints.
+		// Users with certain forms of write access (create pods, create secrets, create service accounts, etc)
+		// can gain access to a service account identity which would allow them to access this information.
+		// This includes the issuer URL, which is already present in the SA token JWT.  Similarly, SAs can
+		// already gain this same info via introspection of their own token.  Since this discovery endpoint
+		// points to what issued all service account tokens, it seems fitting for SAs to have this access.
+		// Defer to the cluster admin with regard to binding directly to all authenticated and/or
+		// unauthenticated users.
+		rolebindings = append(rolebindings,
+			rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie(),
+		)
 	}
 
 	addClusterRoleBindingLabel(rolebindings)

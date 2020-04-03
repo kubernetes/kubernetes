@@ -88,11 +88,11 @@ function set-linux-node-image() {
 function set-windows-node-image() {
   WINDOWS_NODE_IMAGE_PROJECT="windows-cloud"
   if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-for-containers-v20200114"
+    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-for-containers-v20200310"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1909" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-for-containers-v20200114"
+    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-for-containers-v20200310"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1809" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-1809-dc-core-for-containers-v20200114"
+    WINDOWS_NODE_IMAGE="windows-server-1809-dc-core-for-containers-v20200310"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
@@ -1242,6 +1242,7 @@ CUSTOM_CALICO_NODE_DAEMONSET_YAML: |
 $(echo "${CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}" | sed -e "s/'/''/g")
 CUSTOM_TYPHA_DEPLOYMENT_YAML: |
 $(echo "${CUSTOM_TYPHA_DEPLOYMENT_YAML:-}" | sed -e "s/'/''/g")
+CONCURRENT_SERVICE_SYNCS: $(yaml-quote ${CONCURRENT_SERVICE_SYNCS:-})
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
@@ -1524,6 +1525,11 @@ EOF
 ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE: $(yaml-quote ${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE})
 EOF
   fi
+  if [[ -n "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-}" ]]; then
+      cat >>$file <<EOF
+KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE: $(yaml-quote ${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE})
+EOF
+  fi
 }
 
 
@@ -1551,6 +1557,7 @@ KUBEPROXY_ARGS: $(yaml-quote ${KUBEPROXY_ARGS})
 KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_KUBECONFIG_FILE})
 BOOTSTRAP_KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_BOOTSTRAP_KUBECONFIG_FILE})
 KUBEPROXY_KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_KUBEPROXY_KUBECONFIG_FILE})
+WINDOWS_INFRA_CONTAINER: $(yaml-quote ${WINDOWS_INFRA_CONTAINER})
 EOF
 }
 
@@ -3573,11 +3580,11 @@ function kube-down() {
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
   if [[ "${REMAINING_MASTER_COUNT}" -eq 1 ]]; then
+    detect-master
+    local REMAINING_REPLICA_NAME="$(get-all-replica-names)"
+    local REMAINING_REPLICA_ZONE=$(gcloud compute instances list "${REMAINING_REPLICA_NAME}" \
+      --project "${PROJECT}" --format="value(zone)")
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
-      detect-master
-      local REMAINING_REPLICA_NAME="$(get-all-replica-names)"
-      local REMAINING_REPLICA_ZONE=$(gcloud compute instances list "${REMAINING_REPLICA_NAME}" \
-        --project "${PROJECT}" --format="value(zone)")
       gcloud compute forwarding-rules delete \
         --project "${PROJECT}" \
         --region "${REGION}" \

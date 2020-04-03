@@ -21,9 +21,17 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+)
+
+var (
+	// agnHostImage is the image URI of AgnHost
+	agnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 // GetHTTPContent returns the content of the given url by HTTP.
@@ -48,4 +56,23 @@ func DescribeSvc(ns string) {
 	desc, _ := framework.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
+}
+
+// newAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
+// that behave the same, no matter the underlying OS.
+func newAgnhostPod(name string, args ...string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "agnhost",
+					Image: agnHostImage,
+					Args:  args,
+				},
+			},
+		},
+	}
 }

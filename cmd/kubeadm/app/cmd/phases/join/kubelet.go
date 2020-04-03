@@ -148,7 +148,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		return errors.Wrapf(err, "cannot get Node %q", nodeName)
 	}
 	for _, cond := range node.Status.Conditions {
-		if cond.Type == v1.NodeReady {
+		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
 			return errors.Errorf("a Node with name %q and status %q already exists in the cluster. "+
 				"You must delete the existing Node or change the name of this new joining Node", nodeName, v1.NodeReady)
 		}

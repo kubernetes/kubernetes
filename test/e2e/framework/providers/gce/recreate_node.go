@@ -34,6 +34,12 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
+const (
+	// recreateNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is recreated before
+	// the test is considered failed.
+	recreateNodeReadyAgainTimeout = 10 * time.Minute
+)
+
 func nodeNames(nodes []v1.Node) []string {
 	result := make([]string, 0, len(nodes))
 	for i := range nodes {
@@ -102,9 +108,9 @@ func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace
 		framework.Failf("Test failed; failed to start the restart instance group command.")
 	}
 
-	err = WaitForNodeBootIdsToChange(c, nodes, framework.RecreateNodeReadyAgainTimeout)
+	err = WaitForNodeBootIdsToChange(c, nodes, recreateNodeReadyAgainTimeout)
 	if err != nil {
-		framework.Failf("Test failed; failed to recreate at least one node in %v.", framework.RecreateNodeReadyAgainTimeout)
+		framework.Failf("Test failed; failed to recreate at least one node in %v.", recreateNodeReadyAgainTimeout)
 	}
 
 	nodesAfter, err := e2enode.CheckReady(c, len(nodes), framework.RestartNodeReadyAgainTimeout)

@@ -103,7 +103,7 @@ func (proxier *metaProxier) OnServiceSynced() {
 func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.Warningf("failed to add endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
+		klog.V(4).Infof("failed to add endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
 		return
 	}
 	if *ipFamily == v1.IPv4Protocol {
@@ -118,7 +118,7 @@ func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.Warningf("failed to update endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
+		klog.V(4).Infof("failed to update endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
 		return
 	}
 
@@ -134,7 +134,7 @@ func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoi
 func (proxier *metaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.Warningf("failed to delete endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
+		klog.V(4).Infof("failed to delete endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
 		return
 	}
 

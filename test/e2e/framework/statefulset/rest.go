@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/manifest"
 )
@@ -87,7 +87,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		framework.Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
-		if err := c.AppsV1().StatefulSets(ss.Namespace).Delete(context.TODO(), ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
+		if err := c.AppsV1().StatefulSets(ss.Namespace).Delete(context.TODO(), ss.Name, metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 	}
@@ -105,7 +105,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 			pvNames.Insert(pvc.Spec.VolumeName)
 			// TODO: Double check that there are no pods referencing the pvc
 			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, nil); err != nil {
+			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 				return false, nil
 			}
 		}
@@ -160,7 +160,7 @@ func Scale(c clientset.Interface, ss *appsv1.StatefulSet, count int32) (*appsv1.
 	if pollErr != nil {
 		unhealthy := []string{}
 		for _, statefulPod := range statefulPodList.Items {
-			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, podutil.IsPodReady(&statefulPod)
+			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, podutils.IsPodReady(&statefulPod)
 			if delTs != nil || phase != v1.PodRunning || !readiness {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", statefulPod.Name, delTs, phase, readiness))
 			}

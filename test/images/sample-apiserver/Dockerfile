@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM k8s.gcr.io/kube-cross:v1.13.6-1 as build_k8s_1_17_sample_apiserver
+ARG BASEIMAGE
+FROM us.gcr.io/k8s-artifacts-prod/build-image/kube-cross:v1.13.9-2 as build_k8s_1_17_sample_apiserver
 
 ENV GOPATH /go
 RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
@@ -32,7 +33,7 @@ RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=BASEARCH go get k8s.io/sample
 # we can copy it out from this throw away container image from a standard location
 RUN find /go/bin -name sample-apiserver -exec cp {} / \;
 
-FROM BASEIMAGE
+FROM $BASEIMAGE
 COPY --from=build_k8s_1_17_sample_apiserver /sample-apiserver /sample-apiserver
 
 ENTRYPOINT ["/sample-apiserver"]

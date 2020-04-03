@@ -30,6 +30,7 @@ import (
 	// See https://github.com/kubernetes/kubernetes/issues/74827
 	// "github.com/onsi/ginkgo"
 
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -68,6 +69,9 @@ func handleFlags() {
 }
 
 func TestMain(m *testing.M) {
+	var versionFlag bool
+	flag.CommandLine.BoolVar(&versionFlag, "version", false, "Displays version information.")
+
 	// Register test flags, then parse flags.
 	handleFlags()
 
@@ -83,6 +87,10 @@ func TestMain(m *testing.M) {
 		for _, v := range image.GetImageConfigs() {
 			fmt.Println(v.GetE2EImage())
 		}
+		os.Exit(0)
+	}
+	if versionFlag {
+		fmt.Printf("%s\n", version.Get())
 		os.Exit(0)
 	}
 

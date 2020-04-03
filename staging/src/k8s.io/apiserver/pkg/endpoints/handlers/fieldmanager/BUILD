@@ -6,6 +6,7 @@ go_library(
         "buildmanagerinfo.go",
         "capmanagers.go",
         "fieldmanager.go",
+        "managedfieldsupdater.go",
         "skipnonapplied.go",
         "stripmeta.go",
         "structuredmerge.go",

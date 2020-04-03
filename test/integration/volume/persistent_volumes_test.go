@@ -117,7 +117,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -147,7 +147,7 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeRecycler pvc bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
-	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, nil); err != nil {
+	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	klog.V(2).Infof("TestPersistentVolumeRecycler pvc deleted")
@@ -172,7 +172,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -199,7 +199,7 @@ func TestPersistentVolumeDeleter(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeDeleter pvc bound")
 
 	// deleting a claim releases the volume, after which it can be recycled
-	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, nil); err != nil {
+	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	klog.V(2).Infof("TestPersistentVolumeDeleter pvc deleted")
@@ -232,7 +232,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -302,7 +302,7 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -383,7 +383,7 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -483,7 +483,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -549,7 +549,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 	}
 
 	// deleting a claim releases the volume
-	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, nil); err != nil {
+	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	t.Log("claim deleted")
@@ -573,7 +573,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	controllerStopCh := make(chan struct{})
 	informers.Start(controllerStopCh)
@@ -862,8 +862,8 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
-	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	storageClass := storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
@@ -922,7 +922,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	// Delete the claims
 	for i := 0; i < objCount; i++ {
-		_ = testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvcs[i].Name, nil)
+		_ = testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvcs[i].Name, metav1.DeleteOptions{})
 	}
 
 	// Wait for the PVs to get deleted by listing remaining volumes
@@ -957,7 +957,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
-	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), nil, metav1.ListOptions{})
+	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -1014,7 +1014,7 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	}
 
 	// deleting a claim releases the volume
-	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, nil); err != nil {
+	if err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("error deleting claim %s", pvc.Name)
 	}
 	t.Log("claim deleted")

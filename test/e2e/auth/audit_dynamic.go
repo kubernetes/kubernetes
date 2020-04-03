@@ -36,7 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -211,7 +211,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 					_, err = f.PodClient().Patch(context.TODO(), pod.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 					framework.ExpectNoError(err, "failed to patch pod")
 
-					f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+					f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 				},
 				[]utils.AuditEvent{
 					{
@@ -347,7 +347,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			},
 		}
 
-		if auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
+		if e2eauth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			testCases = append(testCases, annotationTestCases...)
 		}
 		expectedEvents := []utils.AuditEvent{}
@@ -376,7 +376,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			return len(missingReport.MissingEvents) == 0, nil
 		})
 		framework.ExpectNoError(err, "after %v failed to observe audit events", pollingTimeout)
-		err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), "test", &metav1.DeleteOptions{})
+		err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), "test", metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "could not delete audit configuration")
 	})
 })

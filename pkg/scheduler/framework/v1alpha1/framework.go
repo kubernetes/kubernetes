@@ -28,14 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const (
@@ -78,7 +78,7 @@ type framework struct {
 
 	clientSet       clientset.Interface
 	informerFactory informers.SharedInformerFactory
-	volumeBinder    *volumebinder.VolumeBinder
+	volumeBinder    scheduling.SchedulerVolumeBinder
 
 	metricsRecorder *metricsRecorder
 
@@ -119,7 +119,7 @@ type frameworkOptions struct {
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister schedulerlisters.SharedLister
 	metricsRecorder      *metricsRecorder
-	volumeBinder         *volumebinder.VolumeBinder
+	volumeBinder         scheduling.SchedulerVolumeBinder
 	runAllFilters        bool
 }
 
@@ -163,7 +163,7 @@ func withMetricsRecorder(recorder *metricsRecorder) Option {
 }
 
 // WithVolumeBinder sets volume binder for the scheduling framework.
-func WithVolumeBinder(binder *volumebinder.VolumeBinder) Option {
+func WithVolumeBinder(binder scheduling.SchedulerVolumeBinder) Option {
 	return func(o *frameworkOptions) {
 		o.volumeBinder = binder
 	}
@@ -199,13 +199,14 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 
 	// get needed plugins from config
 	pg := f.pluginsNeeded(plugins)
-	if len(pg) == 0 {
-		return f, nil
-	}
 
 	pluginConfig := make(map[string]*runtime.Unknown, 0)
 	for i := range args {
-		pluginConfig[args[i].Name] = &args[i].Args
+		name := args[i].Name
+		if _, ok := pluginConfig[name]; ok {
+			return nil, fmt.Errorf("repeated config for plugin %s", name)
+		}
+		pluginConfig[name] = &args[i].Args
 	}
 
 	pluginsMap := make(map[string]Plugin)
@@ -352,7 +353,7 @@ func (f *framework) RunPreFilterExtensionAddPod(
 	state *CycleState,
 	podToSchedule *v1.Pod,
 	podToAdd *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo,
+	nodeInfo *schedulertypes.NodeInfo,
 ) (status *Status) {
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
@@ -370,7 +371,7 @@ func (f *framework) RunPreFilterExtensionAddPod(
 	return nil
 }
 
-func (f *framework) runPreFilterExtensionAddPod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (f *framework) runPreFilterExtensionAddPod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podToAdd, nodeInfo)
 	}
@@ -388,7 +389,7 @@ func (f *framework) RunPreFilterExtensionRemovePod(
 	state *CycleState,
 	podToSchedule *v1.Pod,
 	podToRemove *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo,
+	nodeInfo *schedulertypes.NodeInfo,
 ) (status *Status) {
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil {
@@ -406,7 +407,7 @@ func (f *framework) RunPreFilterExtensionRemovePod(
 	return nil
 }
 
-func (f *framework) runPreFilterExtensionRemovePod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (f *framework) runPreFilterExtensionRemovePod(ctx context.Context, pl PreFilterPlugin, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podToAdd, nodeInfo)
 	}
@@ -424,7 +425,7 @@ func (f *framework) RunFilterPlugins(
 	ctx context.Context,
 	state *CycleState,
 	pod *v1.Pod,
-	nodeInfo *schedulernodeinfo.NodeInfo,
+	nodeInfo *schedulertypes.NodeInfo,
 ) PluginToStatus {
 	var firstFailedStatus *Status
 	statuses := make(PluginToStatus)
@@ -451,7 +452,7 @@ func (f *framework) RunFilterPlugins(
 	return statuses
 }
 
-func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state *CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Filter(ctx, state, pod, nodeInfo)
 	}
@@ -512,7 +513,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 	errCh := schedutil.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
-	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {
+	parallelize.Until(ctx, len(nodes), func(index int) {
 		for _, pl := range f.scorePlugins {
 			nodeName := nodes[index].Name
 			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
@@ -533,7 +534,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
-	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
+	parallelize.Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		nodeScoreList := pluginToNodeScores[pl.Name()]
 		if pl.ScoreExtensions() == nil {
@@ -553,7 +554,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 	}
 
 	// Apply score defaultWeights for each ScorePlugin in parallel.
-	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
+	parallelize.Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		// Score plugins' weight has been checked when they are initialized.
 		weight := f.pluginNameToWeightMap[pl.Name()]
@@ -891,7 +892,7 @@ func (f *framework) SharedInformerFactory() informers.SharedInformerFactory {
 }
 
 // VolumeBinder returns the volume binder used by scheduler.
-func (f *framework) VolumeBinder() *volumebinder.VolumeBinder {
+func (f *framework) VolumeBinder() scheduling.SchedulerVolumeBinder {
 	return f.volumeBinder
 }
 

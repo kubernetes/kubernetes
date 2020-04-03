@@ -94,7 +94,12 @@ var StatusStrategy = flowSchemaStatusStrategy{Strategy}
 func (flowSchemaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newFlowSchema := obj.(*flowcontrol.FlowSchema)
 	oldFlowSchema := old.(*flowcontrol.FlowSchema)
+
+	// managedFields must be preserved since it's been modified to
+	// track changed fields in the status update.
+	managedFields := newFlowSchema.ManagedFields
 	newFlowSchema.ObjectMeta = oldFlowSchema.ObjectMeta
+	newFlowSchema.ManagedFields = managedFields
 	newFlowSchema.Spec = oldFlowSchema.Spec
 }
 

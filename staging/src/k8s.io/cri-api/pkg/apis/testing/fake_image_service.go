@@ -30,6 +30,7 @@ type FakeImageService struct {
 
 	FakeImageSize uint64
 	Called        []string
+	Errors        map[string][]error
 	Images        map[string]*runtimeapi.Image
 
 	pulledImages []*pulledImage
@@ -64,6 +65,7 @@ func (r *FakeImageService) SetFakeFilesystemUsage(usage []*runtimeapi.Filesystem
 func NewFakeImageService() *FakeImageService {
 	return &FakeImageService{
 		Called: make([]string, 0),
+		Errors: make(map[string][]error),
 		Images: make(map[string]*runtimeapi.Image),
 	}
 }
@@ -87,11 +89,34 @@ func stringInSlice(s string, list []string) bool {
 	return false
 }
 
+func (r *FakeImageService) InjectError(f string, err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Errors[f] = append(r.Errors[f], err)
+}
+
+// caller of popError must grab a lock.
+func (r *FakeImageService) popError(f string) error {
+	if r.Errors == nil {
+		return nil
+	}
+	errs := r.Errors[f]
+	if len(errs) == 0 {
+		return nil
+	}
+	err, errs := errs[0], errs[1:]
+	r.Errors[f] = errs
+	return err
+}
+
 func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ListImages")
+	if err := r.popError("ListImages"); err != nil {
+		return nil, err
+	}
 
 	images := make([]*runtimeapi.Image, 0)
 	for _, img := range r.Images {
@@ -111,6 +136,9 @@ func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ImageStatus")
+	if err := r.popError("ImageStatus"); err != nil {
+		return nil, err
+	}
 
 	return r.Images[image.Image], nil
 }
@@ -120,6 +148,9 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "PullImage")
+	if err := r.popError("PullImage"); err != nil {
+		return "", err
+	}
 
 	r.pulledImages = append(r.pulledImages, &pulledImage{imageSpec: image, authConfig: auth})
 	// ImageID should be randomized for real container runtime, but here just use
@@ -137,6 +168,9 @@ func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "RemoveImage")
+	if err := r.popError("RemoveImage"); err != nil {
+		return err
+	}
 
 	// Remove the image
 	delete(r.Images, image.Image)
@@ -150,6 +184,9 @@ func (r *FakeImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) 
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ImageFsInfo")
+	if err := r.popError("ImageFsInfo"); err != nil {
+		return nil, err
+	}
 
 	return r.FakeFilesystemUsage, nil
 }

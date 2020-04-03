@@ -36,9 +36,10 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -104,7 +105,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		if daemonsets != nil && len(daemonsets.Items) > 0 {
 			for _, ds := range daemonsets.Items {
 				ginkgo.By(fmt.Sprintf("Deleting DaemonSet %q", ds.Name))
-				framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
+				framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
 				err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, &ds))
 				framework.ExpectNoError(err, "error waiting for daemon pod to be reaped")
 			}
@@ -166,7 +167,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		ginkgo.By("Stop a daemon pod, check that the daemon pod is revived.")
 		podList := listDaemonPods(c, ns, label)
 		pod := podList.Items[0]
-		err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, nil)
+		err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		framework.ExpectNoError(err, "error waiting for daemon pod to revive")
@@ -687,7 +688,7 @@ func checkAtLeastOneNewPod(c clientset.Interface, ns string, label map[string]st
 // canScheduleOnNode checks if a given DaemonSet can schedule pods on the given node
 func canScheduleOnNode(node v1.Node, ds *appsv1.DaemonSet) bool {
 	newPod := daemon.NewPod(ds, node.Name)
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	nodeInfo := schedulertypes.NewNodeInfo()
 	nodeInfo.SetNode(&node)
 	taints, err := nodeInfo.Taints()
 	if err != nil {

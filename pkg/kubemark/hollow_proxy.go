@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
+	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
@@ -94,7 +95,7 @@ func NewHollowProxyOrDie(
 			proxierMinSyncPeriod,
 			false,
 			0,
-			"10.0.0.0/8",
+			proxyutiliptables.NewNoOpLocalDetector(),
 			nodeName,
 			nodeIP,
 			recorder,

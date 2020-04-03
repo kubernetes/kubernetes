@@ -331,7 +331,6 @@ type PersistentVolumeSpec struct {
 	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,7,opt,name=mountOptions"`
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -460,14 +459,17 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 	// volumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
-	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
-	// enabled and currently VolumeSnapshot is the only supported data source.
-	// If the provisioner can support VolumeSnapshot data source, it will create
-	// a new volume and data will be restored to the volume at the same time.
-	// If the provisioner does not support VolumeSnapshot data source, volume will
+	// This field can be used to specify either:
+	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot - Beta)
+	// * An existing PVC (PersistentVolumeClaim)
+	// * An existing custom resource/object that implements data population (Alpha)
+	// In order to use VolumeSnapshot object types, the appropriate feature gate
+	// must be enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
+	// If the provisioner or an external controller can support the specified data source,
+	// it will create a new volume based on the contents of the specified data source.
+	// If the specified data source is not supported, the volume will
 	// not be created and the failure will be reported as an event.
 	// In the future, we plan to support more data source types and the behavior
 	// of the provisioner may change.
@@ -887,9 +889,10 @@ type FlockerVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node, assume anything we don't explicitly handle is this
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (e.g. tmpfs on linux)
-	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
+	StorageMediumDefault         StorageMedium = ""           // use whatever the default is for the node, assume anything we don't explicitly handle is this
+	StorageMediumMemory          StorageMedium = "Memory"     // use memory (e.g. tmpfs on linux)
+	StorageMediumHugePages       StorageMedium = "HugePages"  // use hugepages
+	StorageMediumHugePagesPrefix StorageMedium = "HugePages-" // prefix for full medium notation HugePages-<size>
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -1089,8 +1092,10 @@ type SecretVolumeSource struct {
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
-	// Optional: mode bits to use on created files by default. Must be a
-	// value between 0 and 0777. Defaults to 0644.
+	// Optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values
+	// for mode bits. Defaults to 0644.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -1515,8 +1520,10 @@ type ConfigMapVolumeSource struct {
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
-	// Optional: mode bits to use on created files by default. Must be a
-	// value between 0 and 0777. Defaults to 0644.
+	// Optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -1582,8 +1589,9 @@ type ServiceAccountTokenProjection struct {
 type ProjectedVolumeSource struct {
 	// list of volume projections
 	Sources []VolumeProjection `json:"sources" protobuf:"bytes,1,rep,name=sources"`
-	// Mode bits to use on created files by default. Must be a value between
-	// 0 and 0777.
+	// Mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -1623,8 +1631,10 @@ type KeyToPath struct {
 	// May not contain the path element '..'.
 	// May not start with the string '..'.
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
-	// Optional: mode bits to use on this file, must be a value between 0
-	// and 0777. If not specified, the volume defaultMode will be used.
+	// Optional: mode bits used to set permissions on this file.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// If not specified, the volume defaultMode will be used.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
@@ -2180,7 +2190,6 @@ type Container struct {
 	// +patchStrategy=merge
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is a beta feature.
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
 	// +optional
@@ -2750,7 +2759,7 @@ type PreferredSchedulingTerm struct {
 type Taint struct {
 	// Required. The taint key to be applied to a node.
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
-	// Required. The taint value corresponding to the taint key.
+	// The taint value corresponding to the taint key.
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 	// Required. The effect of the taint on pods
@@ -3038,8 +3047,7 @@ type PodSpec struct {
 	Overhead ResourceList `json:"overhead,omitempty" protobuf:"bytes,32,opt,name=overhead"`
 	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
 	// domains. Scheduler will schedule pods in a way which abides by the constraints.
-	// This field is alpha-level and is only honored by clusters that enables the EvenPodsSpread
-	// feature.
+	// This field is only honored by clusters that enable the EvenPodsSpread feature.
 	// All topologySpreadConstraints are ANDed.
 	// +optional
 	// +patchMergeKey=topologyKey
@@ -3125,6 +3133,22 @@ type HostAlias struct {
 	Hostnames []string `json:"hostnames,omitempty" protobuf:"bytes,2,rep,name=hostnames"`
 }
 
+// PodFSGroupChangePolicy holds policies that will be used for applying fsGroup to a volume
+// when volume is mounted.
+type PodFSGroupChangePolicy string
+
+const (
+	// FSGroupChangeOnRootMismatch indicates that volume's ownership and permissions will be changed
+	// only when permission and ownership of root directory does not match with expected
+	// permissions on the volume. This can help shorten the time it takes to change
+	// ownership and permissions of a volume.
+	FSGroupChangeOnRootMismatch PodFSGroupChangePolicy = "OnRootMismatch"
+	// FSGroupChangeAlways indicates that volume's ownership and permissions
+	// should always be changed whenever volume is mounted inside a Pod. This the default
+	// behavior.
+	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
+)
+
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
@@ -3183,6 +3207,14 @@ type PodSecurityContext struct {
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
 	Sysctls []Sysctl `json:"sysctls,omitempty" protobuf:"bytes,7,rep,name=sysctls"`
+	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+	// before being exposed inside Pod. This field will only apply to
+	// volume types which support fsGroup based ownership(and permissions).
+	// It will have no effect on ephemeral volume types such as: secret, configmaps
+	// and emptydir.
+	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
+	// +optional
+	FSGroupChangePolicy *PodFSGroupChangePolicy `json:"fsGroupChangePolicy,omitempty" protobuf:"bytes,9,opt,name=fsGroupChangePolicy"`
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -3298,7 +3330,6 @@ type EphemeralContainerCommon struct {
 	// +patchStrategy=merge
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is a beta feature.
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
 	// +optional
@@ -3990,6 +4021,16 @@ type ServicePort struct {
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// Field can be enabled with ServiceAppProtocol feature gate.
+	// +optional
+	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,6,opt,name=appProtocol"`
+
 	// The port that will be exposed by this service.
 	Port int32 `json:"port" protobuf:"varint,3,opt,name=port"`
 
@@ -4205,6 +4246,16 @@ type EndpointPort struct {
 	// Default is TCP.
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,3,opt,name=protocol,casttype=Protocol"`
+
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// Field can be enabled with ServiceAppProtocol feature gate.
+	// +optional
+	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,4,opt,name=appProtocol"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4324,7 +4375,7 @@ type NodeSystemInfo struct {
 	MachineID string `json:"machineID" protobuf:"bytes,1,opt,name=machineID"`
 	// SystemUUID reported by the node. For unique machine identification
 	// MachineID is preferred. This field is specific to Red Hat hosts
-	// https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html
+	// https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
 	SystemUUID string `json:"systemUUID" protobuf:"bytes,2,opt,name=systemUUID"`
 	// Boot ID reported by the node.
 	BootID string `json:"bootID" protobuf:"bytes,3,opt,name=bootID"`
@@ -5686,7 +5737,10 @@ type DownwardAPIVolumeSource struct {
 	// +optional
 	Items []DownwardAPIVolumeFile `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
 	// Optional: mode bits to use on created files by default. Must be a
-	// value between 0 and 0777. Defaults to 0644.
+	// Optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
 	// Directories within the path are not affected by this setting.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
@@ -5709,8 +5763,10 @@ type DownwardAPIVolumeFile struct {
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	// +optional
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
-	// Optional: mode bits to use on this file, must be a value between 0
-	// and 0777. If not specified, the volume defaultMode will be used.
+	// Optional: mode bits used to set permissions on this file, must be an octal value
+	// between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// If not specified, the volume defaultMode will be used.
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
@@ -5823,14 +5879,12 @@ type SELinuxOptions struct {
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 type WindowsSecurityContextOptions struct {
 	// GMSACredentialSpecName is the name of the GMSA credential spec to use.
-	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
 	// +optional
 	GMSACredentialSpecName *string `json:"gmsaCredentialSpecName,omitempty" protobuf:"bytes,1,opt,name=gmsaCredentialSpecName"`
 
 	// GMSACredentialSpec is where the GMSA admission webhook
 	// (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
 	// GMSA credential spec named by the GMSACredentialSpecName field.
-	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
 	// +optional
 	GMSACredentialSpec *string `json:"gmsaCredentialSpec,omitempty" protobuf:"bytes,2,opt,name=gmsaCredentialSpec"`
 
@@ -5838,7 +5892,6 @@ type WindowsSecurityContextOptions struct {
 	// Defaults to the user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
-	// This field is beta-level and may be disabled with the WindowsRunAsUserName feature flag.
 	// +optional
 	RunAsUserName *string `json:"runAsUserName,omitempty" protobuf:"bytes,3,opt,name=runAsUserName"`
 }
@@ -5879,7 +5932,7 @@ type Sysctl struct {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`

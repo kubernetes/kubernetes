@@ -50,7 +50,7 @@ type Waiter interface {
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
 	// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-	WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error
+	WaitForHealthyKubelet(initialTimeout time.Duration, healthzEndpoint string) error
 	// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
 	WaitForKubeletAndFunc(f func() error) error
 	// SetTimeout adjusts the timeout to the specified duration
@@ -133,9 +133,9 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 }
 
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error {
-	time.Sleep(initalTimeout)
-	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initalTimeout)
+func (w *KubeWaiter) WaitForHealthyKubelet(initialTimeout time.Duration, healthzEndpoint string) error {
+	time.Sleep(initialTimeout)
+	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initialTimeout)
 	return TryRunCommand(func() error {
 		client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 		resp, err := client.Get(healthzEndpoint)

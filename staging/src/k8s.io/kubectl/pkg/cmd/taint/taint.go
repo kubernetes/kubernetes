@@ -24,8 +24,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -43,6 +44,9 @@ import (
 type TaintOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
+
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
 
 	resources      []string
 	taintsToAdd    []v1.Taint
@@ -109,6 +113,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	}
 
 	options.PrintFlags.AddFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
@@ -123,6 +128,21 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
+
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	// retrieves resource and taint args from args
 	// also checks args to verify that all resources are specified before taints
@@ -261,12 +281,54 @@ func (o TaintOptions) RunTaint() error {
 			klog.V(2).Infof("couldn't compute patch: %v", err)
 		}
 
+		printer, err := o.ToPrinter(operation)
+		if err != nil {
+			return err
+		}
+		if o.DryRunStrategy == cmdutil.DryRunClient {
+			if createdPatch {
+				typedObj, err := scheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+				if err != nil {
+					return err
+				}
+
+				nodeObj, ok := typedObj.(*v1.Node)
+				if !ok {
+					return fmt.Errorf("unexpected type %T", typedObj)
+				}
+
+				originalObjJS, err := json.Marshal(nodeObj)
+				if err != nil {
+					return err
+				}
+
+				originalPatchedObjJS, err := strategicpatch.StrategicMergePatch(originalObjJS, patchBytes, nodeObj)
+				if err != nil {
+					return err
+				}
+
+				targetObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalPatchedObjJS)
+				if err != nil {
+					return err
+				}
+				return printer.PrintObj(targetObj, o.Out)
+			}
+			return printer.PrintObj(obj, o.Out)
+		}
+
 		mapping := info.ResourceMapping()
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+				return err
+			}
+		}
 		client, err := o.ClientForMapping(mapping)
 		if err != nil {
 			return err
 		}
-		helper := resource.NewHelper(client, mapping)
+		helper := resource.
+			NewHelper(client, mapping).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer)
 
 		var outputObj runtime.Object
 		if createdPatch {
@@ -278,10 +340,6 @@ func (o TaintOptions) RunTaint() error {
 			return err
 		}
 
-		printer, err := o.ToPrinter(operation)
-		if err != nil {
-			return err
-		}
 		return printer.PrintObj(outputObj, o.Out)
 	})
 }

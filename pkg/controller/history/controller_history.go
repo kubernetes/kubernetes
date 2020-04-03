@@ -289,7 +289,7 @@ func (rh *realHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 }
 
 func (rh *realHistory) DeleteControllerRevision(revision *apps.ControllerRevision) error {
-	return rh.client.AppsV1().ControllerRevisions(revision.Namespace).Delete(context.TODO(), revision.Name, nil)
+	return rh.client.AppsV1().ControllerRevisions(revision.Namespace).Delete(context.TODO(), revision.Name, metav1.DeleteOptions{})
 }
 
 type objectForPatch struct {

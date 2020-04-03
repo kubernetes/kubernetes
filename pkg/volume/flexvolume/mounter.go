@@ -93,7 +93,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) 
 
 	if !f.readOnly {
 		if f.plugin.capabilities.FSGroup {
-			volume.SetVolumeOwnership(f, mounterArgs.FsGroup)
+			volume.SetVolumeOwnership(f, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 		}
 	}
 

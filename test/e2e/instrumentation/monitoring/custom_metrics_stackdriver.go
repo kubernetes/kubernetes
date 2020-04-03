@@ -124,7 +124,7 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, &metav1.DeleteOptions{})
+	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	_, err = createSDExporterPods(f, kubeClient)
@@ -172,7 +172,7 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, &metav1.DeleteOptions{})
+	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	pod, err := createSDExporterPods(f, kubeClient)
@@ -258,11 +258,11 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 }
 
 func cleanupSDExporterPod(f *framework.Framework, cs clientset.Interface) {
-	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod1, &metav1.DeleteOptions{})
+	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod1, metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod1, err)
 	}
-	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod2, &metav1.DeleteOptions{})
+	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod2, metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod2, err)
 	}

@@ -445,9 +445,6 @@ function mount-master-pd {
   mkdir -p "${mount_point}/srv/sshproxy"
   ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
 
-  if ! id etcd &>/dev/null; then
-    useradd -s /sbin/nologin -d /var/etcd etcd
-  fi
   chown -R etcd "${mount_point}/var/etcd"
   chgrp -R etcd "${mount_point}/var/etcd"
 }
@@ -464,7 +461,7 @@ function append_or_replace_prefixed_line {
   local -r tmpfile="$(mktemp -t filtered.XXXX --tmpdir=${dirname})"
 
   touch "${file}"
-  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${tmpfile}"
+  awk -v pfx="${prefix}" 'substr($0,1,length(pfx)) != pfx { print }' "${file}" > "${tmpfile}"
   echo "${prefix}${suffix}" >> "${tmpfile}"
   mv "${tmpfile}" "${file}"
 }
@@ -652,8 +649,13 @@ function create-master-auth {
     append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
   fi
   if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"           "system:addon-manager,uid:system:addon-manager,system:masters"
   fi
+  if [[ -n "${KONNECTIVITY_SERVER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KONNECTIVITY_SERVER_TOKEN},"     "system:konnectivity-server,uid:system:konnectivity-server"
+    create-kubeconfig "konnectivity-server" ${KONNECTIVITY_SERVER_TOKEN}
+  fi
+
   if [[ -n "${EXTRA_STATIC_AUTH_COMPONENTS:-}" ]]; then
     # Create a static Bearer token and kubeconfig for extra, comma-separated components.
     IFS="," read -r -a extra_components <<< "${EXTRA_STATIC_AUTH_COMPONENTS:-}"
@@ -801,25 +803,46 @@ contexts:
 EOF
   fi
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
-    cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
+    if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
+      cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1alpha1
 kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
   connection:
-    type: http-connect
-    httpConnect:
-      url: https://127.0.0.1:8131
-      caBundle: /etc/srv/kubernetes/pki/konnectivity-server/ca.crt
-      clientKey: /etc/srv/kubernetes/pki/konnectivity-server/client.key
-      clientCert: /etc/srv/kubernetes/pki/konnectivity-server/client.crt
+    proxyProtocol: GRPC
+    transport:
+      uds:
+        udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
 - name: master
   connection:
-    type: direct
+    proxyProtocol: Direct
 - name: etcd
   connection:
-    type: direct
+    proxyProtocol: Direct
 EOF
+    elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+      cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
+apiVersion: apiserver.k8s.io/v1alpha1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: HTTPConnect
+    transport:
+      uds:
+        udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
+- name: master
+  connection:
+    proxyProtocol: Direct
+- name: etcd
+  connection:
+    proxyProtocol: Direct
+EOF
+    else
+      echo "KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE must be set to either grpc or http-connect"
+      exit 1
+    fi
   fi
 
   if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
@@ -1471,7 +1494,15 @@ function prepare-kube-proxy-manifest-variables {
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
-    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4
+    # use 'nf_conntrack' instead of 'nf_conntrack_ipv4' for linux kernel >= 4.19
+    # https://github.com/kubernetes/kubernetes/pull/70398
+    local -r kernel_version=$(uname -r | cut -d\. -f1,2)
+    local conntrack_module="nf_conntrack"
+    if [[ $(printf "${kernel_version}\n4.18\n" | sort -V | tail -1) == "4.18" ]]; then
+      conntrack_module="nf_conntrack_ipv4"
+    fi
+
+    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}
     if [[ $? -eq 0 ]];
     then
       params+=" --proxy-mode=ipvs"
@@ -1645,9 +1676,8 @@ function start-etcd-servers {
 
 # Replaces the variables in the konnectivity-server manifest file with the real values, and then
 # copy the file to the manifest dir
-# $1: value for variable "server_port"
-# $2: value for variable "agent_port"
-# $3: value for bariable "admin_port"
+# $1: value for variable "agent_port"
+# $2: value for bariable "admin_port"
 function prepare-konnectivity-server-manifest {
   local -r temp_file="/tmp/konnectivity-server.yaml"
   params=()
@@ -1655,24 +1685,32 @@ function prepare-konnectivity-server-manifest {
   params+=("--log-file=/var/log/konnectivity-server.log")
   params+=("--logtostderr=false")
   params+=("--log-file-max-size=0")
-  params+=("--server-ca-cert=${KONNECTIVITY_SERVER_CA_CERT_PATH}")
-  params+=("--server-cert=${KONNECTIVITY_SERVER_CERT_PATH}")
-  params+=("--server-key=${KONNECTIVITY_SERVER_KEY_PATH}")
-  params+=("--cluster-ca-cert=${KONNECTIVITY_AGENT_CA_CERT_PATH}")
-  params+=("--cluster-cert=${KONNECTIVITY_AGENT_CERT_PATH}")
-  params+=("--cluster-key=${KONNECTIVITY_AGENT_KEY_PATH}")
-  params+=("--mode=http-connect")
-  params+=("--server-port=$1")
-  params+=("--agent-port=$2")
-  params+=("--admin-port=$3")
+  params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
+  params+=("--cluster-cert=/etc/srv/kubernetes/pki/apiserver.crt")
+  params+=("--cluster-key=/etc/srv/kubernetes/pki/apiserver.key")
+  if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
+    params+=("--mode=grpc")
+  elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    params+=("--mode=http-connect")
+  else
+    echo "KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE must be set to either grpc or http-connect"
+    exit 1
+  fi
+
+  params+=("--server-port=0")
+  params+=("--agent-port=$1")
+  params+=("--admin-port=$2")
+  params+=("--agent-namespace=kube-system")
+  params+=("--agent-service-account=konnectivity-agent")
+  params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
+  params+=("--authentication-audience=system:konnectivity-server")
   konnectivity_args=""
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
   done
   sed -i -e "s@{{ *konnectivity_args *}}@${konnectivity_args}@g" "${temp_file}"
-  sed -i -e "s@{{ *server_port *}}@$1@g" "${temp_file}"
-  sed -i -e "s@{{ *agent_port *}}@$2@g" "${temp_file}"
-  sed -i -e "s@{{ *admin_port *}}@$3@g" "${temp_file}"
+  sed -i -e "s@{{ *agent_port *}}@$1@g" "${temp_file}"
+  sed -i -e "s@{{ *admin_port *}}@$2@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@30@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
 }
@@ -1683,7 +1721,7 @@ function prepare-konnectivity-server-manifest {
 function start-konnectivity-server {
   echo "Start konnectivity server pods"
   prepare-log-file /var/log/konnectivity-server.log
-  prepare-konnectivity-server-manifest "8131" "8132" "8133"
+  prepare-konnectivity-server-manifest "8132" "8133"
 }
 
 # Calculates the following variables based on env variables, which will be used
@@ -2476,7 +2514,7 @@ function setup-node-termination-handler-manifest {
 }
 
 function setup-konnectivity-agent-manifest {
-    local -r manifest="/etc/kubernetes/addons/konnectivity-agent/daemonset.yaml"
+    local -r manifest="/etc/kubernetes/addons/konnectivity-agent/konnectivity-agent-ds.yaml"
     sed -i "s|__APISERVER_IP__|${KUBERNETES_MASTER_NAME}|g" "${manifest}"
 }
 
@@ -2784,6 +2822,10 @@ function main() {
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   fi
+  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    KONNECTIVITY_SERVER_TOKEN="$(secure_random 32)"
+  fi
+
 
   setup-os-params
   config-ip-firewall

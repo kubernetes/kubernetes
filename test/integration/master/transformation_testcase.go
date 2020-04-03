@@ -98,7 +98,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 
 func (e *transformTest) cleanUp() {
 	os.RemoveAll(e.configDir)
-	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, metav1.NewDeleteOptions(0))
+	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
 	e.kubeAPIServer.TearDownFn()
 }
 

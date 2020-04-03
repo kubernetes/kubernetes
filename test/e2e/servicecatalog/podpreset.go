@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -145,7 +146,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("ensuring pod is modified")
 		// save the running pod
@@ -265,7 +266,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(originalPod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, originalPod.Name, f.Namespace.Name))
 
 		ginkgo.By("ensuring pod is modified")
 		// save the running pod

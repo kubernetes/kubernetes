@@ -109,7 +109,7 @@ func TestDynamicAudit(t *testing.T) {
 
 	// test deletes an audit sink, generates audit events, and ensures they don't arrive in the corresponding server
 	success = t.Run("delete sink", func(t *testing.T) {
-		err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), sinkConfig2.Name, &metav1.DeleteOptions{})
+		err := kubeclient.AuditregistrationV1alpha1().AuditSinks().Delete(context.TODO(), sinkConfig2.Name, metav1.DeleteOptions{})
 		require.NoError(t, err, "failed to delete audit sink2")
 		t.Log("deleted audit sink2")
 

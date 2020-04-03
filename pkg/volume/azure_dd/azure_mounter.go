@@ -164,7 +164,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 
 	if volumeSource.ReadOnly == nil || !*volumeSource.ReadOnly {
-		volume.SetVolumeOwnership(m, mounterArgs.FsGroup)
+		volume.SetVolumeOwnership(m, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	}
 
 	klog.V(2).Infof("azureDisk - successfully mounted disk %s on %s", diskName, dir)

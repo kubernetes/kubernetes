@@ -21,9 +21,12 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -189,4 +192,22 @@ func (csrApprovalStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 
 func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCertificateSigningRequestUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
+}
+
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	csr, ok := obj.(*certificates.CertificateSigningRequest)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a certificatesigningrequest")
+	}
+	return labels.Set(csr.Labels), SelectableFields(csr), nil
+}
+
+// SelectableFields returns a field set that can be used for filter selection
+func SelectableFields(obj *certificates.CertificateSigningRequest) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
+	csrSpecificFieldsSet := fields.Set{
+		"spec.signerName": obj.Spec.SignerName,
+	}
+	return generic.MergeFieldsSets(objectMetaFieldsSet, csrSpecificFieldsSet)
 }

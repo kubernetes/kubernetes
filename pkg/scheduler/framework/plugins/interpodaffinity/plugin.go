@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -52,8 +53,8 @@ var _ framework.ScorePlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	sharedLister          schedulerlisters.SharedLister
-	hardPodAffinityWeight int32
+	Args
+	sharedLister schedulerlisters.SharedLister
 	sync.Mutex
 }
 
@@ -62,24 +63,27 @@ func (pl *InterPodAffinity) Name() string {
 	return Name
 }
 
+// BuildArgs returns the args that were used to build the plugin.
+func (pl *InterPodAffinity) BuildArgs() interface{} {
+	return pl.Args
+}
+
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
-	args := &Args{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
-		return nil, err
-	}
-	if err := validateArgs(args); err != nil {
-		return nil, err
-	}
 	pl := &InterPodAffinity{
-		sharedLister:          h.SnapshotSharedLister(),
-		hardPodAffinityWeight: DefaultHardPodAffinityWeight,
+		sharedLister: h.SnapshotSharedLister(),
 	}
-	if args.HardPodAffinityWeight != nil {
-		pl.hardPodAffinityWeight = *args.HardPodAffinityWeight
+	if err := framework.DecodeInto(plArgs, &pl.Args); err != nil {
+		return nil, err
+	}
+	if err := validateArgs(&pl.Args); err != nil {
+		return nil, err
+	}
+	if pl.HardPodAffinityWeight == nil {
+		pl.HardPodAffinityWeight = pointer.Int32Ptr(DefaultHardPodAffinityWeight)
 	}
 	return pl, nil
 }

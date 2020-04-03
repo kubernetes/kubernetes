@@ -312,7 +312,7 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	}
 	if config.WaitForCompletion {
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
-		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, nil))
+		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, metav1.DeleteOptions{}))
 	} else {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {
@@ -341,7 +341,7 @@ func TestServerCleanup(f *framework.Framework, config TestConfig) {
 	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
-func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test) (*v1.Pod, error) {
+func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
@@ -381,7 +381,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			Volumes:                       []v1.Volume{},
 		},
 	}
-	e2epod.SetNodeSelection(clientPod, config.ClientNodeSelection)
+	e2epod.SetNodeSelection(&clientPod.Spec, config.ClientNodeSelection)
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
@@ -417,8 +417,13 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 	if err != nil {
 		return nil, err
 	}
-	err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
+	if slow {
+		err = e2epod.WaitForPodRunningInNamespaceSlow(client, clientPod.Name, clientPod.Namespace)
+	} else {
+		err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
+	}
 	if err != nil {
+		e2epod.DeletePodOrFail(client, clientPod.Namespace, clientPod.Name)
 		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
 		return nil, err
 	}
@@ -471,8 +476,24 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple Tests can be specified to mount multiple volumes to a single
 // pod.
+// Timeout for dynamic provisioning (if "WaitForFirstConsumer" is set && provided PVC is not bound yet),
+// pod creation, scheduling and complete pod startup (incl. volume attach & mount) is pod.podStartTimeout.
+// It should be used for cases where "regular" dynamic provisioning of an empty volume is requested.
 func TestVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
-	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests)
+	testVolumeClient(f, config, fsGroup, fsType, tests, false)
+}
+
+// TestVolumeClientSlow is the same as TestVolumeClient except for its timeout.
+// Timeout for dynamic provisioning (if "WaitForFirstConsumer" is set && provided PVC is not bound yet),
+// pod creation, scheduling and complete pod startup (incl. volume attach & mount) is pod.slowPodStartTimeout.
+// It should be used for cases where "special" dynamic provisioning is requested, such as volume cloning
+// or snapshot restore.
+func TestVolumeClientSlow(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+	testVolumeClient(f, config, fsGroup, fsType, tests, true)
+}
+
+func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test, slow bool) {
+	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests, slow)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 	}
@@ -481,7 +502,6 @@ func TestVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
 	}()
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, clientPod))
 	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
 }
 
@@ -493,7 +513,7 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 	if framework.NodeOSDistroIs("windows") {
 		privileged = false
 	}
-	injectorPod, err := runVolumeTesterPod(f.ClientSet, config, "injector", privileged, fsGroup, tests)
+	injectorPod, err := runVolumeTesterPod(f.ClientSet, config, "injector", privileged, fsGroup, tests, false /*slow*/)
 	if err != nil {
 		framework.Failf("Failed to create injector pod: %v", err)
 		return

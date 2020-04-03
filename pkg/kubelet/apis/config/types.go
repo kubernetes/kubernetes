@@ -335,6 +335,12 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string
+	// The previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	ShowHiddenMetricsForVersion string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

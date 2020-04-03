@@ -38,7 +38,10 @@ var (
 		Provides utilities for interacting with plugins.
 
 		Plugins provide extended functionality that is not part of the major command-line distribution.
-		Please refer to the documentation and examples for more information about how write your own plugins.`)
+		Please refer to the documentation and examples for more information about how write your own plugins.
+
+		The easiest way to discover and install plugins is via the kubernetes sub-project krew.
+		To install krew, visit [krew.dev](https://github.com/kubernetes-sigs/krew/#installation)`)
 
 	pluginListLong = templates.LongDesc(`
 		List all available plugin files on a user's PATH.

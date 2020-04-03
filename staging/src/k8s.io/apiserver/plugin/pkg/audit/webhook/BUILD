@@ -31,6 +31,7 @@ go_library(
     importpath = "k8s.io/apiserver/plugin/pkg/audit/webhook",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/install:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",

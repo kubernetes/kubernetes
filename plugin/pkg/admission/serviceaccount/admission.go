@@ -216,7 +216,7 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		podutil.VisitPodSecretNames(pod, func(name string) bool {
 			hasSecrets = true
 			return false
-		})
+		}, podutil.AllContainers)
 		if hasSecrets {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
 		}
@@ -467,9 +467,10 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 			tokenVolumeName = s.generateName(ServiceAccountVolumeName + "-")
 		} else {
 			// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
-			tokenVolumeName = serviceAccountToken
+			// Replace dots because volumeMountName can't contain it
+			tokenVolumeName = strings.Replace(serviceAccountToken, ".", "-", -1)
 			if allVolumeNames.Has(tokenVolumeName) {
-				tokenVolumeName = s.generateName(fmt.Sprintf("%s-", serviceAccountToken))
+				tokenVolumeName = s.generateName(fmt.Sprintf("%s-", tokenVolumeName))
 			}
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	v1 "k8s.io/kube-scheduler/config/v1"
 )
 
 const (
@@ -38,12 +39,6 @@ const (
 // KubeSchedulerConfiguration configures a scheduler
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
-
-	// SchedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
-	SchedulerName *string `json:"schedulerName,omitempty"`
-	// AlgorithmSource specifies the scheduler algorithm source.
-	AlgorithmSource SchedulerAlgorithmSource `json:"algorithmSource"`
 
 	// LeaderElection defines the configuration of leader election client.
 	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`
@@ -90,52 +85,43 @@ type KubeSchedulerConfiguration struct {
 	// the default value (10s) will be used.
 	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds"`
 
-	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
-	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
-	// default plugins that should be disabled.
-	// When no enabled or disabled plugin is specified for an extension point, default plugins for
-	// that extension point will be used if there is any.
+	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
+	// choose to be scheduled under a particular profile by setting its associated
+	// scheduler name. Pods that don't specify any scheduler name are scheduled
+	// with the "default-scheduler" profile, if present here.
+	// +listType=map
+	// +listMapKey=schedulerName
+	Profiles []KubeSchedulerProfile `json:"profiles"`
+
+	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
+	// with the extender. These extenders are shared by all scheduler profiles.
+	// +listType=set
+	Extenders []v1.Extender `json:"extenders"`
+}
+
+// KubeSchedulerProfile is a scheduling profile.
+type KubeSchedulerProfile struct {
+	// SchedulerName is the name of the scheduler associated to this profile.
+	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
+	// is scheduled with this profile.
+	SchedulerName *string `json:"schedulerName,omitempty"`
+
+	// Plugins specify the set of plugins that should be enabled or disabled.
+	// Enabled plugins are the ones that should be enabled in addition to the
+	// default plugins. Disabled plugins are any of the default plugins that
+	// should be disabled.
+	// When no enabled or disabled plugin is specified for an extension point,
+	// default plugins for that extension point will be used if there is any.
+	// If a QueueSort plugin is specified, the same QueueSort Plugin and
+	// PluginConfig must be specified for all profiles.
 	Plugins *Plugins `json:"plugins,omitempty"`
 
 	// PluginConfig is an optional set of custom plugin arguments for each plugin.
-	// Omitting config args for a plugin is equivalent to using the default config for that plugin.
+	// Omitting config args for a plugin is equivalent to using the default config
+	// for that plugin.
 	// +listType=map
 	// +listMapKey=name
 	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`
-}
-
-// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
-// field must be specified, and source fields are mutually exclusive.
-type SchedulerAlgorithmSource struct {
-	// Policy is a policy based algorithm source.
-	Policy *SchedulerPolicySource `json:"policy,omitempty"`
-	// Provider is the name of a scheduling algorithm provider to use.
-	Provider *string `json:"provider,omitempty"`
-}
-
-// SchedulerPolicySource configures a means to obtain a scheduler Policy. One
-// source field must be specified, and source fields are mutually exclusive.
-type SchedulerPolicySource struct {
-	// File is a file policy source.
-	File *SchedulerPolicyFileSource `json:"file,omitempty"`
-	// ConfigMap is a config map policy source.
-	ConfigMap *SchedulerPolicyConfigMapSource `json:"configMap,omitempty"`
-}
-
-// SchedulerPolicyFileSource is a policy serialized to disk and accessed via
-// path.
-type SchedulerPolicyFileSource struct {
-	// Path is the location of a serialized policy.
-	Path string `json:"path"`
-}
-
-// SchedulerPolicyConfigMapSource is a policy serialized into a config map value
-// under the SchedulerPolicyConfigMapKey key.
-type SchedulerPolicyConfigMapSource struct {
-	// Namespace is the namespace of the policy config map.
-	Namespace string `json:"namespace"`
-	// Name is the name of hte policy config map.
-	Name string `json:"name"`
 }
 
 // KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration

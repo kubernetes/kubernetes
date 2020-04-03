@@ -108,15 +108,15 @@ func (c *FakePersistentVolumes) UpdateStatus(ctx context.Context, persistentVolu
 }
 
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
-func (c *FakePersistentVolumes) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakePersistentVolumes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(persistentvolumesResource, name), &corev1.PersistentVolume{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePersistentVolumes) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(persistentvolumesResource, listOptions)
+func (c *FakePersistentVolumes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(persistentvolumesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.PersistentVolumeList{})
 	return err

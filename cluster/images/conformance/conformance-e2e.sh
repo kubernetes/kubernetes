@@ -27,7 +27,9 @@ while true; do
     break
   elif [[ "$STATUS" == "Failed" ]]; then
     echo "$timestamp Failed."
-    break
+    kubectl -n conformance describe pods e2e-conformance-test || true
+    kubectl -n conformance logs e2e-conformance-test || true
+    exit 1
   else
     sleep 5
   fi

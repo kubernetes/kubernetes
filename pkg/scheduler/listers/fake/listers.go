@@ -28,7 +28,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 var _ schedulerlisters.PodLister = &PodLister{}
@@ -247,11 +247,11 @@ func (pvcs PersistentVolumeClaimLister) PersistentVolumeClaims(namespace string)
 	}
 }
 
-// NodeInfoLister declares a schedulernodeinfo.NodeInfo type for testing.
-type NodeInfoLister []*schedulernodeinfo.NodeInfo
+// NodeInfoLister declares a schedulertypes.NodeInfo type for testing.
+type NodeInfoLister []*schedulertypes.NodeInfo
 
 // Get returns a fake node object in the fake nodes.
-func (nodes NodeInfoLister) Get(nodeName string) (*schedulernodeinfo.NodeInfo, error) {
+func (nodes NodeInfoLister) Get(nodeName string) (*schedulertypes.NodeInfo, error) {
 	for _, node := range nodes {
 		if node != nil && node.Node().Name == nodeName {
 			return node, nil
@@ -261,21 +261,21 @@ func (nodes NodeInfoLister) Get(nodeName string) (*schedulernodeinfo.NodeInfo, e
 }
 
 // List lists all nodes.
-func (nodes NodeInfoLister) List() ([]*schedulernodeinfo.NodeInfo, error) {
+func (nodes NodeInfoLister) List() ([]*schedulertypes.NodeInfo, error) {
 	return nodes, nil
 }
 
 // HavePodsWithAffinityList is supposed to list nodes with at least one pod with affinity. For the fake lister
 // we just return everything.
-func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
+func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*schedulertypes.NodeInfo, error) {
 	return nodes, nil
 }
 
 // NewNodeInfoLister create a new fake NodeInfoLister from a slice of v1.Nodes.
 func NewNodeInfoLister(nodes []*v1.Node) schedulerlisters.NodeInfoLister {
-	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, len(nodes))
+	nodeInfoList := make([]*schedulertypes.NodeInfo, len(nodes))
 	for _, node := range nodes {
-		nodeInfo := schedulernodeinfo.NewNodeInfo()
+		nodeInfo := schedulertypes.NewNodeInfo()
 		nodeInfo.SetNode(node)
 		nodeInfoList = append(nodeInfoList, nodeInfo)
 	}

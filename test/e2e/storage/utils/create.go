@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/pkg/errors"
 
@@ -29,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +35,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // LoadFromManifests loads .yaml or .json manifest files and returns
@@ -80,7 +79,7 @@ func LoadFromManifests(files ...string) ([]interface{}, error) {
 
 func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
-		data, err := testfiles.Read(fileName)
+		data, err := e2etestfiles.Read(fileName)
 		if err != nil {
 			framework.Failf("reading manifest file: %v", err)
 		}
@@ -331,7 +330,7 @@ func patchItemRecursively(f *framework.Framework, item interface{}) error {
 		PatchName(f, &item.Name)
 	case *storagev1.StorageClass:
 		PatchName(f, &item.Name)
-	case *storagev1beta1.CSIDriver:
+	case *storagev1.CSIDriver:
 		PatchName(f, &item.Name)
 	case *v1.ServiceAccount:
 		PatchNamespace(f, &item.ObjectMeta.Namespace)
@@ -402,7 +401,7 @@ func (*serviceAccountFactory) Create(f *framework.Framework, i interface{}) (fun
 		return nil, errors.Wrap(err, "create ServiceAccount")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -424,7 +423,7 @@ func (*clusterRoleFactory) Create(f *framework.Framework, i interface{}) (func()
 		return nil, errors.Wrap(err, "create ClusterRole")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -445,7 +444,7 @@ func (*clusterRoleBindingFactory) Create(f *framework.Framework, i interface{}) 
 		return nil, errors.Wrap(err, "create ClusterRoleBinding")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -466,7 +465,7 @@ func (*roleFactory) Create(f *framework.Framework, i interface{}) (func() error,
 		return nil, errors.Wrap(err, "create Role")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -487,7 +486,7 @@ func (*roleBindingFactory) Create(f *framework.Framework, i interface{}) (func()
 		return nil, errors.Wrap(err, "create RoleBinding")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -508,7 +507,7 @@ func (*serviceFactory) Create(f *framework.Framework, i interface{}) (func() err
 		return nil, errors.Wrap(err, "create Service")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -529,7 +528,7 @@ func (*statefulSetFactory) Create(f *framework.Framework, i interface{}) (func()
 		return nil, errors.Wrap(err, "create StatefulSet")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -550,7 +549,7 @@ func (*daemonSetFactory) Create(f *framework.Framework, i interface{}) (func() e
 		return nil, errors.Wrap(err, "create DaemonSet")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -571,28 +570,28 @@ func (*storageClassFactory) Create(f *framework.Framework, i interface{}) (func(
 		return nil, errors.Wrap(err, "create StorageClass")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
 type csiDriverFactory struct{}
 
 func (f *csiDriverFactory) New() runtime.Object {
-	return &storagev1beta1.CSIDriver{}
+	return &storagev1.CSIDriver{}
 }
 
 func (*csiDriverFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*storagev1beta1.CSIDriver)
+	item, ok := i.(*storagev1.CSIDriver)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := f.ClientSet.StorageV1beta1().CSIDrivers()
+	client := f.ClientSet.StorageV1().CSIDrivers()
 	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, errors.Wrap(err, "create CSIDriver")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -613,7 +612,7 @@ func (*secretFactory) Create(f *framework.Framework, i interface{}) (func() erro
 		return nil, errors.Wrap(err, "create Secret")
 	}
 	return func() error {
-		return client.Delete(context.TODO(), item.GetName(), &metav1.DeleteOptions{})
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 
@@ -630,8 +629,8 @@ func PrettyPrint(item interface{}) string {
 // one provided via the KUBE_TEST_REPO_LIST env variable
 func patchContainerImages(containers []v1.Container) error {
 	var err error
-	for _, c := range containers {
-		c.Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
+	for i, c := range containers {
+		containers[i].Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
 		if err != nil {
 			return err
 		}

@@ -38,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
-	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
@@ -48,6 +47,7 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog"
@@ -58,6 +58,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
@@ -118,87 +119,35 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	verflag.PrintAndExitIfRequested()
 	utilflag.PrintFlags(cmd.Flags())
 
-	if len(args) != 0 {
-		fmt.Fprint(os.Stderr, "arguments are not supported\n")
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	if errs := opts.Validate(); len(errs) > 0 {
-		return utilerrors.NewAggregate(errs)
+	cc, sched, err := Setup(ctx, args, opts, registryOptions...)
+	if err != nil {
+		return err
 	}
 
 	if len(opts.WriteConfigTo) > 0 {
-		c := &schedulerserverconfig.Config{}
-		if err := opts.ApplyTo(c); err != nil {
-			return err
-		}
-		if err := options.WriteConfigFile(opts.WriteConfigTo, &c.ComponentConfig); err != nil {
+		if err := options.WriteConfigFile(opts.WriteConfigTo, &cc.ComponentConfig); err != nil {
 			return err
 		}
 		klog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
 		return nil
 	}
 
-	c, err := opts.Config()
-	if err != nil {
-		return err
-	}
+	return Run(ctx, cc, sched)
+}
 
-	// Get the completed config
-	cc := c.Complete()
+// Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
+func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *scheduler.Scheduler) error {
+	// To help debugging, immediately log version
+	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
 		cz.Set(cc.ComponentConfig)
 	} else {
 		return fmt.Errorf("unable to register configz: %s", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	return Run(ctx, cc, registryOptions...)
-}
-
-// Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
-func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTreeRegistryOptions ...Option) error {
-	// To help debugging, immediately log version
-	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
-
-	outOfTreeRegistry := make(framework.Registry)
-	for _, option := range outOfTreeRegistryOptions {
-		if err := option(outOfTreeRegistry); err != nil {
-			return err
-		}
-	}
-
-	// Prepare event clients.
-	if _, err := cc.Client.Discovery().ServerResourcesForGroupVersion(eventsv1beta1.SchemeGroupVersion.String()); err == nil {
-		cc.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: cc.EventClient.Events("")})
-		cc.Recorder = cc.Broadcaster.NewRecorder(scheme.Scheme, cc.ComponentConfig.SchedulerName)
-	} else {
-		recorder := cc.CoreBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: cc.ComponentConfig.SchedulerName})
-		cc.Recorder = record.NewEventRecorderAdapter(recorder)
-	}
-
-	// Create the scheduler.
-	sched, err := scheduler.New(cc.Client,
-		cc.InformerFactory,
-		cc.PodInformer,
-		cc.Recorder,
-		ctx.Done(),
-		scheduler.WithName(cc.ComponentConfig.SchedulerName),
-		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
-		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
-		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
-		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
-		scheduler.WithFrameworkPlugins(cc.ComponentConfig.Plugins),
-		scheduler.WithFrameworkPluginConfig(cc.ComponentConfig.PluginConfig),
-		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
-		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
-	)
-	if err != nil {
-		return err
 	}
 
 	// Prepare the event broadcaster.
@@ -270,7 +219,7 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 // buildHandlerChain wraps the given handler with the standard filters.
 func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
-	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
+	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs)
 
 	handler = genericapifilters.WithAuthorization(handler, authz, legacyscheme.Codecs)
 	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
@@ -330,9 +279,70 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 	return pathRecorderMux
 }
 
-// WithPlugin creates an Option based on plugin name and factory. This function is used to register out-of-tree plugins.
+func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.RecorderFactory {
+	if _, err := cc.Client.Discovery().ServerResourcesForGroupVersion(eventsv1beta1.SchemeGroupVersion.String()); err == nil {
+		cc.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: cc.EventClient.Events("")})
+		return profile.NewRecorderFactory(cc.Broadcaster)
+	}
+	return func(name string) events.EventRecorder {
+		r := cc.CoreBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: name})
+		return record.NewEventRecorderAdapter(r)
+	}
+}
+
+// WithPlugin creates an Option based on plugin name and factory. Please don't remove this function: it is used to register out-of-tree plugins,
+// hence there are no references to it from the kubernetes scheduler code base.
 func WithPlugin(name string, factory framework.PluginFactory) Option {
 	return func(registry framework.Registry) error {
 		return registry.Register(name, factory)
 	}
+}
+
+// Setup creates a completed config and a scheduler based on the command args and options
+func Setup(ctx context.Context, args []string, opts *options.Options, outOfTreeRegistryOptions ...Option) (*schedulerserverconfig.CompletedConfig, *scheduler.Scheduler, error) {
+	if len(args) != 0 {
+		fmt.Fprint(os.Stderr, "arguments are not supported\n")
+	}
+
+	if errs := opts.Validate(); len(errs) > 0 {
+		return nil, nil, utilerrors.NewAggregate(errs)
+	}
+
+	c, err := opts.Config()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Get the completed config
+	cc := c.Complete()
+
+	outOfTreeRegistry := make(framework.Registry)
+	for _, option := range outOfTreeRegistryOptions {
+		if err := option(outOfTreeRegistry); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	recorderFactory := getRecorderFactory(&cc)
+	// Create the scheduler.
+	sched, err := scheduler.New(cc.Client,
+		cc.InformerFactory,
+		cc.PodInformer,
+		recorderFactory,
+		ctx.Done(),
+		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
+		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
+		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
+		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
+		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
+		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
+		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
+		scheduler.WithExtenders(cc.ComponentConfig.Extenders...),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &cc, sched, nil
 }

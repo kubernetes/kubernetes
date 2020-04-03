@@ -6,6 +6,8 @@ go_library(
         "config.go",
         "dynamic.go",
         "flags.go",
+        "flags_unix.go",
+        "flags_windows.go",
         "kubelet.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet",

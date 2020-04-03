@@ -43,7 +43,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	ginkgo.AfterEach(func() {
 		if len(secretNeedClean) > 0 {
 			ginkgo.By("delete the bootstrap token secret")
-			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), secretNeedClean, &metav1.DeleteOptions{})
+			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), secretNeedClean, metav1.DeleteOptions{})
 			secretNeedClean = ""
 			framework.ExpectNoError(err)
 		}

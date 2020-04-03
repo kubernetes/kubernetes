@@ -17,6 +17,7 @@ limitations under the License.
 package certificates
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -47,7 +48,7 @@ func TestCertificateController(t *testing.T) {
 			Reason:  "test reason",
 			Message: "test message",
 		})
-		_, err := client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(csr)
+		_, err := client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}

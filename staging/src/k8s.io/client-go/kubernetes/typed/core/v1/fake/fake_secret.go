@@ -103,7 +103,7 @@ func (c *FakeSecrets) Update(ctx context.Context, secret *corev1.Secret, opts v1
 }
 
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
-func (c *FakeSecrets) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeSecrets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(secretsResource, c.ns, name), &corev1.Secret{})
 
@@ -111,8 +111,8 @@ func (c *FakeSecrets) Delete(ctx context.Context, name string, options *v1.Delet
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeSecrets) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOptions)
+func (c *FakeSecrets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.SecretList{})
 	return err

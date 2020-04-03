@@ -14,7 +14,6 @@ go_library(
         "helpers.go",
         "helpers_linux.go",
         "helpers_unsupported.go",
-        "helpers_windows.go",
         "instrumented_services.go",
         "kuberuntime_container.go",
         "kuberuntime_container_linux.go",
@@ -84,7 +83,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/apis:go_default_library",
-            "//vendor/github.com/docker/docker/pkg/sysinfo:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -131,6 +129,7 @@ go_test(
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",

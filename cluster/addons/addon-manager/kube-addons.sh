@@ -210,13 +210,15 @@ function is_leader() {
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get ep kube-controller-manager \
     -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
-    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}')
+    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/')
   # If there was any problem with getting the leader election results, var will
   # be empty. Since it's better to have multiple addon managers than no addon
   # managers at all, we're going to assume that we're the leader in such case.
   log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
-  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ||
-     "$HOSTNAME" == "$KUBE_CONTROLLER_MANAGER_LEADER" ]]
+  # KUBE_CONTROLLER_MANAGER_LEADER value is in the form "${HOSTNAME}_*"
+  # Here we verify that the value is either empty or is in the expected form for the leader
+  KUBE_CONTROLLER_MANAGER_LEADER="${KUBE_CONTROLLER_MANAGER_LEADER##${HOSTNAME}_*}"
+  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ]]
 }
 
 # The business logic for whether a given object should be created

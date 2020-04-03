@@ -180,7 +180,6 @@ func newNodeLifecycleControllerFromClient(
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
 		useTaints,
-		useTaints,
 	)
 	if err != nil {
 		return nil, err
@@ -734,7 +733,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 					return true, 0
 				})
 			} else {
-				t.Fatalf("Zone %v was unitialized!", zone)
+				t.Fatalf("Zone %v was uninitialized!", zone)
 			}
 		}
 

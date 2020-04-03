@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -211,7 +212,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -259,7 +260,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -296,7 +297,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -366,7 +367,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
-	if err := f.WaitForPodReady(pod.Name); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
 		framework.Failf("Pod did not start running: %v", err)
 	}
 
@@ -378,7 +379,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		Param("ports", "80")
 
 	url := req.URL()
-	ws, err := framework.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
+	ws, err := e2ewebsocket.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
 	if err != nil {
 		framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
 	}

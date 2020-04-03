@@ -23,7 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
 
 func TestGetPodFullName(t *testing.T) {

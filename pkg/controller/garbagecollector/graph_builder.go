@@ -67,8 +67,8 @@ type event struct {
 	gvk    schema.GroupVersionKind
 }
 
-// GraphBuilder: based on the events supplied by the informers, GraphBuilder updates
-// uidToNode, a graph that caches the dependencies as we know, and enqueues
+// GraphBuilder processes events supplied by the informers, updates uidToNode,
+// a graph that caches the dependencies as we know, and enqueues
 // items to the attemptToDelete and attemptToOrphan.
 type GraphBuilder struct {
 	restMapper meta.RESTMapper

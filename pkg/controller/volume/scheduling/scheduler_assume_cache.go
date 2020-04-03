@@ -127,7 +127,7 @@ func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 	return c.indexFunc(objInfo.latestObj)
 }
 
-// NewAssumeCache creates an assume cache for genernal objects.
+// NewAssumeCache creates an assume cache for general objects.
 func NewAssumeCache(informer cache.SharedIndexInformer, description, indexName string, indexFunc cache.IndexFunc) AssumeCache {
 	c := &assumeCache{
 		description: description,

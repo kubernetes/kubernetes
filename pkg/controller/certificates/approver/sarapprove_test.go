@@ -36,54 +36,6 @@ import (
 	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
-func TestHasKubeletUsages(t *testing.T) {
-	cases := []struct {
-		usages   []capi.KeyUsage
-		expected bool
-	}{
-		{
-			usages:   nil,
-			expected: false,
-		},
-		{
-			usages:   []capi.KeyUsage{},
-			expected: false,
-		},
-		{
-			usages: []capi.KeyUsage{
-				capi.UsageKeyEncipherment,
-				capi.UsageDigitalSignature,
-			},
-			expected: false,
-		},
-		{
-			usages: []capi.KeyUsage{
-				capi.UsageKeyEncipherment,
-				capi.UsageDigitalSignature,
-				capi.UsageServerAuth,
-			},
-			expected: false,
-		},
-		{
-			usages: []capi.KeyUsage{
-				capi.UsageKeyEncipherment,
-				capi.UsageDigitalSignature,
-				capi.UsageClientAuth,
-			},
-			expected: true,
-		},
-	}
-	for _, c := range cases {
-		if hasExactUsages(&capi.CertificateSigningRequest{
-			Spec: capi.CertificateSigningRequestSpec{
-				Usages: c.usages,
-			},
-		}, kubeletClientUsages) != c.expected {
-			t.Errorf("unexpected result of hasKubeletUsages(%v), expecting: %v", c.usages, c.expected)
-		}
-	}
-}
-
 func TestHandle(t *testing.T) {
 	cases := []struct {
 		allowed    bool
@@ -208,6 +160,12 @@ func TestRecognizers(t *testing.T) {
 		func(b *csrBuilder) {
 			b.usages = append(b.usages, capi.UsageServerAuth)
 		},
+		func(b *csrBuilder) {
+			b.signerName = "example.com/not-correct"
+		},
+		func(b *csrBuilder) {
+			b.signerName = capi.KubeletServingSignerName
+		},
 	}
 
 	testRecognizer(t, badCases, isNodeClientCert, false)
@@ -230,9 +188,10 @@ func TestRecognizers(t *testing.T) {
 func testRecognizer(t *testing.T, cases []func(b *csrBuilder), recognizeFunc func(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool, shouldRecognize bool) {
 	for _, c := range cases {
 		b := csrBuilder{
-			cn:        "system:node:foo",
-			orgs:      []string{"system:nodes"},
-			requestor: "system:node:foo",
+			signerName: capi.KubeAPIServerClientKubeletSignerName,
+			cn:         "system:node:foo",
+			orgs:       []string{"system:nodes"},
+			requestor:  "system:node:foo",
 			usages: []capi.KeyUsage{
 				capi.UsageKeyEncipherment,
 				capi.UsageDigitalSignature,
@@ -242,7 +201,7 @@ func testRecognizer(t *testing.T, cases []func(b *csrBuilder), recognizeFunc fun
 		c(&b)
 		t.Run(fmt.Sprintf("csr:%#v", b), func(t *testing.T) {
 			csr := makeFancyTestCsr(b)
-			x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr)
+			x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr.Spec.Request)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -262,13 +221,14 @@ func makeTestCsr() *capi.CertificateSigningRequest {
 }
 
 type csrBuilder struct {
-	cn        string
-	orgs      []string
-	requestor string
-	usages    []capi.KeyUsage
-	dns       []string
-	emails    []string
-	ips       []net.IP
+	cn         string
+	orgs       []string
+	requestor  string
+	usages     []capi.KeyUsage
+	dns        []string
+	emails     []string
+	ips        []net.IP
+	signerName string
 }
 
 func makeFancyTestCsr(b csrBuilder) *capi.CertificateSigningRequest {
@@ -290,9 +250,10 @@ func makeFancyTestCsr(b csrBuilder) *capi.CertificateSigningRequest {
 	}
 	return &capi.CertificateSigningRequest{
 		Spec: capi.CertificateSigningRequestSpec{
-			Username: b.requestor,
-			Usages:   b.usages,
-			Request:  pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrb}),
+			Username:   b.requestor,
+			Usages:     b.usages,
+			SignerName: &b.signerName,
+			Request:    pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrb}),
 		},
 	}
 }

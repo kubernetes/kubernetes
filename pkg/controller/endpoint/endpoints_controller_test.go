@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var alwaysReady = func() bool { return true }
@@ -1307,7 +1308,7 @@ func TestPodChanged(t *testing.T) {
 
 	/* dual stack tests */
 	// primary changes, because changing IPs is done by changing sandbox
-	// case 1: add new secondrary IP
+	// case 1: add new secondary IP
 	newPod.Status.PodIP = "1.1.3.1"
 	newPod.Status.PodIPs = []v1.PodIP{
 		{
@@ -1945,6 +1946,55 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "DELETE", nil)
+}
+
+func TestEndpointPortFromServicePort(t *testing.T) {
+	http := utilpointer.StringPtr("http")
+	testCases := map[string]struct {
+		featureGateEnabled           bool
+		serviceAppProtocol           *string
+		expectedEndpointsAppProtocol *string
+	}{
+		"feature gate disabled, empty app protocol": {
+			featureGateEnabled:           false,
+			serviceAppProtocol:           nil,
+			expectedEndpointsAppProtocol: nil,
+		},
+		"feature gate disabled, http app protocol": {
+			featureGateEnabled:           false,
+			serviceAppProtocol:           http,
+			expectedEndpointsAppProtocol: nil,
+		},
+		"feature gate enabled, empty app protocol": {
+			featureGateEnabled:           true,
+			serviceAppProtocol:           nil,
+			expectedEndpointsAppProtocol: nil,
+		},
+		"feature gate enabled, http app protocol": {
+			featureGateEnabled:           true,
+			serviceAppProtocol:           http,
+			expectedEndpointsAppProtocol: http,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.featureGateEnabled)()
+
+			epp := endpointPortFromServicePort(&v1.ServicePort{Name: "test", AppProtocol: tc.serviceAppProtocol}, 80)
+
+			if epp.AppProtocol != tc.expectedEndpointsAppProtocol {
+				t.Errorf("Expected Endpoints AppProtocol to be %s, got %s", stringVal(tc.expectedEndpointsAppProtocol), stringVal(epp.AppProtocol))
+			}
+		})
+	}
+}
+
+func stringVal(str *string) string {
+	if str == nil {
+		return "nil"
+	}
+	return *str
 }
 
 func podChangedHelper(oldPod, newPod *v1.Pod, endpointChanged endpointutil.EndpointsMatch) bool {

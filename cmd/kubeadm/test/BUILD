@@ -33,6 +33,7 @@ filegroup(
         ":package-srcs",
         "//cmd/kubeadm/test/cmd:all-srcs",
         "//cmd/kubeadm/test/kubeconfig:all-srcs",
+        "//cmd/kubeadm/test/resources:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -33,7 +33,7 @@ import (
 // WaitForServiceDeletedWithFinalizer waits for the service with finalizer to be deleted.
 func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
 	ginkgo.By("Delete service with finalizer")
-	if err := cs.CoreV1().Services(namespace).Delete(context.TODO(), name, nil); err != nil {
+	if err := cs.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		framework.Failf("Failed to delete service %s/%s", namespace, name)
 	}
 

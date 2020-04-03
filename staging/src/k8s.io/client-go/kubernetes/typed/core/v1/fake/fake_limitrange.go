@@ -103,7 +103,7 @@ func (c *FakeLimitRanges) Update(ctx context.Context, limitRange *corev1.LimitRa
 }
 
 // Delete takes name of the limitRange and deletes it. Returns an error if one occurs.
-func (c *FakeLimitRanges) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeLimitRanges) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(limitrangesResource, c.ns, name), &corev1.LimitRange{})
 
@@ -111,8 +111,8 @@ func (c *FakeLimitRanges) Delete(ctx context.Context, name string, options *v1.D
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeLimitRanges) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(limitrangesResource, c.ns, listOptions)
+func (c *FakeLimitRanges) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(limitrangesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.LimitRangeList{})
 	return err

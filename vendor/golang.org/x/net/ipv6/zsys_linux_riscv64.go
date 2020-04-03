@@ -86,9 +86,6 @@ const (
 	sysICMPV6_FILTER_BLOCKOTHERS = 0x3
 	sysICMPV6_FILTER_PASSONLY    = 0x4
 
-	sysSOL_SOCKET       = 0x1
-	sysSO_ATTACH_FILTER = 0x1a
-
 	sizeofKernelSockaddrStorage = 0x80
 	sizeofSockaddrInet6         = 0x1c
 	sizeofInet6Pktinfo          = 0x14
@@ -100,8 +97,6 @@ const (
 	sizeofGroupSourceReq = 0x108
 
 	sizeofICMPv6Filter = 0x20
-
-	sizeofSockFprog = 0x10
 )
 
 type kernelSockaddrStorage struct {
@@ -158,16 +153,4 @@ type groupSourceReq struct {
 
 type icmpv6Filter struct {
 	Data [8]uint32
-}
-
-type sockFProg struct {
-	Len    uint16
-	Filter *sockFilter
-}
-
-type sockFilter struct {
-	Code uint16
-	Jt   uint8
-	Jf   uint8
-	K    uint32
 }

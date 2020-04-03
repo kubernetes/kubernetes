@@ -252,7 +252,7 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 			}
 		}
 		if !haveRequired {
-			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher.")
+			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 or TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256).")
 		}
 	}
 
@@ -322,7 +322,7 @@ type ServeConnOpts struct {
 }
 
 func (o *ServeConnOpts) context() context.Context {
-	if o.Context != nil {
+	if o != nil && o.Context != nil {
 		return o.Context
 	}
 	return context.Background()
@@ -2415,7 +2415,11 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 			clen = strconv.Itoa(len(p))
 		}
 		_, hasContentType := rws.snapHeader["Content-Type"]
-		if !hasContentType && bodyAllowedForStatus(rws.status) && len(p) > 0 {
+		// If the Content-Encoding is non-blank, we shouldn't
+		// sniff the body. See Issue golang.org/issue/31753.
+		ce := rws.snapHeader.Get("Content-Encoding")
+		hasCE := len(ce) > 0
+		if !hasCE && !hasContentType && bodyAllowedForStatus(rws.status) && len(p) > 0 {
 			ctype = http.DetectContentType(p)
 		}
 		var date string
@@ -2524,7 +2528,7 @@ const TrailerPrefix = "Trailer:"
 // trailers. That worked for a while, until we found the first major
 // user of Trailers in the wild: gRPC (using them only over http2),
 // and gRPC libraries permit setting trailers mid-stream without
-// predeclarnig them. So: change of plans. We still permit the old
+// predeclaring them. So: change of plans. We still permit the old
 // way, but we also permit this hack: if a Header() key begins with
 // "Trailer:", the suffix of that key is a Trailer. Because ':' is an
 // invalid token byte anyway, there is no ambiguity. (And it's already
@@ -2824,7 +2828,7 @@ func (sc *serverConn) startPush(msg *startPushRequest) {
 	// PUSH_PROMISE frames MUST only be sent on a peer-initiated stream that
 	// is in either the "open" or "half-closed (remote)" state.
 	if msg.parent.state != stateOpen && msg.parent.state != stateHalfClosedRemote {
-		// responseWriter.Push checks that the stream is peer-initiaed.
+		// responseWriter.Push checks that the stream is peer-initiated.
 		msg.done <- errStreamClosed
 		return
 	}

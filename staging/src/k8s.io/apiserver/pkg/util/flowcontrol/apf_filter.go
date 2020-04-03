@@ -21,13 +21,6 @@ import (
 	"strconv"
 	"time"
 
-	// TODO: decide whether to use the existing metrics, which
-	// categorize according to mutating vs readonly, or make new
-	// metrics because this filter does not pay attention to that
-	// distinction
-
-	// "k8s.io/apiserver/pkg/endpoints/metrics"
-
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -109,6 +102,7 @@ func (cfgCtl *configController) Handle(ctx context.Context, requestDigest Reques
 		if queued {
 			metrics.ObserveWaitingDuration(pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 		}
+		metrics.AddDispatch(pl.Name, fs.Name)
 		executed = true
 		startExecutionTime := time.Now()
 		execFn()

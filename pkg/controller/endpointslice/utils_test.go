@@ -353,6 +353,97 @@ func TestServiceControllerKey(t *testing.T) {
 	}
 }
 
+func TestGetEndpointPorts(t *testing.T) {
+	protoTCP := v1.ProtocolTCP
+
+	testCases := map[string]struct {
+		service       *v1.Service
+		pod           *v1.Pod
+		expectedPorts []*discovery.EndpointPort
+	}{
+		"service with AppProtocol on one port": {
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Name:        "http",
+						Port:        80,
+						TargetPort:  intstr.FromInt(80),
+						Protocol:    protoTCP,
+						AppProtocol: utilpointer.StringPtr("example.com/custom-protocol"),
+					}},
+				},
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{},
+					}},
+				},
+			},
+			expectedPorts: []*discovery.EndpointPort{{
+				Name:        utilpointer.StringPtr("http"),
+				Port:        utilpointer.Int32Ptr(80),
+				Protocol:    &protoTCP,
+				AppProtocol: utilpointer.StringPtr("example.com/custom-protocol"),
+			}},
+		},
+		"service with named port and AppProtocol on one port": {
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Name:       "http",
+						Port:       80,
+						TargetPort: intstr.FromInt(80),
+						Protocol:   protoTCP,
+					}, {
+						Name:        "https",
+						Protocol:    protoTCP,
+						TargetPort:  intstr.FromString("https"),
+						AppProtocol: utilpointer.StringPtr("https"),
+					}},
+				},
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
+							Name:          "https",
+							ContainerPort: int32(443),
+							Protocol:      protoTCP,
+						}},
+					}},
+				},
+			},
+			expectedPorts: []*discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}, {
+				Name:        utilpointer.StringPtr("https"),
+				Port:        utilpointer.Int32Ptr(443),
+				Protocol:    &protoTCP,
+				AppProtocol: utilpointer.StringPtr("https"),
+			}},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			actualPorts := getEndpointPorts(tc.service, tc.pod)
+
+			if len(actualPorts) != len(tc.expectedPorts) {
+				t.Fatalf("Expected %d ports, got %d", len(tc.expectedPorts), len(actualPorts))
+			}
+
+			for i, actualPort := range actualPorts {
+				if !reflect.DeepEqual(&actualPort, tc.expectedPorts[i]) {
+					t.Errorf("Expected port: %+v, got %+v", tc.expectedPorts[i], &actualPort)
+				}
+			}
+		})
+	}
+}
+
 // Test helpers
 
 func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {

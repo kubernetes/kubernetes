@@ -16,13 +16,13 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/apis/extender/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
@@ -40,11 +40,11 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/scheduler/apis/extender/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

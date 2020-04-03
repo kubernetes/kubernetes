@@ -115,11 +115,11 @@ func (cqs *ctlTestQueueSet) IsIdle() bool {
 	return cqs.countActive == 0
 }
 
-func (cqs *ctlTestQueueSet) StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (req fq.Request, idle bool) {
+func (cqs *ctlTestQueueSet) StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (req fq.Request, idle bool) {
 	cqs.cts.lock.Lock()
 	defer cqs.cts.lock.Unlock()
 	cqs.countActive++
-	cqs.cts.t.Logf("Queued %#+v %#+v for %p QS=%s, countActive:=%d", descr1, descr2, cqs, cqs.qc.Name, cqs.countActive)
+	cqs.cts.t.Logf("Queued %q %#+v %#+v for %p QS=%s, countActive:=%d", fsName, descr1, descr2, cqs, cqs.qc.Name, cqs.countActive)
 	return &ctlTestRequest{cqs, cqs.qc.Name, descr1, descr2}, false
 }
 

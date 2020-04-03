@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -124,15 +125,22 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		userInfo, _ := request.UserFrom(ctx)
 		transformers := []rest.TransformFunc{}
+
+		// allows skipping managedFields update if the resulting object is too big
+		shouldUpdateManagedFields := true
 		if scope.FieldManager != nil {
 			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
-				obj, err := scope.FieldManager.Update(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-				if err != nil {
-					return nil, fmt.Errorf("failed to update object (Update for %v) managed fields: %v", scope.Kind, err)
+				if shouldUpdateManagedFields {
+					obj, err := scope.FieldManager.Update(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+					if err != nil {
+						return nil, fmt.Errorf("failed to update object (Update for %v) managed fields: %v", scope.Kind, err)
+					}
+					return obj, nil
 				}
-				return obj, nil
+				return newObj, nil
 			})
 		}
+
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)
@@ -149,7 +157,6 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 				}
 				return newObj, nil
 			})
-
 		}
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -167,7 +174,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		trace.Step("About to store object in database")
 		wasCreated := false
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+		requestFunc := func() (runtime.Object, error) {
 			obj, created, err := r.Update(
 				ctx,
 				name,
@@ -184,6 +191,19 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			)
 			wasCreated = created
 			return obj, err
+		}
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			result, err := requestFunc()
+			// If the object wasn't committed to storage because it's serialized size was too large,
+			// it is safe to remove managedFields (which can be large) and try again.
+			if isTooLargeError(err) && scope.FieldManager != nil {
+				if accessor, accessorErr := meta.Accessor(obj); accessorErr == nil {
+					accessor.SetManagedFields(nil)
+					shouldUpdateManagedFields = false
+					result, err = requestFunc()
+				}
+			}
+			return result, err
 		})
 		if err != nil {
 			scope.err(err, w, req)

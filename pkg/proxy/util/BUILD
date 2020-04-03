@@ -50,6 +50,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/proxy/util/iptables:all-srcs",
         "//pkg/proxy/util/testing:all-srcs",
     ],
     tags = ["automanaged"],

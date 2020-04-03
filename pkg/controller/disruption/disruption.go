@@ -292,7 +292,7 @@ func (dc *DisruptionController) getScaleController(controllerRef *metav1.OwnerRe
 	}
 	gr := mapping.Resource.GroupResource()
 
-	scale, err := dc.scaleNamespacer.Scales(namespace).Get(gr, controllerRef.Name)
+	scale, err := dc.scaleNamespacer.Scales(namespace).Get(context.TODO(), gr, controllerRef.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil

@@ -215,6 +215,7 @@ var (
 		"ReservedSystemCPUs",
 		"RuntimeRequestTimeout.Duration",
 		"SerializeImagePulls",
+		"ShowHiddenMetricsForVersion",
 		"StreamingConnectionIdleTimeout.Duration",
 		"SyncFrequency.Duration",
 		"SystemCgroups",

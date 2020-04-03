@@ -41,28 +41,40 @@
     ]
   },
   "spec": {
+    "ingressClassName": "19",
     "backend": {
-      "serviceName": "19",
-      "servicePort": "20"
+      "serviceName": "20",
+      "servicePort": "21",
+      "resource": {
+        "apiGroup": "22",
+        "kind": "23",
+        "name": "24"
+      }
     },
     "tls": [
       {
         "hosts": [
-          "21"
+          "25"
         ],
-        "secretName": "22"
+        "secretName": "26"
       }
     ],
     "rules": [
       {
-        "host": "23",
+        "host": "27",
         "http": {
           "paths": [
             {
-              "path": "24",
+              "path": "28",
+              "pathType": ")晿\u003co,c鮽ort昍řČ",
               "backend": {
-                "serviceName": "25",
-                "servicePort": "26"
+                "serviceName": "29",
+                "servicePort": 1973774989,
+                "resource": {
+                  "apiGroup": "30",
+                  "kind": "31",
+                  "name": "32"
+                }
               }
             }
           ]
@@ -74,8 +86,8 @@
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "27",
-          "hostname": "28"
+          "ip": "33",
+          "hostname": "34"
         }
       ]
     }

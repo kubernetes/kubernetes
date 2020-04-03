@@ -17,12 +17,14 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	core "k8s.io/client-go/testing"
 )
 
-func (c *FakeEvictions) Evict(eviction *policy.Eviction) error {
+func (c *FakeEvictions) Evict(ctx context.Context, eviction *policy.Eviction) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
 	action.Namespace = c.ns

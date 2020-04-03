@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/install"
 	"k8s.io/apiserver/pkg/audit"
@@ -60,11 +61,15 @@ func retryOnError(err error) bool {
 	return false
 }
 
-func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration) (*webhook.GenericWebhook, error) {
+func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration, customDial utilnet.DialFunc) (*webhook.GenericWebhook, error) {
 	w, err := webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, configFile,
-		[]schema.GroupVersion{groupVersion}, initialBackoff)
+		[]schema.GroupVersion{groupVersion}, initialBackoff, customDial)
+	if err != nil {
+		return nil, err
+	}
+
 	w.ShouldRetry = retryOnError
-	return w, err
+	return w, nil
 }
 
 type backend struct {
@@ -86,8 +91,8 @@ func NewDynamicBackend(rc *rest.RESTClient, initialBackoff time.Duration) audit.
 }
 
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
-func NewBackend(kubeConfigFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration) (audit.Backend, error) {
-	w, err := loadWebhook(kubeConfigFile, groupVersion, initialBackoff)
+func NewBackend(kubeConfigFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration, customDial utilnet.DialFunc) (audit.Backend, error) {
+	w, err := loadWebhook(kubeConfigFile, groupVersion, initialBackoff, customDial)
 	if err != nil {
 		return nil, err
 	}

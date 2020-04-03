@@ -66,7 +66,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 
 	if s.ClientCA != nil || s.Cert != nil || len(s.SNICerts) > 0 {
 		dynamicCertificateController := dynamiccertificates.NewDynamicServingCertificateController(
-			*tlsConfig,
+			tlsConfig,
 			s.ClientCA,
 			s.Cert,
 			s.SNICerts,

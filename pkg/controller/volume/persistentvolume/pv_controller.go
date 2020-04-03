@@ -1227,7 +1227,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(volume *v1.Persist
 
 	klog.V(4).Infof("deleteVolumeOperation [%s]: success", volume.Name)
 	// Delete the volume
-	if err = ctrl.kubeClient.CoreV1().PersistentVolumes().Delete(context.TODO(), volume.Name, nil); err != nil {
+	if err = ctrl.kubeClient.CoreV1().PersistentVolumes().Delete(context.TODO(), volume.Name, metav1.DeleteOptions{}); err != nil {
 		// Oops, could not delete the volume and therefore the controller will
 		// try to delete the volume again on next update. We _could_ maintain a
 		// cache of "recently deleted volumes" and avoid unnecessary deletion,

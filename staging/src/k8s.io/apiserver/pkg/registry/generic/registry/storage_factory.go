@@ -17,10 +17,12 @@ limitations under the License.
 package registry
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/klog"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
@@ -48,11 +50,11 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 			return s, d, err
 		}
 		if capacity <= 0 {
-			klog.V(5).Infof("Storage caching is disabled for %T", newFunc())
+			klog.V(5).Infof("Storage caching is disabled for %s", objectTypeToString(newFunc()))
 			return s, d, nil
 		}
 		if klog.V(5) {
-			klog.Infof("Storage caching is enabled for %T with capacity %v", newFunc(), capacity)
+			klog.Infof("Storage caching is enabled for %s with capacity %v", objectTypeToString(newFunc()), capacity)
 		}
 
 		// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
@@ -86,6 +88,17 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 
 		return cacher, destroyFunc, nil
 	}
+}
+
+func objectTypeToString(obj runtime.Object) string {
+	// special-case unstructured objects that tell us their apiVersion/kind
+	if u, isUnstructured := obj.(*unstructured.Unstructured); isUnstructured {
+		if apiVersion, kind := u.GetAPIVersion(), u.GetKind(); len(apiVersion) > 0 && len(kind) > 0 {
+			return fmt.Sprintf("apiVersion=%s, kind=%s", apiVersion, kind)
+		}
+	}
+	// otherwise just return the type
+	return fmt.Sprintf("%T", obj)
 }
 
 // TODO : Remove all the code below when PR

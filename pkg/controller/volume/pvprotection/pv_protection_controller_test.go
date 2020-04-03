@@ -107,7 +107,7 @@ func TestPVProtectionController(t *testing.T) {
 		// Optional client reactors.
 		reactors []reaction
 		// PV event to simulate. This PV will be automatically added to
-		// initalObjects.
+		// initialObjects.
 		updatedPV *v1.PersistentVolume
 		// List of expected kubeclient actions that should happen during the
 		// test.
@@ -220,7 +220,7 @@ func TestPVProtectionController(t *testing.T) {
 			case *v1.PersistentVolume:
 				pvInformer.Informer().GetStore().Add(obj)
 			default:
-				t.Fatalf("Unknown initalObject type: %+v", obj)
+				t.Fatalf("Unknown initialObject type: %+v", obj)
 			}
 		}
 

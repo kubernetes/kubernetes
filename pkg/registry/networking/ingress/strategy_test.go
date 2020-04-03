@@ -31,6 +31,7 @@ func newIngress() networking.Ingress {
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt(80),
 	}
+	implementationPathType := networking.PathTypeImplementationSpecific
 	return networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -48,8 +49,9 @@ func newIngress() networking.Ingress {
 						HTTP: &networking.HTTPIngressRuleValue{
 							Paths: []networking.HTTPIngressPath{
 								{
-									Path:    "/foo",
-									Backend: defaultBackend,
+									Path:     "/foo",
+									PathType: &implementationPathType,
+									Backend:  defaultBackend,
 								},
 							},
 						},
@@ -69,6 +71,11 @@ func newIngress() networking.Ingress {
 
 func TestIngressStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	apiRequest := genericapirequest.RequestInfo{APIGroup: "networking.k8s.io",
+		APIVersion: "v1beta1",
+		Resource:   "ingresses",
+	}
+	ctx = genericapirequest.WithRequestInfo(ctx, &apiRequest)
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Ingress must be namespace scoped")
 	}

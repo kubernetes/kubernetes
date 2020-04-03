@@ -54,7 +54,7 @@ const (
 	extraArgsSeparaterEnvKey = "E2E_EXTRA_ARGS_SEP"
 
 	defaultSkip         = ""
-	defaultFocus        = "[Conformance]"
+	defaultFocus        = "\\[Conformance\\]"
 	defaultProvider     = "local"
 	defaultParallel     = "1"
 	defaultResultsDir   = "/tmp/results"
@@ -63,5 +63,5 @@ const (
 
 	// serialTestsRegexp is the default skip value if running in parallel. Will not
 	// override an explicit E2E_SKIP value.
-	serialTestsRegexp = "[Serial]"
+	serialTestsRegexp = "\\[Serial\\]"
 )

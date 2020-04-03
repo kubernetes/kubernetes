@@ -28,6 +28,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -979,22 +980,27 @@ func (*TrivialNodePrepareStrategy) CleanupDependentObjects(nodeName string, clie
 }
 
 type LabelNodePrepareStrategy struct {
-	LabelKey   string
-	LabelValue string
+	LabelKey      string
+	LabelValues   []string
+	roundRobinIdx int
 }
 
 var _ PrepareNodeStrategy = &LabelNodePrepareStrategy{}
 
-func NewLabelNodePrepareStrategy(labelKey string, labelValue string) *LabelNodePrepareStrategy {
+func NewLabelNodePrepareStrategy(labelKey string, labelValues ...string) *LabelNodePrepareStrategy {
 	return &LabelNodePrepareStrategy{
-		LabelKey:   labelKey,
-		LabelValue: labelValue,
+		LabelKey:    labelKey,
+		LabelValues: labelValues,
 	}
 }
 
 func (s *LabelNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
-	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, s.LabelValue)
+	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, s.LabelValues[s.roundRobinIdx])
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
+	s.roundRobinIdx++
+	if s.roundRobinIdx == len(s.LabelValues) {
+		s.roundRobinIdx = 0
+	}
 	return []byte(patch)
 }
 
@@ -1349,39 +1355,59 @@ func CreatePod(client clientset.Interface, namespace string, podCount int, podTe
 	return createError
 }
 
-func CreatePodWithPersistentVolume(client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod, count int) error {
+func CreatePodWithPersistentVolume(client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod, count int, bindVolume bool) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
 		pvcName := fmt.Sprintf("pvc-%d", i)
-
+		// pvc
+		pvc := claimTemplate.DeepCopy()
+		pvc.Name = pvcName
 		// pv
 		pv := factory(i)
-		// bind to "pvc-$i"
-		pv.Spec.ClaimRef = &v1.ObjectReference{
-			Kind:       "PersistentVolumeClaim",
-			Namespace:  namespace,
-			Name:       pvcName,
-			APIVersion: "v1",
+		// PVs are cluster-wide resources.
+		// Prepend a namespace to make the name globally unique.
+		pv.Name = fmt.Sprintf("%s-%s", namespace, pv.Name)
+		if bindVolume {
+			// bind pv to "pvc-$i"
+			pv.Spec.ClaimRef = &v1.ObjectReference{
+				Kind:       "PersistentVolumeClaim",
+				Namespace:  namespace,
+				Name:       pvcName,
+				APIVersion: "v1",
+			}
+			pv.Status.Phase = v1.VolumeBound
+
+			// bind pvc to "pv-$i"
+			// pvc.Spec.VolumeName = pv.Name
+			pvc.Status.Phase = v1.ClaimBound
+		} else {
+			pv.Status.Phase = v1.VolumeAvailable
 		}
-		pv.Status.Phase = v1.VolumeBound
 		if err := CreatePersistentVolumeWithRetries(client, pv); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = fmt.Errorf("error creating PV: %s", err)
 			return
 		}
+		// We need to update statuses separately, as creating pv/pvc resets status to the default one.
+		if _, err := client.CoreV1().PersistentVolumes().UpdateStatus(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = fmt.Errorf("error updating PV status: %s", err)
+			return
+		}
 
-		// pvc
-		pvc := claimTemplate.DeepCopy()
-		pvc.Name = pvcName
-		// bind to "pv-$i"
-		pvc.Spec.VolumeName = pv.Name
-		pvc.Status.Phase = v1.ClaimBound
 		if err := CreatePersistentVolumeClaimWithRetries(client, namespace, pvc); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = fmt.Errorf("error creating PVC: %s", err)
+			return
+		}
+		if _, err := client.CoreV1().PersistentVolumeClaims(namespace).UpdateStatus(context.TODO(), pvc, metav1.UpdateOptions{}); err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = fmt.Errorf("error updating PVC status: %s", err)
 			return
 		}
 
@@ -1446,9 +1472,50 @@ type volumeFactory func(uniqueID int) *v1.PersistentVolume
 
 func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
-		return CreatePodWithPersistentVolume(client, namespace, claimTemplate, factory, podTemplate, podCount)
+		return CreatePodWithPersistentVolume(client, namespace, claimTemplate, factory, podTemplate, podCount, true /* bindVolume */)
 	}
 }
+
+func makeUnboundPersistentVolumeClaim(storageClass string) *v1.PersistentVolumeClaim {
+	return &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
+			StorageClassName: &storageClass,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+}
+
+func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
+	return func(client clientset.Interface, namespace string, podCount int) error {
+		volumeBindingMode := storage.VolumeBindingWaitForFirstConsumer
+		storageClass := &storage.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "storage-class-1",
+			},
+			Provisioner:       "kubernetes.io/gce-pd",
+			VolumeBindingMode: &volumeBindingMode,
+		}
+		claimTemplate := makeUnboundPersistentVolumeClaim(storageClass.Name)
+
+		if err := CreateStorageClassWithRetries(client, storageClass); err != nil {
+			return fmt.Errorf("failed to create storage class: %v", err)
+		}
+
+		factoryWithStorageClass := func(i int) *v1.PersistentVolume {
+			pv := factory(i)
+			pv.Spec.StorageClassName = storageClass.Name
+			return pv
+		}
+
+		return CreatePodWithPersistentVolume(client, namespace, claimTemplate, factoryWithStorageClass, podTemplate, podCount, false /* bindVolume */)
+	}
+}
+
 func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 	basePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1503,7 +1570,7 @@ func (config *SecretConfig) Run() error {
 }
 
 func (config *SecretConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, api.Kind("Secret"), config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client, api.Kind("Secret"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting secret: %v", err)
 	}
 	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
@@ -1561,7 +1628,7 @@ func (config *ConfigMapConfig) Run() error {
 }
 
 func (config *ConfigMapConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, api.Kind("ConfigMap"), config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client, api.Kind("ConfigMap"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting configmap: %v", err)
 	}
 	config.LogFunc("Deleted configmap %v/%v", config.Namespace, config.Name)

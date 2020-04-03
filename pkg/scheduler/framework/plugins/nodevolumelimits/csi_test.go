@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -579,8 +579,8 @@ func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakelisters.CSINodeLister 
 	return fakelisters.CSINodeLister{}
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *storagev1.CSINode) {
-	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulertypes.NodeInfo, *storagev1.CSINode) {
+	nodeInfo := schedulertypes.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
 		Status: v1.NodeStatus{

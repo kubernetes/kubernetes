@@ -24,9 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 const (
@@ -46,7 +47,7 @@ type Args struct {
 	// Labels are homogeneous for pods that are scheduled to a node.
 	// (i.e. it returns true IFF this pod can be added to this node such that all other pods in
 	// the same service are running on nodes with the exact same values for Labels).
-	AffinityLabels []string `json:"labels,omitempty"`
+	AffinityLabels []string `json:"affinityLabels,omitempty"`
 	// AntiAffinityLabelsPreference are the labels to consider for service anti affinity scoring.
 	AntiAffinityLabelsPreference []string `json:"antiAffinityLabelsPreference,omitempty"`
 }
@@ -109,7 +110,7 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 		return nil, fmt.Errorf("a pod is required to calculate service affinity preFilterState")
 	}
 	// Store services which match the pod.
-	matchingPodServices, err := schedulerlisters.GetPodServices(pl.serviceLister, pod)
+	matchingPodServices, err := helper.GetPodServices(pl.serviceLister, pod)
 	if err != nil {
 		return nil, fmt.Errorf("listing pod services: %v", err.Error())
 	}
@@ -145,7 +146,7 @@ func (pl *ServiceAffinity) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
@@ -166,7 +167,7 @@ func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.Cyc
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *ServiceAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *ServiceAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
@@ -229,7 +230,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 // 		- L is a label that the ServiceAffinity object needs as a matching constraint.
 // 		- L is not defined in the pod itself already.
 // 		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
-func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	if len(pl.args.AffinityLabels) == 0 {
 		return nil
 	}
@@ -282,7 +283,7 @@ func (pl *ServiceAffinity) Score(ctx context.Context, state *framework.CycleStat
 
 	// Pods matched namespace,selector on current node.
 	var selector labels.Selector
-	if services, err := schedulerlisters.GetPodServices(pl.serviceLister, pod); err == nil && len(services) > 0 {
+	if services, err := helper.GetPodServices(pl.serviceLister, pod); err == nil && len(services) > 0 {
 		selector = labels.SelectorFromSet(services[0].Spec.Selector)
 	} else {
 		selector = labels.NewSelector()

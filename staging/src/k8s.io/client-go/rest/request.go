@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -90,6 +91,7 @@ type Request struct {
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
 	timeout     time.Duration
+	maxRetries  int
 
 	// generic components accessible via method setters
 	verb       string
@@ -138,6 +140,7 @@ func NewRequest(c *RESTClient) *Request {
 		backoff:     backoff,
 		timeout:     timeout,
 		pathPrefix:  pathPrefix,
+		maxRetries:  10,
 	}
 
 	switch {
@@ -390,6 +393,18 @@ func (r *Request) Timeout(d time.Duration) *Request {
 	return r
 }
 
+// MaxRetries makes the request use the given integer as a ceiling of retrying upon receiving
+// "Retry-After" headers and 429 status-code in the response. The default is 10 unless this
+// function is specifically called with a different value.
+// A zero maxRetries prevent it from doing retires and return an error immediately.
+func (r *Request) MaxRetries(maxRetries int) *Request {
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	r.maxRetries = maxRetries
+	return r
+}
+
 // Body makes the request use obj as the body. Optional.
 // If obj is a string, try to read a file of that name.
 // If obj is a []byte, send it directly.
@@ -556,36 +571,68 @@ func (r *Request) tryThrottle(ctx context.Context) error {
 		klog.V(3).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 	if latency > extraLongThrottleLatency {
-		globalThrottledLogger.Log(2, fmt.Sprintf("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String()))
+		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
+		// but we use a throttled logger to prevent spamming.
+		globalThrottledLogger.Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
+	metrics.RateLimiterLatency.Observe(r.verb, r.finalURLTemplate(), latency)
 
 	return err
 }
 
-type throttledLogger struct {
-	logTimeLock    sync.RWMutex
-	lastLogTime    time.Time
+type throttleSettings struct {
+	logLevel       klog.Level
 	minLogInterval time.Duration
+
+	lastLogTime time.Time
+	lock        sync.RWMutex
+}
+
+type throttledLogger struct {
+	clock    utilclock.PassiveClock
+	settings []*throttleSettings
 }
 
 var globalThrottledLogger = &throttledLogger{
-	minLogInterval: 1 * time.Second,
+	clock: utilclock.RealClock{},
+	settings: []*throttleSettings{
+		{
+			logLevel:       2,
+			minLogInterval: 1 * time.Second,
+		}, {
+			logLevel:       0,
+			minLogInterval: 10 * time.Second,
+		},
+	},
 }
 
-func (b *throttledLogger) Log(level klog.Level, message string) {
-	if bool(klog.V(level)) {
-		if func() bool {
-			b.logTimeLock.RLock()
-			defer b.logTimeLock.RUnlock()
-			return time.Since(b.lastLogTime) > b.minLogInterval
-		}() {
-			b.logTimeLock.Lock()
-			defer b.logTimeLock.Unlock()
-			if time.Since(b.lastLogTime) > b.minLogInterval {
-				klog.V(level).Info(message)
-				b.lastLogTime = time.Now()
+func (b *throttledLogger) attemptToLog() (klog.Level, bool) {
+	for _, setting := range b.settings {
+		if bool(klog.V(setting.logLevel)) {
+			// Return early without write locking if possible.
+			if func() bool {
+				setting.lock.RLock()
+				defer setting.lock.RUnlock()
+				return b.clock.Since(setting.lastLogTime) >= setting.minLogInterval
+			}() {
+				setting.lock.Lock()
+				defer setting.lock.Unlock()
+				if b.clock.Since(setting.lastLogTime) >= setting.minLogInterval {
+					setting.lastLogTime = b.clock.Now()
+					return setting.logLevel, true
+				}
 			}
+			return -1, false
 		}
+	}
+	return -1, false
+}
+
+// Infof will write a log message at each logLevel specified by the reciever's throttleSettings
+// as long as it hasn't written a log message more recently than minLogInterval.
+func (b *throttledLogger) Infof(message string, args ...interface{}) {
+	if logLevel, ok := b.attemptToLog(); ok {
+		klog.V(logLevel).Infof(message, args...)
 	}
 }
 
@@ -798,7 +845,6 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
-	maxRetries := 10
 	retries := 0
 	for {
 
@@ -835,7 +881,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 				return err
 			}
 			// For connection errors and apiserver shutdown errors retry.
-			if net.IsConnectionReset(err) {
+			if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
 				// For the purpose of retry, we set the artificial "retry-after" response.
 				// TODO: Should we clean the original response if it exists?
 				resp = &http.Response{
@@ -861,7 +907,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			}()
 
 			retries++
-			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
+			if seconds, wait := checkWait(resp); wait && retries <= r.maxRetries {
 				if seeker, ok := r.body.(io.Seeker); ok && r.body != nil {
 					_, err := seeker.Seek(0, 0)
 					if err != nil {

@@ -952,7 +952,7 @@ func TestNeedsUpdate(t *testing.T) {
 			expectedNeedsUpdate: true,
 		},
 		{
-			testName: "If externel ip counts are different",
+			testName: "If external ip counts are different",
 			updateFn: func() {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
@@ -962,7 +962,7 @@ func TestNeedsUpdate(t *testing.T) {
 			expectedNeedsUpdate: true,
 		},
 		{
-			testName: "If externel ips are different",
+			testName: "If external ips are different",
 			updateFn: func() {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()

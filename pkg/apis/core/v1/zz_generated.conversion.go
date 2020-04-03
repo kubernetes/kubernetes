@@ -3226,6 +3226,7 @@ func autoConvert_v1_EndpointPort_To_core_EndpointPort(in *v1.EndpointPort, out *
 	out.Name = in.Name
 	out.Port = in.Port
 	out.Protocol = core.Protocol(in.Protocol)
+	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
 	return nil
 }
 
@@ -3238,6 +3239,7 @@ func autoConvert_core_EndpointPort_To_v1_EndpointPort(in *core.EndpointPort, out
 	out.Name = in.Name
 	out.Port = in.Port
 	out.Protocol = v1.Protocol(in.Protocol)
+	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
 	return nil
 }
 
@@ -5939,6 +5941,7 @@ func autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecu
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	out.Sysctls = *(*[]core.Sysctl)(unsafe.Pointer(&in.Sysctls))
+	out.FSGroupChangePolicy = (*core.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	return nil
 }
 
@@ -5959,6 +5962,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
+	out.FSGroupChangePolicy = (*v1.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	out.Sysctls = *(*[]v1.Sysctl)(unsafe.Pointer(&in.Sysctls))
 	return nil
 }
@@ -7405,6 +7409,7 @@ func Convert_core_ServiceList_To_v1_ServiceList(in *core.ServiceList, out *v1.Se
 func autoConvert_v1_ServicePort_To_core_ServicePort(in *v1.ServicePort, out *core.ServicePort, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Protocol = core.Protocol(in.Protocol)
+	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
 	out.Port = in.Port
 	out.TargetPort = in.TargetPort
 	out.NodePort = in.NodePort
@@ -7419,6 +7424,7 @@ func Convert_v1_ServicePort_To_core_ServicePort(in *v1.ServicePort, out *core.Se
 func autoConvert_core_ServicePort_To_v1_ServicePort(in *core.ServicePort, out *v1.ServicePort, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Protocol = v1.Protocol(in.Protocol)
+	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
 	out.Port = in.Port
 	out.TargetPort = in.TargetPort
 	out.NodePort = in.NodePort

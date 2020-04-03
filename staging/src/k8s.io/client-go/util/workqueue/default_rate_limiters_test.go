@@ -19,8 +19,6 @@ package workqueue
 import (
 	"testing"
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 func TestItemExponentialFailureRateLimiter(t *testing.T) {
@@ -96,33 +94,6 @@ func TestItemExponentialFailureRateLimiterOverFlow(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-}
-
-func TestItemBucketRateLimiter(t *testing.T) {
-	limiter := NewItemBucketRateLimiter(rate.Every(100*time.Millisecond), 1)
-
-	// Use initial burst.
-	if got := limiter.When("one"); got != 0 {
-		t.Errorf("limiter.When(two) = %v; want 0", got)
-	}
-	for i := 0; i < 1000; i++ {
-		limiter.When("one")
-	}
-	// limiter.When should be at this point = 1000 * rate.Limit.
-	// We set the threshold 1s below this value to avoid race conditions.
-	if got, want := limiter.When("one"), 990*100*time.Millisecond; got < want {
-		t.Errorf("limiter.When(one) = %v; want at least %v", got, want)
-	}
-
-	if got := limiter.When("two"); got != 0 {
-		t.Errorf("limiter.When(two) = %v; want 0", got)
-	}
-
-	limiter.Forget("one")
-	// Use new budget.
-	if got := limiter.When("one"); got != 0 {
-		t.Errorf("limiter.When(two) = %v; want 0", got)
-	}
 }
 
 func TestItemFastSlowRateLimiter(t *testing.T) {

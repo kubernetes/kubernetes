@@ -5,6 +5,7 @@ load(
     go_test = "go_test_conditional_pure",
 )
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 
 go_test(
     name = "go_default_test",
@@ -15,7 +16,9 @@ go_test(
     out = "e2e.test",
     embed = [":go_default_library"],
     tags = ["e2e"],
+    x_defs = version_x_defs(),
     deps = [
+        "//staging/src/k8s.io/component-base/version:go_default_library",
         "//test/e2e/apimachinery:go_default_library",
         "//test/e2e/apps:go_default_library",
         "//test/e2e/auth:go_default_library",

@@ -57,8 +57,8 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 			Pid:                 1000,
 			ProcessName:         "fakeProcess",
 			TimeOfDeath:         time.Now(),
-			ContainerName:       recordEventContainerName,
-			VictimContainerName: "some-container",
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
 		},
 	}
 	numExpectedOomEvents := len(oomInstancesToStream)
@@ -109,15 +109,15 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 			Pid:                 1000,
 			ProcessName:         "fakeProcess",
 			TimeOfDeath:         time.Now(),
-			ContainerName:       recordEventContainerName,
-			VictimContainerName: "some-container",
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
 		},
 		{
 			Pid:                 1000,
 			ProcessName:         "fakeProcess",
 			TimeOfDeath:         time.Now(),
-			ContainerName:       "/dont-record-oom-event",
-			VictimContainerName: "some-container",
+			ContainerName:       recordEventContainerName + "kubepods/some-container",
+			VictimContainerName: recordEventContainerName + "kubepods",
 		},
 	}
 	numExpectedOomEvents := len(oomInstancesToStream) - numOomEventsWithIncorrectContainerName
@@ -151,8 +151,8 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 			Pid:                 eventPid,
 			ProcessName:         processName,
 			TimeOfDeath:         time.Now(),
-			ContainerName:       recordEventContainerName,
-			VictimContainerName: "some-container",
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
 		},
 	}
 	numExpectedOomEvents := len(oomInstancesToStream)

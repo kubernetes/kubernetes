@@ -1,5 +1,5 @@
-amd64=gcr.io/kubernetes-e2e-test-images/agnhost-amd64:2.7
-arm=gcr.io/kubernetes-e2e-test-images/agnhost-arm:2.7
-arm64=gcr.io/kubernetes-e2e-test-images/agnhost-arm64:2.7
-ppc64le=gcr.io/kubernetes-e2e-test-images/agnhost-ppc64le:2.7
-s390x=gcr.io/kubernetes-e2e-test-images/agnhost-s390x:2.7
+linux/amd64=REGISTRY/agnhost:2.12-linux-amd64
+linux/arm=REGISTRY/agnhost:2.12-linux-arm
+linux/arm64=REGISTRY/agnhost:2.12-linux-arm64
+linux/ppc64le=REGISTRY/agnhost:2.12-linux-ppc64le
+linux/s390x=REGISTRY/agnhost:2.12-linux-s390x

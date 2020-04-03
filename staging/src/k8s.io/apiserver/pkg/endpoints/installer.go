@@ -381,7 +381,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resourceKind = kind
 	}
 
-	tableProvider, _ := storage.(rest.TableConvertor)
+	tableProvider, isTableProvider := storage.(rest.TableConvertor)
+	if isLister && !isTableProvider {
+		// All listers must implement TableProvider
+		return nil, fmt.Errorf("%q must implement TableConvertor", resource)
+	}
 
 	var apiResource metav1.APIResource
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&

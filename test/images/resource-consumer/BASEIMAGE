@@ -1,5 +1,5 @@
-amd64=k8s.gcr.io/debian-base-amd64:0.4.1
-arm=k8s.gcr.io/debian-base-arm:0.4.1
-arm64=k8s.gcr.io/debian-base-arm64:0.4.1
-ppc64le=k8s.gcr.io/debian-base-ppc64le:0.4.1
-s390x=k8s.gcr.io/debian-base-s390x:0.4.1
+linux/amd64=k8s.gcr.io/debian-base-amd64:0.4.1
+linux/arm=k8s.gcr.io/debian-base-arm:0.4.1
+linux/arm64=k8s.gcr.io/debian-base-arm64:0.4.1
+linux/ppc64le=k8s.gcr.io/debian-base-ppc64le:0.4.1
+linux/s390x=k8s.gcr.io/debian-base-s390x:0.4.1

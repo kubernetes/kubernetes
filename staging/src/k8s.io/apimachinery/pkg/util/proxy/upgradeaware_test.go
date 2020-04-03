@@ -355,6 +355,25 @@ func TestProxyUpgrade(t *testing.T) {
 			ServerFunc:     httptest.NewServer,
 			ProxyTransport: nil,
 		},
+		"both client and server support http2, but force to http/1.1 for upgrade": {
+			ServerFunc: func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(exampleCert, exampleKey)
+				if err != nil {
+					t.Errorf("https (invalid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+					NextProtos:   []string{"http2", "http/1.1"},
+				}
+				ts.StartTLS()
+				return ts
+			},
+			ProxyTransport: utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: &tls.Config{
+				NextProtos:         []string{"http2", "http/1.1"},
+				InsecureSkipVerify: true,
+			}}),
+		},
 		"https (invalid hostname + InsecureSkipVerify)": {
 			ServerFunc: func(h http.Handler) *httptest.Server {
 				cert, err := tls.X509KeyPair(exampleCert, exampleKey)

@@ -61,6 +61,10 @@ type RuntimeHelper interface {
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
 func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
+	// Once a pod has been marked deleted, it should not be restarted
+	if pod.DeletionTimestamp != nil {
+		return false
+	}
 	// Get latest container status.
 	status := podStatus.FindContainerStatusByName(container.Name)
 	// If the container was never started before, we should start it.
@@ -279,7 +283,7 @@ func FormatPod(pod *Pod) string {
 // GetContainerSpec gets the container spec by containerName.
 func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 	var containerSpec *v1.Container
-	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
 		if containerName == c.Name {
 			containerSpec = c
 			return false
@@ -292,7 +296,7 @@ func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 // HasPrivilegedContainer returns true if any of the containers in the pod are privileged.
 func HasPrivilegedContainer(pod *v1.Pod) bool {
 	var hasPrivileged bool
-	podutil.VisitContainers(&pod.Spec, func(c *v1.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
 		if c.SecurityContext != nil && c.SecurityContext.Privileged != nil && *c.SecurityContext.Privileged {
 			hasPrivileged = true
 			return false

@@ -2512,6 +2512,7 @@ func TestAllocGetters(t *testing.T) {
 	testCases := []struct {
 		name string
 
+		isIPv6Primary          bool
 		enableDualStack        bool
 		specExpctPrimary       bool
 		clusterIPExpectPrimary bool
@@ -2519,8 +2520,9 @@ func TestAllocGetters(t *testing.T) {
 		svc *api.Service
 	}{
 		{
-			name: "spec:v4 ip:v4 dualstack:off",
+			name: "spec:v4 ip:v4 dualstack:off isIPv6Primary:false",
 
+			isIPv6Primary:          false,
 			specExpctPrimary:       true,
 			clusterIPExpectPrimary: true,
 			enableDualStack:        false,
@@ -2536,8 +2538,9 @@ func TestAllocGetters(t *testing.T) {
 			},
 		},
 		{
-			name: "spec:v4 ip:v4 dualstack:on",
+			name: "spec:v4 ip:v4 dualstack:on isIPv6Primary:false",
 
+			isIPv6Primary:          false,
 			specExpctPrimary:       true,
 			clusterIPExpectPrimary: true,
 			enableDualStack:        true,
@@ -2554,8 +2557,9 @@ func TestAllocGetters(t *testing.T) {
 		},
 
 		{
-			name: "spec:v4 ip:v6 dualstack:on",
+			name: "spec:v4 ip:v6 dualstack:on isIPv6Primary:false",
 
+			isIPv6Primary:          false,
 			specExpctPrimary:       true,
 			clusterIPExpectPrimary: false,
 			enableDualStack:        true,
@@ -2572,8 +2576,9 @@ func TestAllocGetters(t *testing.T) {
 		},
 
 		{
-			name: "spec:v6 ip:v6 dualstack:on",
+			name: "spec:v6 ip:v6 dualstack:on isIPv6Primary:false",
 
+			isIPv6Primary:          false,
 			specExpctPrimary:       false,
 			clusterIPExpectPrimary: false,
 			enableDualStack:        true,
@@ -2590,8 +2595,9 @@ func TestAllocGetters(t *testing.T) {
 		},
 
 		{
-			name: "spec:v6 ip:v4 dualstack:on",
+			name: "spec:v6 ip:v4 dualstack:on isIPv6Primary:false",
 
+			isIPv6Primary:          false,
 			specExpctPrimary:       false,
 			clusterIPExpectPrimary: true,
 			enableDualStack:        true,
@@ -2606,6 +2612,99 @@ func TestAllocGetters(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "spec:v6 ip:v6 dualstack:off isIPv6Primary:true",
+
+			isIPv6Primary:          true,
+			specExpctPrimary:       true,
+			clusterIPExpectPrimary: true,
+			enableDualStack:        false,
+
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.ServiceSpec{
+					Selector:  map[string]string{"bar": "baz"},
+					Type:      api.ServiceTypeClusterIP,
+					IPFamily:  &ipv6Service,
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+		{
+			name: "spec:v6 ip:v6 dualstack:on isIPv6Primary:true",
+
+			isIPv6Primary:          true,
+			specExpctPrimary:       true,
+			clusterIPExpectPrimary: true,
+			enableDualStack:        true,
+
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.ServiceSpec{
+					Selector:  map[string]string{"bar": "baz"},
+					Type:      api.ServiceTypeClusterIP,
+					IPFamily:  &ipv6Service,
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+
+		{
+			name: "spec:v6 ip:v4 dualstack:on isIPv6Primary:true",
+
+			isIPv6Primary:          true,
+			specExpctPrimary:       true,
+			clusterIPExpectPrimary: false,
+			enableDualStack:        true,
+
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.ServiceSpec{
+					Selector:  map[string]string{"bar": "baz"},
+					Type:      api.ServiceTypeClusterIP,
+					IPFamily:  &ipv6Service,
+					ClusterIP: "10.0.0.1",
+				},
+			},
+		},
+
+		{
+			name: "spec:v4 ip:v4 dualstack:on isIPv6Primary:true",
+
+			isIPv6Primary:          true,
+			specExpctPrimary:       false,
+			clusterIPExpectPrimary: false,
+			enableDualStack:        true,
+
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.ServiceSpec{
+					Selector:  map[string]string{"bar": "baz"},
+					Type:      api.ServiceTypeClusterIP,
+					IPFamily:  &ipv4Service,
+					ClusterIP: "10.0.0.1",
+				},
+			},
+		},
+
+		{
+			name: "spec:v4 ip:v6 dualstack:on isIPv6Primary:true",
+
+			isIPv6Primary:          true,
+			specExpctPrimary:       false,
+			clusterIPExpectPrimary: true,
+			enableDualStack:        true,
+
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				Spec: api.ServiceSpec{
+					Selector:  map[string]string{"bar": "baz"},
+					Type:      api.ServiceTypeClusterIP,
+					IPFamily:  &ipv4Service,
+					ClusterIP: "2000::1",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2613,6 +2712,21 @@ func TestAllocGetters(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			storage, _, server := NewTestREST(t, nil, tc.enableDualStack)
 			defer server.Terminate(t)
+
+			if tc.isIPv6Primary {
+				if storage.secondaryServiceIPs != nil {
+					storage.serviceIPs, storage.secondaryServiceIPs = storage.secondaryServiceIPs, storage.serviceIPs
+				} else {
+					r, err := ipallocator.NewCIDRRange(makeIPNet6(t))
+					if err != nil {
+						t.Fatalf("cannot create CIDR Range(primary) %v", err)
+					}
+					if tc.enableDualStack {
+						storage.secondaryServiceIPs = storage.serviceIPs
+					}
+					storage.serviceIPs = r
+				}
+			}
 
 			if tc.enableDualStack && storage.secondaryServiceIPs == nil {
 				t.Errorf("storage must allocate secondary ServiceIPs allocator for dual stack")

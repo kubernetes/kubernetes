@@ -105,6 +105,10 @@ type ManagerImpl struct {
 
 	// Store of Topology Affinties that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
+
+	// devicesToReuse contains devices that can be reused as they have been allocated to
+	// init containers.
+	devicesToReuse PodReusableDevices
 }
 
 type endpointInfo struct {
@@ -113,6 +117,9 @@ type endpointInfo struct {
 }
 
 type sourcesReadyStub struct{}
+
+// PodReusableDevices is a map by pod name of devices to reuse.
+type PodReusableDevices map[string]map[string]sets.String
 
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
@@ -147,6 +154,7 @@ func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, to
 		podDevices:            make(podDevices),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
+		devicesToReuse:        make(PodReusableDevices),
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
@@ -350,32 +358,41 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 	return false
 }
 
-func (m *ManagerImpl) allocatePodResources(pod *v1.Pod) error {
-	devicesToReuse := make(map[string]sets.String)
-	for _, container := range pod.Spec.InitContainers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
-			return err
-		}
-		m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
-	}
-	for _, container := range pod.Spec.Containers {
-		if err := m.allocateContainerResources(pod, &container, devicesToReuse); err != nil {
-			return err
-		}
-		m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, devicesToReuse)
-	}
-	return nil
-}
-
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
-	pod := attrs.Pod
-	err := m.allocatePodResources(pod)
-	if err != nil {
-		klog.Errorf("Failed to allocate device plugin resource for pod %s: %v", string(pod.UID), err)
+func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
+	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
+		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.String)
+	}
+	// If pod entries to m.devicesToReuse other than the current pod exist, delete them.
+	for podUID := range m.devicesToReuse {
+		if podUID != string(pod.UID) {
+			delete(m.devicesToReuse, podUID)
+		}
+	}
+	// Allocate resources for init containers first as we know the caller always loops
+	// through init containers before looping through app containers. Should the caller
+	// ever change those semantics, this logic will need to be amended.
+	for _, initContainer := range pod.Spec.InitContainers {
+		if container.Name == initContainer.Name {
+			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+				return err
+			}
+			m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+			return nil
+		}
+	}
+	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 		return err
 	}
+	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
+	return nil
+
+}
+
+// UpdatePluginResources updates node resources based on devices already allocated to pods.
+func (m *ManagerImpl) UpdatePluginResources(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	pod := attrs.Pod
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -860,8 +877,8 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 		}
 	}
 	if needsReAllocate {
-		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s", podUID)
-		if err := m.allocatePodResources(pod); err != nil {
+		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s, container %s", podUID, container.Name)
+		if err := m.Allocate(pod, container); err != nil {
 			return nil, err
 		}
 	}

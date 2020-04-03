@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -239,7 +239,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup)
+	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
 	if err != nil {
 		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err

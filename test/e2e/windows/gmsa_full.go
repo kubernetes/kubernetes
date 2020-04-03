@@ -79,7 +79,7 @@ const (
 	gmsaWebhookDeployScriptURL = "https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/admission-webhook/deploy/deploy-gmsa-webhook.sh"
 )
 
-var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Full [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] GMSA Full [Slow]", func() {
 	f := framework.NewDefaultFramework("gmsa-full-test-windows")
 
 	ginkgo.Describe("GMSA support", func() {
@@ -313,7 +313,7 @@ func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
 	}
 
 	cleanUpFunc := func() {
-		f.ClientSet.RbacV1().ClusterRoles().Delete(context.TODO(), roleName, &metav1.DeleteOptions{})
+		f.ClientSet.RbacV1().ClusterRoles().Delete(context.TODO(), roleName, metav1.DeleteOptions{})
 	}
 
 	_, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})

@@ -55,6 +55,7 @@ subsets:
       resourceVersion: "35"
       uid: Ă凗蓏Ŋ蛊ĉy
   ports:
-  - name: "37"
+  - appProtocol: "38"
+    name: "37"
     port: 1546792211
     protocol: '>Ž燹憍峕?狱³-Ǐ忄*'

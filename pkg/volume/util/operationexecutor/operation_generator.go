@@ -20,6 +20,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -541,9 +542,14 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		var fsGroup *int64
-		if volumeToMount.Pod.Spec.SecurityContext != nil &&
-			volumeToMount.Pod.Spec.SecurityContext.FSGroup != nil {
-			fsGroup = volumeToMount.Pod.Spec.SecurityContext.FSGroup
+		var fsGroupChangePolicy *v1.PodFSGroupChangePolicy
+		if podSc := volumeToMount.Pod.Spec.SecurityContext; podSc != nil {
+			if podSc.FSGroup != nil {
+				fsGroup = podSc.FSGroup
+			}
+			if podSc.FSGroupChangePolicy != nil {
+				fsGroupChangePolicy = podSc.FSGroupChangePolicy
+			}
 		}
 
 		devicePath := volumeToMount.DevicePath
@@ -621,8 +627,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		// Execute mount
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
-			FsGroup:     fsGroup,
-			DesiredSize: volumeToMount.DesiredSizeLimit,
+			FsGroup:             fsGroup,
+			DesiredSize:         volumeToMount.DesiredSizeLimit,
+			FSGroupChangePolicy: fsGroupChangePolicy,
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{
@@ -929,7 +936,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
 	}
 
-	mapVolumeFunc := func() (error, error) {
+	mapVolumeFunc := func() (simpleErr error, detailedErr error) {
 		var devicePath string
 		// Set up global map path under the given plugin directory using symbolic link
 		globalMapPath, err :=
@@ -956,6 +963,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
 			mapErr := customBlockVolumeMapper.SetUpDevice()
 			if mapErr != nil {
+				og.markDeviceErrorState(volumeToMount, devicePath, globalMapPath, mapErr, actualStateOfWorld)
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateError("MapVolume.SetUpDevice failed", mapErr)
 			}
@@ -970,14 +978,35 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
 		}
 
+		markVolumeOpts := MarkVolumeOpts{
+			PodName:             volumeToMount.PodName,
+			PodUID:              volumeToMount.Pod.UID,
+			VolumeName:          volumeToMount.VolumeName,
+			BlockVolumeMapper:   blockVolumeMapper,
+			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeSpec:          volumeToMount.VolumeSpec,
+			VolumeMountState:    VolumeMounted,
+		}
+
 		// Call MapPodDevice if blockVolumeMapper implements CustomBlockVolumeMapper
 		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
 			// Execute driver specific map
 			pluginDevicePath, mapErr := customBlockVolumeMapper.MapPodDevice()
 			if mapErr != nil {
 				// On failure, return error. Caller will log and retry.
+				og.markVolumeErrorState(volumeToMount, markVolumeOpts, mapErr, actualStateOfWorld)
 				return volumeToMount.GenerateError("MapVolume.MapPodDevice failed", mapErr)
 			}
+
+			// From now on, the volume is mapped. Mark it as uncertain on error,
+			// so it is is unmapped when corresponding pod is deleted.
+			defer func() {
+				if simpleErr != nil {
+					errText := simpleErr.Error()
+					og.markVolumeErrorState(volumeToMount, markVolumeOpts, volumetypes.NewUncertainProgressError(errText), actualStateOfWorld)
+				}
+			}()
 
 			// if pluginDevicePath is provided, assume attacher may not provide device
 			// or attachment flow uses SetupDevice to get device path
@@ -1042,17 +1071,6 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		if resizeError != nil {
 			klog.Errorf("MapVolume.NodeExpandVolume failed with %v", resizeError)
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed while expanding volume", resizeError)
-		}
-
-		markVolumeOpts := MarkVolumeOpts{
-			PodName:             volumeToMount.PodName,
-			PodUID:              volumeToMount.Pod.UID,
-			VolumeName:          volumeToMount.VolumeName,
-			BlockVolumeMapper:   blockVolumeMapper,
-			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToMount.VolumeGidValue,
-			VolumeSpec:          volumeToMount.VolumeSpec,
-			VolumeMountState:    VolumeMounted,
 		}
 
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
@@ -1191,7 +1209,12 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		globalMapPath := deviceToDetach.DeviceMountPath
 		refs, err := og.blkUtil.GetDeviceBindMountRefs(deviceToDetach.DevicePath, globalMapPath)
 		if err != nil {
-			return deviceToDetach.GenerateError("UnmapDevice.GetDeviceBindMountRefs check failed", err)
+			if os.IsNotExist(err) {
+				// Looks like SetupDevice did not complete. Fall through to TearDownDevice and mark the device as unmounted.
+				refs = nil
+			} else {
+				return deviceToDetach.GenerateError("UnmapDevice.GetDeviceBindMountRefs check failed", err)
+			}
 		}
 		if len(refs) > 0 {
 			err = fmt.Errorf("The device %q is still referenced from other Pods %v", globalMapPath, refs)

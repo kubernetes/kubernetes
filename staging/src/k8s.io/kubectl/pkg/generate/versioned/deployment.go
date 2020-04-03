@@ -26,6 +26,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubectl/pkg/generate"
 )
 
@@ -84,9 +85,21 @@ func buildPodSpec(images []string) v1.PodSpec {
 		if strings.Contains(name, "@") {
 			name = strings.Split(name, "@")[0]
 		}
+		name = sanitizeAndUniquify(name)
 		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
 	}
 	return podSpec
+}
+
+// sanitizeAndUniquify: replaces characters like "." or "_" into "-" to follow DNS1123 rules.
+// Then add random suffix to make it uniquified.
+func sanitizeAndUniquify(name string) string {
+	if strings.Contains(name, "_") || strings.Contains(name, ".") {
+		name = strings.Replace(name, "_", "-", -1)
+		name = strings.Replace(name, ".", "-", -1)
+		name = fmt.Sprintf("%s-%s", name, utilrand.String(5))
+	}
+	return name
 }
 
 // DeploymentBasicGeneratorV1 supports stable generation of a deployment

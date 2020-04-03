@@ -70,6 +70,9 @@ type Cluster struct {
 	LocationOfOrigin string
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
+	// TLSServerName is used to check server certificate. If TLSServerName is empty, the hostname used to contact the server is used.
+	// +optional
+	TLSServerName string `json:"tls-server-name,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`

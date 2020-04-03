@@ -53,7 +53,7 @@ func (la *LeastAllocated) Score(ctx context.Context, state *framework.CycleState
 	// prioritizes based on the minimum of the average of the fraction of requested to capacity.
 	//
 	// Details:
-	// (cpu((capacity-sum(requested))*10/capacity) + memory((capacity-sum(requested))*10/capacity))/2
+	// (cpu((capacity-sum(requested))*MaxNodeScore/capacity) + memory((capacity-sum(requested))*MaxNodeScore/capacity))/weightSum
 	return la.score(pod, nodeInfo)
 }
 
@@ -84,8 +84,8 @@ func leastResourceScorer(requested, allocable resourceToValueMap, includeVolumes
 	return nodeScore / weightSum
 }
 
-// The unused capacity is calculated on a scale of 0-10
-// 0 being the lowest priority and 10 being the highest.
+// The unused capacity is calculated on a scale of 0-MaxNodeScore
+// 0 being the lowest priority and `MaxNodeScore` being the highest.
 // The more unused resources the higher the score is.
 func leastRequestedScore(requested, capacity int64) int64 {
 	if capacity == 0 {

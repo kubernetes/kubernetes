@@ -35,7 +35,8 @@ func NewServiceTagsClient(subscriptionID string) ServiceTagsClient {
 	return NewServiceTagsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewServiceTagsClientWithBaseURI creates an instance of the ServiceTagsClient client.
+// NewServiceTagsClientWithBaseURI creates an instance of the ServiceTagsClient client using a custom endpoint.  Use
+// this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewServiceTagsClientWithBaseURI(baseURI string, subscriptionID string) ServiceTagsClient {
 	return ServiceTagsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -100,8 +101,7 @@ func (client ServiceTagsClient) ListPreparer(ctx context.Context, location strin
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client ServiceTagsClient) ListSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always

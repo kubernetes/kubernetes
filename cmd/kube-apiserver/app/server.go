@@ -45,6 +45,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -52,7 +53,6 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -62,6 +62,7 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/metrics"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
+	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog"
@@ -381,6 +382,16 @@ func CreateKubeAPIServerConfig(
 	if config.GenericConfig.EgressSelector != nil {
 		// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
 		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
+
+		// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		c := proxyTransport.Clone()
+		c.DialContext = dialer
+		config.ExtraConfig.ProxyTransport = c
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
@@ -487,13 +498,13 @@ func buildGenericConfig(
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, versionedInformers)
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, genericConfig.EgressSelector, clientgoExternalClient, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authentication config: %v", err)
 		return
 	}
 
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, versionedInformers)
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
@@ -541,7 +552,7 @@ func buildGenericConfig(
 		lastErr = fmt.Errorf("failed to initialize admission: %v", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnableInflightQuotaHandler {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
 		genericConfig.FlowControl = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
 	}
 
@@ -549,7 +560,7 @@ func buildGenericConfig(
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func BuildAuthenticator(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
 	if err != nil {
 		return nil, nil, err
@@ -566,12 +577,29 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 		versionedInformer.Core().V1().Secrets().Lister().Secrets(v1.NamespaceSystem),
 	)
 
+	if EgressSelector != nil {
+		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
+		if err != nil {
+			return nil, nil, err
+		}
+		authenticatorConfig.CustomDial = egressDialer
+	}
+
 	return authenticatorConfig.New()
 }
 
 // BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
+
+	if EgressSelector != nil {
+		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
+		if err != nil {
+			return nil, nil, err
+		}
+		authorizationConfig.CustomDial = egressDialer
+	}
+
 	return authorizationConfig.New()
 }
 

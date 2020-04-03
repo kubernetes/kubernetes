@@ -245,7 +245,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		ginkgo.AfterEach(func() {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+				f.PodClient().DeleteSync(pod.podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")

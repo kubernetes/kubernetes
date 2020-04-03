@@ -26,6 +26,7 @@ The tool is sponsored by the [marvin + konsorten GmbH](http://www.konsorten.de).
 We thank all the authors who provided code to this library:
 
 * Felix Kollmann
+* Nicolas Perraut
 
 ## License
 

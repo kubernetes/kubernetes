@@ -581,12 +581,28 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 
 	wasCreated := false
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
-	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
+	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)
 		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, options)
 		wasCreated = created
 		return updateObject, updateErr
+	}
+	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
+		result, err := requestFunc()
+		// If the object wasn't committed to storage because it's serialized size was too large,
+		// it is safe to remove managedFields (which can be large) and try again.
+		if isTooLargeError(err) && p.patchType != types.ApplyPatchType {
+			if _, accessorErr := meta.Accessor(p.restPatcher.New()); accessorErr == nil {
+				p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, func(_ context.Context, obj, _ runtime.Object) (runtime.Object, error) {
+					accessor, _ := meta.Accessor(obj)
+					accessor.SetManagedFields(nil)
+					return obj, nil
+				})
+				result, err = requestFunc()
+			}
+		}
+		return result, err
 	})
 	return result, wasCreated, err
 }

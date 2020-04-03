@@ -108,15 +108,15 @@ func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *example2.Tes
 }
 
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
-func (c *FakeTestTypes) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeTestTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(testtypesResource, name), &example2.TestType{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeTestTypes) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(testtypesResource, listOptions)
+func (c *FakeTestTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(testtypesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &example2.TestTypeList{})
 	return err

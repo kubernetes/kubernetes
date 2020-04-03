@@ -18,12 +18,19 @@ package egressselector
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/server/egressselector/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 type fakeEgressSelection struct {
@@ -53,37 +60,19 @@ func TestEgressSelector(t *testing.T) {
 					{
 						Name: "cluster",
 						Connection: apiserver.Connection{
-							Type: "direct",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "",
-								CABundle:   "",
-								ClientKey:  "",
-								ClientCert: "",
-							},
+							ProxyProtocol: apiserver.ProtocolDirect,
 						},
 					},
 					{
 						Name: "master",
 						Connection: apiserver.Connection{
-							Type: "direct",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "",
-								CABundle:   "",
-								ClientKey:  "",
-								ClientCert: "",
-							},
+							ProxyProtocol: apiserver.ProtocolDirect,
 						},
 					},
 					{
 						Name: "etcd",
 						Connection: apiserver.Connection{
-							Type: "direct",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "",
-								CABundle:   "",
-								ClientKey:  "",
-								ClientCert: "",
-							},
+							ProxyProtocol: apiserver.ProtocolDirect,
 						},
 					},
 				},
@@ -180,4 +169,98 @@ func validateDirectDialer(dialer utilnet.DialFunc, s *fakeEgressSelection) (bool
 		return false, nil
 	}
 	return s.directDialerCalled, nil
+}
+
+type fakeProxyServerConnector struct {
+	connectorErr bool
+	proxierErr   bool
+}
+
+func (f *fakeProxyServerConnector) connect() (proxier, error) {
+	if f.connectorErr {
+		return nil, fmt.Errorf("fake error")
+	}
+	return &fakeProxier{err: f.proxierErr}, nil
+}
+
+type fakeProxier struct {
+	err bool
+}
+
+func (f *fakeProxier) proxy(_ string) (net.Conn, error) {
+	if f.err {
+		return nil, fmt.Errorf("fake error")
+	}
+	return nil, nil
+}
+
+func TestMetrics(t *testing.T) {
+	testcases := map[string]struct {
+		connectorErr bool
+		proxierErr   bool
+		metrics      []string
+		want         string
+	}{
+		"connect to proxy server error": {
+			connectorErr: true,
+			proxierErr:   false,
+			metrics:      []string{"apiserver_egress_dialer_dial_failure_count"},
+			want: `
+	# HELP apiserver_egress_dialer_dial_failure_count [ALPHA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
+	# TYPE apiserver_egress_dialer_dial_failure_count counter
+	apiserver_egress_dialer_dial_failure_count{protocol="fake_protocol",stage="connect",transport="fake_transport"} 1
+`,
+		},
+		"connect succeeded, proxy failed": {
+			connectorErr: false,
+			proxierErr:   true,
+			metrics:      []string{"apiserver_egress_dialer_dial_failure_count"},
+			want: `
+	# HELP apiserver_egress_dialer_dial_failure_count [ALPHA] Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed
+	# TYPE apiserver_egress_dialer_dial_failure_count counter
+	apiserver_egress_dialer_dial_failure_count{protocol="fake_protocol",stage="proxy",transport="fake_transport"} 1
+`,
+		},
+		"successful": {
+			connectorErr: false,
+			proxierErr:   false,
+			metrics:      []string{"apiserver_egress_dialer_dial_duration_seconds"},
+			want: `
+            # HELP apiserver_egress_dialer_dial_duration_seconds [ALPHA] Dial latency histogram in seconds, labeled by the protocol (http-connect or grpc), transport (tcp or uds)
+            # TYPE apiserver_egress_dialer_dial_duration_seconds histogram
+            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.005"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.025"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.1"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="0.5"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="2.5"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="12.5"} 1
+            apiserver_egress_dialer_dial_duration_seconds_bucket{protocol="fake_protocol",transport="fake_transport",le="+Inf"} 1
+            apiserver_egress_dialer_dial_duration_seconds_sum{protocol="fake_protocol",transport="fake_transport"} 0
+            apiserver_egress_dialer_dial_duration_seconds_count{protocol="fake_protocol",transport="fake_transport"} 1
+`,
+		},
+	}
+	for tn, tc := range testcases {
+
+		t.Run(tn, func(t *testing.T) {
+			metrics.Metrics.Reset()
+			metrics.Metrics.SetClock(clock.NewFakeClock(time.Now()))
+			d := dialerCreator{
+				connector: &fakeProxyServerConnector{
+					connectorErr: tc.connectorErr,
+					proxierErr:   tc.proxierErr,
+				},
+				options: metricsOptions{
+					transport: "fake_transport",
+					protocol:  "fake_protocol",
+				},
+			}
+			dialer := d.createDialer()
+			dialer(context.TODO(), "", "")
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
+				t.Errorf("Err in comparing metrics %v", err)
+			}
+		})
+	}
+
 }

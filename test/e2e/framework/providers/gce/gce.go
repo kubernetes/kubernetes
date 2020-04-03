@@ -188,7 +188,7 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) erro
 
 func getGCEZoneForGroup(group string) (string, error) {
 	output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "list",
-		"--project="+framework.TestContext.CloudConfig.ProjectID, "--format=value(zone)", "--filter=name="+group).CombinedOutput()
+		"--project="+framework.TestContext.CloudConfig.ProjectID, "--format=value(zone)", "--filter=name="+group).Output()
 	if err != nil {
 		return "", fmt.Errorf("Failed to get zone for node group %s: %s", group, output)
 	}
@@ -216,7 +216,7 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	}
 
 	tags := map[string]string{}
-	if err := p.gceCloud.CreateDisk(pdName, gcecloud.DiskTypeStandard, zone, 2 /* sizeGb */, tags); err != nil {
+	if _, err := p.gceCloud.CreateDisk(pdName, gcecloud.DiskTypeStandard, zone, 2 /* sizeGb */, tags); err != nil {
 		return "", err
 	}
 	return pdName, nil

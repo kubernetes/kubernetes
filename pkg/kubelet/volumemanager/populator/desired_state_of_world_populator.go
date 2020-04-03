@@ -56,8 +56,8 @@ import (
 type DesiredStateOfWorldPopulator interface {
 	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
-	// ReprocessPod removes the specified pod from the list of processedPods
-	// (if it exists) forcing it to be reprocessed. This is required to enable
+	// ReprocessPod sets value for the specified pod in processedPods
+	// to false, forcing it to be reprocessed. This is required to enable
 	// remounting volumes on pod updates (volumes like Downward API volumes
 	// depend on this behavior to ensure volume content is updated).
 	ReprocessPod(podName volumetypes.UniquePodName)
@@ -150,7 +150,7 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	podName volumetypes.UniquePodName) {
-	dswp.deleteProcessedPod(podName)
+	dswp.markPodProcessingFailed(podName)
 }
 
 func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
@@ -362,6 +362,12 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		dswp.actualStateOfWorld.MarkRemountRequired(uniquePodName)
 		// Remove any stored errors for the pod, everything went well in this processPodVolumes
 		dswp.desiredStateOfWorld.PopPodErrors(uniquePodName)
+	} else if dswp.podHasBeenSeenOnce(uniquePodName) {
+		// For the Pod which has been processed at least once, even though some volumes
+		// may not have been reprocessed successfully this round, we still mark it as processed to avoid
+		// processing it at a very high frequency. The pod will be reprocessed when volume manager calls
+		// ReprocessPod() which is triggered by SyncPod.
+		dswp.markPodProcessed(uniquePodName)
 	}
 
 }
@@ -434,14 +440,32 @@ func volumeRequiresFSResize(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolu
 }
 
 // podPreviouslyProcessed returns true if the volumes for this pod have already
-// been processed by the populator
+// been processed/reprocessed by the populator. Otherwise, the volumes for this pod need to
+// be reprocessed.
 func (dswp *desiredStateOfWorldPopulator) podPreviouslyProcessed(
 	podName volumetypes.UniquePodName) bool {
 	dswp.pods.RLock()
 	defer dswp.pods.RUnlock()
 
-	_, exists := dswp.pods.processedPods[podName]
-	return exists
+	return dswp.pods.processedPods[podName]
+}
+
+// markPodProcessingFailed marks the specified pod from processedPods as false to indicate that it failed processing
+func (dswp *desiredStateOfWorldPopulator) markPodProcessingFailed(
+	podName volumetypes.UniquePodName) {
+	dswp.pods.Lock()
+	dswp.pods.processedPods[podName] = false
+	dswp.pods.Unlock()
+}
+
+// podHasBeenSeenOnce returns true if the pod has been seen by the popoulator
+// at least once.
+func (dswp *desiredStateOfWorldPopulator) podHasBeenSeenOnce(
+	podName volumetypes.UniquePodName) bool {
+	dswp.pods.RLock()
+	_, exist := dswp.pods.processedPods[podName]
+	dswp.pods.RUnlock()
+	return exist
 }
 
 // markPodProcessed records that the volumes for the specified pod have been
@@ -541,14 +565,12 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 				podVolume.Name,
 				volumeMode)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-			// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
-			if devices.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeBlock {
-				return nil, nil, "", fmt.Errorf(
-					"volume %s has volumeMode %s, but is specified in volumeDevices",
-					podVolume.Name,
-					volumeMode)
-			}
+		// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
+		if devices.Has(podVolume.Name) && volumeMode != v1.PersistentVolumeBlock {
+			return nil, nil, "", fmt.Errorf(
+				"volume %s has volumeMode %s, but is specified in volumeDevices",
+				podVolume.Name,
+				volumeMode)
 		}
 		return pvc, volumeSpec, volumeGidValue, nil
 	}

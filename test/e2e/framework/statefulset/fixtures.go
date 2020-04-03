@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -159,7 +159,7 @@ func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
 		if pod.Status.Phase != v1.PodRunning {
 			framework.Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
 		}
-		if podutil.IsPodReady(&pod) || !hasPauseProbe(&pod) {
+		if podutils.IsPodReady(&pod) || !hasPauseProbe(&pod) {
 			continue
 		}
 		if resumedPod != "" {

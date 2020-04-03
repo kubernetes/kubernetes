@@ -31,9 +31,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	nodev1beta1listers "k8s.io/client-go/listers/node/v1beta1"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 	nodev1beta1 "k8s.io/kubernetes/pkg/apis/node/v1beta1"
@@ -58,6 +58,10 @@ func Register(plugins *admission.Plugins) {
 type RuntimeClass struct {
 	*admission.Handler
 	runtimeClassLister nodev1beta1listers.RuntimeClassLister
+
+	inspectedFeatures   bool
+	runtimeClassEnabled bool
+	podOverheadEnabled  bool
 }
 
 var _ admission.MutationInterface = &RuntimeClass{}
@@ -65,9 +69,16 @@ var _ admission.ValidationInterface = &RuntimeClass{}
 
 var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &RuntimeClass{}
 
+// InspectFeatureGates allows setting bools without taking a dep on a global variable
+func (r *RuntimeClass) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	r.runtimeClassEnabled = featureGates.Enabled(features.RuntimeClass)
+	r.podOverheadEnabled = featureGates.Enabled(features.PodOverhead)
+	r.inspectedFeatures = true
+}
+
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+	if !r.runtimeClassEnabled {
 		return
 	}
 	runtimeClassInformer := f.Node().V1beta1().RuntimeClasses()
@@ -77,7 +88,10 @@ func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformer
 
 // ValidateInitialization implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) ValidateInitialization() error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+	if !r.inspectedFeatures {
+		return fmt.Errorf("InspectFeatureGates was not called")
+	}
+	if !r.runtimeClassEnabled {
 		return nil
 	}
 	if r.runtimeClassLister == nil {
@@ -88,7 +102,7 @@ func (r *RuntimeClass) ValidateInitialization() error {
 
 // Admit makes an admission decision based on the request attributes
 func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+	if !r.runtimeClassEnabled {
 		return nil
 	}
 
@@ -101,7 +115,7 @@ func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attribute
 	if err != nil {
 		return err
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if r.podOverheadEnabled {
 		if err := setOverhead(attributes, pod, runtimeClass); err != nil {
 			return err
 		}
@@ -116,7 +130,7 @@ func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attribute
 
 // Validate makes sure that pod adhere's to RuntimeClass's definition
 func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+	if !r.runtimeClassEnabled {
 		return nil
 	}
 
@@ -129,7 +143,7 @@ func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attrib
 	if err != nil {
 		return err
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if r.podOverheadEnabled {
 		if err := validateOverhead(attributes, pod, runtimeClass); err != nil {
 			return err
 		}

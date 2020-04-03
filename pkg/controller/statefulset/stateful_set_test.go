@@ -251,7 +251,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	// It should not adopt pods.
 	for _, pod := range pods {
 		if len(pod.OwnerReferences) > 0 {
-			t.Errorf("unexpect pod owner references: %v", pod.OwnerReferences)
+			t.Errorf("unexpected pod owner references: %v", pod.OwnerReferences)
 		}
 	}
 
@@ -265,7 +265,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	}
 	for _, revision := range revisions {
 		if len(revision.OwnerReferences) > 0 {
-			t.Errorf("unexpect revision owner references: %v", revision.OwnerReferences)
+			t.Errorf("unexpected revision owner references: %v", revision.OwnerReferences)
 		}
 	}
 }

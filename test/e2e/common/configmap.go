@@ -212,7 +212,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		}
 		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap in list")
 
-		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
 		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")

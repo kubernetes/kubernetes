@@ -190,16 +190,29 @@ func (d *memCacheClient) refreshLocked() error {
 		return err
 	}
 
+	wg := &sync.WaitGroup{}
+	resultLock := &sync.Mutex{}
 	rl := map[string]*cacheEntry{}
 	for _, g := range gl.Groups {
 		for _, v := range g.Versions {
-			r, err := d.serverResourcesForGroupVersion(v.GroupVersion)
-			rl[v.GroupVersion] = &cacheEntry{r, err}
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", v.GroupVersion, err))
-			}
+			gv := v.GroupVersion
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer utilruntime.HandleCrash()
+
+				r, err := d.serverResourcesForGroupVersion(gv)
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", gv, err))
+				}
+
+				resultLock.Lock()
+				defer resultLock.Unlock()
+				rl[gv] = &cacheEntry{r, err}
+			}()
 		}
 	}
+	wg.Wait()
 
 	d.groupToServerResources, d.groupList = rl, gl
 	d.cacheValid = true

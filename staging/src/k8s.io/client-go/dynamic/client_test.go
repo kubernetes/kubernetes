@@ -18,6 +18,7 @@ package dynamic
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -134,7 +135,7 @@ func TestList(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).List(metav1.ListOptions{})
+		got, err := cl.Resource(resource).Namespace(tc.namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when listing %q: %v", tc.name, err)
 			continue
@@ -209,7 +210,7 @@ func TestGet(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Get(tc.name, metav1.GetOptions{}, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Get(context.TODO(), tc.name, metav1.GetOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when getting %q: %v", tc.name, err)
 			continue
@@ -234,7 +235,7 @@ func TestDelete(t *testing.T) {
 		namespace     string
 		name          string
 		path          string
-		deleteOptions *metav1.DeleteOptions
+		deleteOptions metav1.DeleteOptions
 	}{
 		{
 			name: "normal_delete",
@@ -260,7 +261,7 @@ func TestDelete(t *testing.T) {
 			namespace:     "nstest",
 			name:          "namespaced_delete_with_options",
 			path:          "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_delete_with_options",
-			deleteOptions: &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}, PropagationPolicy: &background},
+			deleteOptions: metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}, PropagationPolicy: &background},
 		},
 	}
 	for _, tc := range tcs {
@@ -283,7 +284,7 @@ func TestDelete(t *testing.T) {
 		}
 		defer srv.Close()
 
-		err = cl.Resource(resource).Namespace(tc.namespace).Delete(tc.name, tc.deleteOptions, tc.subresource...)
+		err = cl.Resource(resource).Namespace(tc.namespace).Delete(context.TODO(), tc.name, tc.deleteOptions, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when deleting %q: %v", tc.name, err)
 			continue
@@ -331,7 +332,7 @@ func TestDeleteCollection(t *testing.T) {
 		}
 		defer srv.Close()
 
-		err = cl.Resource(resource).Namespace(tc.namespace).DeleteCollection(nil, metav1.ListOptions{})
+		err = cl.Resource(resource).Namespace(tc.namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when deleting collection %q: %v", tc.name, err)
 			continue
@@ -404,7 +405,7 @@ func TestCreate(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Create(tc.obj, metav1.CreateOptions{}, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Create(context.TODO(), tc.obj, metav1.CreateOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when creating %q: %v", tc.name, err)
 			continue
@@ -481,7 +482,7 @@ func TestUpdate(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Update(tc.obj, metav1.UpdateOptions{}, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Update(context.TODO(), tc.obj, metav1.UpdateOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when updating %q: %v", tc.name, err)
 			continue
@@ -550,7 +551,7 @@ func TestWatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		watcher, err := cl.Resource(resource).Namespace(tc.namespace).Watch(metav1.ListOptions{})
+		watcher, err := cl.Resource(resource).Namespace(tc.namespace).Watch(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when watching %q: %v", tc.name, err)
 			continue
@@ -640,7 +641,7 @@ func TestPatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource).Namespace(tc.namespace).Patch(tc.name, types.StrategicMergePatchType, tc.patch, metav1.PatchOptions{}, tc.subresource...)
+		got, err := cl.Resource(resource).Namespace(tc.namespace).Patch(context.TODO(), tc.name, types.StrategicMergePatchType, tc.patch, metav1.PatchOptions{}, tc.subresource...)
 		if err != nil {
 			t.Errorf("unexpected error when patching %q: %v", tc.name, err)
 			continue

@@ -83,7 +83,7 @@ func TestConfigMapCreation(t *testing.T) {
 		UpdatedConfigMap   *v1.ConfigMap
 		ExpectActions      []action
 	}{
-		"create new namesapce": {
+		"create new namespace": {
 			AddedNamespace: newNs,
 			ExpectActions:  []action{{verb: "create", name: RootCACertConfigMapName}},
 		},

@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -45,7 +45,6 @@ import (
 
 const (
 	dynamicConsumptionTimeInSeconds = 30
-	staticConsumptionTimeInSeconds  = 3600
 	dynamicRequestSizeInMillicores  = 100
 	dynamicRequestSizeInMegabytes   = 100
 	dynamicRequestSizeCustomMetric  = 10
@@ -64,8 +63,7 @@ const (
 )
 
 var (
-	resourceConsumerImage           = imageutils.GetE2EImage(imageutils.ResourceConsumer)
-	resourceConsumerControllerImage = imageutils.GetE2EImage(imageutils.ResourceController)
+	resourceConsumerImage = imageutils.GetE2EImage(imageutils.ResourceConsumer)
 )
 
 var (
@@ -417,10 +415,10 @@ func (rc *ResourceConsumer) CleanUp() {
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
 	kind := rc.kind.GroupKind()
-	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(rc.clientSet, kind, rc.nsName, rc.name))
-	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name, nil))
-	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(rc.clientSet, api.Kind("ReplicationController"), rc.nsName, rc.controllerName))
-	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.controllerName, nil))
+	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(rc.clientSet, kind, rc.nsName, rc.name))
+	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name, metav1.DeleteOptions{}))
+	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(rc.clientSet, schema.GroupKind{Kind: "ReplicationController"}, rc.nsName, rc.controllerName))
+	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.controllerName, metav1.DeleteOptions{}))
 }
 
 func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string) {
@@ -500,12 +498,12 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 	dnsClusterFirst := v1.DNSClusterFirst
 	controllerRcConfig := testutils.RCConfig{
 		Client:    c,
-		Image:     resourceConsumerControllerImage,
+		Image:     imageutils.GetE2EImage(imageutils.Agnhost),
 		Name:      controllerName,
 		Namespace: ns,
 		Timeout:   timeoutRC,
 		Replicas:  1,
-		Command:   []string{"/controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
+		Command:   []string{"/agnhost", "resource-consumer-controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
 		DNSPolicy: &dnsClusterFirst,
 	}
 	framework.ExpectNoError(e2erc.RunRC(controllerRcConfig))
@@ -541,7 +539,7 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 
 // DeleteHorizontalPodAutoscaler delete the horizontalPodAutoscaler for consuming resources.
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
-	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, nil)
+	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
 }
 
 // runReplicaSet launches (and verifies correctness) of a replicaset.

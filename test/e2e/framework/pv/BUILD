@@ -6,8 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/pv",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/storage/v1/util:go_default_library",
-        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

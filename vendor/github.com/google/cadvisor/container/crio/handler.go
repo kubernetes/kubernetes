@@ -272,6 +272,9 @@ func (self *crioContainerHandler) getFsStats(stats *info.ContainerStats) error {
 		}
 	}
 
+	if fsType == "" {
+		return fmt.Errorf("unable to determine fs type for device: %v", device)
+	}
 	fsStat := info.FsStats{Device: device, Type: fsType, Limit: limit}
 	usage := self.fsHandler.Usage()
 	fsStat.BaseUsage = usage.BaseUsageBytes

@@ -29,7 +29,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog"
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog"
 
@@ -165,13 +164,24 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	return nil
 }
 
+// jsonLog is a log message, typically a single entry from a given log stream.
+// since the data structure is originally from docker, we should be careful to
+// with any changes to jsonLog
+type jsonLog struct {
+	// Log is the log message
+	Log string `json:"log,omitempty"`
+	// Stream is the log source
+	Stream string `json:"stream,omitempty"`
+	// Created is the created timestamp of log
+	Created time.Time `json:"time"`
+}
+
 // parseDockerJSONLog parses logs in Docker JSON log format. Docker JSON log format
 // example:
 //   {"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
 //   {"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
 func parseDockerJSONLog(log []byte, msg *logMessage) error {
-	var l = &jsonlog.JSONLog{}
-	l.Reset()
+	var l = &jsonLog{}
 
 	// TODO: JSON decoding is fairly expensive, we should evaluate this.
 	if err := json.Unmarshal(log, l); err != nil {

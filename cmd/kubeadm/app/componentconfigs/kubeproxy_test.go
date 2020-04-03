@@ -63,6 +63,7 @@ var kubeProxyMarshalCases = []struct {
 			  min: null
 			  tcpCloseWaitTimeout: null
 			  tcpEstablishedTimeout: null
+			detectLocalMode: ""
 			enableProfiling: false
 			healthzBindAddress: ""
 			hostnameOverride: ""
@@ -118,6 +119,7 @@ var kubeProxyMarshalCases = []struct {
 			  min: null
 			  tcpCloseWaitTimeout: null
 			  tcpEstablishedTimeout: null
+			detectLocalMode: ""
 			enableProfiling: true
 			healthzBindAddress: ""
 			hostnameOverride: ""

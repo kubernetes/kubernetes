@@ -27,6 +27,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -172,7 +173,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			f.WaitForPodReady(p.Name)
+			e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
 
 			p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)

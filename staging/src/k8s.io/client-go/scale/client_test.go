@@ -18,6 +18,7 @@ package scale
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -273,7 +274,7 @@ func TestGetScale(t *testing.T) {
 	}
 
 	for _, groupResource := range groupResources {
-		scale, err := scaleClient.Scales("default").Get(groupResource, "foo")
+		scale, err := scaleClient.Scales("default").Get(context.TODO(), groupResource, "foo", metav1.GetOptions{})
 		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", groupResource.String()) {
 			continue
 		}
@@ -301,7 +302,7 @@ func TestUpdateScale(t *testing.T) {
 	}
 
 	for _, groupResource := range groupResources {
-		scale, err := scaleClient.Scales("default").Update(groupResource, expectedScale)
+		scale, err := scaleClient.Scales("default").Update(context.TODO(), groupResource, expectedScale, metav1.UpdateOptions{})
 		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", groupResource.String()) {
 			continue
 		}
@@ -344,7 +345,7 @@ func TestPatchScale(t *testing.T) {
 
 	patch := []byte(`{"spec":{"replicas":5}}`)
 	for _, gvr := range gvrs {
-		scale, err := scaleClient.Scales("default").Patch(gvr, "foo", types.MergePatchType, patch)
+		scale, err := scaleClient.Scales("default").Patch(context.TODO(), gvr, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
 		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", gvr.String()) {
 			continue
 		}
@@ -354,7 +355,7 @@ func TestPatchScale(t *testing.T) {
 
 	patch = []byte(`[{"op":"replace","path":"/spec/replicas","value":5}]`)
 	for _, gvr := range gvrs {
-		scale, err := scaleClient.Scales("default").Patch(gvr, "foo", types.JSONPatchType, patch)
+		scale, err := scaleClient.Scales("default").Patch(context.TODO(), gvr, "foo", types.JSONPatchType, patch, metav1.PatchOptions{})
 		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", gvr.String()) {
 			continue
 		}

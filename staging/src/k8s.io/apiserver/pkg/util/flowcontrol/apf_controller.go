@@ -648,7 +648,7 @@ func (cfgCtl *configController) startRequest(ctx context.Context, rd RequestDige
 			}
 			startWaitingTime = time.Now()
 			klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, numQueues)
-			req, idle := plState.queues.StartRequest(ctx, hashValue, rd.RequestInfo, rd.User)
+			req, idle := plState.queues.StartRequest(ctx, hashValue, fs.Name, rd.RequestInfo, rd.User)
 			if idle {
 				cfgCtl.maybeReapLocked(plName, plState)
 			}

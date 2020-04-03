@@ -35,8 +35,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -48,8 +48,8 @@ import (
 )
 
 var (
-	upgradeTarget = config.Flags.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
-	upgradeImage  = config.Flags.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
+	upgradeTarget = e2econfig.Flags.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
+	upgradeImage  = e2econfig.Flags.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 )
 
 var upgradeTests = []upgrades.Test{
@@ -408,7 +408,7 @@ func finalizeUpgradeTest(start time.Time, tc *junit.TestCase) {
 	}
 
 	switch r := r.(type) {
-	case ginkgowrapper.FailurePanic:
+	case e2eginkgowrapper.FailurePanic:
 		tc.Failures = []*junit.Failure{
 			{
 				Message: r.Message,

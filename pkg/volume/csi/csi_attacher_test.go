@@ -315,8 +315,6 @@ func TestAttacherAttachWithInline(t *testing.T) {
 }
 
 func TestAttacherWithCSIDriver(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
-
 	tests := []struct {
 		name                   string
 		driver                 string
@@ -400,8 +398,6 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 }
 
 func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
-
 	// In order to detect if the volume plugin would skip WaitForAttach for non-attachable drivers,
 	// we do not instantiate any VolumeAttachment. So if the plugin does not skip attach,  WaitForVolumeAttachment
 	// will return an error that volume attachment was not found.
@@ -1553,7 +1549,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 
 	// Start informer for CSIDrivers.
 	factory := informers.NewSharedInformerFactory(fakeClient, CsiResyncPeriod)
-	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	factory.Start(wait.NeverStop)
 
@@ -1576,12 +1572,10 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		// Wait until the informer in CSI volume plugin has all CSIDrivers.
-		wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
-			return csiDriverInformer.Informer().HasSynced(), nil
-		})
-	}
+	// Wait until the informer in CSI volume plugin has all CSIDrivers.
+	wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
+		return csiDriverInformer.Informer().HasSynced(), nil
+	})
 
 	return csiPlug, fakeWatcher, tmpDir, fakeClient
 }

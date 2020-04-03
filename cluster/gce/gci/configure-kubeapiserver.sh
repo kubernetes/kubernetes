@@ -101,9 +101,6 @@ function start-kube-apiserver {
     params+=" --service-account-key-file=${SERVICEACCOUNT_CERT_PATH}"
   fi
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
-  if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
-  fi
 
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]]; then
     params+=" --request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}s"
@@ -277,8 +274,8 @@ function start-kube-apiserver {
   local webhook_authn_config_volume=""
   if [[ -n "${GCP_AUTHN_URL:-}" ]]; then
     params+=" --authentication-token-webhook-config-file=/etc/gcp_authn.config"
-    webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": false},"
-    webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\", \"type\": \"FileOrCreate\"}},"
+    webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": true},"
+    webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\", \"type\": \"File\"}},"
     if [[ -n "${GCP_AUTHN_CACHE_TTL:-}" ]]; then
       params+=" --authentication-token-webhook-cache-ttl=${GCP_AUTHN_CACHE_TTL}"
     fi
@@ -310,8 +307,8 @@ function start-kube-apiserver {
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
     authorization_mode="${authorization_mode},Webhook"
     params+=" --authorization-webhook-config-file=/etc/gcp_authz.config"
-    webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
-    webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\", \"type\": \"FileOrCreate\"}},"
+    webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": true},"
+    webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\", \"type\": \"File\"}},"
     if [[ -n "${GCP_AUTHZ_CACHE_AUTHORIZED_TTL:-}" ]]; then
       params+=" --authorization-webhook-cache-authorized-ttl=${GCP_AUTHZ_CACHE_AUTHORIZED_TTL}"
     fi
@@ -324,11 +321,18 @@ function start-kube-apiserver {
 
   local csc_config_mount=""
   local csc_config_volume=""
+  local default_konnectivity_socket_vol=""
+  local default_konnectivity_socket_mnt=""
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     # Create the EgressSelectorConfiguration yaml file to control the Egress Selector.
     csc_config_mount="{\"name\": \"cscconfigmount\",\"mountPath\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"readOnly\": false},"
     csc_config_volume="{\"name\": \"cscconfigmount\",\"hostPath\": {\"path\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"type\": \"FileOrCreate\"}},"
     params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
+
+    # UDS socket for communication between apiserver and konnectivity-server
+    local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity"
+    default_konnectivity_socket_vol="{ \"name\": \"konnectivity-socket\", \"hostPath\": {\"path\": \"${default_konnectivity_socket_path}\", \"type\": \"DirectoryOrCreate\"}},"
+    default_konnectivity_socket_mnt="{ \"name\": \"konnectivity-socket\", \"mountPath\": \"${default_konnectivity_socket_path}\", \"readOnly\": false},"
   fi
 
   local container_env=""
@@ -377,6 +381,8 @@ function start-kube-apiserver {
   sed -i -e "s@{{audit_webhook_config_volume}}@${audit_webhook_config_volume}@g" "${src_file}"
   sed -i -e "s@{{webhook_exec_auth_plugin_mount}}@${webhook_exec_auth_plugin_mount}@g" "${src_file}"
   sed -i -e "s@{{webhook_exec_auth_plugin_volume}}@${webhook_exec_auth_plugin_volume}@g" "${src_file}"
+  sed -i -e "s@{{konnectivity_socket_mount}}@${default_konnectivity_socket_mnt}@g" "${src_file}"
+  sed -i -e "s@{{konnectivity_socket_volume}}@${default_konnectivity_socket_vol}@g" "${src_file}"
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }

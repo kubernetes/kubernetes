@@ -44,7 +44,6 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,7 +54,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -84,7 +83,7 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 			Capabilities: capabilities,
@@ -328,9 +327,9 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		NodeName:                 node.Name,
 		PodInfo:                  m.podInfo,
 		CanAttach:                &m.attachable,
-		VolumeLifecycleModes: &[]storagev1beta1.VolumeLifecycleMode{
-			storagev1beta1.VolumeLifecyclePersistent,
-			storagev1beta1.VolumeLifecycleEphemeral,
+		VolumeLifecycleModes: &[]storagev1.VolumeLifecycleMode{
+			storagev1.VolumeLifecyclePersistent,
+			storagev1.VolumeLifecycleEphemeral,
 		},
 	}
 	cleanup, err := utils.CreateFromManifests(f, func(item interface{}) error {
@@ -364,7 +363,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			Name:        GCEPDCSIDriverName,
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
 			},
 			SupportedFsType: sets.NewString(

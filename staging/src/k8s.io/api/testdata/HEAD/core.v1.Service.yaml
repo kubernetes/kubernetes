@@ -30,34 +30,35 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  clusterIP: "23"
+  clusterIP: "24"
   externalIPs:
-  - "24"
-  externalName: "27"
+  - "25"
+  externalName: "28"
   externalTrafficPolicy: ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕>Ž
   healthCheckNodePort: -1095807277
   ipFamily: ³-Ǐ忄*齧獚敆ȎțêɘĲ斬
-  loadBalancerIP: "25"
+  loadBalancerIP: "26"
   loadBalancerSourceRanges:
-  - "26"
+  - "27"
   ports:
-  - name: "19"
+  - appProtocol: "20"
+    name: "19"
     nodePort: -474380055
     port: 202283346
     protocol: '@Hr鯹)晿'
-    targetPort: "20"
+    targetPort: "21"
   publishNotReadyAddresses: true
   selector:
-    "21": "22"
+    "22": "23"
   sessionAffinity: ɑ
   sessionAffinityConfig:
     clientIP:
       timeoutSeconds: -1973740160
   topologyKeys:
-  - "28"
+  - "29"
   type: .蘯6ċV夸
 status:
   loadBalancer:
     ingress:
-    - hostname: "30"
-      ip: "29"
+    - hostname: "31"
+      ip: "30"

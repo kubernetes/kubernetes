@@ -73,7 +73,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
+		Use:                   "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a ClusterIP service."),
 		Long:                  serviceClusterIPLong,
@@ -147,7 +147,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
+		Use:                   "nodeport NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a NodePort service."),
 		Long:                  serviceNodePortLong,
@@ -218,7 +218,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
+		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a LoadBalancer service."),
 		Long:                  serviceLoadBalancerLong,
@@ -291,7 +291,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "externalname NAME --external-name external.name [--dry-run]",
+		Use:                   "externalname NAME --external-name external.name [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create an ExternalName service."),
 		Long:                  serviceExternalNameLong,

@@ -144,7 +144,7 @@ func ruleHandle(rule *Rule, req *nl.NetlinkRequest) error {
 		req.AddData(nl.NewRtAttr(nl.FRA_OIFNAME, []byte(rule.OifName)))
 	}
 	if rule.Goto >= 0 {
-		msg.Type = nl.FR_ACT_NOP
+		msg.Type = nl.FR_ACT_GOTO
 		b := make([]byte, 4)
 		native.PutUint32(b, uint32(rule.Goto))
 		req.AddData(nl.NewRtAttr(nl.FRA_GOTO, b))

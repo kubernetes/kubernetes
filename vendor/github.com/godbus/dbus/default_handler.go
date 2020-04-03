@@ -263,13 +263,13 @@ func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal)
 		case <-sh.closeChan:
 			return
 		default:
-			go func() {
+			go func(ch chan<- *Signal) {
 				select {
 				case ch <- signal:
 				case <-sh.closeChan:
 					return
 				}
-			}()
+			}(ch)
 		}
 	}
 }

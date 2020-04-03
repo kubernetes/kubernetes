@@ -53,7 +53,7 @@ func (noRestraint) IsIdle() bool {
 	return false
 }
 
-func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (fq.Request, bool) {
+func (noRestraint) StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (fq.Request, bool) {
 	return noRestraintRequest{}, false
 }
 

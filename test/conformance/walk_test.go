@@ -20,129 +20,163 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/test/conformance/behaviors"
 )
 
-var conformanceCases = []struct {
-	filename string
-	code     string
-	output   []conformanceData
-}{
-	// Go unit test
-	{"test/list/main_test.go", `
-var num = 3
-func Helper(x int) { return x / 0 }
-var _ = Describe("Feature", func() {
-/*
-   Testname: Kubelet-OutputToLogs
-   Description: By default the stdout and stderr from the process
-   being executed in a pod MUST be sent to the pod's logs.
-*/
- framework.ConformanceIt("validates describe with ConformanceIt", func() {})
-})`, []conformanceData{{URL: "https://github.com/kubernetes/kubernetes/tree/master/test/list/main_test.go#L11", TestName: "Kubelet-OutputToLogs",
-		Description: `By default the stdout and stderr from the process
-being executed in a pod MUST be sent to the pod's logs.` + "\n\n"}},
-	},
-	// Describe + It
-	{"e2e/foo.go", `
-var _ = Describe("Feature", func() {
-	//It should have comment
-	framework.ConformanceIt("should work properly", func() {})
-})`, []conformanceData{{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L5", TestName: "Feature should work properly", Description: "It should have comment\n\n"}},
-	},
-	// KubeDescribe + It
-	{"e2e/foo.go", `
-var _ = framework.KubeDescribe("Feature", func() {
-	/*It should have comment*/
-	framework.ConformanceIt("should work properly", func() {})
-})`, []conformanceData{{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L5", TestName: "Feature should work properly", Description: "It should have comment\n\n"}},
-	},
-	// KubeDescribe + Context + It
-	{"e2e/foo.go", `
-var _ = framework.KubeDescribe("Feature", func() {
-	Context("when offline", func() {
-		//Testname: Kubelet-OutputToLogs
-		//Description: By default the stdout and stderr from the process
-		//being executed in a pod MUST be sent to the pod's logs.
-		framework.ConformanceIt("should work", func() {})
-	})
-})`, []conformanceData{{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8", TestName: "Kubelet-OutputToLogs",
-		Description: `By default the stdout and stderr from the process
-being executed in a pod MUST be sent to the pod's logs.` + "\n\n"}},
-	},
-	// SIGDescribe + KubeDescribe + It, Describe + KubeDescribe + It
-	{"e2e/foo.go", `
-var _ = framework.SIGDescribe("Feature", func() {
-	KubeDescribe("Described by", func() {
-		// Description: description1
-		framework.ConformanceIt("A ConformanceIt", func() {})
-	})
-	Describe("Also described via", func() {
-		KubeDescribe("A nested", func() {
-			// Description: description2
-			framework.ConformanceIt("ConformanceIt", func() {})
-		})
-	})
-})`, []conformanceData{
-		{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L6", TestName: "Feature Described by A ConformanceIt", Description: "description1\n\n"},
-		{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L11", TestName: "Feature Also described via A nested ConformanceIt", Description: "description2\n\n"},
-	}},
-	// KubeDescribe + Context + It
-	{"e2e/foo.go", `
-var _ = framework.KubeDescribe("Feature", func() {
-	Context("with context", func() {
-		//Description: By default the stdout and stderr from the process
-		//being executed in a pod MUST be sent to the pod's logs.
-		framework.ConformanceIt("should work", func() {})
-	})
-})`, []conformanceData{{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L7", TestName: "Feature with context should work",
-		Description: `By default the stdout and stderr from the process
-being executed in a pod MUST be sent to the pod's logs.` + "\n\n"}},
-	},
-	{"e2e/foo.go", `
-var _ = framework.KubeDescribe("Feature", func() {
-	Context("with context and extra spaces before It block should still pick up Testname", func() {
-		//					Testname: Test with spaces		
-		//Description: Should pick up testname even if it is not within 3 spaces
-		//even when executed from memory.
-		framework.ConformanceIt("should work", func() {})
-	})
-})`, []conformanceData{{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8", TestName: "Test with spaces",
-		Description: `Should pick up testname even if it is not within 3 spaces
-even when executed from memory.` + "\n\n"}},
-	},
-}
-
 func TestConformance(t *testing.T) {
-	for _, test := range conformanceCases {
-		code := "package test\n" + test.code
-		*confDoc = true
-		tests := scanfile(test.filename, code)
-		if !reflect.DeepEqual(tests, test.output) {
-			t.Errorf("code:\n%s\ngot  %+v\nwant %+v",
-				code, tests, test.output)
-		}
-	}
-}
-
-func TestNormalizeTestNames(t *testing.T) {
-	testCases := []struct {
-		rawName        string
-		normalizedName string
+	for _, tc := range []struct {
+		desc        string
+		filename    string
+		code        string
+		targetFrame frame
+		output      *behaviors.ConformanceData
 	}{
 		{
-			"should have monotonically increasing restart count  [Slow]",
-			"should have monotonically increasing restart count",
+			desc:     "Grabs comment above test",
+			filename: "test/list/main_test.go",
+			code: `package test
+
+	var num = 3
+	func Helper(x int) { return x / 0 }
+	var _ = Describe("Feature", func() {
+	/*
+	   Testname: Kubelet-OutputToLogs
+	   Description: By default the stdout and stderr from the process
+	   being executed in a pod MUST be sent to the pod's logs.
+	*/
+	 framework.ConformanceIt("validates describe with ConformanceIt", func() {})
+	})`,
+			output: &behaviors.ConformanceData{
+				URL:         "https://github.com/kubernetes/kubernetes/tree/master/test/list/main_test.go#L11",
+				TestName:    "Kubelet-OutputToLogs",
+				Description: `By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.`,
+				File:        "test/list/main_test.go",
+			},
+			targetFrame: frame{File: "test/list/main_test.go", Line: 11},
+		}, {
+			desc:     "Handles extra spaces",
+			filename: "e2e/foo.go",
+			code: `package test
+
+	var _ = framework.KubeDescribe("Feature", func() {
+		   Context("with context and extra spaces before It block should still pick up Testname", func() {
+				   //                                      Testname: Test with spaces
+				   //Description: Should pick up testname even if it is not within 3 spaces
+				   //even when executed from memory.
+				   framework.ConformanceIt("should work", func() {})
+		   })
+	})`,
+			output: &behaviors.ConformanceData{
+				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8",
+				TestName:    "Test with spaces",
+				Description: `Should pick up testname even if it is not within 3 spaces even when executed from memory.`,
+				File:        "e2e/foo.go",
+			},
+			targetFrame: frame{File: "e2e/foo.go", Line: 8},
+		}, {
+			desc:     "Should target the correct comment based on the line numbers (second)",
+			filename: "e2e/foo.go",
+			code: `package test
+
+	var _ = framework.KubeDescribe("Feature", func() {
+		   Context("with context and extra spaces before It block should still pick up Testname", func() {
+				   // Testname: First test
+				   // Description: Should pick up testname even if it is not within 3 spaces
+				   // even when executed from memory.
+				   framework.ConformanceIt("should work", func() {})
+
+				   // Testname: Second test
+				   // Description: Should target the correct test/comment based on the line numbers
+				   framework.ConformanceIt("should work", func() {})
+		   })
+	})`,
+			output: &behaviors.ConformanceData{
+				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L13",
+				TestName:    "Second test",
+				Description: `Should target the correct test/comment based on the line numbers`,
+				File:        "e2e/foo.go",
+			},
+			targetFrame: frame{File: "e2e/foo.go", Line: 13},
+		}, {
+			desc:     "Should target the correct comment based on the line numbers (first)",
+			filename: "e2e/foo.go",
+			code: `package test
+
+	var _ = framework.KubeDescribe("Feature", func() {
+		   Context("with context and extra spaces before It block should still pick up Testname", func() {
+				   // Testname: First test
+				   // Description: Should target the correct test/comment based on the line numbers
+				   framework.ConformanceIt("should work", func() {})
+
+				   // Testname: Second test
+				   // Description: Should target the correct test/comment based on the line numbers
+				   framework.ConformanceIt("should work", func() {})
+		   })
+	})`,
+			output: &behaviors.ConformanceData{
+				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8",
+				TestName:    "First test",
+				Description: `Should target the correct test/comment based on the line numbers`,
+				File:        "e2e/foo.go",
+			},
+			targetFrame: frame{File: "e2e/foo.go", Line: 8},
 		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			*confDoc = true
+			cd, err := scanFileForFrame(tc.filename, tc.code, tc.targetFrame)
+			if err != nil {
+				panic(err)
+			}
+			if !reflect.DeepEqual(cd, tc.output) {
+				t.Errorf("code:\n%s\ngot  %+v\nwant %+v",
+					tc.code, cd, tc.output)
+			}
+		})
+	}
+}
+
+func TestCommentToConformanceData(t *testing.T) {
+	tcs := []struct {
+		desc     string
+		input    string
+		expected *behaviors.ConformanceData
+	}{
 		{
-			" should check is all data is printed  ",
-			"should check is all data is printed",
+			desc: "Empty comment leads to nil",
+		}, {
+			desc:  "No Release or Testname leads to nil",
+			input: "Description: foo",
+		}, {
+			desc:  "Release but no Testname should result in nil",
+			input: "Release: v1.1\nDescription: foo",
+		}, {
+			desc:     "Testname but no Release does not result in nil",
+			input:    "Testname: mytest\nDescription: foo",
+			expected: &behaviors.ConformanceData{TestName: "mytest", Description: "foo"},
+		}, {
+			desc:     "All fields parsed and newlines and whitespace removed from description",
+			input:    "Release: v1.1\n\t\tTestname: mytest\n\t\tDescription: foo\n\t\tbar\ndone",
+			expected: &behaviors.ConformanceData{TestName: "mytest", Release: "v1.1", Description: "foo bar done"},
+		}, {
+			desc:     "Behaviors are read",
+			input:    "Testname: behaviors\nBehaviors:\n- should behave\n- second behavior",
+			expected: &behaviors.ConformanceData{TestName: "behaviors", Behaviors: []string{"should behave", "second behavior"}},
+		}, {
+			desc:     "Multiple behaviors are parsed",
+			input:    "Testname: behaviors2\nBehaviors:\n- first behavior\n- second behavior",
+			expected: &behaviors.ConformanceData{TestName: "behaviors2", Behaviors: []string{"first behavior", "second behavior"}},
 		},
 	}
-	for i, tc := range testCases {
-		actualName := normalizeTestName(tc.rawName)
-		if actualName != tc.normalizedName {
-			t.Errorf("test case[%d]: expected normalized name %q, got %q", i, tc.normalizedName, actualName)
-		}
+
+	for _, tc := range tcs {
+		t.Run(tc.desc, func(t *testing.T) {
+			out := commentToConformanceData(tc.input)
+			if !reflect.DeepEqual(out, tc.expected) {
+				t.Errorf("Expected %#v but got %#v", tc.expected, out)
+			}
+		})
 	}
 }
 

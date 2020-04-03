@@ -36,7 +36,9 @@ func NewPrivateLinkResourcesClient(subscriptionID string) PrivateLinkResourcesCl
 	return NewPrivateLinkResourcesClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewPrivateLinkResourcesClientWithBaseURI creates an instance of the PrivateLinkResourcesClient client.
+// NewPrivateLinkResourcesClientWithBaseURI creates an instance of the PrivateLinkResourcesClient client using a custom
+// endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure
+// stack).
 func NewPrivateLinkResourcesClientWithBaseURI(baseURI string, subscriptionID string) PrivateLinkResourcesClient {
 	return PrivateLinkResourcesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -116,8 +118,7 @@ func (client PrivateLinkResourcesClient) ListByStorageAccountPreparer(ctx contex
 // ListByStorageAccountSender sends the ListByStorageAccount request. The method will close the
 // http.Response Body if it receives an error.
 func (client PrivateLinkResourcesClient) ListByStorageAccountSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListByStorageAccountResponder handles the response to the ListByStorageAccount request. The method always

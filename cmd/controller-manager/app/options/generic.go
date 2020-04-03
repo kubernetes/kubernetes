@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	cliflag "k8s.io/component-base/cli/flag"
-	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
@@ -39,9 +38,7 @@ type GenericControllerManagerConfigurationOptions struct {
 func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
 		GenericControllerManagerConfiguration: cfg,
-		Debugging: &DebuggingOptions{
-			DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{},
-		},
+		Debugging:                             RecommendedDebuggingOptions(),
 	}
 
 	return o

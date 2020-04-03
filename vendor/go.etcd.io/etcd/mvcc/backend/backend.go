@@ -369,13 +369,27 @@ func (b *backend) defrag() error {
 
 	b.batchTx.tx = nil
 
-	tmpdb, err := bolt.Open(b.db.Path()+".tmp", 0600, boltOpenOptions)
+	// Create a temporary file to ensure we start with a clean slate.
+	// Snapshotter.cleanupSnapdir cleans up any of these that are found during startup.
+	dir := filepath.Dir(b.db.Path())
+	temp, err := ioutil.TempFile(dir, "db.tmp.*")
+	if err != nil {
+		return err
+	}
+	options := bolt.Options{}
+	if boltOpenOptions != nil {
+		options = *boltOpenOptions
+	}
+	options.OpenFile = func(path string, i int, mode os.FileMode) (file *os.File, err error) {
+		return temp, nil
+	}
+	tdbp := temp.Name()
+	tmpdb, err := bolt.Open(tdbp, 0600, &options)
 	if err != nil {
 		return err
 	}
 
 	dbp := b.db.Path()
-	tdbp := tmpdb.Path()
 	size1, sizeInUse1 := b.Size(), b.SizeInUse()
 	if b.lg != nil {
 		b.lg.Info(
@@ -387,11 +401,17 @@ func (b *backend) defrag() error {
 			zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse1))),
 		)
 	}
-
+	// gofail: var defragBeforeCopy struct{}
 	err = defragdb(b.db, tmpdb, defragLimit)
 	if err != nil {
 		tmpdb.Close()
-		os.RemoveAll(tmpdb.Path())
+		if rmErr := os.RemoveAll(tmpdb.Path()); rmErr != nil {
+			if b.lg != nil {
+				b.lg.Error("failed to remove db.tmp after defragmentation completed", zap.Error(rmErr))
+			} else {
+				plog.Fatalf("failed to remove db.tmp after defragmentation completed: %v", rmErr)
+			}
+		}
 		return err
 	}
 
@@ -411,6 +431,7 @@ func (b *backend) defrag() error {
 			plog.Fatalf("cannot close database (%s)", err)
 		}
 	}
+	// gofail: var defragBeforeRename struct{}
 	err = os.Rename(tdbp, dbp)
 	if err != nil {
 		if b.lg != nil {

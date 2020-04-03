@@ -35,7 +35,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/system"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
@@ -296,7 +295,7 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
 

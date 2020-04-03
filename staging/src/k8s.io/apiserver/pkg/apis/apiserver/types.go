@@ -71,29 +71,78 @@ type EgressSelection struct {
 
 // Connection provides the configuration for a single egress selection client.
 type Connection struct {
-	// Type is the type of connection used to connect from client to konnectivity server.
-	// Currently supported values are "http-connect" and "direct".
-	Type string
+	// Protocol is the protocol used to connect from client to the konnectivity server.
+	ProxyProtocol ProtocolType
 
-	// httpConnect is the config needed to use http-connect to the konnectivity server.
+	// Transport defines the transport configurations we use to dial to the konnectivity server.
+	// This is required if ProxyProtocol is HTTPConnect or GRPC.
 	// +optional
-	HTTPConnect *HTTPConnectConfig
+	Transport *Transport
 }
 
-type HTTPConnectConfig struct {
+// ProtocolType is a set of valid values for Connection.ProtocolType
+type ProtocolType string
+
+// Valid types for ProtocolType for konnectivity server
+const (
+	// Use HTTPConnect to connect to konnectivity server
+	ProtocolHTTPConnect ProtocolType = "HTTPConnect"
+	// Use grpc to connect to konnectivity server
+	ProtocolGRPC ProtocolType = "GRPC"
+	// Connect directly (skip konnectivity server)
+	ProtocolDirect ProtocolType = "Direct"
+)
+
+// Transport defines the transport configurations we use to dial to the konnectivity server
+type Transport struct {
+	// TCP is the TCP configuration for communicating with the konnectivity server via TCP
+	// ProxyProtocol of GRPC is not supported with TCP transport at the moment
+	// Requires at least one of TCP or UDS to be set
+	// +optional
+	TCP *TCPTransport
+
+	// UDS is the UDS configuration for communicating with the konnectivity server via UDS
+	// Requires at least one of TCP or UDS to be set
+	// +optional
+	UDS *UDSTransport
+}
+
+// TCPTransport provides the information to connect to konnectivity server via TCP
+type TCPTransport struct {
 	// URL is the location of the konnectivity server to connect to.
 	// As an example it might be "https://127.0.0.1:8131"
 	URL string
 
-	// CABundle is the file location of the CA to be used to determine trust with the konnectivity server.
+	// TLSConfig is the config needed to use TLS when connecting to konnectivity server
+	// +optional
+	TLSConfig *TLSConfig
+}
+
+// UDSTransport provides the information to connect to konnectivity server via UDS
+type UDSTransport struct {
+	// UDSName is the name of the unix domain socket to connect to konnectivity server
+	// This does not use a unix:// prefix. (Eg: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket)
+	UDSName string
+}
+
+// TLSConfig provides the authentication information to connect to konnectivity server
+// Only used with TCPTransport
+type TLSConfig struct {
+	// caBundle is the file location of the CA to be used to determine trust with the konnectivity server.
+	// Must be absent/empty if TCPTransport.URL is prefixed with http://
+	// If absent while TCPTransport.URL is prefixed with https://, default to system trust roots.
 	// +optional
 	CABundle string
 
-	// ClientKey is the file location of the client key to be used in mtls handshakes with the konnectivity server.
+	// clientKey is the file location of the client key to authenticate with the konnectivity server
+	// Must be absent/empty if TCPTransport.URL is prefixed with http://
+	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientKey string
 
-	// ClientCert is the file location of the client certificate to be used in mtls handshakes with the konnectivity server.
+	// clientCert is the file location of the client certificate to authenticate with the konnectivity server
+	// Must be absent/empty if TCPTransport.URL is prefixed with http://
+	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientCert string
 }

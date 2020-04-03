@@ -297,16 +297,19 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 		return nil
 	}
 
-	if !az.ipv6DualStackEnabled {
+	CIDRv6 := utilnet.IsIPv6CIDRString(string(kubeRoute.DestinationCIDR))
+	// if single stack IPv4 then get the IP for the primary ip config
+	// single stack IPv6 is supported on dual stack host. So the IPv6 IP is secondary IP for both single stack IPv6 and dual stack
+	// Get all private IPs for the machine and find the first one that matches the IPv6 family
+	if !az.ipv6DualStackEnabled && !CIDRv6 {
 		targetIP, _, err = az.getIPForMachine(kubeRoute.TargetNode)
 		if err != nil {
 			return err
 		}
 	} else {
-		// for dual stack we need to select
+		// for dual stack and single stack IPv6 we need to select
 		// a private ip that matches family of the cidr
 		klog.V(4).Infof("CreateRoute: create route instance=%q cidr=%q is in dual stack mode", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
-		CIDRv6 := utilnet.IsIPv6CIDRString(string(kubeRoute.DestinationCIDR))
 		nodePrivateIPs, err := az.getPrivateIPsForMachine(kubeRoute.TargetNode)
 		if nil != err {
 			klog.V(3).Infof("CreateRoute: create route: failed(GetPrivateIPsByNodeName) instance=%q cidr=%q with error=%v", kubeRoute.TargetNode, kubeRoute.DestinationCIDR, err)

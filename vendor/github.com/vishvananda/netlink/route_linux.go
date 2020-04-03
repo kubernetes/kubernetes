@@ -32,6 +32,7 @@ const (
 	RT_FILTER_SRC
 	RT_FILTER_GW
 	RT_FILTER_TABLE
+	RT_FILTER_HOPLIMIT
 )
 
 const (
@@ -207,6 +208,7 @@ func (e *SEG6Encap) Decode(buf []byte) error {
 	}
 	buf = buf[:l] // make sure buf size upper limit is Length
 	typ := native.Uint16(buf[2:])
+	// LWTUNNEL_ENCAP_SEG6 has only one attr type SEG6_IPTUNNEL_SRH
 	if typ != nl.SEG6_IPTUNNEL_SRH {
 		return fmt.Errorf("unknown SEG6 Type: %d", typ)
 	}
@@ -255,6 +257,188 @@ func (e *SEG6Encap) Equal(x Encap) bool {
 		if !e.Segments[i].Equal(o.Segments[i]) {
 			return false
 		}
+	}
+	return true
+}
+
+// SEG6LocalEncap definitions
+type SEG6LocalEncap struct {
+	Flags    [nl.SEG6_LOCAL_MAX]bool
+	Action   int
+	Segments []net.IP // from SRH in seg6_local_lwt
+	Table    int      // table id for End.T and End.DT6
+	InAddr   net.IP
+	In6Addr  net.IP
+	Iif      int
+	Oif      int
+}
+
+func (e *SEG6LocalEncap) Type() int {
+	return nl.LWTUNNEL_ENCAP_SEG6_LOCAL
+}
+func (e *SEG6LocalEncap) Decode(buf []byte) error {
+	attrs, err := nl.ParseRouteAttr(buf)
+	if err != nil {
+		return err
+	}
+	native := nl.NativeEndian()
+	for _, attr := range attrs {
+		switch attr.Attr.Type {
+		case nl.SEG6_LOCAL_ACTION:
+			e.Action = int(native.Uint32(attr.Value[0:4]))
+			e.Flags[nl.SEG6_LOCAL_ACTION] = true
+		case nl.SEG6_LOCAL_SRH:
+			e.Segments, err = nl.DecodeSEG6Srh(attr.Value[:])
+			e.Flags[nl.SEG6_LOCAL_SRH] = true
+		case nl.SEG6_LOCAL_TABLE:
+			e.Table = int(native.Uint32(attr.Value[0:4]))
+			e.Flags[nl.SEG6_LOCAL_TABLE] = true
+		case nl.SEG6_LOCAL_NH4:
+			e.InAddr = net.IP(attr.Value[0:4])
+			e.Flags[nl.SEG6_LOCAL_NH4] = true
+		case nl.SEG6_LOCAL_NH6:
+			e.In6Addr = net.IP(attr.Value[0:16])
+			e.Flags[nl.SEG6_LOCAL_NH6] = true
+		case nl.SEG6_LOCAL_IIF:
+			e.Iif = int(native.Uint32(attr.Value[0:4]))
+			e.Flags[nl.SEG6_LOCAL_IIF] = true
+		case nl.SEG6_LOCAL_OIF:
+			e.Oif = int(native.Uint32(attr.Value[0:4]))
+			e.Flags[nl.SEG6_LOCAL_OIF] = true
+		}
+	}
+	return err
+}
+func (e *SEG6LocalEncap) Encode() ([]byte, error) {
+	var err error
+	native := nl.NativeEndian()
+	res := make([]byte, 8)
+	native.PutUint16(res, 8) // length
+	native.PutUint16(res[2:], nl.SEG6_LOCAL_ACTION)
+	native.PutUint32(res[4:], uint32(e.Action))
+	if e.Flags[nl.SEG6_LOCAL_SRH] {
+		srh, err := nl.EncodeSEG6Srh(e.Segments)
+		if err != nil {
+			return nil, err
+		}
+		attr := make([]byte, 4)
+		native.PutUint16(attr, uint16(len(srh)+4))
+		native.PutUint16(attr[2:], nl.SEG6_LOCAL_SRH)
+		attr = append(attr, srh...)
+		res = append(res, attr...)
+	}
+	if e.Flags[nl.SEG6_LOCAL_TABLE] {
+		attr := make([]byte, 8)
+		native.PutUint16(attr, 8)
+		native.PutUint16(attr[2:], nl.SEG6_LOCAL_TABLE)
+		native.PutUint32(attr[4:], uint32(e.Table))
+		res = append(res, attr...)
+	}
+	if e.Flags[nl.SEG6_LOCAL_NH4] {
+		attr := make([]byte, 4)
+		native.PutUint16(attr, 8)
+		native.PutUint16(attr[2:], nl.SEG6_LOCAL_NH4)
+		ipv4 := e.InAddr.To4()
+		if ipv4 == nil {
+			err = fmt.Errorf("SEG6_LOCAL_NH4 has invalid IPv4 address")
+			return nil, err
+		}
+		attr = append(attr, ipv4...)
+		res = append(res, attr...)
+	}
+	if e.Flags[nl.SEG6_LOCAL_NH6] {
+		attr := make([]byte, 4)
+		native.PutUint16(attr, 20)
+		native.PutUint16(attr[2:], nl.SEG6_LOCAL_NH6)
+		attr = append(attr, e.In6Addr...)
+		res = append(res, attr...)
+	}
+	if e.Flags[nl.SEG6_LOCAL_IIF] {
+		attr := make([]byte, 8)
+		native.PutUint16(attr, 8)
+		native.PutUint16(attr[2:], nl.SEG6_LOCAL_IIF)
+		native.PutUint32(attr[4:], uint32(e.Iif))
+		res = append(res, attr...)
+	}
+	if e.Flags[nl.SEG6_LOCAL_OIF] {
+		attr := make([]byte, 8)
+		native.PutUint16(attr, 8)
+		native.PutUint16(attr[2:], nl.SEG6_LOCAL_OIF)
+		native.PutUint32(attr[4:], uint32(e.Oif))
+		res = append(res, attr...)
+	}
+	return res, err
+}
+func (e *SEG6LocalEncap) String() string {
+	strs := make([]string, 0, nl.SEG6_LOCAL_MAX)
+	strs = append(strs, fmt.Sprintf("action %s", nl.SEG6LocalActionString(e.Action)))
+
+	if e.Flags[nl.SEG6_LOCAL_TABLE] {
+		strs = append(strs, fmt.Sprintf("table %d", e.Table))
+	}
+	if e.Flags[nl.SEG6_LOCAL_NH4] {
+		strs = append(strs, fmt.Sprintf("nh4 %s", e.InAddr))
+	}
+	if e.Flags[nl.SEG6_LOCAL_NH6] {
+		strs = append(strs, fmt.Sprintf("nh6 %s", e.In6Addr))
+	}
+	if e.Flags[nl.SEG6_LOCAL_IIF] {
+		link, err := LinkByIndex(e.Iif)
+		if err != nil {
+			strs = append(strs, fmt.Sprintf("iif %d", e.Iif))
+		} else {
+			strs = append(strs, fmt.Sprintf("iif %s", link.Attrs().Name))
+		}
+	}
+	if e.Flags[nl.SEG6_LOCAL_OIF] {
+		link, err := LinkByIndex(e.Oif)
+		if err != nil {
+			strs = append(strs, fmt.Sprintf("oif %d", e.Oif))
+		} else {
+			strs = append(strs, fmt.Sprintf("oif %s", link.Attrs().Name))
+		}
+	}
+	if e.Flags[nl.SEG6_LOCAL_SRH] {
+		segs := make([]string, 0, len(e.Segments))
+		//append segment backwards (from n to 0) since seg#0 is the last segment.
+		for i := len(e.Segments); i > 0; i-- {
+			segs = append(segs, fmt.Sprintf("%s", e.Segments[i-1]))
+		}
+		strs = append(strs, fmt.Sprintf("segs %d [ %s ]", len(e.Segments), strings.Join(segs, " ")))
+	}
+	return strings.Join(strs, " ")
+}
+func (e *SEG6LocalEncap) Equal(x Encap) bool {
+	o, ok := x.(*SEG6LocalEncap)
+	if !ok {
+		return false
+	}
+	if e == o {
+		return true
+	}
+	if e == nil || o == nil {
+		return false
+	}
+	// compare all arrays first
+	for i := range e.Flags {
+		if e.Flags[i] != o.Flags[i] {
+			return false
+		}
+	}
+	if len(e.Segments) != len(o.Segments) {
+		return false
+	}
+	for i := range e.Segments {
+		if !e.Segments[i].Equal(o.Segments[i]) {
+			return false
+		}
+	}
+	// compare values
+	if !e.InAddr.Equal(o.InAddr) || !e.In6Addr.Equal(o.In6Addr) {
+		return false
+	}
+	if e.Action != o.Action || e.Table != o.Table || e.Iif != o.Iif || e.Oif != o.Oif {
+		return false
 	}
 	return true
 }
@@ -335,18 +519,18 @@ func (h *Handle) routeHandle(route *Route, req *nl.NetlinkRequest, msg *nl.RtMsg
 		if err != nil {
 			return err
 		}
-		rtAttrs = append(rtAttrs, nl.NewRtAttr(nl.RTA_NEWDST, buf))
+		rtAttrs = append(rtAttrs, nl.NewRtAttr(unix.RTA_NEWDST, buf))
 	}
 
 	if route.Encap != nil {
 		buf := make([]byte, 2)
 		native.PutUint16(buf, uint16(route.Encap.Type()))
-		rtAttrs = append(rtAttrs, nl.NewRtAttr(nl.RTA_ENCAP_TYPE, buf))
+		rtAttrs = append(rtAttrs, nl.NewRtAttr(unix.RTA_ENCAP_TYPE, buf))
 		buf, err := route.Encap.Encode()
 		if err != nil {
 			return err
 		}
-		rtAttrs = append(rtAttrs, nl.NewRtAttr(nl.RTA_ENCAP, buf))
+		rtAttrs = append(rtAttrs, nl.NewRtAttr(unix.RTA_ENCAP, buf))
 	}
 
 	if route.Src != nil {
@@ -410,17 +594,17 @@ func (h *Handle) routeHandle(route *Route, req *nl.NetlinkRequest, msg *nl.RtMsg
 				if err != nil {
 					return err
 				}
-				children = append(children, nl.NewRtAttr(nl.RTA_NEWDST, buf))
+				children = append(children, nl.NewRtAttr(unix.RTA_NEWDST, buf))
 			}
 			if nh.Encap != nil {
 				buf := make([]byte, 2)
 				native.PutUint16(buf, uint16(nh.Encap.Type()))
-				rtAttrs = append(rtAttrs, nl.NewRtAttr(nl.RTA_ENCAP_TYPE, buf))
+				children = append(children, nl.NewRtAttr(unix.RTA_ENCAP_TYPE, buf))
 				buf, err := nh.Encap.Encode()
 				if err != nil {
 					return err
 				}
-				children = append(children, nl.NewRtAttr(nl.RTA_ENCAP, buf))
+				children = append(children, nl.NewRtAttr(unix.RTA_ENCAP, buf))
 			}
 			rtnh.Children = children
 			buf = append(buf, rtnh.Serialize()...)
@@ -463,6 +647,10 @@ func (h *Handle) routeHandle(route *Route, req *nl.NetlinkRequest, msg *nl.RtMsg
 	if route.AdvMSS > 0 {
 		b := nl.Uint32Attr(uint32(route.AdvMSS))
 		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_ADVMSS, b))
+	}
+	if route.Hoplimit > 0 {
+		b := nl.Uint32Attr(uint32(route.Hoplimit))
+		metrics = append(metrics, nl.NewRtAttr(unix.RTAX_HOPLIMIT, b))
 	}
 
 	if metrics != nil {
@@ -574,6 +762,8 @@ func (h *Handle) RouteListFiltered(family int, filter *Route, filterMask uint64)
 						continue
 					}
 				}
+			case filterMask&RT_FILTER_HOPLIMIT != 0 && route.Hoplimit != filter.Hoplimit:
+				continue
 			}
 		}
 		res = append(res, route)
@@ -649,7 +839,7 @@ func deserializeRoute(m []byte) (Route, error) {
 					switch attr.Attr.Type {
 					case unix.RTA_GATEWAY:
 						info.Gw = net.IP(attr.Value)
-					case nl.RTA_NEWDST:
+					case unix.RTA_NEWDST:
 						var d Destination
 						switch msg.Family {
 						case nl.FAMILY_MPLS:
@@ -659,9 +849,9 @@ func deserializeRoute(m []byte) (Route, error) {
 							return nil, nil, err
 						}
 						info.NewDst = d
-					case nl.RTA_ENCAP_TYPE:
+					case unix.RTA_ENCAP_TYPE:
 						encapType = attr
-					case nl.RTA_ENCAP:
+					case unix.RTA_ENCAP:
 						encap = attr
 					}
 				}
@@ -690,7 +880,7 @@ func deserializeRoute(m []byte) (Route, error) {
 				route.MultiPath = append(route.MultiPath, info)
 				rest = buf
 			}
-		case nl.RTA_NEWDST:
+		case unix.RTA_NEWDST:
 			var d Destination
 			switch msg.Family {
 			case nl.FAMILY_MPLS:
@@ -700,9 +890,9 @@ func deserializeRoute(m []byte) (Route, error) {
 				return route, err
 			}
 			route.NewDst = d
-		case nl.RTA_ENCAP_TYPE:
+		case unix.RTA_ENCAP_TYPE:
 			encapType = attr
-		case nl.RTA_ENCAP:
+		case unix.RTA_ENCAP:
 			encap = attr
 		case unix.RTA_METRICS:
 			metrics, err := nl.ParseRouteAttr(attr.Value)
@@ -715,6 +905,8 @@ func deserializeRoute(m []byte) (Route, error) {
 					route.MTU = int(native.Uint32(metric.Value[0:4]))
 				case unix.RTAX_ADVMSS:
 					route.AdvMSS = int(native.Uint32(metric.Value[0:4]))
+				case unix.RTAX_HOPLIMIT:
+					route.Hoplimit = int(native.Uint32(metric.Value[0:4]))
 				}
 			}
 		}
@@ -731,6 +923,11 @@ func deserializeRoute(m []byte) (Route, error) {
 			}
 		case nl.LWTUNNEL_ENCAP_SEG6:
 			e = &SEG6Encap{}
+			if err := e.Decode(encap.Value); err != nil {
+				return route, err
+			}
+		case nl.LWTUNNEL_ENCAP_SEG6_LOCAL:
+			e = &SEG6LocalEncap{}
 			if err := e.Decode(encap.Value); err != nil {
 				return route, err
 			}
@@ -840,12 +1037,18 @@ func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <
 	go func() {
 		defer close(ch)
 		for {
-			msgs, err := s.Receive()
+			msgs, from, err := s.Receive()
 			if err != nil {
 				if cberr != nil {
 					cberr(err)
 				}
 				return
+			}
+			if from.Pid != nl.PidKernel {
+				if cberr != nil {
+					cberr(fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, nl.PidKernel))
+				}
+				continue
 			}
 			for _, m := range msgs {
 				if m.Header.Type == unix.NLMSG_DONE {

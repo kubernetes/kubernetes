@@ -119,7 +119,7 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 }
 
 func deleteConfigMapOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), name, nil); err != nil {
+	if err := c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unable to delete ConfigMap %v: %v", name, err)
 	}
 }

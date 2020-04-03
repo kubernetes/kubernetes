@@ -344,7 +344,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 		return nil, err
 	}
 
-	req, err := csr.RequestCertificate(client, csrData, name, usages, privateKey)
+	req, err := csr.RequestCertificate(client, csrData, name, certificates.KubeAPIServerClientKubeletSignerName, usages, privateKey)
 	if err != nil {
 		return nil, err
 	}

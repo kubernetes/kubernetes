@@ -103,7 +103,7 @@ func (c *FakeEndpoints) Update(ctx context.Context, endpoints *corev1.Endpoints,
 }
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
-func (c *FakeEndpoints) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeEndpoints) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(endpointsResource, c.ns, name), &corev1.Endpoints{})
 
@@ -111,8 +111,8 @@ func (c *FakeEndpoints) Delete(ctx context.Context, name string, options *v1.Del
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeEndpoints) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
+func (c *FakeEndpoints) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(endpointsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.EndpointsList{})
 	return err

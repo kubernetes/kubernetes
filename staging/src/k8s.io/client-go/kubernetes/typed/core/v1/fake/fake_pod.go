@@ -115,7 +115,7 @@ func (c *FakePods) UpdateStatus(ctx context.Context, pod *corev1.Pod, opts v1.Up
 }
 
 // Delete takes name of the pod and deletes it. Returns an error if one occurs.
-func (c *FakePods) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakePods) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(podsResource, c.ns, name), &corev1.Pod{})
 
@@ -123,8 +123,8 @@ func (c *FakePods) Delete(ctx context.Context, name string, options *v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePods) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
+func (c *FakePods) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.PodList{})
 	return err

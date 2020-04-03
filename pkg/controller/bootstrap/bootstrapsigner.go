@@ -53,7 +53,7 @@ type SignerOptions struct {
 	// TokenSecretNamespace string is the namespace for token Secrets.
 	TokenSecretNamespace string
 
-	// ConfigMapResynce is the time.Duration at which to fully re-list configmaps.
+	// ConfigMapResync is the time.Duration at which to fully re-list configmaps.
 	// If zero, re-list will be delayed as long as possible
 	ConfigMapResync time.Duration
 

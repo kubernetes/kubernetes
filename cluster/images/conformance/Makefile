@@ -31,7 +31,7 @@ E2E_GO_RUNNER_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/go-runner && echo $(LOCA
 
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
-BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.12.1
+BASEIMAGE=debian:stretch-slim
 TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
 
 all: build

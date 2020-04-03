@@ -17,12 +17,14 @@ limitations under the License.
 package scale
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -115,7 +117,7 @@ var _ Scaler = &genericScaler{}
 // ScaleSimple updates a scale of a given resource. It returns the resourceVersion of the scale if the update was successful.
 func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, gvr schema.GroupVersionResource) (updatedResourceVersion string, err error) {
 	if preconditions != nil {
-		scale, err := s.scaleNamespacer.Scales(namespace).Get(gvr.GroupResource(), name)
+		scale, err := s.scaleNamespacer.Scales(namespace).Get(context.TODO(), gvr.GroupResource(), name, metav1.GetOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -123,7 +125,7 @@ func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 			return "", err
 		}
 		scale.Spec.Replicas = int32(newSize)
-		updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(gvr.GroupResource(), scale)
+		updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(context.TODO(), gvr.GroupResource(), scale, metav1.UpdateOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -131,7 +133,7 @@ func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 	}
 
 	patch := []byte(fmt.Sprintf(`{"spec":{"replicas":%d}}`, newSize))
-	updatedScale, err := s.scaleNamespacer.Scales(namespace).Patch(gvr, name, types.MergePatchType, patch)
+	updatedScale, err := s.scaleNamespacer.Scales(namespace).Patch(context.TODO(), gvr, name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -159,7 +161,7 @@ func (s *genericScaler) Scale(namespace, resourceName string, newSize uint, prec
 // count for a scale (Spec) equals its updated replicas count (Status)
 func scaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupResource, resourceName string, namespace string, desiredReplicas int32) wait.ConditionFunc {
 	return func() (bool, error) {
-		actualScale, err := sClient.Scales(namespace).Get(gr, resourceName)
+		actualScale, err := sClient.Scales(namespace).Get(context.TODO(), gr, resourceName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

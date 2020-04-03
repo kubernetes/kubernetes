@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
-type configMutatorsFunc func(*kubeadmapi.InitConfiguration, *certutil.Config) error
+type configMutatorsFunc func(*kubeadmapi.InitConfiguration, *pkiutil.CertConfig) error
 
 // KubeadmCert represents a certificate that Kubeadm will create to function properly.
 type KubeadmCert struct {
@@ -39,17 +39,18 @@ type KubeadmCert struct {
 	// Some attributes will depend on the InitConfiguration, only known at runtime.
 	// These functions will be run in series, passed both the InitConfiguration and a cert Config.
 	configMutators []configMutatorsFunc
-	config         certutil.Config
+	config         pkiutil.CertConfig
 }
 
 // GetConfig returns the definition for the given cert given the provided InitConfiguration
-func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*certutil.Config, error) {
+func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*pkiutil.CertConfig, error) {
 	for _, f := range k.configMutators {
 		if err := f(ic, &k.config); err != nil {
 			return nil, err
 		}
 	}
 
+	k.config.PublicKeyAlgorithm = ic.ClusterConfiguration.PublicKeyAlgorithm()
 	return &k.config, nil
 }
 
@@ -239,8 +240,10 @@ var (
 		Name:     "ca",
 		LongName: "self-signed Kubernetes CA to provision identities for other Kubernetes components",
 		BaseName: kubeadmconstants.CACertAndKeyBaseName,
-		config: certutil.Config{
-			CommonName: "kubernetes",
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "kubernetes",
+			},
 		},
 	}
 	// KubeadmCertAPIServer is the definition of the cert used to serve the Kubernetes API.
@@ -249,9 +252,11 @@ var (
 		LongName: "certificate for serving the Kubernetes API",
 		BaseName: kubeadmconstants.APIServerCertAndKeyBaseName,
 		CAName:   "ca",
-		config: certutil.Config{
-			CommonName: kubeadmconstants.APIServerCertCommonName,
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: kubeadmconstants.APIServerCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			},
 		},
 		configMutators: []configMutatorsFunc{
 			makeAltNamesMutator(pkiutil.GetAPIServerAltNames),
@@ -263,10 +268,12 @@ var (
 		LongName: "certificate for the API server to connect to kubelet",
 		BaseName: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
 		CAName:   "ca",
-		config: certutil.Config{
-			CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
+				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 
@@ -275,8 +282,10 @@ var (
 		Name:     "front-proxy-ca",
 		LongName: "self-signed CA to provision identities for front proxy",
 		BaseName: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
-		config: certutil.Config{
-			CommonName: "front-proxy-ca",
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "front-proxy-ca",
+			},
 		},
 	}
 
@@ -286,9 +295,11 @@ var (
 		BaseName: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
 		LongName: "certificate for the front proxy client",
 		CAName:   "front-proxy-ca",
-		config: certutil.Config{
-			CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 
@@ -297,8 +308,10 @@ var (
 		Name:     "etcd-ca",
 		LongName: "self-signed CA to provision identities for etcd",
 		BaseName: kubeadmconstants.EtcdCACertAndKeyBaseName,
-		config: certutil.Config{
-			CommonName: "etcd-ca",
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "etcd-ca",
+			},
 		},
 	}
 	// KubeadmCertEtcdServer is the definition of the cert used to serve etcd to clients.
@@ -307,12 +320,14 @@ var (
 		LongName: "certificate for serving etcd",
 		BaseName: kubeadmconstants.EtcdServerCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
-			// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
-			// Once the upstream issue is resolved, this should be returned to only allowing
-			// ServerAuth usage.
-			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
+				// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
+				// Once the upstream issue is resolved, this should be returned to only allowing
+				// ServerAuth usage.
+				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			},
 		},
 		configMutators: []configMutatorsFunc{
 			makeAltNamesMutator(pkiutil.GetEtcdAltNames),
@@ -325,8 +340,10 @@ var (
 		LongName: "certificate for etcd nodes to communicate with each other",
 		BaseName: kubeadmconstants.EtcdPeerCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			},
 		},
 		configMutators: []configMutatorsFunc{
 			makeAltNamesMutator(pkiutil.GetEtcdPeerAltNames),
@@ -339,10 +356,12 @@ var (
 		LongName: "certificate for liveness probes to healthcheck etcd",
 		BaseName: kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
+				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 	// KubeadmCertEtcdAPIClient is the definition of the cert used by the API server to access etcd.
@@ -351,16 +370,18 @@ var (
 		LongName: "certificate the apiserver uses to access etcd",
 		BaseName: kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
+				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 )
 
 func makeAltNamesMutator(f func(*kubeadmapi.InitConfiguration) (*certutil.AltNames, error)) configMutatorsFunc {
-	return func(mc *kubeadmapi.InitConfiguration, cc *certutil.Config) error {
+	return func(mc *kubeadmapi.InitConfiguration, cc *pkiutil.CertConfig) error {
 		altNames, err := f(mc)
 		if err != nil {
 			return err
@@ -371,7 +392,7 @@ func makeAltNamesMutator(f func(*kubeadmapi.InitConfiguration) (*certutil.AltNam
 }
 
 func setCommonNameToNodeName() configMutatorsFunc {
-	return func(mc *kubeadmapi.InitConfiguration, cc *certutil.Config) error {
+	return func(mc *kubeadmapi.InitConfiguration, cc *pkiutil.CertConfig) error {
 		cc.CommonName = mc.NodeRegistration.Name
 		return nil
 	}

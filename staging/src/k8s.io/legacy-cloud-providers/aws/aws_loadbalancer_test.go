@@ -19,6 +19,7 @@ limitations under the License.
 package aws
 
 import (
+	"k8s.io/apimachinery/pkg/types"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -293,6 +294,129 @@ func TestElbListenersAreEqual(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.equal, elbListenersAreEqual(test.expected, test.actual))
+		})
+	}
+}
+
+func TestBuildTargetGroupName(t *testing.T) {
+	type args struct {
+		serviceName    types.NamespacedName
+		servicePort    int64
+		nodePort       int64
+		targetProtocol string
+		targetType     string
+	}
+	tests := []struct {
+		name      string
+		clusterID string
+		args      args
+		want      string
+	}{
+		{
+			name:      "base case",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-a"},
+				servicePort:    80,
+				nodePort:       8080,
+				targetProtocol: "TCP",
+				targetType:     "instance",
+			},
+			want: "k8s-default-servicea-0aeb5b75af",
+		},
+		{
+			name:      "base case & clusterID changed",
+			clusterID: "cluster-b",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-a"},
+				servicePort:    80,
+				nodePort:       8080,
+				targetProtocol: "TCP",
+				targetType:     "instance",
+			},
+			want: "k8s-default-servicea-5d3a0a69a8",
+		},
+		{
+			name:      "base case & serviceNamespace changed",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "another", Name: "service-a"},
+				servicePort:    80,
+				nodePort:       8080,
+				targetProtocol: "TCP",
+				targetType:     "instance",
+			},
+			want: "k8s-another-servicea-f3a3263315",
+		},
+		{
+			name:      "base case & serviceName changed",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-b"},
+				servicePort:    80,
+				nodePort:       8080,
+				targetProtocol: "TCP",
+				targetType:     "instance",
+			},
+			want: "k8s-default-serviceb-9a3c03b25e",
+		},
+		{
+			name:      "base case & servicePort changed",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-a"},
+				servicePort:    9090,
+				nodePort:       8080,
+				targetProtocol: "TCP",
+				targetType:     "instance",
+			},
+			want: "k8s-default-servicea-6e07474ff4",
+		},
+		{
+			name:      "base case & nodePort changed",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-a"},
+				servicePort:    80,
+				nodePort:       9090,
+				targetProtocol: "TCP",
+				targetType:     "instance",
+			},
+			want: "k8s-default-servicea-6cb2d0201c",
+		},
+		{
+			name:      "base case & targetProtocol changed",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-a"},
+				servicePort:    80,
+				nodePort:       8080,
+				targetProtocol: "UDP",
+				targetType:     "instance",
+			},
+			want: "k8s-default-servicea-70495e628e",
+		},
+		{
+			name:      "base case & targetType changed",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-a"},
+				servicePort:    80,
+				nodePort:       8080,
+				targetProtocol: "TCP",
+				targetType:     "ip",
+			},
+			want: "k8s-default-servicea-fff6dd8028",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{
+				tagging: awsTagging{ClusterID: tt.clusterID},
+			}
+			if got := c.buildTargetGroupName(tt.args.serviceName, tt.args.servicePort, tt.args.nodePort, tt.args.targetProtocol, tt.args.targetType); got != tt.want {
+				assert.Equal(t, tt.want, got)
+			}
 		})
 	}
 }

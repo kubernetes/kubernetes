@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
-	compmetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	utilpointer "k8s.io/utils/pointer"
@@ -884,44 +883,58 @@ type expectedMetrics struct {
 func expectMetrics(t *testing.T, em expectedMetrics) {
 	t.Helper()
 
-	actualDesiredSlices := getGaugeMetricValue(t, metrics.DesiredEndpointSlices.WithLabelValues())
+	actualDesiredSlices, err := testutil.GetGaugeMetricValue(metrics.DesiredEndpointSlices.WithLabelValues())
+	handleErr(t, err, "desiredEndpointSlices")
 	if actualDesiredSlices != float64(em.desiredSlices) {
 		t.Errorf("Expected desiredEndpointSlices to be %d, got %v", em.desiredSlices, actualDesiredSlices)
 	}
 
-	actualNumSlices := getGaugeMetricValue(t, metrics.NumEndpointSlices.WithLabelValues())
+	actualNumSlices, err := testutil.GetGaugeMetricValue(metrics.NumEndpointSlices.WithLabelValues())
+	handleErr(t, err, "numEndpointSlices")
 	if actualDesiredSlices != float64(em.desiredSlices) {
 		t.Errorf("Expected numEndpointSlices to be %d, got %v", em.actualSlices, actualNumSlices)
 	}
 
-	actualEndpointsDesired := getGaugeMetricValue(t, metrics.EndpointsDesired.WithLabelValues())
+	actualEndpointsDesired, err := testutil.GetGaugeMetricValue(metrics.EndpointsDesired.WithLabelValues())
+	handleErr(t, err, "desiredEndpoints")
 	if actualEndpointsDesired != float64(em.desiredEndpoints) {
 		t.Errorf("Expected desiredEndpoints to be %d, got %v", em.desiredEndpoints, actualEndpointsDesired)
 	}
 
-	actualAddedPerSync := getHistogramMetricValue(t, metrics.EndpointsAddedPerSync.WithLabelValues())
+	actualAddedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointsAddedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsAddedPerSync")
 	if actualAddedPerSync != float64(em.addedPerSync) {
 		t.Errorf("Expected endpointsAddedPerSync to be %d, got %v", em.addedPerSync, actualAddedPerSync)
 	}
 
-	actualRemovedPerSync := getHistogramMetricValue(t, metrics.EndpointsRemovedPerSync.WithLabelValues())
+	actualRemovedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointsRemovedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsRemovedPerSync")
 	if actualRemovedPerSync != float64(em.removedPerSync) {
 		t.Errorf("Expected endpointsRemovedPerSync to be %d, got %v", em.removedPerSync, actualRemovedPerSync)
 	}
 
-	actualCreated := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("create"))
+	actualCreated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("create"))
+	handleErr(t, err, "endpointSliceChangesCreated")
 	if actualCreated != float64(em.numCreated) {
 		t.Errorf("Expected endpointSliceChangesCreated to be %d, got %v", em.numCreated, actualCreated)
 	}
 
-	actualUpdated := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("update"))
+	actualUpdated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("update"))
+	handleErr(t, err, "endpointSliceChangesUpdated")
 	if actualUpdated != float64(em.numUpdated) {
 		t.Errorf("Expected endpointSliceChangesUpdated to be %d, got %v", em.numUpdated, actualUpdated)
 	}
 
-	actualDeleted := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("delete"))
+	actualDeleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
+	handleErr(t, err, "desiredEndpointSlices")
 	if actualDeleted != float64(em.numDeleted) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
+	}
+}
+
+func handleErr(t *testing.T, err error, metricName string) {
+	if err != nil {
+		t.Errorf("Failed to get %s value, err: %v", metricName, err)
 	}
 }
 
@@ -935,31 +948,4 @@ func setupMetrics() {
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "create"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "update"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "delete"})
-}
-
-func getGaugeMetricValue(t *testing.T, metric compmetrics.GaugeMetric) float64 {
-	t.Helper()
-	metricProto := &dto.Metric{}
-	if err := metric.Write(metricProto); err != nil {
-		t.Errorf("Error writing metric: %v", err)
-	}
-	return metricProto.Gauge.GetValue()
-}
-
-func getCounterMetricValue(t *testing.T, metric compmetrics.CounterMetric) float64 {
-	t.Helper()
-	metricProto := &dto.Metric{}
-	if err := metric.(compmetrics.Metric).Write(metricProto); err != nil {
-		t.Errorf("Error writing metric: %v", err)
-	}
-	return metricProto.Counter.GetValue()
-}
-
-func getHistogramMetricValue(t *testing.T, metric compmetrics.ObserverMetric) float64 {
-	t.Helper()
-	metricProto := &dto.Metric{}
-	if err := metric.(compmetrics.Metric).Write(metricProto); err != nil {
-		t.Errorf("Error writing metric: %v", err)
-	}
-	return metricProto.Histogram.GetSampleSum()
 }

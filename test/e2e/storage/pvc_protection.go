@@ -36,6 +36,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
+const (
+	// claimDeletingTimeout is How long claims have to become deleted.
+	claimDeletingTimeout = 3 * time.Minute
+)
+
 // waitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
 func waitForPersistentVolumeClaimDeleted(c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for PersistentVolumeClaim %s to be removed", timeout, pvcName)
@@ -110,15 +115,15 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Deleting the PVC")
-		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PVC")
-		waitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
+		waitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
 	ginkgo.It("Verify that PVC in active use by a pod is not removed immediately", func() {
 		ginkgo.By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
-		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PVC")
 
 		ginkgo.By("Checking that the PVC status is Terminating")
@@ -131,13 +136,13 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		waitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
+		waitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
 	ginkgo.It("Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable", func() {
 		ginkgo.By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
-		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.NewDeleteOptions(0))
+		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PVC")
 
 		ginkgo.By("Checking that the PVC status is Terminating")
@@ -163,7 +168,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		waitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
+		waitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, claimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 })

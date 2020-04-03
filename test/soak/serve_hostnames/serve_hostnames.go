@@ -122,7 +122,7 @@ func main() {
 	}
 	ns := got.Name
 	defer func(ns string) {
-		if err := client.CoreV1().Namespaces().Delete(context.TODO(), ns, nil); err != nil {
+		if err := client.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{}); err != nil {
 			klog.Warningf("Failed to delete namespace %s: %v", ns, err)
 		} else {
 			// wait until the namespace disappears
@@ -177,7 +177,7 @@ func main() {
 		klog.Infof("Cleaning up service %s/serve-hostnames", ns)
 		// Make several attempts to delete the service.
 		for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-			if err := client.CoreV1().Services(ns).Delete(context.TODO(), svc.Name, nil); err == nil {
+			if err := client.CoreV1().Services(ns).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{}); err == nil {
 				return
 			}
 			klog.Warningf("After %v unable to delete service %s/%s: %v", time.Since(start), ns, svc.Name, err)
@@ -230,7 +230,7 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err = client.CoreV1().Pods(ns).Delete(context.TODO(), podName, nil); err == nil {
+				if err = client.CoreV1().Pods(ns).Delete(context.TODO(), podName, metav1.DeleteOptions{}); err == nil {
 					break
 				}
 				klog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)

@@ -24,6 +24,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
+	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
+	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
+	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
+	"k8s.io/kubernetes/plugin/pkg/admission/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
@@ -86,11 +90,19 @@ var AllOrderedPlugins = []string{
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
 	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
 	resize.PluginName,                       // PersistentVolumeClaimResize
-	mutatingwebhook.PluginName,              // MutatingAdmissionWebhook
-	validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
-	runtimeclass.PluginName,                 //RuntimeClass
-	resourcequota.PluginName,                // ResourceQuota
-	deny.PluginName,                         // AlwaysDeny
+	runtimeclass.PluginName,                 // RuntimeClass
+	certapproval.PluginName,                 // CertificateApproval
+	certsigning.PluginName,                  // CertificateSigning
+	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
+	defaultingressclass.PluginName,          // DefaultIngressClass
+
+	// new admission plugins should generally be inserted above here
+	// webhook, resourcequota, and deny plugins must go at the end
+
+	mutatingwebhook.PluginName,   // MutatingAdmissionWebhook
+	validatingwebhook.PluginName, // ValidatingAdmissionWebhook
+	resourcequota.PluginName,     // ResourceQuota
+	deny.PluginName,              // AlwaysDeny
 }
 
 // RegisterAllAdmissionPlugins registers all admission plugins and
@@ -100,6 +112,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
+	defaultingressclass.Register(plugins)
 	deny.Register(plugins) // DEPRECATED as no real meaning
 	eventratelimit.Register(plugins)
 	exec.Register(plugins)
@@ -124,6 +137,9 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	setdefault.Register(plugins)
 	resize.Register(plugins)
 	storageobjectinuseprotection.Register(plugins)
+	certapproval.Register(plugins)
+	certsigning.Register(plugins)
+	certsubjectrestriction.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
@@ -142,6 +158,10 @@ func DefaultOffAdmissionPlugins() sets.String {
 		podpriority.PluginName,                  //PodPriority
 		nodetaint.PluginName,                    //TaintNodesByCondition
 		runtimeclass.PluginName,                 //RuntimeClass, gates internally on the feature
+		certapproval.PluginName,                 // CertificateApproval
+		certsigning.PluginName,                  // CertificateSigning
+		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
+		defaultingressclass.PluginName,          //DefaultIngressClass
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)

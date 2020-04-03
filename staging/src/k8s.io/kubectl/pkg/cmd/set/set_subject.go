@@ -48,7 +48,7 @@ var (
 	kubectl set subject rolebinding admin --user=user1 --user=user2 --group=group1
 
 	# Print the result (in yaml format) of updating rolebinding subjects from a local, without hitting the server
-	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run | kubectl set subject --local -f - --user=foo -o yaml`)
+	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run=client | kubectl set subject --local -f - --user=foo -o yaml`)
 )
 
 type updateSubjects func(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject)
@@ -93,7 +93,7 @@ func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
 func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSubjectOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Use:                   "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
 		Long:                  subjectLong,

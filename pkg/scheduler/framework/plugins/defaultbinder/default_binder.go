@@ -53,7 +53,7 @@ func (b DefaultBinder) Bind(ctx context.Context, state *framework.CycleState, p 
 		ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID},
 		Target:     v1.ObjectReference{Kind: "Node", Name: nodeName},
 	}
-	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(binding)
+	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(context.TODO(), binding, metav1.CreateOptions{})
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}

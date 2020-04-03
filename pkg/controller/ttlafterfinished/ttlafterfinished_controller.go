@@ -230,7 +230,7 @@ func (tc *Controller) processJob(key string) error {
 	}
 	// Cascade deletes the Jobs if TTL truly expires.
 	policy := metav1.DeletePropagationForeground
-	options := &metav1.DeleteOptions{
+	options := metav1.DeleteOptions{
 		PropagationPolicy: &policy,
 		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
 	}

@@ -35,7 +35,8 @@ func NewVpnConnectionsClient(subscriptionID string) VpnConnectionsClient {
 	return NewVpnConnectionsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewVpnConnectionsClientWithBaseURI creates an instance of the VpnConnectionsClient client.
+// NewVpnConnectionsClientWithBaseURI creates an instance of the VpnConnectionsClient client using a custom endpoint.
+// Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewVpnConnectionsClientWithBaseURI(baseURI string, subscriptionID string) VpnConnectionsClient {
 	return VpnConnectionsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -101,9 +102,8 @@ func (client VpnConnectionsClient) CreateOrUpdatePreparer(ctx context.Context, r
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) CreateOrUpdateSender(req *http.Request) (future VpnConnectionsCreateOrUpdateFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -180,9 +180,8 @@ func (client VpnConnectionsClient) DeletePreparer(ctx context.Context, resourceG
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) DeleteSender(req *http.Request) (future VpnConnectionsDeleteFuture, err error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	var resp *http.Response
-	resp, err = autorest.SendWithSender(client, req, sd...)
+	resp, err = client.Send(req, azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
@@ -264,8 +263,7 @@ func (client VpnConnectionsClient) GetPreparer(ctx context.Context, resourceGrou
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) GetSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -342,8 +340,7 @@ func (client VpnConnectionsClient) ListByVpnGatewayPreparer(ctx context.Context,
 // ListByVpnGatewaySender sends the ListByVpnGateway request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnConnectionsClient) ListByVpnGatewaySender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListByVpnGatewayResponder handles the response to the ListByVpnGateway request. The method always

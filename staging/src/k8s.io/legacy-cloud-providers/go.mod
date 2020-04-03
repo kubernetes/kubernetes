@@ -6,10 +6,10 @@ go 1.13
 
 require (
 	cloud.google.com/go v0.38.0
-	github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.9.0
-	github.com/Azure/go-autorest/autorest/adal v0.5.0
-	github.com/Azure/go-autorest/autorest/mocks v0.2.0
+	github.com/Azure/azure-sdk-for-go v40.2.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.9.6
+	github.com/Azure/go-autorest/autorest/adal v0.8.2
+	github.com/Azure/go-autorest/autorest/mocks v0.3.0
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
@@ -22,7 +22,7 @@ require (
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/vmware/govmomi v0.20.3
-	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	gopkg.in/gcfg.v1 v1.2.0
@@ -35,7 +35,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200117235808-5f6fbceb4c31
+	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 	sigs.k8s.io/yaml v1.2.0
 )
 

@@ -356,6 +356,10 @@ func TestCmdInitFeatureGates(t *testing.T) {
 			name: "feature gate IPv6DualStack=true",
 			args: "--feature-gates=IPv6DualStack=true",
 		},
+		{
+			name: "feature gate PublicKeysECDSA=true",
+			args: "--feature-gates=PublicKeysECDSA=true",
+		},
 	}
 
 	for _, rt := range initTest {

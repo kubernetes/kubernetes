@@ -147,6 +147,8 @@ func addGrouplessTypes() {
 	scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
+
+	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
 }
 
 func addTestTypes() {
@@ -166,6 +168,8 @@ func addTestTypes() {
 	scheme.AddKnownTypes(testGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
 	scheme.AddKnownTypes(testInternalGroup2Version, &genericapitesting.SimpleXGSubresource{}, &metav1.ExportOptions{})
 	metav1.AddToGroupVersion(scheme, testGroupVersion)
+
+	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
 }
 
 func addNewTestTypes() {
@@ -175,6 +179,8 @@ func addNewTestTypes() {
 		&examplev1.Pod{},
 	)
 	metav1.AddToGroupVersion(scheme, newGroupVersion)
+
+	utilruntime.Must(genericapitesting.RegisterConversions(scheme))
 }
 
 func init() {

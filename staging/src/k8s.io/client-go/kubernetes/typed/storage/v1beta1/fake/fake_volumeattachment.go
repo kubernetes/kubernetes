@@ -108,15 +108,15 @@ func (c *FakeVolumeAttachments) UpdateStatus(ctx context.Context, volumeAttachme
 }
 
 // Delete takes name of the volumeAttachment and deletes it. Returns an error if one occurs.
-func (c *FakeVolumeAttachments) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeVolumeAttachments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(volumeattachmentsResource, name), &v1beta1.VolumeAttachment{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeVolumeAttachments) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(volumeattachmentsResource, listOptions)
+func (c *FakeVolumeAttachments) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(volumeattachmentsResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.VolumeAttachmentList{})
 	return err

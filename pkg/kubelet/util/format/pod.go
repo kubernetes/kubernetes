@@ -30,6 +30,9 @@ type podHandler func(*v1.Pod) string
 // Pod returns a string representing a pod in a consistent human readable format,
 // with pod UID as part of the string.
 func Pod(pod *v1.Pod) string {
+	if pod == nil {
+		return "<nil>"
+	}
 	return PodDesc(pod.Name, pod.Namespace, pod.UID)
 }
 
@@ -44,6 +47,9 @@ func PodDesc(podName, podNamespace string, podUID types.UID) string {
 // PodWithDeletionTimestamp is the same as Pod. In addition, it prints the
 // deletion timestamp of the pod if it's not nil.
 func PodWithDeletionTimestamp(pod *v1.Pod) string {
+	if pod == nil {
+		return "<nil>"
+	}
 	var deletionTimestamp string
 	if pod.DeletionTimestamp != nil {
 		deletionTimestamp = ":DeletionTimestamp=" + pod.DeletionTimestamp.UTC().Format(time.RFC3339)

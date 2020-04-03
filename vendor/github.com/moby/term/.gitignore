@@ -1,0 +1,24 @@
+# Docker project generated files to ignore
+#  if you want to ignore files created by your editor/tools,
+#  please consider a global .gitignore https://help.github.com/articles/ignoring-files
+*.exe
+*.exe~
+*.gz
+*.orig
+test.main
+.*.swp
+.DS_Store
+# a .bashrc may be added to customize the build environment
+.bashrc
+.editorconfig
+.gopath/
+.go-pkg-cache/
+.idea/
+autogen/
+bundles/
+cmd/dockerd/dockerd
+contrib/builder/rpm/*/changelog
+vendor/pkg/
+go-test-report.json
+profile.out
+junit-report.xml

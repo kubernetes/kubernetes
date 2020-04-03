@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -147,11 +148,11 @@ var _ = SIGDescribe("Generated clientset", func() {
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
-		if err := podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
+		if err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 
@@ -264,7 +265,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("deleting the cronJob")
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
-		if err := cronJobClient.Delete(context.TODO(), cronJob.Name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
+		if err := cronJobClient.Delete(context.TODO(), cronJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
 			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 

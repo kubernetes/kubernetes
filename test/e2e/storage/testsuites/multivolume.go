@@ -32,7 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -54,7 +54,7 @@ func InitMultiVolumeTestSuite() TestSuite {
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
-			SupportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
 		},
@@ -374,9 +374,13 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, ns string,
 	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim, readSeedBase int64, writeSeedBase int64) string {
 	ginkgo.By(fmt.Sprintf("Creating pod on %+v with multiple volumes", node))
-	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, ns, pvcs, nil,
-		false, "", false, false, e2epv.SELinuxLabel,
-		nil, node, framework.PodStartTimeout)
+	podConfig := e2epod.Config{
+		NS:            ns,
+		PVCs:          pvcs,
+		SeLinuxLabel:  e2epv.SELinuxLabel,
+		NodeSelection: node,
+	}
+	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
@@ -447,10 +451,13 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	for i := 0; i < numPods; i++ {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Creating pod%d with a volume on %+v", index, node))
-		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, ns,
-			[]*v1.PersistentVolumeClaim{pvc}, nil,
-			false, "", false, false, e2epv.SELinuxLabel,
-			nil, node, framework.PodStartTimeout)
+		podConfig := e2epod.Config{
+			NS:            ns,
+			PVCs:          []*v1.PersistentVolumeClaim{pvc},
+			SeLinuxLabel:  e2epv.SELinuxLabel,
+			NodeSelection: node,
+		}
+		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
 		defer func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 		}()

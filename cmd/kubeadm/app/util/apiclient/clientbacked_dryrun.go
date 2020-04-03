@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -74,7 +75,7 @@ func NewClientBackedDryRunGetterFromKubeconfig(file string) (*ClientBackedDryRun
 
 // HandleGetAction handles GET actions to the dryrun clientset this interface supports
 func (clg *ClientBackedDryRunGetter) HandleGetAction(action core.GetAction) (bool, runtime.Object, error) {
-	unstructuredObj, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).Get(action.GetName(), metav1.GetOptions{})
+	unstructuredObj, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).Get(context.TODO(), action.GetName(), metav1.GetOptions{})
 	// Inform the user that the requested object wasn't found.
 	printIfNotExists(err)
 	if err != nil {
@@ -95,7 +96,7 @@ func (clg *ClientBackedDryRunGetter) HandleListAction(action core.ListAction) (b
 		FieldSelector: action.GetListRestrictions().Fields.String(),
 	}
 
-	unstructuredList, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).List(listOpts)
+	unstructuredList, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).List(context.TODO(), listOpts)
 	if err != nil {
 		return true, nil, err
 	}

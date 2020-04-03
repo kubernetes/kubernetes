@@ -97,15 +97,15 @@ func (c *FakeStorageClasses) Update(ctx context.Context, storageClass *v1beta1.S
 }
 
 // Delete takes name of the storageClass and deletes it. Returns an error if one occurs.
-func (c *FakeStorageClasses) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeStorageClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(storageclassesResource, name), &v1beta1.StorageClass{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeStorageClasses) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(storageclassesResource, listOptions)
+func (c *FakeStorageClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(storageclassesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.StorageClassList{})
 	return err

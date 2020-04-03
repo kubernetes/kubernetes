@@ -36,7 +36,8 @@ func NewFileServicesClient(subscriptionID string) FileServicesClient {
 	return NewFileServicesClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewFileServicesClientWithBaseURI creates an instance of the FileServicesClient client.
+// NewFileServicesClientWithBaseURI creates an instance of the FileServicesClient client using a custom endpoint.  Use
+// this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewFileServicesClientWithBaseURI(baseURI string, subscriptionID string) FileServicesClient {
 	return FileServicesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -118,8 +119,7 @@ func (client FileServicesClient) GetServicePropertiesPreparer(ctx context.Contex
 // GetServicePropertiesSender sends the GetServiceProperties request. The method will close the
 // http.Response Body if it receives an error.
 func (client FileServicesClient) GetServicePropertiesSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetServicePropertiesResponder handles the response to the GetServiceProperties request. The method always
@@ -210,8 +210,7 @@ func (client FileServicesClient) ListPreparer(ctx context.Context, resourceGroup
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client FileServicesClient) ListSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -256,7 +255,16 @@ func (client FileServicesClient) SetServiceProperties(ctx context.Context, resou
 			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
 				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
 		{TargetValue: client.SubscriptionID,
-			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}},
+		{TargetValue: parameters,
+			Constraints: []validation.Constraint{{Target: "parameters.FileServicePropertiesProperties", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{{Target: "parameters.FileServicePropertiesProperties.ShareDeleteRetentionPolicy", Name: validation.Null, Rule: false,
+					Chain: []validation.Constraint{{Target: "parameters.FileServicePropertiesProperties.ShareDeleteRetentionPolicy.Days", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "parameters.FileServicePropertiesProperties.ShareDeleteRetentionPolicy.Days", Name: validation.InclusiveMaximum, Rule: int64(365), Chain: nil},
+							{Target: "parameters.FileServicePropertiesProperties.ShareDeleteRetentionPolicy.Days", Name: validation.InclusiveMinimum, Rule: int64(1), Chain: nil},
+						}},
+					}},
+				}}}}}); err != nil {
 		return result, validation.NewError("storage.FileServicesClient", "SetServiceProperties", err.Error())
 	}
 
@@ -295,6 +303,7 @@ func (client FileServicesClient) SetServicePropertiesPreparer(ctx context.Contex
 		"api-version": APIVersion,
 	}
 
+	parameters.Sku = nil
 	preparer := autorest.CreatePreparer(
 		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
@@ -308,8 +317,7 @@ func (client FileServicesClient) SetServicePropertiesPreparer(ctx context.Contex
 // SetServicePropertiesSender sends the SetServiceProperties request. The method will close the
 // http.Response Body if it receives an error.
 func (client FileServicesClient) SetServicePropertiesSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // SetServicePropertiesResponder handles the response to the SetServiceProperties request. The method always

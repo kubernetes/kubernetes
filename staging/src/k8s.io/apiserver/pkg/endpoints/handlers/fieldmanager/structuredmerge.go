@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
@@ -42,6 +41,7 @@ type structuredMergeManager struct {
 }
 
 var _ Manager = &structuredMergeManager{}
+var atMostEverySecond = internal.NewAtMostEvery(time.Second)
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
@@ -99,37 +99,27 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
 		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object of type %v: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		atMostEverySecond.Do(func() {
+			klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object of type %v: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		})
 		return newObj, managed, nil
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
 		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object of type %v: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		atMostEverySecond.Do(func() {
+			klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object of type %v: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
+		})
 		return newObj, managed, nil
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 
 	// TODO(apelisse) use the first return value when unions are implemented
-	self := "current-operation"
-	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), self)
+	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), manager)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
 	managed = internal.NewManaged(managedFields, managed.Times())
-
-	// If the current operation took any fields from anything, it means the object changed,
-	// so update the timestamp of the managedFieldsEntry and merge with any previous updates from the same manager
-	if vs, ok := managed.Fields()[self]; ok {
-		delete(managed.Fields(), self)
-
-		managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
-		if previous, ok := managed.Fields()[manager]; ok {
-			managed.Fields()[manager] = fieldpath.NewVersionedSet(vs.Set().Union(previous.Set()), vs.APIVersion(), vs.Applied())
-		} else {
-			managed.Fields()[manager] = vs
-		}
-	}
 
 	return newObj, managed, nil
 }
@@ -177,8 +167,9 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	}
 	managed = internal.NewManaged(managedFields, managed.Times())
 
-	// Update the time in the managedFieldsEntry for this operation
-	managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
+	if newObjTyped == nil {
+		return nil, managed, nil
+	}
 
 	newObj, err := f.typeConverter.TypedToObject(newObjTyped)
 	if err != nil {

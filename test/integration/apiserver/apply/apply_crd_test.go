@@ -191,12 +191,12 @@ func TestApplyCRDStructuralSchema(t *testing.T) {
 										"type": "string"
 									},
 									"protocol": {
-										"type": "string",
-										"nullable": true
+										"type": "string"
 									}
 								},
 								"required": [
-									"containerPort"
+									"containerPort",
+									"protocol"
 								],
 								"type": "object"
 							}

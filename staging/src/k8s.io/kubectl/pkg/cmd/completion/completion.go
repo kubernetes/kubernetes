@@ -157,8 +157,6 @@ func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command)
 	zshInitialization := `
 __kubectl_bash_source() {
 	alias shopt=':'
-	alias _expand=_bash_expand
-	alias _complete=_bash_comp
 	emulate -L sh
 	setopt kshglob noshglob braceexpand
 
@@ -307,7 +305,6 @@ BASH_COMPLETION_EOF
 }
 
 __kubectl_bash_source <(__kubectl_convert_bash_to_zsh)
-_complete kubectl 2>/dev/null
 `
 	out.Write([]byte(zshTail))
 	return nil

@@ -85,7 +85,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a secret from a local file, directory or literal value"),
 		Long:                  secretLong,
@@ -172,7 +172,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
+		Use:                   "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a secret for use with a Docker registry"),
 		Long:                  secretForDockerRegistryLong,
@@ -265,7 +265,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
+		Use:                   "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a TLS secret"),
 		Long:                  secretForTLSLong,

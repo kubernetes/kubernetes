@@ -161,7 +161,7 @@ type IPBlock struct {
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`
 }
 
-// NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of
+// NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of
 // fields are allowed
 type NetworkPolicyPeer struct {
 	// This is a label selector which selects Pods. This field follows standard label

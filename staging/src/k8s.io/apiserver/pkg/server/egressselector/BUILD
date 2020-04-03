@@ -15,9 +15,13 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector/metrics:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
+        "//vendor/k8s.io/utils/trace:go_default_library",
+        "//vendor/sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
@@ -31,7 +35,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector/metrics:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
@@ -45,7 +52,11 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
     ],
 )

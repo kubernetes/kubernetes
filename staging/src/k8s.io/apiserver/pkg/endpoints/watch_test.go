@@ -17,6 +17,7 @@ limitations under the License.
 package endpoints
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -781,7 +782,7 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		APIPath: "/" + prefix,
 	}).Resource(newGroupVersion.WithResource("simple"))
 
-	_, err := client.Watch(metav1.ListOptions{})
+	_, err := client.Watch(context.TODO(), metav1.ListOptions{})
 	if err == nil {
 		t.Fatal(err)
 	}

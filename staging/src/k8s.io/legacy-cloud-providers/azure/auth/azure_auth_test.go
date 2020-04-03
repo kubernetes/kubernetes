@@ -24,6 +24,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	CrossTenantNetworkResourceNegativeConfig = []*AzureAuthConfig{
+		{
+			TenantID:        "TenantID",
+			AADClientID:     "AADClientID",
+			AADClientSecret: "AADClientSecret",
+		},
+		{
+			TenantID:                      "TenantID",
+			AADClientID:                   "AADClientID",
+			AADClientSecret:               "AADClientSecret",
+			NetworkResourceTenantID:       "NetworkResourceTenantID",
+			NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
+			IdentitySystem:                ADFSIdentitySystem,
+		},
+		{
+			TenantID:                      "TenantID",
+			AADClientID:                   "AADClientID",
+			AADClientSecret:               "AADClientSecret",
+			NetworkResourceTenantID:       "NetworkResourceTenantID",
+			NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
+			UseManagedIdentityExtension:   true,
+		},
+	}
+)
+
 func TestGetServicePrincipalTokenFromMSIWithUserAssignedID(t *testing.T) {
 	configs := []*AzureAuthConfig{
 		{
@@ -104,6 +130,66 @@ func TestGetServicePrincipalToken(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, token, spt)
+}
+
+func TestGetMultiTenantServicePrincipalToken(t *testing.T) {
+	config := &AzureAuthConfig{
+		TenantID:                      "TenantID",
+		AADClientID:                   "AADClientID",
+		AADClientSecret:               "AADClientSecret",
+		NetworkResourceTenantID:       "NetworkResourceTenantID",
+		NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
+	}
+	env := &azure.PublicCloud
+
+	multiTenantToken, err := GetMultiTenantServicePrincipalToken(config, env)
+	assert.NoError(t, err)
+
+	multiTenantOAuthConfig, err := adal.NewMultiTenantOAuthConfig(env.ActiveDirectoryEndpoint, config.TenantID, []string{config.NetworkResourceTenantID}, adal.OAuthOptions{})
+	assert.NoError(t, err)
+
+	spt, err := adal.NewMultiTenantServicePrincipalToken(multiTenantOAuthConfig, config.AADClientID, config.AADClientSecret, env.ServiceManagementEndpoint)
+	assert.NoError(t, err)
+
+	assert.Equal(t, multiTenantToken, spt)
+}
+
+func TestGetMultiTenantServicePrincipalTokenNegative(t *testing.T) {
+	env := &azure.PublicCloud
+	for _, config := range CrossTenantNetworkResourceNegativeConfig {
+		_, err := GetMultiTenantServicePrincipalToken(config, env)
+		assert.Error(t, err)
+	}
+}
+
+func TestGetNetworkResourceServicePrincipalToken(t *testing.T) {
+	config := &AzureAuthConfig{
+		TenantID:                      "TenantID",
+		AADClientID:                   "AADClientID",
+		AADClientSecret:               "AADClientSecret",
+		NetworkResourceTenantID:       "NetworkResourceTenantID",
+		NetworkResourceSubscriptionID: "NetworkResourceSubscriptionID",
+	}
+	env := &azure.PublicCloud
+
+	token, err := GetNetworkResourceServicePrincipalToken(config, env)
+	assert.NoError(t, err)
+
+	oauthConfig, err := adal.NewOAuthConfigWithAPIVersion(env.ActiveDirectoryEndpoint, config.NetworkResourceTenantID, nil)
+	assert.NoError(t, err)
+
+	spt, err := adal.NewServicePrincipalToken(*oauthConfig, config.AADClientID, config.AADClientSecret, env.ServiceManagementEndpoint)
+	assert.NoError(t, err)
+
+	assert.Equal(t, token, spt)
+}
+
+func TestGetNetworkResourceServicePrincipalTokenNegative(t *testing.T) {
+	env := &azure.PublicCloud
+	for _, config := range CrossTenantNetworkResourceNegativeConfig {
+		_, err := GetNetworkResourceServicePrincipalToken(config, env)
+		assert.Error(t, err)
+	}
 }
 
 func TestParseAzureEngironment(t *testing.T) {

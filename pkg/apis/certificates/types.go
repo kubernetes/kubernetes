@@ -42,6 +42,12 @@ type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte
 
+	// Requested signer for the request. It is a qualified name in the form:
+	// `scope-hostname.io/name`.
+	// Distribution of trust for signers happens out of band.
+	// You can select on this field using `spec.signerName`.
+	SignerName string
+
 	// usages specifies a set of usage contexts the key will be
 	// valid for.
 	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3

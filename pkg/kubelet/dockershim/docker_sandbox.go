@@ -253,7 +253,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 	// This depends on the implementation detail of network plugin and proper error handling.
 	// For kubenet, if tearing down network failed and sandbox container is stopped, kubelet
 	// will retry. On retry, kubenet will not be able to retrieve network namespace of the sandbox
-	// since it is stopped. With empty network namespcae, CNI bridge plugin will conduct best
+	// since it is stopped. With empty network namespace, CNI bridge plugin will conduct best
 	// effort clean up and will not return error.
 	errList := []error{}
 	ready, ok := ds.getNetworkReady(podSandboxID)

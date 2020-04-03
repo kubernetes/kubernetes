@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -451,7 +452,7 @@ func (o *CreateSubcommandOptions) Run() error {
 			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
-		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured, createOptions)
+		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(context.TODO(), asUnstructured, createOptions)
 		if err != nil {
 			return err
 		}

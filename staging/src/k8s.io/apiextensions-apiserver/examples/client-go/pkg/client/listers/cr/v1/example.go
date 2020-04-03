@@ -26,8 +26,10 @@ import (
 )
 
 // ExampleLister helps list Examples.
+// All objects returned here must be treated as read-only.
 type ExampleLister interface {
 	// List lists all Examples in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Example, err error)
 	// Examples returns an object that can list and get Examples.
 	Examples(namespace string) ExampleNamespaceLister
@@ -58,10 +60,13 @@ func (s *exampleLister) Examples(namespace string) ExampleNamespaceLister {
 }
 
 // ExampleNamespaceLister helps list and get Examples.
+// All objects returned here must be treated as read-only.
 type ExampleNamespaceLister interface {
 	// List lists all Examples in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Example, err error)
 	// Get retrieves the Example from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Example, error)
 	ExampleNamespaceListerExpansion
 }

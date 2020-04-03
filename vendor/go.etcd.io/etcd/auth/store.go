@@ -306,7 +306,7 @@ func (as *authStore) Authenticate(ctx context.Context, username, password string
 		return nil, ErrAuthFailed
 	}
 
-	if user.Options.NoPassword {
+	if user.Options != nil && user.Options.NoPassword {
 		return nil, ErrAuthFailed
 	}
 
@@ -344,7 +344,7 @@ func (as *authStore) CheckPassword(username, password string) (uint64, error) {
 		return 0, ErrAuthFailed
 	}
 
-	if user.Options.NoPassword {
+	if user.Options != nil && user.Options.NoPassword {
 		return 0, ErrAuthFailed
 	}
 
@@ -388,7 +388,8 @@ func (as *authStore) UserAdd(r *pb.AuthUserAddRequest) (*pb.AuthUserAddResponse,
 	var hashed []byte
 	var err error
 
-	if r.Options != nil && !r.Options.NoPassword {
+	noPassword := r.Options != nil && r.Options.NoPassword
+	if !noPassword {
 		hashed, err = bcrypt.GenerateFromPassword([]byte(r.Password), as.bcryptCost)
 		if err != nil {
 			if as.lg != nil {

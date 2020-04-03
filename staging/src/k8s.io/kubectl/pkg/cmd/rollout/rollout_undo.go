@@ -62,7 +62,7 @@ var (
 		kubectl rollout undo daemonset/abc --to-revision=3
 
 		# Rollback to the previous deployment with dry-run
-		kubectl rollout undo --dry-run=true deployment/abc`)
+		kubectl rollout undo --dry-run=server deployment/abc`)
 )
 
 // NewRolloutUndoOptions returns an initialized UndoOptions instance

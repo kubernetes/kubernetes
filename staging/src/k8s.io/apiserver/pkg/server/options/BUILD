@@ -18,6 +18,8 @@ go_library(
         "recommended.go",
         "server_run_options.go",
         "serving.go",
+        "serving_unix.go",
+        "serving_windows.go",
         "serving_with_loopback.go",
         "webhook.go",
     ],
@@ -91,7 +93,42 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
@@ -104,6 +141,7 @@ go_test(
         "etcd_test.go",
         "server_run_options_test.go",
         "serving_test.go",
+        "serving_unix_test.go",
     ],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],

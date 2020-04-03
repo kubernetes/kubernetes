@@ -17,6 +17,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -97,7 +98,7 @@ func (p *pruner) pruneAll(o *ApplyOptions) error {
 func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 	objList, err := p.dynamicClient.Resource(mapping.Resource).
 		Namespace(namespace).
-		List(metav1.ListOptions{
+		List(context.TODO(), metav1.ListOptions{
 			LabelSelector: p.labelSelector,
 			FieldSelector: p.fieldSelector,
 		})
@@ -145,9 +146,9 @@ func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error
 }
 
 func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, serverDryRun bool) error {
-	options := &metav1.DeleteOptions{}
+	options := metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
-		options = metav1.NewDeleteOptions(int64(gracePeriod))
+		options = *metav1.NewDeleteOptions(int64(gracePeriod))
 	}
 	if serverDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
@@ -157,7 +158,7 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Inte
 		policy = metav1.DeletePropagationOrphan
 	}
 	options.PropagationPolicy = &policy
-	return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, options)
+	return c.Resource(mapping.Resource).Namespace(namespace).Delete(context.TODO(), name, options)
 }
 
 type pruneResource struct {

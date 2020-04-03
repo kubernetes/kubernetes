@@ -26,6 +26,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -83,7 +84,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// delete the referenced secret
 		ginkgo.By("deleting the service account token")
-		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secrets[0].Name, nil))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secrets[0].Name, metav1.DeleteOptions{}))
 
 		// wait for the referenced secret to be removed, and another one autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
@@ -519,6 +520,106 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}); err != nil {
 			framework.Failf("Unexpected error: %v\n%s", err, logs)
 		}
+	})
+
+	ginkgo.It("should support OIDC discovery of service account issuer [Feature:ServiceAccountIssuerDiscovery]", func() {
+		// Allow the test pod access to the OIDC discovery non-resource URLs.
+		// The role should have already been automatically created as part of the
+		// bootstrap policy, but not the role binding.
+		const clusterRoleName = "system:service-account-issuer-discovery"
+		crbName := fmt.Sprintf("%s-%s", f.Namespace.Name, clusterRoleName)
+		if _, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(
+			context.TODO(),
+			&rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: crbName,
+				},
+				Subjects: []rbacv1.Subject{
+					{
+						Kind:      rbacv1.ServiceAccountKind,
+						APIGroup:  "",
+						Name:      "default",
+						Namespace: f.Namespace.Name,
+					},
+				},
+				RoleRef: rbacv1.RoleRef{
+					Name:     clusterRoleName,
+					APIGroup: rbacv1.GroupName,
+					Kind:     "ClusterRole",
+				},
+			},
+			metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("Unexpected err creating ClusterRoleBinding %s: %v", crbName, err)
+		}
+
+		// Create the pod with tokens.
+		tokenPath := "/var/run/secrets/tokens"
+		tokenName := "sa-token"
+		audience := "oidc-discovery-test"
+		tenMin := int64(10 * 60)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "oidc-discovery-validator"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "oidc-discovery-validator",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args: []string{
+						"test-service-account-issuer-discovery",
+						"--in-cluster-discovery",
+						"--token-path", path.Join(tokenPath, tokenName),
+						"--audience", audience,
+					},
+					VolumeMounts: []v1.VolumeMount{{
+						MountPath: tokenPath,
+						Name:      tokenName,
+						ReadOnly:  true,
+					}},
+				}},
+				RestartPolicy:      v1.RestartPolicyNever,
+				ServiceAccountName: "default",
+				Volumes: []v1.Volume{{
+					Name: tokenName,
+					VolumeSource: v1.VolumeSource{
+						Projected: &v1.ProjectedVolumeSource{
+							Sources: []v1.VolumeProjection{
+								{
+									ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+										Path:              tokenName,
+										ExpirationSeconds: &tenMin,
+										Audience:          audience,
+									},
+								},
+							},
+						},
+					},
+				}},
+			},
+		}
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		framework.Logf("created pod")
+		podErr := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+
+		// Get the logs before calling ExpectNoError, so we can debug any errors.
+		var logs string
+		if err := wait.Poll(30*time.Second, 2*time.Minute, func() (done bool, err error) {
+			framework.Logf("polling logs")
+			logs, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+			if err != nil {
+				framework.Logf("Error pulling logs: %v", err)
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
+			framework.Failf("Unexpected error getting pod logs: %v\n%s", err, logs)
+		} else {
+			framework.Logf("Pod logs: \n%v", logs)
+		}
+
+		framework.ExpectNoError(podErr)
+		framework.Logf("completed pod")
 	})
 })
 

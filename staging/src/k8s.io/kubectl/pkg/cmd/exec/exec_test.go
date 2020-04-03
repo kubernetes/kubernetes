@@ -103,7 +103,7 @@ func TestPodAndContainer(t *testing.T) {
 		{
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
-			argsLenAtDash: -1,
+			argsLenAtDash: 1,
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, w/o flags",
@@ -112,7 +112,7 @@ func TestPodAndContainer(t *testing.T) {
 		{
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
-			argsLenAtDash: 1,
+			argsLenAtDash: -1,
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, cmd is behind dash",
@@ -148,6 +148,9 @@ func TestPodAndContainer(t *testing.T) {
 			options.ErrOut = bytes.NewBuffer([]byte{})
 			options.Out = bytes.NewBuffer([]byte{})
 			err = options.Complete(tf, cmd, test.args, test.argsLenAtDash)
+			if !test.expectError && err != nil {
+				t.Errorf("%s: unexpected error: %v", test.name, err)
+			}
 			err = options.Validate()
 
 			if test.expectError && err == nil {
@@ -160,7 +163,7 @@ func TestPodAndContainer(t *testing.T) {
 				return
 			}
 
-			pod, err := options.ExecutablePodFn(tf, test.obj, defaultPodExecTimeout)
+			pod, _ := options.ExecutablePodFn(tf, test.obj, defaultPodExecTimeout)
 			if pod.Name != test.expectedPod {
 				t.Errorf("%s: expected: %s, got: %s", test.name, test.expectedPod, options.PodName)
 			}

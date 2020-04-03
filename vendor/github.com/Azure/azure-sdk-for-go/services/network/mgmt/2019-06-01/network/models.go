@@ -23123,8 +23123,8 @@ type PrivateLinkServiceConnectionState struct {
 	Status *string `json:"status,omitempty"`
 	// Description - The reason for approval/rejection of the connection.
 	Description *string `json:"description,omitempty"`
-	// ActionRequired - A message indicating if changes on the service provider require any updates on the consumer.
-	ActionRequired *string `json:"actionRequired,omitempty"`
+	// ActionsRequired - A message indicating if changes on the service provider require any updates on the consumer.
+	ActionsRequired *string `json:"actionsRequired,omitempty"`
 }
 
 // PrivateLinkServiceIPConfiguration the private link service ip configuration.

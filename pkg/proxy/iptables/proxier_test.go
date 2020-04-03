@@ -34,9 +34,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utilproxytest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
@@ -229,7 +233,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 	}
 
 	// Create a fake executor for the conntrack utility. This should only be
-	// invoked for UDP connections, since no conntrack cleanup is needed for TCP
+	// invoked for UDP and SCTP connections, since no conntrack cleanup is needed for TCP
 	fcmd := fakeexec.FakeCmd{}
 	fexec := fakeexec.FakeExec{
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
@@ -238,7 +242,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
 	}
 	for _, tc := range testCases {
-		if tc.protocol == UDP {
+		if conntrack.IsClearConntrackNeeded(tc.protocol) {
 			var cmdOutput string
 			var simErr error
 			if tc.simulatedErr == "" {
@@ -291,15 +295,15 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 		fp.deleteEndpointConnections(input)
 
-		// For UDP connections, check the executed conntrack command
+		// For UDP and SCTP connections, check the executed conntrack command
 		var expExecs int
-		if tc.protocol == UDP {
+		if conntrack.IsClearConntrackNeeded(tc.protocol) {
 			isIPv6 := func(ip string) bool {
 				netIP := net.ParseIP(ip)
 				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
-			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
+			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p %s", tc.svcIP, endpointIP, strings.ToLower(string((tc.protocol))))
 			if isIPv6(endpointIP) {
 				expectCommand += " -f ipv6"
 			}
@@ -345,6 +349,7 @@ const testHostname = "test-hostname"
 func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
+	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24", ipt)
 	p := &Proxier{
 		exec:                     &fakeexec.FakeExec{},
 		serviceMap:               make(proxy.ServiceMap),
@@ -352,7 +357,7 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, nil, nil, endpointSlicesEnabled),
 		iptables:                 ipt,
-		clusterCIDR:              "10.0.0.0/24",
+		localDetector:            detectLocal,
 		hostname:                 testHostname,
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
@@ -830,6 +835,80 @@ func TestExternalIPsReject(t *testing.T) {
 	}
 }
 
+func TestOnlyLocalExternalIPs(t *testing.T) {
+	// TODO(freehan): remove this in k8s 1.19
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalPolicyForExternalIP, true)()
+
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcExternalIPs := "50.60.70.81"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalIPs = []string{svcExternalIPs}
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       svcPortName.Port,
+				Port:       int32(svcPort),
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(svcPort),
+			}}
+		}),
+	)
+	makeEndpointsMap(fp)
+	epIP1 := "10.180.0.1"
+	epIP2 := "10.180.2.1"
+	epStrLocal := fmt.Sprintf("%s:%d", epIP1, svcPort)
+	epStrNonLocal := fmt.Sprintf("%s:%d", epIP2, svcPort)
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{
+					IP:       epIP1,
+					NodeName: nil,
+				}, {
+					IP:       epIP2,
+					NodeName: utilpointer.StringPtr(testHostname),
+				}},
+				Ports: []v1.EndpointPort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	proto := strings.ToLower(string(v1.ProtocolTCP))
+	lbChain := string(serviceLBChainName(svcPortName.String(), proto))
+
+	nonLocalEpChain := string(servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP)), epStrLocal))
+	localEpChain := string(servicePortEndpointChainName(svcPortName.String(), strings.ToLower(string(v1.ProtocolTCP)), epStrNonLocal))
+
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(kubeSvcRules, lbChain, svcExternalIPs, svcPort) {
+		errorf(fmt.Sprintf("Failed to find jump to xlb chain %v", lbChain), kubeSvcRules, t)
+	}
+
+	lbRules := ipt.GetRules(lbChain)
+	if hasJump(lbRules, nonLocalEpChain, "", 0) {
+		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, epStrLocal), lbRules, t)
+	}
+	if !hasJump(lbRules, localEpChain, "", 0) {
+		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, epStrNonLocal), lbRules, t)
+	}
+}
+
 func TestNodePortReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt, false)
@@ -958,8 +1037,6 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt, false)
-	// set cluster CIDR to empty before test
-	fp.clusterCIDR = ""
 	onlyLocalNodePorts(t, fp, ipt)
 }
 
@@ -2342,8 +2419,8 @@ func TestEndpointSliceE2E(t *testing.T) {
 :KUBE-FORWARD - [0:0]
 -A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 -A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark  -j ACCEPT
--A KUBE-FORWARD -s 10.0.0.0/24 -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
--A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -d 10.0.0.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 COMMIT
 *nat
 :KUBE-SERVICES - [0:0]

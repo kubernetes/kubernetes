@@ -18,6 +18,8 @@ limitations under the License.
 
 package v1
 
+type CSIDriverExpansion interface{}
+
 type CSINodeExpansion interface{}
 
 type StorageClassExpansion interface{}

@@ -106,7 +106,7 @@ type ProcStat struct {
 
 // NewStat returns the current status information of the process.
 //
-// Deprecated: use NewStat() instead
+// Deprecated: use p.Stat() instead
 func (p Proc) NewStat() (ProcStat, error) {
 	return p.Stat()
 }

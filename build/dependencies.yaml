@@ -1,6 +1,6 @@
 dependencies:
   - name: "etcd"
-    version: 3.4.3
+    version: 3.4.4
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -32,13 +32,9 @@ dependencies:
 
 
   - name: "golang"
-    version: 1.13.6
+    version: 1.13.9
     refPaths:
-    - path: build/build-image/cross/Dockerfile
-      match: "golang:"
     - path: build/build-image/cross/VERSION
-    - path: build/root/WORKSPACE
-      match: go_version
     - path: test/images/Makefile
       match: GOLANG_VERSION
 
@@ -46,8 +42,6 @@ dependencies:
   - name: "cni"
     version: 0.8.5
     refPaths:
-    - path: build/debian-hyperkube-base/Makefile
-      match: CNI_VERSION=
     - path: build/workspace.bzl
       match: CNI_VERSION =
     - path: cluster/gce/gci/configure.sh
@@ -59,7 +53,7 @@ dependencies:
 
 
   - name: "coredns-kube-up"
-    version: 1.6.5
+    version: 1.6.7
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns
@@ -69,7 +63,7 @@ dependencies:
       match: k8s.gcr.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.6.5
+    version: 1.6.7
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =

@@ -6,7 +6,11 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/metrics",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol/metrics",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
+    ],
 )
 
 filegroup(

@@ -92,6 +92,15 @@ func ParseMetrics(data string, output *Metrics) error {
 	}
 }
 
+// TextToMetricFamilies reads 'in' as the simple and flat text-based exchange
+// format and creates MetricFamily proto messages. It returns the MetricFamily
+// proto messages in a map where the metric names are the keys, along with any
+// error encountered.
+func TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricFamily, error) {
+	var textParser expfmt.TextParser
+	return textParser.TextToMetricFamilies(in)
+}
+
 // ExtractMetricSamples parses the prometheus metric samples from the input string.
 func ExtractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	dec := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
@@ -253,6 +262,10 @@ func bucketQuantile(q float64, buckets []bucket) float64 {
 		return buckets[0].upperBound * (rank / buckets[0].count)
 	}
 
+	if b == len(buckets)-1 && math.IsInf(buckets[b].upperBound, 1) {
+		return buckets[len(buckets)-2].upperBound
+	}
+
 	// linear approximation of b-th bucket
 	brank := rank - buckets[b-1].count
 	bSize := buckets[b].upperBound - buckets[b-1].upperBound
@@ -319,4 +332,31 @@ func (hist *Histogram) Validate() error {
 	}
 
 	return nil
+}
+
+// GetGaugeMetricValue extract metric value from GaugeMetric
+func GetGaugeMetricValue(m metrics.GaugeMetric) (float64, error) {
+	metricProto := &dto.Metric{}
+	if err := m.Write(metricProto); err != nil {
+		return 0, fmt.Errorf("Error writing m: %v", err)
+	}
+	return metricProto.Gauge.GetValue(), nil
+}
+
+// GetCounterMetricValue extract metric value from CounterMetric
+func GetCounterMetricValue(m metrics.CounterMetric) (float64, error) {
+	metricProto := &dto.Metric{}
+	if err := m.(metrics.Metric).Write(metricProto); err != nil {
+		return 0, fmt.Errorf("Error writing m: %v", err)
+	}
+	return metricProto.Counter.GetValue(), nil
+}
+
+// GetHistogramMetricValue extract sum of all samples from ObserverMetric
+func GetHistogramMetricValue(m metrics.ObserverMetric) (float64, error) {
+	metricProto := &dto.Metric{}
+	if err := m.(metrics.Metric).Write(metricProto); err != nil {
+		return 0, fmt.Errorf("Error writing m: %v", err)
+	}
+	return metricProto.Histogram.GetSampleSum(), nil
 }

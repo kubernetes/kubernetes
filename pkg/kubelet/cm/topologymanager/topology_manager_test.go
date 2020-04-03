@@ -75,10 +75,18 @@ func TestNewManager(t *testing.T) {
 
 type mockHintProvider struct {
 	th map[string][]TopologyHint
+	//TODO: Add this field and add some tests to make sure things error out
+	//appropriately on allocation errors.
+	//allocateError error
 }
 
 func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
 	return m.th
+}
+
+func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+	//return allocateError
+	return nil
 }
 
 func TestGetAffinity(t *testing.T) {

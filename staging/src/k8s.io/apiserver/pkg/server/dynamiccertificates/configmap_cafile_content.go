@@ -97,10 +97,7 @@ func NewDynamicCAFromConfigMapController(purpose, namespace, name, key string, k
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicConfigMapCABundle-%s", purpose)),
 		preRunCaches: []cache.InformerSynced{uncastConfigmapInformer.HasSynced},
 	}
-	if err := c.loadCABundle(); err != nil {
-		// don't fail, but do print out a message
-		klog.Warningf("unable to load initial CA bundle for: %q due to: %s", c.name, err)
-	}
+
 	uncastConfigmapInformer.AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
 			if cast, ok := obj.(*corev1.ConfigMap); ok {

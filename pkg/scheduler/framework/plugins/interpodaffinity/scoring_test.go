@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/utils/pointer"
 )
 
 func TestPreferredAffinity(t *testing.T) {
@@ -519,8 +520,10 @@ func TestPreferredAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			p := &InterPodAffinity{
-				sharedLister:          snapshot,
-				hardPodAffinityWeight: 1,
+				Args: Args{
+					HardPodAffinityWeight: pointer.Int32Ptr(DefaultHardPodAffinityWeight),
+				},
+				sharedLister: snapshot,
 			}
 
 			status := p.PreScore(context.Background(), state, test.pod, test.nodes)

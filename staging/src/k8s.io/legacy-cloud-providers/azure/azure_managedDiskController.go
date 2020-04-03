@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 
 	v1 "k8s.io/api/core/v1"
@@ -75,6 +75,8 @@ type ManagedDiskOptions struct {
 	SourceType string
 	// ResourceId of the disk encryption set to use for enabling encryption at rest.
 	DiskEncryptionSetID string
+	// The maximum number of VMs that can attach to the disk at the same time. Value greater than one indicates a disk that can be mounted on multiple VMs at the same time.
+	MaxShares int32
 }
 
 //CreateManagedDisk : create managed disk
@@ -124,15 +126,15 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		}
 		diskProperties.DiskIOPSReadWrite = to.Int64Ptr(diskIOPSReadWrite)
 
-		diskMBpsReadWrite := int32(defaultDiskMBpsReadWrite)
+		diskMBpsReadWrite := int64(defaultDiskMBpsReadWrite)
 		if options.DiskMBpsReadWrite != "" {
 			v, err := strconv.Atoi(options.DiskMBpsReadWrite)
 			if err != nil {
 				return "", fmt.Errorf("AzureDisk - failed to parse DiskMBpsReadWrite: %v", err)
 			}
-			diskMBpsReadWrite = int32(v)
+			diskMBpsReadWrite = int64(v)
 		}
-		diskProperties.DiskMBpsReadWrite = to.Int32Ptr(diskMBpsReadWrite)
+		diskProperties.DiskMBpsReadWrite = to.Int64Ptr(diskMBpsReadWrite)
 	} else {
 		if options.DiskIOPSReadWrite != "" {
 			return "", fmt.Errorf("AzureDisk - DiskIOPSReadWrite parameter is only applicable in UltraSSD_LRS disk type")
@@ -150,6 +152,10 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 			DiskEncryptionSetID: &options.DiskEncryptionSetID,
 			Type:                compute.EncryptionAtRestWithCustomerKey,
 		}
+	}
+
+	if options.MaxShares > 1 {
+		diskProperties.MaxShares = &options.MaxShares
 	}
 
 	model := compute.Disk{
@@ -214,7 +220,16 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 		return fmt.Errorf("failed to delete disk(%s) since it's in attaching or detaching state", diskURI)
 	}
 
-	rerr := c.common.cloud.DisksClient.Delete(ctx, resourceGroup, diskName)
+	disk, rerr := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
+	if rerr != nil {
+		return rerr.Error()
+	}
+
+	if disk.ManagedBy != nil {
+		return fmt.Errorf("disk(%s) already attached to node(%s), could not be deleted", diskURI, *disk.ManagedBy)
+	}
+
+	rerr = c.common.cloud.DisksClient.Delete(ctx, resourceGroup, diskName)
 	if rerr != nil {
 		return rerr.Error()
 	}

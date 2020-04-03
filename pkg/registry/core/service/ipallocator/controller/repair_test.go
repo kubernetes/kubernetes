@@ -270,13 +270,13 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 
 			fakeClient := makeFakeClientSet()
 			primaryRegistry := makeRangeRegistry(t, tc.primaryNet.String())
-			var secondaryRegistery *mockRangeRegistry
+			var secondaryRegistry *mockRangeRegistry
 
 			if tc.secondaryNet != nil {
-				secondaryRegistery = makeRangeRegistry(t, tc.secondaryNet.String())
+				secondaryRegistry = makeRangeRegistry(t, tc.secondaryNet.String())
 			}
 
-			repair := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistery)
+			repair := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistry)
 			if repair.shouldWorkOnSecondary() != tc.expectedResult {
 				t.Errorf("shouldWorkOnSecondary should be %v and found %v", tc.expectedResult, repair.shouldWorkOnSecondary())
 			}

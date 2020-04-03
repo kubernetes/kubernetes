@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"path/filepath"
 	"strings"
 	"time"
 	"unsafe"
@@ -145,20 +144,13 @@ func NewProgramFromFD(fd int) (*Program, error) {
 	}
 	bpfFd := newBPFFD(uint32(fd))
 
-	info, err := bpfGetProgInfoByFD(bpfFd)
+	name, abi, err := newProgramABIFromFd(bpfFd)
 	if err != nil {
 		bpfFd.forget()
 		return nil, err
 	}
 
-	var name string
-	if bpfName := convertCString(info.name[:]); bpfName != "" {
-		name = bpfName
-	} else {
-		name = convertCString(info.tag[:])
-	}
-
-	return newProgram(bpfFd, name, newProgramABIFromInfo(info)), nil
+	return newProgram(bpfFd, name, abi), nil
 }
 
 func newProgram(fd *bpfFD, name string, abi *ProgramABI) *Program {
@@ -209,9 +201,9 @@ func convertProgramSpec(spec *ProgramSpec, includeName bool) (*bpfProgLoadAttr, 
 
 func (p *Program) String() string {
 	if p.name != "" {
-		return fmt.Sprintf("%s(%s)#%s", p.abi.Type, p.name, p.fd)
+		return fmt.Sprintf("%s(%s)#%v", p.abi.Type, p.name, p.fd)
 	}
-	return fmt.Sprintf("%s#%s", p.abi.Type, p.fd)
+	return fmt.Sprintf("%s#%v", p.abi.Type, p.fd)
 }
 
 // ABI gets the ABI of the Program
@@ -392,13 +384,13 @@ func unmarshalProgram(buf []byte) (*Program, error) {
 		return nil, err
 	}
 
-	abi, err := newProgramABIFromFd(fd)
+	name, abi, err := newProgramABIFromFd(fd)
 	if err != nil {
 		_ = fd.close()
 		return nil, err
 	}
 
-	return newProgram(fd, "", abi), nil
+	return newProgram(fd, name, abi), nil
 }
 
 // MarshalBinary implements BinaryMarshaler.
@@ -456,32 +448,19 @@ func (p *Program) Detach(fd int, typ AttachType, flags AttachFlags) error {
 }
 
 // LoadPinnedProgram loads a Program from a BPF file.
-//
-// Requires at least Linux 4.13, use LoadPinnedProgramExplicit on
-// earlier versions.
 func LoadPinnedProgram(fileName string) (*Program, error) {
 	fd, err := bpfGetObject(fileName)
 	if err != nil {
 		return nil, err
 	}
 
-	abi, err := newProgramABIFromFd(fd)
+	name, abi, err := newProgramABIFromFd(fd)
 	if err != nil {
 		_ = fd.close()
 		return nil, err
 	}
 
-	return newProgram(fd, filepath.Base(fileName), abi), nil
-}
-
-// LoadPinnedProgramExplicit loads a program with explicit parameters.
-func LoadPinnedProgramExplicit(fileName string, abi *ProgramABI) (*Program, error) {
-	fd, err := bpfGetObject(fileName)
-	if err != nil {
-		return nil, err
-	}
-
-	return newProgram(fd, filepath.Base(fileName), abi), nil
+	return newProgram(fd, name, abi), nil
 }
 
 // SanitizeName replaces all invalid characters in name.

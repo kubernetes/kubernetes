@@ -263,7 +263,7 @@ func TestValidateUpdate(t *testing.T) {
 					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
 				},
 			},
-		}, false},
+		}, true},
 		{api.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "hugepage-change-values",
@@ -328,7 +328,7 @@ func TestValidate(t *testing.T) {
 					api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
 				},
 			},
-		}, false},
+		}, true},
 	}
 	for i, test := range tests {
 		test.node.ObjectMeta.ResourceVersion = "1"

@@ -26,6 +26,8 @@ go_library(
         "msghdr_openbsd.go",
         "msghdr_solaris_64bit.go",
         "msghdr_stub.go",
+        "norace.go",
+        "race.go",
         "rawconn.go",
         "rawconn_mmsg.go",
         "rawconn_msg.go",

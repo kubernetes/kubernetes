@@ -17,17 +17,22 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -325,7 +330,7 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "", []string{})
+		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
 		if err != nil {
 			t.Errorf("startContainer error =%v", err)
 		}
@@ -333,4 +338,73 @@ func TestLifeCycleHook(t *testing.T) {
 			t.Errorf("CMD PostStart hook was not invoked")
 		}
 	})
+}
+
+func TestStartSpec(t *testing.T) {
+	podStatus := &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.ContainerStatus{
+			{
+				ID: kubecontainer.ContainerID{
+					Type: "docker",
+					ID:   "docker-something-something",
+				},
+				Name: "target",
+			},
+		},
+	}
+
+	for _, tc := range []struct {
+		name string
+		spec *startSpec
+		want *kubecontainer.ContainerID
+	}{
+		{
+			"Regular Container",
+			containerStartSpec(&v1.Container{
+				Name: "test",
+			}),
+			nil,
+		},
+		{
+			"Ephemeral Container w/o Target",
+			ephemeralContainerStartSpec(&v1.EphemeralContainer{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					Name: "test",
+				},
+			}),
+			nil,
+		},
+		{
+			"Ephemeral Container w/ Target",
+			ephemeralContainerStartSpec(&v1.EphemeralContainer{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					Name: "test",
+				},
+				TargetContainerName: "target",
+			}),
+			&kubecontainer.ContainerID{
+				Type: "docker",
+				ID:   "docker-something-something",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+			if got, err := tc.spec.getTargetID(podStatus); err != nil {
+				t.Fatalf("%v: getTargetID got unexpected error: %v", t.Name(), err)
+			} else if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("%v: getTargetID got unexpected result. diff:\n%v", t.Name(), diff)
+			}
+		})
+
+		// Test with feature disabled in self-contained section which can be removed when feature flag is removed.
+		t.Run(fmt.Sprintf("%s (disabled)", tc.name), func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
+			if got, err := tc.spec.getTargetID(podStatus); err != nil {
+				t.Fatalf("%v: getTargetID got unexpected error: %v", t.Name(), err)
+			} else if got != nil {
+				t.Errorf("%v: getTargetID got: %v, wanted nil", t.Name(), got)
+			}
+		})
+	}
 }

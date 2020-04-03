@@ -1133,7 +1133,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 	})
 
 	// (A) Delete one pod
-	if err := dc.coreClient.CoreV1().Pods("default").Delete(context.TODO(), podNames[0], &metav1.DeleteOptions{}); err != nil {
+	if err := dc.coreClient.CoreV1().Pods("default").Delete(context.TODO(), podNames[0], metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := waitForCacheCount(dc.podStore, len(podNames)-1); err != nil {

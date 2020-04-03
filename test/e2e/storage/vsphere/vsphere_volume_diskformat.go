@@ -113,7 +113,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, nil)
+	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass)
@@ -121,7 +121,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	framework.ExpectNoError(err)
 
 	defer func() {
-		client.CoreV1().PersistentVolumeClaims(namespace).Delete(context.TODO(), pvclaimSpec.Name, nil)
+		client.CoreV1().PersistentVolumeClaims(namespace).Delete(context.TODO(), pvclaimSpec.Name, metav1.DeleteOptions{})
 	}()
 
 	ginkgo.By("Waiting for claim to be in bound phase")

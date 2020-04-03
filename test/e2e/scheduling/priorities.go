@@ -148,7 +148,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 
 		err = framework.CheckTestingNSDeletedExcept(cs, ns)
@@ -233,7 +232,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			},
 		})
 		ginkgo.By("Wait the pod becomes running")
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
@@ -332,7 +331,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			Name:        tolerationPodName,
 			Tolerations: tolerations,
 		})
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(context.TODO(), tolerationPodName, metav1.GetOptions{})
@@ -378,7 +377,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 				PodConfig: pausePodConfig{
 					Name:         podLabel,
 					Namespace:    ns,
-					Labels:       map[string]string{podLabel: ""},
+					Labels:       map[string]string{podLabel: "foo"},
 					NodeSelector: map[string]string{topologyKey: nodeNames[0]},
 				},
 			}
@@ -388,7 +387,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			podCfg := pausePodConfig{
 				Name:      "test-pod",
 				Namespace: ns,
-				Labels:    map[string]string{podLabel: ""},
+				// The labels shouldn't match the preceding ReplicaSet, otherwise it will
+				// be claimed as orphan of the ReplicaSet.
+				Labels: map[string]string{podLabel: "bar"},
 				Affinity: &v1.Affinity{
 					NodeAffinity: &v1.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{

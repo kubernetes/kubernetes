@@ -246,7 +246,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 
 			if c.shouldDeny {
-				err = cs.CoreV1().Pods(ns).Evict(e)
+				err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
 				// Only wait for running pods in the "allow" case
@@ -257,7 +257,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
 				err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-					err = cs.CoreV1().Pods(ns).Evict(e)
+					err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 					if err != nil {
 						return false, nil
 					}
@@ -284,7 +284,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
@@ -297,7 +297,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
 		waitForPdbToObserveHealthyPods(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 
 		ginkgo.By("Patching the pdb to disallow a pod to be evicted")
@@ -319,7 +319,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				Namespace: ns,
 			},
 		}
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
@@ -327,7 +327,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
-		err = cs.CoreV1().Pods(ns).Evict(e)
+		err = cs.CoreV1().Pods(ns).Evict(context.TODO(), e)
 		framework.ExpectNoError(err) // the eviction is now allowed
 	})
 
@@ -404,7 +404,7 @@ func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, nam
 }
 
 func deletePDBOrDie(cs kubernetes.Interface, ns string, name string) {
-	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Delete(context.TODO(), name, &metav1.DeleteOptions{})
+	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "Deleting pdb in namespace %s", ns)
 	waitForPdbToBeDeleted(cs, ns, name)
 }
@@ -423,7 +423,7 @@ func listPDBs(cs kubernetes.Interface, ns string, labelSelector string, count in
 
 func deletePDBCollection(cs kubernetes.Interface, ns string) {
 	ginkgo.By("deleting a collection of PDBs")
-	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).DeleteCollection(context.TODO(), &metav1.DeleteOptions{}, metav1.ListOptions{})
+	err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	framework.ExpectNoError(err, "Deleting PDB set in namespace %s", ns)
 
 	waitForPDBCollectionToBeDeleted(cs, ns)
@@ -431,15 +431,17 @@ func deletePDBCollection(cs kubernetes.Interface, ns string) {
 
 func waitForPDBCollectionToBeDeleted(cs kubernetes.Interface, ns string) {
 	ginkgo.By("Waiting for the PDB collection to be deleted")
-	wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
 		pdbList, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-		framework.ExpectNoError(err, "Listing PDB set in namespace %s", ns)
-		framework.ExpectEqual(len(pdbList.Items), 0, "Expecting No PDBs returned in namespace %s", ns)
+		if len(pdbList.Items) != 0 {
+			return false, nil
+		}
 		return true, nil
 	})
+	framework.ExpectNoError(err, "Waiting for the PDB collection to be deleted in namespace %s", ns)
 }
 
 func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
@@ -600,7 +602,7 @@ func waitForPdbToObserveHealthyPods(cs kubernetes.Interface, ns string, healthyC
 
 func getPDBStatusOrDie(dc dynamic.Interface, ns string, name string) *policyv1beta1.PodDisruptionBudget {
 	pdbStatusResource := policyv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets")
-	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(name, metav1.GetOptions{}, "status")
+	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(context.TODO(), name, metav1.GetOptions{}, "status")
 	pdb, err := unstructuredToPDB(unstruct)
 	framework.ExpectNoError(err, "Getting the status of the pdb %s in namespace %s", name, ns)
 	return pdb

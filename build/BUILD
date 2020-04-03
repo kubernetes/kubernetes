@@ -52,6 +52,7 @@ DOCKERIZED_BINARIES = {
     srcs = select({"@io_bazel_rules_go//go/platform:" + arch: ["//cmd/" + binary]}),
     mode = "0755",
     package_dir = "/usr/bin",
+    tags = ["manual"],
     visibility = ["//visibility:private"],
 ) for binary in DOCKERIZED_BINARIES.keys() for arch in SERVER_PLATFORMS["linux"]]
 

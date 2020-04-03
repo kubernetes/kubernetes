@@ -233,6 +233,7 @@ func Convert_api_AuthProviderConfig_To_v1_AuthProviderConfig(in *api.AuthProvide
 
 func autoConvert_v1_Cluster_To_api_Cluster(in *Cluster, out *api.Cluster, s conversion.Scope) error {
 	out.Server = in.Server
+	out.TLSServerName = in.TLSServerName
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
 	out.CertificateAuthority = in.CertificateAuthority
 	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))
@@ -250,6 +251,7 @@ func Convert_v1_Cluster_To_api_Cluster(in *Cluster, out *api.Cluster, s conversi
 func autoConvert_api_Cluster_To_v1_Cluster(in *api.Cluster, out *Cluster, s conversion.Scope) error {
 	// INFO: in.LocationOfOrigin opted out of conversion generation
 	out.Server = in.Server
+	out.TLSServerName = in.TLSServerName
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
 	out.CertificateAuthority = in.CertificateAuthority
 	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))

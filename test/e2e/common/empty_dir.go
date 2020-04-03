@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -283,7 +284,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		pod = f.PodClient().CreateSync(pod)
 
 		ginkgo.By("Waiting for the pod running")
-		err = f.WaitForPodRunning(pod.Name)
+		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
 
 		ginkgo.By("Geting the pod")

@@ -39,6 +39,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
 	kubeschedulerconfigv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
@@ -48,6 +50,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
 // Options has all the params needed to run a Scheduler
@@ -68,6 +71,8 @@ type Options struct {
 	WriteConfigTo string
 
 	Master string
+
+	ShowHiddenMetricsForVersion string
 }
 
 // NewOptions returns default scheduler app options.
@@ -98,8 +103,10 @@ func NewOptions() (*Options, error) {
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
-			UseLegacyPolicyConfig:    false,
-			PolicyConfigMapNamespace: metav1.NamespaceSystem,
+			UseLegacyPolicyConfig:          false,
+			PolicyConfigMapNamespace:       metav1.NamespaceSystem,
+			SchedulerName:                  corev1.DefaultSchedulerName,
+			HardPodAffinitySymmetricWeight: interpodaffinity.DefaultHardPodAffinityWeight,
 		},
 	}
 
@@ -130,6 +137,8 @@ func splitHostIntPort(s string) (string, int, error) {
 
 func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
 	versionedCfg := kubeschedulerconfigv1alpha2.KubeSchedulerConfiguration{}
+	versionedCfg.DebuggingConfiguration = *configv1alpha1.NewRecommendedDebuggingConfiguration()
+
 	kubeschedulerscheme.Scheme.Default(&versionedCfg)
 	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
 	if err := kubeschedulerscheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
@@ -153,6 +162,15 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 
 	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, nfs.FlagSet("leader election"))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
+
+	// TODO(RainbowMango): move it to genericoptions before next flag comes.
+	mfs := nfs.FlagSet("metrics")
+	mfs.StringVar(&o.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.ShowHiddenMetricsForVersion,
+		"The previous version for which you want to show hidden metrics. "+
+			"Only the previous minor version is meaningful, other values will not be allowed. "+
+			"Accepted format of version is <major>.<minor>, e.g.: '1.16'. "+
+			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
+			"rather than being surprised when they are permanently removed in the release after that.")
 
 	return nfs
 }
@@ -199,6 +217,9 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 			return err
 		}
 	}
+	if len(o.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
+	}
 
 	return nil
 }
@@ -215,6 +236,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authentication.Validate()...)
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Deprecated.Validate()...)
+	errs = append(errs, metrics.ValidateShowHiddenMetricsVersion(o.ShowHiddenMetricsForVersion)...)
 
 	return errs
 }
@@ -239,11 +261,12 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	coreBroadcaster := record.NewBroadcaster()
-	coreRecorder := coreBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: c.ComponentConfig.SchedulerName})
 
 	// Set up leader election if enabled.
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig
 	if c.ComponentConfig.LeaderElection.LeaderElect {
+		// Use the scheduler name in the first profile to record leader election.
+		coreRecorder := coreBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: c.ComponentConfig.Profiles[0].SchedulerName})
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, leaderElectionClient, coreRecorder)
 		if err != nil {
 			return nil, err

@@ -30,33 +30,76 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-func TestConvertHardPodAffinitySymmetricWeight(t *testing.T) {
+func TestConvertKubeSchedulerConfiguration(t *testing.T) {
 	cases := []struct {
 		name string
 		cfg  v1alpha1.KubeSchedulerConfiguration
 		want config.KubeSchedulerConfiguration
 	}{
 		{
-			name: "no weight",
-		},
-		{
-			name: "custom weight",
+			name: "scheduler name",
 			cfg: v1alpha1.KubeSchedulerConfiguration{
-				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(3),
+				SchedulerName: pointer.StringPtr("custom-name"),
 			},
 			want: config.KubeSchedulerConfiguration{
-				PluginConfig: []config.PluginConfig{
+				Profiles: []config.KubeSchedulerProfile{
+					{SchedulerName: "custom-name"},
+				},
+			},
+		},
+		{
+			name: "plugins and plugin config",
+			cfg: v1alpha1.KubeSchedulerConfiguration{
+				Plugins: &v1alpha1.Plugins{
+					QueueSort: &v1alpha1.PluginSet{
+						Enabled: []v1alpha1.Plugin{
+							{Name: "FooPlugin"},
+						},
+					},
+				},
+				PluginConfig: []v1alpha1.PluginConfig{
+					{Name: "FooPlugin"},
+				},
+			},
+			want: config.KubeSchedulerConfiguration{
+				Profiles: []config.KubeSchedulerProfile{
 					{
-						Name: "InterPodAffinity",
-						Args: runtime.Unknown{
-							Raw: []byte(`{"hardPodAffinityWeight":3}`),
+						Plugins: &config.Plugins{
+							QueueSort: &config.PluginSet{
+								Enabled: []config.Plugin{
+									{Name: "FooPlugin"},
+								},
+							},
+						},
+						PluginConfig: []config.PluginConfig{
+							{Name: "FooPlugin"},
 						},
 					},
 				},
 			},
 		},
 		{
-			name: "custom weight and existing PluginConfig",
+			name: "custom hard pod affinity weight",
+			cfg: v1alpha1.KubeSchedulerConfiguration{
+				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(3),
+			},
+			want: config.KubeSchedulerConfiguration{
+				Profiles: []config.KubeSchedulerProfile{
+					{
+						PluginConfig: []config.PluginConfig{
+							{
+								Name: "InterPodAffinity",
+								Args: runtime.Unknown{
+									Raw: []byte(`{"hardPodAffinityWeight":3}`),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "custom hard pod affinity weight and existing PluginConfig",
 			cfg: v1alpha1.KubeSchedulerConfiguration{
 				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(3),
 				PluginConfig: []v1alpha1.PluginConfig{
@@ -69,17 +112,21 @@ func TestConvertHardPodAffinitySymmetricWeight(t *testing.T) {
 				},
 			},
 			want: config.KubeSchedulerConfiguration{
-				PluginConfig: []config.PluginConfig{
+				Profiles: []config.KubeSchedulerProfile{
 					{
-						Name: "InterPodAffinity",
-						Args: runtime.Unknown{
-							Raw: []byte(`{"hardPodAffinityWeight":5}`),
-						},
-					},
-					{
-						Name: "InterPodAffinity",
-						Args: runtime.Unknown{
-							Raw: []byte(`{"hardPodAffinityWeight":3}`),
+						PluginConfig: []config.PluginConfig{
+							{
+								Name: "InterPodAffinity",
+								Args: runtime.Unknown{
+									Raw: []byte(`{"hardPodAffinityWeight":5}`),
+								},
+							},
+							{
+								Name: "InterPodAffinity",
+								Args: runtime.Unknown{
+									Raw: []byte(`{"hardPodAffinityWeight":3}`),
+								},
+							},
 						},
 					},
 				},

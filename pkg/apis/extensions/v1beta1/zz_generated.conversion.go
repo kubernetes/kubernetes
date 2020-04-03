@@ -1161,6 +1161,7 @@ func Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in 
 
 func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*networking.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_v1beta1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -1174,6 +1175,7 @@ func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.H
 
 func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1beta1.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*v1beta1.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_networking_IngressBackend_To_v1beta1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -1296,6 +1298,7 @@ func Convert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *
 func autoConvert_v1beta1_IngressBackend_To_networking_IngressBackend(in *v1beta1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
 	out.ServiceName = in.ServiceName
 	out.ServicePort = in.ServicePort
+	out.Resource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
@@ -1307,6 +1310,7 @@ func Convert_v1beta1_IngressBackend_To_networking_IngressBackend(in *v1beta1.Ing
 func autoConvert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.IngressBackend, out *v1beta1.IngressBackend, s conversion.Scope) error {
 	out.ServiceName = in.ServiceName
 	out.ServicePort = in.ServicePort
+	out.Resource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
@@ -1404,6 +1408,7 @@ func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *network
 }
 
 func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
 	out.Backend = (*networking.IngressBackend)(unsafe.Pointer(in.Backend))
 	out.TLS = *(*[]networking.IngressTLS)(unsafe.Pointer(&in.TLS))
 	out.Rules = *(*[]networking.IngressRule)(unsafe.Pointer(&in.Rules))
@@ -1416,6 +1421,7 @@ func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSp
 }
 
 func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *v1beta1.IngressSpec, s conversion.Scope) error {
+	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
 	out.Backend = (*v1beta1.IngressBackend)(unsafe.Pointer(in.Backend))
 	out.TLS = *(*[]v1beta1.IngressTLS)(unsafe.Pointer(&in.TLS))
 	out.Rules = *(*[]v1beta1.IngressRule)(unsafe.Pointer(&in.Rules))

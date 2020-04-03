@@ -192,11 +192,11 @@ func (o *RolloutStatusOptions) Run() error {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(options)
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(options)
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
 		},
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"path"
 	"reflect"
 	"strings"
@@ -209,7 +210,7 @@ func TestPruningCreate(t *testing.T) {
 	unstructured.SetNestedField(foo.Object, float64(42.0), "beta")
 	unstructured.SetNestedField(foo.Object, "bar", "metadata", "unspecified")
 	unstructured.SetNestedField(foo.Object, "bar", "metadata", "labels", "foo")
-	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
+	foo, err = fooClient.Create(context.TODO(), foo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
 	}
@@ -256,7 +257,7 @@ func TestPruningStatus(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
-	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
+	foo, err = fooClient.Create(context.TODO(), foo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
 	}
@@ -267,7 +268,7 @@ func TestPruningStatus(t *testing.T) {
 	unstructured.SetNestedField(foo.Object, float64(42.0), "status", "beta")
 	unstructured.SetNestedField(foo.Object, "bar", "metadata", "unspecified")
 
-	foo, err = fooClient.UpdateStatus(foo, metav1.UpdateOptions{})
+	foo, err = fooClient.UpdateStatus(context.TODO(), foo, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to update status: %v", err)
 	}
@@ -368,7 +369,7 @@ func TestPruningFromStorage(t *testing.T) {
 
 	t.Logf("Checking that CustomResource is pruned from unknown fields")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
-	foo, err := fooClient.Get("foo", metav1.GetOptions{})
+	foo, err := fooClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -413,7 +414,7 @@ func TestPruningPatch(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
-	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
+	foo, err = fooClient.Create(context.TODO(), foo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
 	}
@@ -421,7 +422,7 @@ func TestPruningPatch(t *testing.T) {
 
 	// a patch with a change
 	patch := []byte(`{"alpha": "abc", "beta": 42.0, "unspecified": "bar", "metadata": {"unspecified": "bar", "labels":{"foo":"bar"}}}`)
-	if foo, err = fooClient.Patch("foo", types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	if foo, err = fooClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -484,7 +485,7 @@ func TestPruningCreatePreservingUnknownFields(t *testing.T) {
 		"preserving":        map[string]interface{}{"unspecified": "bar"},
 	}, "preserving")
 
-	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
+	foo, err = fooClient.Create(context.TODO(), foo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
 	}
@@ -551,7 +552,7 @@ func TestPruningEmbeddedResources(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(fooSchemaEmbeddedResourceInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
-	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
+	foo, err = fooClient.Create(context.TODO(), foo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
 	}

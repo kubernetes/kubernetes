@@ -21,7 +21,11 @@ import (
 	"math/rand"
 	"testing"
 
+	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 )
 
@@ -74,5 +78,245 @@ func TestPolicyRules(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLiterals(t *testing.T) {
+	ui := &user.DefaultInfo{Name: "goodu", UID: "1",
+		Groups: []string{"goodg1", "goodg2"}}
+	reqRN := RequestDigest{
+		&request.RequestInfo{
+			IsResourceRequest: true,
+			Path:              "/apis/goodapig/v1/namespaces/goodns/goodrscs",
+			Verb:              "goodverb",
+			APIPrefix:         "apis",
+			APIGroup:          "goodapig",
+			APIVersion:        "v1",
+			Namespace:         "goodns",
+			Resource:          "goodrscs",
+			Name:              "eman",
+			Parts:             []string{"goodrscs", "eman"}},
+		ui}
+	reqRU := RequestDigest{
+		&request.RequestInfo{
+			IsResourceRequest: true,
+			Path:              "/apis/goodapig/v1/goodrscs",
+			Verb:              "goodverb",
+			APIPrefix:         "apis",
+			APIGroup:          "goodapig",
+			APIVersion:        "v1",
+			Namespace:         "",
+			Resource:          "goodrscs",
+			Name:              "eman",
+			Parts:             []string{"goodrscs", "eman"}},
+		ui}
+	reqN := RequestDigest{
+		&request.RequestInfo{
+			IsResourceRequest: false,
+			Path:              "/openapi/v2",
+			Verb:              "goodverb"},
+		ui}
+	checkRules(t, true, reqRN, []fcv1a1.PolicyRulesWithSubjects{{
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindGroup,
+			Group: &fcv1a1.GroupSubject{"goodg1"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"*"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindGroup,
+			Group: &fcv1a1.GroupSubject{"*"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"*"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"*"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"*"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"*"}}}},
+	})
+	checkRules(t, false, reqRN, []fcv1a1.PolicyRulesWithSubjects{{
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"badu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindGroup,
+			Group: &fcv1a1.GroupSubject{"badg"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"badverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"badapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"badrscs"},
+			Namespaces: []string{"goodns"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:      []string{"goodverb"},
+			APIGroups:  []string{"goodapig"},
+			Resources:  []string{"goodrscs"},
+			Namespaces: []string{"badns"}}}},
+	})
+	checkRules(t, true, reqRU, []fcv1a1.PolicyRulesWithSubjects{{
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
+			ClusterScope: true}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"*"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
+			ClusterScope: true}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"*"},
+			Resources:    []string{"goodrscs"},
+			ClusterScope: true}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"*"},
+			ClusterScope: true}}}})
+	checkRules(t, false, reqRU, []fcv1a1.PolicyRulesWithSubjects{{
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"badverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
+			ClusterScope: true}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"badapig"},
+			Resources:    []string{"goodrscs"},
+			ClusterScope: true}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"badrscs"},
+			ClusterScope: true}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		ResourceRules: []fcv1a1.ResourcePolicyRule{{
+			Verbs:        []string{"goodverb"},
+			APIGroups:    []string{"goodapig"},
+			Resources:    []string{"goodrscs"},
+			ClusterScope: false}}},
+	})
+	checkRules(t, true, reqN, []fcv1a1.PolicyRulesWithSubjects{{
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
+			Verbs:           []string{"goodverb"},
+			NonResourceURLs: []string{"/openapi/v2"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
+			Verbs:           []string{"*"},
+			NonResourceURLs: []string{"/openapi/v2"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
+			Verbs:           []string{"goodverb"},
+			NonResourceURLs: []string{"*"}}}},
+	})
+	checkRules(t, false, reqN, []fcv1a1.PolicyRulesWithSubjects{{
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
+			Verbs:           []string{"badverb"},
+			NonResourceURLs: []string{"/openapi/v2"}}}}, {
+		Subjects: []fcv1a1.Subject{{Kind: fcv1a1.SubjectKindUser,
+			User: &fcv1a1.UserSubject{"goodu"}}},
+		NonResourceRules: []fcv1a1.NonResourcePolicyRule{{
+			Verbs:           []string{"goodverb"},
+			NonResourceURLs: []string{"/closedapi/v2"}}}},
+	})
+}
+
+func checkRules(t *testing.T, expectMatch bool, digest RequestDigest, rules []fcv1a1.PolicyRulesWithSubjects) {
+	for idx, rule := range rules {
+		fs := &fcv1a1.FlowSchema{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("rule%d", idx)},
+			Spec: fcv1a1.FlowSchemaSpec{
+				Rules: []fcv1a1.PolicyRulesWithSubjects{rule}}}
+		actualMatch := matchesFlowSchema(digest, fs)
+		if expectMatch != actualMatch {
+			t.Errorf("expectMatch=%v, actualMatch=%v, digest=%#+v, fs=%s", expectMatch, actualMatch, digest, fcfmt.Fmt(fs))
+		}
 	}
 }

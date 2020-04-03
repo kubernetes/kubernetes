@@ -46,10 +46,9 @@ const (
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
-	// SchedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
-	SchedulerName string
 	// AlgorithmSource specifies the scheduler algorithm source.
+	// TODO(#87526): Remove AlgorithmSource from this package
+	// DEPRECATED: AlgorithmSource is removed in the v1alpha2 ComponentConfig
 	AlgorithmSource SchedulerAlgorithmSource
 
 	// LeaderElection defines the configuration of leader election client.
@@ -97,15 +96,37 @@ type KubeSchedulerConfiguration struct {
 	// the default value (10s) will be used.
 	PodMaxBackoffSeconds int64
 
-	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
-	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
-	// default plugins that should be disabled.
-	// When no enabled or disabled plugin is specified for an extension point, default plugins for
-	// that extension point will be used if there is any.
+	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
+	// choose to be scheduled under a particular profile by setting its associated
+	// scheduler name. Pods that don't specify any scheduler name are scheduled
+	// with the "default-scheduler" profile, if present here.
+	Profiles []KubeSchedulerProfile
+
+	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
+	// with the extender. These extenders are shared by all scheduler profiles.
+	Extenders []Extender
+}
+
+// KubeSchedulerProfile is a scheduling profile.
+type KubeSchedulerProfile struct {
+	// SchedulerName is the name of the scheduler associated to this profile.
+	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
+	// is scheduled with this profile.
+	SchedulerName string
+
+	// Plugins specify the set of plugins that should be enabled or disabled.
+	// Enabled plugins are the ones that should be enabled in addition to the
+	// default plugins. Disabled plugins are any of the default plugins that
+	// should be disabled.
+	// When no enabled or disabled plugin is specified for an extension point,
+	// default plugins for that extension point will be used if there is any.
+	// If a QueueSort plugin is specified, the same QueueSort Plugin and
+	// PluginConfig must be specified for all profiles.
 	Plugins *Plugins
 
 	// PluginConfig is an optional set of custom plugin arguments for each plugin.
-	// Omitting config args for a plugin is equivalent to using the default config for that plugin.
+	// Omitting config args for a plugin is equivalent to using the default config
+	// for that plugin.
 	PluginConfig []PluginConfig
 }
 

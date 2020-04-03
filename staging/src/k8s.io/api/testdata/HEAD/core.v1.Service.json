@@ -45,25 +45,26 @@
       {
         "name": "19",
         "protocol": "@Hr鯹)晿",
+        "appProtocol": "20",
         "port": 202283346,
-        "targetPort": "20",
+        "targetPort": "21",
         "nodePort": -474380055
       }
     ],
     "selector": {
-      "21": "22"
+      "22": "23"
     },
-    "clusterIP": "23",
+    "clusterIP": "24",
     "type": ".蘯6ċV夸",
     "externalIPs": [
-      "24"
+      "25"
     ],
     "sessionAffinity": "ɑ",
-    "loadBalancerIP": "25",
+    "loadBalancerIP": "26",
     "loadBalancerSourceRanges": [
-      "26"
+      "27"
     ],
-    "externalName": "27",
+    "externalName": "28",
     "externalTrafficPolicy": "ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕\u003eŽ",
     "healthCheckNodePort": -1095807277,
     "publishNotReadyAddresses": true,
@@ -74,15 +75,15 @@
     },
     "ipFamily": "³-Ǐ忄*齧獚敆ȎțêɘĲ斬",
     "topologyKeys": [
-      "28"
+      "29"
     ]
   },
   "status": {
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "29",
-          "hostname": "30"
+          "ip": "30",
+          "hostname": "31"
         }
       ]
     }

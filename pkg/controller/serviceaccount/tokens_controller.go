@@ -342,9 +342,9 @@ func (e *TokensController) deleteTokens(serviceAccount *v1.ServiceAccount) ( /*r
 }
 
 func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry*/ bool, error) {
-	var opts *metav1.DeleteOptions
+	var opts metav1.DeleteOptions
 	if len(uid) > 0 {
-		opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
+		opts.Preconditions = &metav1.Preconditions{UID: &uid}
 	}
 	err := e.client.CoreV1().Secrets(ns).Delete(context.TODO(), name, opts)
 	// NotFound doesn't need a retry (it's already been deleted)
@@ -460,9 +460,9 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	if !addedReference {
 		// we weren't able to use the token, try to clean it up.
 		klog.V(2).Infof("deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
-		deleteOpts := &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
-		if deleteErr := e.client.CoreV1().Secrets(createdToken.Namespace).Delete(context.TODO(), createdToken.Name, deleteOpts); deleteErr != nil {
-			klog.Error(deleteErr) // if we fail, just log it
+		deleteOpts := metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
+		if err := e.client.CoreV1().Secrets(createdToken.Namespace).Delete(context.TODO(), createdToken.Name, deleteOpts); err != nil {
+			klog.Error(err) // if we fail, just log it
 		}
 	}
 

@@ -252,6 +252,7 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 		case bag.Id.Equal(oidPKCS8ShroundedKeyBag):
 			if privateKey != nil {
 				err = errors.New("pkcs12: expected exactly one key bag")
+				return nil, nil, err
 			}
 
 			if privateKey, err = decodePkcs8ShroudedKeyBag(bag.Value.Bytes, encodedPassword); err != nil {

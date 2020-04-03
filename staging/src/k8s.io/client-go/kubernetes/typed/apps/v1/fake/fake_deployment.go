@@ -116,7 +116,7 @@ func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *appsv1.D
 }
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
-func (c *FakeDeployments) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(deploymentsResource, c.ns, name), &appsv1.Deployment{})
 
@@ -124,8 +124,8 @@ func (c *FakeDeployments) Delete(ctx context.Context, name string, options *v1.D
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeDeployments) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
+func (c *FakeDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &appsv1.DeploymentList{})
 	return err

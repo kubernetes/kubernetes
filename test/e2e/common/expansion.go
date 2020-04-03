@@ -155,11 +155,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		    Testname: var-expansion-subpath
-		    Description: Make sure a container's subpath can be set using an
-			expansion of environment variables.
+		Release : v1.19
+		Testname: VolumeSubpathEnvExpansion, subpath expansion
+		Description: Make sure a container's subpath can be set using an expansion of environment variables.
 	*/
-	ginkgo.It("should allow substituting values in a volume subpath [sig-storage]", func() {
+	framework.ConformanceIt("should allow substituting values in a volume subpath [sig-storage]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -209,11 +209,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		    Testname: var-expansion-subpath-with-backticks
-		    Description: Make sure a container's subpath can not be set using an
-			expansion of environment variables when backticks are supplied.
+		Release : v1.19
+		Testname: VolumeSubpathEnvExpansion, subpath with backticks
+		Description: Make sure a container's subpath can not be set using an expansion of environment variables when backticks are supplied.
 	*/
-	ginkgo.It("should fail substituting values in a volume subpath with backticks [sig-storage][Slow]", func() {
+	framework.ConformanceIt("should fail substituting values in a volume subpath with backticks [sig-storage][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
@@ -258,11 +258,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		    Testname: var-expansion-subpath-with-absolute-path
-		    Description: Make sure a container's subpath can not be set using an
-			expansion of environment variables when absolute path is supplied.
+		Release : v1.19
+		Testname: VolumeSubpathEnvExpansion, subpath with absolute path
+		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
-	ginkgo.It("should fail substituting values in a volume subpath with absolute path [sig-storage][Slow]", func() {
+	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path [sig-storage][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
@@ -307,10 +307,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-	   Testname: var-expansion-subpath-ready-from-failed-state
-	   Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
+		Release : v1.19
+		Testname: VolumeSubpathEnvExpansion, subpath ready from failed state
+		Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
 	*/
-	ginkgo.It("should verify that a failing subpath expansion can be modified during the lifecycle of a container [sig-storage][Slow]", func() {
+	framework.ConformanceIt("should verify that a failing subpath expansion can be modified during the lifecycle of a container [sig-storage][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		containerName := "dapi-container"
@@ -387,14 +388,15 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		    Testname: var-expansion-subpath-test-writes
-		    Description: Verify that a subpath expansion can be used to write files into subpaths.
-			1.	valid subpathexpr starts a container running
-			2.	test for valid subpath writes
-			3.	successful expansion of the subpathexpr isn't required for volume cleanup
+		Release : v1.19
+		Testname: VolumeSubpathEnvExpansion, subpath test writes
+		Description: Verify that a subpath expansion can be used to write files into subpaths.
+		1.	valid subpathexpr starts a container running
+		2.	test for valid subpath writes
+		3.	successful expansion of the subpathexpr isn't required for volume cleanup
 
 	*/
-	ginkgo.It("should succeed in writing subpaths in container [sig-storage][Slow]", func() {
+	framework.ConformanceIt("should succeed in writing subpaths in container [sig-storage][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		containerName := "dapi-container"
@@ -487,16 +489,16 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		    Testname: var-expansion-subpath-lifecycle
-		    Description: Verify should not change the subpath mount on a container restart if the environment variable changes
-			1.	valid subpathexpr starts a container running
-			2.	test for valid subpath writes
-			3.	container restarts
-			4.	delete cleanly
-
+		Release : v1.19
+		Testname: VolumeSubpathEnvExpansion, subpath lifecycle
+		Description: Verify should not change the subpath mount on a container restart if the environment variable changes
+		1.	valid subpathexpr starts a container running
+		2.	test for valid subpath writes
+		3.	container restarts
+		4.	delete cleanly
 	*/
 
-	ginkgo.It("should not change the subpath mount on a container restart if the environment variable changes [sig-storage][Slow]", func() {
+	framework.ConformanceIt("should not change the subpath mount on a container restart if the environment variable changes [sig-storage][Slow]", func() {
 
 		suffix := string(uuid.NewUUID())
 		podName := fmt.Sprintf("var-expansion-%s", suffix)

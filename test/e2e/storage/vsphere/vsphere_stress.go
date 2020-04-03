@@ -109,7 +109,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 			}
 			gomega.Expect(sc).NotTo(gomega.BeNil())
 			framework.ExpectNoError(err)
-			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, nil)
+			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, metav1.DeleteOptions{})
 			scArrays[index] = sc
 		}
 
@@ -149,7 +149,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Waiting for the Pod: %v to be in the running state", logPrefix, pod.Name))
-		err = f.WaitForPodRunningSlow(pod.Name)
+		err = e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 
 		// Get the copy of the Pod to know the assigned node name.

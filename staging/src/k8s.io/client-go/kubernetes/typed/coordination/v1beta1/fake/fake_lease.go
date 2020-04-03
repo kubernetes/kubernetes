@@ -103,7 +103,7 @@ func (c *FakeLeases) Update(ctx context.Context, lease *v1beta1.Lease, opts v1.U
 }
 
 // Delete takes name of the lease and deletes it. Returns an error if one occurs.
-func (c *FakeLeases) Delete(ctx context.Context, name string, options *v1.DeleteOptions) error {
+func (c *FakeLeases) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(leasesResource, c.ns, name), &v1beta1.Lease{})
 
@@ -111,8 +111,8 @@ func (c *FakeLeases) Delete(ctx context.Context, name string, options *v1.Delete
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeLeases) DeleteCollection(ctx context.Context, options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(leasesResource, c.ns, listOptions)
+func (c *FakeLeases) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(leasesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.LeaseList{})
 	return err

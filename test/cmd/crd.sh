@@ -439,7 +439,7 @@ run_non_native_resource_tests() {
   # apply --prune on bar.yaml that has bar/test
   kubectl apply --prune -l pruneGroup=true -f hack/testdata/CRD/bar.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
   # check right crds exist
-  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
   # Delete the resource

@@ -43,7 +43,7 @@ type DeprecatedInsecureServingOptions struct {
 
 	// ListenFunc can be overridden to create a custom listener, e.g. for mocking in tests.
 	// It defaults to options.CreateListener.
-	ListenFunc func(network, addr string) (net.Listener, int, error)
+	ListenFunc func(network, addr string, config net.ListenConfig) (net.Listener, int, error)
 }
 
 // Validate ensures that the insecure port values within the range of the port.
@@ -113,7 +113,7 @@ func (s *DeprecatedInsecureServingOptions) ApplyTo(c **server.DeprecatedInsecure
 			listen = s.ListenFunc
 		}
 		addr := net.JoinHostPort(s.BindAddress.String(), fmt.Sprintf("%d", s.BindPort))
-		s.Listener, s.BindPort, err = listen(s.BindNetwork, addr)
+		s.Listener, s.BindPort, err = listen(s.BindNetwork, addr, net.ListenConfig{})
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}

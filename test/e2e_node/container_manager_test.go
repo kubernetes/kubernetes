@@ -220,7 +220,8 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{
 							{
-								Image: imageutils.GetE2EImage(imageutils.TestWebserver),
+								Image: imageutils.GetE2EImage(imageutils.Agnhost),
+								Args:  []string{"test-webserver"},
 								Name:  podName,
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{

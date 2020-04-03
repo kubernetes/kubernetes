@@ -22,33 +22,34 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/klog"
-	"k8s.io/kubernetes/test/images/agnhost/audit-proxy"
+	auditproxy "k8s.io/kubernetes/test/images/agnhost/audit-proxy"
 	"k8s.io/kubernetes/test/images/agnhost/connect"
-	"k8s.io/kubernetes/test/images/agnhost/crd-conversion-webhook"
+	crdconvwebhook "k8s.io/kubernetes/test/images/agnhost/crd-conversion-webhook"
 	"k8s.io/kubernetes/test/images/agnhost/dns"
 	"k8s.io/kubernetes/test/images/agnhost/entrypoint-tester"
 	"k8s.io/kubernetes/test/images/agnhost/fakegitserver"
 	"k8s.io/kubernetes/test/images/agnhost/guestbook"
 	"k8s.io/kubernetes/test/images/agnhost/inclusterclient"
 	"k8s.io/kubernetes/test/images/agnhost/liveness"
-	"k8s.io/kubernetes/test/images/agnhost/logs-generator"
+	logsgen "k8s.io/kubernetes/test/images/agnhost/logs-generator"
 	"k8s.io/kubernetes/test/images/agnhost/mounttest"
 	"k8s.io/kubernetes/test/images/agnhost/net"
 	"k8s.io/kubernetes/test/images/agnhost/netexec"
 	"k8s.io/kubernetes/test/images/agnhost/nettest"
-	"k8s.io/kubernetes/test/images/agnhost/no-snat-test"
-	"k8s.io/kubernetes/test/images/agnhost/no-snat-test-proxy"
+	nosnat "k8s.io/kubernetes/test/images/agnhost/no-snat-test"
+	nosnatproxy "k8s.io/kubernetes/test/images/agnhost/no-snat-test-proxy"
+	"k8s.io/kubernetes/test/images/agnhost/openidmetadata"
 	"k8s.io/kubernetes/test/images/agnhost/pause"
-	"k8s.io/kubernetes/test/images/agnhost/port-forward-tester"
+	portforwardtester "k8s.io/kubernetes/test/images/agnhost/port-forward-tester"
 	"k8s.io/kubernetes/test/images/agnhost/porter"
-	"k8s.io/kubernetes/test/images/agnhost/resource-consumer-controller"
-	"k8s.io/kubernetes/test/images/agnhost/serve-hostname"
-	"k8s.io/kubernetes/test/images/agnhost/test-webserver"
+	resconsumerctrl "k8s.io/kubernetes/test/images/agnhost/resource-consumer-controller"
+	servehostname "k8s.io/kubernetes/test/images/agnhost/serve-hostname"
+	testwebserver "k8s.io/kubernetes/test/images/agnhost/test-webserver"
 	"k8s.io/kubernetes/test/images/agnhost/webhook"
 )
 
 func main() {
-	rootCmd := &cobra.Command{Use: "app", Version: "2.10"}
+	rootCmd := &cobra.Command{Use: "app", Version: "2.12"}
 
 	rootCmd.AddCommand(auditproxy.CmdAuditProxy)
 	rootCmd.AddCommand(connect.CmdConnect)
@@ -75,6 +76,7 @@ func main() {
 	rootCmd.AddCommand(servehostname.CmdServeHostname)
 	rootCmd.AddCommand(testwebserver.CmdTestWebserver)
 	rootCmd.AddCommand(webhook.CmdWebhook)
+	rootCmd.AddCommand(openidmetadata.CmdTestServiceAccountIssuerDiscovery)
 
 	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to
 	// accept them. This will also include them in the printed help.

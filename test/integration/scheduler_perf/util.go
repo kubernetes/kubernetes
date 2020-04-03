@@ -27,6 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -36,10 +37,13 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/integration/util"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
 	dateFormat                = "2006-01-02T15:04:05Z"
+	testNamespace             = "sched-test"
+	setupNamespace            = "sched-setup"
 	throughputSampleFrequency = time.Second
 )
 
@@ -61,8 +65,10 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 		Burst:         5000,
 	})
 	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet)
+	fakePVControllerShutdown := util.StartFakePVController(clientSet)
 
 	shutdownFunc := func() {
+		fakePVControllerShutdown()
 		schedulerShutdown()
 		apiShutdown()
 	}
@@ -102,6 +108,17 @@ type DataItem struct {
 type DataItems struct {
 	Version   string     `json:"version"`
 	DataItems []DataItem `json:"dataItems"`
+}
+
+// makeBasePod creates a Pod object to be used as a template.
+func makeBasePod() *v1.Pod {
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pod-",
+		},
+		Spec: testutils.MakePodSpec(),
+	}
+	return basePod
 }
 
 func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
@@ -241,9 +258,7 @@ func (tc *throughputCollector) collect() []DataItem {
 			sum += tc.schedulingThroughputs[i]
 		}
 
-		throughputSummary.Labels = map[string]string{
-			"Metric": "SchedulingThroughput",
-		}
+		throughputSummary.Labels["Metric"] = "SchedulingThroughput"
 		throughputSummary.Data = map[string]float64{
 			"Average": sum / float64(length),
 			"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],

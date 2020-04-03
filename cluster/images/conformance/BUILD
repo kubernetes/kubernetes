@@ -23,7 +23,7 @@ container_layer(
 multi_arch_container(
     name = "conformance",
     architectures = SERVER_PLATFORMS["linux"],
-    base = "@debian-hyperkube-base-{ARCH}//image",
+    base = "@debian-base-{ARCH}//image",
     cmd = [
         "/bin/bash",
         "-c",

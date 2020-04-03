@@ -35,7 +35,8 @@ func NewVpnSiteLinksClient(subscriptionID string) VpnSiteLinksClient {
 	return NewVpnSiteLinksClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewVpnSiteLinksClientWithBaseURI creates an instance of the VpnSiteLinksClient client.
+// NewVpnSiteLinksClientWithBaseURI creates an instance of the VpnSiteLinksClient client using a custom endpoint.  Use
+// this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
 func NewVpnSiteLinksClientWithBaseURI(baseURI string, subscriptionID string) VpnSiteLinksClient {
 	return VpnSiteLinksClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -102,8 +103,7 @@ func (client VpnSiteLinksClient) GetPreparer(ctx context.Context, resourceGroupN
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSiteLinksClient) GetSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -180,8 +180,7 @@ func (client VpnSiteLinksClient) ListByVpnSitePreparer(ctx context.Context, reso
 // ListByVpnSiteSender sends the ListByVpnSite request. The method will close the
 // http.Response Body if it receives an error.
 func (client VpnSiteLinksClient) ListByVpnSiteSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListByVpnSiteResponder handles the response to the ListByVpnSite request. The method always

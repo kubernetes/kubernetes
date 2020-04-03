@@ -212,7 +212,7 @@ func (group *dhGroup) Server(c packetConn, randSource io.Reader, magics *handsha
 		HostKey:   hostKeyBytes,
 		Signature: sig,
 		Hash:      crypto.SHA1,
-	}, nil
+	}, err
 }
 
 // ecdh performs Elliptic Curve Diffie-Hellman key exchange as

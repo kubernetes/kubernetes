@@ -21,13 +21,16 @@ import (
 	"strings"
 )
 
-// ProcStat provides status information about the process,
+// ProcStatus provides status information about the process,
 // read from /proc/[pid]/stat.
 type ProcStatus struct {
 	// The process ID.
 	PID int
 	// The process name.
 	Name string
+
+	// Thread group ID.
+	TGID int
 
 	// Peak virtual memory size.
 	VmPeak uint64
@@ -113,6 +116,8 @@ func (p Proc) NewStatus() (ProcStatus, error) {
 
 func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintBytes uint64) {
 	switch k {
+	case "Tgid":
+		s.TGID = int(vUint)
 	case "Name":
 		s.Name = vString
 	case "VmPeak":

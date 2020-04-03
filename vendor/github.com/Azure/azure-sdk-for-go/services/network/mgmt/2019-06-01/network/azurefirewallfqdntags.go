@@ -35,7 +35,9 @@ func NewAzureFirewallFqdnTagsClient(subscriptionID string) AzureFirewallFqdnTags
 	return NewAzureFirewallFqdnTagsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewAzureFirewallFqdnTagsClientWithBaseURI creates an instance of the AzureFirewallFqdnTagsClient client.
+// NewAzureFirewallFqdnTagsClientWithBaseURI creates an instance of the AzureFirewallFqdnTagsClient client using a
+// custom endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds,
+// Azure stack).
 func NewAzureFirewallFqdnTagsClientWithBaseURI(baseURI string, subscriptionID string) AzureFirewallFqdnTagsClient {
 	return AzureFirewallFqdnTagsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -96,8 +98,7 @@ func (client AzureFirewallFqdnTagsClient) ListAllPreparer(ctx context.Context) (
 // ListAllSender sends the ListAll request. The method will close the
 // http.Response Body if it receives an error.
 func (client AzureFirewallFqdnTagsClient) ListAllSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListAllResponder handles the response to the ListAll request. The method always

@@ -186,7 +186,7 @@ func (c *realRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
 }
 
 func (c *realRecyclerClient) DeletePod(name, namespace string) error {
-	return c.client.CoreV1().Pods(namespace).Delete(context.TODO(), name, nil)
+	return c.client.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
 func (c *realRecyclerClient) Event(eventtype, message string) {

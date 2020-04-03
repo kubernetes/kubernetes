@@ -37,10 +37,6 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/net/websocket"
-
-	"k8s.io/klog"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
@@ -57,19 +53,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
-	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/master/ports"
-	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -79,8 +72,6 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 const (
@@ -102,12 +93,6 @@ const (
 
 	// PodEventTimeout is how much we wait for a pod event to occur.
 	PodEventTimeout = 2 * time.Minute
-
-	// NamespaceCleanupTimeout is how long to wait for the namespace to be deleted.
-	// If there are any orphaned namespaces to clean up, this test is running
-	// on a long lived cluster. A long wait here is preferably to spurious test
-	// failures caused by leaked resources from a previous test run.
-	NamespaceCleanupTimeout = 15 * time.Minute
 
 	// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
 	ServiceStartTimeout = 3 * time.Minute
@@ -138,12 +123,8 @@ const (
 	// Use it case by case when we are sure this timeout is enough.
 	ClaimProvisionShortTimeout = 1 * time.Minute
 
-	// ClaimDeletingTimeout is How long claims have to become deleted.
-	ClaimDeletingTimeout = 3 * time.Minute
-
-	// RecreateNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is recreated before
-	// the test is considered failed.
-	RecreateNodeReadyAgainTimeout = 10 * time.Minute
+	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
+	ClaimProvisionTimeout = 5 * time.Minute
 
 	// RestartNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
@@ -156,29 +137,16 @@ const (
 	// SnapshotCreateTimeout is how long for snapshot to create snapshotContent.
 	SnapshotCreateTimeout = 5 * time.Minute
 
-	// Number of objects that gc can delete in a second.
-	// GC issues 2 requestes for single delete.
-	gcThroughput = 10
-
 	// Minimal number of nodes for the cluster to be considered large.
 	largeClusterThreshold = 100
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
-
-	// ssh port
-	sshPort = "22"
 )
 
 var (
-	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
-	ClaimProvisionTimeout = 5 * time.Minute
-
 	// BusyBoxImage is the image URI of BusyBox.
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-
-	// AgnHostImage is the image URI of AgnHost
-	AgnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
 	ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
@@ -266,7 +234,7 @@ OUTER:
 		go func(nsName string) {
 			defer wg.Done()
 			defer ginkgo.GinkgoRecover()
-			gomega.Expect(c.CoreV1().Namespaces().Delete(context.TODO(), nsName, nil)).To(gomega.Succeed())
+			gomega.Expect(c.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{})).To(gomega.Succeed())
 			Logf("namespace : %v api call to delete is complete ", nsName)
 		}(item.Name)
 	}
@@ -304,8 +272,22 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, conditions.ServiceAccountHasSecrets)
+	_, err = watchtools.UntilWithoutRetry(ctx, w, serviceAccountHasSecrets)
 	return err
+}
+
+// serviceAccountHasSecrets returns true if the service account has at least one secret,
+// false if it does not, or an error.
+func serviceAccountHasSecrets(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *v1.ServiceAccount:
+		return len(t.Secrets) > 0, nil
+	}
+	return false, nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
@@ -313,24 +295,6 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace string) error {
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
-}
-
-// WaitForPersistentVolumeDeleted waits for a PersistentVolume to get deleted or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, timeout time.Duration) error {
-	Logf("Waiting up to %v for PersistentVolume %s to get deleted", timeout, pvName)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
-		if err == nil {
-			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
-			continue
-		}
-		if apierrors.IsNotFound(err) {
-			Logf("PersistentVolume %s was removed", pvName)
-			return nil
-		}
-		Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
-	}
-	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
 }
 
 // findAvailableNamespaceName random namespace name starting with baseName.
@@ -561,47 +525,6 @@ func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
 }
 
-// Cleanup stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
-func Cleanup(filePath, ns string, selectors ...string) {
-	ginkgo.By("using delete to clean up resources")
-	var nsArg string
-	if ns != "" {
-		nsArg = fmt.Sprintf("--namespace=%s", ns)
-	}
-	RunKubectlOrDie(ns, "delete", "--grace-period=0", "-f", filePath, nsArg)
-	AssertCleanup(ns, selectors...)
-}
-
-// AssertCleanup asserts that cleanup of a namespace wrt selectors occurred.
-func AssertCleanup(ns string, selectors ...string) {
-	var nsArg string
-	if ns != "" {
-		nsArg = fmt.Sprintf("--namespace=%s", ns)
-	}
-
-	var e error
-	verifyCleanupFunc := func() (bool, error) {
-		e = nil
-		for _, selector := range selectors {
-			resources := RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers", nsArg)
-			if resources != "" {
-				e = fmt.Errorf("Resources left running after stop:\n%s", resources)
-				return false, nil
-			}
-			pods := RunKubectlOrDie(ns, "get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
-			if pods != "" {
-				e = fmt.Errorf("Pods left unterminated after stop:\n%s", pods)
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
-	if err != nil {
-		Failf(e.Error())
-	}
-}
-
 // LookForStringInPodExec looks for the given string in the output of a command
 // executed in a specific pod container.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
@@ -827,7 +750,7 @@ func (f *Framework) MatchContainerOutput(
 	createdPod := podClient.Create(pod)
 	defer func() {
 		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
+		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
 	}()
 
 	// Wait for client pod to complete.
@@ -841,7 +764,7 @@ func (f *Framework) MatchContainerOutput(
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = podutil.VisitContainers(&podStatus.Spec, func(c *v1.Container) bool {
+		_ = podutil.VisitContainers(&podStatus.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
 			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				Logf("Failed to get logs from node %q pod %q container %q: %v",
@@ -993,7 +916,7 @@ func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
 		client = c.CoreV1().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Name(fmt.Sprintf("%v:%v", node, KubeletPort)).
 			Suffix("pods").
 			Do(context.TODO())
 
@@ -1042,43 +965,6 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	)
 }
 
-// GetPodSecretUpdateTimeout reuturns the timeout duration for updating pod secret.
-func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
-	// With SecretManager(ConfigMapManager), we may have to wait up to full sync period +
-	// TTL of secret(configmap) to elapse before the Kubelet projects the update into the
-	// volume and the container picks it up.
-	// So this timeout is based on default Kubelet sync period (1 minute) + maximum TTL for
-	// secret(configmap) that's based on cluster size + additional time as a fudge factor.
-	secretTTL, err := getNodeTTLAnnotationValue(c)
-	if err != nil {
-		Logf("Couldn't get node TTL annotation (using default value of 0): %v", err)
-	}
-	podLogTimeout := 240*time.Second + secretTTL
-	return podLogTimeout
-}
-
-func getNodeTTLAnnotationValue(c clientset.Interface) (time.Duration, error) {
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil || len(nodes.Items) == 0 {
-		return time.Duration(0), fmt.Errorf("Couldn't list any nodes to get TTL annotation: %v", err)
-	}
-	// Since TTL the kubelet is using is stored in node object, for the timeout
-	// purpose we take it from the first node (all of them should be the same).
-	node := &nodes.Items[0]
-	if node.Annotations == nil {
-		return time.Duration(0), fmt.Errorf("No annotations found on the node")
-	}
-	value, ok := node.Annotations[v1.ObjectTTLAnnotationKey]
-	if !ok {
-		return time.Duration(0), fmt.Errorf("No TTL annotation found on the node")
-	}
-	intValue, err := strconv.Atoi(value)
-	if err != nil {
-		return time.Duration(0), fmt.Errorf("Cannot convert TTL annotation from %#v to int", *node)
-	}
-	return time.Duration(intValue) * time.Second, nil
-}
-
 // AddOrUpdateLabelOnNode adds the given label key and value to the given node or updates value.
 func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
 	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
@@ -1117,7 +1003,7 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
 	nodeUpdated, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
-	if taintutils.TaintExists(nodeUpdated.Spec.Taints, taint) {
+	if taintExists(nodeUpdated.Spec.Taints, taint) {
 		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
@@ -1140,143 +1026,10 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 
 	nodeTaints := node.Spec.Taints
 
-	if len(nodeTaints) == 0 || !taintutils.TaintExists(nodeTaints, taint) {
+	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
 		return false, nil
 	}
 	return true, nil
-}
-
-// ScaleResource scales resource to the given size.
-func ScaleResource(
-	clientset clientset.Interface,
-	scalesGetter scaleclient.ScalesGetter,
-	ns, name string,
-	size uint,
-	wait bool,
-	kind schema.GroupKind,
-	gvr schema.GroupVersionResource,
-) error {
-	ginkgo.By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
-	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gvr); err != nil {
-		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
-	}
-	if !wait {
-		return nil
-	}
-	return e2epod.WaitForControlledPodsRunning(clientset, ns, name, kind)
-}
-
-// DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
-func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
-	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
-
-	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			Logf("%v %s not found: %v", kind, name, err)
-			return nil
-		}
-		return err
-	}
-	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-	replicas, err := e2eresource.GetReplicasFromRuntimeObject(rtObject)
-	if err != nil {
-		return err
-	}
-
-	ps, err := testutils.NewPodStore(c, ns, selector, fields.Everything())
-	if err != nil {
-		return err
-	}
-
-	defer ps.Stop()
-	falseVar := false
-	deleteOption := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	startTime := time.Now()
-	if err := testutils.DeleteResourceWithRetries(c, kind, ns, name, deleteOption); err != nil {
-		return err
-	}
-	deleteTime := time.Since(startTime)
-	Logf("Deleting %v %s took: %v", kind, name, deleteTime)
-
-	var interval, timeout time.Duration
-	switch {
-	case replicas < 100:
-		interval = 100 * time.Millisecond
-	case replicas < 1000:
-		interval = 1 * time.Second
-	default:
-		interval = 10 * time.Second
-	}
-	if replicas < 5000 {
-		timeout = 10 * time.Minute
-	} else {
-		timeout = time.Duration(replicas/gcThroughput) * time.Second
-		// gcThroughput is pretty strict now, add a bit more to it
-		timeout = timeout + 3*time.Minute
-	}
-
-	err = waitForPodsInactive(ps, interval, timeout)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
-	}
-	terminatePodTime := time.Since(startTime) - deleteTime
-	Logf("Terminating %v %s pods took: %v", kind, name, terminatePodTime)
-
-	// In gce, at any point, small percentage of nodes can disappear for
-	// ~10 minutes due to hostError. 20 minutes should be long enough to
-	// restart VM in that case and delete the pod.
-	err = waitForPodsGone(ps, interval, 20*time.Minute)
-	if err != nil {
-		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
-	}
-	return nil
-}
-
-// waitForPodsGone waits until there are no pods left in the PodStore.
-func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var pods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		if pods = ps.List(); len(pods) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range pods {
-			Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d pods left. E.g. %q on node %q", len(pods), pods[0].Name, pods[0].Spec.NodeName)
-	}
-	return err
-}
-
-// waitForPodsInactive waits until there are no active pods left in the PodStore.
-// This is to make a fair comparison of deletion time between DeleteRCAndPods
-// and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
-// when the pod is inactvie.
-func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var activePods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pods := ps.List()
-		activePods = controller.FilterActivePods(pods)
-		if len(activePods) != 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range activePods {
-			Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
-	}
-	return err
 }
 
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
@@ -1357,220 +1110,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	return nil
 }
 
-// RestartKubelet restarts kubelet on the given host.
-func RestartKubelet(host string) error {
-	// TODO: Make it work for all providers and distros.
-	supportedProviders := []string{"gce", "aws", "vsphere"}
-	if !ProviderIs(supportedProviders...) {
-		return fmt.Errorf("unsupported provider for RestartKubelet: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
-	}
-	if ProviderIs("gce") && !NodeOSDistroIs("debian", "gci") {
-		return fmt.Errorf("unsupported node OS distro: %s", TestContext.NodeOSDistro)
-	}
-	var cmd string
-
-	if ProviderIs("gce") && NodeOSDistroIs("debian") {
-		cmd = "sudo /etc/init.d/kubelet restart"
-	} else if ProviderIs("vsphere") {
-		var sudoPresent bool
-		sshResult, err := e2essh.SSH("sudo --version", host, TestContext.Provider)
-		if err != nil {
-			return fmt.Errorf("Unable to ssh to host %s with error %v", host, err)
-		}
-		if !strings.Contains(sshResult.Stderr, "command not found") {
-			sudoPresent = true
-		}
-		sshResult, err = e2essh.SSH("systemctl --version", host, TestContext.Provider)
-		if err != nil {
-			return fmt.Errorf("Failed to execute command 'systemctl' on host %s with error %v", host, err)
-		}
-		if !strings.Contains(sshResult.Stderr, "command not found") {
-			cmd = "systemctl restart kubelet"
-		} else {
-			cmd = "service kubelet restart"
-		}
-		if sudoPresent {
-			cmd = fmt.Sprintf("sudo %s", cmd)
-		}
-	} else {
-		cmd = "sudo systemctl restart kubelet"
-	}
-	Logf("Restarting kubelet via ssh on host %s with command %s", host, cmd)
-	result, err := e2essh.SSH(cmd, host, TestContext.Provider)
-	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart kubelet: %v", err)
-	}
-	return nil
-}
-
-// RestartApiserver restarts the kube-apiserver.
-func RestartApiserver(namespace string, cs clientset.Interface) error {
-	// TODO: Make it work for all providers.
-	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider for RestartApiserver: %s", TestContext.Provider)
-	}
-	if ProviderIs("gce", "aws") {
-		initialRestartCount, err := getApiserverRestartCount(cs)
-		if err != nil {
-			return fmt.Errorf("failed to get apiserver's restart count: %v", err)
-		}
-		if err := sshRestartMaster(); err != nil {
-			return fmt.Errorf("failed to restart apiserver: %v", err)
-		}
-		return waitForApiserverRestarted(cs, initialRestartCount)
-	}
-	// GKE doesn't allow ssh access, so use a same-version master
-	// upgrade to teardown/recreate master.
-	v, err := cs.Discovery().ServerVersion()
-	if err != nil {
-		return err
-	}
-	return masterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
-}
-
-func sshRestartMaster() error {
-	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider for sshRestartMaster: %s", TestContext.Provider)
-	}
-	var command string
-	if ProviderIs("gce") {
-		command = "pidof kube-apiserver | xargs sudo kill"
-	} else {
-		command = "sudo /etc/init.d/kube-apiserver restart"
-	}
-	Logf("Restarting master via ssh, running: %v", command)
-	result, err := e2essh.SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
-	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart apiserver: %v", err)
-	}
-	return nil
-}
-
-// waitForApiserverRestarted waits until apiserver's restart count increased.
-func waitForApiserverRestarted(c clientset.Interface, initialRestartCount int32) error {
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		restartCount, err := getApiserverRestartCount(c)
-		if err != nil {
-			Logf("Failed to get apiserver's restart count: %v", err)
-			continue
-		}
-		if restartCount > initialRestartCount {
-			Logf("Apiserver has restarted.")
-			return nil
-		}
-		Logf("Waiting for apiserver restart count to increase")
-	}
-	return fmt.Errorf("timed out waiting for apiserver to be restarted")
-}
-
-func getApiserverRestartCount(c clientset.Interface) (int32, error) {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "kube-apiserver"}))
-	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
-	if err != nil {
-		return -1, err
-	}
-	if len(pods.Items) != 1 {
-		return -1, fmt.Errorf("unexpected number of apiserver pod: %d", len(pods.Items))
-	}
-	for _, s := range pods.Items[0].Status.ContainerStatuses {
-		if s.Name != "kube-apiserver" {
-			continue
-		}
-		return s.RestartCount, nil
-	}
-	return -1, fmt.Errorf("Failed to find kube-apiserver container in pod")
-}
-
-// RestartControllerManager restarts the kube-controller-manager.
-func RestartControllerManager() error {
-	// TODO: Make it work for all providers and distros.
-	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", TestContext.Provider)
-	}
-	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
-		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
-	}
-	cmd := "pidof kube-controller-manager | xargs sudo kill"
-	Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
-	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart controller-manager: %v", err)
-	}
-	return nil
-}
-
-// WaitForControllerManagerUp waits for the kube-controller-manager to be up.
-func WaitForControllerManagerUp() error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
-		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
-		}
-		if result.Stdout == "ok" {
-			return nil
-		}
-	}
-	return fmt.Errorf("waiting for controller-manager timed out")
-}
-
-type extractRT struct {
-	http.Header
-}
-
-func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
-	rt.Header = req.Header
-	return &http.Response{}, nil
-}
-
-// headersForConfig extracts any http client logic necessary for the provided
-// config.
-func headersForConfig(c *restclient.Config, url *url.URL) (http.Header, error) {
-	extract := &extractRT{}
-	rt, err := restclient.HTTPWrappersForConfig(c, extract)
-	if err != nil {
-		return nil, err
-	}
-	request, err := http.NewRequest("GET", url.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := rt.RoundTrip(request); err != nil {
-		return nil, err
-	}
-	return extract.Header, nil
-}
-
-// OpenWebSocketForURL constructs a websocket connection to the provided URL, using the client
-// config, with the specified protocols.
-func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
-	tlsConfig, err := restclient.TLSConfigFor(config)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create tls config: %v", err)
-	}
-	if url.Scheme == "https" {
-		url.Scheme = "wss"
-	} else {
-		url.Scheme = "ws"
-	}
-	headers, err := headersForConfig(config, url)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to load http headers: %v", err)
-	}
-	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
-	}
-	cfg.Header = headers
-	cfg.TlsConfig = tlsConfig
-	cfg.Protocol = protocols
-	return websocket.DialConfig(cfg)
-}
-
 // LookForStringInLog looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
@@ -1582,62 +1121,6 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
-}
-
-// BlockNetwork blocks network between the given from value and the given to value.
-// The following helper functions can block/unblock network from source
-// host to destination host by manipulating iptable rules.
-// This function assumes it can ssh to the source host.
-//
-// Caution:
-// Recommend to input IP instead of hostnames. Using hostnames will cause iptables to
-// do a DNS lookup to resolve the name to an IP address, which will
-// slow down the test and cause it to fail if DNS is absent or broken.
-//
-// Suggested usage pattern:
-// func foo() {
-//	...
-//	defer UnblockNetwork(from, to)
-//	BlockNetwork(from, to)
-//	...
-// }
-//
-func BlockNetwork(from string, to string) {
-	Logf("block network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := e2essh.SSH(dropCmd, from, TestContext.Provider); result.Code != 0 || err != nil {
-		e2essh.LogResult(result)
-		Failf("Unexpected error: %v", err)
-	}
-}
-
-// UnblockNetwork unblocks network between the given from value and the given to value.
-func UnblockNetwork(from string, to string) {
-	Logf("Unblock network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
-	// Undrop command may fail if the rule has never been created.
-	// In such case we just lose 30 seconds, but the cluster is healthy.
-	// But if the rule had been created and removing it failed, the node is broken and
-	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
-	// may fail). Manual intervention is required in such case (recreating the
-	// cluster solves the problem too).
-	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-		result, err := e2essh.SSH(undropCmd, from, TestContext.Provider)
-		if result.Code == 0 && err == nil {
-			return true, nil
-		}
-		e2essh.LogResult(result)
-		if err != nil {
-			Logf("Unexpected error: %v", err)
-		}
-		return false, nil
-	})
-	if err != nil {
-		Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
-			"required on host %s: remove rule %s, if exists", from, iptablesRule)
-	}
 }
 
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
@@ -1700,65 +1183,6 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
-// to create/modify Nodes before running a test.
-type E2ETestNodePreparer struct {
-	client clientset.Interface
-	// Specifies how many nodes should be modified using the given strategy.
-	// Only one strategy can be applied to a single Node, so there needs to
-	// be at least <sum_of_keys> Nodes in the cluster.
-	countToStrategy       []testutils.CountToStrategy
-	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
-}
-
-// PrepareNodes prepares nodes in the cluster.
-func (p *E2ETestNodePreparer) PrepareNodes() error {
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
-	if err != nil {
-		return err
-	}
-	numTemplates := 0
-	for _, v := range p.countToStrategy {
-		numTemplates += v.Count
-	}
-	if numTemplates > len(nodes.Items) {
-		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes")
-	}
-	index := 0
-	sum := 0
-	for _, v := range p.countToStrategy {
-		sum += v.Count
-		for ; index < sum; index++ {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
-				klog.Errorf("Aborting node preparation: %v", err)
-				return err
-			}
-			p.nodeToAppliedStrategy[nodes.Items[index].Name] = v.Strategy
-		}
-	}
-	return nil
-}
-
-// CleanupNodes cleanups nodes in the cluster.
-func (p *E2ETestNodePreparer) CleanupNodes() error {
-	var encounteredError error
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
-	if err != nil {
-		return err
-	}
-	for i := range nodes.Items {
-		name := nodes.Items[i].Name
-		strategy, found := p.nodeToAppliedStrategy[name]
-		if found {
-			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
-				klog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
-				encounteredError = err
-			}
-		}
-	}
-	return encounteredError
-}
-
 // getMasterAddresses returns the externalIP, internalIP and hostname fields of the master.
 // If any of these is unavailable, it is set to "".
 func getMasterAddresses(c clientset.Interface) (string, string, string) {
@@ -1818,46 +1242,6 @@ func DescribeIng(ns string) {
 	desc, _ := RunKubectl(
 		ns, "describe", "ing", fmt.Sprintf("--namespace=%v", ns))
 	Logf(desc)
-}
-
-// NewTestPod returns a pod that has the specified requests and limits
-func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.ResourceList) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "pause",
-					Image: imageutils.GetPauseImageName(),
-					Resources: v1.ResourceRequirements{
-						Requests: requests,
-						Limits:   limits,
-					},
-				},
-			},
-		},
-	}
-}
-
-// NewAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
-// that behave the same, no matter the underlying OS.
-func (f *Framework) NewAgnhostPod(name string, args ...string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "agnhost",
-					Image: AgnHostImage,
-					Args:  args,
-				},
-			},
-		},
-	}
 }
 
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
@@ -1924,48 +1308,6 @@ func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
 	return &ds, nil
 }
 
-// GetClusterZones returns the values of zone label collected from all nodes.
-func GetClusterZones(c clientset.Interface) (sets.String, error) {
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
-	}
-
-	// collect values of zone label from all nodes
-	zones := sets.NewString()
-	for _, node := range nodes.Items {
-		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
-			zones.Insert(zone)
-		}
-
-		if zone, found := node.Labels[v1.LabelZoneFailureDomainStable]; found {
-			zones.Insert(zone)
-		}
-	}
-	return zones, nil
-}
-
-// GetFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.
-// If the given mask is nil, then the regex will contain the default OS file modes, which are 0644 for Linux and 0775 for Windows.
-func GetFileModeRegex(filePath string, mask *int32) string {
-	var (
-		linuxMask   int32
-		windowsMask int32
-	)
-	if mask == nil {
-		linuxMask = int32(0644)
-		windowsMask = int32(0775)
-	} else {
-		linuxMask = *mask
-		windowsMask = *mask
-	}
-
-	linuxOutput := fmt.Sprintf("mode of file \"%s\": %v", filePath, os.FileMode(linuxMask))
-	windowsOutput := fmt.Sprintf("mode of Windows file \"%v\": %s", filePath, os.FileMode(windowsMask))
-
-	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
-}
-
 // PrettyPrintJSON converts metrics to JSON format.
 func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
@@ -1979,4 +1321,14 @@ func PrettyPrintJSON(metrics interface{}) string {
 		return ""
 	}
 	return string(formatted.Bytes())
+}
+
+// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
+func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
 }

@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -904,8 +904,7 @@ func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
 	}
 	failedTestCases := []core.PersistentVolumeClaimSpec{
 		*testVolumeSnapshotDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
-		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "PersistentVolumeClaim", "snapshot.storage.k8s.io"),
-		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
+		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io"),
 	}
 
 	for _, tc := range successTestCases {
@@ -1475,204 +1474,168 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		oldClaim          *core.PersistentVolumeClaim
 		newClaim          *core.PersistentVolumeClaim
 		enableResize      bool
-		enableBlock       bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-update-volume-mode-block-to-block": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"valid-update-volume-mode-file-to-file": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeFile,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeFile,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-nil-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeFile,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-nil-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-block-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          invalidClaimVolumeModeNil,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-file-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          invalidClaimVolumeModeNil,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-empty-to-mode": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          validClaimVolumeModeBlock,
 			enableResize:      false,
-			enableBlock:       true,
 		},
 		"invalid-update-volume-mode-mode-to-empty": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaim,
 			enableResize:      false,
-			enableBlock:       true,
-		},
-		// with the new validation changes this test should not fail
-		"noop-update-volumemode-allowed": {
-			isExpectedFailure: false,
-			oldClaim:          validClaimVolumeModeFile,
-			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-size-update-resize-disabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-size-update-resize-enabled": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
 			enableResize:      true,
-			enableBlock:       false,
 		},
 		"invalid-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          invalidSizeUpdate,
 			enableResize:      true,
-			enableBlock:       false,
 		},
 		"unbound-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          unboundSizeUpdate,
 			enableResize:      true,
-			enableBlock:       false,
 		},
 		"valid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"valid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInAnnotationAndSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInAnnotationAndSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-upgrade-storage-class-in-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          invalidClaimStorageClassInSpec,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 		"invalid-downgrade-storage-class-spec-to-annotation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          validClaimStorageClass,
 			enableResize:      false,
-			enableBlock:       false,
 		},
 	}
 
@@ -1680,7 +1643,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
@@ -3908,121 +3870,190 @@ func TestValidateVolumes(t *testing.T) {
 }
 
 func TestHugePagesIsolation(t *testing.T) {
-	successCases := []core.Pod{
-		{ // Basic fields.
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+	testCases := map[string]struct {
+		pod                             *core.Pod
+		enableHugePageStorageMediumSize bool
+		expectError                     bool
+	}{
+		"Valid: request hugepages-2Mi": {
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+								},
 							},
 						},
 					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
 				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
 			},
+		},
+		"Valid: HugePageStorageMediumSize enabled: request more than one hugepages size": {
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+									core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+									core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+				},
+			},
+			enableHugePageStorageMediumSize: true,
+			expectError:                     false,
+		},
+		"Invalid: HugePageStorageMediumSize disabled: request hugepages-1Gi, limit hugepages-2Mi and hugepages-1Gi": {
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-multiple", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+									core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+				},
+			},
+			expectError: true,
+		},
+		"Invalid: not requesting cpu and memory": {
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-requireCpuOrMemory", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+				},
+			},
+			expectError: true,
+		},
+		"Invalid: request 1Gi hugepages-2Mi but limit 2Gi": {
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+				},
+			},
+			expectError: true,
+		},
+		"Invalid: HugePageStorageMediumSize disabled: request more than one hugepages size": {
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+							Resources: core.ResourceRequirements{
+								Requests: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+									core.ResourceName("hugepages-1Gi"):     resource.MustParse("1Gi"),
+								},
+								Limits: core.ResourceList{
+									core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+									core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+									core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
+									core.ResourceName("hugepages-1Gi"):     resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyAlways,
+					DNSPolicy:     core.DNSClusterFirst,
+				},
+			},
+			expectError: true,
 		},
 	}
-	failureCases := []core.Pod{
-		{ // Basic fields.
-			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-requireCpuOrMemory", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		{ // Basic fields.
-			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("2Gi"),
-							},
-						},
-					},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-		{ // Basic fields.
-			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-multiple", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-								core.ResourceName("hugepages-2Mi"):     resource.MustParse("1Gi"),
-								core.ResourceName("hugepages-1Gi"):     resource.MustParse("2Gi"),
-							},
-						},
-					},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
-	}
-	for i := range successCases {
-		pod := &successCases[i]
-		if errs := ValidatePod(pod); len(errs) != 0 {
-			t.Errorf("Unexpected error for case[%d], err: %v", i, errs)
-		}
-	}
-	for i := range failureCases {
-		pod := &failureCases[i]
-		if errs := ValidatePod(pod); len(errs) == 0 {
-			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
-		}
+	for tcName, tc := range testCases {
+		t.Run(tcName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
+			errs := ValidatePod(tc.pod, PodValidationOptions{tc.enableHugePageStorageMediumSize})
+			if tc.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
 	}
 }
 
 func TestPVCVolumeMode(t *testing.T) {
-	// Enable feature BlockVolume for PVC
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
 	fake := core.PersistentVolumeMode("fake")
@@ -4053,9 +4084,6 @@ func TestPVCVolumeMode(t *testing.T) {
 }
 
 func TestPVVolumeMode(t *testing.T) {
-	// Enable feature BlockVolume for PVC
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
 	fake := core.PersistentVolumeMode("fake")
@@ -5025,8 +5053,7 @@ func TestValidateDisabledSubpath(t *testing.T) {
 }
 
 func TestValidateSubpathMutuallyExclusive(t *testing.T) {
-	// Enable feature VolumeSubpathEnvExpansion and VolumeSubpath
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, true)()
+	// Enable feature VolumeSubpath
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, true)()
 
 	volumes := []core.Volume{
@@ -5109,8 +5136,6 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 }
 
 func TestValidateDisabledSubpathExpr(t *testing.T) {
-	// Enable feature VolumeSubpathEnvExpansion
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, true)()
 
 	volumes := []core.Volume{
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
@@ -6530,6 +6555,9 @@ func TestValidatePodSpec(t *testing.T) {
 	maxUserID := int64(2147483647)
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
+	goodfsGroupChangePolicy := core.FSGroupChangeAlways
+	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
+	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
 
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
@@ -6676,6 +6704,14 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:        core.DNSClusterFirst,
 			RuntimeClassName: utilpointer.StringPtr("valid-sandbox"),
 			Overhead:         core.ResourceList{},
+		},
+		{
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				FSGroupChangePolicy: &goodfsGroupChangePolicy,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
 		},
 	}
 	for i := range successCases {
@@ -6863,6 +6899,22 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy:    core.RestartPolicyAlways,
 			DNSPolicy:        core.DNSClusterFirst,
 			RuntimeClassName: utilpointer.StringPtr("invalid/sandbox"),
+		},
+		"bad empty fsGroupchangepolicy": {
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				FSGroupChangePolicy: &badfsGroupChangePolicy2,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"bad invalid fsgroupchangepolicy": {
+			Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &core.PodSecurityContext{
+				FSGroupChangePolicy: &badfsGroupChangePolicy1,
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
 		},
 	}
 	for k, v := range failureCases {
@@ -7375,7 +7427,7 @@ func TestValidatePod(t *testing.T) {
 		},
 	}
 	for _, pod := range successCases {
-		if errs := ValidatePod(&pod); len(errs) != 0 {
+		if errs := ValidatePod(&pod, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -8225,7 +8277,7 @@ func TestValidatePod(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := ValidatePod(&v.spec); len(errs) == 0 {
+		if errs := ValidatePod(&v.spec, PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		} else if v.expectedError == "" {
 			t.Errorf("missing expectedError for %q, got %q", k, errs.ToAggregate().Error())
@@ -8241,6 +8293,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		activeDeadlineSecondsNegative = int64(-30)
 		activeDeadlineSecondsPositive = int64(30)
 		activeDeadlineSecondsLarger   = int64(31)
+		validfsGroupChangePolicy      = core.FSGroupChangeOnRootMismatch
 
 		now    = metav1.Now()
 		grace  = int64(30)
@@ -8698,6 +8751,36 @@ func TestValidatePodUpdate(t *testing.T) {
 					Containers: []core.Container{
 						{
 							Image: "foo:V1",
+						},
+					},
+					SecurityContext: &core.PodSecurityContext{
+						FSGroupChangePolicy: &validfsGroupChangePolicy,
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Image: "foo:V2",
+						},
+					},
+					SecurityContext: &core.PodSecurityContext{
+						FSGroupChangePolicy: nil,
+					},
+				},
+			},
+			"spec: Forbidden: pod updates may not change fields",
+			"fsGroupChangePolicy change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Image: "foo:V1",
 							Ports: []core.ContainerPort{
 								{HostPort: 8080, ContainerPort: 80},
 							},
@@ -8965,7 +9048,7 @@ func TestValidatePodUpdate(t *testing.T) {
 	for _, test := range tests {
 		test.new.ObjectMeta.ResourceVersion = "1"
 		test.old.ObjectMeta.ResourceVersion = "1"
-		errs := ValidatePodUpdate(&test.new, &test.old)
+		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{})
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -9387,14 +9470,15 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 	}
 }
 
-func TestValidateService(t *testing.T) {
+func TestValidateServiceCreate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTopology, true)()
 
 	testCases := []struct {
-		name     string
-		tweakSvc func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs  int
+		name               string
+		tweakSvc           func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs            int
+		appProtocolEnabled bool
 	}{
 		{
 			name: "missing namespace",
@@ -10128,15 +10212,57 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: `valid appProtocol`,
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Ports = []core.ServicePort{{
+					Port:        12345,
+					TargetPort:  intstr.FromInt(12345),
+					Protocol:    "TCP",
+					AppProtocol: utilpointer.StringPtr("HTTP"),
+				}}
+			},
+			appProtocolEnabled: true,
+			numErrs:            0,
+		},
+		{
+			name: `valid custom appProtocol`,
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Ports = []core.ServicePort{{
+					Port:        12345,
+					TargetPort:  intstr.FromInt(12345),
+					Protocol:    "TCP",
+					AppProtocol: utilpointer.StringPtr("example.com/protocol"),
+				}}
+			},
+			appProtocolEnabled: true,
+			numErrs:            0,
+		},
+		{
+			name: `invalid appProtocol`,
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Ports = []core.ServicePort{{
+					Port:        12345,
+					TargetPort:  intstr.FromInt(12345),
+					Protocol:    "TCP",
+					AppProtocol: utilpointer.StringPtr("example.com/protocol_with{invalid}[characters]"),
+				}}
+			},
+			appProtocolEnabled: true,
+			numErrs:            1,
+		},
 	}
 
 	for _, tc := range testCases {
-		svc := makeValidService()
-		tc.tweakSvc(&svc)
-		errs := ValidateService(&svc)
-		if len(errs) != tc.numErrs {
-			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, true)()
+			svc := makeValidService()
+			tc.tweakSvc(&svc)
+			errs := ValidateServiceCreate(&svc)
+			if len(errs) != tc.numErrs {
+				t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
+			}
+		})
 	}
 }
 
@@ -10812,9 +10938,6 @@ func TestValidateReplicationController(t *testing.T) {
 }
 
 func TestValidateNode(t *testing.T) {
-	opts := NodeValidationOptions{
-		ValidateSingleHugePageResource: true,
-	}
 	validSelector := map[string]string{"a": "b"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []core.Node{
@@ -10847,6 +10970,24 @@ func TestValidateNode(t *testing.T) {
 				Capacity: core.ResourceList{
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "abc",
+				Labels: validSelector,
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "something"},
+				},
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+					core.ResourceName("my.org/gpu"):        resource.MustParse("10"),
+					core.ResourceName("hugepages-2Mi"):     resource.MustParse("10Gi"),
+					core.ResourceName("hugepages-1Gi"):     resource.MustParse("10Gi"),
 				},
 			},
 		},
@@ -10921,7 +11062,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateNode(&successCase, opts); len(errs) != 0 {
+		if errs := ValidateNode(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -11091,24 +11232,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 		},
-		"multiple-pre-allocated-hugepages": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "abc",
-				Labels: validSelector,
-			},
-			Status: core.NodeStatus{
-				Addresses: []core.NodeAddress{
-					{Type: core.NodeExternalIP, Address: "something"},
-				},
-				Capacity: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-					core.ResourceName("my.org/gpu"):        resource.MustParse("10"),
-					core.ResourceName("hugepages-2Mi"):     resource.MustParse("10Gi"),
-					core.ResourceName("hugepages-1Gi"):     resource.MustParse("10Gi"),
-				},
-			},
-		},
 		"invalid-pod-cidr": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc",
@@ -11145,7 +11268,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateNode(&v, opts)
+		errs := ValidateNode(&v)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -11172,134 +11295,7 @@ func TestValidateNode(t *testing.T) {
 	}
 }
 
-func TestNodeValidationOptions(t *testing.T) {
-	updateTests := []struct {
-		oldNode core.Node
-		node    core.Node
-		opts    NodeValidationOptions
-		valid   bool
-	}{
-		{core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"): resource.MustParse("0"),
-				},
-			},
-		}, core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
-				},
-			},
-		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
-		{core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"): resource.MustParse("1Gi"),
-				},
-			},
-		}, core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"): resource.MustParse("1Gi"),
-				},
-			},
-		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
-		{core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "not-validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"): resource.MustParse("0"),
-				},
-			},
-		}, core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "not-validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
-				},
-			},
-		}, NodeValidationOptions{ValidateSingleHugePageResource: false}, true},
-	}
-	for i, test := range updateTests {
-		test.oldNode.ObjectMeta.ResourceVersion = "1"
-		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNodeUpdate(&test.node, &test.oldNode, test.opts)
-		if test.valid && len(errs) > 0 {
-			t.Errorf("%d: Unexpected error: %v", i, errs)
-			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
-		}
-		if !test.valid && len(errs) == 0 {
-			t.Errorf("%d: Unexpected non-error", i)
-			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
-		}
-	}
-	nodeTests := []struct {
-		node  core.Node
-		opts  NodeValidationOptions
-		valid bool
-	}{
-		{core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
-				},
-			},
-		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
-		{core.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "not-validate-single-hugepages",
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName("hugepages-2Mi"):  resource.MustParse("1Gi"),
-					core.ResourceName("hugepages-1Gi"):  resource.MustParse("2Gi"),
-					core.ResourceName("hugepages-64Ki"): resource.MustParse("2Gi"),
-				},
-			},
-		}, NodeValidationOptions{ValidateSingleHugePageResource: false}, true},
-	}
-	for i, test := range nodeTests {
-		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNode(&test.node, test.opts)
-		if test.valid && len(errs) > 0 {
-			t.Errorf("%d: Unexpected error: %v", i, errs)
-		}
-		if !test.valid && len(errs) == 0 {
-			t.Errorf("%d: Unexpected non-error", i)
-		}
-	}
-}
 func TestValidateNodeUpdate(t *testing.T) {
-	opts := NodeValidationOptions{
-		ValidateSingleHugePageResource: true,
-	}
 	tests := []struct {
 		oldNode core.Node
 		node    core.Node
@@ -11723,7 +11719,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"
 		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNodeUpdate(&test.node, &test.oldNode, opts)
+		errs := ValidateNodeUpdate(&test.node, &test.oldNode)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
@@ -11736,9 +11732,10 @@ func TestValidateNodeUpdate(t *testing.T) {
 
 func TestValidateServiceUpdate(t *testing.T) {
 	testCases := []struct {
-		name     string
-		tweakSvc func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
-		numErrs  int
+		name               string
+		tweakSvc           func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs            int
+		appProtocolEnabled bool
 	}{
 		{
 			name: "no change",
@@ -12182,16 +12179,54 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "update with valid app protocol, field unset, gate disabled",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "update to valid app protocol, field set, gate disabled",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("http")}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "update to valid app protocol, gate enabled",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
+			},
+			appProtocolEnabled: true,
+			numErrs:            0,
+		},
+		{
+			name: "update to invalid app protocol, gate enabled",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("~https")}}
+			},
+			appProtocolEnabled: true,
+			numErrs:            1,
+		},
 	}
 
 	for _, tc := range testCases {
-		oldSvc := makeValidService()
-		newSvc := makeValidService()
-		tc.tweakSvc(&oldSvc, &newSvc)
-		errs := ValidateServiceUpdate(&newSvc, &oldSvc)
-		if len(errs) != tc.numErrs {
-			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
+
+			oldSvc := makeValidService()
+			newSvc := makeValidService()
+			tc.tweakSvc(&oldSvc, &newSvc)
+			errs := ValidateServiceUpdate(&newSvc, &oldSvc)
+			if len(errs) != tc.numErrs {
+				t.Errorf("Expected %d errors, got %d: %v", tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
 	}
 }
 
@@ -13478,53 +13513,82 @@ func TestValidateSSHAuthSecret(t *testing.T) {
 	}
 }
 
-func TestValidateEndpoints(t *testing.T) {
-	successCases := map[string]core.Endpoints{
+func TestValidateEndpointsCreate(t *testing.T) {
+	successCases := map[string]struct {
+		endpoints          core.Endpoints
+		appProtocolEnabled bool
+	}{
 		"simple endpoint": {
-			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
-			Subsets: []core.EndpointSubset{
-				{
-					Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}, {IP: "10.10.2.2"}},
-					Ports:     []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
-				},
-				{
-					Addresses: []core.EndpointAddress{{IP: "10.10.3.3"}},
-					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}, {Name: "b", Port: 76, Protocol: "TCP"}},
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{
+					{
+						Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}, {IP: "10.10.2.2"}},
+						Ports:     []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
+					},
+					{
+						Addresses: []core.EndpointAddress{{IP: "10.10.3.3"}},
+						Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}, {Name: "b", Port: 76, Protocol: "TCP"}},
+					},
 				},
 			},
 		},
 		"empty subsets": {
-			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			},
 		},
 		"no name required for singleton port": {
-			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
-			Subsets: []core.EndpointSubset{
-				{
-					Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
-					Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP"}},
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{
+					{
+						Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP"}},
+					},
 				},
 			},
 		},
+		"valid appProtocol": {
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{
+					{
+						Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("HTTP")}},
+					},
+				},
+			},
+			appProtocolEnabled: true,
+		},
 		"empty ports": {
-			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
-			Subsets: []core.EndpointSubset{
-				{
-					Addresses: []core.EndpointAddress{{IP: "10.10.3.3"}},
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{
+					{
+						Addresses: []core.EndpointAddress{{IP: "10.10.3.3"}},
+					},
 				},
 			},
 		},
 	}
 
-	for k, v := range successCases {
-		if errs := ValidateEndpoints(&v); len(errs) != 0 {
-			t.Errorf("Expected success for %s, got %v", k, errs)
-		}
+	for name, tc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
+			errs := ValidateEndpointsCreate(&tc.endpoints)
+			if len(errs) != 0 {
+				t.Errorf("Expected no validation errors, got %v", errs)
+			}
+
+		})
 	}
 
 	errorCases := map[string]struct {
-		endpoints   core.Endpoints
-		errorType   field.ErrorType
-		errorDetail string
+		endpoints          core.Endpoints
+		appProtocolEnabled bool
+		errorType          field.ErrorType
+		errorDetail        string
 	}{
 		"missing namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
@@ -13682,12 +13746,100 @@ func TestValidateEndpoints(t *testing.T) {
 			errorType:   "FieldValueInvalid",
 			errorDetail: "link-local multicast",
 		},
+		"Invalid AppProtocol": {
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{
+					{
+						Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("lots-of[invalid]-{chars}")}},
+					},
+				},
+			},
+			appProtocolEnabled: true,
+			errorType:          "FieldValueInvalid",
+			errorDetail:        "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
+		},
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
-			t.Errorf("[%s] Expected error type %s with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
-		}
+		t.Run(k, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, v.appProtocolEnabled)()
+			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+				t.Errorf("Expected error type %s with detail %q, got %v", v.errorType, v.errorDetail, errs)
+			}
+		})
+	}
+}
+
+func TestValidateEndpointsUpdate(t *testing.T) {
+	baseEndpoints := core.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace", ResourceVersion: "1234"},
+		Subsets: []core.EndpointSubset{{
+			Addresses: []core.EndpointAddress{{IP: "10.1.2.3"}},
+		}},
+	}
+
+	testCases := map[string]struct {
+		tweakOldEndpoints  func(ep *core.Endpoints)
+		tweakNewEndpoints  func(ep *core.Endpoints)
+		appProtocolEnabled bool
+		numExpectedErrors  int
+	}{
+		"update with valid app protocol, field unset, gate not enabled": {
+			tweakOldEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
+			},
+			tweakNewEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
+			},
+			numExpectedErrors: 1,
+		},
+		"update with valid app protocol, field set, gate not enabled": {
+			tweakOldEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("http")}}
+			},
+			tweakNewEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
+			},
+			numExpectedErrors: 0,
+		},
+		"update to valid app protocol, gate enabled": {
+			tweakOldEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
+			},
+			tweakNewEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
+			},
+			appProtocolEnabled: true,
+			numExpectedErrors:  0,
+		},
+		"update to invalid app protocol, gate enabled": {
+			tweakOldEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
+			},
+			tweakNewEndpoints: func(ep *core.Endpoints) {
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("~https")}}
+			},
+			appProtocolEnabled: true,
+			numExpectedErrors:  1,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
+			oldEndpoints := baseEndpoints.DeepCopy()
+			tc.tweakOldEndpoints(oldEndpoints)
+			newEndpoints := baseEndpoints.DeepCopy()
+			tc.tweakNewEndpoints(newEndpoints)
+
+			errs := ValidateEndpointsUpdate(newEndpoints, oldEndpoints)
+			if len(errs) != tc.numExpectedErrors {
+				t.Errorf("Expected %d validation errors, got %d: %v", tc.numExpectedErrors, len(errs), errs)
+			}
+
+		})
 	}
 }
 
@@ -14226,7 +14378,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
 	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
 	// The same ip will now have a different nodeName.
-	errList := ValidateEndpoints(updatedEndpoint)
+	errList := ValidateEndpoints(updatedEndpoint, false)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
 	if len(errList) != 0 {
 		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
@@ -14236,7 +14388,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 	// Check NodeName DNS validation
 	endpoint := newNodeNameEndpoint("illegal*.nodename")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, false)
 	if len(errList) == 0 {
 		t.Error("Endpoint should reject invalid NodeName")
 	}
@@ -14244,7 +14396,7 @@ func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 
 func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	endpoint := newNodeNameEndpoint("10.10.1.1")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, false)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
@@ -14636,13 +14788,17 @@ func TestAlphaVolumePVCDataSource(t *testing.T) {
 			expectedFail: true,
 		},
 		{
-			testName:     "test specifying pvc with snapshot api group should fail",
-			claimSpec:    *testDataSourceInSpec("test_snapshot", "PersistentVolumeClaim", "snapshot.storage.k8s.io"),
+			testName:     "test missing kind in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io"),
 			expectedFail: true,
 		},
 		{
-			testName:     "test invalid group name in snapshot datasource should fail",
-			claimSpec:    *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
+			testName:  "test create from valid generic custom resource source",
+			claimSpec: *testDataSourceInSpec("test_generic", "Generic", "generic.storage.k8s.io"),
+		},
+		{
+			testName:     "test invalid datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_pod", "Pod", ""),
 			expectedFail: true,
 		},
 	}
@@ -14876,7 +15032,7 @@ func TestPodIPsValidation(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		errs := ValidatePod(&testCase.pod)
+		errs := ValidatePod(&testCase.pod, PodValidationOptions{})
 		if len(errs) == 0 && testCase.expectError {
 			t.Errorf("expected failure for %s, but there were none", testCase.pod.Name)
 			return
@@ -14909,9 +15065,6 @@ func makeNode(nodeName string, podCIDRs []string) core.Node {
 	}
 }
 func TestValidateNodeCIDRs(t *testing.T) {
-	opts := NodeValidationOptions{
-		ValidateSingleHugePageResource: true,
-	}
 	testCases := []struct {
 		expectError bool
 		node        core.Node
@@ -14972,7 +15125,7 @@ func TestValidateNodeCIDRs(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errs := ValidateNode(&testCase.node, opts)
+		errs := ValidateNode(&testCase.node)
 		if len(errs) == 0 && testCase.expectError {
 			t.Errorf("expected failure for %s, but there were none", testCase.node.Name)
 			return

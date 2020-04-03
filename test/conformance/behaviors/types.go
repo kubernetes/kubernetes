@@ -37,3 +37,21 @@ type Behavior struct {
 	APIType     string `json:"apiType,omitempty"`
 	Description string `json:"description,omitempty"`
 }
+
+// ConformanceData describes the structure of the conformance.yaml file
+type ConformanceData struct {
+	// A URL to the line of code in the kube src repo for the test. Omitted from the YAML to avoid exposing line number.
+	URL string `yaml:"-"`
+	// Extracted from the "Testname:" comment before the test
+	TestName string
+	// CodeName is taken from the actual ginkgo descriptions, e.g. `[sig-apps] Foo should bar [Conformance]`
+	CodeName string
+	// Extracted from the "Description:" comment before the test
+	Description string
+	// Version when this test is added or modified ex: v1.12, v1.13
+	Release string
+	// File is the filename where the test is defined. We intentionally don't save the line here to avoid meaningless changes.
+	File string
+	// Behaviors is the list of conformance behaviors tested by a particular e2e test
+	Behaviors []string `yaml:"behaviors,omitempty"`
+}

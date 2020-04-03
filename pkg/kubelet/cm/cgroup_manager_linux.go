@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -153,10 +154,11 @@ func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup, pa
 		if !cgroupsystemd.UseSystemd() {
 			panic("systemd cgroup manager not available")
 		}
-		return &cgroupsystemd.LegacyManager{
-			Cgroups: cgroups,
-			Paths:   paths,
-		}, nil
+		f, err := cgroupsystemd.NewSystemdCgroupsManager()
+		if err != nil {
+			return nil, err
+		}
+		return f(cgroups, paths), nil
 	}
 	return nil, fmt.Errorf("invalid cgroup manager configuration")
 }
@@ -254,6 +256,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
 	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd")
+
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		whitelistControllers.Insert("pids")
 	}
@@ -361,6 +364,30 @@ func setSupportedSubsystems(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	return nil
 }
 
+// getCpuWeight converts from the range [2, 262144] to [1, 10000]
+func getCpuWeight(cpuShares *uint64) uint64 {
+	if cpuShares == nil {
+		return 0
+	}
+	if *cpuShares >= 262144 {
+		return 10000
+	}
+	return 1 + ((*cpuShares-2)*9999)/262142
+}
+
+// getCpuMax returns the cgroup v2 cpu.max setting given the cpu quota and the cpu period
+func getCpuMax(cpuQuota *int64, cpuPeriod *uint64) string {
+	quotaStr := "max"
+	periodStr := "100000"
+	if cpuQuota != nil {
+		quotaStr = strconv.FormatInt(*cpuQuota, 10)
+	}
+	if cpuPeriod != nil {
+		periodStr = strconv.FormatUint(*cpuPeriod, 10)
+	}
+	return fmt.Sprintf("%s %s", quotaStr, periodStr)
+}
+
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
 	resources := &libcontainerconfigs.Resources{}
 	if resourceConfig == nil {
@@ -369,14 +396,19 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.Memory != nil {
 		resources.Memory = *resourceConfig.Memory
 	}
-	if resourceConfig.CpuShares != nil {
-		resources.CpuShares = *resourceConfig.CpuShares
-	}
-	if resourceConfig.CpuQuota != nil {
-		resources.CpuQuota = *resourceConfig.CpuQuota
-	}
-	if resourceConfig.CpuPeriod != nil {
-		resources.CpuPeriod = *resourceConfig.CpuPeriod
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		resources.CpuWeight = getCpuWeight(resourceConfig.CpuShares)
+		resources.CpuMax = getCpuMax(resourceConfig.CpuQuota, resourceConfig.CpuPeriod)
+	} else {
+		if resourceConfig.CpuShares != nil {
+			resources.CpuShares = *resourceConfig.CpuShares
+		}
+		if resourceConfig.CpuQuota != nil {
+			resources.CpuQuota = *resourceConfig.CpuQuota
+		}
+		if resourceConfig.CpuPeriod != nil {
+			resources.CpuPeriod = *resourceConfig.CpuPeriod
+		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		if resourceConfig.PidsLimit != nil {

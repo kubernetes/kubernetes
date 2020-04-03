@@ -30,8 +30,8 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/gpu"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -171,7 +171,7 @@ func PrePullAllImages() error {
 
 // getGPUDevicePluginImage returns the image of GPU device plugin.
 func getGPUDevicePluginImage() string {
-	ds, err := framework.DsFromManifest(gpu.GPUDevicePluginDSYAML)
+	ds, err := framework.DsFromManifest(e2egpu.GPUDevicePluginDSYAML)
 	if err != nil {
 		klog.Errorf("Failed to parse the device plugin image: %v", err)
 		return ""
@@ -189,7 +189,7 @@ func getGPUDevicePluginImage() string {
 
 // getSRIOVDevicePluginImage returns the image of SRIOV device plugin.
 func getSRIOVDevicePluginImage() string {
-	data, err := testfiles.Read(SRIOVDevicePluginDSYAML)
+	data, err := e2etestfiles.Read(SRIOVDevicePluginDSYAML)
 	if err != nil {
 		klog.Errorf("Failed to read the device plugin manifest: %v", err)
 		return ""

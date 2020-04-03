@@ -318,7 +318,13 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	go func() {
 		defer close(delayedStopCh)
+
 		<-stopCh
+
+		// As soon as shutdown is initiated, /readyz should start returning failure.
+		// This gives the load balancer a window defined by ShutdownDelayDuration to detect that /readyz is red
+		// and stop sending traffic to this server.
+		close(s.readinessStopCh)
 
 		time.Sleep(s.ShutdownDelayDuration)
 	}()
@@ -379,7 +385,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	// ensure cleanup.
 	go func() {
 		<-stopCh
-		close(s.readinessStopCh)
 		close(internalStopCh)
 		if stoppedCh != nil {
 			<-stoppedCh

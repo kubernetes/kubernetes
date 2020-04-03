@@ -192,7 +192,7 @@ HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 NUM_ADDITIONAL_NODES="${NUM_ADDITIONAL_NODES:-}"
 ADDITIONAL_MACHINE_TYPE="${ADDITIONAL_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.4.3-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.4.4-0) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -517,7 +517,9 @@ ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
 
-SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
+# The value kubernetes.default.svc is only usable in Pods and should only be
+# set for tests. DO NOT COPY THIS VALUE FOR PRODUCTION CLUSTERS.
+SERVICEACCOUNT_ISSUER="https://kubernetes.default.svc"
 
 # Optional: Enable Node termination Handler for Preemptible and GPU VMs.
 # https://github.com/GoogleCloudPlatform/k8s-node-termination-handler

@@ -37,7 +37,6 @@ import (
 type createAuthInfoOptions struct {
 	configAccess      clientcmd.ConfigAccess
 	name              string
-	authPath          cliflag.StringFlag
 	clientCertificate cliflag.StringFlag
 	clientKey         cliflag.StringFlag
 	token             cliflag.StringFlag

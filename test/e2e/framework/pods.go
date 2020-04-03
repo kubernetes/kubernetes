@@ -31,9 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/sysctl"
+	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -42,8 +40,22 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-// DefaultPodDeletionTimeout is the default timeout for deleting pod
-const DefaultPodDeletionTimeout = 3 * time.Minute
+const (
+	// DefaultPodDeletionTimeout is the default timeout for deleting pod
+	DefaultPodDeletionTimeout = 3 * time.Minute
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	killingContainer = "Killing"
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	failedToCreateContainer = "Failed"
+
+	// the status of container event, copied from k8s.io/kubernetes/pkg/kubelet/events
+	startedContainer = "Started"
+
+	// it is copied from k8s.io/kubernetes/pkg/kubelet/sysctl
+	forbiddenReason = "SysctlForbidden"
+)
 
 // ImageWhiteList is the images used in the current test suite. It should be initialized in test suite and
 // the images in the white list should be pre-pulled in the test suite.  Currently, this is only used by
@@ -136,7 +148,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
+func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeout time.Duration) {
 	namespace := c.f.Namespace.Name
 	err := c.Delete(context.TODO(), name, options)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -227,10 +239,10 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 		}
 		for _, e := range evnts.Items {
 			switch e.Reason {
-			case events.KillingContainer, events.FailedToCreateContainer, sysctl.ForbiddenReason:
+			case killingContainer, failedToCreateContainer, forbiddenReason:
 				ev = &e
 				return true, nil
-			case events.StartedContainer:
+			case startedContainer:
 				return true, nil
 			default:
 				// ignore all other errors
@@ -262,5 +274,5 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	ExpectNoError(err)
-	return podutil.IsPodReady(pod)
+	return podutils.IsPodReady(pod)
 }

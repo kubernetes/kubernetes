@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -53,6 +53,9 @@ import (
 
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
+
+// It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+var errAllocated = errors.New("provided port is already allocated")
 
 // TestJig is a test jig to help service testing.
 type TestJig struct {
@@ -117,15 +120,7 @@ func (j *TestJig) CreateTCPServiceWithPort(tweak func(svc *v1.Service), port int
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
 func (j *TestJig) CreateTCPService(tweak func(svc *v1.Service)) (*v1.Service, error) {
-	svc := j.newServiceTemplate(v1.ProtocolTCP, 80)
-	if tweak != nil {
-		tweak(svc)
-	}
-	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
-	}
-	return j.sanityCheckService(result, svc.Spec.Type)
+	return j.CreateTCPServiceWithPort(tweak, 80)
 }
 
 // CreateUDPService creates a new UDP Service based on the j's
@@ -305,7 +300,7 @@ func (j *TestJig) GetEndpointNodeNames() (sets.String, error) {
 
 // WaitForEndpointOnNode waits for a service endpoint on the given node.
 func (j *TestJig) WaitForEndpointOnNode(nodeName string) error {
-	return wait.PollImmediate(framework.Poll, LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
+	return wait.PollImmediate(framework.Poll, KubeProxyLagTimeout, func() (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get endpoints for service %s/%s failed (%s)", j.Namespace, j.Name, err)
@@ -484,7 +479,7 @@ func (j *TestJig) ChangeServiceNodePort(initial int) (*v1.Service, error) {
 		service, err = j.UpdateService(func(s *v1.Service) {
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
-		if err != nil && strings.Contains(err.Error(), portallocator.ErrAllocated.Error()) {
+		if err != nil && strings.Contains(err.Error(), errAllocated.Error()) {
 			framework.Logf("tried nodePort %d, but it is in use, will try another", newPort)
 			continue
 		}
@@ -764,9 +759,11 @@ func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod 
 	return nil
 }
 
-func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod) error {
+func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
+	isClusterIPV4 := net.ParseIP(clusterIP).To4() != nil
+
 	for _, internalAddr := range internalAddrs {
 		// If the node's internal address points to localhost, then we are not
 		// able to test the service reachability via that address
@@ -774,12 +771,25 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
 			continue
 		}
+		isNodeInternalIPV4 := net.ParseIP(internalAddr).To4() != nil
+		// Check service reachability on the node internalIP which is same family
+		// as clusterIP
+		if isClusterIPV4 != isNodeInternalIPV4 {
+			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
+			continue
+		}
+
 		err := testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
 		if err != nil {
 			return err
 		}
 	}
 	for _, externalAddr := range externalAddrs {
+		isNodeExternalIPV4 := net.ParseIP(externalAddr).To4() != nil
+		if isClusterIPV4 != isNodeExternalIPV4 {
+			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
+			continue
+		}
 		err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
 		if err != nil {
 			return err
@@ -879,7 +889,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 		if err != nil {
 			return err
 		}
-		err = testReachabilityOverNodePorts(nodes, servicePort, pod)
+		err = testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP)
 		if err != nil {
 			return err
 		}

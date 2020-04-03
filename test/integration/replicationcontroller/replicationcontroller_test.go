@@ -520,7 +520,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	updatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
 		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
 	})
-	if err := c.CoreV1().Pods(ns.Name).Delete(context.TODO(), deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := c.CoreV1().Pods(ns.Name).Delete(context.TODO(), deletingPod.Name, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Error deleting pod %s: %v", deletingPod.Name, err)
 	}
 

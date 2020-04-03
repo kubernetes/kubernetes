@@ -66,7 +66,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		ginkgo.By("Deleting the server pod")
-		c.CoreV1().Pods(ns).Delete(context.TODO(), podDescr.Name, nil)
+		c.CoreV1().Pods(ns).Delete(context.TODO(), podDescr.Name, metav1.DeleteOptions{})
 	}()
 
 	ginkgo.By("Waiting for pods to come up.")
@@ -113,7 +113,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	defer func() {
 		if deletePreStop {
 			ginkgo.By("Deleting the tester pod")
-			c.CoreV1().Pods(ns).Delete(context.TODO(), preStopDescr.Name, nil)
+			c.CoreV1().Pods(ns).Delete(context.TODO(), preStopDescr.Name, metav1.DeleteOptions{})
 		}
 	}()
 
@@ -122,7 +122,7 @@ func testPreStop(c clientset.Interface, ns string) {
 
 	// Delete the pod with the preStop handler.
 	ginkgo.By("Deleting pre-stop pod")
-	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), preStopDescr.Name, nil); err == nil {
+	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), preStopDescr.Name, metav1.DeleteOptions{}); err == nil {
 		deletePreStop = false
 	}
 	framework.ExpectNoError(err, fmt.Sprintf("deleting pod: %s", preStopDescr.Name))
@@ -191,14 +191,14 @@ var _ = SIGDescribe("PreStop", func() {
 		podClient.Create(pod)
 
 		ginkgo.By("waiting for pod running")
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		var err error
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = podClient.Delete(context.TODO(), pod.Name, metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
+		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
 		framework.ExpectNoError(err, "failed to delete pod")
 
 		//wait up to graceful termination period seconds

@@ -43,20 +43,41 @@ type ContainerHandlerFactory interface {
 type MetricKind string
 
 const (
-	CpuUsageMetrics         MetricKind = "cpu"
-	ProcessSchedulerMetrics MetricKind = "sched"
-	PerCpuUsageMetrics      MetricKind = "percpu"
-	MemoryUsageMetrics      MetricKind = "memory"
-	CpuLoadMetrics          MetricKind = "cpuLoad"
-	DiskIOMetrics           MetricKind = "diskIO"
-	DiskUsageMetrics        MetricKind = "disk"
-	NetworkUsageMetrics     MetricKind = "network"
-	NetworkTcpUsageMetrics  MetricKind = "tcp"
-	NetworkUdpUsageMetrics  MetricKind = "udp"
-	AcceleratorUsageMetrics MetricKind = "accelerator"
-	AppMetrics              MetricKind = "app"
-	ProcessMetrics          MetricKind = "process"
+	CpuUsageMetrics                MetricKind = "cpu"
+	ProcessSchedulerMetrics        MetricKind = "sched"
+	PerCpuUsageMetrics             MetricKind = "percpu"
+	MemoryUsageMetrics             MetricKind = "memory"
+	CpuLoadMetrics                 MetricKind = "cpuLoad"
+	DiskIOMetrics                  MetricKind = "diskIO"
+	DiskUsageMetrics               MetricKind = "disk"
+	NetworkUsageMetrics            MetricKind = "network"
+	NetworkTcpUsageMetrics         MetricKind = "tcp"
+	NetworkAdvancedTcpUsageMetrics MetricKind = "advtcp"
+	NetworkUdpUsageMetrics         MetricKind = "udp"
+	AcceleratorUsageMetrics        MetricKind = "accelerator"
+	AppMetrics                     MetricKind = "app"
+	ProcessMetrics                 MetricKind = "process"
+	HugetlbUsageMetrics            MetricKind = "hugetlb"
 )
+
+// AllMetrics represents all kinds of metrics that cAdvisor supported.
+var AllMetrics = MetricSet{
+	CpuUsageMetrics:                struct{}{},
+	ProcessSchedulerMetrics:        struct{}{},
+	PerCpuUsageMetrics:             struct{}{},
+	MemoryUsageMetrics:             struct{}{},
+	CpuLoadMetrics:                 struct{}{},
+	DiskIOMetrics:                  struct{}{},
+	AcceleratorUsageMetrics:        struct{}{},
+	DiskUsageMetrics:               struct{}{},
+	NetworkUsageMetrics:            struct{}{},
+	NetworkTcpUsageMetrics:         struct{}{},
+	NetworkAdvancedTcpUsageMetrics: struct{}{},
+	NetworkUdpUsageMetrics:         struct{}{},
+	ProcessMetrics:                 struct{}{},
+	AppMetrics:                     struct{}{},
+	HugetlbUsageMetrics:            struct{}{},
+}
 
 func (mk MetricKind) String() string {
 	return string(mk)
@@ -71,6 +92,16 @@ func (ms MetricSet) Has(mk MetricKind) bool {
 
 func (ms MetricSet) Add(mk MetricKind) {
 	ms[mk] = struct{}{}
+}
+
+func (ms MetricSet) Difference(ms1 MetricSet) MetricSet {
+	result := MetricSet{}
+	for kind := range ms {
+		if !ms1.Has(kind) {
+			result.Add(kind)
+		}
+	}
+	return result
 }
 
 // All registered auth provider plugins.

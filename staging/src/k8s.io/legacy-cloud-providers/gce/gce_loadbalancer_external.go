@@ -33,7 +33,6 @@ import (
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	utilnet "k8s.io/utils/net"
 
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
 )
@@ -932,29 +931,17 @@ func createForwardingRule(s CloudForwardingRuleService, name, serviceName, regio
 	desc := makeServiceDescription(serviceName)
 	ipProtocol := string(ports[0].Protocol)
 
-	switch netTier {
-	case cloud.NetworkTierPremium:
-		rule := &compute.ForwardingRule{
-			Name:        name,
-			Description: desc,
-			IPAddress:   ipAddress,
-			IPProtocol:  ipProtocol,
-			PortRange:   portRange,
-			Target:      target,
-		}
-		err = s.CreateRegionForwardingRule(rule, region)
-	default:
-		rule := &computealpha.ForwardingRule{
-			Name:        name,
-			Description: desc,
-			IPAddress:   ipAddress,
-			IPProtocol:  ipProtocol,
-			PortRange:   portRange,
-			Target:      target,
-			NetworkTier: netTier.ToGCEValue(),
-		}
-		err = s.CreateAlphaRegionForwardingRule(rule, region)
+	rule := &compute.ForwardingRule{
+		Name:        name,
+		Description: desc,
+		IPAddress:   ipAddress,
+		IPProtocol:  ipProtocol,
+		PortRange:   portRange,
+		Target:      target,
+		NetworkTier: netTier.ToGCEValue(),
 	}
+
+	err = s.CreateRegionForwardingRule(rule, region)
 
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 		return err
@@ -1045,27 +1032,15 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 	desc := makeServiceDescription(serviceName)
 
 	var creationErr error
-	switch netTier {
-	case cloud.NetworkTierPremium:
-		addressObj := &compute.Address{
-			Name:        name,
-			Description: desc,
-		}
-		if existingIP != "" {
-			addressObj.Address = existingIP
-		}
-		creationErr = s.ReserveRegionAddress(addressObj, region)
-	default:
-		addressObj := &computealpha.Address{
-			Name:        name,
-			Description: desc,
-			NetworkTier: netTier.ToGCEValue(),
-		}
-		if existingIP != "" {
-			addressObj.Address = existingIP
-		}
-		creationErr = s.ReserveAlphaRegionAddress(addressObj, region)
+	addressObj := &compute.Address{
+		Name:        name,
+		Description: desc,
+		NetworkTier: netTier.ToGCEValue(),
 	}
+	if existingIP != "" {
+		addressObj.Address = existingIP
+	}
+	creationErr = s.ReserveRegionAddress(addressObj, region)
 
 	if creationErr != nil {
 		// GCE returns StatusConflict if the name conflicts; it returns

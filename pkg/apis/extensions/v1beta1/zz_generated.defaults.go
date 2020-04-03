@@ -34,6 +34,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*v1beta1.DaemonSetList)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*v1beta1.Deployment)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*v1beta1.DeploymentList)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.Ingress{}, func(obj interface{}) { SetObjectDefaults_Ingress(obj.(*v1beta1.Ingress)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*v1beta1.IngressList)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*v1beta1.NetworkPolicy)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*v1beta1.NetworkPolicyList)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.PodSecurityPolicy{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicy(obj.(*v1beta1.PodSecurityPolicy)) })
@@ -454,6 +456,25 @@ func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Deployment(a)
+	}
+}
+
+func SetObjectDefaults_Ingress(in *v1beta1.Ingress) {
+	for i := range in.Spec.Rules {
+		a := &in.Spec.Rules[i]
+		if a.IngressRuleValue.HTTP != nil {
+			for j := range a.IngressRuleValue.HTTP.Paths {
+				b := &a.IngressRuleValue.HTTP.Paths[j]
+				SetDefaults_HTTPIngressPath(b)
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_IngressList(in *v1beta1.IngressList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_Ingress(a)
 	}
 }
 

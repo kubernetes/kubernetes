@@ -19,8 +19,6 @@ package dynamiccertificates
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
-	"io/ioutil"
 )
 
 type staticCAContent struct {
@@ -29,19 +27,6 @@ type staticCAContent struct {
 }
 
 var _ CAContentProvider = &staticCAContent{}
-
-// NewStaticCAContentFromFile returns a CAContentProvider based on a filename
-func NewStaticCAContentFromFile(filename string) (CAContentProvider, error) {
-	if len(filename) == 0 {
-		return nil, fmt.Errorf("missing filename for ca bundle")
-	}
-
-	caBundle, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	return NewStaticCAContent(filename, caBundle)
-}
 
 // NewStaticCAContent returns a CAContentProvider that always returns the same value
 func NewStaticCAContent(name string, caBundle []byte) (CAContentProvider, error) {
@@ -79,48 +64,6 @@ type staticCertKeyContent struct {
 type staticSNICertKeyContent struct {
 	staticCertKeyContent
 	sniNames []string
-}
-
-// NewStaticCertKeyContentFromFiles returns a CertKeyContentProvider based on a filename
-func NewStaticCertKeyContentFromFiles(certFile, keyFile string) (CertKeyContentProvider, error) {
-	if len(certFile) == 0 {
-		return nil, fmt.Errorf("missing filename for certificate")
-	}
-	if len(keyFile) == 0 {
-		return nil, fmt.Errorf("missing filename for key")
-	}
-
-	certPEMBlock, err := ioutil.ReadFile(certFile)
-	if err != nil {
-		return nil, err
-	}
-	keyPEMBlock, err := ioutil.ReadFile(keyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewStaticCertKeyContent(fmt.Sprintf("cert: %s, key: %s", certFile, keyFile), certPEMBlock, keyPEMBlock)
-}
-
-// NewStaticSNICertKeyContentFromFiles returns a SNICertKeyContentProvider based on a filename
-func NewStaticSNICertKeyContentFromFiles(certFile, keyFile string, sniNames ...string) (SNICertKeyContentProvider, error) {
-	if len(certFile) == 0 {
-		return nil, fmt.Errorf("missing filename for certificate")
-	}
-	if len(keyFile) == 0 {
-		return nil, fmt.Errorf("missing filename for key")
-	}
-
-	certPEMBlock, err := ioutil.ReadFile(certFile)
-	if err != nil {
-		return nil, err
-	}
-	keyPEMBlock, err := ioutil.ReadFile(keyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewStaticSNICertKeyContent(fmt.Sprintf("cert: %s, key: %s", certFile, keyFile), certPEMBlock, keyPEMBlock, sniNames...)
 }
 
 // NewStaticCertKeyContent returns a CertKeyContentProvider that always returns the same value

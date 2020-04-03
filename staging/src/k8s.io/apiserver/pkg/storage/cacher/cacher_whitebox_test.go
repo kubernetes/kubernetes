@@ -793,7 +793,7 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(2)
 		go func() {
-			cacher.dispatchEvent(bookmark)
+			cacher.processEvent(bookmark)
 			wg.Done()
 		}()
 

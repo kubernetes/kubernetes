@@ -608,7 +608,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 
 	assertImagePullPolicy := func(got, expected *v1.Container) error {
 		if got.ImagePullPolicy != expected.ImagePullPolicy {
-			return fmt.Errorf("different image pull poicy: got <%v>, expected <%v>", got.ImagePullPolicy, expected.ImagePullPolicy)
+			return fmt.Errorf("different image pull policy: got <%v>, expected <%v>", got.ImagePullPolicy, expected.ImagePullPolicy)
 		}
 		return nil
 	}
@@ -1375,7 +1375,7 @@ func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
 	}
 }
 
-func TestSetDefaulEndpointsProtocol(t *testing.T) {
+func TestSetDefaultEndpointsProtocol(t *testing.T) {
 	in := &v1.Endpoints{Subsets: []v1.EndpointSubset{
 		{Ports: []v1.EndpointPort{{}, {Protocol: "UDP"}, {}}},
 	}}
@@ -1397,7 +1397,7 @@ func TestSetDefaulEndpointsProtocol(t *testing.T) {
 	}
 }
 
-func TestSetDefaulServiceTargetPort(t *testing.T) {
+func TestSetDefaultServiceTargetPort(t *testing.T) {
 	in := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1234}}}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*v1.Service)
@@ -1457,7 +1457,7 @@ func TestSetDefaultServicePort(t *testing.T) {
 	}
 }
 
-func TestSetDefaulServiceExternalTraffic(t *testing.T) {
+func TestSetDefaultServiceExternalTraffic(t *testing.T) {
 	in := &v1.Service{}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*v1.Service)

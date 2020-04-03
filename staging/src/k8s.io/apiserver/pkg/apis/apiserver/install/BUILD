@@ -16,6 +16,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1beta1:go_default_library",
     ],
 )
 

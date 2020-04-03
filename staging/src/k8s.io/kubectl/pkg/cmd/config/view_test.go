@@ -48,8 +48,8 @@ func TestViewCluster(t *testing.T) {
 		},
 		CurrentContext: "minikube",
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"minikube":   {Token: "minikube-token"},
-			"mu-cluster": {Token: "minikube-token"},
+			"minikube":   {Token: "REDACTED"},
+			"mu-cluster": {Token: "REDACTED"},
 		},
 	}
 
@@ -79,10 +79,10 @@ preferences: {}
 users:
 - name: minikube
   user:
-    token: minikube-token
+    token: REDACTED
 - name: mu-cluster
   user:
-    token: minikube-token` + "\n",
+    token: REDACTED` + "\n",
 	}
 
 	test.run(t)
@@ -103,8 +103,8 @@ func TestViewClusterMinify(t *testing.T) {
 		},
 		CurrentContext: "minikube",
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"minikube":   {Token: "minikube-token"},
-			"mu-cluster": {Token: "minikube-token"},
+			"minikube":   {Token: "REDACTED"},
+			"mu-cluster": {Token: "REDACTED"},
 		},
 	}
 
@@ -134,7 +134,7 @@ preferences: {}
 users:
 - name: minikube
   user:
-    token: minikube-token` + "\n",
+    token: REDACTED` + "\n",
 		},
 		{
 			description: "Testing for kubectl config view --minify=true --context=my-cluster",
@@ -156,7 +156,7 @@ preferences: {}
 users:
 - name: mu-cluster
   user:
-    token: minikube-token` + "\n",
+    token: REDACTED` + "\n",
 		},
 	}
 

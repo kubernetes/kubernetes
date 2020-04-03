@@ -36,7 +36,8 @@ func NewAvailablePrivateEndpointTypesClient(subscriptionID string) AvailablePriv
 }
 
 // NewAvailablePrivateEndpointTypesClientWithBaseURI creates an instance of the AvailablePrivateEndpointTypesClient
-// client.
+// client using a custom endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI
+// (sovereign clouds, Azure stack).
 func NewAvailablePrivateEndpointTypesClientWithBaseURI(baseURI string, subscriptionID string) AvailablePrivateEndpointTypesClient {
 	return AvailablePrivateEndpointTypesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -100,8 +101,7 @@ func (client AvailablePrivateEndpointTypesClient) ListPreparer(ctx context.Conte
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client AvailablePrivateEndpointTypesClient) ListSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -216,8 +216,7 @@ func (client AvailablePrivateEndpointTypesClient) ListByResourceGroupPreparer(ct
 // ListByResourceGroupSender sends the ListByResourceGroup request. The method will close the
 // http.Response Body if it receives an error.
 func (client AvailablePrivateEndpointTypesClient) ListByResourceGroupSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListByResourceGroupResponder handles the response to the ListByResourceGroup request. The method always

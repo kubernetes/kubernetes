@@ -46,7 +46,7 @@ func getValidCSIDriver(name string) *storage.CSIDriver {
 func TestCSIDriverStrategy(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
-		APIVersion: "v1beta1",
+		APIVersion: "v1",
 		Resource:   "csidrivers",
 	})
 	if Strategy.NamespaceScoped() {
@@ -81,7 +81,7 @@ func TestCSIDriverStrategy(t *testing.T) {
 func TestCSIDriverPrepareForCreate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
-		APIVersion: "v1beta1",
+		APIVersion: "v1",
 		Resource:   "csidrivers",
 	})
 
@@ -139,7 +139,7 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
-		APIVersion: "v1beta1",
+		APIVersion: "v1",
 		Resource:   "csidrivers",
 	})
 
@@ -369,18 +369,18 @@ func TestCSIDriverValidation(t *testing.T) {
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 					APIGroup:   "storage.k8s.io",
-					APIVersion: "v1beta1",
+					APIVersion: "v1",
 					Resource:   "csidrivers",
 				})
 				return Strategy.Validate(ctx, csiDriver)
 			}
 
-			betaErr := testValidation(test.csiDriver, "v1beta1")
-			if len(betaErr) > 0 && !test.expectError {
-				t.Errorf("Validation of v1beta1 object failed: %+v", betaErr)
+			err := testValidation(test.csiDriver, "v1")
+			if len(err) > 0 && !test.expectError {
+				t.Errorf("Validation of v1 object failed: %+v", err)
 			}
-			if len(betaErr) == 0 && test.expectError {
-				t.Errorf("Validation of v1beta1 object unexpectedly succeeded")
+			if len(err) == 0 && test.expectError {
+				t.Errorf("Validation of v1 object unexpectedly succeeded")
 			}
 		})
 	}

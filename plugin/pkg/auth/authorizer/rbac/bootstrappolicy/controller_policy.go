@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/klog"
 
+	capi "k8s.io/api/certificates/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -72,9 +73,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie())
-		}
+		role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie())
 		if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
 		}
@@ -154,6 +153,9 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpointslice-controller"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services", "pods", "nodes").RuleOrDie(),
+				// The controller needs to be able to set a service's finalizers to be able to create an EndpointSlice
+				// resource that is owned by the service and sets blockOwnerDeletion=true in its ownerRef.
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("services/finalizers").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 				eventsRule(),
 			},
@@ -337,6 +339,13 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(certificatesGroup).Resources("certificatesigningrequests/status", "certificatesigningrequests/approval").RuleOrDie(),
+			rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientKubeletSignerName).RuleOrDie(),
+			rbacv1helpers.NewRule("sign").Groups(certificatesGroup).Resources("signers").Names(
+				capi.LegacyUnknownSignerName,
+				capi.KubeAPIServerClientSignerName,
+				capi.KubeAPIServerClientKubeletSignerName,
+				capi.KubeletServingSignerName,
+			).RuleOrDie(),
 			rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 			eventsRule(),
 		},

@@ -369,7 +369,7 @@ func (e *EndpointController) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		err = e.client.CoreV1().Endpoints(namespace).Delete(context.TODO(), name, nil)
+		err = e.client.CoreV1().Endpoints(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -444,17 +444,14 @@ func (e *EndpointController) syncService(key string) error {
 		} else {
 			for i := range service.Spec.Ports {
 				servicePort := &service.Spec.Ports[i]
-
-				portName := servicePort.Name
-				portProto := servicePort.Protocol
 				portNum, err := podutil.FindPort(pod, servicePort)
 				if err != nil {
 					klog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 					continue
 				}
+				epp := endpointPortFromServicePort(servicePort, portNum)
 
 				var readyEps, notReadyEps int
-				epp := &v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 				subsets, readyEps, notReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
@@ -607,4 +604,16 @@ func shouldPodBeInEndpoints(pod *v1.Pod) bool {
 	default:
 		return true
 	}
+}
+
+func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.EndpointPort {
+	epp := &v1.EndpointPort{
+		Name:     servicePort.Name,
+		Port:     int32(portNum),
+		Protocol: servicePort.Protocol,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol) {
+		epp.AppProtocol = servicePort.AppProtocol
+	}
+	return epp
 }

@@ -174,7 +174,7 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 	expectedVolumeAttachment := statusVolumeAttachment.DeepCopy()
 	StatusStrategy.PrepareForUpdate(ctx, statusVolumeAttachment, volumeAttachment)
 	if !apiequality.Semantic.DeepEqual(statusVolumeAttachment, expectedVolumeAttachment) {
-		t.Errorf("unexpected objects differerence after modifying status: %v", diff.ObjectDiff(statusVolumeAttachment, expectedVolumeAttachment))
+		t.Errorf("unexpected objects difference after modifying status: %v", diff.ObjectDiff(statusVolumeAttachment, expectedVolumeAttachment))
 	}
 
 	// spec and metadata modifications should be dropped
@@ -192,7 +192,7 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 
 	StatusStrategy.PrepareForUpdate(ctx, newVolumeAttachment, volumeAttachment)
 	if !apiequality.Semantic.DeepEqual(newVolumeAttachment, volumeAttachment) {
-		t.Errorf("unexpected objects differerence after modifying spec: %v", diff.ObjectDiff(newVolumeAttachment, volumeAttachment))
+		t.Errorf("unexpected objects difference after modifying spec: %v", diff.ObjectDiff(newVolumeAttachment, volumeAttachment))
 	}
 }
 

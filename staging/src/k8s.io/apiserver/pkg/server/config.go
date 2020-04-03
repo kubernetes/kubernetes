@@ -197,6 +197,12 @@ type Config struct {
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
 
+	// GoawayChance is the probability that send a GOAWAY to HTTP/2 clients. When client received
+	// GOAWAY, the in-flight requests will not be affected and new requests will use
+	// a new TCP connection to triggering re-balancing to another server behind the load balance.
+	// Default to 0, means never send GOAWAY. Max is 0.02 to prevent break the apiserver.
+	GoawayChance float64
+
 	// MergedResourceConfig indicates which groupVersion enabled and its resources enabled/disabled.
 	// This is composed of genericapiserver defaultAPIResourceConfig and those parsed from flags.
 	// If not specify any in flags, then genericapiserver will only enable defaultAPIResourceConfig.
@@ -266,10 +272,6 @@ type AuthenticationInfo struct {
 	APIAudiences authenticator.Audiences
 	// Authenticator determines which subject is making the request
 	Authenticator authenticator.Request
-	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
-	// If this is true, a basic auth challenge is returned on authentication failure
-	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth bool
 }
 
 type AuthorizationInfo struct {
@@ -664,13 +666,16 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
-	failedHandler := genericapifilters.Unauthorized(c.Serializer, c.Authentication.SupportsBasicAuth)
+	failedHandler := genericapifilters.Unauthorized(c.Serializer)
 	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyChecker)
 	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
+	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
+		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
+	}
 	handler = genericfilters.WithPanicRecovery(handler)
 	return handler
 }

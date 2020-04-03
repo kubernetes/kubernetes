@@ -154,7 +154,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk [Flaky]", func() {
 
 		ginkgo.By("Deleting the Namespace")
-		err := c.CoreV1().Namespaces().Delete(context.TODO(), ns, nil)
+		err := c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)

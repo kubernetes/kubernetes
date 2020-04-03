@@ -67,6 +67,7 @@ func NewReconciler(
 		desiredStateOfWorld: desiredStateOfWorld,
 		actualStateOfWorld:  actualStateOfWorld,
 		handlers:            make(map[string]cache.PluginHandler),
+		pathToHandlers:      cache.SocketPluginHandlers{Handlers: make(map[string]cache.NamedPluginHandler)},
 	}
 }
 
@@ -76,6 +77,7 @@ type reconciler struct {
 	desiredStateOfWorld cache.DesiredStateOfWorld
 	actualStateOfWorld  cache.ActualStateOfWorld
 	handlers            map[string]cache.PluginHandler
+	pathToHandlers      cache.SocketPluginHandlers
 	sync.RWMutex
 }
 
@@ -103,6 +105,13 @@ func (rc *reconciler) getHandlers() map[string]cache.PluginHandler {
 	return rc.handlers
 }
 
+func (rc *reconciler) getPathToHandlers() *cache.SocketPluginHandlers {
+	rc.RLock()
+	defer rc.RUnlock()
+
+	return &rc.pathToHandlers
+}
+
 func (rc *reconciler) reconcile() {
 	// Unregisterations are triggered before registrations
 
@@ -127,7 +136,7 @@ func (rc *reconciler) reconcile() {
 
 		if unregisterPlugin {
 			klog.V(5).Infof(registeredPlugin.GenerateMsgDetailed("Starting operationExecutor.UnregisterPlugin", ""))
-			err := rc.operationExecutor.UnregisterPlugin(registeredPlugin.SocketPath, rc.getHandlers(), rc.actualStateOfWorld)
+			err := rc.operationExecutor.UnregisterPlugin(registeredPlugin.SocketPath, rc.getHandlers(), rc.getPathToHandlers(), rc.actualStateOfWorld)
 			if err != nil &&
 				!goroutinemap.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -145,7 +154,7 @@ func (rc *reconciler) reconcile() {
 	for _, pluginToRegister := range rc.desiredStateOfWorld.GetPluginsToRegister() {
 		if !rc.actualStateOfWorld.PluginExistsWithCorrectTimestamp(pluginToRegister) {
 			klog.V(5).Infof(pluginToRegister.GenerateMsgDetailed("Starting operationExecutor.RegisterPlugin", ""))
-			err := rc.operationExecutor.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld)
+			err := rc.operationExecutor.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.Timestamp, rc.getHandlers(), rc.getPathToHandlers(), rc.actualStateOfWorld)
 			if err != nil &&
 				!goroutinemap.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {

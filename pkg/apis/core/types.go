@@ -302,7 +302,6 @@ type PersistentVolumeSpec struct {
 	MountOptions []string
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -416,17 +415,17 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string
 	// volumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
 	// This field can be used to specify either:
-	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
+	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot - Beta)
 	// * An existing PVC (PersistentVolumeClaim)
-	// In order to use either of these DataSource types, the appropriate feature gate
-	// must be enabled (VolumeSnapshotDataSource, VolumePVCDataSource)
-	// If the provisioner can support the specified data source, it will create
-	// a new volume based on the contents of the specified PVC or Snapshot.
-	// If the provisioner does not support the specified data source, the volume will
+	// * An existing custom resource/object that implements data population (Alpha)
+	// In order to use VolumeSnapshot object types, the appropriate feature gate
+	// must be enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
+	// If the provisioner or an external controller can support the specified data source,
+	// it will create a new volume based on the contents of the specified data source.
+	// If the specified data source is not supported, the volume will
 	// not be created and the failure will be reported as an event.
 	// In the future, we plan to support more data source types and the behavior
 	// of the provisioner may change.
@@ -583,9 +582,10 @@ type StorageMedium string
 
 // These are the valid value for StorageMedium
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
-	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
+	StorageMediumDefault         StorageMedium = ""           // use whatever the default is for the node
+	StorageMediumMemory          StorageMedium = "Memory"     // use memory (tmpfs)
+	StorageMediumHugePages       StorageMedium = "HugePages"  // use hugepages
+	StorageMediumHugePagesPrefix StorageMedium = "HugePages-" // prefix for full medium notation HugePages-<size>
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -2056,7 +2056,6 @@ type Container struct {
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is a beta feature.
 	// +optional
 	VolumeDevices []VolumeDevice
 	// +optional
@@ -2765,8 +2764,7 @@ type PodSpec struct {
 	EnableServiceLinks *bool
 	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
 	// domains. Scheduler will schedule pods in a way which abides by the constraints.
-	// This field is alpha-level and is only honored by clusters that enables the EvenPodsSpread
-	// feature.
+	// This field is only honored by clusters that enable the EvenPodsSpread feature.
 	// All topologySpreadConstraints are ANDed.
 	// +optional
 	TopologySpreadConstraints []TopologySpreadConstraint
@@ -2786,6 +2784,22 @@ type Sysctl struct {
 	// Value of a property to set
 	Value string
 }
+
+// PodFSGroupChangePolicy holds policies that will be used for applying fsGroup to a volume
+// when volume is mounted.
+type PodFSGroupChangePolicy string
+
+const (
+	// FSGroupChangeOnRootMismatch indicates that volume's ownership and permissions will be changed
+	// only when permission and ownership of root directory does not match with expected
+	// permissions on the volume. This can help shorten the time it takes to change
+	// ownership and permissions of a volume.
+	FSGroupChangeOnRootMismatch PodFSGroupChangePolicy = "OnRootMismatch"
+	// FSGroupChangeAlways indicates that volume's ownership and permissions
+	// should always be changed whenever volume is mounted inside a Pod. This the default
+	// behavior.
+	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
+)
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
@@ -2866,6 +2880,14 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64
+	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+	// before being exposed inside Pod. This field will only apply to
+	// volume types which support fsGroup based ownership(and permissions).
+	// It will have no effect on ephemeral volume types such as: secret, configmaps
+	// and emptydir.
+	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
+	// +optional
+	FSGroupChangePolicy *PodFSGroupChangePolicy
 	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
@@ -2969,7 +2991,6 @@ type EphemeralContainerCommon struct {
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is a beta feature.
 	// +optional
 	VolumeDevices []VolumeDevice
 	// Probes are not allowed for ephemeral containers.
@@ -3533,6 +3554,16 @@ type ServicePort struct {
 	// The IP protocol for this port.  Supports "TCP", "UDP", and "SCTP".
 	Protocol Protocol
 
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// Field can be enabled with ServiceAppProtocol feature gate.
+	// +optional
+	AppProtocol *string
+
 	// The port that will be exposed on the service.
 	Port int32
 
@@ -3673,6 +3704,16 @@ type EndpointPort struct {
 
 	// The IP protocol for this port.
 	Protocol Protocol
+
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// Field can be enabled with ServiceAppProtocol feature gate.
+	// +optional
+	AppProtocol *string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -3775,7 +3816,7 @@ type NodeSystemInfo struct {
 	MachineID string
 	// SystemUUID reported by the node. For unique machine identification
 	// MachineID is preferred. This field is specific to Red Hat hosts
-	// https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html
+	// https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
 	SystemUUID string
 	// Boot ID reported by the node.
 	BootID string
@@ -3996,7 +4037,7 @@ type NodeAddress struct {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	// +optional
@@ -5076,14 +5117,12 @@ type SELinuxOptions struct {
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 type WindowsSecurityContextOptions struct {
 	// GMSACredentialSpecName is the name of the GMSA credential spec to use.
-	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
 	// +optional
 	GMSACredentialSpecName *string
 
 	// GMSACredentialSpec is where the GMSA admission webhook
 	// (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
 	// GMSA credential spec named by the GMSACredentialSpecName field.
-	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
 	// +optional
 	GMSACredentialSpec *string
 
@@ -5091,7 +5130,6 @@ type WindowsSecurityContextOptions struct {
 	// Defaults to the user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
-	// This field is beta-level and may be disabled with the WindowsRunAsUserName feature flag.
 	// +optional
 	RunAsUserName *string
 }

@@ -125,6 +125,9 @@ func (test unsetConfigTest) run(t *testing.T) {
 	if err == nil {
 		err = opts.run(buf)
 	}
+	if test.expectedErr == "" && err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error loading kubeconfig file: %v", err)

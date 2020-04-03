@@ -26,10 +26,13 @@ import (
 )
 
 // APIServiceLister helps list APIServices.
+// All objects returned here must be treated as read-only.
 type APIServiceLister interface {
 	// List lists all APIServices in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.APIService, err error)
 	// Get retrieves the APIService from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.APIService, error)
 	APIServiceListerExpansion
 }

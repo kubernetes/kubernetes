@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"testing"
 
-	libipvs "github.com/docker/libnetwork/ipvs"
+	libipvs "github.com/moby/ipvs"
 )
 
 func Test_toVirtualServer(t *testing.T) {

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -144,7 +145,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		// Defer the cleanup
 		defer func() {
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
-			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, nil)
+			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			if err != nil {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
@@ -189,7 +190,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	c := f.ClientSet
 	ns := f.Namespace.Name
 
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	framework.ExpectNoError(err)
 	zonelist := zones.List()
 	ginkgo.By("Creating static PVs across zones")

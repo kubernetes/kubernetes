@@ -134,6 +134,8 @@ func SystemBus() (conn *Conn, err error) {
 }
 
 // SystemBusPrivate returns a new private connection to the system bus.
+// Note: this connection is not ready to use. One must perform Auth and Hello
+// on the connection before it is useable.
 func SystemBusPrivate(opts ...ConnOption) (*Conn, error) {
 	return Dial(getSystemBusPlatformAddress(), opts...)
 }
@@ -267,7 +269,7 @@ func (conn *Conn) Eavesdrop(ch chan<- *Message) {
 	conn.eavesdroppedLck.Unlock()
 }
 
-// GetSerial returns an unused serial.
+// getSerial returns an unused serial.
 func (conn *Conn) getSerial() uint32 {
 	return conn.serialGen.GetSerial()
 }
@@ -381,8 +383,6 @@ func (conn *Conn) Object(dest string, path ObjectPath) BusObject {
 	return &Object{conn, dest, path}
 }
 
-// outWorker runs in an own goroutine, encoding and sending messages that are
-// sent to conn.out.
 func (conn *Conn) sendMessage(msg *Message) {
 	conn.sendMessageAndIfClosed(msg, func() {})
 }

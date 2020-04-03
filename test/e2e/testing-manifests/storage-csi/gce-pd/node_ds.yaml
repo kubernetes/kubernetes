@@ -11,6 +11,11 @@ spec:
       labels:
         app: gcp-compute-persistent-disk-csi-driver
     spec:
+      # Host network must be used for interaction with Workload Identity in GKE
+      # since it replaces GCE Metadata Server with GKE Metadata Server. Remove
+      # this requirement when issue is resolved and before any exposure of
+      # metrics ports.
+      hostNetwork: true
       containers:
         - name: csi-driver-registrar
           image: gcr.io/gke-release/csi-node-driver-registrar:v1.2.0-gke.0
@@ -35,7 +40,7 @@ spec:
         - name: gce-pd-driver
           securityContext:
             privileged: true
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.6.0-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.6.2-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"
@@ -47,7 +52,8 @@ spec:
               mountPath: /csi
             - name: device-dir
               mountPath: /dev
-            # The following mounts are required to trigger host udevadm from container
+            # The following mounts are required to trigger host udevadm from
+            # container
             - name: udev-rules-etc
               mountPath: /etc/udev
             - name: udev-rules-lib
@@ -73,7 +79,8 @@ spec:
           hostPath:
             path: /dev
             type: Directory
-        # The following mounts are required to trigger host udevadm from container
+        # The following mounts are required to trigger host udevadm from
+        # container
         - name: udev-rules-etc
           hostPath:
             path: /etc/udev
@@ -90,3 +97,10 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+      # https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+      # See "special case". This will tolerate everything. Node component should
+      # be scheduled on all nodes.
+      tolerations:
+      - operator: Exists
+      nodeSelector:
+        kubernetes.io/os: linux

@@ -28,12 +28,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/stretchr/testify/assert"
 
 	utilpointer "k8s.io/utils/pointer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -148,6 +149,7 @@ mode: "%s"
 oomScoreAdj: 17
 portRange: "2-7"
 udpIdleTimeout: 123ms
+detectLocalMode: "ClusterCIDR"
 nodePortAddresses:
   - "10.20.30.40/16"
   - "fd00:1::0/64"
@@ -288,6 +290,7 @@ nodePortAddresses:
 			PortRange:          "2-7",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
 		}
 
 		options := NewOptions()
@@ -304,7 +307,7 @@ nodePortAddresses:
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 
 		if !reflect.DeepEqual(expected, config) {
-			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, cmp.Diff(config, expected))
 		}
 	}
 }
@@ -474,6 +477,7 @@ mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
+detectLocalMode: "ClusterCIDR"
 udpIdleTimeout: 250ms`)
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)

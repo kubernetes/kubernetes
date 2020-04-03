@@ -21,13 +21,14 @@ package azure
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"path"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
 	"k8s.io/apimachinery/pkg/types"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
@@ -135,7 +136,7 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			return -1, rerr.Error()
 		}
 
-		if disk.ManagedBy != nil {
+		if disk.ManagedBy != nil && (disk.MaxShares == nil || *disk.MaxShares <= 1) {
 			attachErr := fmt.Sprintf(
 				"disk(%s) already attached to node(%s), could not be attached to node(%s)",
 				diskURI, *disk.ManagedBy, nodeName)
@@ -343,6 +344,48 @@ func filterDetachingDisks(unfilteredDisks []compute.DataDisk) []compute.DataDisk
 		}
 	}
 	return filteredDisks
+}
+
+func (c *controllerCommon) filterNonExistingDisks(ctx context.Context, unfilteredDisks []compute.DataDisk) []compute.DataDisk {
+	filteredDisks := []compute.DataDisk{}
+	for _, disk := range unfilteredDisks {
+		filter := false
+		if disk.ManagedDisk != nil && disk.ManagedDisk.ID != nil {
+			diskURI := *disk.ManagedDisk.ID
+			exist, err := c.cloud.checkDiskExists(ctx, diskURI)
+			if err != nil {
+				klog.Errorf("checkDiskExists(%s) failed with error: %v", diskURI, err)
+			} else {
+				// only filter disk when checkDiskExists returns <false, nil>
+				filter = !exist
+				if filter {
+					klog.Errorf("disk(%s) does not exist, removed from data disk list", diskURI)
+				}
+			}
+		}
+
+		if !filter {
+			filteredDisks = append(filteredDisks, disk)
+		}
+	}
+	return filteredDisks
+}
+
+func (c *controllerCommon) checkDiskExists(ctx context.Context, diskURI string) (bool, error) {
+	diskName := path.Base(diskURI)
+	resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
+	if err != nil {
+		return false, err
+	}
+
+	if _, rerr := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName); rerr != nil {
+		if rerr.HTTPStatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, rerr.Error()
+	}
+
+	return true, nil
 }
 
 func getValidCreationData(subscriptionID, resourceGroup, sourceResourceID, sourceType string) (compute.CreationData, error) {

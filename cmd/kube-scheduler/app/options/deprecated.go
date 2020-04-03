@@ -38,6 +38,7 @@ type DeprecatedOptions struct {
 	UseLegacyPolicyConfig          bool
 	AlgorithmProvider              string
 	HardPodAffinitySymmetricWeight int32
+	SchedulerName                  string
 }
 
 // AddFlags adds flags for the deprecated options.
@@ -59,14 +60,14 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 	fs.StringVar(&cfg.ClientConnection.ContentType, "kube-api-content-type", cfg.ClientConnection.ContentType, "DEPRECATED: content type of requests sent to apiserver.")
 	fs.Float32Var(&cfg.ClientConnection.QPS, "kube-api-qps", cfg.ClientConnection.QPS, "DEPRECATED: QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&cfg.ClientConnection.Burst, "kube-api-burst", cfg.ClientConnection.Burst, "DEPRECATED: burst to use while talking with kubernetes apiserver")
-	fs.StringVar(&cfg.SchedulerName, "scheduler-name", cfg.SchedulerName, "DEPRECATED: name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.schedulerName\".")
 	fs.StringVar(&cfg.LeaderElection.ResourceNamespace, "lock-object-namespace", cfg.LeaderElection.ResourceNamespace, "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace.")
 	fs.StringVar(&cfg.LeaderElection.ResourceName, "lock-object-name", cfg.LeaderElection.ResourceName, "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name")
 
-	fs.Int32Var(&o.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", interpodaffinity.DefaultHardPodAffinityWeight,
+	fs.Int32Var(&o.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", o.HardPodAffinitySymmetricWeight,
 		"DEPRECATED: RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule. Must be in the range 0-100."+
 			"This option was moved to the policy configuration file")
+	fs.StringVar(&o.SchedulerName, "scheduler-name", o.SchedulerName, "DEPRECATED: name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.schedulerName\".")
 	// MarkDeprecated hides the flag from the help. We don't want that:
 	// fs.MarkDeprecated("hard-pod-affinity-symmetric-weight", "This option was moved to the policy configuration file")
 }
@@ -120,11 +121,17 @@ func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfig
 		}
 	}
 
+	// The following deprecated options affect the only existing profile that is
+	// added by default.
+	profile := &cfg.Profiles[0]
+	if len(o.SchedulerName) > 0 {
+		profile.SchedulerName = o.SchedulerName
+	}
 	if o.HardPodAffinitySymmetricWeight != interpodaffinity.DefaultHardPodAffinityWeight {
 		args := interpodaffinity.Args{
 			HardPodAffinityWeight: &o.HardPodAffinitySymmetricWeight,
 		}
-		cfg.PluginConfig = append(cfg.PluginConfig, plugins.NewPluginConfig(interpodaffinity.Name, args))
+		profile.PluginConfig = append(profile.PluginConfig, plugins.NewPluginConfig(interpodaffinity.Name, args))
 	}
 
 	return nil

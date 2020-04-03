@@ -420,7 +420,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 		})
 
 	// The following two features are the last ones to be supported as predicate/priority.
-	// Once they graduate to GA, there will be no more checking for featue gates here.
+	// Once they graduate to GA, there will be no more checking for feature gates here.
 	// Only register EvenPodsSpread predicate & priority if the feature is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
 		klog.Infof("Registering EvenPodsSpread predicate and priority function")

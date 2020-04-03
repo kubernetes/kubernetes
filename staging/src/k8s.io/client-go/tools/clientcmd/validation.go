@@ -30,7 +30,7 @@ import (
 
 var (
 	ErrNoContext   = errors.New("no context chosen")
-	ErrEmptyConfig = errors.New("no configuration has been provided")
+	ErrEmptyConfig = errors.New("no configuration has been provided, try setting KUBERNETES_MASTER environment variable")
 	// message is for consistency with old behavior
 	ErrEmptyCluster = errors.New("cluster has no server defined")
 )
@@ -86,9 +86,39 @@ func (e errConfigurationInvalid) Error() string {
 	return fmt.Sprintf("invalid configuration: %v", utilerrors.NewAggregate(e).Error())
 }
 
-// Errors implements the AggregateError interface
+// Errors implements the utilerrors.Aggregate interface
 func (e errConfigurationInvalid) Errors() []error {
 	return e
+}
+
+// Is implements the utilerrors.Aggregate interface
+func (e errConfigurationInvalid) Is(target error) bool {
+	return e.visit(func(err error) bool {
+		return errors.Is(err, target)
+	})
+}
+
+func (e errConfigurationInvalid) visit(f func(err error) bool) bool {
+	for _, err := range e {
+		switch err := err.(type) {
+		case errConfigurationInvalid:
+			if match := err.visit(f); match {
+				return match
+			}
+		case utilerrors.Aggregate:
+			for _, nestedErr := range err.Errors() {
+				if match := f(nestedErr); match {
+					return match
+				}
+			}
+		default:
+			if match := f(err); match {
+				return match
+			}
+		}
+	}
+
+	return false
 }
 
 // IsConfigurationInvalid returns true if the provided error indicates the configuration is invalid.

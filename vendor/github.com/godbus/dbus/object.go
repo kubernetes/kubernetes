@@ -16,6 +16,7 @@ type BusObject interface {
 	AddMatchSignal(iface, member string, options ...MatchOption) *Call
 	RemoveMatchSignal(iface, member string, options ...MatchOption) *Call
 	GetProperty(p string) (Variant, error)
+	SetProperty(p string, v interface{}) error
 	Destination() string
 	Path() ObjectPath
 }
@@ -146,7 +147,7 @@ func (o *Object) createCall(ctx context.Context, method string, flags Flags, ch 
 	}
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		if ch == nil {
-			ch = make(chan *Call, 10)
+			ch = make(chan *Call, 1)
 		} else if cap(ch) == 0 {
 			panic("dbus: unbuffered channel passed to (*Object).Go")
 		}
@@ -187,7 +188,7 @@ func (o *Object) createCall(ctx context.Context, method string, flags Flags, ch 
 	return call
 }
 
-// GetProperty calls org.freedesktop.DBus.Properties.GetProperty on the given
+// GetProperty calls org.freedesktop.DBus.Properties.Get on the given
 // object. The property name must be given in interface.member notation.
 func (o *Object) GetProperty(p string) (Variant, error) {
 	idx := strings.LastIndex(p, ".")
@@ -206,6 +207,20 @@ func (o *Object) GetProperty(p string) (Variant, error) {
 	}
 
 	return result, nil
+}
+
+// SetProperty calls org.freedesktop.DBus.Properties.Set on the given
+// object. The property name must be given in interface.member notation.
+func (o *Object) SetProperty(p string, v interface{}) error {
+	idx := strings.LastIndex(p, ".")
+	if idx == -1 || idx+1 == len(p) {
+		return errors.New("dbus: invalid property " + p)
+	}
+
+	iface := p[:idx]
+	prop := p[idx+1:]
+
+	return o.Call("org.freedesktop.DBus.Properties.Set", 0, iface, prop, v).Err
 }
 
 // Destination returns the destination that calls on (o *Object) are sent to.

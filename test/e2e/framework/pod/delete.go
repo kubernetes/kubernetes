@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
@@ -37,7 +38,7 @@ const (
 // DeletePodOrFail deletes the pod of the specified namespace and name.
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	ginkgo.By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
-	err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, nil)
+	err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	expectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
@@ -54,7 +55,7 @@ func DeletePodWithWait(c clientset.Interface, pod *v1.Pod) error {
 // not existing.
 func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string) error {
 	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
-	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, nil)
+	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil // assume pod was already deleted

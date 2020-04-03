@@ -36,10 +36,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -491,7 +490,7 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 
 func getCloudTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.Key == schedulerapi.TaintExternalCloudProvider {
+		if taint.Key == cloudproviderapi.TaintExternalCloudProvider {
 			return &taint
 		}
 	}
@@ -501,7 +500,7 @@ func getCloudTaint(taints []v1.Taint) *v1.Taint {
 func excludeCloudTaint(taints []v1.Taint) []v1.Taint {
 	newTaints := []v1.Taint{}
 	for _, taint := range taints {
-		if taint.Key == schedulerapi.TaintExternalCloudProvider {
+		if taint.Key == cloudproviderapi.TaintExternalCloudProvider {
 			continue
 		}
 		newTaints = append(newTaints, taint)
@@ -565,7 +564,7 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 func ensureNodeProvidedIPExists(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.NodeAddress, bool) {
 	var nodeIP *v1.NodeAddress
 	nodeIPExists := false
-	if providedIP, ok := node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr]; ok {
+	if providedIP, ok := node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr]; ok {
 		nodeIPExists = true
 		for i := range nodeAddresses {
 			if nodeAddresses[i].Address == providedIP {

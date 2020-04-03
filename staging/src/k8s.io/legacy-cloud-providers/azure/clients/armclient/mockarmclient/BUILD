@@ -10,6 +10,7 @@ go_library(
     importpath = "k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",

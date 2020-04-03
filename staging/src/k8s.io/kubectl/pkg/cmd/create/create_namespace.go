@@ -48,7 +48,7 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "namespace NAME [--dry-run]",
+		Use:                   "namespace NAME [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"ns"},
 		Short:                 i18n.T("Create a namespace with the specified name"),

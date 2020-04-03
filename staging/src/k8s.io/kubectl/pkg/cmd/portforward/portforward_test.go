@@ -210,6 +210,35 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 			err:        false,
 		},
 		{
+			name: "test success 1 (int port with explicit local port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:       8080,
+							TargetPort: intstr.FromInt(8080),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"8000:8080"},
+			translated: []string{"8000:8080"},
+			err:        false,
+		},
+		{
 			name: "test success 2 (clusterIP: None)",
 			svc: corev1.Service{
 				Spec: corev1.ServiceSpec{

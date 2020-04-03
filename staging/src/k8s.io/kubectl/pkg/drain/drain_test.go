@@ -241,7 +241,7 @@ func addEvictionSupport(t *testing.T, k *fake.Clientset) {
 		eviction := *action.(ktest.CreateAction).GetObject().(*policyv1beta1.Eviction)
 		// Avoid the lock
 		go func() {
-			err := k.CoreV1().Pods(eviction.Namespace).Delete(context.TODO(), eviction.Name, &metav1.DeleteOptions{})
+			err := k.CoreV1().Pods(eviction.Namespace).Delete(context.TODO(), eviction.Name, metav1.DeleteOptions{})
 			if err != nil {
 				// Errorf because we can't call Fatalf from another goroutine
 				t.Errorf("failed to delete pod: %s/%s", eviction.Namespace, eviction.Name)

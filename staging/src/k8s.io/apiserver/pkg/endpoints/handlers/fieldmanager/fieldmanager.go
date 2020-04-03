@@ -35,7 +35,7 @@ const DefaultMaxUpdateManagers int = 10
 
 // DefaultTrackOnCreateProbability defines the default probability that the field management of an object
 // starts being tracked from the object's creation, instead of from the first time the object is applied to.
-const DefaultTrackOnCreateProbability float32 = 0.1
+const DefaultTrackOnCreateProbability float32 = 1
 
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {
@@ -94,6 +94,7 @@ func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runti
 // newDefaultFieldManager is a helper function which wraps a Manager with certain default logic.
 func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind) *FieldManager {
 	f = NewStripMetaManager(f)
+	f = NewManagedFieldsUpdater(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
 	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)

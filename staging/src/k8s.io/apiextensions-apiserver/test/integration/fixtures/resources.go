@@ -351,6 +351,11 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 		return nil, err
 	}
 
+	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	// This is only for a test.  We need the watch cache to have a resource version that works for the test.
 	// When new REST storage is created, the storage cacher for the CR starts asynchronously.
 	// REST API operations return like list use the RV of etcd, but the storage cacher's reflector's list
@@ -362,7 +367,7 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
 	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-		return isWatchCachePrimed(crd, dynamicClientSet)
+		return isWatchCachePrimed(v1CRD, dynamicClientSet)
 	})
 	if err != nil {
 		return nil, err
@@ -379,15 +384,11 @@ func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.Custo
 	if err != nil {
 		return nil, err
 	}
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), v1CRD.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
 
 	// wait until all resources appears in discovery
-	for _, version := range servedVersions(crd) {
+	for _, version := range servedV1Versions(v1CRD) {
 		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-			return existsInDiscovery(crd, apiExtensionsClient, version)
+			return existsInDiscoveryV1(v1CRD, apiExtensionsClient, version)
 		})
 		if err != nil {
 			return nil, err
@@ -403,10 +404,6 @@ func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDe
 	if err != nil {
 		return nil, err
 	}
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), v1CRD.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
 
 	// This is only for a test.  We need the watch cache to have a resource version that works for the test.
 	// When new REST storage is created, the storage cacher for the CR starts asynchronously.
@@ -419,7 +416,7 @@ func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDe
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
 	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-		return isWatchCachePrimed(crd, dynamicClientSet)
+		return isWatchCachePrimed(v1CRD, dynamicClientSet)
 	})
 	if err != nil {
 		return nil, err
@@ -427,22 +424,22 @@ func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDe
 	return v1CRD, nil
 }
 
-func resourceClientForVersion(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClientSet dynamic.Interface, namespace, version string) dynamic.ResourceInterface {
+func resourceClientForVersion(crd *apiextensionsv1.CustomResourceDefinition, dynamicClientSet dynamic.Interface, namespace, version string) dynamic.ResourceInterface {
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: version, Resource: crd.Spec.Names.Plural}
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
+	if crd.Spec.Scope != apiextensionsv1.ClusterScoped {
 		return dynamicClientSet.Resource(gvr).Namespace(namespace)
 	}
 	return dynamicClientSet.Resource(gvr)
 }
 
 // isWatchCachePrimed returns true if the watch is primed for an specified version of CRD watch
-func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClientSet dynamic.Interface) (bool, error) {
+func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicClientSet dynamic.Interface) (bool, error) {
 	ns := ""
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
+	if crd.Spec.Scope != apiextensionsv1.ClusterScoped {
 		ns = "aval"
 	}
 
-	versions := servedVersions(crd)
+	versions := servedV1Versions(crd)
 	if len(versions) == 0 {
 		return true, nil
 	}
@@ -465,11 +462,11 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 			"spec":    map[string]interface{}{},
 		},
 	}
-	createdInstance, err := resourceClient.Create(instance, metav1.CreateOptions{})
+	createdInstance, err := resourceClient.Create(context.TODO(), instance, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
-	err = resourceClient.Delete(createdInstance.GetName(), nil)
+	err = resourceClient.Delete(context.TODO(), createdInstance.GetName(), metav1.DeleteOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -483,6 +480,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 	// delivered to any future watch with resourceVersion=0.
 	for _, v := range versions {
 		noxuWatch, err := resourceClientForVersion(crd, dynamicClientSet, ns, v).Watch(
+			context.TODO(),
 			metav1.ListOptions{ResourceVersion: createdInstance.GetResourceVersion()})
 		if err != nil {
 			return false, err
@@ -507,7 +505,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 
 // DeleteCustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	for _, version := range servedVersions(crd) {
@@ -524,7 +522,7 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 
 // DeleteV1CustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	for _, version := range servedV1Versions(crd) {
@@ -539,36 +537,13 @@ func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinit
 	return nil
 }
 
-// DeleteCustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
-func DeleteCustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
-	list, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(context.TODO(), deleteListOpts)
-	if err != nil {
-		return err
-	}
-	if err = apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().DeleteCollection(context.TODO(), nil, deleteListOpts); err != nil {
-		return err
-	}
-	for _, crd := range list.Items {
-		for _, version := range servedVersions(&crd) {
-			err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-				exists, err := existsInDiscovery(&crd, apiExtensionsClient, version)
-				return !exists, err
-			})
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // DeleteV1CustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
 func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
 	list, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(context.TODO(), deleteListOpts)
 	if err != nil {
 		return err
 	}
-	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(context.TODO(), nil, deleteListOpts); err != nil {
+	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, deleteListOpts); err != nil {
 		return err
 	}
 	for _, crd := range list.Items {

@@ -20,7 +20,10 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	autoscalingapi "k8s.io/api/autoscaling/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/scale"
@@ -44,7 +47,7 @@ type fakeNamespacedScaleClient struct {
 	fake      *testing.Fake
 }
 
-func (f *fakeNamespacedScaleClient) Get(resource schema.GroupResource, name string) (*autoscalingapi.Scale, error) {
+func (f *fakeNamespacedScaleClient) Get(ctx context.Context, resource schema.GroupResource, name string, opts metav1.GetOptions) (*autoscalingapi.Scale, error) {
 	obj, err := f.fake.
 		Invokes(testing.NewGetSubresourceAction(resource.WithVersion(""), f.namespace, "scale", name), &autoscalingapi.Scale{})
 
@@ -55,7 +58,7 @@ func (f *fakeNamespacedScaleClient) Get(resource schema.GroupResource, name stri
 	return obj.(*autoscalingapi.Scale), err
 }
 
-func (f *fakeNamespacedScaleClient) Update(resource schema.GroupResource, scale *autoscalingapi.Scale) (*autoscalingapi.Scale, error) {
+func (f *fakeNamespacedScaleClient) Update(ctx context.Context, resource schema.GroupResource, scale *autoscalingapi.Scale, opts metav1.UpdateOptions) (*autoscalingapi.Scale, error) {
 	obj, err := f.fake.
 		Invokes(testing.NewUpdateSubresourceAction(resource.WithVersion(""), f.namespace, "scale", scale), &autoscalingapi.Scale{})
 
@@ -66,7 +69,7 @@ func (f *fakeNamespacedScaleClient) Update(resource schema.GroupResource, scale 
 	return obj.(*autoscalingapi.Scale), err
 }
 
-func (f *fakeNamespacedScaleClient) Patch(gvr schema.GroupVersionResource, name string, pt types.PatchType, patch []byte) (*autoscalingapi.Scale, error) {
+func (f *fakeNamespacedScaleClient) Patch(ctx context.Context, gvr schema.GroupVersionResource, name string, pt types.PatchType, patch []byte, opts metav1.PatchOptions) (*autoscalingapi.Scale, error) {
 	obj, err := f.fake.
 		Invokes(testing.NewPatchSubresourceAction(gvr, f.namespace, name, pt, patch, "scale"), &autoscalingapi.Scale{})
 
