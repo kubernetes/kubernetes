@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -329,4 +330,30 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
 		}
 	}
+}
+
+func TestSharedInformerErrorHandling(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	source.ListError = fmt.Errorf("Access Denied")
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+
+	errCh := make(chan error)
+	_ = informer.SetWatchErrorHandler(func(_ *Reflector, err error) {
+		errCh <- err
+	})
+
+	stop := make(chan struct{})
+	go informer.Run(stop)
+
+	select {
+	case err := <-errCh:
+		if !strings.Contains(err.Error(), "Access Denied") {
+			t.Errorf("Expected 'Access Denied' error. Actual: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Errorf("Timeout waiting for error handler call")
+	}
+	close(stop)
 }
