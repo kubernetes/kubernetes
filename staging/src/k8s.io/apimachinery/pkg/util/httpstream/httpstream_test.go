@@ -58,8 +58,19 @@ func TestHandshake(t *testing.T) {
 			expectedProtocol: "",
 			expectError:      true,
 		},
+		"no common protocol with comma separated list": {
+			clientProtocols:  []string{"c, d"},
+			serverProtocols:  []string{"a", "b"},
+			expectedProtocol: "",
+			expectError:      true,
+		},
 		"common protocol": {
 			clientProtocols:  []string{"b"},
+			serverProtocols:  []string{"a", "b"},
+			expectedProtocol: "b",
+		},
+		"common protocol with comma separated list": {
+			clientProtocols:  []string{"b, c"},
 			serverProtocols:  []string{"a", "b"},
 			expectedProtocol: "b",
 		},
