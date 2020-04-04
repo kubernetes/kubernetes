@@ -12,14 +12,14 @@ go_library(
         "union.go",
         "validate.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/typed",
-    importpath = "sigs.k8s.io/structured-merge-diff/typed",
+    importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v2/typed",
+    importpath = "sigs.k8s.io/structured-merge-diff/v2/typed",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/gopkg.in/yaml.v2:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/schema:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v2/fieldpath:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v2/schema:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v2/value:go_default_library",
     ],
 )
 
