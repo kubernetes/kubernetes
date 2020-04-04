@@ -145,6 +145,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		OOMScoreAdj:        config.OOMScoreAdj,
 		ConfigSyncPeriod:   config.ConfigSyncPeriod.Duration,
 		HealthzServer:      healthzServer,
+		UseEndpointSlices:  false,
 	}, nil
 }
 
