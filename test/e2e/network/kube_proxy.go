@@ -208,9 +208,12 @@ var _ = SIGDescribe("Network", func() {
 			serverNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(serverPodSpec)
+		defer fr.PodClient().DeleteSync(serverPodSpec.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
 		// The server should be listening before spawning the client pod
-		<-time.After(time.Duration(2) * time.Second)
+		if readyErr := e2epod.WaitForPodsReady(fr.ClientSet, fr.Namespace.Name, serverPodSpec.Name, 0); readyErr != nil {
+			framework.Failf("error waiting for server pod %s to be ready: %w", serverPodSpec.Name, readyErr)
+		}
 		// Connect to the server and leak the connection
 		ginkgo.By(fmt.Sprintf(
 			"Launching a client connection on node %v (node ip: %v, image: %v)",
@@ -218,6 +221,7 @@ var _ = SIGDescribe("Network", func() {
 			clientNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(clientPodSpec)
+		defer fr.PodClient().DeleteSync(clientPodSpec.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
 		ginkgo.By("Checking /proc/net/nf_conntrack for the timeout")
 		// These must be synchronized from the default values set in
