@@ -46,7 +46,9 @@ const (
 	Deleted  EventType = "DELETED"
 	Bookmark EventType = "BOOKMARK"
 	Error    EventType = "ERROR"
+)
 
+var (
 	DefaultChanSize int32 = 100
 )
 
