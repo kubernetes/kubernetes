@@ -28,6 +28,7 @@ filegroup(
         "//pkg/probe/exec:all-srcs",
         "//pkg/probe/http:all-srcs",
         "//pkg/probe/tcp:all-srcs",
+        "//pkg/probe/grpc:all-srcs",
     ],
     tags = ["automanaged"],
 )
