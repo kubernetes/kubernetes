@@ -13,6 +13,11 @@ spec:
   - name: kubernetes-pause
     image: k8s.gcr.io/pause:2.0
 ---
+apiVersion: example.com/v1
+kind: Bogus
+metadata:
+  name: foo
+---
 apiVersion: v1
 kind: Namespace
 metadata:

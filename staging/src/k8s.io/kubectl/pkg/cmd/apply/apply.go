@@ -340,7 +340,7 @@ func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 		}
 		infos, err := r.Infos()
 		if err != nil {
-			return nil, err
+			return infos, err
 		}
 		o.objects = infos
 		o.objectsCached = true
