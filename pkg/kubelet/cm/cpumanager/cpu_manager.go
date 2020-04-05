@@ -50,6 +50,8 @@ type policyName string
 // cpuManagerStateFileName is the file name where cpu manager stores its state
 const cpuManagerStateFileName = "cpu_manager_state"
 
+const allowCPUQuotaDisabled string = "AllowCPUQuotaDisabled"
+
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
 	// Start is called during Kubelet initialization.
@@ -125,10 +127,14 @@ type sourcesReadyStub struct{}
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
+var cmCPUPolicyName policyName
+
 // NewManager creates new cpu manager based on provided policy
 func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, numaNodeInfo topology.NUMANodeInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
+
+	cmCPUPolicyName = policyName(cpuPolicyName)
 
 	switch policyName(cpuPolicyName) {
 
@@ -294,7 +300,32 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(m.state, pod, container)
+	hint := m.policy.GetTopologyHints(m.state, pod, container)
+	podAnnotations := pod.GetAnnotations()
+	if cmCPUPolicyName == PolicyStatic && hint != nil {
+		if podAnnotations == nil {
+			pod.SetAnnotations(map[string]string{allowCPUQuotaDisabled: "true"})
+		} else if _, ok := podAnnotations[allowCPUQuotaDisabled]; !ok {
+			podAnnotations[allowCPUQuotaDisabled] = "true"
+		}
+	} else if podAnnotations == nil {
+		pod.SetAnnotations(map[string]string{allowCPUQuotaDisabled: "false"})
+	} else {
+		podAnnotations[allowCPUQuotaDisabled] = "false"
+	}
+	return hint
+}
+
+// CanDisablePodCPUQuota is used by runtime pod
+func CanDisablePodCPUQuota(pod *v1.Pod) bool {
+	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
+		if v, ok := podAnnotations[allowCPUQuotaDisabled]; ok {
+			if v == "true" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type reconciledContainer struct {
