@@ -2686,12 +2686,12 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	/*
-	   Release : v1.19
-	   Testname: Endpoint resource lifecycle
-	   Description: Create an endpoint, the endpoint MUST exist.
-           The endpoint is updated with a new label, a check after the update MUST find the changes.
-           The endpoint is then patched with a new IP address and port, a check after the patch MUST the changes.
-           The endpoint is deleted by it's label, a watch listens for the deleted watch event.
+		   Release : v1.19
+		   Testname: Endpoint resource lifecycle
+		   Description: Create an endpoint, the endpoint MUST exist.
+	           The endpoint is updated with a new label, a check after the update MUST find the changes.
+	           The endpoint is then patched with a new IP address and port, a check after the patch MUST the changes.
+	           The endpoint is deleted by it's label, a watch listens for the deleted watch event.
 	*/
 	framework.ConformanceIt("should test the lifecycle of an Endpoint", func() {
 		ns := f.Namespace.Name
