@@ -149,7 +149,8 @@ require (
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.0.4
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
-	sigs.k8s.io/kustomize v2.0.3+incompatible
+	sigs.k8s.io/kustomize/api v0.3.3-0.20200405233609-a8b9741866cf // indirect
+	sigs.k8s.io/kustomize/kustomize/v3 v3.5.5-0.20200405233609-a8b9741866cf // indirect
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -566,3 +567,7 @@ replace (
 	sourcegraph.com/sqs/pbtypes => sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4
 	vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
+
+replace sigs.k8s.io/kustomize/kustomize/v3 => sigs.k8s.io/kustomize/kustomize/v3 v3.5.5-0.20200405233609-a8b9741866cf
+
+replace sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.3.3-0.20200405233609-a8b9741866cf
