@@ -19,14 +19,18 @@ package kustomize
 import (
 	"io"
 
-	"k8s.io/cli-runtime/pkg/kustomize/k8sdeps"
-	"sigs.k8s.io/kustomize/pkg/commands/build"
-	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/api/krusty"
 )
 
 // RunKustomizeBuild runs kustomize build given a filesystem and a path
-func RunKustomizeBuild(out io.Writer, fSys fs.FileSystem, path string) error {
-	f := k8sdeps.NewFactory()
-	o := build.NewOptions(path, "")
-	return o.RunBuild(out, fSys, f.ResmapF, f.TransformerF)
+func RunKustomizeBuild(out io.Writer, fSys filesys.FileSystem, path string) error {
+	o := NewOptions(path, "")
+	o.outOrder = legacy
+	k := krusty.MakeKustomizer(fSys, o.makeOptions())
+	m, err := k.Run(o.kustomizationPath)
+	if err != nil {
+		return err
+	}
+	return o.emitResources(out, fSys, m)
 }

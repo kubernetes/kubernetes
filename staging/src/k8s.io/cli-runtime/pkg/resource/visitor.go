@@ -31,7 +31,7 @@ import (
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 
-	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/api/filesys"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -538,7 +538,7 @@ type KustomizeVisitor struct {
 
 // Visit in a KustomizeVisitor gets the output of Kustomize build and save it in the Streamvisitor
 func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
-	fSys := fs.MakeRealFS()
+	fSys := filesys.MakeFsOnDisk()
 	var out bytes.Buffer
 	err := kustomize.RunKustomizeBuild(&out, fSys, v.Path)
 	if err != nil {

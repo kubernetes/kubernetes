@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/api/filesys"
 )
 
 const (
@@ -132,7 +132,7 @@ spec:
 )
 
 func TestResources1(t *testing.T) {
-	fSys := fs.MakeFakeFS()
+	fSys := filesys.MakeFsInMemory()
 	fSys.WriteFile("/kustomization.yaml", []byte(kustomizationContent1))
 	fSys.WriteFile("/deployment.yaml", []byte(deploymentContent))
 	fSys.WriteFile("/namespace.yaml", []byte(namespaceContent))
