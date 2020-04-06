@@ -21,7 +21,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -67,7 +66,7 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 		"STORAGE_BACKEND="+targetStorage,
 		"TEST_ETCD_IMAGE="+etcdImage)
 
-	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
+	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-l", "-M")
 	return err
 }
 
@@ -93,11 +92,12 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 	}
 
 	v := "v" + rawV
-	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-M", v)
+	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-M", v)
 	return err
 }
 
-func locationParamGKE() string {
+// LocationParamGKE returns parameter related to location for gcloud command.
+func LocationParamGKE() string {
 	if TestContext.CloudConfig.MultiMaster {
 		// GKE Regional Clusters are being tested.
 		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
@@ -105,7 +105,8 @@ func locationParamGKE() string {
 	return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
 }
 
-func appendContainerCommandGroupIfNeeded(args []string) []string {
+// AppendContainerCommandGroupIfNeeded returns container command group parameter if necessary.
+func AppendContainerCommandGroupIfNeeded(args []string) []string {
 	if TestContext.CloudConfig.Region != "" {
 		// TODO(wojtek-t): Get rid of it once Regional Clusters go to GA.
 		return append([]string{"beta"}, args...)
@@ -120,19 +121,19 @@ func MasterUpgradeGKE(namespace string, v string) error {
 		"container",
 		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		locationParamGKE(),
+		LocationParamGKE(),
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet",
 	}
-	_, _, err := RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
+	_, _, err := RunCmd("gcloud", AppendContainerCommandGroupIfNeeded(args)...)
 	if err != nil {
 		return err
 	}
 
-	waitForSSHTunnels(namespace)
+	WaitForSSHTunnels(namespace)
 
 	return nil
 }
@@ -174,124 +175,16 @@ func masterUpgradeKubernetesAnywhere(v string) error {
 	return nil
 }
 
-// NodeUpgrade upgrades nodes on GCE/GKE.
-func NodeUpgrade(f *Framework, v string, img string) error {
-	// Perform the upgrade.
-	var err error
-	switch TestContext.Provider {
-	case "gce":
-		err = nodeUpgradeGCE(v, img, false)
-	case "gke":
-		err = nodeUpgradeGKE(f.Namespace.Name, v, img)
-	default:
-		err = fmt.Errorf("NodeUpgrade() is not implemented for provider %s", TestContext.Provider)
-	}
-	if err != nil {
-		return err
-	}
-	return waitForNodesReadyAfterUpgrade(f)
-}
-
-// NodeUpgradeGCEWithKubeProxyDaemonSet upgrades nodes on GCE with enabling/disabling the daemon set of kube-proxy.
-// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
-	// Perform the upgrade.
-	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
-		return err
-	}
-	return waitForNodesReadyAfterUpgrade(f)
-}
-
-func waitForNodesReadyAfterUpgrade(f *Framework) error {
-	// Wait for it to complete and validate nodes are healthy.
-	//
-	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
-	// GKE; the operation shouldn't return until they all are.
-	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
-	if err != nil {
-		return fmt.Errorf("couldn't detect number of nodes")
-	}
-	Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout, numNodes)
-	if _, err := e2enode.CheckReady(f.ClientSet, numNodes, RestartNodeReadyAgainTimeout); err != nil {
-		return err
-	}
-	return nil
-}
-
-// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func nodeUpgradeGCE(rawV, img string, enableKubeProxyDaemonSet bool) error {
-	v := "v" + rawV
-	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
-	if img != "" {
-		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
-		_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-N", "-o", v)
-		return err
-	}
-	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-N", v)
-	return err
-}
-
-func nodeUpgradeGKE(namespace string, v string, img string) error {
-	Logf("Upgrading nodes to version %q and image %q", v, img)
-	nps, err := nodePoolsGKE()
-	if err != nil {
-		return err
-	}
-	Logf("Found node pools %v", nps)
-	for _, np := range nps {
-		args := []string{
-			"container",
-			"clusters",
-			fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-			locationParamGKE(),
-			"upgrade",
-			TestContext.CloudConfig.Cluster,
-			fmt.Sprintf("--node-pool=%s", np),
-			fmt.Sprintf("--cluster-version=%s", v),
-			"--quiet",
-		}
-		if len(img) > 0 {
-			args = append(args, fmt.Sprintf("--image-type=%s", img))
-		}
-		_, _, err = RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
-
-		if err != nil {
-			return err
-		}
-
-		waitForSSHTunnels(namespace)
-	}
-	return nil
-}
-
-func nodePoolsGKE() ([]string, error) {
-	args := []string{
-		"container",
-		"node-pools",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		locationParamGKE(),
-		"list",
-		fmt.Sprintf("--cluster=%s", TestContext.CloudConfig.Cluster),
-		"--format=get(name)",
-	}
-	stdout, _, err := RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
-	if err != nil {
-		return nil, err
-	}
-	if len(strings.TrimSpace(stdout)) == 0 {
-		return []string{}, nil
-	}
-	return strings.Fields(stdout), nil
-}
-
-func gceUpgradeScript() string {
+// GCEUpgradeScript returns path of script for upgrading on GCE.
+func GCEUpgradeScript() string {
 	if len(TestContext.GCEUpgradeScript) == 0 {
 		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
 	return TestContext.GCEUpgradeScript
 }
 
-func waitForSSHTunnels(namespace string) {
+// WaitForSSHTunnels waits for establishing SSH tunnel to busybox pod.
+func WaitForSSHTunnels(namespace string) {
 	Logf("Waiting for SSH tunnels to establish")
 	RunKubectl(namespace, "run", "ssh-tunnel-test",
 		"--image=busybox",
