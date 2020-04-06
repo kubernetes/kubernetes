@@ -29,12 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/kustomize"
-	"sigs.k8s.io/kustomize/pkg/constants"
-	"sigs.k8s.io/kustomize/pkg/fs"
-	"sigs.k8s.io/kustomize/pkg/ifc"
-	"sigs.k8s.io/kustomize/pkg/loader"
-	"sigs.k8s.io/kustomize/pkg/patch"
-	"sigs.k8s.io/kustomize/pkg/types"
+	"sigs.k8s.io/kustomize/api/konfig"
+	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/api/ifc"
+	"sigs.k8s.io/kustomize/api/loader"
+	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/yaml"
 )
 
@@ -67,8 +66,8 @@ func GetManager(kustomizeDir string) (*Manager, error) {
 		// Create a loader that mimics the behavior of kubectl kustomize, including support for reading from
 		// a local folder or git repository like git@github.com:someOrg/someRepo.git or https://github.com/someOrg/someRepo?ref=someHash
 		// in order to do so you must use ldr.Root() instead of km.kustomizeDir and ldr.Load instead of other ways to read files
-		fSys := fs.MakeRealFS()
-		ldr, err := loader.NewLoader(km.kustomizeDir, fSys)
+		fSys := filesys.MakeFsOnDisk()
+		ldr, err := loader.NewLoader(loader.RestrictionRootOnly, km.kustomizeDir, fSys)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +101,7 @@ func (km *Manager) loadFromKustomizationFile(ldr ifc.Loader) error {
 	// Kustomize support different KustomizationFileNames, so we try to read all
 	var content []byte
 	match := 0
-	for _, kf := range constants.KustomizationFileNames {
+	for _, kf := range konfig.RecognizedKustomizationFileNames() {
 		c, err := ldr.Load(kf)
 		if err == nil {
 			match++
@@ -192,7 +191,7 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 	fmt.Printf("[kustomize] Applying %d patches to %s Resource=%s/%s\n", patchesCnt, resource.GroupVersionKind(), resource.GetNamespace(), resource.GetName())
 
 	// create an in memory fs to use for the kustomization
-	memFS := fs.MakeFakeFS()
+	memFS := filesys.MakeFsInMemory()
 
 	fakeDir := "/"
 	// for Windows we need this to be a drive because kustomize uses filepath.Abs()
@@ -213,7 +212,7 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 	km.kustomizationFile.Resources = []string{name}
 
 	// writes strategic merge patches to files in the temp file system
-	km.kustomizationFile.PatchesStrategicMerge = []patch.StrategicMerge{}
+	km.kustomizationFile.PatchesStrategicMerge = []types.PatchStrategicMerge{}
 	for i, p := range strategicMerge {
 		b, err := yaml.Marshal(p)
 		if err != nil {
@@ -222,16 +221,16 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 		name := fmt.Sprintf("patch-%d.yaml", i)
 		memFS.WriteFile(filepath.Join(fakeDir, name), b)
 
-		km.kustomizationFile.PatchesStrategicMerge = append(km.kustomizationFile.PatchesStrategicMerge, patch.StrategicMerge(name))
+		km.kustomizationFile.PatchesStrategicMerge = append(km.kustomizationFile.PatchesStrategicMerge, types.PatchStrategicMerge(name))
 	}
 
 	// writes json6902 patches to files in the temp file system
-	km.kustomizationFile.PatchesJson6902 = []patch.Json6902{}
+	km.kustomizationFile.PatchesJson6902 = []types.PatchJson6902{}
 	for i, p := range json6902 {
 		name := fmt.Sprintf("patchjson-%d.yaml", i)
 		memFS.WriteFile(filepath.Join(fakeDir, name), []byte(p.Patch))
 
-		km.kustomizationFile.PatchesJson6902 = append(km.kustomizationFile.PatchesJson6902, patch.Json6902{Target: p.Target, Path: name})
+		km.kustomizationFile.PatchesJson6902 = append(km.kustomizationFile.PatchesJson6902, types.PatchJson6902{Target: p.Target, Path: name})
 	}
 
 	// writes the kustomization file to the temp file system

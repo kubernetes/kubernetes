@@ -19,14 +19,14 @@ package kustomize
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/kustomize/pkg/ifc"
-	"sigs.k8s.io/kustomize/pkg/patch"
+	"sigs.k8s.io/kustomize/api/ifc"
+	"sigs.k8s.io/kustomize/api/types"
 )
 
 // json6902 represents a json6902 patch
 type json6902 struct {
 	// Target refers to a Kubernetes object that the json patch will be applied to
-	*patch.Target
+	Target *types.PatchTarget
 
 	// Patch contain the json patch as a string
 	Patch string
@@ -36,7 +36,7 @@ type json6902 struct {
 type json6902Slice []*json6902
 
 // newJSON6902FromFile returns a json6902 patch from a file
-func newJSON6902FromFile(f patch.Json6902, ldr ifc.Loader, file string) (*json6902, error) {
+func newJSON6902FromFile(f types.PatchJson6902, ldr ifc.Loader, file string) (*json6902, error) {
 	patch, err := ldr.Load(file)
 	if err != nil {
 		return nil, err
@@ -52,11 +52,11 @@ func newJSON6902FromFile(f patch.Json6902, ldr ifc.Loader, file string) (*json69
 func (s *json6902Slice) filterByResource(r *unstructured.Unstructured) json6902Slice {
 	var result json6902Slice
 	for _, p := range *s {
-		if p.Group == r.GroupVersionKind().Group &&
-			p.Version == r.GroupVersionKind().Version &&
-			p.Kind == r.GroupVersionKind().Kind &&
-			p.Namespace == r.GetNamespace() &&
-			p.Name == r.GetName() {
+		if p.Target.Group == r.GroupVersionKind().Group &&
+			p.Target.Version == r.GroupVersionKind().Version &&
+			p.Target.Kind == r.GroupVersionKind().Kind &&
+			p.Target.Namespace == r.GetNamespace() &&
+			p.Target.Name == r.GetName() {
 			result = append(result, p)
 		}
 	}

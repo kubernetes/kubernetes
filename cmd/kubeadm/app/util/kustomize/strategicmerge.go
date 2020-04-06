@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"sigs.k8s.io/kustomize/pkg/ifc"
+	"sigs.k8s.io/kustomize/api/ifc"
 )
 
 // strategicMergeSlice is a slice of strategic merge patches.
