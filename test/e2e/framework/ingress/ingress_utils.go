@@ -557,6 +557,14 @@ func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 	return ing, err
 }
 
+// DescribeIng describes information of ingress by running kubectl describe ing.
+func DescribeIng(ns string) {
+	framework.Logf("\nOutput of kubectl describe ing:\n")
+	desc, _ := framework.RunKubectl(
+		ns, "describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+	framework.Logf(desc)
+}
+
 // Update retrieves the ingress, performs the passed function, and then updates it.
 func (j *TestJig) Update(update func(ing *networkingv1beta1.Ingress)) {
 	var err error
@@ -569,7 +577,7 @@ func (j *TestJig) Update(update func(ing *networkingv1beta1.Ingress)) {
 		update(j.Ingress)
 		j.Ingress, err = j.runUpdate(j.Ingress)
 		if err == nil {
-			framework.DescribeIng(j.Ingress.Namespace)
+			DescribeIng(j.Ingress.Namespace)
 			return
 		}
 		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
