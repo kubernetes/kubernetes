@@ -45,6 +45,8 @@ const (
 	ILBFinalizerV1 = "gke.networking.io/l4-ilb-v1"
 	// ILBFinalizerV2 is the finalizer used by newer controllers that implement Internal LoadBalancer services.
 	ILBFinalizerV2 = "gke.networking.io/l4-ilb-v2"
+	// maxInstancesPerInstanceGroup defines maximum number of VMs per InstanceGroup.
+	maxInstancesPerInstanceGroup = 1000
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -510,6 +512,17 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node)
 	kubeNodes := sets.NewString()
 	for _, n := range nodes {
 		kubeNodes.Insert(n.Name)
+	}
+
+	// Individual InstanceGroup has a limit for 1000 instances in it.
+	// As a result, it's not possible to add more to it.
+	// Given that the long-term fix (AlphaFeatureILBSubsets) is already in-progress,
+	// to stop the bleeding we now simply cut down the contents to first 1000
+	// instances in the alphabetical order. Since there is a limitation for
+	// 250 backend VMs for ILB, this isn't making things worse.
+	if len(kubeNodes) > maxInstancesPerInstanceGroup {
+		klog.Warningf("Limiting number of VMs for InstanceGroup %s to %d", name, maxInstancesPerInstanceGroup)
+		kubeNodes = sets.NewString(kubeNodes.List()[:maxInstancesPerInstanceGroup]...)
 	}
 
 	gceNodes := sets.NewString()
