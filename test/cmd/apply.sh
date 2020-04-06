@@ -257,21 +257,60 @@ __EOF__
   # cleanup
   kubectl delete --kustomize hack/testdata/kustomize
 
-  ## kubectl apply multiple resources with initial failure.
+  ## kubectl apply multiple resources with one failure during apply phase.
   # Pre-Condition: namepace does not exist and no POD exists
   output_message=$(! kubectl get namespace multi-resource-ns 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'namespaces "multi-resource-ns" not found'
   kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # First pass, namespace is created, but pod is not (since namespace does not exist yet).
-  output_message=$(! kubectl apply -f hack/testdata/multi-resource.yaml 2>&1 "${kube_flags[@]:?}")
+  output_message=$(! kubectl apply -f hack/testdata/multi-resource-1.yaml 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'namespaces "multi-resource-ns" not found'
   output_message=$(! kubectl get pods test-pod -n multi-resource-ns 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'pods "test-pod" not found'
   # Second pass, pod is created (now that namespace exists).
-  kubectl apply -f hack/testdata/multi-resource.yaml "${kube_flags[@]:?}"
+  kubectl apply -f hack/testdata/multi-resource-1.yaml "${kube_flags[@]:?}"
   kube::test::get_object_assert 'pods test-pod -n multi-resource-ns' "{{${id_field}}}" 'test-pod'
   # cleanup
-  kubectl delete -f hack/testdata/multi-resource.yaml "${kube_flags[@]:?}"
+  kubectl delete -f hack/testdata/multi-resource-1.yaml "${kube_flags[@]:?}"
+
+  ## kubectl apply multiple resources with one failure during builder phase.
+  # Pre-Condition: No configmaps
+  kube::test::get_object_assert configmaps "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Apply a configmap and a bogus custom resource.
+  output_message=$(! kubectl apply -f hack/testdata/multi-resource-2.yaml 2>&1 "${kube_flags[@]:?}")
+  # Should be error message from bogus custom resource.
+  kube::test::if_has_string "${output_message}" 'no matches for kind "Bogus" in version "example.com/v1"'
+  # ConfigMap should have been created even with custom resource error.
+  kube::test::get_object_assert 'configmaps foo' "{{${id_field}}}" 'foo'
+  # cleanup
+  kubectl delete configmaps foo "${kube_flags[@]:?}"
+
+  ## kubectl apply multiple resources with one failure during builder phase.
+  # Pre-Condition: No pods exist.
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Applies three pods, one of which is invalid (POD-B), two succeed (pod-a, pod-c).
+  output_message=$(! kubectl apply -f hack/testdata/multi-resource-3.yaml 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'The Pod "POD-B" is invalid'
+  kube::test::get_object_assert 'pods pod-a' "{{${id_field}}}" 'pod-a'
+  kube::test::get_object_assert 'pods pod-c' "{{${id_field}}}" 'pod-c'
+  # cleanup
+  kubectl delete pod pod-a pod-c "${kube_flags[@]:?}"
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+
+  ## kubectl apply multiple resources with one failure during apply phase.
+  # Pre-Condition: crd does not exist, and custom resource does not exist.
+  kube::test::get_object_assert crds "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # First pass, custom resource fails, but crd apply succeeds.
+  output_message=$(! kubectl apply -f hack/testdata/multi-resource-4.yaml 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'no matches for kind "Widget" in version "example.com/v1"'
+  output_message=$(! kubectl get widgets foo 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'widgets.example.com "foo" not found'
+  kube::test::get_object_assert 'crds widgets.example.com' "{{${id_field}}}" 'widgets.example.com'
+  # Second pass, custom resource is created (now that crd exists).
+  kubectl apply -f hack/testdata/multi-resource-4.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'widget foo' "{{${id_field}}}" 'foo'
+  # cleanup
+  kubectl delete -f hack/testdata/multi-resource-4.yaml "${kube_flags[@]:?}"
 
   set +o nounset
   set +o errexit
