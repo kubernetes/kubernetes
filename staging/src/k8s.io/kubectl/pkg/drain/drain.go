@@ -37,14 +37,14 @@ import (
 )
 
 const (
-	// EvictionKind represents the kind of evictions object
+	// EvictionKind represents the kind of evictions object.
 	EvictionKind = "Eviction"
-	// EvictionSubresource represents the kind of evictions object as pod's subresource
+	// EvictionSubresource represents the kind of evictions object as pod's subresource.
 	EvictionSubresource = "pods/eviction"
 	podSkipMsgTemplate  = "pod %q has DeletionTimestamp older than %v seconds, skipping\n"
 )
 
-// Helper contains the parameters to control the behaviour of drainer
+// Helper contains the parameters to control the behaviour of drainer.
 type Helper struct {
 	Ctx                 context.Context
 	Client              kubernetes.Interface
@@ -56,13 +56,13 @@ type Helper struct {
 	Selector            string
 	PodSelector         string
 
-	// DisableEviction forces drain to use delete rather than evict
+	// DisableEviction forces drain to use delete rather than evict.
 	DisableEviction bool
 
 	// SkipWaitForDeleteTimeoutSeconds ignores pods that have a
 	// DeletionTimeStamp > N seconds. It's up to the user to decide when this
 	// option is appropriate; examples include the Node is unready and the pods
-	// won't drain otherwise
+	// won't drain otherwise.
 	SkipWaitForDeleteTimeoutSeconds int
 
 	// AdditionalFilters are applied sequentially after base drain filters to
@@ -76,7 +76,7 @@ type Helper struct {
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
 
-	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
+	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; it is for printing progress output.
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
 }
 
@@ -93,9 +93,9 @@ type waitForDeleteParams struct {
 	out                             io.Writer
 }
 
-// CheckEvictionSupport uses Discovery API to find out if the server support
-// eviction subresource If support, it will return its groupVersion; Otherwise,
-// it will return an empty string
+// CheckEvictionSupport uses Discovery API to find out if the server supports
+// the eviction subresource. If supported, it will return its groupVersion; Otherwise,
+// it will return an empty string.
 func CheckEvictionSupport(clientset kubernetes.Interface) (string, error) {
 	discoveryClient := clientset.Discovery()
 	groupList, err := discoveryClient.ServerGroups()
@@ -138,7 +138,7 @@ func (d *Helper) makeDeleteOptions() metav1.DeleteOptions {
 	return deleteOptions
 }
 
-// DeletePod will delete the given pod, or return an error if it couldn't
+// DeletePod will delete the given pod or return an error if it couldn't.
 func (d *Helper) DeletePod(pod corev1.Pod) error {
 	if d.DryRunStrategy == cmdutil.DryRunServer {
 		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
@@ -148,7 +148,7 @@ func (d *Helper) DeletePod(pod corev1.Pod) error {
 	return d.Client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, d.makeDeleteOptions())
 }
 
-// EvictPod will evict the give pod, or return an error if it couldn't
+// EvictPod will evict the given pod or return an error if it couldn't.
 func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 	if d.DryRunStrategy == cmdutil.DryRunServer {
 		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
@@ -169,14 +169,14 @@ func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 		DeleteOptions: &delOpts,
 	}
 
-	// Remember to change change the URL manipulation func when Eviction's version change
+	// Remember to change the URL manipulation func when Eviction's version changes.
 	return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
 }
 
-// GetPodsForDeletion receives resource info for a node, and returns those pods as PodDeleteList,
-// or error if it cannot list pods. All pods that are ready to be deleted can be obtained with .Pods(),
-// and string with all warning can be obtained with .Warnings(), and .Errors() for all errors that
-// occurred during deletion.
+// GetPodsForDeletion receives resource info for a node and returns those pods as PodDeleteList,
+// or error if it cannot list pods. A slice of pods that are ready to be deleted can be obtained with .Pods(),
+// a string with all warnings can be obtained with .Warnings(), and a slice of all errors that
+// occurred during deletion can be obtained with .Errors().
 func (d *Helper) GetPodsForDeletion(nodeName string) (*PodDeleteList, []error) {
 	labelSelector, err := labels.Parse(d.PodSelector)
 	if err != nil {
@@ -205,15 +205,15 @@ func filterPods(podList *corev1.PodList, filters []PodFilter) *PodDeleteList {
 		for _, filter := range filters {
 			status = filter(pod)
 			if !status.Delete {
-				// short-circuit as soon as pod is filtered out
+				// Short-circuit as soon as pod is filtered out
 				// at that point, there is no reason to run pod
-				// through any additional filters
+				// through any additional filters.
 				break
 			}
 		}
-		// Add the pod to PodDeleteList no matter what PodDeleteStatus is,
+		// Add the pod to PodDeleteList no matter what PodDeleteStatus is;
 		// those pods whose PodDeleteStatus is false like DaemonSet will
-		// be catched by list.errors()
+		// be caught by list.errors()
 		pods = append(pods, PodDelete{
 			Pod:    pod,
 			Status: status,
@@ -223,7 +223,7 @@ func filterPods(podList *corev1.PodList, filters []PodFilter) *PodDeleteList {
 	return list
 }
 
-// DeleteOrEvictPods deletes or evicts the pods on the api server
+// DeleteOrEvictPods deletes or evicts the pods on the api server.
 func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 	if len(pods) == 0 {
 		return nil
