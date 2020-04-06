@@ -1,30 +1,20 @@
-/*
-Copyright 2018 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2019 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
 
 package configmapandsecret
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/kustomize/pkg/fs"
-	"sigs.k8s.io/kustomize/pkg/loader"
-	"sigs.k8s.io/kustomize/pkg/types"
+	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/api/kv"
+	"sigs.k8s.io/kustomize/api/loader"
+	valtest_test "sigs.k8s.io/kustomize/api/testutils/valtest"
+	"sigs.k8s.io/kustomize/api/types"
 )
 
 func makeEnvConfigMap(name string) *corev1.ConfigMap {
@@ -63,7 +53,7 @@ BAR=baz
 	}
 }
 
-func makeLiteralConfigMap(name string) *corev1.ConfigMap {
+func makeLiteralConfigMap(name string, labels, annotations map[string]string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -79,7 +69,12 @@ func makeLiteralConfigMap(name string) *corev1.ConfigMap {
 			"d": "true",
 		},
 	}
-	cm.SetLabels(map[string]string{"foo": "bar"})
+	if labels != nil {
+		cm.SetLabels(labels)
+	}
+	if annotations != nil {
+		cm.SetAnnotations(annotations)
+	}
 	return cm
 }
 
@@ -97,8 +92,10 @@ func TestConstructConfigMap(t *testing.T) {
 			input: types.ConfigMapArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name: "envConfigMap",
-					DataSources: types.DataSources{
-						EnvSource: "configmap/app.env",
+					KvPairSources: types.KvPairSources{
+						EnvSources: []string{
+							filepath.Join("configmap", "app.env"),
+						},
 					},
 				},
 			},
@@ -110,8 +107,11 @@ func TestConstructConfigMap(t *testing.T) {
 			input: types.ConfigMapArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name: "fileConfigMap",
-					DataSources: types.DataSources{
-						FileSources: []string{"configmap/app-init.ini", "configmap/app.bin"},
+					KvPairSources: types.KvPairSources{
+						FileSources: []string{
+							filepath.Join("configmap", "app-init.ini"),
+							filepath.Join("configmap", "app.bin"),
+						},
 					},
 				},
 			},
@@ -123,7 +123,7 @@ func TestConstructConfigMap(t *testing.T) {
 			input: types.ConfigMapArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name: "literalConfigMap",
-					DataSources: types.DataSources{
+					KvPairSources: types.KvPairSources{
 						LiteralSources: []string{"a=x", "b=y", "c=\"Hello World\"", "d='true'"},
 					},
 				},
@@ -133,17 +133,68 @@ func TestConstructConfigMap(t *testing.T) {
 					"foo": "bar",
 				},
 			},
-			expected: makeLiteralConfigMap("literalConfigMap"),
+			expected: makeLiteralConfigMap("literalConfigMap", map[string]string{
+				"foo": "bar",
+			}, nil),
+		},
+		{
+			description: "construct config map from literal with GeneratorOptions in ConfigMapArgs",
+			input: types.ConfigMapArgs{
+				GeneratorArgs: types.GeneratorArgs{
+					Name: "literalConfigMap",
+					KvPairSources: types.KvPairSources{
+						LiteralSources: []string{"a=x", "b=y", "c=\"Hello World\"", "d='true'"},
+					},
+					GeneratorOptions: &types.GeneratorOptions{
+						Labels: map[string]string{
+							"foo": "changed",
+							"cat": "dog",
+						},
+						Annotations: map[string]string{
+							"foo": "changed",
+							"cat": "dog",
+						},
+					},
+				},
+			},
+			options: &types.GeneratorOptions{
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+				Annotations: map[string]string{
+					"foo": "bar",
+				},
+			},
+			// GeneratorOptions from the ConfigMapArgs take precedence over the
+			// factory level GeneratorOptions and should overwrite
+			// labels/annotations set in the factory level if there are common
+			// labels/annotations
+			expected: makeLiteralConfigMap("literalConfigMap", map[string]string{
+				"foo": "changed",
+				"cat": "dog",
+			}, map[string]string{
+				"foo": "changed",
+				"cat": "dog",
+			}),
 		},
 	}
 
-	fSys := fs.MakeFakeFS()
-	fSys.WriteFile("/configmap/app.env", []byte("DB_USERNAME=admin\nDB_PASSWORD=somepw\n"))
-	fSys.WriteFile("/configmap/app-init.ini", []byte("FOO=bar\nBAR=baz\n"))
-	fSys.WriteFile("/configmap/app.bin", []byte{0xff, 0xfd})
-	f := NewConfigMapFactory(loader.NewFileLoaderAtRoot(fSys))
+	fSys := filesys.MakeFsInMemory()
+	fSys.WriteFile(
+		filesys.RootedPath("configmap", "app.env"),
+		[]byte("DB_USERNAME=admin\nDB_PASSWORD=somepw\n"))
+	fSys.WriteFile(
+		filesys.RootedPath("configmap", "app-init.ini"),
+		[]byte("FOO=bar\nBAR=baz\n"))
+	fSys.WriteFile(
+		filesys.RootedPath("configmap", "app.bin"),
+		[]byte{0xff, 0xfd})
+	kvLdr := kv.NewLoader(
+		loader.NewFileLoaderAtRoot(fSys),
+		valtest_test.MakeFakeValidator())
 	for _, tc := range testCases {
-		cm, err := f.MakeConfigMap(&tc.input, tc.options)
+		f := NewFactory(kvLdr, tc.options)
+		cm, err := f.MakeConfigMap(&tc.input)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

@@ -1,29 +1,21 @@
-/*
-Copyright 2018 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2019 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
 
 package patch
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"sigs.k8s.io/kustomize/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/kustomize/api/resid"
+	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/kustomize/api/resource"
 )
 
 type conflictDetector interface {
@@ -53,7 +45,7 @@ func (jmp *jsonMergePatch) findConflict(
 		if i == conflictingPatchIdx {
 			continue
 		}
-		if !patches[conflictingPatchIdx].Id().GvknEquals(patch.Id()) {
+		if !patches[conflictingPatchIdx].OrgId().Equals(patch.OrgId()) {
 			continue
 		}
 		conflict, err := mergepatch.HasConflicts(
@@ -113,7 +105,7 @@ func (smp *strategicMergePatch) findConflict(
 		if i == conflictingPatchIdx {
 			continue
 		}
-		if !patches[conflictingPatchIdx].Id().GvknEquals(patch.Id()) {
+		if !patches[conflictingPatchIdx].OrgId().Equals(patch.OrgId()) {
 			continue
 		}
 		conflict, err := strategicpatch.MergingMapsHaveConflicts(
@@ -131,7 +123,99 @@ func (smp *strategicMergePatch) findConflict(
 }
 
 func (smp *strategicMergePatch) mergePatches(patch1, patch2 *resource.Resource) (*resource.Resource, error) {
+	if hasDeleteDirectiveMarker(patch2.Map()) {
+		if hasDeleteDirectiveMarker(patch1.Map()) {
+			return nil, fmt.Errorf("cannot merge patches both containing '$patch: delete' directives")
+		}
+		patch1, patch2 = patch2, patch1
+	}
 	mergeJSONMap, err := strategicpatch.MergeStrategicMergeMapPatchUsingLookupPatchMeta(
 		smp.lookupPatchMeta, patch1.Map(), patch2.Map())
 	return smp.rf.FromMap(mergeJSONMap), err
+}
+
+// MergePatches merge and index patches by OrgId.
+// It errors out if there is conflict between patches.
+func MergePatches(patches []*resource.Resource,
+	rf *resource.Factory) (resmap.ResMap, error) {
+	rc := resmap.New()
+	for ix, patch := range patches {
+		id := patch.OrgId()
+		existing := rc.GetMatchingResourcesByOriginalId(id.Equals)
+		if len(existing) == 0 {
+			rc.Append(patch)
+			continue
+		}
+		if len(existing) > 1 {
+			return nil, fmt.Errorf("self conflict in patches")
+		}
+
+		versionedObj, err := scheme.Scheme.New(toSchemaGvk(id.Gvk))
+		if err != nil && !runtime.IsNotRegisteredError(err) {
+			return nil, err
+		}
+		var cd conflictDetector
+		if err != nil {
+			cd = newJMPConflictDetector(rf)
+		} else {
+			cd, err = newSMPConflictDetector(versionedObj, rf)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		conflict, err := cd.hasConflict(existing[0], patch)
+		if err != nil {
+			return nil, err
+		}
+		if conflict {
+			conflictingPatch, err := cd.findConflict(ix, patches)
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf(
+				"conflict between %#v and %#v",
+				conflictingPatch.Map(), patch.Map())
+		}
+		merged, err := cd.mergePatches(existing[0], patch)
+		if err != nil {
+			return nil, err
+		}
+		rc.Replace(merged)
+	}
+	return rc, nil
+}
+
+// toSchemaGvk converts to a schema.GroupVersionKind.
+func toSchemaGvk(x resid.Gvk) schema.GroupVersionKind {
+	return schema.GroupVersionKind{
+		Group:   x.Group,
+		Version: x.Version,
+		Kind:    x.Kind,
+	}
+}
+
+func hasDeleteDirectiveMarker(patch map[string]interface{}) bool {
+	if v, ok := patch["$patch"]; ok && v == "delete" {
+		return true
+	}
+	for _, v := range patch {
+		switch typedV := v.(type) {
+		case map[string]interface{}:
+			if hasDeleteDirectiveMarker(typedV) {
+				return true
+			}
+		case []interface{}:
+			for _, sv := range typedV {
+				typedE, ok := sv.(map[string]interface{})
+				if !ok {
+					break
+				}
+				if hasDeleteDirectiveMarker(typedE) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

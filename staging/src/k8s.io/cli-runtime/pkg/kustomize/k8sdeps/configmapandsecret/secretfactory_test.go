@@ -1,18 +1,5 @@
-/*
-Copyright 2018 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2019 The Kubernetes Authors.
+// SPDX-License-Identifier: Apache-2.0
 
 package configmapandsecret
 
@@ -22,9 +9,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/kustomize/pkg/fs"
-	"sigs.k8s.io/kustomize/pkg/loader"
-	"sigs.k8s.io/kustomize/pkg/types"
+	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/api/kv"
+	"sigs.k8s.io/kustomize/api/loader"
+	valtest_test "sigs.k8s.io/kustomize/api/testutils/valtest"
+	"sigs.k8s.io/kustomize/api/types"
 )
 
 func makeEnvSecret(name string) *corev1.Secret {
@@ -62,7 +51,7 @@ BAR=baz
 	}
 }
 
-func makeLiteralSecret(name string) *corev1.Secret {
+func makeLiteralSecret(name string, labels, annotations map[string]string) *corev1.Secret {
 	s := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -77,7 +66,12 @@ func makeLiteralSecret(name string) *corev1.Secret {
 		},
 		Type: "Opaque",
 	}
-	s.SetLabels(map[string]string{"foo": "bar"})
+	if labels != nil {
+		s.SetLabels(labels)
+	}
+	if annotations != nil {
+		s.SetAnnotations(annotations)
+	}
 	return s
 }
 
@@ -95,8 +89,8 @@ func TestConstructSecret(t *testing.T) {
 			input: types.SecretArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name: "envSecret",
-					DataSources: types.DataSources{
-						EnvSource: "secret/app.env",
+					KvPairSources: types.KvPairSources{
+						EnvSources: []string{"secret/app.env"},
 					},
 				},
 			},
@@ -108,7 +102,7 @@ func TestConstructSecret(t *testing.T) {
 			input: types.SecretArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name: "fileSecret",
-					DataSources: types.DataSources{
+					KvPairSources: types.KvPairSources{
 						FileSources: []string{"secret/app-init.ini"},
 					},
 				},
@@ -121,7 +115,7 @@ func TestConstructSecret(t *testing.T) {
 			input: types.SecretArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name: "literalSecret",
-					DataSources: types.DataSources{
+					KvPairSources: types.KvPairSources{
 						LiteralSources: []string{"a=x", "b=y"},
 					},
 				},
@@ -131,16 +125,61 @@ func TestConstructSecret(t *testing.T) {
 					"foo": "bar",
 				},
 			},
-			expected: makeLiteralSecret("literalSecret"),
+			expected: makeLiteralSecret("literalSecret", map[string]string{
+				"foo": "bar",
+			}, nil),
+		},
+		{
+			description: "construct secret from literal with GeneratorOptions in SecretArgs",
+			input: types.SecretArgs{
+				GeneratorArgs: types.GeneratorArgs{
+					Name: "literalSecret",
+					KvPairSources: types.KvPairSources{
+						LiteralSources: []string{"a=x", "b=y"},
+					},
+					GeneratorOptions: &types.GeneratorOptions{
+						Labels: map[string]string{
+							"foo": "changed",
+							"cat": "dog",
+						},
+						Annotations: map[string]string{
+							"foo": "changed",
+							"cat": "dog",
+						},
+					},
+				},
+			},
+			options: &types.GeneratorOptions{
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+				Annotations: map[string]string{
+					"foo": "bar",
+				},
+			},
+			// GeneratorOptions from the SecretArgs take precedence over the
+			// factory level GeneratorOptions and should overwrite
+			// labels/annotations set in the factory level if there are common
+			// labels/annotations
+			expected: makeLiteralSecret("literalSecret", map[string]string{
+				"foo": "changed",
+				"cat": "dog",
+			}, map[string]string{
+				"foo": "changed",
+				"cat": "dog",
+			}),
 		},
 	}
 
-	fSys := fs.MakeFakeFS()
+	fSys := filesys.MakeFsInMemory()
 	fSys.WriteFile("/secret/app.env", []byte("DB_USERNAME=admin\nDB_PASSWORD=somepw\n"))
 	fSys.WriteFile("/secret/app-init.ini", []byte("FOO=bar\nBAR=baz\n"))
-	f := NewSecretFactory(loader.NewFileLoaderAtRoot(fSys))
+	kvLdr := kv.NewLoader(
+		loader.NewFileLoaderAtRoot(fSys),
+		valtest_test.MakeFakeValidator())
 	for _, tc := range testCases {
-		cm, err := f.MakeSecret(&tc.input, tc.options)
+		f := NewFactory(kvLdr, tc.options)
+		cm, err := f.MakeSecret(&tc.input)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
