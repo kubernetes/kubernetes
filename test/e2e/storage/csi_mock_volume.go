@@ -583,7 +583,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	ginkgo.Context("CSI NodeStage error cases [Slow]", func() {
 		// Global variable in all scripts (called before each test)
-		globalScript := `counter=0;`
+		globalScript := `counter=0; console.log("globals loaded", OK, INVALIDARGUMENT)`
 		trackedCalls := []string{
 			"NodeStageVolume",
 			"NodeUnstageVolume",
@@ -604,7 +604,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeStageVolume", expectedError: codes.OK, deletePod: true},
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
-				nodeStageScript: `__grpcCode.OK;`,
+				nodeStageScript: `OK;`,
 			},
 			{
 				// Kubelet should repeat NodeStage as long as the pod exists
@@ -617,7 +617,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
 				// Fail first 3 NodeStage requests, 4th succeeds
-				nodeStageScript: `console.log("Counter:", ++counter); if (counter < 4) { __grpcCode.INVALIDARGUMENT; } else { __grpcCode.OK; }`,
+				nodeStageScript: `console.log("Counter:", ++counter); if (counter < 4) { INVALIDARGUMENT; } else { OK; }`,
 			},
 			{
 				// Kubelet should repeat NodeStage as long as the pod exists
@@ -630,7 +630,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
 				// Fail first 3 NodeStage requests, 4th succeeds
-				nodeStageScript: `console.log("Counter:", ++counter); if (counter < 4) { __grpcCode.DEADLINEEXCEEDED; } else { __grpcCode.OK; }`,
+				nodeStageScript: `console.log("Counter:", ++counter); if (counter < 4) { DEADLINEEXCEEDED; } else { OK; }`,
 			},
 			{
 				// After NodeUnstage with ephemeral error, the driver may continue staging the volume.
@@ -644,7 +644,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeStageVolume", expectedError: codes.DeadlineExceeded, deletePod: true},
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
-				nodeStageScript: `__grpcCode.DEADLINEEXCEEDED;`,
+				nodeStageScript: `DEADLINEEXCEEDED;`,
 			},
 			{
 				// After NodeUnstage with final error, kubelet can be sure the volume is not staged.
@@ -656,16 +656,16 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					// This matches all repeated NodeStage calls with InvalidArgument error (due to exp. backoff).
 					{expectedMethod: "NodeStageVolume", expectedError: codes.InvalidArgument, deletePod: true},
 				},
-				nodeStageScript: `__grpcCode.INVALIDARGUMENT;`,
+				nodeStageScript: `INVALIDARGUMENT;`,
 			},
 		}
 		for _, t := range tests {
 			test := t
 			ginkgo.It(test.name, func() {
 				scripts := map[string]string{
-					"Globals":                globalScript,
-					"NodeStageVolumeStart":   test.nodeStageScript,
-					"NodeUnstageVolumeStart": test.nodeUnstageScript,
+					"globals":                globalScript,
+					"nodeStageVolumeStart":   test.nodeStageScript,
+					"nodeUnstageVolumeStart": test.nodeUnstageScript,
 				}
 				init(testParameters{
 					disableAttach:   true,
@@ -706,7 +706,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				ginkgo.By("Deleting the previously created pod")
-				err := e2epod.DeletePodWithWait(m.cs, pod)
+				err = e2epod.DeletePodWithWait(m.cs, pod)
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
@@ -865,7 +865,7 @@ type mockCSICall struct {
 	Request struct {
 		VolumeContext map[string]string `json:"volume_context"`
 	}
-	Error struct {
+	FullError struct {
 		Code    codes.Code `json:"code"`
 		Message string     `json:"message"`
 	}
@@ -988,7 +988,7 @@ func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, cs c
 		if !tracked.Has(c.Method) {
 			continue
 		}
-		if c.Method != last.Method || c.Error.Code != last.Error.Code {
+		if c.Method != last.Method || c.FullError.Code != last.FullError.Code {
 			last = c
 			calls = append(calls, c)
 		}
@@ -998,14 +998,14 @@ func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, cs c
 	for i, c := range calls {
 		if i >= len(expectedCallSequence) {
 			// Log all unexpected calls first, return error below outside the loop.
-			framework.Logf("Unexpected CSI driver call: %s (%d)", c.Method, c.Error)
+			framework.Logf("Unexpected CSI driver call: %s (%d)", c.Method, c.FullError)
 			continue
 		}
 
 		// Compare current call with expected call
 		expectedCall := expectedCallSequence[i]
-		if c.Method != expectedCall.expectedMethod || c.Error.Code != expectedCall.expectedError {
-			return i, fmt.Errorf("Unexpected CSI call %d: expected %s (%d), got %s (%d)", i, expectedCall.expectedMethod, expectedCall.expectedError, c.Method, c.Error.Code)
+		if c.Method != expectedCall.expectedMethod || c.FullError.Code != expectedCall.expectedError {
+			return i, fmt.Errorf("Unexpected CSI call %d: expected %s (%d), got %s (%d)", i, expectedCall.expectedMethod, expectedCall.expectedError, c.Method, c.FullError.Code)
 		}
 	}
 	if len(calls) > len(expectedCallSequence) {
