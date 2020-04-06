@@ -25,13 +25,12 @@ type grpcProber struct {
 
 // Create new Prober for execute grpc probe test
 func New() Prober {
-	return &grpcProber{
-	}
+	return grpcProber{}
 }
 
 // Probe executes a grpc call to check the liveness/readiness of container.
 // Returns the Result status, command output, and errors if any.
-func (p *grpcProber) Probe(host string, port int, timeout time.Duration, opts ...grpc.DialOption) (probe.Result, string, error) {
+func (p grpcProber) Probe(host string, port int, timeout time.Duration, opts ...grpc.DialOption) (probe.Result, string, error) {
 	v := version.Get()
 
 	md := metadata.New(map[string]string{
