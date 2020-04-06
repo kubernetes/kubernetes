@@ -20,7 +20,7 @@ import (
 	"context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	health_check "google.golang.org/grpc/health/grpc_health_v1"
+	hcservice "google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/kubernetes/pkg/probe"
 	"net"
 	"testing"
@@ -37,40 +37,40 @@ func TestNew(t *testing.T) {
 type successServerMock struct {
 }
 
-func (s successServerMock) Check(context.Context, *health_check.HealthCheckRequest) (*health_check.HealthCheckResponse, error) {
-	return &health_check.HealthCheckResponse{
-		Status: health_check.HealthCheckResponse_SERVING,
+func (s successServerMock) Check(context.Context, *hcservice.HealthCheckRequest) (*hcservice.HealthCheckResponse, error) {
+	return &hcservice.HealthCheckResponse{
+		Status: hcservice.HealthCheckResponse_SERVING,
 	}, nil
 }
 
-func (s successServerMock) Watch(*health_check.HealthCheckRequest, health_check.Health_WatchServer) error {
+func (s successServerMock) Watch(*hcservice.HealthCheckRequest, hcservice.Health_WatchServer) error {
 	panic("implement me")
 }
 
 type errorTimeoutServerMock struct {
 }
 
-func (e errorTimeoutServerMock) Check(context.Context, *health_check.HealthCheckRequest) (*health_check.HealthCheckResponse, error) {
+func (e errorTimeoutServerMock) Check(context.Context, *hcservice.HealthCheckRequest) (*hcservice.HealthCheckResponse, error) {
 	time.Sleep(time.Second * 4)
-	return &health_check.HealthCheckResponse{
-		Status: health_check.HealthCheckResponse_SERVING,
+	return &hcservice.HealthCheckResponse{
+		Status: hcservice.HealthCheckResponse_SERVING,
 	}, nil
 }
 
-func (e errorTimeoutServerMock) Watch(*health_check.HealthCheckRequest, health_check.Health_WatchServer) error {
+func (e errorTimeoutServerMock) Watch(*hcservice.HealthCheckRequest, hcservice.Health_WatchServer) error {
 	panic("implement me")
 }
 
 type errorNotServeServerMock struct {
 }
 
-func (e errorNotServeServerMock) Check(context.Context, *health_check.HealthCheckRequest) (*health_check.HealthCheckResponse, error) {
-	return &health_check.HealthCheckResponse{
-		Status: health_check.HealthCheckResponse_NOT_SERVING,
+func (e errorNotServeServerMock) Check(context.Context, *hcservice.HealthCheckRequest) (*hcservice.HealthCheckResponse, error) {
+	return &hcservice.HealthCheckResponse{
+		Status: hcservice.HealthCheckResponse_NOT_SERVING,
 	}, nil
 }
 
-func (e errorNotServeServerMock) Watch(*health_check.HealthCheckRequest, health_check.Health_WatchServer) error {
+func (e errorNotServeServerMock) Watch(*hcservice.HealthCheckRequest, hcservice.Health_WatchServer) error {
 	panic("implement me")
 }
 
@@ -86,7 +86,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		lis, _ := net.Listen("tcp", ":10413")
 		grpcServer := grpc.NewServer()
 		defer grpcServer.Stop()
-		health_check.RegisterHealthServer(grpcServer, &errorNotServeServerMock{})
+		hcservice.RegisterHealthServer(grpcServer, &errorNotServeServerMock{})
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
@@ -101,7 +101,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		lis, _ := net.Listen("tcp", ":10414")
 		grpcServer := grpc.NewServer()
 		defer grpcServer.Stop()
-		health_check.RegisterHealthServer(grpcServer, &errorTimeoutServerMock{})
+		hcservice.RegisterHealthServer(grpcServer, &errorTimeoutServerMock{})
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
@@ -116,7 +116,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		lis, _ := net.Listen("tcp", ":10415")
 		grpcServer := grpc.NewServer()
 		defer grpcServer.Stop()
-		health_check.RegisterHealthServer(grpcServer, &successServerMock{})
+		hcservice.RegisterHealthServer(grpcServer, &successServerMock{})
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()

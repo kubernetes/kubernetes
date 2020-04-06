@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"google.golang.org/grpc"
-	health_check "google.golang.org/grpc/health/grpc_health_v1"
+	hcservice "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
 	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/probe"
@@ -68,15 +68,15 @@ func (p grpcProber) Probe(host string, port int, timeout time.Duration, opts ...
 		_ = conn.Close()
 	}()
 
-	client := health_check.NewHealthClient(conn)
+	client := hcservice.NewHealthClient(conn)
 
-	res, err := client.Check(metadata.NewOutgoingContext(ctx, md), &health_check.HealthCheckRequest{})
+	res, err := client.Check(metadata.NewOutgoingContext(ctx, md), &hcservice.HealthCheckRequest{})
 
 	if err != nil {
 		return probe.Failure, fmt.Sprintf("GRPC probe failed with error: %s", err.Error()), err
 	}
 
-	if res.Status != health_check.HealthCheckResponse_SERVING {
+	if res.Status != hcservice.HealthCheckResponse_SERVING {
 		return probe.Failure, fmt.Sprintf("GRPC probe failed with status: %s", res.Status.String()), errGrpcNotServing
 	}
 
