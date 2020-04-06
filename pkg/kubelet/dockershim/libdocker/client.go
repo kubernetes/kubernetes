@@ -73,7 +73,7 @@ type Interface interface {
 func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
 		klog.Infof("Connecting to docker on %s", dockerEndpoint)
-		return dockerapi.NewClient(dockerEndpoint, "", nil, nil)
+		return dockerapi.NewClientWithOpts(dockerapi.WithHost(dockerEndpoint), dockerapi.WithVersion(""))
 	}
 	return dockerapi.NewClientWithOpts(dockerapi.FromEnv)
 }
