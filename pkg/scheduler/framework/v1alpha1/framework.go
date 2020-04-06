@@ -35,7 +35,6 @@ import (
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -510,7 +509,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 		pluginToNodeScores[pl.Name()] = make(NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	errCh := schedutil.NewErrorChannel()
+	errCh := parallelize.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
 	parallelize.Until(ctx, len(nodes), func(index int) {

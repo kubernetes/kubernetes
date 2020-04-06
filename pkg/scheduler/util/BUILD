@@ -9,7 +9,6 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "error_channel_test.go",
         "non_zero_test.go",
         "topologies_test.go",
         "utils_test.go",
@@ -31,7 +30,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "clock.go",
-        "error_channel.go",
         "non_zero.go",
         "topologies.go",
         "utils.go",

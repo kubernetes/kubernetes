@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -40,6 +39,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -438,7 +438,7 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, prof *p
 		return filtered, nil
 	}
 
-	errCh := util.NewErrorChannel()
+	errCh := parallelize.NewErrorChannel()
 	var statusesLock sync.Mutex
 	var filteredLen int32
 	ctx, cancel := context.WithCancel(ctx)
