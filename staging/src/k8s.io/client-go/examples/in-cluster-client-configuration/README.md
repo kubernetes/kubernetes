@@ -22,7 +22,7 @@ on the Docker engine of the Minikube node without pushing it to a registry. To
 build the image on Minikube:
 
     eval $(minikube docker-env)
-    docker build -t in-cluster .
+    docker build -t in-cluster:0.1 .
 
 If you are not using Minikube, you should build this image and push it to a registry
 that your Kubernetes cluster can pull from.
@@ -37,7 +37,7 @@ kubectl create clusterrolebinding default-view --clusterrole=view --serviceaccou
 
 Then, run the image in a Pod with a single instance Deployment:
 
-    kubectl run --rm -i demo --image=in-cluster
+    kubectl run --rm -i demo --image=in-cluster:0.1
 
     There are 4 pods in the cluster
     There are 4 pods in the cluster
