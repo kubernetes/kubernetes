@@ -420,6 +420,11 @@ function dump_nodes() {
 
   proc=${max_dump_processes}
   start="$(date +%s)"
+  # log_dump_ssh_timeout is the maximal number of seconds the log dumping over
+  # SSH operation can take. Please note that the logic enforcing the timeout
+  # is only a best effort. The actual time of the operation may be longer
+  # due to waiting for all the child processes below.
+  log_dump_ssh_timeout_seconds="${LOG_DUMP_SSH_TIMEOUT_SECONDS:-}"
   for i in "${!all_selected_nodes[@]}"; do
     node_name="${all_selected_nodes[$i]}"
     node_dir="${report_dir}/${node_name}"
@@ -440,7 +445,8 @@ function dump_nodes() {
       proc=${max_dump_processes}
       wait
       now="$(date +%s)"
-      if [[ ! -z "${LOG_DUMP_SSH_TIMEOUT}" && $((now - start)) -gt ${LOG_DUMP_SSH_TIMEOUT} ]]; then
+      if [[ -n "${log_dump_ssh_timeout_seconds}" && $((now - start)) -gt ${log_dump_ssh_timeout_seconds} ]]; then
+        echo "WARNING: Hit timeout after ${log_dump_ssh_timeout_seconds} seconds, finishing log dumping over SSH shortly"
         break
       fi
     fi
