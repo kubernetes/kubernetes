@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cacheable_object.go",
+        "conversion.go",
         "doc.go",
         "types.go",
         "zz_generated.deepcopy.go",
@@ -16,6 +17,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/testing",
     importpath = "k8s.io/apimachinery/pkg/runtime/testing",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
