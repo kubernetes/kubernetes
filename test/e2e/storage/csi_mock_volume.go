@@ -974,10 +974,14 @@ func parseMockLogs(cs clientset.Interface, namespace, driverPodName, driverConta
 // yet or error when calls do not match.
 // All repeated calls to the CSI mock driver (e.g. due to exponential backoff)
 // are squashed and checked against single expectedCallSequence item.
+//
+// Only permanent errors are returned. Other errors are logged and no
+// calls are returned. The caller is expected to retry.
 func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, cs clientset.Interface, namespace, driverPodName, driverContainerName string) (int, error) {
 	allCalls, err := parseMockLogs(cs, namespace, driverPodName, driverContainerName)
 	if err != nil {
-		return 0, err
+		framework.Logf("intermittent (?) log retrieval error, proceeding without output: %v", err)
+		return 0, nil
 	}
 
 	// Remove all repeated and ignored calls
