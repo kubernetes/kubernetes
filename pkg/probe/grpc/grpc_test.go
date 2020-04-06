@@ -64,7 +64,6 @@ func (e errorNotServeServerMock) Watch(*health_check.HealthCheckRequest, health_
 func TestGrpcProber_Probe(t *testing.T) {
 	t.Run("Should: return error because cant find host", func(t *testing.T) {
 		s := New()
-
 		p, _, err := s.Probe("", 32,  time.Second, grpc.WithInsecure(), grpc.WithBlock())
 		assert.Equal(t, probe.Failure, p)
 		assert.NotEqual(t, nil, err)
@@ -77,7 +76,6 @@ func TestGrpcProber_Probe(t *testing.T) {
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
-		time.Sleep(time.Second) // for open port
 		p, _, err := s.Probe("0.0.0.0", 10413,  time.Second , grpc.WithInsecure())
 		assert.Equal(t, probe.Failure, p)
 		assert.NotEqual(t, nil, err)
@@ -90,7 +88,6 @@ func TestGrpcProber_Probe(t *testing.T) {
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
-		time.Sleep(time.Second) // for open port
 		p, _, err := s.Probe("0.0.0.0", 10414, time.Second * 2, grpc.WithInsecure())
 		assert.Equal(t, probe.Failure, p)
 		assert.NotEqual(t, nil, err)
@@ -103,7 +100,6 @@ func TestGrpcProber_Probe(t *testing.T) {
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
-		time.Sleep(time.Second) // for open port
 		p, _, err := s.Probe("0.0.0.0", 10415, time.Second * 2, grpc.WithInsecure())
 		assert.Equal(t, probe.Success, p)
 		assert.Equal(t, nil, err)
