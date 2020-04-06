@@ -24,7 +24,10 @@ go_test(
     srcs = ["grpc_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/probe:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/health/grpc_health_v1:go_default_library",
     ],
 )
 

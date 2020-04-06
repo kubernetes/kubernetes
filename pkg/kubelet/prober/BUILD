@@ -24,9 +24,9 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/probe:go_default_library",
         "//pkg/probe/exec:go_default_library",
+        "//pkg/probe/grpc:go_default_library",
         "//pkg/probe/http:go_default_library",
         "//pkg/probe/tcp:go_default_library",
-        "//pkg/probe/grpc:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
@@ -38,7 +38,6 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/google.golang.org/grpc:go_default_library",
     ],
 )
 
