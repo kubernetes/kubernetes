@@ -85,10 +85,13 @@ func TestGrpcProber_Probe(t *testing.T) {
 		s := New()
 		lis, _ := net.Listen("tcp", ":10413")
 		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
 		health_check.RegisterHealthServer(grpcServer, &errorNotServeServerMock{})
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
+		// take some time to wait server boot
+		time.Sleep(2 * time.Second)
 		p, _, err := s.Probe("0.0.0.0", 10413, time.Second, grpc.WithInsecure())
 		assert.Equal(t, probe.Failure, p)
 		assert.NotEqual(t, nil, err)
@@ -97,10 +100,13 @@ func TestGrpcProber_Probe(t *testing.T) {
 		s := New()
 		lis, _ := net.Listen("tcp", ":10414")
 		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
 		health_check.RegisterHealthServer(grpcServer, &errorTimeoutServerMock{})
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
+		// take some time to wait server boot
+		time.Sleep(2 * time.Second)
 		p, _, err := s.Probe("0.0.0.0", 10414, time.Second*2, grpc.WithInsecure())
 		assert.Equal(t, probe.Failure, p)
 		assert.NotEqual(t, nil, err)
@@ -109,10 +115,13 @@ func TestGrpcProber_Probe(t *testing.T) {
 		s := New()
 		lis, _ := net.Listen("tcp", ":10415")
 		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
 		health_check.RegisterHealthServer(grpcServer, &successServerMock{})
 		go func() {
 			_ = grpcServer.Serve(lis)
 		}()
+		// take some time to wait server boot
+		time.Sleep(2 * time.Second)
 		p, _, err := s.Probe("0.0.0.0", 10415, time.Second*2, grpc.WithInsecure())
 		assert.Equal(t, probe.Success, p)
 		assert.Equal(t, nil, err)
