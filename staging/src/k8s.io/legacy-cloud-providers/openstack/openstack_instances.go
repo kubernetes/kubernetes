@@ -48,6 +48,16 @@ const (
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	klog.V(4).Info("openstack.Instances() called")
 
+	err := os.ensureCloudProviderWasInitialized()
+	if err != nil {
+		// cannot initialize cloud provider - return empty instances without compute instance,
+		// it will be generated later with any call of an Instances' receiver.
+		klog.Errorf("cannot initialize cloud provider, only limited functionality is available : %v", err)
+		return &Instances{
+			opts: os.metadataOpts,
+		}, true
+	}
+
 	compute, err := os.NewComputeV2()
 	if err != nil {
 		klog.Errorf("unable to access compute v2 API : %v", err)
@@ -85,6 +95,43 @@ func (i *Instances) AddSSHKeyToAllInstances(ctx context.Context, user string, ke
 // NodeAddresses implements Instances.NodeAddresses
 func (i *Instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	klog.V(4).Infof("NodeAddresses(%v) called", name)
+
+	// check if the node is local, in this case we can get its addresses from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return nil, err
+	}
+	if localName := types.NodeName(md.Name); localName == name {
+		localAddress, publicAddress, err := getNodeAddresses()
+		if err != nil {
+			return nil, err
+		}
+
+		addrs := []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: md.Name,
+			},
+		}
+
+		if localAddress != "" {
+			addrs = append(addrs, v1.NodeAddress{
+				Type:    v1.NodeInternalIP,
+				Address: localAddress,
+			})
+		}
+
+		if publicAddress != "" {
+			addrs = append(addrs, v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: publicAddress,
+			})
+		}
+
+		klog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+		return addrs, nil
+	}
 
 	addrs, err := getAddressesByName(i.compute, name)
 	if err != nil {
@@ -202,6 +249,17 @@ func (os *OpenStack) InstanceID() (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (i *Instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
+	// check if the node is local, in this case we can get its ID from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return "", err
+	}
+	localName := types.NodeName(md.Name)
+	if localName == name {
+		return md.UUID, nil
+	}
+
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		if err == ErrNotFound {
@@ -235,6 +293,17 @@ func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID str
 
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
+	// check if the node is local, in this case we can get its type from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return "", err
+	}
+	localName := types.NodeName(md.Name)
+	if localName == name {
+		return getIntanceType()
+	}
+
 	srv, err := getServerByName(i.compute, name)
 
 	if err != nil {
