@@ -41,6 +41,8 @@ import (
 	"strconv"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -213,6 +215,7 @@ type mockCSIDriver struct {
 	attachable          bool
 	attachLimit         int
 	enableNodeExpansion bool
+	javascriptHooks     map[string]string
 }
 
 // CSIMockDriverOpts defines options used for csi driver
@@ -223,6 +226,7 @@ type CSIMockDriverOpts struct {
 	AttachLimit         int
 	EnableResizing      bool
 	EnableNodeExpansion bool
+	JavascriptHooks     map[string]string
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
@@ -271,6 +275,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		attachable:          !driverOpts.DisableAttach,
 		attachLimit:         driverOpts.AttachLimit,
 		enableNodeExpansion: driverOpts.EnableNodeExpansion,
+		javascriptHooks:     driverOpts.JavascriptHooks,
 	}
 }
 
@@ -318,6 +323,26 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		containerArgs = append(containerArgs, "--node-expand-required=true")
 	}
 
+	// Create a config map with javascript hooks. Create it even when javascriptHooks
+	// are empty, so we can unconditionally add it to the mock pod.
+	const hooksConfigMapName = "mock-driver-hooks"
+	hooksYaml, err := yaml.Marshal(m.javascriptHooks)
+	framework.ExpectNoError(err)
+	hooks := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: hooksConfigMapName,
+		},
+		Data: map[string]string{
+			"hooks.yaml": string(hooksYaml),
+		},
+	}
+	_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), hooks, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	if len(m.javascriptHooks) > 0 {
+		containerArgs = append(containerArgs, "--hooks-file=/etc/hooks/hooks.yaml")
+	}
+
 	o := utils.PatchCSIOptions{
 		OldDriverName:            "csi-mock",
 		NewDriverName:            "csi-mock-" + f.UniqueName,
@@ -342,6 +367,10 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 
 	return config, func() {
 		ginkgo.By("uninstalling csi mock driver")
+		err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), hooksConfigMapName, metav1.DeleteOptions{})
+		if err != nil {
+			framework.Logf("deleting failed: %s", err)
+		}
 		cleanup()
 		cancelLogging()
 	}

@@ -65,6 +65,8 @@ spec:
             - mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
+            - name: hooks
+              mountPath: /etc/hooks
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-mock
@@ -78,3 +80,6 @@ spec:
             path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
+        - name: hooks
+          configMap:
+            name: mock-driver-hooks
