@@ -27,11 +27,10 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-var _ schedulerlisters.PodLister = &PodLister{}
+var _ framework.PodLister = &PodLister{}
 
 // PodLister implements PodLister on an []v1.Pods for test purposes.
 type PodLister []*v1.Pod
@@ -47,7 +46,7 @@ func (f PodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 }
 
 // FilteredList returns pods matching a pod filter and a label selector.
-func (f PodLister) FilteredList(podFilter schedulerlisters.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
+func (f PodLister) FilteredList(podFilter framework.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {
 		if podFilter(pod) && s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)
@@ -247,11 +246,11 @@ func (pvcs PersistentVolumeClaimLister) PersistentVolumeClaims(namespace string)
 	}
 }
 
-// NodeInfoLister declares a schedulertypes.NodeInfo type for testing.
-type NodeInfoLister []*schedulertypes.NodeInfo
+// NodeInfoLister declares a framework.NodeInfo type for testing.
+type NodeInfoLister []*framework.NodeInfo
 
 // Get returns a fake node object in the fake nodes.
-func (nodes NodeInfoLister) Get(nodeName string) (*schedulertypes.NodeInfo, error) {
+func (nodes NodeInfoLister) Get(nodeName string) (*framework.NodeInfo, error) {
 	for _, node := range nodes {
 		if node != nil && node.Node().Name == nodeName {
 			return node, nil
@@ -261,21 +260,21 @@ func (nodes NodeInfoLister) Get(nodeName string) (*schedulertypes.NodeInfo, erro
 }
 
 // List lists all nodes.
-func (nodes NodeInfoLister) List() ([]*schedulertypes.NodeInfo, error) {
+func (nodes NodeInfoLister) List() ([]*framework.NodeInfo, error) {
 	return nodes, nil
 }
 
 // HavePodsWithAffinityList is supposed to list nodes with at least one pod with affinity. For the fake lister
 // we just return everything.
-func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*schedulertypes.NodeInfo, error) {
+func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
 	return nodes, nil
 }
 
 // NewNodeInfoLister create a new fake NodeInfoLister from a slice of v1.Nodes.
-func NewNodeInfoLister(nodes []*v1.Node) schedulerlisters.NodeInfoLister {
-	nodeInfoList := make([]*schedulertypes.NodeInfo, len(nodes))
+func NewNodeInfoLister(nodes []*v1.Node) framework.NodeInfoLister {
+	nodeInfoList := make([]*framework.NodeInfo, len(nodes))
 	for _, node := range nodes {
-		nodeInfo := schedulertypes.NewNodeInfo()
+		nodeInfo := framework.NewNodeInfo()
 		nodeInfo.SetNode(node)
 		nodeInfoList = append(nodeInfoList, nodeInfo)
 	}

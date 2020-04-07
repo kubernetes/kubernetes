@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 var (
@@ -1636,7 +1635,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := schedulertypes.NewNodeInfo()
+	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p := &InterPodAffinity{}
@@ -2211,7 +2210,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 }
 
-func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *schedulertypes.NodeInfo {
+func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *framework.NodeInfo {
 	t.Helper()
 	nodeInfo, err := snapshot.NodeInfos().Get(name)
 	if err != nil {

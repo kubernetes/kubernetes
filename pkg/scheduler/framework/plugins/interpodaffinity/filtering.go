@@ -28,8 +28,6 @@ import (
 	"k8s.io/klog"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -210,7 +208,7 @@ func podMatchesAllAffinityTerms(pod *v1.Pod, terms []*affinityTerm) bool {
 // getTPMapMatchingExistingAntiAffinity calculates the following for each existing pod on each node:
 // (1) Whether it has PodAntiAffinity
 // (2) Whether any AffinityTerm matches the incoming pod
-func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*nodeinfo.NodeInfo) (topologyToMatchedTermCount, error) {
+func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*framework.NodeInfo) (topologyToMatchedTermCount, error) {
 	errCh := parallelize.NewErrorChannel()
 	var lock sync.Mutex
 	topologyMap := make(topologyToMatchedTermCount)
@@ -254,7 +252,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*nodeinfo.Node
 // It returns a topologyToMatchedTermCount that are checked later by the affinity
 // predicate. With this topologyToMatchedTermCount available, the affinity predicate does not
 // need to check all the pods in the cluster.
-func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*schedulertypes.NodeInfo) (topologyToMatchedTermCount, topologyToMatchedTermCount, error) {
+func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*framework.NodeInfo) (topologyToMatchedTermCount, topologyToMatchedTermCount, error) {
 	topologyPairsAffinityPodsMap := make(topologyToMatchedTermCount)
 	topologyToMatchedExistingAntiAffinityTerms := make(topologyToMatchedTermCount)
 	affinity := pod.Spec.Affinity
@@ -329,8 +327,8 @@ func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	var allNodes []*schedulertypes.NodeInfo
-	var havePodsWithAffinityNodes []*schedulertypes.NodeInfo
+	var allNodes []*framework.NodeInfo
+	var havePodsWithAffinityNodes []*framework.NodeInfo
 	var err error
 	if allNodes, err = pl.sharedLister.NodeInfos().List(); err != nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos: %v", err))
@@ -367,7 +365,7 @@ func (pl *InterPodAffinity) PreFilterExtensions() framework.PreFilterExtensions 
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
@@ -377,7 +375,7 @@ func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.Cy
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
@@ -402,7 +400,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // Checks if scheduling the pod onto this node would break any anti-affinity
 // terms indicated by the existing pods.
-func (pl *InterPodAffinity) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, state *preFilterState, nodeInfo *schedulertypes.NodeInfo) (bool, error) {
+func (pl *InterPodAffinity) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, state *preFilterState, nodeInfo *framework.NodeInfo) (bool, error) {
 	node := nodeInfo.Node()
 	topologyMap := state.topologyToMatchedExistingAntiAffinityTerms
 
@@ -418,7 +416,7 @@ func (pl *InterPodAffinity) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, state
 }
 
 //  nodeMatchesAllTopologyTerms checks whether "nodeInfo" matches topology of all the "terms" for the given "pod".
-func nodeMatchesAllTopologyTerms(pod *v1.Pod, topologyPairs topologyToMatchedTermCount, nodeInfo *schedulertypes.NodeInfo, terms []v1.PodAffinityTerm) bool {
+func nodeMatchesAllTopologyTerms(pod *v1.Pod, topologyPairs topologyToMatchedTermCount, nodeInfo *framework.NodeInfo, terms []v1.PodAffinityTerm) bool {
 	node := nodeInfo.Node()
 	for _, term := range terms {
 		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
@@ -435,7 +433,7 @@ func nodeMatchesAllTopologyTerms(pod *v1.Pod, topologyPairs topologyToMatchedTer
 
 //  nodeMatchesAnyTopologyTerm checks whether "nodeInfo" matches
 //  topology of any "term" for the given "pod".
-func nodeMatchesAnyTopologyTerm(pod *v1.Pod, topologyPairs topologyToMatchedTermCount, nodeInfo *schedulertypes.NodeInfo, terms []v1.PodAffinityTerm) bool {
+func nodeMatchesAnyTopologyTerm(pod *v1.Pod, topologyPairs topologyToMatchedTermCount, nodeInfo *framework.NodeInfo, terms []v1.PodAffinityTerm) bool {
 	node := nodeInfo.Node()
 	for _, term := range terms {
 		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
@@ -478,7 +476,7 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 // This function returns two boolean flags. The first boolean flag indicates whether the pod matches affinity rules
 // or not. The second boolean flag indicates if the pod matches anti-affinity rules.
 func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
-	state *preFilterState, nodeInfo *schedulertypes.NodeInfo,
+	state *preFilterState, nodeInfo *framework.NodeInfo,
 	affinity *v1.Affinity) (bool, bool, error) {
 	node := nodeInfo.Node()
 	if node == nil {
@@ -514,7 +512,7 @@ func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 
 // Filter invoked at the filter extension point.
 // It checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
-func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())

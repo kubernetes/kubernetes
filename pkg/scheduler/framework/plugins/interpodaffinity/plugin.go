@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/utils/pointer"
 )
 
@@ -54,7 +53,7 @@ var _ framework.ScorePlugin = &InterPodAffinity{}
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
 	Args
-	sharedLister schedulerlisters.SharedLister
+	sharedLister framework.SharedLister
 	sync.Mutex
 }
 

@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // NodePorts is a plugin that checks if a node has free ports for the requested pod ports.
@@ -98,7 +97,7 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
@@ -113,11 +112,11 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleStat
 }
 
 // Fits checks if the pod fits the node.
-func Fits(pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) bool {
+func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 	return fitsPorts(getContainerPorts(pod), nodeInfo)
 }
 
-func fitsPorts(wantPorts []*v1.ContainerPort, nodeInfo *schedulertypes.NodeInfo) bool {
+func fitsPorts(wantPorts []*v1.ContainerPort, nodeInfo *framework.NodeInfo) bool {
 	// try to see whether existingPorts and wantPorts will conflict or not
 	existingPorts := nodeInfo.UsedPorts()
 	for _, cp := range wantPorts {

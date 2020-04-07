@@ -18,8 +18,7 @@ package cache
 
 import (
 	v1 "k8s.io/api/core/v1"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -57,7 +56,7 @@ import (
 // - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
-	schedulerlisters.PodLister
+	framework.PodLister
 
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
@@ -108,5 +107,5 @@ type Cache interface {
 // Dump is a dump of the cache state.
 type Dump struct {
 	AssumedPods map[string]bool
-	Nodes       map[string]*schedulertypes.NodeInfo
+	Nodes       map[string]*framework.NodeInfo
 }

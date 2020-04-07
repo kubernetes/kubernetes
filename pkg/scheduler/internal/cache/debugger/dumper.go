@@ -23,9 +23,9 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // CacheDumper writes some information from the scheduler cache and the scheduling queue to the
@@ -61,7 +61,7 @@ func (d *CacheDumper) dumpSchedulingQueue() {
 }
 
 // printNodeInfo writes parts of NodeInfo to a string.
-func (d *CacheDumper) printNodeInfo(n *schedulertypes.NodeInfo) string {
+func (d *CacheDumper) printNodeInfo(n *framework.NodeInfo) string {
 	var nodeData strings.Builder
 	nodeData.WriteString(fmt.Sprintf("\nNode name: %+v\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
 		n.Node().Name, n.RequestedResource(), n.AllocatableResource(), len(n.Pods())))

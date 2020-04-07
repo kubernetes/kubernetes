@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // ResourceLimits is a score plugin that increases score of input node by 1 if the node satisfies
@@ -46,7 +45,7 @@ const (
 
 // preScoreState computed at PreScore and used at Score.
 type preScoreState struct {
-	podResourceRequest *schedulertypes.Resource
+	podResourceRequest *framework.Resource
 }
 
 // Clone the preScore state.
@@ -81,7 +80,7 @@ func (rl *ResourceLimits) PreScore(
 	return nil
 }
 
-func getPodResource(cycleState *framework.CycleState) (*schedulertypes.Resource, error) {
+func getPodResource(cycleState *framework.CycleState) (*framework.Resource, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
 		return nil, fmt.Errorf("Error reading %q from cycleState: %v", preScoreStateKey, err)
@@ -136,9 +135,9 @@ func NewResourceLimits(_ *runtime.Unknown, h framework.FrameworkHandle) (framewo
 // getResourceLimits computes resource limits for input pod.
 // The reason to create this new function is to be consistent with other
 // priority functions because most or perhaps all priority functions work
-// with schedulertypes.Resource.
-func getResourceLimits(pod *v1.Pod) *schedulertypes.Resource {
-	result := &schedulertypes.Resource{}
+// with framework.Resource.
+func getResourceLimits(pod *v1.Pod) *framework.Resource {
+	result := &framework.Resource{}
 	for _, container := range pod.Spec.Containers {
 		result.Add(container.Resources.Limits)
 	}

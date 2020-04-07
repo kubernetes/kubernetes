@@ -33,7 +33,6 @@ go_test(
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/profile:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
-        "//pkg/scheduler/types:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/priority:go_default_library",
