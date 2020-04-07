@@ -40,10 +40,8 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -143,7 +141,7 @@ type FakeExtender struct {
 	ignorable        bool
 
 	// Cached node information for fake extender
-	cachedNodeNameToInfo map[string]*schedulertypes.NodeInfo
+	cachedNodeNameToInfo map[string]*framework.NodeInfo
 }
 
 func (f *FakeExtender) Name() string {
@@ -162,7 +160,7 @@ func (f *FakeExtender) SupportsPreemption() bool {
 func (f *FakeExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeToVictims map[*v1.Node]*extenderv1.Victims,
-	nodeInfos listers.NodeInfoLister,
+	nodeInfos framework.NodeInfoLister,
 ) (map[*v1.Node]*extenderv1.Victims, error) {
 	nodeToVictimsCopy := map[*v1.Node]*extenderv1.Victims{}
 	// We don't want to change the original nodeToVictims

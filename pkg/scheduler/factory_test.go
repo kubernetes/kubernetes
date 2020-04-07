@@ -53,9 +53,7 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 const (
@@ -538,7 +536,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeToVictims map[*v1.Node]*extenderv1.Victims,
-	nodeInfos listers.NodeInfoLister,
+	nodeInfos framework.NodeInfoLister,
 ) (map[*v1.Node]*extenderv1.Victims, error) {
 	return nil, nil
 }
@@ -593,6 +591,6 @@ func (t *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (t *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (t *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return nil
 }

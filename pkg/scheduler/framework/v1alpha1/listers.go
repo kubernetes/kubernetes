@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package listers
+package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // PodFilter is a function to filter a pod. If pod passed return true else return false.
@@ -38,11 +37,11 @@ type PodLister interface {
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// Returns the list of NodeInfos.
-	List() ([]*schedulertypes.NodeInfo, error)
+	List() ([]*NodeInfo, error)
 	// Returns the list of NodeInfos of nodes with pods with affinity terms.
-	HavePodsWithAffinityList() ([]*schedulertypes.NodeInfo, error)
+	HavePodsWithAffinityList() ([]*NodeInfo, error)
 	// Returns the NodeInfo of the given node name.
-	Get(nodeName string) (*schedulertypes.NodeInfo, error)
+	Get(nodeName string) (*NodeInfo, error)
 }
 
 // SharedLister groups scheduler-specific listers.

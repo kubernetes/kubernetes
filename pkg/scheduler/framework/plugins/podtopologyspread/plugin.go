@@ -28,7 +28,6 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 )
 
 const (
@@ -56,7 +55,7 @@ type Args struct {
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
 	Args
-	sharedLister     schedulerlisters.SharedLister
+	sharedLister     framework.SharedLister
 	services         corelisters.ServiceLister
 	replicationCtrls corelisters.ReplicationControllerLister
 	replicaSets      appslisters.ReplicaSetLister

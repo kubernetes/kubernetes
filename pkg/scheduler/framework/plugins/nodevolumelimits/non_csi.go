@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -196,7 +195,7 @@ func (pl *nonCSILimits) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {

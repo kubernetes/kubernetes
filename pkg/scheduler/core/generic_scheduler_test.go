@@ -54,12 +54,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -77,7 +76,7 @@ func (pl *trueFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *trueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *trueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -94,7 +93,7 @@ func (pl *falseFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *falseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *falseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Unschedulable, ErrReasonFake)
 }
 
@@ -111,7 +110,7 @@ func (pl *matchFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *matchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *matchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
@@ -135,7 +134,7 @@ func (pl *noPodsFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if len(nodeInfo.Pods()) == 0 {
 		return nil
 	}
@@ -160,7 +159,7 @@ func (pl *fakeFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *fakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
+func (pl *fakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	atomic.AddInt32(&pl.numFilterCalled, 1)
 
 	if returnCode, ok := pl.failedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
@@ -808,7 +807,7 @@ func TestGenericScheduler(t *testing.T) {
 
 			var pvcs []v1.PersistentVolumeClaim
 			pvcs = append(pvcs, test.pvcs...)
-			pvcLister := fakelisters.PersistentVolumeClaimLister(pvcs)
+			pvcLister := fakeframework.PersistentVolumeClaimLister(pvcs)
 
 			scheduler := NewGenericScheduler(
 				cache,
@@ -2028,9 +2027,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			fitErr := FitError{
 				FilteredNodesStatuses: test.nodesStatuses,
 			}
-			var nodeInfos []*schedulertypes.NodeInfo
+			var nodeInfos []*framework.NodeInfo
 			for _, n := range makeNodeList(nodeNames) {
-				ni := schedulertypes.NewNodeInfo()
+				ni := framework.NewNodeInfo()
 				ni.SetNode(n)
 				nodeInfos = append(nodeInfos, ni)
 			}
@@ -2371,7 +2370,7 @@ func TestPreempt(t *testing.T) {
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
-			cachedNodeInfoMap := map[string]*schedulertypes.NodeInfo{}
+			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodeNames := defaultNodeNames
 			if len(test.nodeNames) != 0 {
 				nodeNames = test.nodeNames
@@ -2391,7 +2390,7 @@ func TestPreempt(t *testing.T) {
 				nodeNames[i] = node.Name
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
-				cachedNodeInfo := schedulertypes.NewNodeInfo()
+				cachedNodeInfo := framework.NewNodeInfo()
 				cachedNodeInfo.SetNode(node)
 				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
@@ -2570,8 +2569,8 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	}
 }
 
-func nodesToNodeInfos(nodes []*v1.Node, snapshot *internalcache.Snapshot) ([]*schedulertypes.NodeInfo, error) {
-	var nodeInfos []*schedulertypes.NodeInfo
+func nodesToNodeInfos(nodes []*v1.Node, snapshot *internalcache.Snapshot) ([]*framework.NodeInfo, error) {
+	var nodeInfos []*framework.NodeInfo
 	for _, n := range nodes {
 		nodeInfo, err := snapshot.NodeInfos().Get(n.Name)
 		if err != nil {

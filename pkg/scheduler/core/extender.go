@@ -30,8 +30,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 const (
@@ -77,7 +76,7 @@ type SchedulerExtender interface {
 	ProcessPreemption(
 		pod *v1.Pod,
 		nodeToVictims map[*v1.Node]*extenderv1.Victims,
-		nodeInfos listers.NodeInfoLister) (map[*v1.Node]*extenderv1.Victims, error)
+		nodeInfos framework.NodeInfoLister) (map[*v1.Node]*extenderv1.Victims, error)
 
 	// SupportsPreemption returns if the scheduler extender support preemption or not.
 	SupportsPreemption() bool
@@ -214,7 +213,7 @@ func (h *HTTPExtender) SupportsPreemption() bool {
 func (h *HTTPExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeToVictims map[*v1.Node]*extenderv1.Victims,
-	nodeInfos listers.NodeInfoLister,
+	nodeInfos framework.NodeInfoLister,
 ) (map[*v1.Node]*extenderv1.Victims, error) {
 	var (
 		result extenderv1.ExtenderPreemptionResult
@@ -258,7 +257,7 @@ func (h *HTTPExtender) ProcessPreemption(
 // such as UIDs and names, to object pointers.
 func (h *HTTPExtender) convertToNodeToVictims(
 	nodeNameToMetaVictims map[string]*extenderv1.MetaVictims,
-	nodeInfos listers.NodeInfoLister,
+	nodeInfos framework.NodeInfoLister,
 ) (map[*v1.Node]*extenderv1.Victims, error) {
 	nodeToVictims := map[*v1.Node]*extenderv1.Victims{}
 	for nodeName, metaVictims := range nodeNameToMetaVictims {
@@ -287,7 +286,7 @@ func (h *HTTPExtender) convertToNodeToVictims(
 // and extender, i.e. when the pod is not found in nodeInfo.Pods.
 func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *extenderv1.MetaPod,
-	nodeInfo *schedulertypes.NodeInfo) (*v1.Pod, error) {
+	nodeInfo *framework.NodeInfo) (*v1.Pod, error) {
 	for _, pod := range nodeInfo.Pods() {
 		if string(pod.UID) == metaPod.UID {
 			return pod, nil

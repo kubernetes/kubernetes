@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 func TestVolumeBinding(t *testing.T) {
@@ -99,7 +98,7 @@ func TestVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			nodeInfo := schedulertypes.NewNodeInfo()
+			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(item.node)
 			fakeVolumeBinder := scheduling.NewFakeVolumeBinder(item.volumeBinderConfig)
 			p := &VolumeBinding{

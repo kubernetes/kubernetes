@@ -12,9 +12,8 @@ go_library(
     visibility = ["//pkg/scheduler:__subpackages__"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/listers:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
-        "//pkg/scheduler/types:go_default_library",
         "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -35,7 +34,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/types:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

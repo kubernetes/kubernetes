@@ -19,8 +19,8 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 )
 
 // Cache is used for testing
@@ -83,7 +83,7 @@ func (c *Cache) UpdateSnapshot(snapshot *internalcache.Snapshot) error {
 func (c *Cache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }
 
 // FilteredList is a fake method for testing.
-func (c *Cache) FilteredList(filter schedulerlisters.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+func (c *Cache) FilteredList(filter framework.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	return nil, nil
 }
 

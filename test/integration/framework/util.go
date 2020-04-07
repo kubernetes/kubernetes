@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
+	schedfwk "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -250,7 +250,7 @@ func isNodeUntainted(node *v1.Node) bool {
 		},
 	}
 
-	nodeInfo := schedulertypes.NewNodeInfo()
+	nodeInfo := schedfwk.NewNodeInfo()
 
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}

@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 func nodeWithTaints(nodeName string, taints []v1.Taint) *v1.Node {
@@ -330,7 +329,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeInfo := schedulertypes.NewNodeInfo()
+			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
 			p, _ := New(nil, nil)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)

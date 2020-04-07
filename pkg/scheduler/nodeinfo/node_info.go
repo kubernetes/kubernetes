@@ -18,26 +18,26 @@ package nodeinfo
 
 import (
 	v1 "k8s.io/api/core/v1"
-	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // TODO(#89528): This file defines temporary aliases of types used by kubelet.
 // Those will be removed and the underlying types defined in scheduler/types will be used directly.
 
 // NodeInfo is node level aggregated information.
-type NodeInfo = schedulertypes.NodeInfo
+type NodeInfo = framework.NodeInfo
 
 // Resource is a collection of compute resource.
-type Resource = schedulertypes.Resource
+type Resource = framework.Resource
 
 // NewResource creates a Resource from ResourceList
 func NewResource(rl v1.ResourceList) *Resource {
-	return schedulertypes.NewResource(rl)
+	return framework.NewResource(rl)
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
 // If any pods are given in arguments, their information will be aggregated in
 // the returned object.
 func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
-	return schedulertypes.NewNodeInfo(pods...)
+	return framework.NewNodeInfo(pods...)
 }
