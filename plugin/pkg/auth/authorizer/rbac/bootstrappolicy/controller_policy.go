@@ -153,6 +153,9 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpointslice-controller"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services", "pods", "nodes").RuleOrDie(),
+				// The controller needs to be able to set a service's finalizers to be able to create an EndpointSlice
+				// resource that is owned by the service and sets blockOwnerDeletion=true in its ownerRef.
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("services/finalizers").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 				eventsRule(),
 			},
