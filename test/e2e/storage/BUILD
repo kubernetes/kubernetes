@@ -89,6 +89,7 @@ go_library(
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
     ],
 )
 
