@@ -29,10 +29,15 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
+var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
-
-	ginkgo.It("should run the lifecycle of PodTemplates", func() {
+	/*
+	   Release : v1.19
+	   Testname: PodTemplate lifecycle
+	   Description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching the PodTemplate MUST reflect changes.
+	          By fetching all the PodTemplates via a Label selector it MUST find the PodTemplate by it's static label and updated value. The PodTemplate must be deleted.
+	*/
+	framework.ConformanceIt("should run the lifecycle of PodTemplates", func() {
 		testNamespaceName := f.Namespace.Name
 		podTemplateName := "nginx-pod-template-" + string(uuid.NewUUID())
 
