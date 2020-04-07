@@ -145,7 +145,8 @@ func Test_getProxyMode(t *testing.T) {
 			modules:       c.kmods,
 			kernelVersion: c.kernelVersion,
 		}
-		r := getProxyMode(c.flag, khandler, ipsetver, kcompater)
+		canUseIPVS, _ := ipvs.CanUseIPVSProxier(khandler, ipsetver)
+		r := getProxyMode(c.flag, canUseIPVS, kcompater)
 		if r != c.expected {
 			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
 		}
