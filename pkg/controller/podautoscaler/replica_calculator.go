@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
+
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
@@ -69,7 +70,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 	podList, err := c.getNonemptyPodList(namespace, selector)
 	if err != nil {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get pods while getting nonempty podList: %v", err)
+		return 0, 0, 0, time.Time{}, err
 	}
 
 	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
@@ -173,7 +174,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	podList, err := c.getNonemptyPodList(namespace, selector)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get pods while getting nonempty podList: %v", err)
+		return 0, 0, err
 	}
 
 	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
@@ -288,11 +289,11 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 func (c *ReplicaCalculator) getNonemptyPodList(namespace string, selector labels.Selector) ([]*v1.Pod, error) {
 	podList, err := c.podLister.Pods(namespace).List(selector)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get pods while getting podList: %v", err)
+		return nil, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
 
 	if len(podList) == 0 {
-		return nil, fmt.Errorf("no pods returned by selector while getting podList")
+		return nil, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
 	return podList, nil
