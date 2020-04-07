@@ -17,7 +17,6 @@ limitations under the License.
 package genericclioptions
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -58,8 +57,7 @@ const (
 
 var (
 	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
-
-	ErrEmptyConfig = errors.New(`Missing or incomplete configuration info.  Please point to an existing, complete config file:
+	ErrEmptyConfig  = clientcmd.NewEmptyConfigError(`Missing or incomplete configuration info.  Please point to an existing, complete config file:
 
   1. Via the command-line flag --kubeconfig
   2. Via the KUBECONFIG environment variable
