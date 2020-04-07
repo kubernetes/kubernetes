@@ -101,7 +101,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DescribeIng(ns)
+				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
 				ginkgo.By("No ingress created, no cleanup necessary")
@@ -257,7 +257,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DescribeIng(ns)
+				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
 				ginkgo.By("No ingress created, no cleanup necessary")
@@ -614,7 +614,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DescribeIng(ns)
+				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
 				ginkgo.By("No ingress created, no cleanup necessary")
@@ -741,7 +741,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				framework.ExpectNoError(gce.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
 			}
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DescribeIng(ns)
+				e2eingress.DescribeIng(ns)
 			}
 			defer nginxController.TearDown()
 			if jig.Ingress == nil {

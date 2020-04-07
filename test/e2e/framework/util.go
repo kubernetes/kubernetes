@@ -1236,14 +1236,6 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 	return ips.List()
 }
 
-// DescribeIng describes information of ingress by running kubectl describe ing.
-func DescribeIng(ns string) {
-	Logf("\nOutput of kubectl describe ing:\n")
-	desc, _ := RunKubectl(
-		ns, "describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-	Logf(desc)
-}
-
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 // TODO(alejandrox1): move to subpkg pod once kubectl methods have been refactored.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
