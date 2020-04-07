@@ -382,7 +382,8 @@ func (f *Framework) AfterEach() {
 		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-				if err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{}); err != nil {
+				err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
+				if err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 
@@ -393,7 +394,14 @@ func (f *Framework) AfterEach() {
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
 					}
+				} else {
+					err := WaitForNamespacesDeleted(f.ClientSet, []string{ns.Name}, f.NamespaceDeletionTimeout)
+					if err != nil {
+						Logf("Error waiting for namespace %s to be deleted", ns.Name)
+						nsDeletionErrors[ns.Name] = err
+					}
 				}
+
 			}
 		} else {
 			if !TestContext.DeleteNamespace {

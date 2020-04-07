@@ -108,6 +108,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	var m mockDriverSetup
 
 	f := framework.NewDefaultFramework("csi-mock-volumes")
+	f.NamespaceDeletionTimeout = framework.DefaultNamespaceDeletionTimeout
 
 	init := func(tp testParameters) {
 		m = mockDriverSetup{
@@ -381,6 +382,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			var err error
 			init(testParameters{attachLimit: 2})
 			defer cleanup()
+
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
@@ -543,7 +545,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				init(params)
-
 				defer cleanup()
 
 				sc, pvc, pod := createPod(false)

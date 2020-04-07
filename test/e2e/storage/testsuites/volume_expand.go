@@ -106,6 +106,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volume-expand")
+	f.NamespaceDeletionTimeout = framework.DefaultNamespaceDeletionTimeout
 
 	init := func() {
 		l = local{}
