@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -123,7 +123,11 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 		return nil, err
 	}
 
-	err = scheme.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
+	scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	err = scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
 	if err != nil {
 		return nil, err
 	}

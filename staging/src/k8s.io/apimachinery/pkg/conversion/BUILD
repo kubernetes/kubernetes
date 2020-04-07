@@ -45,7 +45,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/conversion/queryparams:all-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion/unstructured:all-srcs",
     ],
     tags = ["automanaged"],
 )
