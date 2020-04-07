@@ -1232,7 +1232,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 
 	// Create a few pods for tests.
 	pods := []*v1.Pod{}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("test-pod%v", i),
@@ -1240,7 +1240,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				UID:       types.UID(fmt.Sprintf("test-puid%v", i)),
 			},
 			Spec: v1.PodSpec{
-				NodeName: fmt.Sprintf("test-node%v", i),
+				NodeName: fmt.Sprintf("test-node%v", i%10),
 			},
 		}
 		pods = append(pods, pod)
@@ -1309,6 +1309,13 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 	addPodWithAffinity := func(i int) operation {
 		return func() {
 			if err := cache.AddPod(podsWithAffinity[i]); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	removePod := func(i int) operation {
+		return func() {
+			if err := cache.RemovePod(pods[i]); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1382,13 +1389,6 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expected: []*v1.Node{nodes[6], nodes[5], nodes[2], nodes[0]},
 		},
 		{
-			name: "Remove non-existing node",
-			operations: []operation{
-				addNode(0), addNode(1), updateSnapshot(),
-			},
-			expected: []*v1.Node{nodes[1], nodes[0]},
-		},
-		{
 			name: "Update some nodes",
 			operations: []operation{
 				addNode(0), addNode(1), addNode(5), updateSnapshot(), updateNode(1),
@@ -1444,11 +1444,19 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			expected: []*v1.Node{nodes[0], nodes[4], nodes[2]},
 		},
 		{
-			name: "Remove pod from non-existing node",
+			name: "Add pod before its node",
 			operations: []operation{
-				addNode(0), addPod(0), addNode(2), updateSnapshot(),
+				addNode(0), addPod(1), updatePod(1), addNode(1),
 			},
-			expected: []*v1.Node{nodes[2], nodes[0]},
+			expected: []*v1.Node{nodes[1], nodes[0]},
+		},
+		{
+			name: "Remove node before its pods",
+			operations: []operation{
+				addNode(0), addNode(1), addPod(1), addPod(11),
+				removeNode(1), updatePod(1), updatePod(11), removePod(1), removePod(11),
+			},
+			expected: []*v1.Node{nodes[0]},
 		},
 		{
 			name: "Add Pods with affinity",

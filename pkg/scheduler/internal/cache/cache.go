@@ -428,6 +428,13 @@ func (cache *schedulerCache) addPod(pod *v1.Pod) {
 
 // Assumes that lock is already acquired.
 func (cache *schedulerCache) updatePod(oldPod, newPod *v1.Pod) error {
+	if _, ok := cache.nodes[newPod.Spec.NodeName]; !ok {
+		// The node might have been deleted already.
+		// This is not a problem in the case where a pod update arrives before the
+		// node creation, because we will always have a create pod event before
+		// that, which will create the placeholder node item.
+		return nil
+	}
 	if err := cache.removePod(oldPod); err != nil {
 		return err
 	}
