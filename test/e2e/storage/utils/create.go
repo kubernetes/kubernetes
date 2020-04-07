@@ -141,14 +141,7 @@ func PatchItems(f *framework.Framework, items ...interface{}) error {
 // - only the latest stable API version for each item is supported
 func CreateItems(f *framework.Framework, items ...interface{}) (func(), error) {
 	var destructors []func() error
-	var cleanupHandle framework.CleanupActionHandle
 	cleanup := func() {
-		if cleanupHandle == nil {
-			// Already done.
-			return
-		}
-		framework.RemoveCleanupAction(cleanupHandle)
-
 		// TODO (?): use same logic as framework.go for determining
 		// whether we are expected to clean up? This would change the
 		// meaning of the -delete-namespace and -delete-namespace-on-failure
@@ -160,7 +153,6 @@ func CreateItems(f *framework.Framework, items ...interface{}) (func(), error) {
 			}
 		}
 	}
-	cleanupHandle = framework.AddCleanupAction(cleanup)
 
 	var result error
 	for _, item := range items {
