@@ -45,6 +45,7 @@ type Webhook struct {
 	sourceFactory sourceFactory
 
 	hookSource       Source
+	staticConfigFile string
 	clientManager    *webhookutil.ClientManager
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
@@ -61,7 +62,7 @@ type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
 
 // NewWebhook creates a new generic admission webhook.
 func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
-	kubeconfigFile, err := config.LoadConfig(configFile)
+	kubeconfigFile, staticConfigFile, err := config.LoadStaticAndKubeConfig(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +88,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 
 	return &Webhook{
 		Handler:          handler,
+		staticConfigFile: staticConfigFile,
 		sourceFactory:    sourceFactory,
 		clientManager:    &cm,
 		namespaceMatcher: &namespace.Matcher{},
@@ -106,6 +108,12 @@ func (a *Webhook) SetAuthenticationInfoResolverWrapper(wrapper webhookutil.Authe
 // Passing a nil resolver does not have an effect, instead a default one will be used.
 func (a *Webhook) SetServiceResolver(sr webhookutil.ServiceResolver) {
 	a.clientManager.SetServiceResolver(sr)
+}
+
+// SetValidatorAndDefaultor sets a validator and defaultor for static webhooks
+// for the webhook admission plugin.
+func (a *Webhook) SetValidatorAndDefaultor(v WebhookValidator, d WebhookDefaultor) {
+	a.sourceFactory = wrapHookSourceFactory(a.sourceFactory, a.staticConfigFile, d, v)
 }
 
 // SetExternalKubeClientSet implements the WantsExternalKubeInformerFactory interface.

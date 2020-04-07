@@ -125,7 +125,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil, kubeadmission.NewWebhookDefaultor(), kubeadmission.NewWebhookValidator())
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)

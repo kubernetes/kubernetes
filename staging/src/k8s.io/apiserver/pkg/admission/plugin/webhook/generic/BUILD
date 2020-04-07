@@ -5,6 +5,9 @@ go_library(
     srcs = [
         "conversion.go",
         "interfaces.go",
+        "staticconfigwatcher.go",
+        "staticwebhook.go",
+        "types.go",
         "webhook.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/generic",
@@ -15,8 +18,12 @@ go_library(
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library",
@@ -27,6 +34,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/github.com/fsnotify/fsnotify:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -48,6 +57,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "conversion_test.go",
+        "staticconfig_test.go",
         "webhook_test.go",
     ],
     embed = [":go_default_library"],
@@ -65,6 +75,8 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/apis/example:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/example2/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/informers:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )

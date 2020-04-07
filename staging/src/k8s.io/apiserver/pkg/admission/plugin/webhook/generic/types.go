@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package webhookadmission
+package generic
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	v1 "k8s.io/api/admissionregistration/v1"
+)
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type WebhookValidator interface {
+	ValidateValidatingWebhookConfiguration(*v1.ValidatingWebhookConfiguration) error
+	ValidateMutatingWebhookConfiguration(*v1.MutatingWebhookConfiguration) error
+}
 
-// WebhookAdmission provides configuration for the webhook admission controller.
-type WebhookAdmission struct {
-	metav1.TypeMeta
-
-	// KubeConfigFile is the path to the kubeconfig file.
-	KubeConfigFile string
-
-	// StaticConfigFile is the path to the static configuration of the webhook.
-	StaticConfigFile string `json:"staticConfigFile"`
+type WebhookDefaultor interface {
+	SetDefaultForValidatingWebhookConfiguration(*v1.ValidatingWebhookConfiguration)
+	SetDefaultForMutatingWebhookConfiguration(*v1.MutatingWebhookConfiguration)
 }

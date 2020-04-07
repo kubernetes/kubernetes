@@ -68,6 +68,8 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 		cloudConfig,
 		discoveryRESTMapper,
 		quotainstall.NewQuotaConfigurationForAdmission(),
+		NewWebhookDefaultor(),
+		NewWebhookValidator(),
 	)
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
