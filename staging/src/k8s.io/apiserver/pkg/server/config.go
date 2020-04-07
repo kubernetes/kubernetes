@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,6 +33,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/google/uuid"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -62,6 +64,7 @@ import (
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog"
@@ -615,8 +618,16 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	const priorityAndFairnessConfigConsumerHookName = "priority-and-fairness-config-consumer"
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
 	} else if c.FlowControl != nil {
-		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(context PostStartHookContext) error {
-			go c.FlowControl.Run(context.StopCh)
+		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(ctx PostStartHookContext) error {
+			loopBackClient, err := kubernetes.NewForConfig(ctx.LoopbackClientConfig)
+			if err != nil {
+				return fmt.Errorf("failed constructing pre-flight-check client for FlowControl config controller: %v", err)
+			}
+			_, err = loopBackClient.FlowcontrolV1alpha1().PriorityLevelConfigurations().List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to list PriorityLevelConfigurations as FlowControl system's pre-flight-check: %v", err)
+			}
+			go c.FlowControl.Run(ctx.StopCh)
 			return nil
 		})
 		if err != nil {

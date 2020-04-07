@@ -108,6 +108,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
