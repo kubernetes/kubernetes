@@ -40,7 +40,7 @@ type Prober interface {
 type grpcProber struct {
 }
 
-// New Prober for execute grpc probe test
+// New Prober for execute grpc probe
 func New() Prober {
 	return grpcProber{}
 }
