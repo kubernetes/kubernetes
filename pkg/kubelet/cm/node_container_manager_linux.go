@@ -120,7 +120,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
 		klog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved, cpuset.NewCPUSet()); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved, cm.NodeConfig.ReservedSystemCPUs); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -137,7 +137,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		ResourceParameters: getCgroupConfig(rl),
 	}
 	if cgroupConfig.ResourceParameters == nil {
-		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
+		return fmt.Errorf("%q cgroup is not configured properly", cgroupConfig.Name)
 	}
 	cgroupConfig.ResourceParameters.CpuSet = cpus
 	klog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares, %d bytes of memory, %d processes, and cpuset '%s'", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory, cgroupConfig.ResourceParameters.PidsLimit, cpus)

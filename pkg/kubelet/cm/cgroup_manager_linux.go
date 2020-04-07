@@ -329,7 +329,7 @@ func getSupportedSubsystems() map[subsystem]bool {
 		&cgroupfs.MemoryGroup{}: true,
 		&cgroupfs.CpuGroup{}:    true,
 		&cgroupfs.PidsGroup{}:   false,
-		&cgroupfs.CpusetGroup{}: false, // currently needed only for setting cpuset for system-reserved cgroup
+		&cgroupfs.CpusetGroup{}: false, // currently needed only for setting cpuset for system-reserved and kube-reserved cgroups
 	}
 	// not all hosts support hugetlb cgroup, and in the absent of hugetlb, we will fail silently by reporting no capacity.
 	supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false

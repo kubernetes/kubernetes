@@ -677,15 +677,17 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 		}
 
 		if reservedSystemCPUs.Size() > 0 {
-			// at cmd option valication phase it is tested either --system-reserved-cgroup or --kube-reserved-cgroup is specified, so overwrite should be ok
+			// In case --kube-reserved-cgroup or --system-reserved-cgroup is specified, it depends on the --enforce-node-allocatable whether --reserved-cpus
+			// should enforce the cpuset of those cgroups. Here we set just the cpu shares.
 			klog.Infof("Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved=\"%v\", SystemReserved=\"%v\".", s.KubeReserved, s.SystemReserved)
-			if s.KubeReserved != nil {
-				delete(s.KubeReserved, "cpu")
-			}
 			if s.SystemReserved == nil {
 				s.SystemReserved = make(map[string]string)
 			}
+			if s.KubeReserved == nil {
+				s.KubeReserved = make(map[string]string)
+			}
 			s.SystemReserved["cpu"] = strconv.Itoa(reservedSystemCPUs.Size())
+			s.KubeReserved["cpu"] = strconv.Itoa(reservedSystemCPUs.Size())
 			klog.Infof("After cpu setting is overwritten, KubeReserved=\"%v\", SystemReserved=\"%v\"", s.KubeReserved, s.SystemReserved)
 		}
 		kubeReserved, err := parseResourceList(s.KubeReserved)
