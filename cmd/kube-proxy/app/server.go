@@ -168,6 +168,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address with port for the health check server to serve on (set to '0.0.0.0:10256' for all IPv4 interfaces and '[::]:10256' for all IPv6 interfaces). Set empty to disable.")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address with port for the metrics server to serve on (set to '0.0.0.0:10249' for all IPv4 interfaces and '[::]:10249' for all IPv6 interfaces). Set empty to disable.")
+	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
 	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' or 'kernelspace' (windows). If blank, use the best-available proxy (currently iptables). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
@@ -531,6 +532,7 @@ type ProxyServer struct {
 	NodeRef                *v1.ObjectReference
 	CleanupIPVS            bool
 	MetricsBindAddress     string
+	BindAddressHardFail    bool
 	EnableProfiling        bool
 	UseEndpointSlices      bool
 	OOMScoreAdj            *int32
@@ -576,7 +578,7 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	return client, eventClient.CoreV1(), nil
 }
 
-func serveHealthz(hz healthcheck.ProxierHealthUpdater) {
+func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	if hz == nil {
 		return
 	}
@@ -584,9 +586,13 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater) {
 	fn := func() {
 		err := hz.Run()
 		if err != nil {
-			// For historical reasons we do not abort on errors here.  We may
-			// change that in the future.
 			klog.Errorf("healthz server failed: %v", err)
+			if errCh != nil {
+				errCh <- fmt.Errorf("healthz server failed: %v", err)
+				// if in hardfail mode, never retry again
+				blockCh := make(chan error)
+				<-blockCh
+			}
 		} else {
 			klog.Errorf("healthz server returned without error")
 		}
@@ -594,7 +600,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater) {
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
 
-func serveMetrics(bindAddress string, proxyMode string, enableProfiling bool) {
+func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh chan error) {
 	if len(bindAddress) == 0 {
 		return
 	}
@@ -619,9 +625,14 @@ func serveMetrics(bindAddress string, proxyMode string, enableProfiling bool) {
 	fn := func() {
 		err := http.ListenAndServe(bindAddress, proxyMux)
 		if err != nil {
-			// For historical reasons we do not abort on errors here.  We may
-			// change that in the future.
-			utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
+			err = fmt.Errorf("starting metrics server failed: %v", err)
+			utilruntime.HandleError(err)
+			if errCh != nil {
+				errCh <- err
+				// if in hardfail mode, never retry again
+				blockCh := make(chan error)
+				<-blockCh
+			}
 		}
 	}
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
@@ -648,11 +659,16 @@ func (s *ProxyServer) Run() error {
 
 	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
 
+	var errCh chan error
+	if s.BindAddressHardFail {
+		errCh = make(chan error)
+	}
+
 	// Start up a healthz server if requested
-	serveHealthz(s.HealthzServer)
+	serveHealthz(s.HealthzServer, errCh)
 
 	// Start up a metrics server if requested
-	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling)
+	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling, errCh)
 
 	// Tune conntrack, if requested
 	// Conntracker is always nil for windows
@@ -754,9 +770,9 @@ func (s *ProxyServer) Run() error {
 	// Birth Cry after the birth is successful
 	s.birthCry()
 
-	// Just loop forever for now...
-	s.Proxier.SyncLoop()
-	return nil
+	go s.Proxier.SyncLoop()
+
+	return <-errCh
 }
 
 func (s *ProxyServer) birthCry() {
