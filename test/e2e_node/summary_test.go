@@ -435,7 +435,11 @@ func recordSystemCgroupProcesses() {
 			continue
 		}
 
-		pids, err := ioutil.ReadFile(fmt.Sprintf("/sys/fs/cgroup/cpu/%s/cgroup.procs", cgroup))
+		filePattern := "/sys/fs/cgroup/cpu/%s/cgroup.procs"
+		if IsCgroup2UnifiedMode() {
+			filePattern = "/sys/fs/cgroup/%s/cgroup.procs"
+		}
+		pids, err := ioutil.ReadFile(fmt.Sprintf(filePattern, cgroup))
 		if err != nil {
 			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
