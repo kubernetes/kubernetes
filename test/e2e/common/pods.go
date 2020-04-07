@@ -42,7 +42,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -300,28 +299,6 @@ var _ = framework.KubeDescribe("Pods", func() {
 		ginkgo.By("deleting the pod gracefully")
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
 		framework.ExpectNoError(err, "failed to delete pod")
-
-		ginkgo.By("verifying the kubelet observed the termination notice")
-		err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-			podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
-			if err != nil {
-				framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
-				return false, nil
-			}
-			for _, kubeletPod := range podList.Items {
-				if pod.Name != kubeletPod.Name {
-					continue
-				}
-				if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-					framework.Logf("deletion has not yet been observed")
-					return false, nil
-				}
-				return true, nil
-			}
-			framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
-			return true, nil
-		})
-		framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false

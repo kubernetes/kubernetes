@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -112,8 +111,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
-			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
-			printAllKubeletPods(cs, node.Name)
+			framework.Logf("\nLogging pods the apiserver thinks is on node %v before test", node.Name)
+			printAllPodsOnNode(cs, node.Name)
 		}
 
 	})
@@ -796,11 +795,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 })
 
-// printAllKubeletPods outputs status of all kubelet pods into log.
-func printAllKubeletPods(c clientset.Interface, nodeName string) {
-	podList, err := e2ekubelet.GetKubeletPods(c, nodeName)
+// printAllPodsOnNode outputs status of all kubelet pods into log.
+func printAllPodsOnNode(c clientset.Interface, nodeName string) {
+	podList, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.nodeName=" + nodeName})
 	if err != nil {
-		framework.Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
+		framework.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
 		return
 	}
 	for _, p := range podList.Items {
