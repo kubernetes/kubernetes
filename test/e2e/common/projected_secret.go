@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"path"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -38,10 +38,11 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, Secrets, volume mode default
-	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
+	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
+		defaultMode := int32(0444)
+		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
 	/*
@@ -73,7 +74,8 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. The secret is also mapped to a custom path. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------on the mapped volume.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doProjectedSecretE2EWithMapping(f, nil)
+		defaultMode := int32(0444)
+		doProjectedSecretE2EWithMapping(f, &defaultMode)
 	})
 
 	/*
@@ -105,7 +107,8 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(context.TODO(), secret2, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
-		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
+		defaultMode := int32(0444)
+		doProjectedSecretE2EWithoutMapping(f, &defaultMode, secret2.Name, nil, nil)
 	})
 
 	/*
@@ -196,7 +199,8 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 			},
 		}
 
-		fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/data-1", nil)
+		defaultMode := int32(0444)
+		fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/data-1", &defaultMode)
 		f.TestContainerOutputRegexp("consume secrets", pod, 0, []string{
 			"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 			fileModeRegexp,

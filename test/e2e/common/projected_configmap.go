@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"path"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,10 +39,11 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, volume mode default
-	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
+	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -r--r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithoutMappings(f, false, 0, nil)
+		defaultMode := int32(0444)
+		doProjectedConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
 
 	/*
@@ -66,25 +67,28 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, non-root user
-	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
+	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -r--r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithoutMappings(f, true, 0, nil)
+		defaultMode := int32(0444)
+		doProjectedConfigMapE2EWithoutMappings(f, true, 0, &defaultMode)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
+		defaultMode := int32(0444)
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		doProjectedConfigMapE2EWithoutMappings(f, true, 1001, nil)
+		doProjectedConfigMapE2EWithoutMappings(f, true, 1001, &defaultMode)
 	})
 
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, mapped
-	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -rw-r--r--.
+	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r--r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithMappings(f, false, 0, nil)
+		defaultMode := int32(0444)
+		doProjectedConfigMapE2EWithMappings(f, false, 0, &defaultMode)
 	})
 
 	/*
@@ -104,7 +108,8 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r--r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithMappings(f, true, 0, nil)
+		defaultMode := int32(0444)
+		doProjectedConfigMapE2EWithMappings(f, true, 0, &defaultMode)
 	})
 
 	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {

@@ -215,6 +215,14 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		return err
 	}
 
+	// clear write bits
+	if b.GetAttributes().ReadOnly {
+		for k, v := range payload {
+			v.Mode &= ^0222
+			payload[k] = v
+		}
+	}
+
 	setupSuccess := false
 	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err

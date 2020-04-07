@@ -354,6 +354,15 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 		}
 	}
+
+	// clear write bits
+	if s.GetAttributes().ReadOnly {
+		for k, v := range payload {
+			v.Mode &= ^0222
+			payload[k] = v
+		}
+	}
+
 	return payload, utilerrors.NewAggregate(errlist)
 }
 

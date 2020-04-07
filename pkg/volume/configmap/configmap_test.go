@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,10 +55,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"foo": {Data: []byte("foo"), Mode: 0644},
-				"bar": {Data: []byte("bar"), Mode: 0644},
+				"foo": {Data: []byte("foo"), Mode: 0444},
+				"bar": {Data: []byte("bar"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -70,10 +70,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": []byte("bar"),
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"foo": {Data: []byte("foo"), Mode: 0644},
-				"bar": {Data: []byte("bar"), Mode: 0644},
+				"foo": {Data: []byte("foo"), Mode: 0444},
+				"bar": {Data: []byte("bar"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -87,10 +87,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"foo": {Data: []byte("foo"), Mode: 0644},
-				"bar": {Data: []byte("bar"), Mode: 0644},
+				"foo": {Data: []byte("foo"), Mode: 0444},
+				"bar": {Data: []byte("bar"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -108,9 +108,9 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/foo.txt": {Data: []byte("foo"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -128,9 +128,9 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -148,9 +148,9 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0644},
+				"path/to/1/2/3/foo.txt": {Data: []byte("foo"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -172,10 +172,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0644},
-				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"path/to/1/2/3/foo.txt":                {Data: []byte("foo"), Mode: 0444},
+				"another/path/to/the/esteemed/bar.bin": {Data: []byte("bar"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -193,7 +193,7 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode:    0644,
+			mode:    0444,
 			success: false,
 		},
 		{
@@ -216,7 +216,7 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
 				"foo.txt": {Data: []byte("foo"), Mode: caseMappingMode},
 				"bar.bin": {Data: []byte("bar"), Mode: caseMappingMode},
@@ -241,10 +241,10 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode: 0644,
+			mode: 0444,
 			payload: map[string]util.FileProjection{
-				"foo.txt": {Data: []byte("foo"), Mode: 0644},
-				"bar.bin": {Data: []byte("bar"), Mode: 0644},
+				"foo.txt": {Data: []byte("foo"), Mode: 0444},
+				"bar.bin": {Data: []byte("bar"), Mode: 0444},
 			},
 			success: true,
 		},
@@ -262,7 +262,7 @@ func TestMakePayload(t *testing.T) {
 					"bar": "bar",
 				},
 			},
-			mode:     0644,
+			mode:     0444,
 			optional: true,
 			payload:  map[string]util.FileProjection{},
 			success:  true,

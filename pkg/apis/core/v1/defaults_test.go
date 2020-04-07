@@ -138,13 +138,13 @@ func TestWorkloadDefaults(t *testing.T) {
 		".Spec.Volumes[0].VolumeSource.AzureDisk.FSType":                                              `"ext4"`,
 		".Spec.Volumes[0].VolumeSource.AzureDisk.Kind":                                                `"Shared"`,
 		".Spec.Volumes[0].VolumeSource.AzureDisk.ReadOnly":                                            `false`,
-		".Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode":                                         `420`,
-		".Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode":                                       `420`,
+		".Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode":                                         `292`,
+		".Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode":                                       `292`,
 		".Spec.Volumes[0].VolumeSource.DownwardAPI.Items[0].FieldRef.APIVersion":                      `"v1"`,
 		".Spec.Volumes[0].VolumeSource.EmptyDir":                                                      `{}`,
 		".Spec.Volumes[0].VolumeSource.HostPath.Type":                                                 `""`,
 		".Spec.Volumes[0].VolumeSource.ISCSI.ISCSIInterface":                                          `"default"`,
-		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `420`,
+		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `292`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].DownwardAPI.Items[0].FieldRef.APIVersion": `"v1"`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].ServiceAccountToken.ExpirationSeconds":    `3600`,
 		".Spec.Volumes[0].VolumeSource.RBD.Keyring":                                                   `"/etc/ceph/keyring"`,
@@ -152,7 +152,7 @@ func TestWorkloadDefaults(t *testing.T) {
 		".Spec.Volumes[0].VolumeSource.RBD.RadosUser":                                                 `"admin"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
-		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `292`,
 	}
 	defaults := detectDefaults(t, rc, reflect.ValueOf(template))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
@@ -261,13 +261,13 @@ func TestPodDefaults(t *testing.T) {
 		".Spec.Volumes[0].VolumeSource.AzureDisk.FSType":                                              `"ext4"`,
 		".Spec.Volumes[0].VolumeSource.AzureDisk.Kind":                                                `"Shared"`,
 		".Spec.Volumes[0].VolumeSource.AzureDisk.ReadOnly":                                            `false`,
-		".Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode":                                         `420`,
-		".Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode":                                       `420`,
+		".Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode":                                         `292`,
+		".Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode":                                       `292`,
 		".Spec.Volumes[0].VolumeSource.DownwardAPI.Items[0].FieldRef.APIVersion":                      `"v1"`,
 		".Spec.Volumes[0].VolumeSource.EmptyDir":                                                      `{}`,
 		".Spec.Volumes[0].VolumeSource.HostPath.Type":                                                 `""`,
 		".Spec.Volumes[0].VolumeSource.ISCSI.ISCSIInterface":                                          `"default"`,
-		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `420`,
+		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `292`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].DownwardAPI.Items[0].FieldRef.APIVersion": `"v1"`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].ServiceAccountToken.ExpirationSeconds":    `3600`,
 		".Spec.Volumes[0].VolumeSource.RBD.Keyring":                                                   `"/etc/ceph/keyring"`,
@@ -275,7 +275,7 @@ func TestPodDefaults(t *testing.T) {
 		".Spec.Volumes[0].VolumeSource.RBD.RadosUser":                                                 `"admin"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
-		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `292`,
 	}
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {

@@ -19,7 +19,6 @@ limitations under the License.
 package volume
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -73,45 +72,36 @@ func TestSkipPermissionChange(t *testing.T) {
 		skipPermssion       bool
 	}{
 		{
-			description:   "skippermission=false, policy=nil",
-			skipPermssion: false,
+			description: "skippermission=false, policy=nil",
 		},
 		{
 			description:         "skippermission=false, policy=always",
 			fsGroupChangePolicy: &always,
-			skipPermssion:       false,
 		},
 		{
 			description:         "skippermission=false, policy=always, gidmatch=true",
 			fsGroupChangePolicy: &always,
-			skipPermssion:       false,
 			gidOwnerMatch:       true,
 		},
 		{
 			description:         "skippermission=false, policy=nil, gidmatch=true",
 			fsGroupChangePolicy: nil,
-			skipPermssion:       false,
 			gidOwnerMatch:       true,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=false",
 			fsGroupChangePolicy: &onrootMismatch,
-			gidOwnerMatch:       false,
-			skipPermssion:       false,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=false",
 			fsGroupChangePolicy: &onrootMismatch,
 			gidOwnerMatch:       true,
-			permissionMatch:     false,
-			skipPermssion:       false,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true",
 			fsGroupChangePolicy: &onrootMismatch,
 			gidOwnerMatch:       true,
 			permissionMatch:     true,
-			skipPermssion:       false,
 		},
 		{
 			description:         "skippermission=false, policy=onrootmismatch, gidmatch=true, permmatch=true, sgidmatch=true",
@@ -152,11 +142,14 @@ func TestSkipPermissionChange(t *testing.T) {
 				expectedGid = int64(gid + 3000)
 			}
 
-			mask := rwMask
+			mask := os.FileMode(0770)
 
-			if test.permissionMatch {
-				mask |= execMask
+			if test.sgidMatch {
+				mask |= os.ModeSetgid
+			}
 
+			if !test.permissionMatch {
+				mask &= ^os.FileMode(0110)
 			}
 			if test.sgidMatch {
 				mask |= os.ModeSetgid
@@ -183,170 +176,183 @@ func TestSkipPermissionChange(t *testing.T) {
 
 func TestSetVolumeOwnership(t *testing.T) {
 	always := v1.FSGroupChangeAlways
-	onrootMismatch := v1.FSGroupChangeOnRootMismatch
-	expectedMask := rwMask | os.ModeSetgid | execMask
-
 	tests := []struct {
-		description         string
-		fsGroupChangePolicy *v1.PodFSGroupChangePolicy
-		setupFunc           func(path string) error
-		assertFunc          func(path string) error
-		featureGate         bool
+		desc            string
+		fsGroup         bool
+		readOnly        bool
+		rootMode        os.FileMode
+		dirMode         os.FileMode
+		fileMode        os.FileMode
+		wantRootMode    os.FileMode
+		wantDirMode     os.FileMode
+		wantFileMode    os.FileMode
+		wantSymlinkMode os.FileMode
 	}{
 		{
-			description:         "featuregate=on, fsgroupchangepolicy=always",
-			fsGroupChangePolicy: &always,
-			featureGate:         true,
-			setupFunc: func(path string) error {
-				info, err := os.Lstat(path)
-				if err != nil {
-					return err
-				}
-				// change mode of root folder to be right
-				err = os.Chmod(path, info.Mode()|expectedMask)
-				if err != nil {
-					return err
-				}
-
-				// create a subdirectory with invalid permissions
-				rogueDir := filepath.Join(path, "roguedir")
-				nosgidPerm := info.Mode() &^ os.ModeSetgid
-				err = os.Mkdir(rogueDir, nosgidPerm)
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			assertFunc: func(path string) error {
-				rogueDir := filepath.Join(path, "roguedir")
-				hasCorrectPermissions := verifyDirectoryPermission(rogueDir, false /*readOnly*/)
-				if !hasCorrectPermissions {
-					return fmt.Errorf("invalid permissions on %s", rogueDir)
-				}
-				return nil
-			},
+			desc:            "no fsGroup",
+			fsGroup:         false,
+			readOnly:        false,
+			rootMode:        0777 | os.ModeSticky | os.ModeDir,
+			dirMode:         0777 | os.ModeDir,
+			fileMode:        0666,
+			wantRootMode:    0777 | os.ModeSticky | os.ModeDir,
+			wantDirMode:     0777 | os.ModeDir,
+			wantFileMode:    0666,
+			wantSymlinkMode: 0777 | os.ModeSymlink,
 		},
 		{
-			description:         "featuregate=on, fsgroupchangepolicy=onrootmismatch,rootdir=validperm",
-			fsGroupChangePolicy: &onrootMismatch,
-			featureGate:         true,
-			setupFunc: func(path string) error {
-				info, err := os.Lstat(path)
-				if err != nil {
-					return err
-				}
-				// change mode of root folder to be right
-				err = os.Chmod(path, info.Mode()|expectedMask)
-				if err != nil {
-					return err
-				}
-
-				// create a subdirectory with invalid permissions
-				rogueDir := filepath.Join(path, "roguedir")
-				err = os.Mkdir(rogueDir, rwMask)
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			assertFunc: func(path string) error {
-				rogueDir := filepath.Join(path, "roguedir")
-				hasCorrectPermissions := verifyDirectoryPermission(rogueDir, false /*readOnly*/)
-				if hasCorrectPermissions {
-					return fmt.Errorf("invalid permissions on %s", rogueDir)
-				}
-				return nil
-			},
+			desc:            "fsGroup",
+			fsGroup:         true,
+			readOnly:        false,
+			rootMode:        0700 | os.ModeSticky | os.ModeDir,
+			dirMode:         0700 | os.ModeDir,
+			fileMode:        0600,
+			wantRootMode:    0770 | os.ModeSticky | os.ModeSetgid | os.ModeDir,
+			wantDirMode:     0770 | os.ModeDir | os.ModeSetgid,
+			wantFileMode:    0660,
+			wantSymlinkMode: 0777 | os.ModeSymlink,
 		},
 		{
-			description:         "featuregate=on, fsgroupchangepolicy=onrootmismatch,rootdir=invalidperm",
-			fsGroupChangePolicy: &onrootMismatch,
-			featureGate:         true,
-			setupFunc: func(path string) error {
-				// change mode of root folder to be right
-				err := os.Chmod(path, 0770)
-				if err != nil {
-					return err
-				}
-
-				// create a subdirectory with invalid permissions
-				rogueDir := filepath.Join(path, "roguedir")
-				err = os.Mkdir(rogueDir, rwMask)
-				if err != nil {
-					return err
-				}
-				return nil
-			},
-			assertFunc: func(path string) error {
-				rogueDir := filepath.Join(path, "roguedir")
-				hasCorrectPermissions := verifyDirectoryPermission(rogueDir, false /*readOnly*/)
-				if !hasCorrectPermissions {
-					return fmt.Errorf("invalid permissions on %s", rogueDir)
-				}
-				return nil
-			},
+			desc:            "fsGroup, read only",
+			fsGroup:         true,
+			readOnly:        true,
+			rootMode:        0700 | os.ModeSticky | os.ModeDir,
+			dirMode:         0700 | os.ModeDir,
+			fileMode:        0600,
+			wantRootMode:    0550 | os.ModeSticky | os.ModeSetgid | os.ModeDir,
+			wantDirMode:     0550 | os.ModeDir | os.ModeSetgid,
+			wantFileMode:    0440,
+			wantSymlinkMode: 0777 | os.ModeSymlink,
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, test.featureGate)()
-			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
-			if err != nil {
-				t.Fatalf("error creating temp dir: %v", err)
-			}
+	// when i == 0, FsGroupPolicy is enabled to test new path.
+	//      i == 1, FsGroupPolicy is disabled to test legacy path.
+	for i := 0; i < 2; i++ {
+		for _, test := range tests {
+			t.Run(test.desc, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConfigurableFSGroupPolicy, i == 0)()
 
-			defer os.RemoveAll(tmpDir)
-			info, err := os.Lstat(tmpDir)
-			if err != nil {
-				t.Fatalf("error reading permission of tmpdir: %v", err)
-			}
+				root := utiltesting.MkTmpdirOrDie("root")
+				defer os.RemoveAll(root)
+				chmod(root, test.rootMode)
 
-			stat, ok := info.Sys().(*syscall.Stat_t)
-			if !ok || stat == nil {
-				t.Fatalf("error reading permission stats for tmpdir: %s", tmpDir)
-			}
+				dir := filepath.Join(root, "dir")
+				err := os.Mkdir(dir, test.dirMode)
+				if err != nil {
+					t.Fatalf("error creating a dir in root dir: %v", err)
+				}
+				chmod(dir, test.dirMode)
 
-			var expectedGid int64 = int64(stat.Gid)
-			err = test.setupFunc(tmpDir)
-			if err != nil {
-				t.Errorf("for %s error running setup with: %v", test.description, err)
-			}
+				file := filepath.Join(dir, "file")
+				_, err = os.Create(file)
+				if err != nil {
+					t.Fatalf("error creating a file in dir: %v", err)
+				}
+				chmod(file, test.fileMode)
 
-			mounter := &localFakeMounter{path: tmpDir}
-			err = SetVolumeOwnership(mounter, &expectedGid, test.fsGroupChangePolicy)
-			if err != nil {
-				t.Errorf("for %s error changing ownership with: %v", test.description, err)
-			}
-			err = test.assertFunc(tmpDir)
-			if err != nil {
-				t.Errorf("for %s error verifying permissions with: %v", test.description, err)
-			}
-		})
+				symlink := filepath.Join(root, "symlink")
+				err = os.Symlink(file, symlink)
+				if err != nil {
+					t.Fatalf("error creating a symlink in root dir: %v", err)
+				}
+				// should NOT change mode of symlink because it follows the link.
+
+				if !(uid(root) == uid(dir) && uid(dir) == uid(file) && uid(file) == uid(symlink)) {
+					panic("uid not the same")
+				}
+				if !(gid(root) == gid(dir) && gid(dir) == gid(file) && gid(file) == gid(symlink)) {
+					panic("gid not the same")
+				}
+
+				// until now, a volume is created:
+				// - root
+				//   - dir
+				//     - file <-
+				//             |
+				//   - symlink->
+
+				var wantGID *int64
+				if test.fsGroup {
+					// ideally should set this to a different group.
+					wantGID = new(int64)
+					*wantGID = gid(root)
+				}
+				mounter := &localFakeMounter{path: root, attributes: Attributes{ReadOnly: test.readOnly}}
+
+				err = SetVolumeOwnership(mounter, wantGID, &always)
+				if err != nil {
+					t.Errorf("error setting ownership: %v", err)
+				}
+
+				if test.fsGroup && (gid(root) != *wantGID || gid(dir) != *wantGID ||
+					gid(file) != *wantGID || gid(symlink) != *wantGID) {
+					t.Errorf(`
+gid of root want %v got %v
+gid of dir want %v got %v
+gid of file want %v got %v
+gid of symlink want %v got %v
+                    `,
+						*wantGID, gid(root),
+						*wantGID, gid(dir),
+						*wantGID, gid(file),
+						*wantGID, gid(symlink))
+				}
+
+				if mode(root) != test.wantRootMode || mode(dir) != test.wantDirMode ||
+					mode(file) != test.wantFileMode || mode(symlink) != test.wantSymlinkMode {
+					t.Errorf(`
+mode of root want %v got %v
+mode of dir want %v got %v
+mode of file want %v got %v
+mode of symlink want %v got %v
+                    `,
+						test.wantRootMode, mode(root),
+						test.wantDirMode, mode(dir),
+						test.wantFileMode, mode(file),
+						test.wantSymlinkMode, mode(symlink))
+				}
+			})
+		}
+
 	}
 }
 
-// verifyDirectoryPermission checks if given path has directory permissions
-// that is expected by k8s. If returns true if it does otherwise false
-func verifyDirectoryPermission(path string, readonly bool) bool {
+func uid(path string) int64 {
 	info, err := os.Lstat(path)
 	if err != nil {
-		return false
+		panic(err)
 	}
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok || stat == nil {
-		return false
+		panic(err)
 	}
-	unixPerms := rwMask
+	return int64(stat.Uid)
+}
 
-	if readonly {
-		unixPerms = roMask
+func gid(path string) int64 {
+	info, err := os.Lstat(path)
+	if err != nil {
+		panic(err)
 	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat == nil {
+		panic(err)
+	}
+	return int64(stat.Gid)
+}
 
-	unixPerms |= execMask
-	filePerm := info.Mode().Perm()
-	if (unixPerms&filePerm == unixPerms) && (info.Mode()&os.ModeSetgid != 0) {
-		return true
+func mode(path string) os.FileMode {
+	info, err := os.Lstat(path)
+	if err != nil {
+		panic(err)
 	}
-	return false
+	return info.Mode()
+}
+
+func chmod(path string, mode os.FileMode) {
+	err := os.Chmod(path, mode)
+	if err != nil {
+		panic(err)
+	}
 }

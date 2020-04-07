@@ -31,14 +31,17 @@ import (
 )
 
 const (
-	rwMask   = os.FileMode(0660)
-	roMask   = os.FileMode(0440)
-	execMask = os.FileMode(0110)
+	modeUserRWPerm  os.FileMode = 0600
+	modeUserXPerm   os.FileMode = 0100
+	modeGroupRWPerm os.FileMode = 0060
+	modeGroupXPerm  os.FileMode = 0010
+	modeAllWPerm    os.FileMode = 0222
+	modeAllXPerm    os.FileMode = 0111
 )
 
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
-// fsGroup. If fsGroup is nil nothing is done.
+// fsGroup. If fsGroup is nil, nothing is done.
 func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
 	if fsGroup == nil {
 		return nil
@@ -77,18 +80,7 @@ func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
 	})
 }
 
-func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
-	// chown and chmod pass through to the underlying file for symlinks.
-	// Symlinks have a mode of 777 but this really doesn't mean anything.
-	// The permissions of the underlying file are what matter.
-	// However, if one reads the mode of a symlink then chmods the symlink
-	// with that mode, it changes the mode of the underlying file, overridden
-	// the defaultMode and permissions initialized by the volume plugin, which
-	// is not what we want; thus, we skip chown/chmod for symlinks.
-	if info.Mode()&os.ModeSymlink != 0 {
-		return nil
-	}
-
+func changeFilePermission(filename string, fsGroup *int64, readOnly bool, info os.FileInfo) error {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return nil
@@ -99,22 +91,27 @@ func changeFilePermission(filename string, fsGroup *int64, readonly bool, info o
 		return nil
 	}
 
-	err := os.Chown(filename, int(stat.Uid), int(*fsGroup))
+	// use lchown to not follow symlinks when chown. we want to change the
+	// ownership of symlinks because in sticky directory, the owner of symlink
+	// has to be the binary following the symlink.
+	gid := int(*fsGroup)
+	err := os.Lchown(filename, -1, gid)
 	if err != nil {
-		klog.Errorf("Chown failed on %v: %v", filename, err)
+		klog.Errorf("Chown failed on %v: %v: %v", filename, err, gid)
 	}
 
-	mask := rwMask
-	if readonly {
-		mask = roMask
+	// chmod pass through to the underlying file for symlinks.
+	// Symlinks have a mode of 777 but this really doesn't mean anything.
+	// The permissions of the underlying file are what matter.
+	// However, if one reads the mode of a symlink then chmods the symlink
+	// with that mode, it changes the mode of the underlying file, overridden
+	// the defaultMode and permissions initialized by the volume plugin, which
+	// is not what we want; thus, we skip chmod for symlinks.
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil
 	}
 
-	if info.IsDir() {
-		mask |= os.ModeSetgid
-		mask |= execMask
-	}
-
-	err = os.Chmod(filename, info.Mode()|mask)
+	err = os.Chmod(filename, modifyMode(info.Mode(), fsGroup, readOnly, info.IsDir()))
 	if err != nil {
 		klog.Errorf("Chmod failed on %v: %v", filename, err)
 	}
@@ -126,39 +123,35 @@ func skipPermissionChange(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *
 	dir := mounter.GetPath()
 
 	if fsGroupChangePolicy == nil || *fsGroupChangePolicy != v1.FSGroupChangeOnRootMismatch {
-		klog.V(4).Infof("perform recursive ownership change for %s", dir)
+		klog.V(4).Infof("Perform recursive ownership change for %s", dir)
 		return false
 	}
 	return !requiresPermissionChange(mounter.GetPath(), fsGroup, mounter.GetAttributes().ReadOnly)
 }
 
-func requiresPermissionChange(rootDir string, fsGroup *int64, readonly bool) bool {
+func requiresPermissionChange(rootDir string, fsGroup *int64, readOnly bool) bool {
 	fsInfo, err := os.Stat(rootDir)
 	if err != nil {
-		klog.Errorf("performing recursive ownership change on %s because reading permissions of root volume failed: %v", rootDir, err)
+		klog.Errorf("Performing recursive ownership change on %s because reading permissions of root volume failed: %v", rootDir, err)
 		return true
 	}
 	stat, ok := fsInfo.Sys().(*syscall.Stat_t)
 	if !ok || stat == nil {
-		klog.Errorf("performing recursive ownership change on %s because reading permissions of root volume failed", rootDir)
+		klog.Errorf("Performing recursive ownership change on %s because reading permissions of root volume failed", rootDir)
 		return true
 	}
 
 	if int(stat.Gid) != int(*fsGroup) {
-		klog.V(4).Infof("expected group ownership of volume %s did not match with: %d", rootDir, stat.Gid)
+		klog.V(4).Infof("Expected group ownership of volume %s did not match with: %d", rootDir, stat.Gid)
 		return true
-	}
-	unixPerms := rwMask
-
-	if readonly {
-		unixPerms = roMask
 	}
 
 	// if rootDir is not a directory then we should apply permission change anyways
 	if !fsInfo.IsDir() {
 		return true
 	}
-	unixPerms |= execMask
+
+	unixPerms := modifyMode(fsInfo.Mode(), fsGroup, readOnly, true).Perm()
 	filePerm := fsInfo.Mode().Perm()
 
 	// We need to check if actual permissions of root directory is a superset of permissions required by unixPerms.
@@ -169,7 +162,7 @@ func requiresPermissionChange(rootDir string, fsGroup *int64, readonly bool) boo
 	//     unixPerms: 770, filePerms: 750 : 770&750 = 750 (perms on directory is NOT a superset)
 	// We also need to check if setgid bits are set in permissions of the directory.
 	if (unixPerms&filePerm != unixPerms) || (fsInfo.Mode()&os.ModeSetgid == 0) {
-		klog.V(4).Infof("performing recursive ownership change on %s because of mismatching mode", rootDir)
+		klog.V(4).Infof("Performing recursive ownership change on %s because of mismatching mode", rootDir)
 		return true
 	}
 	return false
@@ -227,4 +220,22 @@ func walk(path string, info os.FileInfo, walkFunc filepath.WalkFunc) error {
 		}
 	}
 	return walkFunc(path, info, nil)
+}
+
+func modifyMode(mode os.FileMode, fsGroup *int64, readOnly, isDir bool) os.FileMode {
+	mode |= modeUserRWPerm | modeGroupRWPerm
+	if isDir {
+		mode |= modeUserXPerm | modeGroupXPerm
+		// ensure consistency of group ownership within directory
+		mode |= os.ModeSetgid
+	}
+	if readOnly {
+		// clear write bits
+		mode &= ^modeAllWPerm
+		if !isDir {
+			// clear exec bits
+			mode &= ^modeAllXPerm
+		}
+	}
+	return mode
 }
