@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/test/conformance/behaviors"
 )
 
-func link(o *options) {
+func link(o *options) error {
 	var behaviorFiles []string
 	behaviorsMapping := make(map[string][]string)
 	var conformanceDataList []behaviors.ConformanceData
@@ -36,7 +36,7 @@ func link(o *options) {
 	err := filepath.Walk(o.behaviorsDir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				fmt.Printf("%v", err)
+				return err
 			}
 			r, _ := regexp.Compile(".+.yaml$")
 			if r.MatchString(path) {
@@ -45,23 +45,30 @@ func link(o *options) {
 			return nil
 		})
 	if err != nil {
-		fmt.Printf("%v", err)
-		return
+		return err
 	}
-	fmt.Printf("%v", behaviorFiles)
+	fmt.Println()
+	fmt.Printf("Using behaviors from these %d files:\n", len(behaviorFiles))
+	for _, f := range behaviorFiles {
+		fmt.Println("    ", f)
+	}
+	fmt.Println()
+	if o.listAll {
+		fmt.Println("All behaviors:")
+	} else {
+		fmt.Println("Behaviors not covered by any conformance test:")
+	}
 
 	for _, behaviorFile := range behaviorFiles {
 		var suite behaviors.Suite
 
 		yamlFile, err := ioutil.ReadFile(behaviorFile)
 		if err != nil {
-			fmt.Printf("%v", err)
-			return
+			return err
 		}
 		err = yaml.UnmarshalStrict(yamlFile, &suite)
 		if err != nil {
-			fmt.Printf("%v", err)
-			return
+			return err
 		}
 
 		for _, behavior := range suite.Behaviors {
@@ -71,36 +78,30 @@ func link(o *options) {
 
 	conformanceYaml, err := ioutil.ReadFile(o.testdata)
 	if err != nil {
-		fmt.Printf("%v", err)
-		return
+		return err
 	}
 
 	err = yaml.Unmarshal(conformanceYaml, &conformanceDataList)
 	if err != nil {
-		fmt.Printf("%v", err)
-		return
+		return err
 	}
 
 	for _, data := range conformanceDataList {
 		for _, behaviorID := range data.Behaviors {
 			if _, ok := behaviorsMapping[behaviorID]; !ok {
-				fmt.Printf("Error, cannot find behavior \"%s\"", behaviorID)
-				return
+				return fmt.Errorf("cannot find behavior %q", behaviorID)
 			}
 			behaviorsMapping[behaviorID] = append(behaviorsMapping[behaviorID], data.CodeName)
 		}
 	}
 	printBehaviorsMapping(behaviorsMapping, o)
+	return nil
 }
 
 func printBehaviorsMapping(behaviorsMapping map[string][]string, o *options) {
 	for behaviorID, tests := range behaviorsMapping {
-		if o.listMissing {
-			if tests == nil {
-				fmt.Println(behaviorID)
-			} else {
-				fmt.Println(behaviorID)
-			}
+		if o.listAll || tests == nil {
+			fmt.Println("    ", behaviorID)
 		}
 	}
 }

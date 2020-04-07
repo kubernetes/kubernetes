@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -31,12 +32,11 @@ import (
 
 var defMap map[string]analysis.SchemaRef
 
-func gen(o *options) {
+func gen(o *options) error {
 	defMap = make(map[string]analysis.SchemaRef)
 	d, err := loads.JSONSpec(o.schemaPath)
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
-		os.Exit(1)
+		return err
 	}
 	defs := d.Analyzer.AllDefinitions()
 	sort.Slice(defs, func(i, j int) bool { return defs[i].Name < defs[j].Name })
@@ -105,27 +105,25 @@ func gen(o *options) {
 
 	var area behaviors.Area = behaviors.Area{Area: o.area, Suites: suites}
 	countFields(suites)
-	printYAML(o.behaviorsDir+o.area, area)
+	return printYAML(filepath.Join(o.behaviorsDir, o.area), area)
 }
 
-func printYAML(fileName string, areaO behaviors.Area) {
+func printYAML(fileName string, areaO behaviors.Area) error {
 	f, err := os.Create(fileName + ".yaml")
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
-		os.Exit(1)
+		return err
 	}
 	defer f.Close()
 	y, err := yaml.Marshal(areaO)
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	_, err = f.WriteString(string(y))
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 func countFields(suites []behaviors.Suite) {
