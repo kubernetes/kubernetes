@@ -559,7 +559,7 @@ func (r *REST) getAllocatorByClusterIP(service *api.Service) ipallocator.Interfa
 	}
 
 	secondaryAllocatorCIDR := r.secondaryServiceIPs.CIDR()
-	if netutil.IsIPv6String(service.Spec.ClusterIP) && netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
+	if netutil.IsIPv6String(service.Spec.ClusterIP) == netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
 		return r.secondaryServiceIPs
 	}
 
@@ -574,7 +574,7 @@ func (r *REST) getAllocatorBySpec(service *api.Service) ipallocator.Interface {
 	}
 
 	secondaryAllocatorCIDR := r.secondaryServiceIPs.CIDR()
-	if *(service.Spec.IPFamily) == api.IPv6Protocol && netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
+	if (*(service.Spec.IPFamily) == api.IPv6Protocol) == netutil.IsIPv6CIDR(&secondaryAllocatorCIDR) {
 		return r.secondaryServiceIPs
 	}
 

@@ -31,8 +31,8 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	"k8s.io/utils/pointer"
 )
 
@@ -1619,7 +1619,7 @@ func TestMultipleConstraints(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	nodeInfo := schedulertypes.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p := &PodTopologySpread{}

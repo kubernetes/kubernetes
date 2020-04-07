@@ -41,6 +41,7 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -345,25 +346,20 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				if !createCallFound {
 					t.Errorf("Got no create call for load balancer, expected one")
 				}
-				// TODO(@MrHohn): Clean up the awkward pattern here.
-				var balancer *fakecloud.Balancer
-				for k := range cloud.Balancers {
-					if balancer == nil {
-						b := cloud.Balancers[k]
-						balancer = &b
-					} else {
-						t.Errorf("Got load balancer %v, expected one to be created", cloud.Balancers)
-						break
+
+				if len(cloud.Balancers) == 0 {
+					t.Errorf("Got no load balancer: %v, expected one to be created", cloud.Balancers)
+				}
+
+				for _, balancer := range cloud.Balancers {
+					if balancer.Name != controller.balancer.GetLoadBalancerName(context.Background(), "", tc.service) ||
+						balancer.Region != region ||
+						balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
+						t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
 					}
 				}
-				if balancer == nil {
-					t.Errorf("Got no load balancer, expected one to be created")
-				} else if balancer.Name != controller.balancer.GetLoadBalancerName(context.Background(), "", tc.service) ||
-					balancer.Region != region ||
-					balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
-					t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
-				}
 			}
+
 			if tc.expectDeleteAttempt {
 				deleteCallFound := false
 				for _, call := range cloud.Calls {
@@ -472,8 +468,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		var services []*v1.Service
 		services = append(services, item.services...)
 
-		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
-			t.Errorf("unexpected error: %v", err)
+		if servicesToRetry := controller.updateLoadBalancerHosts(services, nodes); servicesToRetry != nil {
+			t.Errorf("unexpected servicesToRetry: %v", servicesToRetry)
 		}
 		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
 			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)

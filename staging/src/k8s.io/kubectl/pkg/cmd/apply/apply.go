@@ -316,13 +316,14 @@ func isIncompatibleServerError(err error) bool {
 	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
 }
 
-// GetObjects returns a (possibly cached) version of all the objects to apply
-// as a slice of pointer to resource.Info. The resource.Info contains the object
-// and some other denormalized data. This function should not be called until
-// AFTER the "complete" and "validate" methods have been called to ensure that
-// the ApplyOptions is filled in and valid. Returns an error if the resource
-// builder returns an error retrieving the objects.
+// GetObjects returns a (possibly cached) version of all the valid objects to apply
+// as a slice of pointer to resource.Info and an error if one or more occurred.
+// IMPORTANT: This function can return both valid objects AND an error, since
+// "ContinueOnError" is set on the builder. This function should not be called
+// until AFTER the "complete" and "validate" methods have been called to ensure that
+// the ApplyOptions is filled in and valid.
 func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
+	var err error = nil
 	if !o.objectsCached {
 		// include the uninitialized objects by default if --prune is true
 		// unless explicitly set --include-uninitialized=false
@@ -335,17 +336,10 @@ func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 			LabelSelectorParam(o.Selector).
 			Flatten().
 			Do()
-		if err := r.Err(); err != nil {
-			return nil, err
-		}
-		infos, err := r.Infos()
-		if err != nil {
-			return nil, err
-		}
-		o.objects = infos
+		o.objects, err = r.Infos()
 		o.objectsCached = true
 	}
-	return o.objects, nil
+	return o.objects, err
 }
 
 // SetObjects stores the set of objects (as resource.Info) to be

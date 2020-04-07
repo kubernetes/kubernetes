@@ -72,7 +72,6 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 const (
@@ -143,9 +142,6 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
-
-	// ssh port
-	sshPort = "22"
 )
 
 var (
@@ -1114,40 +1110,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	return nil
 }
 
-// RestartControllerManager restarts the kube-controller-manager.
-func RestartControllerManager() error {
-	// TODO: Make it work for all providers and distros.
-	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", TestContext.Provider)
-	}
-	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
-		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
-	}
-	cmd := "pidof kube-controller-manager | xargs sudo kill"
-	Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
-	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart controller-manager: %v", err)
-	}
-	return nil
-}
-
-// WaitForControllerManagerUp waits for the kube-controller-manager to be up.
-func WaitForControllerManagerUp() error {
-	cmd := "curl http://localhost:" + strconv.Itoa(InsecureKubeControllerManagerPort) + "/healthz"
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
-		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
-		}
-		if result.Stdout == "ok" {
-			return nil
-		}
-	}
-	return fmt.Errorf("waiting for controller-manager timed out")
-}
-
 // LookForStringInLog looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
@@ -1272,14 +1234,6 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
 	return ips.List()
-}
-
-// DescribeIng describes information of ingress by running kubectl describe ing.
-func DescribeIng(ns string) {
-	Logf("\nOutput of kubectl describe ing:\n")
-	desc, _ := RunKubectl(
-		ns, "describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-	Logf(desc)
 }
 
 // CreateEmptyFileOnPod creates empty file at given path on the pod.

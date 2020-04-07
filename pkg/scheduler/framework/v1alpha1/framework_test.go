@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 const (
@@ -138,10 +138,10 @@ type TestPluginPreFilterExtension struct {
 	inj injectedResult
 }
 
-func (e *TestPluginPreFilterExtension) AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (e *TestPluginPreFilterExtension) AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	return NewStatus(Code(e.inj.PreFilterAddPodStatus), "injected status")
 }
-func (e *TestPluginPreFilterExtension) RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (e *TestPluginPreFilterExtension) RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	return NewStatus(Code(e.inj.PreFilterRemovePodStatus), "injected status")
 }
 
@@ -165,7 +165,7 @@ func (pl *TestPlugin) PreFilterExtensions() PreFilterExtensions {
 	return &TestPluginPreFilterExtension{inj: pl.inj}
 }
 
-func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	return NewStatus(Code(pl.inj.FilterStatus), "injected filter status")
 }
 
@@ -228,13 +228,13 @@ func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, stat
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod,
-	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	pl.AddCalled++
 	return nil
 }
 
 func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod,
-	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	podToRemove *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status {
 	pl.RemoveCalled++
 	return nil
 }

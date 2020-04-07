@@ -70,19 +70,6 @@ users:
 		t.Fatal(err)
 	}
 
-	v1alpha1Config := filepath.Join(tmpDir, "kubeconfig_v1alpha1.yaml")
-	if err := ioutil.WriteFile(v1alpha1Config, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1alpha1
-kind: KubeSchedulerConfiguration
-schedulerName: "my-old-scheduler"
-clientConnection:
-  kubeconfig: "%s"
-leaderElection:
-  leaderElect: true
-hardPodAffinitySymmetricWeight: 3`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
 	// plugin config
 	pluginConfigFile := filepath.Join(tmpDir, "plugin.yaml")
 	if err := ioutil.WriteFile(pluginConfigFile, []byte(fmt.Sprintf(`
@@ -219,16 +206,6 @@ profiles:
 			},
 			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
 				"default-scheduler": defaultPlugins,
-			},
-		},
-		{
-			name: "v1alpha1 config with SchedulerName and HardPodAffinitySymmetricWeight",
-			flags: []string{
-				"--config", v1alpha1Config,
-				"--kubeconfig", configKubeconfig,
-			},
-			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
-				"my-old-scheduler": defaultPlugins,
 			},
 		},
 		{

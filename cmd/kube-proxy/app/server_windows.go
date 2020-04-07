@@ -138,19 +138,20 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}
 
 	return &ProxyServer{
-		Client:             client,
-		EventClient:        eventClient,
-		Proxier:            proxier,
-		Broadcaster:        eventBroadcaster,
-		Recorder:           recorder,
-		ProxyMode:          proxyMode,
-		NodeRef:            nodeRef,
-		MetricsBindAddress: config.MetricsBindAddress,
-		EnableProfiling:    config.EnableProfiling,
-		OOMScoreAdj:        config.OOMScoreAdj,
-		ConfigSyncPeriod:   config.ConfigSyncPeriod.Duration,
-		HealthzServer:      healthzServer,
-		UseEndpointSlices:  false,
+		Client:              client,
+		EventClient:         eventClient,
+		Proxier:             proxier,
+		Broadcaster:         eventBroadcaster,
+		Recorder:            recorder,
+		ProxyMode:           proxyMode,
+		NodeRef:             nodeRef,
+		MetricsBindAddress:  config.MetricsBindAddress,
+		BindAddressHardFail: config.BindAddressHardFail,
+		EnableProfiling:     config.EnableProfiling,
+		OOMScoreAdj:         config.OOMScoreAdj,
+		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
+		HealthzServer:       healthzServer,
+		UseEndpointSlices:   false,
 	}, nil
 }
 

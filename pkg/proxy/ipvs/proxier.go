@@ -608,7 +608,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
 
-	var bmods []string
+	var bmods, lmods []string
 
 	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
 	modulesFile, err := os.Open("/proc/modules")
@@ -650,11 +650,15 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 			if err != nil {
 				klog.Warningf("Failed to load kernel module %v with modprobe. "+
 					"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", module)
+			} else {
+				lmods = append(lmods, module)
 			}
 		}
 	}
 
-	return append(mods, bmods...), nil
+	mods = append(mods, bmods...)
+	mods = append(mods, lmods...)
+	return mods, nil
 }
 
 // getFirstColumn reads all the content from r into memory and return a
@@ -1040,8 +1044,8 @@ func (proxier *Proxier) syncProxyRules() {
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
-			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIP().String())
+		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+			klog.V(2).Infof("Stale %s service %v -> %s", strings.ToLower(string(svcInfo.Protocol())), svcPortName, svcInfo.ClusterIP().String())
 			staleServices.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				staleServices.Insert(extIP)
@@ -1859,9 +1863,6 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 	}
 	if proxier.iptables.HasRandomFully() {
 		masqRule = append(masqRule, "--random-fully")
-		klog.V(3).Info("Using `--random-fully` in the MASQUERADE rule for iptables")
-	} else {
-		klog.V(2).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
 	}
 	writeLine(proxier.natRules, masqRule...)
 
@@ -1888,25 +1889,26 @@ func (proxier *Proxier) getExistingChains(buffer *bytes.Buffer, table utiliptabl
 	return nil
 }
 
-// After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
+// After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
 // risk sending more traffic to it, all of which will be lost (because UDP).
 // This assumes the proxier mutex is held
 func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && svcInfo.Protocol() == v1.ProtocolUDP {
+		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
-			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, v1.ProtocolUDP)
+			svcProto := svcInfo.Protocol()
+			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, v1.ProtocolUDP)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
 				}

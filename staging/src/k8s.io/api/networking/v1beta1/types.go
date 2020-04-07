@@ -315,6 +315,5 @@ type IngressClassList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of IngressClasses.
-	// +listType=set
 	Items []IngressClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

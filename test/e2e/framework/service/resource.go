@@ -104,9 +104,19 @@ func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
-		return LoadBalancerCreateTimeoutLarge
+		return loadBalancerCreateTimeoutLarge
 	}
-	return LoadBalancerCreateTimeoutDefault
+	return loadBalancerCreateTimeoutDefault
+}
+
+// GetServiceLoadBalancerPropagationTimeout returns a timeout value for propagating a load balancer of a service.
+func GetServiceLoadBalancerPropagationTimeout(cs clientset.Interface) time.Duration {
+	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+	framework.ExpectNoError(err)
+	if len(nodes.Items) > LargeClusterMinNodesNumber {
+		return loadBalancerPropagationTimeoutLarge
+	}
+	return loadBalancerPropagationTimeoutDefault
 }
 
 // CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.

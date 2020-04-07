@@ -47,7 +47,7 @@ type Location struct {
 }
 
 // A Map represents a mapping between token locations in an input source text
-// and locations in the correspnding output text.
+// and locations in the corresponding output text.
 type Map map[Location]Location
 
 // Find reports whether the specified span is recorded by m, and if so returns

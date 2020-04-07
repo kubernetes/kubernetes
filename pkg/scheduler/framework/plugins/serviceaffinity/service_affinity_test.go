@@ -27,7 +27,7 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 func TestServiceAffinity(t *testing.T) {
@@ -591,7 +591,7 @@ func sortNodeScoreList(out framework.NodeScoreList) {
 	})
 }
 
-func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *nodeinfo.NodeInfo {
+func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *schedulertypes.NodeInfo {
 	t.Helper()
 	nodeInfo, err := snapshot.NodeInfos().Get(name)
 	if err != nil {
@@ -602,7 +602,7 @@ func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *nodei
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := nodeinfo.NewNodeInfo()
+	nodeInfo := schedulertypes.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p := &ServiceAffinity{

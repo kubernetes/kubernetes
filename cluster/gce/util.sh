@@ -20,7 +20,7 @@
 # config-default.sh.
 readonly GCE_MAX_LOCAL_SSD=8
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
@@ -1242,6 +1242,7 @@ CUSTOM_CALICO_NODE_DAEMONSET_YAML: |
 $(echo "${CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}" | sed -e "s/'/''/g")
 CUSTOM_TYPHA_DEPLOYMENT_YAML: |
 $(echo "${CUSTOM_TYPHA_DEPLOYMENT_YAML:-}" | sed -e "s/'/''/g")
+CONCURRENT_SERVICE_SYNCS: $(yaml-quote ${CONCURRENT_SERVICE_SYNCS:-})
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \

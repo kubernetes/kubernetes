@@ -375,7 +375,7 @@ HTTP server:
 
 ### netexec
 
-Starts a HTTP server on given TCP / UDP ports with the following endpoints:
+Starts a HTTP server on given port with the following endpoints:
 
 - `/`: Returns the request's timestamp.
 - `/clientip`: Returns the request's IP address.
@@ -389,7 +389,7 @@ Starts a HTTP server on given TCP / UDP ports with the following endpoints:
   - `request`: The HTTP endpoint or data to be sent through UDP. If not specified, it will result
     in a `400 Bad Request` status code being returned.
   - `protocol`: The protocol which will be used when making the request. Default value: `http`.
-    Acceptable values: `http`, `udp`.
+    Acceptable values: `http`, `udp`, `sctp`.
   - `tries`: The number of times the request will be performed. Default value: `1`.
 - `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`)
 - `/exit`: Closes the server with the given code (`/exit?code=some-code`). The `code`
@@ -407,10 +407,19 @@ Starts a HTTP server on given TCP / UDP ports with the following endpoints:
   Returns a JSON with the fields `output` (containing the file's name on the server) and
   `error` containing any potential server side errors.
 
+It will also start a UDP server on the indicated UDP port that responds to the following commands:
+
+- `hostname`: Returns the server's hostname
+- `echo <msg>`: Returns the given `<msg>`
+- `clientip`: Returns the request's IP address
+
+Additionally, if (and only if) `--sctp-port` is passed, it will start an SCTP server on that port,
+responding to the same commands as the UDP server.
+
 Usage:
 
 ```console
-    kubectl exec test-agnhost -- /agnhost netexec [--http-port <http-port>] [--udp-port <udp-port>]
+    kubectl exec test-agnhost -- /agnhost netexec [--http-port <http-port>] [--udp-port <udp-port>] [--sctp-port <sctp-port>]
 ```
 
 ### nettest

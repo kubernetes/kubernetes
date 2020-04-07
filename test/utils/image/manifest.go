@@ -35,6 +35,7 @@ type RegistryList struct {
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
+	// TODO: The last consumer of this has been removed and it should be deprecated
 	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
@@ -71,10 +72,11 @@ func initReg() RegistryList {
 		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		// TODO: After the domain flip, this should instead be k8s.gcr.io/k8s-artifacts-prod/e2e-test-images
-		PromoterE2eRegistry:     "us.gcr.io/k8s-artifacts-prod/e2e-test-images",
-		InvalidRegistry:         "invalid.com/invalid",
-		GcRegistry:              "k8s.gcr.io",
-		GcrReleaseRegistry:      "gcr.io/gke-release",
+		PromoterE2eRegistry: "us.gcr.io/k8s-artifacts-prod/e2e-test-images",
+		InvalidRegistry:     "invalid.com/invalid",
+		GcRegistry:          "k8s.gcr.io",
+		GcrReleaseRegistry:  "gcr.io/gke-release",
+		// TODO: The last consumer of this has been removed and it should be deleted
 		GoogleContainerRegistry: "gcr.io/google-containers",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
@@ -107,7 +109,6 @@ var (
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
-	googleContainerRegistry = registry.GoogleContainerRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	quayK8sCSI              = registry.QuayK8sCSI
 	quayIncubator           = registry.QuayIncubator
@@ -191,8 +192,6 @@ const (
 	ResourceConsumer
 	// SdDummyExporter image
 	SdDummyExporter
-	// StartupScript image
-	StartupScript
 	// VolumeNFSServer image
 	VolumeNFSServer
 	// VolumeISCSIServer image
@@ -205,7 +204,7 @@ const (
 
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.12"}
+	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.13"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
@@ -241,7 +240,6 @@ func initImageConfigs() map[int]Config {
 	configs[RegressionIssue74839] = Config{e2eRegistry, "regression-issue-74839-amd64", "1.0"}
 	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
-	configs[StartupScript] = Config{googleContainerRegistry, "startup-script", "v1"}
 	configs[VolumeNFSServer] = Config{e2eRegistry, "volume/nfs", "1.0"}
 	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}

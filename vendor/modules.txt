@@ -217,7 +217,7 @@ github.com/dgrijalva/jwt-go
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
-# github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0 => github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
+# github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c => github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
 github.com/docker/docker/api
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/blkiodev
@@ -333,7 +333,7 @@ github.com/gogo/protobuf/vanity/command
 github.com/golang/groupcache/lru
 # github.com/golang/mock v1.3.1 => github.com/golang/mock v1.3.1
 github.com/golang/mock/gomock
-# github.com/golang/protobuf v1.3.2 => github.com/golang/protobuf v1.3.2
+# github.com/golang/protobuf v1.3.3 => github.com/golang/protobuf v1.3.3
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
@@ -401,10 +401,10 @@ github.com/google/go-cmp/cmp/internal/value
 github.com/google/gofuzz
 # github.com/google/uuid v1.1.1 => github.com/google/uuid v1.1.1
 github.com/google/uuid
-# github.com/googleapis/gnostic v0.1.0 => github.com/googleapis/gnostic v0.1.0
-github.com/googleapis/gnostic/OpenAPIv2
+# github.com/googleapis/gnostic v0.4.1 => github.com/googleapis/gnostic v0.4.1
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
+github.com/googleapis/gnostic/openapiv2
 # github.com/gophercloud/gophercloud v0.1.0 => github.com/gophercloud/gophercloud v0.1.0
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
@@ -478,6 +478,8 @@ github.com/hpcloud/tail/winfile
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0 => github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
+# github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5 => github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
+github.com/ishidawataru/sctp
 # github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0 => github.com/jonboulle/clockwork v0.1.0
@@ -733,7 +735,7 @@ github.com/vmware/govmomi/vim25/xml
 github.com/xiang90/probing
 # go.etcd.io/bbolt v1.3.3 => go.etcd.io/bbolt v1.3.3
 go.etcd.io/bbolt
-# go.etcd.io/etcd v0.5.0-alpha.5.0.20200224211402-c65a9e2dd1fd => go.etcd.io/etcd v0.5.0-alpha.5.0.20200224211402-c65a9e2dd1fd
+# go.etcd.io/etcd v0.5.0-alpha.5.0.20200401174654-e694b7bb0875 => go.etcd.io/etcd v0.5.0-alpha.5.0.20200401174654-e694b7bb0875
 go.etcd.io/etcd/auth
 go.etcd.io/etcd/auth/authpb
 go.etcd.io/etcd/client
@@ -874,7 +876,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20190409202823-959b441ac422 => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20200202094626-16171245cfb2 => golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+# golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e => golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -903,7 +905,7 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
+# golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -1714,7 +1716,7 @@ k8s.io/cri-api/pkg/apis/testing
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
-# k8s.io/gengo v0.0.0-20200114144118-36b2048a9120 => k8s.io/gengo v0.0.0-20200114144118-36b2048a9120
+# k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12 => k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
 k8s.io/gengo/examples/defaulter-gen/generators
@@ -1759,7 +1761,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c => k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
+# k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d => k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
 k8s.io/kube-openapi/pkg/aggregator
@@ -1778,7 +1780,6 @@ k8s.io/kube-openapi/pkg/util/sets
 k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
 k8s.io/kube-scheduler/config/v1
-k8s.io/kube-scheduler/config/v1alpha1
 k8s.io/kube-scheduler/config/v1alpha2
 k8s.io/kube-scheduler/extender/v1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl

@@ -41,9 +41,9 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -143,7 +143,7 @@ type FakeExtender struct {
 	ignorable        bool
 
 	// Cached node information for fake extender
-	cachedNodeNameToInfo map[string]*schedulernodeinfo.NodeInfo
+	cachedNodeNameToInfo map[string]*schedulertypes.NodeInfo
 }
 
 func (f *FakeExtender) Name() string {

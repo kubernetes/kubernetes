@@ -38,7 +38,6 @@ import (
 )
 
 const (
-	sshPort                = "22"
 	driverDir              = "test/e2e/testing-manifests/flexvolume/"
 	defaultVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 	// TODO: change this and config-test.sh when default flex volume install path is changed for GCI
@@ -84,7 +83,7 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	} else {
 		masterHostWithPort := framework.GetMasterHost()
 		hostName := getHostFromHostPort(masterHostWithPort)
-		host = net.JoinHostPort(hostName, sshPort)
+		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
 
 	framework.ExpectNoError(err)
@@ -113,7 +112,7 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 	} else {
 		masterHostWithPort := framework.GetMasterHost()
 		hostName := getHostFromHostPort(masterHostWithPort)
-		host = net.JoinHostPort(hostName, sshPort)
+		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
 
 	if host == "" {

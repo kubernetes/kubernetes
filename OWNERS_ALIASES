@@ -367,7 +367,7 @@ aliases:
     - smarterclayton
     - thockin
     - liggitt
-  
+
   api-reviewers:
     - erictune
     - lavalamp
@@ -406,16 +406,16 @@ aliases:
 
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
-  
+
   sig-api-machinery-api-reviewers:
     - caesarxuchao
     - deads2k
     - jpbetz
     - sttts
-  
+
   # sig-apps-api-reviewers:
-  #   - 
-  #   - 
+  #   -
+  #   -
 
   sig-auth-api-reviewers:
     - enj
@@ -428,11 +428,11 @@ aliases:
   sig-cloud-provider-api-reviewers:
     - andrewsykim
     - cheftako
-  
+
   # sig-cluster-lifecycle-api-reviewers:
-  #   - 
   #   -
-  
+  #   -
+
   sig-node-api-reviewers:
     - dchen1107
     - derekwaynecarr
@@ -446,24 +446,23 @@ aliases:
   sig-scalability-reviewers:
     - mm4tt
     - wojtek-t
-  
+
   sig-scheduling-api-reviewers:
       - bsalamat
       - k82cn
-  
+
   sig-storage-api-reviewers:
     - saad-ali
     - msau42
     - jsafrane
 
-  
+
   sig-windows-api-reviewers:
     - patricklang
     - ddebroy
     - benmoss
 
   dep-approvers:
-    - apelisse
     - BenTheElder
     - cblecker
     - dims

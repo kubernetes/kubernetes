@@ -291,14 +291,14 @@ func (le *lessor) Grant(id LeaseID, ttl int64) (*Lease, error) {
 	}
 
 	le.leaseMap[id] = l
-	item := &LeaseWithTime{id: l.ID, time: l.expiry.UnixNano()}
-	le.leaseExpiredNotifier.RegisterOrUpdate(item)
 	l.persistTo(le.b)
 
 	leaseTotalTTLs.Observe(float64(l.ttl))
 	leaseGranted.Inc()
 
 	if le.isPrimary() {
+		item := &LeaseWithTime{id: l.ID, time: l.expiry.UnixNano()}
+		le.leaseExpiredNotifier.RegisterOrUpdate(item)
 		le.scheduleCheckpointIfNeeded(l)
 	}
 
@@ -505,6 +505,7 @@ func (le *lessor) Demote() {
 	}
 
 	le.clearScheduledLeasesCheckpoints()
+	le.clearLeaseExpiredNotifier()
 
 	if le.demotec != nil {
 		close(le.demotec)
@@ -646,6 +647,10 @@ func (le *lessor) checkpointScheduledLeases() {
 
 func (le *lessor) clearScheduledLeasesCheckpoints() {
 	le.leaseCheckpointHeap = make(LeaseQueue, 0)
+}
+
+func (le *lessor) clearLeaseExpiredNotifier() {
+	le.leaseExpiredNotifier = newLeaseExpiredNotifier()
 }
 
 // expireExists returns true if expiry items exist.

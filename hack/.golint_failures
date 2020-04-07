@@ -100,7 +100,6 @@ pkg/kubeapiserver
 pkg/kubeapiserver/options
 pkg/kubectl/cmd/convert
 pkg/kubelet/apis/config/v1beta1
-pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/cm
 pkg/kubelet/container
 pkg/kubelet/container/testing
@@ -184,7 +183,6 @@ pkg/registry/scheduling/rest
 pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
-pkg/scheduler/apis/config/v1alpha1
 pkg/scheduler/apis/config/v1alpha2
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
@@ -290,7 +288,6 @@ staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/protobuf
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/recognizer
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming
-staging/src/k8s.io/apimachinery/pkg/runtime/serializer/testing
 staging/src/k8s.io/apimachinery/pkg/runtime/testing
 staging/src/k8s.io/apimachinery/pkg/selection
 staging/src/k8s.io/apimachinery/pkg/test

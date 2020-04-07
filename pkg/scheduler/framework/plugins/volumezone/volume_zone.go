@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // VolumeZone is a plugin that checks volume zone.
@@ -78,7 +78,7 @@ func (pl *VolumeZone) Name() string {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {

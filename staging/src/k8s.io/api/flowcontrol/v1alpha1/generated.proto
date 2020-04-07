@@ -84,7 +84,6 @@ message FlowSchemaList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of FlowSchemas.
-  // +listType=atomic
   repeated FlowSchema items = 2;
 }
 
@@ -275,7 +274,6 @@ message PriorityLevelConfigurationList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of request-priorities.
-  // +listType=atomic
   repeated PriorityLevelConfiguration items = 2;
 }
 

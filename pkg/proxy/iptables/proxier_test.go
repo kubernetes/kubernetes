@@ -233,7 +233,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 	}
 
 	// Create a fake executor for the conntrack utility. This should only be
-	// invoked for UDP connections, since no conntrack cleanup is needed for TCP
+	// invoked for UDP and SCTP connections, since no conntrack cleanup is needed for TCP
 	fcmd := fakeexec.FakeCmd{}
 	fexec := fakeexec.FakeExec{
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
@@ -242,7 +242,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
 	}
 	for _, tc := range testCases {
-		if tc.protocol == UDP {
+		if conntrack.IsClearConntrackNeeded(tc.protocol) {
 			var cmdOutput string
 			var simErr error
 			if tc.simulatedErr == "" {
@@ -295,15 +295,15 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 		fp.deleteEndpointConnections(input)
 
-		// For UDP connections, check the executed conntrack command
+		// For UDP and SCTP connections, check the executed conntrack command
 		var expExecs int
-		if tc.protocol == UDP {
+		if conntrack.IsClearConntrackNeeded(tc.protocol) {
 			isIPv6 := func(ip string) bool {
 				netIP := net.ParseIP(ip)
 				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
-			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
+			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p %s", tc.svcIP, endpointIP, strings.ToLower(string((tc.protocol))))
 			if isIPv6(endpointIP) {
 				expectCommand += " -f ipv6"
 			}

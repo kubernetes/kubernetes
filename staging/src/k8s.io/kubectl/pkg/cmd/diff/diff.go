@@ -312,6 +312,7 @@ func (obj InfoObject) Live() runtime.Object {
 // Returns the "merged" object, as it would look like if applied or
 // created.
 func (obj InfoObject) Merged() (runtime.Object, error) {
+	helper := resource.NewHelper(obj.Info.Client, obj.Info.Mapping).DryRun(true)
 	if obj.ServerSideApply {
 		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj.LocalObj)
 		if err != nil {
@@ -320,9 +321,8 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		options := metav1.PatchOptions{
 			Force:        &obj.ForceConflicts,
 			FieldManager: obj.FieldManager,
-			DryRun:       []string{metav1.DryRunAll},
 		}
-		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).Patch(
+		return helper.Patch(
 			obj.Info.Namespace,
 			obj.Info.Name,
 			types.ApplyPatchType,
@@ -334,11 +334,11 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// Build the patcher, and then apply the patch with dry-run, unless the object doesn't exist, in which case we need to create it.
 	if obj.Live() == nil {
 		// Dry-run create if the object doesn't exist.
-		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).CreateWithOptions(
+		return helper.CreateWithOptions(
 			obj.Info.Namespace,
 			true,
 			obj.LocalObj,
-			&metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			&metav1.CreateOptions{},
 		)
 	}
 
@@ -361,7 +361,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// We plan on replacing this with server-side apply when it becomes available.
 	patcher := &apply.Patcher{
 		Mapping:         obj.Info.Mapping,
-		Helper:          resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
+		Helper:          helper,
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
 		ServerDryRun:    true,

@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -37,6 +36,14 @@ const (
 
 	loaderLabelKey   = "name"
 	loaderLabelValue = "e2e-apparmor-loader"
+
+	// TODO: import this from the k8s.io/api once it's moved there (ref: https://github.com/kubernetes/kubernetes/pull/89198)
+	// Unconfined profile
+	profileNameUnconfined = "unconfined"
+
+	// TODO: import this from the k8s.io/api once it's moved there (ref: https://github.com/kubernetes/kubernetes/pull/89198)
+	// The prefix to an annotation key specifying a container profile.
+	containerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 )
 
 // LoadAppArmorProfiles creates apparmor-profiles ConfigMap and apparmor-loader ReplicationController.
@@ -64,7 +71,7 @@ elif [[ $(< /proc/self/attr/current) != "%[3]s" ]]; then
 fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+nsName)
 
 	if unconfined {
-		profile = apparmor.ProfileNameUnconfined
+		profile = profileNameUnconfined
 		testCmd = `
 if cat /proc/sysrq-trigger 2>&1 | grep 'Permission denied'; then
   echo 'FAILURE: reading /proc/sysrq-trigger should be allowed'
@@ -98,7 +105,7 @@ done`, testCmd)
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-apparmor-",
 			Annotations: map[string]string{
-				apparmor.ContainerAnnotationKeyPrefix + "test": profile,
+				containerAnnotationKeyPrefix + "test": profile,
 			},
 			Labels: map[string]string{
 				"test": "apparmor",

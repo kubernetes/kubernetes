@@ -31,6 +31,8 @@ func (cli *Client) Ping(ctx context.Context) (types.Ping, error) {
 			// Server handled the request, so parse the response
 			return parsePingResponse(cli, serverResp)
 		}
+	} else if IsErrConnectionFailed(err) {
+		return ping, err
 	}
 
 	req, err = cli.buildRequest("GET", path.Join(cli.basePath, "/_ping"), nil, nil)

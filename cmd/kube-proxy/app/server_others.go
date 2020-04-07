@@ -108,7 +108,11 @@ func newProxyServer(
 	iptInterface = utiliptables.New(execer, protocol)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
-	canUseIPVS, _ := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
+	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
+	if string(config.Mode) == proxyModeIPVS && err != nil {
+		klog.Errorf("Can't use the IPVS proxier: %v", err)
+	}
+
 	if canUseIPVS {
 		ipvsInterface = utilipvs.New(execer)
 	}
@@ -375,6 +379,7 @@ func newProxyServer(
 		ProxyMode:              proxyMode,
 		NodeRef:                nodeRef,
 		MetricsBindAddress:     config.MetricsBindAddress,
+		BindAddressHardFail:    config.BindAddressHardFail,
 		EnableProfiling:        config.EnableProfiling,
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,

@@ -18,6 +18,7 @@ package testutil
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"k8s.io/utils/pointer"
@@ -54,6 +55,7 @@ func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 
 func TestHistogramQuantile(t *testing.T) {
 	tests := []struct {
+		name    string
 		samples []float64
 		bounds  []float64
 		q50     float64
@@ -61,7 +63,7 @@ func TestHistogramQuantile(t *testing.T) {
 		q99     float64
 	}{
 		{
-			// repeating numbers
+			name:    "Repeating numbers",
 			samples: []float64{0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 3, 3, 3, 3, 6, 6, 6, 6},
 			bounds:  []float64{1, 2, 4, 8},
 			q50:     2,
@@ -69,7 +71,7 @@ func TestHistogramQuantile(t *testing.T) {
 			q99:     7.84,
 		},
 		{
-			// random numbers
+			name:    "Random numbers",
 			samples: []float64{11, 67, 61, 21, 40, 36, 52, 63, 8, 3, 67, 35, 61, 1, 36, 58},
 			bounds:  []float64{10, 20, 40, 80},
 			q50:     40,
@@ -77,35 +79,45 @@ func TestHistogramQuantile(t *testing.T) {
 			q99:     79.2,
 		},
 		{
-			// the last bucket is empty
+			name:    "The last bucket is empty",
 			samples: []float64{6, 34, 30, 10, 20, 18, 26, 31, 4, 2, 33, 17, 30, 1, 18, 29},
 			bounds:  []float64{10, 20, 40, 80},
 			q50:     20,
 			q90:     36,
 			q99:     39.6,
 		},
+		{
+			name:    "The last bucket has positive infinity upper bound",
+			samples: []float64{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 500},
+			bounds:  []float64{10, 20, 40, math.Inf(1)},
+			q50:     5.3125,
+			q90:     9.5625,
+			q99:     40,
+		},
 	}
 
 	for _, test := range tests {
-		h := samples2Histogram(test.samples, test.bounds)
-		q50 := h.Quantile(0.5)
-		q90 := h.Quantile(0.9)
-		q99 := h.Quantile(0.99)
-		q999999 := h.Quantile(0.999999)
+		t.Run(test.name, func(t *testing.T) {
+			h := samples2Histogram(test.samples, test.bounds)
+			q50 := h.Quantile(0.5)
+			q90 := h.Quantile(0.9)
+			q99 := h.Quantile(0.99)
+			q999999 := h.Quantile(0.999999)
 
-		if q50 != test.q50 {
-			t.Errorf("Expected q50 to be %v, got %v instead", test.q50, q50)
-		}
-		if q90 != test.q90 {
-			t.Errorf("Expected q90 to be %v, got %v instead", test.q90, q90)
-		}
-		if q99 != test.q99 {
-			t.Errorf("Expected q99 to be %v, got %v instead", test.q99, q99)
-		}
-		lastUpperBound := test.bounds[len(test.bounds)-1]
-		if !(q999999 < lastUpperBound) {
-			t.Errorf("Expected q999999 to be less than %v, got %v instead", lastUpperBound, q999999)
-		}
+			if q50 != test.q50 {
+				t.Errorf("Expected q50 to be %v, got %v instead", test.q50, q50)
+			}
+			if q90 != test.q90 {
+				t.Errorf("Expected q90 to be %v, got %v instead", test.q90, q90)
+			}
+			if q99 != test.q99 {
+				t.Errorf("Expected q99 to be %v, got %v instead", test.q99, q99)
+			}
+			lastUpperBound := test.bounds[len(test.bounds)-1]
+			if !(q999999 < lastUpperBound) {
+				t.Errorf("Expected q999999 to be less than %v, got %v instead", lastUpperBound, q999999)
+			}
+		})
 	}
 }
 

@@ -1892,7 +1892,9 @@ func (rl *clientConnReadLoop) handleResponse(cs *clientStream, f *MetaHeadersFra
 		return nil, errors.New("malformed response from server: malformed non-numeric status pseudo header")
 	}
 
-	header := make(http.Header)
+	regularFields := f.RegularFields()
+	strs := make([]string, len(regularFields))
+	header := make(http.Header, len(regularFields))
 	res := &http.Response{
 		Proto:      "HTTP/2.0",
 		ProtoMajor: 2,
@@ -1900,7 +1902,7 @@ func (rl *clientConnReadLoop) handleResponse(cs *clientStream, f *MetaHeadersFra
 		StatusCode: statusCode,
 		Status:     status + " " + http.StatusText(statusCode),
 	}
-	for _, hf := range f.RegularFields() {
+	for _, hf := range regularFields {
 		key := http.CanonicalHeaderKey(hf.Name)
 		if key == "Trailer" {
 			t := res.Trailer
@@ -1912,7 +1914,18 @@ func (rl *clientConnReadLoop) handleResponse(cs *clientStream, f *MetaHeadersFra
 				t[http.CanonicalHeaderKey(v)] = nil
 			})
 		} else {
-			header[key] = append(header[key], hf.Value)
+			vv := header[key]
+			if vv == nil && len(strs) > 0 {
+				// More than likely this will be a single-element key.
+				// Most headers aren't multi-valued.
+				// Set the capacity on strs[0] to 1, so any future append
+				// won't extend the slice into the other strings.
+				vv, strs = strs[:1:1], strs[1:]
+				vv[0] = hf.Value
+				header[key] = vv
+			} else {
+				header[key] = append(vv, hf.Value)
+			}
 		}
 	}
 
@@ -2198,8 +2211,6 @@ func (rl *clientConnReadLoop) processData(f *DataFrame) error {
 	return nil
 }
 
-var errInvalidTrailers = errors.New("http2: invalid trailers")
-
 func (rl *clientConnReadLoop) endStream(cs *clientStream) {
 	// TODO: check that any declared content-length matches, like
 	// server.go's (*stream).endStream method.
@@ -2430,7 +2441,6 @@ func (cc *ClientConn) writeStreamReset(streamID uint32, code ErrCode, err error)
 var (
 	errResponseHeaderListSize = errors.New("http2: response header list larger than advertised limit")
 	errRequestHeaderListSize  = errors.New("http2: request header list larger than peer's advertised limit")
-	errPseudoTrailers         = errors.New("http2: invalid pseudo header in trailers")
 )
 
 func (cc *ClientConn) logf(format string, args ...interface{}) {

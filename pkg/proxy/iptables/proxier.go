@@ -722,32 +722,33 @@ func servicePortEndpointChainName(servicePortName string, protocol string, endpo
 	return utiliptables.Chain("KUBE-SEP-" + encoded[:16])
 }
 
-// After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
-// risk sending more traffic to it, all of which will be lost (because UDP).
+// After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
+// risk sending more traffic to it, all of which will be lost.
 // This assumes the proxier mutex is held
 // TODO: move it to util
 func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && svcInfo.Protocol() == v1.ProtocolUDP {
+		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
 			nodePort := svcInfo.NodePort()
+			svcProto := svcInfo.Protocol()
 			var err error
 			if nodePort != 0 {
-				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, v1.ProtocolUDP)
+				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, svcProto)
 			} else {
-				err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, v1.ProtocolUDP)
+				err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			}
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, v1.ProtocolUDP)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
 					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
 				}
@@ -808,8 +809,8 @@ func (proxier *Proxier) syncProxyRules() {
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
-			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIP().String())
+		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+			klog.V(2).Infof("Stale %s service %v -> %s", strings.ToLower(string(svcInfo.Protocol())), svcPortName, svcInfo.ClusterIP().String())
 			staleServices.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				staleServices.Insert(extIP)
@@ -908,9 +909,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	if proxier.iptables.HasRandomFully() {
 		masqRule = append(masqRule, "--random-fully")
-		klog.V(3).Info("Using `--random-fully` in the MASQUERADE rule for iptables")
-	} else {
-		klog.V(3).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
 	}
 	writeLine(proxier.natRules, masqRule...)
 

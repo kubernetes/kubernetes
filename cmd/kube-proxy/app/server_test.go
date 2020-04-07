@@ -445,6 +445,7 @@ func TestConfigChange(t *testing.T) {
 
 		_, err = file.WriteString(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 10

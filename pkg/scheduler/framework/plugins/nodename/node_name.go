@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
@@ -44,7 +44,7 @@ func (pl *NodeName) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *framework.Status {
 	if nodeInfo.Node() == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
@@ -55,7 +55,7 @@ func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1
 }
 
 // Fits actually checks if the pod fits the node.
-func Fits(pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) bool {
+func Fits(pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) bool {
 	return len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == nodeInfo.Node().Name
 }
 

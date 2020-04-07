@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulertypes "k8s.io/kubernetes/pkg/scheduler/types"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -256,10 +256,10 @@ type QueueSortPlugin interface {
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
-	AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+	AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status
 	// RemovePod is called by the framework while trying to evaluate the impact
 	// of removing podToRemove from the node while scheduling podToSchedule.
-	RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+	RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status
 }
 
 // PreFilterPlugin is an interface that must be implemented by "prefilter" plugins.
@@ -299,7 +299,7 @@ type FilterPlugin interface {
 	// For example, during preemption, we may pass a copy of the original
 	// nodeInfo object that has some pods removed from it to evaluate the
 	// possibility of preempting them to schedule the target pod.
-	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status
 }
 
 // PreScorePlugin is an interface for Pre-score plugin. Pre-score is an
@@ -425,17 +425,17 @@ type Framework interface {
 	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
-	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) PluginToStatus
+	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulertypes.NodeInfo) PluginToStatus
 
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status
 
 	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulertypes.NodeInfo) *Status
 
 	// RunPreScorePlugins runs the set of configured pre-score plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.

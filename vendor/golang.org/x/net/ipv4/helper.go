@@ -13,16 +13,13 @@ import (
 )
 
 var (
-	errInvalidConn              = errors.New("invalid connection")
-	errMissingAddress           = errors.New("missing address")
-	errMissingHeader            = errors.New("missing header")
-	errNilHeader                = errors.New("nil header")
-	errHeaderTooShort           = errors.New("header too short")
-	errExtHeaderTooShort        = errors.New("extension header too short")
-	errInvalidConnType          = errors.New("invalid conn type")
-	errNoSuchInterface          = errors.New("no such interface")
-	errNoSuchMulticastInterface = errors.New("no such multicast interface")
-	errNotImplemented           = errors.New("not implemented on " + runtime.GOOS + "/" + runtime.GOARCH)
+	errInvalidConn       = errors.New("invalid connection")
+	errMissingAddress    = errors.New("missing address")
+	errNilHeader         = errors.New("nil header")
+	errHeaderTooShort    = errors.New("header too short")
+	errExtHeaderTooShort = errors.New("extension header too short")
+	errInvalidConnType   = errors.New("invalid conn type")
+	errNotImplemented    = errors.New("not implemented on " + runtime.GOOS + "/" + runtime.GOARCH)
 
 	// See https://www.freebsd.org/doc/en/books/porters-handbook/versions.html.
 	freebsdVersion  uint32
