@@ -805,8 +805,8 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 	}
 
 	// Try to lookup pid by process name
-	pids, pidsErr := procfs.PidOf(name)
-	if pidsErr == nil {
+	pids, err := procfs.PidOf(name)
+	if err == nil {
 		return pids, nil
 	}
 
