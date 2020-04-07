@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	// "google.golang.org/grpc"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
@@ -206,20 +206,6 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		klog.V(4).Infof("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
 		return pb.tcp.Probe(host, port, timeout)
 	}
-	/*
-		if p.GRPCHealth != nil {
-			port, err := extractPort(p.GRPCHealth.Port, container)
-			if err != nil {
-				return probe.Unknown, "", err
-			}
-			host := p.GRPCHealth.Host
-			if host == "" {
-				host = status.PodIP
-			}
-			klog.V(4).Infof("GRPC-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
-			return pb.grpc.Probe(host, port, timeout, grpc.WithInsecure())
-		}
-	*/
 	klog.Warningf("Failed to find probe builder for container: %v", container)
 	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(pod), container.Name)
 }
