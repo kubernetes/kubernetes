@@ -159,7 +159,7 @@ func newProxyServer(
 	var proxier proxy.Provider
 	var detectLocalMode proxyconfigapi.LocalMode
 
-	proxyMode := getProxyMode(string(config.Mode), kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), canUseIPVS, iptables.LinuxKernelCompatTester{})
 	detectLocalMode, err = getDetectLocalMode(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine detect-local-mode: %v", err)
@@ -553,28 +553,21 @@ func nodeIPTuple(bindAddress string) [2]net.IP {
 	return nodes
 }
 
-func getProxyMode(proxyMode string, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
+func getProxyMode(proxyMode string, canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
 	switch proxyMode {
 	case proxyModeUserspace:
 		return proxyModeUserspace
 	case proxyModeIPTables:
 		return tryIPTablesProxy(kcompat)
 	case proxyModeIPVS:
-		return tryIPVSProxy(khandle, ipsetver, kcompat)
+		return tryIPVSProxy(canUseIPVS, kcompat)
 	}
 	klog.Warningf("Unknown proxy mode %q, assuming iptables proxy", proxyMode)
 	return tryIPTablesProxy(kcompat)
 }
 
-func tryIPVSProxy(khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
-	// guaranteed false on error, error only necessary for debugging
-	// IPVS Proxier relies on ip_vs_* kernel modules and ipset
-	useIPVSProxy, err := ipvs.CanUseIPVSProxier(khandle, ipsetver)
-	if err != nil {
-		// Try to fallback to iptables before falling back to userspace
-		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, error: %v", err))
-	}
-	if useIPVSProxy {
+func tryIPVSProxy(canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
+	if canUseIPVS {
 		return proxyModeIPVS
 	}
 
