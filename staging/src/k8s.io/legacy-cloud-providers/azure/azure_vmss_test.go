@@ -20,6 +20,7 @@ package azure
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -253,6 +254,7 @@ func TestGetZoneByNodeName(t *testing.T) {
 		scaleSet    string
 		vmList      []string
 		nodeName    string
+		location    string
 		zone        string
 		faultDomain int32
 		expected    string
@@ -276,6 +278,16 @@ func TestGetZoneByNodeName(t *testing.T) {
 			expected:    "westus-2",
 		},
 		{
+			description: "scaleSet should get availability zone in lower cases",
+			scaleSet:    "ss",
+			vmList:      []string{"vmssee6c2000000", "vmssee6c2000001"},
+			nodeName:    "vmssee6c2000000",
+			location:    "WestUS",
+			zone:        "2",
+			faultDomain: 3,
+			expected:    "westus-2",
+		},
+		{
 			description: "scaleSet should return error for non-exist nodes",
 			scaleSet:    "ss",
 			faultDomain: 3,
@@ -286,8 +298,14 @@ func TestGetZoneByNodeName(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		ss, err := newTestScaleSet(ctrl, test.scaleSet, test.zone, test.faultDomain, test.vmList)
+		cloud := GetTestCloud(ctrl)
+		if test.location != "" {
+			cloud.Location = test.location
+		}
+		setTestVirtualMachineCloud(cloud, test.scaleSet, test.zone, test.faultDomain, test.vmList, "Running")
+		scaleset, err := newScaleSet(cloud)
 		assert.NoError(t, err, test.description)
+		ss := scaleset.(*scaleSet)
 
 		real, err := ss.GetZoneByNodeName(test.nodeName)
 		if test.expectError {
@@ -297,6 +315,7 @@ func TestGetZoneByNodeName(t *testing.T) {
 
 		assert.NoError(t, err, test.description)
 		assert.Equal(t, test.expected, real.FailureDomain, test.description)
+		assert.Equal(t, strings.ToLower(cloud.Location), real.Region, test.description)
 	}
 }
 
