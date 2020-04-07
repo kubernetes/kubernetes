@@ -398,32 +398,6 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
 }
 
-// WaitForService waits until the service appears (exist == true), or disappears (exist == false)
-func WaitForService(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := c.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		switch {
-		case err == nil:
-			Logf("Service %s in namespace %s found.", name, namespace)
-			return exist, nil
-		case apierrors.IsNotFound(err):
-			Logf("Service %s in namespace %s disappeared.", name, namespace)
-			return !exist, nil
-		case !testutils.IsRetryableAPIError(err):
-			Logf("Non-retryable failure while getting service.")
-			return false, err
-		default:
-			Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
-			return false, nil
-		}
-	})
-	if err != nil {
-		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
-		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
-	}
-	return nil
-}
-
 //WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
