@@ -10,16 +10,16 @@ go get -u golang.org/x/sys/...
 
 Cross platform: Windows, Linux, BSD and macOS.
 
-|Adapter   |OS        |Status    |
-|----------|----------|----------|
-|inotify   |Linux 2.6.27 or later, Android\*|Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify)|
-|kqueue    |BSD, macOS, iOS\*|Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify)|
-|ReadDirectoryChangesW|Windows|Supported [![Build status](https://ci.appveyor.com/api/projects/status/ivwjubaih4r0udeh/branch/master?svg=true)](https://ci.appveyor.com/project/NathanYoungman/fsnotify/branch/master)|
-|FSEvents  |macOS         |[Planned](https://github.com/fsnotify/fsnotify/issues/11)|
-|FEN       |Solaris 11    |[In Progress](https://github.com/fsnotify/fsnotify/issues/12)|
-|fanotify  |Linux 2.6.37+ | |
-|USN Journals |Windows    |[Maybe](https://github.com/fsnotify/fsnotify/issues/53)|
-|Polling   |*All*         |[Maybe](https://github.com/fsnotify/fsnotify/issues/9)|
+| Adapter               | OS                               | Status                                                                                                                          |
+| --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| inotify               | Linux 2.6.27 or later, Android\* | Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify) |
+| kqueue                | BSD, macOS, iOS\*                | Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify) |
+| ReadDirectoryChangesW | Windows                          | Supported [![Build Status](https://travis-ci.org/fsnotify/fsnotify.svg?branch=master)](https://travis-ci.org/fsnotify/fsnotify) |
+| FSEvents              | macOS                            | [Planned](https://github.com/fsnotify/fsnotify/issues/11)                                                                       |
+| FEN                   | Solaris 11                       | [In Progress](https://github.com/fsnotify/fsnotify/issues/12)                                                                   |
+| fanotify              | Linux 2.6.37+                    | [Planned](https://github.com/fsnotify/fsnotify/issues/114)                                                                      |
+| USN Journals          | Windows                          | [Maybe](https://github.com/fsnotify/fsnotify/issues/53)                                                                         |
+| Polling               | *All*                            | [Maybe](https://github.com/fsnotify/fsnotify/issues/9)                                                                          |
 
 \* Android and iOS are untested.
 
@@ -32,6 +32,53 @@ fsnotify is a fork of [howeyc/fsnotify](https://godoc.org/github.com/howeyc/fsno
 All [releases](https://github.com/fsnotify/fsnotify/releases) are tagged based on [Semantic Versioning](http://semver.org/). Further API changes are [planned](https://github.com/fsnotify/fsnotify/milestones), and will be tagged with a new major revision number.
 
 Go 1.6 supports dependencies located in the `vendor/` folder. Unless you are creating a library, it is recommended that you copy fsnotify into `vendor/github.com/fsnotify/fsnotify` within your project, and likewise for `golang.org/x/sys`.
+
+## Usage
+
+```go
+package main
+
+import (
+	"log"
+
+	"github.com/fsnotify/fsnotify"
+)
+
+func main() {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				log.Println("event:", event)
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					log.Println("modified file:", event.Name)
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("error:", err)
+			}
+		}
+	}()
+
+	err = watcher.Add("/tmp/foo")
+	if err != nil {
+		log.Fatal(err)
+	}
+	<-done
+}
+```
 
 ## Contributing
 
@@ -64,6 +111,10 @@ Spotlight indexing on OS X can result in multiple events (see [howeyc #62][#62])
 There are OS-specific limits as to how many watches can be created:
 * Linux: /proc/sys/fs/inotify/max_user_watches contains the limit, reaching this limit results in a "no space left on device" error.
 * BSD / OSX: sysctl variables "kern.maxfiles" and "kern.maxfilesperproc", reaching these limits results in a "too many open files" error.
+
+**Why don't notifications work with NFS filesystems or filesystem in userspace (FUSE)?**
+
+fsnotify requires support from underlying OS to work. The current NFS protocol does not provide network level support for file notifications.
 
 [#62]: https://github.com/howeyc/fsnotify/issues/62
 [#18]: https://github.com/fsnotify/fsnotify/issues/18
