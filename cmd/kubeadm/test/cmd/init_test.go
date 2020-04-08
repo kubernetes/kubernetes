@@ -17,6 +17,8 @@ limitations under the License.
 package kubeadm
 
 import (
+	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -30,6 +32,10 @@ import (
 )
 
 func runKubeadmInit(args ...string) (string, string, int, error) {
+	const dryRunDir = "KUBEADM_INIT_DRYRUN_DIR"
+	if err := os.Setenv(dryRunDir, os.TempDir()); err != nil {
+		panic(fmt.Sprintf("could not set the %s environment variable", dryRunDir))
+	}
 	kubeadmPath := getKubeadmPath()
 	kubeadmArgs := []string{"init", "--dry-run", "--ignore-preflight-errors=all"}
 	kubeadmArgs = append(kubeadmArgs, args...)
