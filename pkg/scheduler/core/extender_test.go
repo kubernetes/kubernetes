@@ -110,7 +110,7 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 type machine2PrioritizerPlugin struct{}
 
 func newMachine2PrioritizerPlugin() framework.PluginFactory {
-	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &machine2PrioritizerPlugin{}, nil
 	}
 }

@@ -188,7 +188,7 @@ func (pl *DefaultPodTopologySpread) PreScore(ctx context.Context, cycleState *fr
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	return &DefaultPodTopologySpread{
 		handle: handle,
 	}, nil

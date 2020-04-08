@@ -48,7 +48,7 @@ type functionShapePoint struct {
 }
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
-func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	args := &schedulerv1alpha2.RequestedToCapacityRatioArgs{}
 	if err := framework.DecodeInto(plArgs, args); err != nil {
 		return nil, err

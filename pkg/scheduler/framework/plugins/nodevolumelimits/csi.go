@@ -268,7 +268,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 }
 
 // NewCSI initializes a new plugin and returns it.
-func NewCSI(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func NewCSI(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()

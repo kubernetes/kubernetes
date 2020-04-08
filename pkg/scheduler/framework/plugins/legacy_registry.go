@@ -496,7 +496,7 @@ func NewPluginConfig(pluginName string, args interface{}) config.PluginConfig {
 	}
 	return config.PluginConfig{
 		Name: pluginName,
-		Args: runtime.Unknown{Raw: encoding},
+		Args: &runtime.Unknown{Raw: encoding},
 	}
 }
 

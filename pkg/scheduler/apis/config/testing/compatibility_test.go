@@ -1598,7 +1598,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			pluginConfig: []config.PluginConfig{
 				{
 					Name: "NodeResourcesFit",
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{
 							"ignoredResources": [
 								"foo",
@@ -1609,7 +1609,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				},
 				{
 					Name: "PodTopologySpread",
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{
 							"defaultConstraints": [
 								{
@@ -1628,7 +1628,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				},
 				{
 					Name: "RequestedToCapacityRatio",
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{
 							"shape":[
 								"Utilization": 5,
@@ -1643,7 +1643,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				},
 				{
 					Name: "InterPodAffinity",
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{
 							"HardPodAffinityWeight": 100
 						}`),
@@ -1651,7 +1651,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				},
 				{
 					Name: "NodeLabel",
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{
 							"presentLabels": [
 								"foo",
@@ -1671,7 +1671,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				},
 				{
 					Name: "ServiceAffinity",
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{
 							affinityLabels: [
 								"foo",

@@ -88,7 +88,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 }
 
 // New initializes a new plugin with volume binder and returns it.
-func New(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 	return &VolumeBinding{
 		binder: fh.VolumeBinder(),
 	}, nil

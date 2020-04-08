@@ -50,7 +50,7 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	args := schedulerv1alpha2.NodeLabelArgs{}
 	if err := framework.DecodeInto(plArgs, &args); err != nil {
 		return nil, err

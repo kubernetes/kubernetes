@@ -53,7 +53,7 @@ const (
 var _ ScorePlugin = &TestScoreWithNormalizePlugin{}
 var _ ScorePlugin = &TestScorePlugin{}
 
-func newScoreWithNormalizePlugin1(injArgs *runtime.Unknown, f FrameworkHandle) (Plugin, error) {
+func newScoreWithNormalizePlugin1(injArgs runtime.Object, f FrameworkHandle) (Plugin, error) {
 	var inj injectedResult
 	if err := DecodeInto(injArgs, &inj); err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func newScoreWithNormalizePlugin1(injArgs *runtime.Unknown, f FrameworkHandle) (
 	return &TestScoreWithNormalizePlugin{scoreWithNormalizePlugin1, inj}, nil
 }
 
-func newScoreWithNormalizePlugin2(injArgs *runtime.Unknown, f FrameworkHandle) (Plugin, error) {
+func newScoreWithNormalizePlugin2(injArgs runtime.Object, f FrameworkHandle) (Plugin, error) {
 	var inj injectedResult
 	if err := DecodeInto(injArgs, &inj); err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func newScoreWithNormalizePlugin2(injArgs *runtime.Unknown, f FrameworkHandle) (
 	return &TestScoreWithNormalizePlugin{scoreWithNormalizePlugin2, inj}, nil
 }
 
-func newScorePlugin1(injArgs *runtime.Unknown, f FrameworkHandle) (Plugin, error) {
+func newScorePlugin1(injArgs runtime.Object, f FrameworkHandle) (Plugin, error) {
 	var inj injectedResult
 	if err := DecodeInto(injArgs, &inj); err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func newScorePlugin1(injArgs *runtime.Unknown, f FrameworkHandle) (Plugin, error
 	return &TestScorePlugin{scorePlugin1, inj}, nil
 }
 
-func newPluginNotImplementingScore(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+func newPluginNotImplementingScore(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 	return &PluginNotImplementingScore{}, nil
 }
 
@@ -259,7 +259,7 @@ func (dp *TestDuplicatePlugin) PreFilterExtensions() PreFilterExtensions {
 
 var _ PreFilterPlugin = &TestDuplicatePlugin{}
 
-func newDuplicatePlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+func newDuplicatePlugin(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 	return &TestDuplicatePlugin{}, nil
 }
 
@@ -277,7 +277,7 @@ func (pp *TestPermitPlugin) Permit(ctx context.Context, state *CycleState, p *v1
 
 var _ QueueSortPlugin = &TestQueueSortPlugin{}
 
-func newQueueSortPlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+func newQueueSortPlugin(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 	return &TestQueueSortPlugin{}, nil
 }
 
@@ -294,7 +294,7 @@ func (pl *TestQueueSortPlugin) Less(_, _ *PodInfo) bool {
 
 var _ BindPlugin = &TestBindPlugin{}
 
-func newBindPlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+func newBindPlugin(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 	return &TestBindPlugin{}, nil
 }
 
@@ -479,7 +479,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{ "scoreRes": 1 }`),
 					},
 				},
@@ -496,7 +496,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{ "scoreRes": 10, "normalizeRes": 5 }`),
 					},
 				},
@@ -512,19 +512,19 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{ "scoreRes": 1 }`),
 					},
 				},
 				{
 					Name: scoreWithNormalizePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{ "scoreRes": 3, "normalizeRes": 4}`),
 					},
 				},
 				{
 					Name: scoreWithNormalizePlugin2,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{ "scoreRes": 4, "normalizeRes": 5}`),
 					},
 				},
@@ -543,7 +543,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{ "scoreStatus": 1 }`),
 					},
 				},
@@ -556,7 +556,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(`{ "normalizeStatus": 1 }`),
 					},
 				},
@@ -570,7 +570,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(fmt.Sprintf(`{ "scoreRes": %d }`, MaxNodeScore+1)),
 					},
 				},
@@ -583,7 +583,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(fmt.Sprintf(`{ "scoreRes": %d }`, MinNodeScore-1)),
 					},
 				},
@@ -596,7 +596,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(fmt.Sprintf(`{ "normalizeRes": %d }`, MaxNodeScore+1)),
 					},
 				},
@@ -609,7 +609,7 @@ func TestRunScorePlugins(t *testing.T) {
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
-					Args: runtime.Unknown{
+					Args: &runtime.Unknown{
 						Raw: []byte(fmt.Sprintf(`{ "normalizeRes": %d }`, MinNodeScore-1)),
 					},
 				},
@@ -650,11 +650,11 @@ func TestPreFilterPlugins(t *testing.T) {
 	preFilter2 := &TestPreFilterWithExtensionsPlugin{}
 	r := make(Registry)
 	r.Register(preFilterPluginName,
-		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+		func(_ runtime.Object, fh FrameworkHandle) (Plugin, error) {
 			return preFilter1, nil
 		})
 	r.Register(preFilterWithExtensionsPluginName,
-		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+		func(_ runtime.Object, fh FrameworkHandle) (Plugin, error) {
 			return preFilter2, nil
 		})
 	plugins := &config.Plugins{PreFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
@@ -874,7 +874,7 @@ func TestFilterPlugins(t *testing.T) {
 				// register all plugins
 				tmpPl := pl
 				if err := registry.Register(pl.name,
-					func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+					func(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 						return tmpPl, nil
 					}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.name)
@@ -1032,7 +1032,7 @@ func TestPreBindPlugins(t *testing.T) {
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
-				if err := registry.Register(pl.name, func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+				if err := registry.Register(pl.name, func(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 					return tmpPl, nil
 				}); err != nil {
 					t.Fatalf("Unable to register pre bind plugins: %s", pl.name)
@@ -1188,7 +1188,7 @@ func TestReservePlugins(t *testing.T) {
 
 			for _, pl := range tt.plugins {
 				tmpPl := pl
-				if err := registry.Register(pl.name, func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+				if err := registry.Register(pl.name, func(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 					return tmpPl, nil
 				}); err != nil {
 					t.Fatalf("Unable to register pre bind plugins: %s", pl.name)
@@ -1311,7 +1311,7 @@ func TestPermitPlugins(t *testing.T) {
 
 		for _, pl := range tt.plugins {
 			tmpPl := pl
-			if err := registry.Register(pl.name, func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+			if err := registry.Register(pl.name, func(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 				return tmpPl, nil
 			}); err != nil {
 				t.Fatalf("Unable to register Permit plugin: %s", pl.name)
@@ -1469,7 +1469,7 @@ func TestRecordingMetrics(t *testing.T) {
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
 			r.Register(testPlugin,
-				func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+				func(_ runtime.Object, fh FrameworkHandle) (Plugin, error) {
 					return plugin, nil
 				})
 			pluginSet := &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
@@ -1584,7 +1584,7 @@ func TestRunBindPlugins(t *testing.T) {
 				name := fmt.Sprintf("bind-%d", i)
 				plugin := &TestPlugin{name: name, inj: injectedResult{BindStatus: int(inj)}}
 				r.Register(name,
-					func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+					func(_ runtime.Object, fh FrameworkHandle) (Plugin, error) {
 						return plugin, nil
 					})
 				pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
@@ -1635,7 +1635,7 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
 			err := r.Register(testPlugin,
-				func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+				func(_ runtime.Object, fh FrameworkHandle) (Plugin, error) {
 					return plugin, nil
 				})
 			if err != nil {
@@ -1694,7 +1694,7 @@ func TestWaitOnPermit(t *testing.T) {
 			testPermitPlugin := &TestPermitPlugin{}
 			r := make(Registry)
 			r.Register(permitPlugin,
-				func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+				func(_ runtime.Object, fh FrameworkHandle) (Plugin, error) {
 					return testPermitPlugin, nil
 				})
 			plugins := &config.Plugins{

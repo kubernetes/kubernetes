@@ -102,7 +102,7 @@ func (p *mockNoopPlugin) Name() string {
 }
 
 func NewMockNoopPluginFactory() PluginFactory {
-	return func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+	return func(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
 		return &mockNoopPlugin{}, nil
 	}
 }

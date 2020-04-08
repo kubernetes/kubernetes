@@ -197,13 +197,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	// get needed plugins from config
 	pg := f.pluginsNeeded(plugins)
 
-	pluginConfig := make(map[string]*runtime.Unknown, 0)
+	pluginConfig := make(map[string]runtime.Object, 0)
 	for i := range args {
 		name := args[i].Name
 		if _, ok := pluginConfig[name]; ok {
 			return nil, fmt.Errorf("repeated config for plugin %s", name)
 		}
-		pluginConfig[name] = &args[i].Args
+		pluginConfig[name] = args[i].Args
 	}
 
 	pluginsMap := make(map[string]Plugin)

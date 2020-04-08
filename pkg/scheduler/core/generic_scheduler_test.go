@@ -81,7 +81,7 @@ func (pl *trueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 }
 
 // NewTrueFilterPlugin initializes a trueFilterPlugin and returns it.
-func NewTrueFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewTrueFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &trueFilterPlugin{}, nil
 }
 
@@ -98,7 +98,7 @@ func (pl *falseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, 
 }
 
 // NewFalseFilterPlugin initializes a falseFilterPlugin and returns it.
-func NewFalseFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewFalseFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &falseFilterPlugin{}, nil
 }
 
@@ -122,7 +122,7 @@ func (pl *matchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, 
 }
 
 // NewMatchFilterPlugin initializes a matchFilterPlugin and returns it.
-func NewMatchFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewMatchFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &matchFilterPlugin{}, nil
 }
 
@@ -142,7 +142,7 @@ func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState,
 }
 
 // NewNoPodsFilterPlugin initializes a noPodsFilterPlugin and returns it.
-func NewNoPodsFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &noPodsFilterPlugin{}, nil
 }
 
@@ -171,7 +171,7 @@ func (pl *fakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 
 // NewFakeFilterPlugin initializes a fakeFilterPlugin and returns it.
 func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) framework.PluginFactory {
-	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &fakeFilterPlugin{
 			failedNodeReturnCodeMap: failedNodeReturnCodeMap,
 		}, nil
@@ -181,7 +181,7 @@ func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) fram
 type numericMapPlugin struct{}
 
 func newNumericMapPlugin() framework.PluginFactory {
-	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &numericMapPlugin{}, nil
 	}
 }
@@ -205,7 +205,7 @@ func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 type reverseNumericMapPlugin struct{}
 
 func newReverseNumericMapPlugin() framework.PluginFactory {
-	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &reverseNumericMapPlugin{}, nil
 	}
 }
@@ -246,7 +246,7 @@ func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ *framewor
 type trueMapPlugin struct{}
 
 func newTrueMapPlugin() framework.PluginFactory {
-	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &trueMapPlugin{}, nil
 	}
 }
@@ -275,7 +275,7 @@ func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleSta
 type falseMapPlugin struct{}
 
 func newFalseMapPlugin() framework.PluginFactory {
-	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &falseMapPlugin{}, nil
 	}
 }
@@ -962,7 +962,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		plugin := fakeFilterPlugin{}
 		registerFakeFilterFunc := st.RegisterFilterPlugin(
 			"FakeFilter",
-			func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+			func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 				return &plugin, nil
 			},
 		)
@@ -1598,7 +1598,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			fakePlugin.failedNodeReturnCodeMap = filterFailedNodeReturnCodeMap
 			registerFakeFilterFunc := st.RegisterFilterPlugin(
 				"FakeFilter",
-				func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+				func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 					return &fakePlugin, nil
 				},
 			)

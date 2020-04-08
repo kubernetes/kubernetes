@@ -122,7 +122,7 @@ func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
 	registry := make(framework.Registry)
-	err := registry.Register(filterPluginName, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+	err := registry.Register(filterPluginName, func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		return &filter, nil
 	})
 	if err != nil {
