@@ -49,14 +49,13 @@ func TestAllocate(t *testing.T) {
 		{
 			name:     "IPv6",
 			cidr:     "2001:db8:1::/48",
-			free:     65534,
+			free:     65535,
 			released: "2001:db8:1::5",
 			outOfRange: []string{
-				"2001:db8::1",      // not in 2001:db8:1::/48
-				"2001:db8:1::",     // reserved (base address)
-				"2001:db8:1::ffff", // reserved (broadcast address)
-				"2001:db8:1::1:0",  // not in the low 16 bits of 2001:db8:1::/48
-				"2001:db8:2::2",    // not in 2001:db8:1::/48
+				"2001:db8::1",     // not in 2001:db8:1::/48
+				"2001:db8:1::",    // reserved (base address)
+				"2001:db8:1::1:0", // not in the low 16 bits of 2001:db8:1::/48
+				"2001:db8:2::2",   // not in 2001:db8:1::/48
 			},
 			alreadyAllocated: "2001:db8:1::1",
 		},

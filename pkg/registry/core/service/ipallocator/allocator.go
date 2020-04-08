@@ -91,12 +91,19 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 		if max > 65536 {
 			max = 65536
 		}
+	} else {
+		// Don't use the IPv4 network's broadcast address.
+		max--
 	}
+
+	// Don't use the network's ".0" address.
+	base.Add(base, big.NewInt(1))
+	max--
 
 	r := Range{
 		net:  cidr,
-		base: base.Add(base, big.NewInt(1)), // don't use the network base
-		max:  maximum(0, int(max-2)),        // don't use the network broadcast,
+		base: base,
+		max:  maximum(0, int(max)),
 	}
 	var err error
 	r.alloc, err = allocatorFactory(r.max, rangeSpec)
