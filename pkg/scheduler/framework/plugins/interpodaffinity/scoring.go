@@ -247,7 +247,7 @@ func (pl *InterPodAffinity) PreScore(
 
 		topoScore := make(scoreMap)
 		for _, existingPod := range podsToProcess {
-			if err := pl.processExistingPod(state, existingPod, nodeInfo, pod, topoScore); err != nil {
+			if err := pl.processExistingPod(state, existingPod.Pod, nodeInfo, pod, topoScore); err != nil {
 				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}

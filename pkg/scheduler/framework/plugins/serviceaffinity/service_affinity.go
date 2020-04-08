@@ -294,8 +294,8 @@ func (pl *ServiceAffinity) Score(ctx context.Context, state *framework.CycleStat
 	for _, existingPod := range nodeInfo.Pods() {
 		// Ignore pods being deleted for spreading purposes
 		// Similar to how it is done for SelectorSpreadPriority
-		if pod.Namespace == existingPod.Namespace && existingPod.DeletionTimestamp == nil {
-			if selector.Matches(labels.Set(existingPod.Labels)) {
+		if pod.Namespace == existingPod.Pod.Namespace && existingPod.Pod.DeletionTimestamp == nil {
+			if selector.Matches(labels.Set(existingPod.Pod.Labels)) {
 				score++
 			}
 		}

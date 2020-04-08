@@ -287,9 +287,9 @@ func (h *HTTPExtender) convertToNodeToVictims(
 func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *extenderv1.MetaPod,
 	nodeInfo *framework.NodeInfo) (*v1.Pod, error) {
-	for _, pod := range nodeInfo.Pods() {
-		if string(pod.UID) == metaPod.UID {
-			return pod, nil
+	for _, p := range nodeInfo.Pods() {
+		if string(p.Pod.UID) == metaPod.UID {
+			return p.Pod, nil
 		}
 	}
 	return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node",

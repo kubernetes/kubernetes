@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
@@ -35,6 +36,39 @@ var (
 	emptyResource = Resource{}
 	generation    int64
 )
+
+// PodInfo is a wrapper to a Pod with additional information for purposes such as tracking
+// the timestamp when it's added to the queue or recording per-pod metrics.
+type PodInfo struct {
+	Pod *v1.Pod
+	// The time pod added to the scheduling queue.
+	Timestamp time.Time
+	// Number of schedule attempts before successfully scheduled.
+	// It's used to record the # attempts metric.
+	Attempts int
+	// The time when the pod is added to the queue for the first time. The pod may be added
+	// back to the queue multiple times before it's successfully scheduled.
+	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
+	// latency for a pod.
+	InitialAttemptTimestamp time.Time
+}
+
+// DeepCopy returns a deep copy of the PodInfo object.
+func (podInfo *PodInfo) DeepCopy() *PodInfo {
+	return &PodInfo{
+		Pod:                     podInfo.Pod.DeepCopy(),
+		Timestamp:               podInfo.Timestamp,
+		Attempts:                podInfo.Attempts,
+		InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
+	}
+}
+
+// NewPodInfo return a new PodInfo
+func NewPodInfo(pod *v1.Pod) *PodInfo {
+	return &PodInfo{
+		Pod: pod,
+	}
+}
 
 // ImageStateSummary provides summarized information about the state of an image.
 type ImageStateSummary struct {
@@ -49,8 +83,8 @@ type NodeInfo struct {
 	// Overall node information.
 	node *v1.Node
 
-	pods             []*v1.Pod
-	podsWithAffinity []*v1.Pod
+	pods             []*PodInfo
+	podsWithAffinity []*PodInfo
 	usedPorts        HostPortInfo
 
 	// Total requested resources of all pods on this node. This includes assumed
@@ -290,16 +324,11 @@ func (n *NodeInfo) Node() *v1.Node {
 }
 
 // Pods return all pods scheduled (including assumed to be) on this node.
-func (n *NodeInfo) Pods() []*v1.Pod {
+func (n *NodeInfo) Pods() []*PodInfo {
 	if n == nil {
 		return nil
 	}
 	return n.pods
-}
-
-// SetPods sets all pods scheduled (including assumed to be) on this node.
-func (n *NodeInfo) SetPods(pods []*v1.Pod) {
-	n.pods = pods
 }
 
 // UsedPorts returns used ports on this node.
@@ -329,7 +358,7 @@ func (n *NodeInfo) SetImageStates(newImageStates map[string]*ImageStateSummary) 
 }
 
 // PodsWithAffinity return all pods with (anti)affinity constraints on this node.
-func (n *NodeInfo) PodsWithAffinity() []*v1.Pod {
+func (n *NodeInfo) PodsWithAffinity() []*PodInfo {
 	if n == nil {
 		return nil
 	}
@@ -427,7 +456,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
-		clone.pods = append([]*v1.Pod(nil), n.pods...)
+		clone.pods = append([]*PodInfo(nil), n.pods...)
 	}
 	if len(n.usedPorts) > 0 {
 		// HostPortInfo is a map-in-map struct
@@ -440,7 +469,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		}
 	}
 	if len(n.podsWithAffinity) > 0 {
-		clone.podsWithAffinity = append([]*v1.Pod(nil), n.podsWithAffinity...)
+		clone.podsWithAffinity = append([]*PodInfo(nil), n.podsWithAffinity...)
 	}
 	if len(n.taints) > 0 {
 		clone.taints = append([]v1.Taint(nil), n.taints...)
@@ -462,8 +491,8 @@ func (n *NodeInfo) VolumeLimits() map[v1.ResourceName]int64 {
 // String returns representation of human readable format of this NodeInfo.
 func (n *NodeInfo) String() string {
 	podKeys := make([]string, len(n.pods))
-	for i, pod := range n.pods {
-		podKeys[i] = pod.Name
+	for i, p := range n.pods {
+		podKeys[i] = p.Pod.Name
 	}
 	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
 		podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts, n.allocatableResource)
@@ -476,7 +505,9 @@ func hasPodAffinityConstraints(pod *v1.Pod) bool {
 
 // AddPod adds pod information to this NodeInfo.
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	res, non0CPU, non0Mem := calculateResource(pod)
+	// TODO(#89528): AddPod should accept a PodInfo as an input argument.
+	podInfo := NewPodInfo(pod)
+	res, non0CPU, non0Mem := calculateResource(podInfo.Pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
 	n.requestedResource.EphemeralStorage += res.EphemeralStorage
@@ -488,13 +519,13 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	}
 	n.nonzeroRequest.MilliCPU += non0CPU
 	n.nonzeroRequest.Memory += non0Mem
-	n.pods = append(n.pods, pod)
-	if hasPodAffinityConstraints(pod) {
-		n.podsWithAffinity = append(n.podsWithAffinity, pod)
+	n.pods = append(n.pods, podInfo)
+	if hasPodAffinityConstraints(podInfo.Pod) {
+		n.podsWithAffinity = append(n.podsWithAffinity, podInfo)
 	}
 
 	// Consume ports when pods added.
-	n.UpdateUsedPorts(pod, true)
+	n.UpdateUsedPorts(podInfo.Pod, true)
 
 	n.generation = nextGeneration()
 }
@@ -507,7 +538,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	}
 
 	for i := range n.podsWithAffinity {
-		k2, err := GetPodKey(n.podsWithAffinity[i])
+		k2, err := GetPodKey(n.podsWithAffinity[i].Pod)
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
@@ -520,7 +551,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 		}
 	}
 	for i := range n.pods {
-		k2, err := GetPodKey(n.pods[i])
+		k2, err := GetPodKey(n.pods[i].Pod)
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
@@ -656,7 +687,7 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 		for _, np := range n.Pods() {
-			npodkey, _ := GetPodKey(np)
+			npodkey, _ := GetPodKey(np.Pod)
 			if npodkey == podKey {
 				filtered = append(filtered, p)
 				break
@@ -673,21 +704,6 @@ func GetPodKey(pod *v1.Pod) (string, error) {
 		return "", errors.New("Cannot get cache key for pod with empty UID")
 	}
 	return uid, nil
-}
-
-// Filter implements PodFilter interface. It returns false only if the pod node name
-// matches NodeInfo.node and the pod is not found in the pods list. Otherwise,
-// returns true.
-func (n *NodeInfo) Filter(pod *v1.Pod) bool {
-	if pod.Spec.NodeName != n.node.Name {
-		return true
-	}
-	for _, p := range n.pods {
-		if p.Name == pod.Name && p.Namespace == pod.Namespace {
-			return true
-		}
-	}
-	return false
 }
 
 // DefaultBindAllHostIP defines the default ip address used to bind to all host.
