@@ -946,7 +946,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podStatusBytes, err := json.Marshal(podStatusUnstructured)
 		framework.ExpectNoError(err, "failed to marshal unstructured response")
 		var podStatus v1.Pod
-		json.Unmarshal(podStatusBytes, &podStatus)
+		err = json.Unmarshal(podStatusBytes, &podStatus)
+		framework.ExpectNoError(err, "failed to unmarshal JSON bytes to a Pod object type")
 
 		ginkgo.By("replacing the Pod's status Ready condition to False")
 		podStatusUpdated := podStatus
