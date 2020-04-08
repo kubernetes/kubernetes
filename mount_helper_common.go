@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // CleanupMountPoint unmounts the given path and deletes the remaining directory
