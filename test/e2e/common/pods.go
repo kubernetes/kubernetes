@@ -865,7 +865,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		testPod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: testPodName,
+				Name:   testPodName,
 				Labels: testPodLabels,
 			},
 			Spec: v1.PodSpec{
@@ -903,7 +903,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{
-					Name: testPodName,
+					Name:  testPodName,
 					Image: testPodImage2,
 				}},
 			},
