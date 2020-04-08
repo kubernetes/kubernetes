@@ -87,6 +87,9 @@ type SchedulingQueue interface {
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
+	// NominatedPodsChan returns a write-only channel for event producers to send NominateEvent.
+	// Its main purpose is to strip the dependency from preemption to schedulingQueue.
+	NominatedPodsChan() chan<- framework.NominateEvent
 	// UpdateNominatedPodForNode adds the given pod to the nominated pod map or
 	// updates it if it already exists.
 	UpdateNominatedPodForNode(pod *v1.Pod, nodeName string)
@@ -135,6 +138,9 @@ type PriorityQueue struct {
 	podBackoffQ *heap.Heap
 	// unschedulableQ holds pods that have been tried and determined unschedulable.
 	unschedulableQ *UnschedulablePodsMap
+	// nominatedPodsChan is a channel accepting incoming NominateEvent, which will be
+	// processed in the schedulingQueue to maintain <nominatedPods> in accurate state.
+	nominatedPodsChan chan framework.NominateEvent
 	// nominatedPods is a structures that stores pods which are nominated to run
 	// on nodes.
 	nominatedPods *nominatedPodMap
@@ -221,6 +227,7 @@ func NewPriorityQueue(
 		podMaxBackoffDuration:     options.podMaxBackoffDuration,
 		activeQ:                   heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:            newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
+		nominatedPodsChan:         make(chan framework.NominateEvent),
 		nominatedPods:             newNominatedPodMap(),
 		moveRequestCycle:          -1,
 	}
@@ -234,6 +241,7 @@ func NewPriorityQueue(
 func (p *PriorityQueue) Run() {
 	go wait.Until(p.flushBackoffQCompleted, 1.0*time.Second, p.stop)
 	go wait.Until(p.flushUnschedulableQLeftover, 30*time.Second, p.stop)
+	go p.processNominateEvent(p.stop)
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
@@ -283,6 +291,12 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 	return p.schedulingCycle
 }
 
+// NominatedPodsChan returns a write-only channel for in-tree or out-of-tree
+// event producers to send NominateEvent.
+func (p *PriorityQueue) NominatedPodsChan() chan<- framework.NominateEvent {
+	return p.nominatedPodsChan
+}
+
 // AddUnschedulableIfNotPresent inserts a pod that cannot be scheduled into
 // the queue, unless it is already in the queue. Normally, PriorityQueue puts
 // unschedulable pods in `unschedulableQ`. But if there has been a recent move
@@ -318,7 +332,24 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.PodInfo, p
 
 	p.nominatedPods.add(pod, "")
 	return nil
+}
 
+func (p *PriorityQueue) processNominateEvent(stop chan struct{}) {
+	for {
+		select {
+		case <-stop:
+			return
+		case e := <-p.nominatedPodsChan:
+			p.lock.Lock()
+			switch t := e.Type; t {
+			case framework.AddNominatedPod:
+				p.nominatedPods.add(e.Pod, e.NominatedNode)
+			case framework.DeleteNominatedPod:
+				p.nominatedPods.delete(e.Pod)
+			}
+			p.lock.Unlock()
+		}
+	}
 }
 
 // flushBackoffQCompleted Moves all pods from backoffQ which have completed backoff in to activeQ

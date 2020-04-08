@@ -54,6 +54,24 @@ const (
 	permit                                    = "Permit"
 )
 
+// NominateEvent stands for an event to nominate a <Pod> to the <NominatedNode>,
+// and <Type> represents whether it's a Add or Delete request.
+type NominateEvent struct {
+	Pod           *v1.Pod
+	NominatedNode string
+	Type          NominateEventType
+}
+
+// NominateEventType defines the type of a nominate event.
+type NominateEventType int
+
+const (
+	// AddNominatedPod denotes it's trying to add a nominated Pod.
+	AddNominatedPod = iota
+	// DeleteNominatedPod denotes it's trying to remove a nominated Pod.
+	DeleteNominatedPod
+)
+
 // framework is the component responsible for initializing and running scheduler
 // plugins.
 type framework struct {

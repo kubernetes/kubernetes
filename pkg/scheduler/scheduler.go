@@ -419,13 +419,20 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 		// Update the scheduling queue with the nominated pod information. Without
 		// this, there would be a race condition between the next scheduling cycle
 		// and the time the scheduler receives a Pod Update for the nominated pod.
-		sched.SchedulingQueue.UpdateNominatedPodForNode(preemptor, nodeName)
+		sched.SchedulingQueue.NominatedPodsChan() <- framework.NominateEvent{
+			Pod:           preemptor,
+			NominatedNode: nodeName,
+			Type:          framework.AddNominatedPod,
+		}
 
 		// Make a call to update nominated node name of the pod on the API server.
 		err = sched.podPreemptor.setNominatedNodeName(preemptor, nodeName)
 		if err != nil {
 			klog.Errorf("Error in preemption process. Cannot set 'NominatedNodeName' on pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
-			sched.SchedulingQueue.DeleteNominatedPodIfExists(preemptor)
+			sched.SchedulingQueue.NominatedPodsChan() <- framework.NominateEvent{
+				Pod:  preemptor,
+				Type: framework.DeleteNominatedPod,
+			}
 			return "", err
 		}
 
