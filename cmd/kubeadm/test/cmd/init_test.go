@@ -37,11 +37,6 @@ func runKubeadmInit(args ...string) (string, string, int, error) {
 }
 
 func TestCmdInitToken(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -86,11 +81,6 @@ func TestCmdInitToken(t *testing.T) {
 }
 
 func TestCmdInitKubernetesVersion(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -130,11 +120,6 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 }
 
 func TestCmdInitConfig(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -214,11 +199,6 @@ func TestCmdInitConfig(t *testing.T) {
 }
 
 func TestCmdInitCertPhaseCSR(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	tests := []struct {
 		name          string
 		baseName      string
@@ -279,11 +259,6 @@ func TestCmdInitCertPhaseCSR(t *testing.T) {
 }
 
 func TestCmdInitAPIPort(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	initTest := []struct {
 		name     string
 		args     string
@@ -338,11 +313,6 @@ func TestCmdInitAPIPort(t *testing.T) {
 // kubeadm with different feature gates is not 2.
 func TestCmdInitFeatureGates(t *testing.T) {
 	const PanicExitcode = 2
-
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
 
 	initTest := []struct {
 		name string
