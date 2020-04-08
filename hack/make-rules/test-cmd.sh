@@ -122,7 +122,15 @@ __EOF__
 WHAT=${WHAT:-}
 if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
   kube::log::status "Running kubeadm tests"  
-  run_kubeadm_tests
+
+  # build kubeadm
+  make all -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
+  # unless the user sets KUBEADM_PATH, assume that "make all..." just built it
+  export KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/_output/local/go/bin/kubeadm}"
+  # invoke the tests
+  make -C "${KUBE_ROOT}" test \
+    WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd
+
   # if we ONLY want to run kubeadm, then exit here.
   if [[ ${WHAT} == "kubeadm" ]]; then
     kube::log::status "TESTS PASSED"
