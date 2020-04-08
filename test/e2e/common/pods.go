@@ -878,16 +878,17 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	ginkgo.It("should run through the lifecycle of Pods and PodStatus", func() {
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-		testNs := "default"
+		testNs := f.Namespace.Name
 		testPodName := "pod-test"
 		testPodImage := "nginx"
-		testPodImage2 := "nginx"
+		testPodImage2 := "httpd"
+		testPodLabels := map[string]string{"test-pod-static": "true"}
+		testPodLabelsFlat := "test-pod-static=true"
+
 		testPod := v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testPodName,
-				Labels: map[string]string{
-					"test-pod-static": "true",
-				},
+				Labels: testPodLabels,
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -904,40 +905,36 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		ginkgo.By("setting up a watch for the Pod")
 		podWatchTimeoutSeconds := int64(180)
-		podWatch, err := f.ClientSet.CoreV1().Pods(testNs).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-pod-static=true", TimeoutSeconds: &podWatchTimeoutSeconds})
+		podWatch, err := f.ClientSet.CoreV1().Pods(testNs).Watch(context.TODO(), metav1.ListOptions{LabelSelector: testPodLabelsFlat, TimeoutSeconds: &podWatchTimeoutSeconds})
 		framework.ExpectNoError(err, "failed to set up watch")
 
 		podWatchChan := podWatch.ResultChan()
 		ginkgo.By("watching for Pod to be ready")
 		for watchEvent := range podWatchChan {
 			podWatchEvent, ok := watchEvent.Object.(*v1.Pod)
-			framework.ExpectEqual(ok, true, "unable to fix type")
-			if podWatchEvent.Status.Phase == "Running" {
+			framework.ExpectEqual(ok, true, "unable to assert runtime object type to v1.Pod")
+			if podWatchEvent.Status.Phase == v1.PodRunning {
 				break
 			}
 		}
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
-		podPatch, err := json.Marshal(map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"labels": map[string]string{
-					"podtemplate": "patched",
-				},
+		podPatch, err := json.Marshal(v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"podtemplate": "patched"},
 			},
-			"spec": map[string]interface{}{
-				"containers": []map[string]interface{}{
-					{
-						"name":  testPodName,
-						"image": testPodImage2,
-					},
-				},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: testPodName,
+					Image: testPodImage2,
+				}},
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch for Pod")
 		_, err = f.ClientSet.CoreV1().Pods(testNs).Patch(context.TODO(), testPodName, types.StrategicMergePatchType, []byte(podPatch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Pod")
 
-		ginkgo.By("getting the Pod and ensure it's patched")
+		ginkgo.By("getting the Pod and ensuring that it's patched")
 		pod, err := f.ClientSet.CoreV1().Pods(testNs).Get(context.TODO(), testPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch Pod")
 		framework.ExpectEqual(pod.ObjectMeta.Labels["test-pod-static"], "true", "failed to patch Pod - missing label")
@@ -946,18 +943,18 @@ var _ = framework.KubeDescribe("Pods", func() {
 		ginkgo.By("getting the PodStatus")
 		podStatusUnstructured, err := dc.Resource(podResource).Namespace(testNs).Get(context.TODO(), testPodName, metav1.GetOptions{}, "status")
 		framework.ExpectNoError(err, "failed to fetch PodStatus")
-		podStatusUjson, err := json.Marshal(podStatusUnstructured)
+		podStatusBytes, err := json.Marshal(podStatusUnstructured)
 		framework.ExpectNoError(err, "failed to marshal unstructured response")
 		var podStatus v1.Pod
-		json.Unmarshal(podStatusUjson, &podStatus)
+		json.Unmarshal(podStatusBytes, &podStatus)
 
 		ginkgo.By("replacing the Pod's status Ready condition to False")
 		podStatusUpdated := podStatus
 		podStatusFieldPatchCount := 0
 		podStatusFieldPatchCountTotal := 2
 		for pos, cond := range podStatusUpdated.Status.Conditions {
-			if (cond.Type == "Ready" && cond.Status == "True") || (cond.Type == "ContainersReady" && cond.Status == "True") {
-				podStatusUpdated.Status.Conditions[pos].Status = "False"
+			if (cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionTrue) {
+				podStatusUpdated.Status.Conditions[pos].Status = v1.ConditionFalse
 				podStatusFieldPatchCount++
 			}
 		}
@@ -965,23 +962,23 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podStatusUpdate, err := f.ClientSet.CoreV1().Pods(testNs).UpdateStatus(context.TODO(), &podStatusUpdated, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update PodStatus")
 
-		ginkgo.By("check the PodStatus updates's return status to ensure it's Ready condition is False")
+		ginkgo.By("check the Pod again to ensure its Ready conditions are False")
 		podStatusFieldPatchCount = 0
 		podStatusFieldPatchCountTotal = 2
 		for _, cond := range podStatusUpdate.Status.Conditions {
-			if (cond.Type == "Ready" && cond.Status == "False") || (cond.Type == "ContainersReady" && cond.Status == "False") {
+			if (cond.Type == v1.PodReady && cond.Status == v1.ConditionFalse) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionFalse) {
 				podStatusFieldPatchCount++
 			}
 		}
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
 
 		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
-		err = f.ClientSet.CoreV1().Pods(testNs).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-pod-static=true"})
+		err = f.ClientSet.CoreV1().Pods(testNs).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Pod by collection")
 
-		ginkgo.By("watching for Pod to be deleted")
+		ginkgo.By("watching for the Pod to be deleted")
 		for watchEvent := range podWatchChan {
-			if watchEvent.Type == "DELETED" {
+			if watchEvent.Type == watch.Deleted {
 				break
 			}
 		}
