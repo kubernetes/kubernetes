@@ -432,7 +432,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		flowcontrolrest.RESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
-		appsrest.RESTStorageProvider{},
+		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{},
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
 	}
