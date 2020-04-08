@@ -416,7 +416,7 @@ runTests() {
     fi
   }
 
-   if [[ -n "${WHAT-}" ]]; then
+  if [[ -n "${WHAT-}" ]]; then
     for pkg in ${WHAT}
     do
       # running of kubeadm is captured in hack/make-targets/test-cmd.sh
