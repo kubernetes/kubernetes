@@ -102,3 +102,59 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Test that one item is allocated in storage but is not allocated locally
+// When try to allocate it, it should fail despite it's free in the local bitmap
+// bot not in the storage
+func TestAllocatedStorageButReleasedLocally(t *testing.T) {
+	storage, server, backing, _ := newStorage(t)
+	defer server.Terminate(t)
+	if err := storage.storage.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Allocate an item in the storage
+	if _, err := storage.Allocate(2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Release the item in the local bitmap
+	// emulating it's out of sync with the storage
+	err := backing.Release(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// It should fail trying to allocate it deespite it's free
+	// in the local bitmap because it's not in the storage
+	ok, err := storage.Allocate(2)
+	if ok || err != nil {
+		t.Fatal(err)
+	}
+
+}
+
+// Test that one item is free in storage but is  allocated locally
+// When try to allocate it, it should succeed despite it's allocated
+// in the local bitmap bot not in the storage
+func TestAllocatedLocallyButReleasedStorage(t *testing.T) {
+	storage, server, backing, _ := newStorage(t)
+	defer server.Terminate(t)
+	if err := storage.storage.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Allocate an item in the local bitmap only but not in the storage
+	// emulating it's out of sync with the storage
+	if _, err := backing.Allocate(2); err != nil {
+		t.Fatal(err)
+	}
+
+	// It should be able to allocate it
+	// because it's free in the storage
+	ok, err := storage.Allocate(2)
+	if !ok || err != nil {
+		t.Fatal(err)
+	}
+
+}
