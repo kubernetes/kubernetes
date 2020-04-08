@@ -9,7 +9,8 @@
   }
 },
 "spec":{
-"priorityClass": "system-node-critical",
+"priorityClassName": "system-node-critical",
+"priority": 2000001000,
 "hostNetwork": true,
 "containers":[
     {
