@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,6 +45,20 @@ func TestPullImage(t *testing.T) {
 	assert.Equal(t, images[0].RepoTags, []string{"busybox"})
 }
 
+func TestPullImageWithError(t *testing.T) {
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
+	imageRef, err := fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	assert.Error(t, err)
+	assert.Equal(t, "", imageRef)
+
+	images, err := fakeManager.ListImages()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(images))
+}
+
 func TestListImages(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -62,6 +77,17 @@ func TestListImages(t *testing.T) {
 	assert.Equal(t, expected.List(), actual.List())
 }
 
+func TestListImagesWithError(t *testing.T) {
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	fakeImageService.InjectError("ListImages", fmt.Errorf("test-failure"))
+
+	actualImages, err := fakeManager.ListImages()
+	assert.Error(t, err)
+	assert.Nil(t, actualImages)
+}
+
 func TestGetImageRef(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -71,6 +97,32 @@ func TestGetImageRef(t *testing.T) {
 	imageRef, err := fakeManager.GetImageRef(kubecontainer.ImageSpec{Image: image})
 	assert.NoError(t, err)
 	assert.Equal(t, image, imageRef)
+}
+
+func TestGetImageRefImageNotAvailableLocally(t *testing.T) {
+	_, _, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	image := "busybox"
+
+	imageRef, err := fakeManager.GetImageRef(kubecontainer.ImageSpec{Image: image})
+	assert.NoError(t, err)
+
+	imageNotAvailableLocallyRef := ""
+	assert.Equal(t, imageNotAvailableLocallyRef, imageRef)
+}
+
+func TestGetImageRefWithError(t *testing.T) {
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	image := "busybox"
+
+	fakeImageService.InjectError("ImageStatus", fmt.Errorf("test-error"))
+
+	imageRef, err := fakeManager.GetImageRef(kubecontainer.ImageSpec{Image: image})
+	assert.Error(t, err)
+	assert.Equal(t, "", imageRef)
 }
 
 func TestRemoveImage(t *testing.T) {
@@ -86,6 +138,29 @@ func TestRemoveImage(t *testing.T) {
 	assert.Equal(t, 0, len(fakeImageService.Images))
 }
 
+func TestRemoveImageNoOpIfImageNotLocal(t *testing.T) {
+	_, _, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	err = fakeManager.RemoveImage(kubecontainer.ImageSpec{Image: "busybox"})
+	assert.NoError(t, err)
+}
+
+func TestRemoveImageWithError(t *testing.T) {
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	_, err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(fakeImageService.Images))
+
+	fakeImageService.InjectError("RemoveImage", fmt.Errorf("test-failure"))
+
+	err = fakeManager.RemoveImage(kubecontainer.ImageSpec{Image: "busybox"})
+	assert.Error(t, err)
+	assert.Equal(t, 1, len(fakeImageService.Images))
+}
+
 func TestImageStats(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -99,6 +174,17 @@ func TestImageStats(t *testing.T) {
 	assert.NoError(t, err)
 	expectedStats := &kubecontainer.ImageStats{TotalStorageBytes: imageSize * uint64(len(images))}
 	assert.Equal(t, expectedStats, actualStats)
+}
+
+func TestImageStatsWithError(t *testing.T) {
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	fakeImageService.InjectError("ListImages", fmt.Errorf("test-failure"))
+
+	actualImageStats, err := fakeManager.ImageStats()
+	assert.Error(t, err)
+	assert.Nil(t, actualImageStats)
 }
 
 func TestPullWithSecrets(t *testing.T) {
