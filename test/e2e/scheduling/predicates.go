@@ -587,7 +587,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
@@ -630,7 +630,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
@@ -904,7 +904,7 @@ func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 // from the given node upon invocation.
 func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) Action {
 	return func() error {
-		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+		e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 		return nil
 	}
 }
