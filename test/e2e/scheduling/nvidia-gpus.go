@@ -288,11 +288,11 @@ func VerifyJobNCompletions(f *framework.Framework, completions int32) {
 	framework.Logf("Got the following pods for job cuda-add: %v", createdPodNames)
 
 	successes := int32(0)
+	regex := regexp.MustCompile("PASSED")
 	for _, podName := range createdPodNames {
 		f.PodClient().WaitForFinish(podName, 5*time.Minute)
 		logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podName, "vector-addition")
 		framework.ExpectNoError(err, "Should be able to get logs for pod %v", podName)
-		regex := regexp.MustCompile("PASSED")
 		if regex.MatchString(logs) {
 			successes++
 		}
