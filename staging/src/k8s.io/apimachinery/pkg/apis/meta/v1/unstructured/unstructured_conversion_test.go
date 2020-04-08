@@ -135,8 +135,13 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 					"kind":       "Carp",
 				},
 			},
-			convertingObject:        &testapigroupv1.Carp{},
-			expectedConvertedObject: &testapigroupv1.Carp{},
+			convertingObject: &testapigroupv1.Carp{},
+			expectedConvertedObject: &testapigroupv1.Carp{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Carp",
+				},
+			},
 		},
 		{
 			name: "convert empty unstructured w/o gvk to versioned object should fail",
@@ -166,6 +171,10 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 			},
 			convertingObject: &testapigroupv1.Carp{},
 			expectedConvertedObject: &testapigroupv1.Carp{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Carp",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "noxu",
 				},
@@ -243,7 +252,7 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 			},
 			convertingObject: &metav1.CreateOptions{},
 			expectedErrFunc: func(err error) bool {
-				return strings.HasPrefix(err.Error(), "converting (v1.Carp) to (v1.CreateOptions):")
+				return strings.HasPrefix(err.Error(), "converting (*v1.Carp) to (*v1.CreateOptions):")
 			},
 		},
 	}

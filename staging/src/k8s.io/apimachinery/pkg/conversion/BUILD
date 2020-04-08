@@ -13,11 +13,7 @@ go_test(
         "helper_test.go",
     ],
     embed = [":go_default_library"],
-    deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/github.com/google/gofuzz:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
-    ],
+    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 go_library(
