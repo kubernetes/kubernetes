@@ -56,7 +56,11 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReferen
 		listMeta = objectMeta
 	}
 
-	gvk := obj.GetObjectKind().GroupVersionKind()
+	objKind := obj.GetObjectKind()
+	if objKind == nil {
+		return nil, fmt.Errorf("unable to retrieve ObjectKind for %v", obj)
+	}
+	gvk := objKind.GroupVersionKind()
 
 	// If object meta doesn't contain data about kind and/or version,
 	// we are falling back to scheme.
