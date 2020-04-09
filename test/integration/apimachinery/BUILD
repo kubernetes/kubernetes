@@ -5,6 +5,7 @@ go_test(
     srcs = [
         "main_test.go",
         "watch_restart_test.go",
+        "watch_timeout_test.go",
     ],
     tags = [
         "etcd",
@@ -22,6 +23,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/proxy:go_default_library",
         "//test/integration/framework:go_default_library",
     ],
 )
