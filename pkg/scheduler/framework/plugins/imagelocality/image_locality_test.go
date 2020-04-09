@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 func TestImageLocalityPriority(t *testing.T) {
@@ -69,7 +68,7 @@ func TestImageLocalityPriority(t *testing.T) {
 		Images: []v1.ContainerImage{
 			{
 				Names: []string{
-					"gcr.io/40:" + parsers.DefaultImageTag,
+					"gcr.io/40:latest",
 					"gcr.io/40:v1",
 					"gcr.io/40:v1",
 				},
@@ -77,14 +76,14 @@ func TestImageLocalityPriority(t *testing.T) {
 			},
 			{
 				Names: []string{
-					"gcr.io/300:" + parsers.DefaultImageTag,
+					"gcr.io/300:latest",
 					"gcr.io/300:v1",
 				},
 				SizeBytes: int64(300 * mb),
 			},
 			{
 				Names: []string{
-					"gcr.io/2000:" + parsers.DefaultImageTag,
+					"gcr.io/2000:latest",
 				},
 				SizeBytes: int64(2000 * mb),
 			},
@@ -95,13 +94,13 @@ func TestImageLocalityPriority(t *testing.T) {
 		Images: []v1.ContainerImage{
 			{
 				Names: []string{
-					"gcr.io/250:" + parsers.DefaultImageTag,
+					"gcr.io/250:latest",
 				},
 				SizeBytes: int64(250 * mb),
 			},
 			{
 				Names: []string{
-					"gcr.io/10:" + parsers.DefaultImageTag,
+					"gcr.io/10:latest",
 					"gcr.io/10:v1",
 				},
 				SizeBytes: int64(10 * mb),
