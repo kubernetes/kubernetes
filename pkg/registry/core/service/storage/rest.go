@@ -599,10 +599,12 @@ func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Ge
 	if pod == nil {
 		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
 	}
-	if pod.Status.PodIPs[0].IP != addr.IP {
-		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIPs[0].IP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
+	for _, podIP := range pod.Status.PodIPs {
+		if podIP.IP == addr.IP {
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("pod ip(s) doesn't match endpoint ip, skipping: %v vs %s (%s/%s)", pod.Status.PodIPs, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
 }
 
 // This is O(N), but we expect haystack to be small;
