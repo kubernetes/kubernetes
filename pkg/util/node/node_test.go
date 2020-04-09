@@ -175,7 +175,7 @@ func Test_GetZoneKey(t *testing.T) {
 			zone: "region1:\x00:zone1",
 		},
 		{
-			name: "has both beta and GA zone and region keys, beta labels take precedent",
+			name: "has both beta and GA zone and region keys, stable labels take precedent",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -186,7 +186,7 @@ func Test_GetZoneKey(t *testing.T) {
 					},
 				},
 			},
-			zone: "region2:\x00:zone2",
+			zone: "region1:\x00:zone1",
 		},
 	}
 
