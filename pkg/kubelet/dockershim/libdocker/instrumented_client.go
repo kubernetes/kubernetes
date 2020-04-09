@@ -23,6 +23,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimagetypes "github.com/docker/docker/api/types/image"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 )
 
@@ -42,7 +43,7 @@ func NewInstrumentedInterface(dockerClient Interface) Interface {
 // recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
 	metrics.DockerOperations.WithLabelValues(operation).Inc()
-	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
+	metrics.DockerOperationsLatency.WithLabelValues(operation).Observe(clock.RealClock{}.SinceInSeconds(start))
 }
 
 // recordError records error for metric if an error occurred.

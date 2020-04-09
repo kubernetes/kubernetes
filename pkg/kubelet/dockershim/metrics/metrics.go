@@ -17,11 +17,9 @@ limitations under the License.
 package metrics
 
 import (
-	"sync"
-	"time"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"sync"
 )
 
 const (
@@ -94,9 +92,4 @@ func Register() {
 		legacyregistry.MustRegister(DockerOperationsErrors)
 		legacyregistry.MustRegister(DockerOperationsTimeout)
 	})
-}
-
-// SinceInSeconds gets the time since the specified start in seconds.
-func SinceInSeconds(start time.Time) float64 {
-	return time.Since(start).Seconds()
 }

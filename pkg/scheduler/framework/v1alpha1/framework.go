@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -313,7 +314,7 @@ func (f *framework) QueueSortFunc() LessFunc {
 func (f *framework) RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilter, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilter, status.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.preFilterPlugins {
 		status = f.runPreFilterPlugin(ctx, pl, state, pod)
@@ -338,7 +339,7 @@ func (f *framework) runPreFilterPlugin(ctx context.Context, pl PreFilterPlugin, 
 	}
 	startTime := time.Now()
 	status := pl.PreFilter(ctx, state, pod)
-	f.metricsRecorder.observePluginDurationAsync(preFilter, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(preFilter, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -374,7 +375,7 @@ func (f *framework) runPreFilterExtensionAddPod(ctx context.Context, pl PreFilte
 	}
 	startTime := time.Now()
 	status := pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podToAdd, nodeInfo)
-	f.metricsRecorder.observePluginDurationAsync(preFilterExtensionAddPod, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(preFilterExtensionAddPod, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -410,7 +411,7 @@ func (f *framework) runPreFilterExtensionRemovePod(ctx context.Context, pl PreFi
 	}
 	startTime := time.Now()
 	status := pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podToAdd, nodeInfo)
-	f.metricsRecorder.observePluginDurationAsync(preFilterExtensionRemovePod, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(preFilterExtensionRemovePod, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -455,7 +456,7 @@ func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state 
 	}
 	startTime := time.Now()
 	status := pl.Filter(ctx, state, pod, nodeInfo)
-	f.metricsRecorder.observePluginDurationAsync(Filter, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(Filter, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -469,7 +470,7 @@ func (f *framework) RunPreScorePlugins(
 ) (status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.preScorePlugins {
 		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes)
@@ -489,7 +490,7 @@ func (f *framework) runPreScorePlugin(ctx context.Context, pl PreScorePlugin, st
 	}
 	startTime := time.Now()
 	status := pl.PreScore(ctx, state, pod, nodes)
-	f.metricsRecorder.observePluginDurationAsync(preScore, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(preScore, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -500,7 +501,7 @@ func (f *framework) runPreScorePlugin(ctx context.Context, pl PreScorePlugin, st
 func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) (ps PluginToNodeScores, status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	pluginToNodeScores := make(PluginToNodeScores, len(f.scorePlugins))
 	for _, pl := range f.scorePlugins {
@@ -582,7 +583,7 @@ func (f *framework) runScorePlugin(ctx context.Context, pl ScorePlugin, state *C
 	}
 	startTime := time.Now()
 	s, status := pl.Score(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(score, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(score, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return s, status
 }
 
@@ -592,7 +593,7 @@ func (f *framework) runScoreExtension(ctx context.Context, pl ScorePlugin, state
 	}
 	startTime := time.Now()
 	status := pl.ScoreExtensions().NormalizeScore(ctx, state, pod, nodeScoreList)
-	f.metricsRecorder.observePluginDurationAsync(scoreExtensionNormalize, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(scoreExtensionNormalize, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -602,7 +603,7 @@ func (f *framework) runScoreExtension(ctx context.Context, pl ScorePlugin, state
 func (f *framework) RunPreBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) (status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(preBind, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(preBind, status.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.preBindPlugins {
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
@@ -621,7 +622,7 @@ func (f *framework) runPreBindPlugin(ctx context.Context, pl PreBindPlugin, stat
 	}
 	startTime := time.Now()
 	status := pl.PreBind(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(preBind, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(preBind, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -629,7 +630,7 @@ func (f *framework) runPreBindPlugin(ctx context.Context, pl PreBindPlugin, stat
 func (f *framework) RunBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) (status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(bind, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(bind, status.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	if len(f.bindPlugins) == 0 {
 		return NewStatus(Skip, "")
@@ -655,7 +656,7 @@ func (f *framework) runBindPlugin(ctx context.Context, bp BindPlugin, state *Cyc
 	}
 	startTime := time.Now()
 	status := bp.Bind(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(bind, bp.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(bind, bp.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -663,7 +664,7 @@ func (f *framework) runBindPlugin(ctx context.Context, bp BindPlugin, state *Cyc
 func (f *framework) RunPostBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(postBind, Success.String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(postBind, Success.String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.postBindPlugins {
 		f.runPostBindPlugin(ctx, pl, state, pod, nodeName)
@@ -677,7 +678,7 @@ func (f *framework) runPostBindPlugin(ctx context.Context, pl PostBindPlugin, st
 	}
 	startTime := time.Now()
 	pl.PostBind(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(postBind, pl.Name(), nil, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(postBind, pl.Name(), nil, clock.RealClock{}.SinceInSeconds(startTime))
 }
 
 // RunReservePlugins runs the set of configured reserve plugins. If any of these
@@ -686,7 +687,7 @@ func (f *framework) runPostBindPlugin(ctx context.Context, pl PostBindPlugin, st
 func (f *framework) RunReservePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) (status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(reserve, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(reserve, status.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.reservePlugins {
 		status = f.runReservePlugin(ctx, pl, state, pod, nodeName)
@@ -705,7 +706,7 @@ func (f *framework) runReservePlugin(ctx context.Context, pl ReservePlugin, stat
 	}
 	startTime := time.Now()
 	status := pl.Reserve(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(reserve, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(reserve, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status
 }
 
@@ -713,7 +714,7 @@ func (f *framework) runReservePlugin(ctx context.Context, pl ReservePlugin, stat
 func (f *framework) RunUnreservePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(unreserve, Success.String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(unreserve, Success.String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	for _, pl := range f.unreservePlugins {
 		f.runUnreservePlugin(ctx, pl, state, pod, nodeName)
@@ -727,7 +728,7 @@ func (f *framework) runUnreservePlugin(ctx context.Context, pl UnreservePlugin, 
 	}
 	startTime := time.Now()
 	pl.Unreserve(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(unreserve, pl.Name(), nil, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(unreserve, pl.Name(), nil, clock.RealClock{}.SinceInSeconds(startTime))
 }
 
 // RunPermitPlugins runs the set of configured permit plugins. If any of these
@@ -739,7 +740,7 @@ func (f *framework) runUnreservePlugin(ctx context.Context, pl UnreservePlugin, 
 func (f *framework) RunPermitPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) (status *Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(permit, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(permit, status.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 	}()
 	pluginsWaitTime := make(map[string]time.Duration)
 	statusCode := Success
@@ -781,7 +782,7 @@ func (f *framework) runPermitPlugin(ctx context.Context, pl PermitPlugin, state 
 	}
 	startTime := time.Now()
 	status, timeout := pl.Permit(ctx, state, pod, nodeName)
-	f.metricsRecorder.observePluginDurationAsync(permit, pl.Name(), status, metrics.SinceInSeconds(startTime))
+	f.metricsRecorder.observePluginDurationAsync(permit, pl.Name(), status, clock.RealClock{}.SinceInSeconds(startTime))
 	return status, timeout
 }
 
@@ -796,7 +797,7 @@ func (f *framework) WaitOnPermit(ctx context.Context, pod *v1.Pod) (status *Stat
 
 	startTime := time.Now()
 	s := <-waitingPod.s
-	metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 
 	if !s.IsSuccess() {
 		if s.IsUnschedulable() {

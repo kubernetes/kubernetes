@@ -17,11 +17,9 @@ limitations under the License.
 package metrics
 
 import (
-	"sync"
-	"time"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"sync"
 )
 
 const kubeProxySubsystem = "kubeproxy"
@@ -141,11 +139,6 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
 	})
-}
-
-// SinceInSeconds gets the time since the specified start in seconds.
-func SinceInSeconds(start time.Time) float64 {
-	return time.Since(start).Seconds()
 }
 
 func merge(slices ...[]float64) []float64 {

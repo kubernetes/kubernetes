@@ -18,11 +18,9 @@ package metrics
 
 import (
 	"fmt"
-	"sync"
-	"time"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -409,11 +407,6 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.S
 // GetGather returns the gatherer. It used by test case outside current package.
 func GetGather() metrics.Gatherer {
 	return legacyregistry.DefaultGatherer
-}
-
-// SinceInSeconds gets the time since the specified start in seconds.
-func SinceInSeconds(start time.Time) float64 {
-	return time.Since(start).Seconds()
 }
 
 const configMapAPIPathFmt = "/api/v1/namespaces/%s/configmaps/%s"

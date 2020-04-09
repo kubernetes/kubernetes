@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -49,7 +50,7 @@ func newInstrumentedImageManagerService(service internalapi.ImageManagerService)
 // recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
 	metrics.RuntimeOperations.WithLabelValues(operation).Inc()
-	metrics.RuntimeOperationsDuration.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
+	metrics.RuntimeOperationsDuration.WithLabelValues(operation).Observe(clock.RealClock{}.SinceInSeconds(start))
 }
 
 // recordError records error for metric if an error occurred.
@@ -180,7 +181,7 @@ func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandbox
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
-	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(metrics.SinceInSeconds(startTime))
+	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(clock.RealClock{}.SinceInSeconds(startTime))
 
 	out, err := in.service.RunPodSandbox(config, runtimeHandler)
 	recordError(operation, err)

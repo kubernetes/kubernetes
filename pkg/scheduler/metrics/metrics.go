@@ -301,8 +301,3 @@ func UnschedulablePods() metrics.GaugeMetric {
 func Reset() {
 	DeprecatedSchedulingDuration.Reset()
 }
-
-// SinceInSeconds gets the time since the specified start in seconds.
-func SinceInSeconds(start time.Time) float64 {
-	return time.Since(start).Seconds()
-}

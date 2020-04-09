@@ -52,6 +52,11 @@ func (RealClock) Since(ts time.Time) time.Duration {
 	return time.Since(ts)
 }
 
+// SinceInSeconds gets the time since the specified start in seconds.
+func (RealClock) SinceInSeconds(ts time.Time) float64 {
+	return time.Since(ts).Seconds()
+}
+
 // After is the same as time.After(d).
 func (RealClock) After(d time.Duration) <-chan time.Time {
 	return time.After(d)
@@ -123,6 +128,13 @@ func (f *FakePassiveClock) Since(ts time.Time) time.Duration {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	return f.time.Sub(ts)
+}
+
+// SinceInSeconds gets the time since the specified start in seconds.
+func (f *FakePassiveClock) SinceInSeconds(ts time.Time) float64 {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	return f.Since(ts).Seconds()
 }
 
 // SetTime sets the time on the FakePassiveClock.

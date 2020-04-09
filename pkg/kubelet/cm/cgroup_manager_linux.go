@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -287,7 +288,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
-		metrics.CgroupManagerDuration.WithLabelValues("destroy").Observe(metrics.SinceInSeconds(start))
+		metrics.CgroupManagerDuration.WithLabelValues("destroy").Observe(clock.RealClock{}.SinceInSeconds(start))
 	}()
 
 	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
@@ -447,7 +448,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
-		metrics.CgroupManagerDuration.WithLabelValues("update").Observe(metrics.SinceInSeconds(start))
+		metrics.CgroupManagerDuration.WithLabelValues("update").Observe(clock.RealClock{}.SinceInSeconds(start))
 	}()
 
 	// Extract the cgroup resource parameters
@@ -482,7 +483,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	start := time.Now()
 	defer func() {
-		metrics.CgroupManagerDuration.WithLabelValues("create").Observe(metrics.SinceInSeconds(start))
+		metrics.CgroupManagerDuration.WithLabelValues("create").Observe(clock.RealClock{}.SinceInSeconds(start))
 	}()
 
 	resources := m.toResources(cgroupConfig.ResourceParameters)

@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -551,8 +552,8 @@ func (sched *Scheduler) finishBinding(prof *profile.Profile, assumed *v1.Pod, ta
 		return
 	}
 
-	metrics.BindingLatency.Observe(metrics.SinceInSeconds(start))
-	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(start))
+	metrics.BindingLatency.Observe(clock.RealClock{}.SinceInSeconds(start))
+	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.Binding).Observe(clock.RealClock{}.SinceInSeconds(start))
 	prof.Recorder.Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 
@@ -597,8 +598,8 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				preemptionStartTime := time.Now()
 				sched.preempt(schedulingCycleCtx, prof, state, pod, fitError)
 				metrics.PreemptionAttempts.Inc()
-				metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
-				metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+				metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(clock.RealClock{}.SinceInSeconds(preemptionStartTime))
+				metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PreemptionEvaluation).Observe(clock.RealClock{}.SinceInSeconds(preemptionStartTime))
 			}
 			// Pod did not fit anywhere, so it is counted as a failure. If preemption
 			// succeeds, the pod should get counted as a success the next time we try to
@@ -611,7 +612,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		sched.recordSchedulingFailure(prof, podInfo.DeepCopy(), err, v1.PodReasonUnschedulable, err.Error())
 		return
 	}
-	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
+	metrics.SchedulingAlgorithmLatency.Observe(clock.RealClock{}.SinceInSeconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPodInfo := podInfo.DeepCopy()
@@ -728,7 +729,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		}
 
 		err := sched.bind(bindingCycleCtx, prof, assumedPod, scheduleResult.SuggestedHost, state)
-		metrics.E2eSchedulingLatency.Observe(metrics.SinceInSeconds(start))
+		metrics.E2eSchedulingLatency.Observe(clock.RealClock{}.SinceInSeconds(start))
 		if err != nil {
 			metrics.PodScheduleErrors.Inc()
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
@@ -742,7 +743,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 
 			metrics.PodScheduleSuccesses.Inc()
 			metrics.PodSchedulingAttempts.Observe(float64(podInfo.Attempts))
-			metrics.PodSchedulingDuration.Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
+			metrics.PodSchedulingDuration.Observe(clock.RealClock{}.SinceInSeconds(podInfo.InitialAttemptTimestamp))
 
 			// Run "postbind" plugins.
 			prof.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
