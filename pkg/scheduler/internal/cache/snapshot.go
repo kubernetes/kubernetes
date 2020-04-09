@@ -157,9 +157,9 @@ func (p podLister) FilteredList(filter framework.PodFilter, selector labels.Sele
 	}
 	pods := make([]*v1.Pod, 0, maxSize)
 	for _, n := range p {
-		for _, pod := range n.Pods() {
-			if filter(pod) && selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
+		for _, p := range n.Pods() {
+			if filter(p.Pod) && selector.Matches(labels.Set(p.Pod.Labels)) {
+				pods = append(pods, p.Pod)
 			}
 		}
 	}

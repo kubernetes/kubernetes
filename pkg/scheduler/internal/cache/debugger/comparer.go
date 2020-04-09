@@ -91,8 +91,8 @@ func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[s
 
 	cached := []string{}
 	for _, nodeinfo := range nodeinfos {
-		for _, pod := range nodeinfo.Pods() {
-			cached = append(cached, string(pod.UID))
+		for _, p := range nodeinfo.Pods() {
+			cached = append(cached, string(p.Pod.UID))
 		}
 	}
 	for _, pod := range waitingPods {

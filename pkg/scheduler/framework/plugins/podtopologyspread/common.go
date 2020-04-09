@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 type topologyPair struct {
@@ -83,14 +84,14 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 	return result, nil
 }
 
-func countPodsMatchSelector(pods []*v1.Pod, selector labels.Selector, ns string) int {
+func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selector, ns string) int {
 	count := 0
-	for _, p := range pods {
+	for _, p := range podInfos {
 		// Bypass terminating Pod (see #87621).
-		if p.DeletionTimestamp != nil || p.Namespace != ns {
+		if p.Pod.DeletionTimestamp != nil || p.Pod.Namespace != ns {
 			continue
 		}
-		if selector.Matches(labels.Set(p.Labels)) {
+		if selector.Matches(labels.Set(p.Pod.Labels)) {
 			count++
 		}
 	}

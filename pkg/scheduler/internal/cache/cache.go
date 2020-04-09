@@ -314,12 +314,7 @@ func (cache *schedulerCache) removeDeletedNodesFromSnapshot(snapshot *Snapshot) 
 	}
 }
 
-func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
-	alwaysTrue := func(p *v1.Pod) bool { return true }
-	return cache.FilteredList(alwaysTrue, selector)
-}
-
-func (cache *schedulerCache) FilteredList(podFilter framework.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+func (cache *schedulerCache) ListPods(selector labels.Selector) ([]*v1.Pod, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 	// podFilter is expected to return true for most or all of the pods. We
@@ -331,9 +326,9 @@ func (cache *schedulerCache) FilteredList(podFilter framework.PodFilter, selecto
 	}
 	pods := make([]*v1.Pod, 0, maxSize)
 	for _, n := range cache.nodes {
-		for _, pod := range n.info.Pods() {
-			if podFilter(pod) && selector.Matches(labels.Set(pod.Labels)) {
-				pods = append(pods, pod)
+		for _, p := range n.info.Pods() {
+			if selector.Matches(labels.Set(p.Pod.Labels)) {
+				pods = append(pods, p.Pod)
 			}
 		}
 	}

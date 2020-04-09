@@ -927,42 +927,15 @@ func TestForgetPod(t *testing.T) {
 	}
 }
 
-// getResourceRequest returns the resource request of all containers in Pods;
-// excluding initContainers.
-func getResourceRequest(pod *v1.Pod) v1.ResourceList {
-	result := &framework.Resource{}
-	for _, container := range pod.Spec.Containers {
-		result.Add(container.Resources.Requests)
-	}
-
-	return result.ResourceList()
-}
-
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
 func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *framework.NodeInfo {
 	expected := framework.NewNodeInfo()
-
-	// Simulate SetNode.
 	expected.SetNode(node)
-
 	expected.SetAllocatableResource(framework.NewResource(node.Status.Allocatable))
 	expected.SetTaints(node.Spec.Taints)
 	expected.SetGeneration(expected.GetGeneration() + 1)
-
 	for _, pod := range pods {
-		// Simulate AddPod
-		pods := append(expected.Pods(), pod)
-		expected.SetPods(pods)
-		requestedResource := expected.RequestedResource()
-		newRequestedResource := &requestedResource
-		newRequestedResource.Add(getResourceRequest(pod))
-		expected.SetRequestedResource(newRequestedResource)
-		nonZeroRequest := expected.NonZeroRequest()
-		newNonZeroRequest := &nonZeroRequest
-		newNonZeroRequest.Add(getResourceRequest(pod))
-		expected.SetNonZeroRequest(newNonZeroRequest)
-		expected.UpdateUsedPorts(pod, true)
-		expected.SetGeneration(expected.GetGeneration() + 1)
+		expected.AddPod(pod)
 	}
 
 	return expected

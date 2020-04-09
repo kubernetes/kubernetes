@@ -555,7 +555,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 				return
 			default:
 			}
-			pods, err := scache.List(labels.Everything())
+			pods, err := scache.ListPods(labels.Everything())
 			if err != nil {
 				errChan <- fmt.Errorf("cache.List failed: %v", err)
 				return

@@ -67,7 +67,7 @@ func (d *CacheDumper) printNodeInfo(n *framework.NodeInfo) string {
 		n.Node().Name, n.RequestedResource(), n.AllocatableResource(), len(n.Pods())))
 	// Dumping Pod Info
 	for _, p := range n.Pods() {
-		nodeData.WriteString(printPod(p))
+		nodeData.WriteString(printPod(p.Pod))
 	}
 	// Dumping nominated pods info on the node
 	nominatedPods := d.podQueue.NominatedPodsForNode(n.Node().Name)
