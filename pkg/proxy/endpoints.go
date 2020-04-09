@@ -176,6 +176,10 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		// there will be no network programming for them and thus no network programming latency metric
 		// should be exported.
 		delete(ect.lastChangeTriggerTimes, namespacedName)
+	} else {
+		for spn, eps := range change.current {
+			klog.V(2).Infof("Service port %s updated: %d endpoints", spn, len(eps))
+		}
 	}
 
 	metrics.EndpointChangesPending.Set(float64(len(ect.items)))
