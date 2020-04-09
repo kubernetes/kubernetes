@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/integer"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const statusUpdateRetries = 3

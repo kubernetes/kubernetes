@@ -19,7 +19,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/session:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/ecr:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

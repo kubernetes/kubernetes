@@ -22,7 +22,7 @@ import (
 	"io"
 	"reflect"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"

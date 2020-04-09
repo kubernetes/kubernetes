@@ -26,7 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/healthz"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // PostStartHookFunc is a function that is called after the server has started.

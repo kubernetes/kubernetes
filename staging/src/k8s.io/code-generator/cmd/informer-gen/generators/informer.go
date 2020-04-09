@@ -28,7 +28,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // informerGenerator produces a file of listers for a given GroupVersion and

@@ -11,7 +11,7 @@ go_library(
         "//pkg/util/goroutinemap:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

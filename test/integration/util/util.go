@@ -39,7 +39,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"

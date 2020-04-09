@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")

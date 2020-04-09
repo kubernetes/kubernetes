@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -430,7 +430,7 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 		defer rq.workerLock.Unlock()
 
 		// Something has changed, so track the new state and perform a sync.
-		if klog.V(2) {
+		if klog.V(2).Enabled() {
 			klog.Infof("syncing resource quota controller with updated resources from discovery: %s", printDiff(oldResources, newResources))
 		}
 

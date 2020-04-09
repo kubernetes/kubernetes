@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"

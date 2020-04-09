@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 

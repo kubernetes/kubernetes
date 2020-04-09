@@ -176,6 +176,7 @@ github.com/go-ini/ini v1.9.0/go.mod h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ie
 github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
 github.com/go-lintpack/lintpack v0.5.2/go.mod h1:NwZuYi2nUHho8XEIZ6SIxihrnPoqBTDqfpXvXAN0sXM=
 github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9GBnD5lWE=
+github.com/go-logr/logr v0.1.0 h1:M1Tv3VzNlEHg6uyACnRdtrploV2P7wZqH8BoQMtz0cg=
 github.com/go-logr/logr v0.1.0/go.mod h1:ixOQHD9gLJUVQQ2ZOR7zLEifBX6tGkNJF4QyIY7sIas=
 github.com/go-ole/go-ole v1.2.1/go.mod h1:7FAglXiTm7HKlQRDeOQ6ZNUHidzCWXuZWq/1dTyBNF8=
 github.com/go-openapi/analysis v0.19.5 h1:8b2ZgKfKIUTVQpTb77MoRDIMEIwvDVw40o3aOXdfYzI=
@@ -606,6 +607,8 @@ k8s.io/heapster v1.2.0-beta.1 h1:lUsE/AHOMHpi3MLlBEkaU8Esxm5QhdyCrv1o7ot0s84=
 k8s.io/heapster v1.2.0-beta.1/go.mod h1:h1uhptVXMwC8xtZBYsPXKVi8fpdlYkTs6k949KozGrM=
 k8s.io/klog v1.0.0 h1:Pt+yjF5aB1xDSVbau4VsWe+dQNzA0qv1LlXdC2dF6Q8=
 k8s.io/klog v1.0.0/go.mod h1:4Bi6QPql/J/LkTDqv7R/cd3hPo4k2DG6Ptcz060Ez5I=
+k8s.io/klog/v2 v2.0.0-rc.1 h1:oHFdhslL/sRDU3StMqmHvA6zmdkzv4EWCyoWXVIJe24=
+k8s.io/klog/v2 v2.0.0-rc.1/go.mod h1:PBfzABfn139FHAV07az/IF9Wp1bkk3vpT2XSJ76fSDE=
 k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d h1:SaMrAnTezfJejw3Y3Ysw9DHTUW2qwW/EzzaTw1xtL74=
 k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d/go.mod h1:NwPpO8COeh/j9Q9ModsqBxwHcWDo/PmrJOPyquZCC1A=
 k8s.io/repo-infra v0.0.1-alpha.1 h1:2us1n30u3cOcoPsacNfCvCssS9B9Yldr1ZGOdK0728U=

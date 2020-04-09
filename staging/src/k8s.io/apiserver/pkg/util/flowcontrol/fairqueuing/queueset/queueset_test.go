@@ -29,7 +29,7 @@ import (
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type uniformScenario []uniformClient

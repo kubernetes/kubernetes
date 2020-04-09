@@ -27,7 +27,7 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // New returns an http.RoundTripper that will provide the authentication

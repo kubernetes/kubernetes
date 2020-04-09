@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // FindMultipathDeviceForDevice given a device name like /dev/sdx, find the devicemapper parent

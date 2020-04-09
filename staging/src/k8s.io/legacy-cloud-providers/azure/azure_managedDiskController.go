@@ -33,7 +33,7 @@ import (
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

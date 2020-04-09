@@ -135,7 +135,7 @@ require (
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12
 	k8s.io/heapster v1.2.0-beta.1
-	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.0.0-rc.1
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d
@@ -535,6 +535,7 @@ replace (
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
 	k8s.io/klog => k8s.io/klog v1.0.0
+	k8s.io/klog/v2 => k8s.io/klog/v2 v2.0.0-rc.1
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d

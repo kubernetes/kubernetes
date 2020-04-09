@@ -35,7 +35,7 @@ import (
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"

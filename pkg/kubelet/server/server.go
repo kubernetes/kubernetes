@@ -37,7 +37,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/metrics"
 	"google.golang.org/grpc"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 
 	"k8s.io/api/core/v1"

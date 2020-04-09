@@ -44,7 +44,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // NewProxyServer returns a new ProxyServer.

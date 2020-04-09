@@ -31,7 +31,7 @@ import (
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	utilnet "k8s.io/utils/net"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

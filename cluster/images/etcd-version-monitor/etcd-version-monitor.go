@@ -31,7 +31,7 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Initialize the prometheus instrumentation and client related flags.

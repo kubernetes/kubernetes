@@ -30,7 +30,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // getResourceList returns a ResourceList with the

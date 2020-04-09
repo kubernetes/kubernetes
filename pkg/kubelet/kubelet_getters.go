@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
 

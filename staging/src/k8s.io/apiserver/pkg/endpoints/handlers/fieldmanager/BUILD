@@ -21,7 +21,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/v3/fieldpath:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/v3/merge:go_default_library",

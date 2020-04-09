@@ -38,7 +38,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func TestEnsureNodeExistsByProviderID(t *testing.T) {

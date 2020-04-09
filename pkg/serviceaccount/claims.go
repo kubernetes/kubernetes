@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"gopkg.in/square/go-jose.v2/jwt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/apis/core"

@@ -69,7 +69,7 @@ go_library(
         "//vendor/github.com/armon/circbuf:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/google.golang.org/grpc/status:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/apis/core/v1/helper:go_default_library",

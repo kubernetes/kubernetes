@@ -34,7 +34,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	egressmetrics "k8s.io/apiserver/pkg/server/egressselector/metrics"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 )

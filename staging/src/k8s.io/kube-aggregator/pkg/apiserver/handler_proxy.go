@@ -37,7 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 )

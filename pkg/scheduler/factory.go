@@ -39,7 +39,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	kubefeatures "k8s.io/kubernetes/pkg/features"

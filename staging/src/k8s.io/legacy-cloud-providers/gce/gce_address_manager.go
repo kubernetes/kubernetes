@@ -25,7 +25,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type addressManager struct {

@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"

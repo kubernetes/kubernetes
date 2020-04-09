@@ -51,7 +51,7 @@ import (
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/integer"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

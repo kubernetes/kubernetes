@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 

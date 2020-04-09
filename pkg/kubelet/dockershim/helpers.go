@@ -29,7 +29,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	dockernat "github.com/docker/go-connections/nat"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"

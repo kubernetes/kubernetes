@@ -23,7 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"

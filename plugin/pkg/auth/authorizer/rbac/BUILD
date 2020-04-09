@@ -22,7 +22,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/client-go/listers/rbac/v1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

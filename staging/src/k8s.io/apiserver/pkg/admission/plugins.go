@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Factory is a function that returns an Interface for admission decisions.

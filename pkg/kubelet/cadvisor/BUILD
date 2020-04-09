@@ -41,7 +41,7 @@ go_library(
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/azure:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/gce:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
@@ -56,7 +56,7 @@ go_library(
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/azure:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/cloudinfo/gce:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/winstats:go_default_library",

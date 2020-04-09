@@ -90,7 +90,7 @@ go_library(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )

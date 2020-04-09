@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"net/http"
 

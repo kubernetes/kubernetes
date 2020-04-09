@@ -37,7 +37,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/mxk/go-flowrate/flowrate"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // UpgradeRequestRoundTripper provides an additional method to decorate a request

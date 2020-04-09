@@ -45,7 +45,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	fcclientv1a1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
@@ -440,7 +440,7 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*fctypesv1a1.FlowSchema) {
 	}
 
 	meal.cfgCtl.flowSchemas = fsSeq
-	if klog.V(5) {
+	if klog.V(5).Enabled() {
 		for _, fs := range fsSeq {
 			klog.Infof("Using FlowSchema %s", fcfmt.Fmt(fs))
 		}

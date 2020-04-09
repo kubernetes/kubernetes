@@ -22,7 +22,7 @@ import (
 
 	"github.com/prometheus/procfs"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var processStartTime = NewGaugeVec(

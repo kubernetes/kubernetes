@@ -23,7 +23,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )

@@ -273,6 +273,8 @@ github.com/ghodss/yaml
 # github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
 github.com/go-bindata/go-bindata
 github.com/go-bindata/go-bindata/go-bindata
+# github.com/go-logr/logr v0.1.0 => github.com/go-logr/logr v0.1.0
+github.com/go-logr/logr
 # github.com/go-openapi/analysis v0.19.5 => github.com/go-openapi/analysis v0.19.5
 github.com/go-openapi/analysis
 github.com/go-openapi/analysis/internal
@@ -1731,6 +1733,8 @@ k8s.io/gengo/types
 k8s.io/heapster/metrics/api/v1/types
 # k8s.io/klog v1.0.0 => k8s.io/klog v1.0.0
 k8s.io/klog
+# k8s.io/klog/v2 v2.0.0-rc.1 => k8s.io/klog/v2 v2.0.0-rc.1
+k8s.io/klog/v2
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/install

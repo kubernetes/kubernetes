@@ -35,7 +35,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var errAuthnCrash = apierrors.NewInternalError(errors.New("authentication failed unexpectedly"))

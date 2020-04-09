@@ -41,7 +41,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeschedulerconfigv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"

@@ -45,7 +45,7 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -1072,7 +1072,7 @@ func truncateBody(body string) string {
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
 func glogBody(prefix string, body []byte) {
-	if klog.V(8) {
+	if klog.V(8).Enabled() {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {

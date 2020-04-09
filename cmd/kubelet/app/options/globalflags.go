@@ -27,7 +27,7 @@ import (
 	// libs that provide registration functions
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	// ensure libs have a chance to globally register their flags
 	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"

@@ -8,7 +8,7 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/cmd/openapi-gen/args:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/generators:go_default_library",
     ],

@@ -19,7 +19,7 @@ package routes
 import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/kube-openapi/pkg/builder"

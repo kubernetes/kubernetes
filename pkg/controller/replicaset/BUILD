@@ -38,7 +38,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/ratelimiter:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
     ],
 )
@@ -73,7 +73,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

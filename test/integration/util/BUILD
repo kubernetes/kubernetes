@@ -38,7 +38,7 @@ go_library(
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
         "//vendor/golang.org/x/oauth2:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

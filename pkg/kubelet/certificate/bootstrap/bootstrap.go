@@ -29,7 +29,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
