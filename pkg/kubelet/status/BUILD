@@ -15,6 +15,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/status",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -27,6 +28,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
