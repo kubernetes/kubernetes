@@ -466,6 +466,14 @@ func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) b
 		return false
 	}
 
+	//Ignore static pod validate limitrange
+	if a.GetKind().GroupKind() == api.Kind("Pod"){
+		pod := a.GetObject().(*api.Pod)
+		if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+			return false
+		}
+	}
+
 	return a.GetKind().GroupKind() == api.Kind("Pod") || a.GetKind().GroupKind() == api.Kind("PersistentVolumeClaim")
 }
 
