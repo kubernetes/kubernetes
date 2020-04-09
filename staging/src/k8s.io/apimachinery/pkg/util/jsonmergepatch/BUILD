@@ -13,7 +13,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-        "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/evanphx/json-patch/v5:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
@@ -26,7 +26,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
-        "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/evanphx/json-patch/v5:go_default_library",
     ],
 )
 

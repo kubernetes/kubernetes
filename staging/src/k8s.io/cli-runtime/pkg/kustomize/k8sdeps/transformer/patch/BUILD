@@ -15,7 +15,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/evanphx/json-patch/v5:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/gvk:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/resmap:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/resource:go_default_library",

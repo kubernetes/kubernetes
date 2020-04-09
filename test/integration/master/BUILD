@@ -67,7 +67,7 @@ go_test(
         "//test/integration/etcd:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
-        "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/evanphx/json-patch/v5:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
