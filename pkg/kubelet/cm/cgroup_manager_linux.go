@@ -500,6 +500,8 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	if err := propagateControllers(cgroupConfig.Path); err != nil {
 		return err
 	}
+	allowAll := true
+	cgroupConfig.Resources.AllowAllDevices = &allowAll
 
 	manager, err := cgroupfs2.NewManager(cgroupConfig, cgroupConfig.Path, false)
 	if err != nil {
