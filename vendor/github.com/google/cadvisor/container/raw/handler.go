@@ -27,7 +27,7 @@ import (
 
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type rawContainerHandler struct {

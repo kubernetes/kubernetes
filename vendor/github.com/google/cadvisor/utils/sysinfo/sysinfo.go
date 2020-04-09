@@ -24,7 +24,7 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

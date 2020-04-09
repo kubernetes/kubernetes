@@ -23,7 +23,7 @@ import (
 	"github.com/google/cadvisor/storage"
 	"github.com/google/cadvisor/utils"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ErrDataNotFound is the error resulting if failed to find a container in memory cache.

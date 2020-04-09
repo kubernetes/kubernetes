@@ -18,7 +18,7 @@ package cloudinfo
 
 import (
 	info "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type CloudInfo interface {

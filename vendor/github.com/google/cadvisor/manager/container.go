@@ -39,7 +39,7 @@ import (
 	"github.com/google/cadvisor/utils/cpuload"
 
 	units "github.com/docker/go-units"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 

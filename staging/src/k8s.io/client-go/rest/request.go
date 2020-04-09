@@ -608,7 +608,7 @@ var globalThrottledLogger = &throttledLogger{
 
 func (b *throttledLogger) attemptToLog() (klog.Level, bool) {
 	for _, setting := range b.settings {
-		if bool(klog.V(setting.logLevel)) {
+		if bool(klog.V(setting.logLevel).Enabled()) {
 			// Return early without write locking if possible.
 			if func() bool {
 				setting.lock.RLock()
@@ -1053,11 +1053,11 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 func truncateBody(body string) string {
 	max := 0
 	switch {
-	case bool(klog.V(10)):
+	case bool(klog.V(10).Enabled()):
 		return body
-	case bool(klog.V(9)):
+	case bool(klog.V(9).Enabled()):
 		max = 10240
-	case bool(klog.V(8)):
+	case bool(klog.V(8).Enabled()):
 		max = 1024
 	}
 
