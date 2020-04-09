@@ -17,10 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	"flag"
-	"os"
-	"path"
-	"path/filepath"
 	"regexp"
 	"testing"
 )
@@ -29,25 +25,8 @@ const (
 	TokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
 )
 
-var kubeadmPathFlag = flag.String("kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
-
-func getKubeadmPath() string {
-	kubeadmPath := *kubeadmPathFlag // TEST_SRCDIR is provided by Bazel.
-	if srcDir := os.Getenv("TEST_SRCDIR"); srcDir != "" {
-		kubeadmPath = path.Join(srcDir, os.Getenv("TEST_WORKSPACE"), kubeadmPath)
-	}
-
-	return kubeadmPath
-}
-
-var kubeadmCmdSkip = flag.Bool("kubeadm-cmd-skip", false, "Skip kubeadm cmd tests")
-
 func TestCmdTokenGenerate(t *testing.T) {
 	kubeadmPath := getKubeadmPath()
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
 	stdout, _, _, err := RunCmd(kubeadmPath, "token", "generate")
 	if err != nil {
 		t.Fatalf("'kubeadm token generate' exited uncleanly: %v", err)
@@ -72,11 +51,6 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 		with a non-zero status code after showing the command's usage, so that
 		the usage itself isn't captured as a token without the user noticing.
 	*/
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	kubeadmPath := getKubeadmPath()
 	_, _, _, err := RunCmd(kubeadmPath, "token", "genorate") // subtle typo
 	if err == nil {
@@ -84,11 +58,6 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 	}
 }
 func TestCmdTokenDelete(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	var tests = []struct {
 		name     string
 		args     string

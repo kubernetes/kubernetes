@@ -34,11 +34,6 @@ var (
 )
 
 func TestCmdVersion(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	var versionTest = []struct {
 		name     string
 		args     string
@@ -78,11 +73,6 @@ func TestCmdVersion(t *testing.T) {
 }
 
 func TestCmdVersionOutputJsonOrYaml(t *testing.T) {
-	if *kubeadmCmdSkip {
-		t.Log("kubeadm cmd tests being skipped")
-		t.Skip()
-	}
-
 	var versionTest = []struct {
 		name     string
 		args     string

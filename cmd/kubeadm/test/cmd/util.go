@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	"bytes"
+	"os"
 	"os/exec"
 	"testing"
 
@@ -78,4 +79,14 @@ func getSubCommand(t *testing.T, subCmds []*cobra.Command, name string) *cobra.C
 	t.Fatalf("Unable to find sub command %s", name)
 
 	return nil
+}
+
+// getKubeadmPath returns the contents of the environment variable KUBEADM_PATH
+// or panics if it's empty
+func getKubeadmPath() string {
+	kubeadmPath := os.Getenv("KUBEADM_PATH")
+	if len(kubeadmPath) == 0 {
+		panic("the environment variable KUBEADM_PATH must point to the kubeadm binary path")
+	}
+	return kubeadmPath
 }
