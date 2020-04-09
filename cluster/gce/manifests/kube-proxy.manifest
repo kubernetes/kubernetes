@@ -10,6 +10,7 @@ metadata:
     component: kube-proxy
 spec:
   priorityClassName: system-node-critical
+  priority: 2000001000
   hostNetwork: true
   tolerations:
   - operator: "Exists"

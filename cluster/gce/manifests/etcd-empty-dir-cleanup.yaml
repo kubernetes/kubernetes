@@ -9,6 +9,7 @@ metadata:
     k8s-app: etcd-empty-dir-cleanup
 spec:
   priorityClassName: system-node-critical
+  priority: 2000001000
   hostNetwork: true
   dnsPolicy: Default
   containers:
