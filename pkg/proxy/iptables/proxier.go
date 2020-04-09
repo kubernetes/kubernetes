@@ -273,6 +273,7 @@ func NewProxier(ipt utiliptables.Interface,
 		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 		}
+		klog.V(1).Infof("Set sysctl %q to 1", sysctlRouteLocalnet)
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -285,6 +286,7 @@ func NewProxier(ipt utiliptables.Interface,
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
+	klog.V(2).Infof("iptables(%s) masquerade mark: %s", ipVersion(ipt.IsIpv6()), masqueradeMark)
 
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 
@@ -319,16 +321,33 @@ func NewProxier(ipt utiliptables.Interface,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        utilproxy.RealNetwork{},
 	}
+
 	burstSyncs := 2
-	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
+	klog.V(2).Infof("iptables(%s) sync params: minSyncPeriod=%v, syncPeriod=%v, burstSyncs=%d",
+		ipVersion(ipt.IsIpv6()), minSyncPeriod, syncPeriod, burstSyncs)
 	// We pass syncPeriod to ipt.Monitor, which will call us only if it needs to.
 	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner anyway though.
 	// time.Hour is arbitrary.
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, time.Hour, burstSyncs)
+
 	go ipt.Monitor(utiliptables.Chain("KUBE-PROXY-CANARY"),
 		[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
 		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
+
+	if ipt.HasRandomFully() {
+		klog.V(2).Infof("iptables(%s) supports --random-fully", ipVersion(ipt.IsIpv6()))
+	} else {
+		klog.V(2).Infof("iptables(%s) does not support --random-fully", ipVersion(ipt.IsIpv6()))
+	}
+
 	return proxier, nil
+}
+
+func ipVersion(isIPv6 bool) string {
+	if isIPv6 {
+		return "ipv6"
+	}
+	return "ipv4"
 }
 
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
@@ -787,7 +806,7 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+		klog.V(2).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 
 	localAddrs, err := utilproxy.GetLocalAddrs()
@@ -818,7 +837,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	klog.V(3).Info("Syncing iptables rules")
+	klog.V(2).Info("Syncing iptables rules")
 
 	success := false
 	defer func() {

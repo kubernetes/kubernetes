@@ -351,6 +351,7 @@ func NewProxier(ipt utiliptables.Interface,
 		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 		}
+		klog.V(1).Infof("Set sysctl %q to 1", sysctlRouteLocalnet)
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -365,6 +366,7 @@ func NewProxier(ipt utiliptables.Interface,
 		if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
 		}
+		klog.V(1).Infof("Set sysctl %q to 1", sysctlVSConnTrack)
 	}
 
 	kernelVersionStr, err := kernelHandler.GetKernelVersion()
@@ -383,6 +385,7 @@ func NewProxier(ipt utiliptables.Interface,
 			if err := sysctl.SetSysctl(sysctlConnReuse, 0); err != nil {
 				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlConnReuse, err)
 			}
+			klog.V(1).Infof("Set sysctl %q to 0", sysctlConnReuse)
 		}
 	}
 
@@ -391,6 +394,7 @@ func NewProxier(ipt utiliptables.Interface,
 		if err := sysctl.SetSysctl(sysctlExpireNoDestConn, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireNoDestConn, err)
 		}
+		klog.V(1).Infof("Set sysctl %q to 1", sysctlExpireNoDestConn)
 	}
 
 	// Set the expire_quiescent_template sysctl we need for
@@ -398,6 +402,7 @@ func NewProxier(ipt utiliptables.Interface,
 		if err := sysctl.SetSysctl(sysctlExpireQuiescentTemplate, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireQuiescentTemplate, err)
 		}
+		klog.V(1).Infof("Set sysctl %q to 1", sysctlExpireQuiescentTemplate)
 	}
 
 	// Set the ip_forward sysctl we need for
@@ -405,6 +410,7 @@ func NewProxier(ipt utiliptables.Interface,
 		if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
 			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
 		}
+		klog.V(1).Infof("Set sysctl %q to 1", sysctlForward)
 	}
 
 	if strictARP {
@@ -413,6 +419,7 @@ func NewProxier(ipt utiliptables.Interface,
 			if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
 				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
 			}
+			klog.V(1).Infof("Set sysctl %q to 1", sysctlArpIgnore)
 		}
 
 		// Set the arp_announce sysctl we need for
@@ -420,6 +427,7 @@ func NewProxier(ipt utiliptables.Interface,
 			if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
 				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
 			}
+			klog.V(1).Infof("Set sysctl %q to 2", sysctlArpAnnounce)
 		}
 	}
 
@@ -490,10 +498,18 @@ func NewProxier(ipt utiliptables.Interface,
 		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, isIPv6, is.comment)
 	}
 	burstSyncs := 2
-	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
+	klog.V(2).Infof("ipvs(%s) sync params: minSyncPeriod=%v, syncPeriod=%v, burstSyncs=%d",
+		ipVersion(ipt.IsIpv6()), minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
+}
+
+func ipVersion(isIPv6 bool) string {
+	if isIPv6 {
+		return "ipv6"
+	}
+	return "ipv4"
 }
 
 // NewDualStackProxier returns a new Proxier for dual-stack operation
