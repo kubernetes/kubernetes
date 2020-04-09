@@ -199,7 +199,7 @@ func newProxyServer(
 			// Create iptables handlers for both families, one is already created
 			// Always ordered as IPv4, IPv6
 			var ipt [2]utiliptables.Interface
-			if iptInterface.IsIpv6() {
+			if iptInterface.IsIPv6() {
 				ipt[1] = iptInterface
 				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIpv4)
 			} else {
@@ -267,7 +267,7 @@ func newProxyServer(
 			// Create iptables handlers for both families, one is already created
 			// Always ordered as IPv4, IPv6
 			var ipt [2]utiliptables.Interface
-			if iptInterface.IsIpv6() {
+			if iptInterface.IsIPv6() {
 				ipt[1] = iptInterface
 				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIpv4)
 			} else {

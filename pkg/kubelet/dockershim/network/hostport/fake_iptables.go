@@ -223,7 +223,7 @@ func (f *fakeIPTables) DeleteRule(tableName utiliptables.Table, chainName utilip
 	return nil
 }
 
-func (f *fakeIPTables) IsIpv6() bool {
+func (f *fakeIPTables) IsIPv6() bool {
 	return f.protocol == utiliptables.ProtocolIpv6
 }
 

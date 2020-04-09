@@ -90,7 +90,7 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	podIP := podPortMapping.IP.String()
 	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
 
-	if isIpv6 != hm.iptables.IsIpv6() {
+	if isIpv6 != hm.iptables.IsIPv6() {
 		return fmt.Errorf("HostPortManager IP family mismatch: %v, isIPv6 - %v", podIP, isIpv6)
 	}
 

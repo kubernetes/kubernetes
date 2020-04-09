@@ -55,8 +55,8 @@ type Interface interface {
 	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
-	// IsIpv6 returns true if this is managing ipv6 tables.
-	IsIpv6() bool
+	// IsIPv6 returns true if this is managing ipv6 tables.
+	IsIPv6() bool
 	// Protocol returns the IP family this instance is managing,
 	Protocol() Protocol
 	// SaveInto calls `iptables-save` for table and stores result in a given buffer.
@@ -321,7 +321,7 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 	return nil
 }
 
-func (runner *runner) IsIpv6() bool {
+func (runner *runner) IsIPv6() bool {
 	return runner.protocol == ProtocolIpv6
 }
 

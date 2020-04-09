@@ -289,7 +289,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
-	isIPv6 := ipt.IsIpv6()
+	isIPv6 := ipt.IsIPv6()
 	proxier := &Proxier{
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:               make(proxy.ServiceMap),
@@ -1468,7 +1468,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil {
 		klog.Errorf("Failed to get node ip address matching nodeport cidr")
 	} else {
-		isIPv6 := proxier.iptables.IsIpv6()
+		isIPv6 := proxier.iptables.IsIPv6()
 		for address := range addresses {
 			// TODO(thockin, m1093782566): If/when we have dual-stack support we will want to distinguish v4 from v6 zero-CIDRs.
 			if utilproxy.IsZeroCIDR(address) {

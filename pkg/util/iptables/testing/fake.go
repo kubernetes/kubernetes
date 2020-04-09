@@ -101,8 +101,8 @@ func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args
 	return nil
 }
 
-// IsIpv6 is part of iptables.Interface
-func (f *FakeIPTables) IsIpv6() bool {
+// IsIPv6 is part of iptables.Interface
+func (f *FakeIPTables) IsIPv6() bool {
 	return f.protocol == iptables.ProtocolIpv6
 }
 

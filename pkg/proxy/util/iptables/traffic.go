@@ -66,8 +66,8 @@ type detectLocalByCIDR struct {
 // NewDetectLocalByCIDR implements the LocalTrafficDetector interface using a CIDR. This can be used when a single CIDR
 // range can be used to capture the notion of local traffic.
 func NewDetectLocalByCIDR(cidr string, ipt utiliptables.Interface) (LocalTrafficDetector, error) {
-	if utilnet.IsIPv6CIDRString(cidr) != ipt.IsIpv6() {
-		return nil, fmt.Errorf("CIDR %s has incorrect IP version: expect isIPv6=%t", cidr, ipt.IsIpv6())
+	if utilnet.IsIPv6CIDRString(cidr) != ipt.IsIPv6() {
+		return nil, fmt.Errorf("CIDR %s has incorrect IP version: expect isIPv6=%t", cidr, ipt.IsIPv6())
 	}
 	_, _, err := net.ParseCIDR(cidr)
 	if err != nil {
