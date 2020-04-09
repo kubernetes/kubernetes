@@ -29,7 +29,6 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog/v2"
 )
@@ -160,7 +159,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 		}
 
 		volumeUniqueName := fmt.Sprintf("%s/%s", driverName, volumeHandle)
-		volumeLimitKey := volumeutil.GetCSIAttachLimitKey(driverName)
+		volumeLimitKey := getCSIAttachLimitKey(driverName)
 		result[volumeUniqueName] = volumeLimitKey
 	}
 	return nil
@@ -290,7 +289,7 @@ func getVolumeLimits(nodeInfo *framework.NodeInfo, csiNode *storagev1.CSINode) m
 			d := csiNode.Spec.Drivers[i]
 			if d.Allocatable != nil && d.Allocatable.Count != nil {
 				// TODO: drop GetCSIAttachLimitKey once we don't get values from Node object (v1.18)
-				k := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(d.Name))
+				k := v1.ResourceName(getCSIAttachLimitKey(d.Name))
 				nodeVolumeLimits[k] = int64(*d.Allocatable.Count)
 			}
 		}

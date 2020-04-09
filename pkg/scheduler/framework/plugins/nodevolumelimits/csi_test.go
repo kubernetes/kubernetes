@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -51,15 +50,15 @@ const (
 func getVolumeLimitKey(filterType string) v1.ResourceName {
 	switch filterType {
 	case ebsVolumeFilterType:
-		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
+		return v1.ResourceName(ebsVolumeLimitKey)
 	case gcePDVolumeFilterType:
-		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
+		return v1.ResourceName(gceVolumeLimitKey)
 	case azureDiskVolumeFilterType:
-		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+		return v1.ResourceName(azureVolumeLimitKey)
 	case cinderVolumeFilterType:
-		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
+		return v1.ResourceName(cinderVolumeLimitKey)
 	default:
-		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
+		return v1.ResourceName(getCSIAttachLimitKey(filterType))
 	}
 }
 

@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -156,19 +155,19 @@ func newNonCSILimits(
 	case ebsVolumeFilterType:
 		name = EBSName
 		filter = ebsVolumeFilter
-		volumeLimitKey = v1.ResourceName(volumeutil.EBSVolumeLimitKey)
+		volumeLimitKey = v1.ResourceName(ebsVolumeLimitKey)
 	case gcePDVolumeFilterType:
 		name = GCEPDName
 		filter = gcePDVolumeFilter
-		volumeLimitKey = v1.ResourceName(volumeutil.GCEVolumeLimitKey)
+		volumeLimitKey = v1.ResourceName(gceVolumeLimitKey)
 	case azureDiskVolumeFilterType:
 		name = AzureDiskName
 		filter = azureDiskVolumeFilter
-		volumeLimitKey = v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+		volumeLimitKey = v1.ResourceName(azureVolumeLimitKey)
 	case cinderVolumeFilterType:
 		name = CinderName
 		filter = cinderVolumeFilter
-		volumeLimitKey = v1.ResourceName(volumeutil.CinderVolumeLimitKey)
+		volumeLimitKey = v1.ResourceName(cinderVolumeLimitKey)
 	default:
 		klog.Fatalf("Wrong filterName, Only Support %v %v %v %v", ebsVolumeFilterType,
 			gcePDVolumeFilterType, azureDiskVolumeFilterType, cinderVolumeFilterType)
@@ -498,7 +497,7 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 		case azureDiskVolumeFilterType:
 			return defaultMaxAzureDiskVolumes
 		case cinderVolumeFilterType:
-			return volumeutil.DefaultMaxCinderVolumes
+			return defaultMaxCinderVolumes
 		default:
 			return -1
 		}
@@ -506,10 +505,10 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 }
 
 func getMaxEBSVolume(nodeInstanceType string) int {
-	if ok, _ := regexp.MatchString(volumeutil.EBSNitroLimitRegex, nodeInstanceType); ok {
-		return volumeutil.DefaultMaxEBSNitroVolumeLimit
+	if ok, _ := regexp.MatchString(ebsNitroLimitRegex, nodeInstanceType); ok {
+		return defaultMaxEBSNitroVolumeLimit
 	}
-	return volumeutil.DefaultMaxEBSVolumes
+	return defaultMaxEBSVolumes
 }
 
 // getCSINodeListerIfEnabled returns the CSINode lister or nil if the feature is disabled

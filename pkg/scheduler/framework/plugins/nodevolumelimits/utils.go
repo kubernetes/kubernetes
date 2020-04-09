@@ -17,6 +17,8 @@ limitations under the License.
 package nodevolumelimits
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -27,6 +29,38 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+)
+
+// NOTE: constants in this file are copied from pkg/volume/util package to avoid external scheduler dependency
+
+const (
+	// ebsVolumeLimitKey resource name that will store volume limits for EBS
+	ebsVolumeLimitKey = "attachable-volumes-aws-ebs"
+	// ebsNitroLimitRegex finds nitro instance types with different limit than EBS defaults
+	ebsNitroLimitRegex = "^[cmr]5.*|t3|z1d"
+	// defaultMaxEBSVolumes is the limit for volumes attached to an instance.
+	// Amazon recommends no more than 40; the system root volume uses at least one.
+	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
+	defaultMaxEBSVolumes = 39
+	// defaultMaxEBSNitroVolumeLimit is default EBS volume limit on m5 and c5 instances
+	defaultMaxEBSNitroVolumeLimit = 25
+	// azureVolumeLimitKey stores resource name that will store volume limits for Azure
+	azureVolumeLimitKey = "attachable-volumes-azure-disk"
+	// gceVolumeLimitKey stores resource name that will store volume limits for GCE node
+	gceVolumeLimitKey = "attachable-volumes-gce-pd"
+
+	// cinderVolumeLimitKey contains Volume limit key for Cinder
+	cinderVolumeLimitKey = "attachable-volumes-cinder"
+	// defaultMaxCinderVolumes defines the maximum number of PD Volumes for Cinder
+	// For Openstack we are keeping this to a high enough value so as depending on backend
+	// cluster admins can configure it.
+	defaultMaxCinderVolumes = 256
+
+	// csiAttachLimitPrefix defines prefix used for CSI volumes
+	csiAttachLimitPrefix = "attachable-volumes-csi-"
+
+	// resourceNameLengthLimit stores maximum allowed Length for a ResourceName
+	resourceNameLengthLimit = 63
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
@@ -91,4 +125,20 @@ func volumeLimits(n *framework.NodeInfo) map[v1.ResourceName]int64 {
 		}
 	}
 	return volumeLimits
+}
+
+// getCSIAttachLimitKey returns limit key used for CSI volumes
+// NOTE: This function copied from pkg/volume/util package to avoid external scheduler dependency
+func getCSIAttachLimitKey(driverName string) string {
+	csiPrefixLength := len(csiAttachLimitPrefix)
+	totalkeyLength := csiPrefixLength + len(driverName)
+	if totalkeyLength >= resourceNameLengthLimit {
+		charsFromDriverName := driverName[:23]
+		hash := sha1.New()
+		hash.Write([]byte(driverName))
+		hashed := hex.EncodeToString(hash.Sum(nil))
+		hashed = hashed[:16]
+		return csiAttachLimitPrefix + charsFromDriverName + hashed
+	}
+	return csiAttachLimitPrefix + driverName
 }
