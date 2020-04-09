@@ -166,7 +166,9 @@ function download-or-bust {
       if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
-        echo "== Hash validation of ${url} failed. Retrying. =="
+        # TODO(b/153659289): Evaluate re-enabling retry.
+        echo "== Downloaded ${url} but hash validation failed (ignoring). =="
+        return
       else
         if [[ -n "${hash}" ]]; then
           echo "== Downloaded ${url} (HASH = ${hash}) =="
@@ -255,7 +257,7 @@ function install-cni-binaries {
   fi
 
   local -r cni_tar="${CNI_TAR_PREFIX}${cni_version}.tgz"
-  local -r cni_url="${CNI_STORAGE_URL_BASE}/${cni_version}/${cni_tar}"
+  local -r cni_url="${CNI_STORAGE_URL_BASE:-https://storage.googleapis.com/gke-release/cni-plugins}/${cni_version}/${cni_tar}"
 
   if is-preloaded "${cni_tar}" "${cni_hash}"; then
     echo "${cni_tar} is preloaded."

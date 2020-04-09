@@ -119,8 +119,9 @@ function Validate-SHA {
   # Powershell Get-FileHash produces uppercase hashes. This must be case-insensitive
   # to work.
   if ($actual.Hash -ne $Hash) {
-    Log-Output "$Path corrupted, $Algorithm $actual doesn't match expected $Hash"
-    Throw ("$Path corrupted, $Algorithm $actual doesn't match expected $Hash")
+    Log-Output "$Path may be corrupted, $Algorithm $actual doesn't match expected $Hash"
+    # TODO(b/153659289): Evaluate re-enabling this.
+    # Throw ("$Path corrupted, $Algorithm $actual doesn't match expected $Hash")
   }
 }
 
@@ -162,9 +163,10 @@ function MustDownload-File {
         Try {
             Validate-SHA -Hash $Hash -Path $OutFile -Algorithm $Algorithm
         } Catch {
+            # TODO(b/153659289): Evaluate re-enabling retry.
             $message = $_.Exception.ToString()
-            Log-Output "Hash validation of $url failed. Will retry. Error: $message"
-            continue
+            Log-Output "Downloaded $url but hash validation failed (ignoring). Error: $message"
+            return
         }
         Log-Output "Downloaded $url ($Algorithm = $Hash)"
         return
