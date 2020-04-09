@@ -55,8 +55,10 @@ type Interface interface {
 	EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error)
 	// DeleteRule checks if the specified rule is present and, if so, deletes it.
 	DeleteRule(table Table, chain Chain, args ...string) error
-	// IsIpv6 returns true if this is managing ipv6 tables
+	// IsIpv6 returns true if this is managing ipv6 tables.
 	IsIpv6() bool
+	// Protocol returns the IP family this instance is managing,
+	Protocol() Protocol
 	// SaveInto calls `iptables-save` for table and stores result in a given buffer.
 	SaveInto(table Table, buffer *bytes.Buffer) error
 	// Restore runs `iptables-restore` passing data through []byte.
@@ -87,13 +89,13 @@ type Interface interface {
 }
 
 // Protocol defines the ip protocol either ipv4 or ipv6
-type Protocol byte
+type Protocol string
 
 const (
 	// ProtocolIpv4 represents ipv4 protocol in iptables
-	ProtocolIpv4 Protocol = iota + 1
+	ProtocolIpv4 Protocol = "IPv4"
 	// ProtocolIpv6 represents ipv6 protocol in iptables
-	ProtocolIpv6
+	ProtocolIpv6 Protocol = "IPv6"
 )
 
 // Table represents different iptable like filter,nat, mangle and raw
@@ -321,6 +323,10 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 
 func (runner *runner) IsIpv6() bool {
 	return runner.protocol == ProtocolIpv6
+}
+
+func (runner *runner) Protocol() Protocol {
+	return runner.protocol
 }
 
 // SaveInto is part of Interface.

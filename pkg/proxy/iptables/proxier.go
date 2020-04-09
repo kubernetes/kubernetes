@@ -283,7 +283,7 @@ func NewProxier(ipt utiliptables.Interface,
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
-	klog.V(2).Infof("iptables(%s) masquerade mark: %s", ipVersion(ipt.IsIpv6()), masqueradeMark)
+	klog.V(2).Infof("iptables(%s) masquerade mark: %s", ipt.Protocol(), masqueradeMark)
 
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 
@@ -321,7 +321,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	burstSyncs := 2
 	klog.V(2).Infof("iptables(%s) sync params: minSyncPeriod=%v, syncPeriod=%v, burstSyncs=%d",
-		ipVersion(ipt.IsIpv6()), minSyncPeriod, syncPeriod, burstSyncs)
+		ipt.Protocol(), minSyncPeriod, syncPeriod, burstSyncs)
 	// We pass syncPeriod to ipt.Monitor, which will call us only if it needs to.
 	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner anyway though.
 	// time.Hour is arbitrary.
@@ -332,19 +332,12 @@ func NewProxier(ipt utiliptables.Interface,
 		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
 
 	if ipt.HasRandomFully() {
-		klog.V(2).Infof("iptables(%s) supports --random-fully", ipVersion(ipt.IsIpv6()))
+		klog.V(2).Infof("iptables(%s) supports --random-fully", ipt.Protocol())
 	} else {
-		klog.V(2).Infof("iptables(%s) does not support --random-fully", ipVersion(ipt.IsIpv6()))
+		klog.V(2).Infof("iptables(%s) does not support --random-fully", ipt.Protocol())
 	}
 
 	return proxier, nil
-}
-
-func ipVersion(isIPv6 bool) string {
-	if isIPv6 {
-		return "ipv6"
-	}
-	return "ipv4"
 }
 
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.

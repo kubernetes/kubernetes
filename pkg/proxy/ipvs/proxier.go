@@ -475,17 +475,10 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 	burstSyncs := 2
 	klog.V(2).Infof("ipvs(%s) sync params: minSyncPeriod=%v, syncPeriod=%v, burstSyncs=%d",
-		ipVersion(ipt.IsIpv6()), minSyncPeriod, syncPeriod, burstSyncs)
+		ipt.Protocol(), minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
-}
-
-func ipVersion(isIPv6 bool) string {
-	if isIPv6 {
-		return "ipv6"
-	}
-	return "ipv4"
 }
 
 // NewDualStackProxier returns a new Proxier for dual-stack operation
