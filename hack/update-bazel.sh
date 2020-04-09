@@ -93,7 +93,7 @@ fi
 
 # restrict ./vendor/github.com/prometheus/* targets visibility
 # see comment above re: buildozer exit codes
-buildozer -quiet 'set visibility //staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
+buildozer -quiet 'set visibility //build/visible_to:vendor_githubcom_prometheus_CONSUMERS' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
 if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi

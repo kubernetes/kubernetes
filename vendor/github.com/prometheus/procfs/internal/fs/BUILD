@@ -5,7 +5,7 @@ go_library(
     srcs = ["fs.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs/internal/fs",
     importpath = "github.com/prometheus/procfs/internal/fs",
-    visibility = ["//staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list"],
+    visibility = ["//build/visible_to:vendor_githubcom_prometheus_CONSUMERS"],
 )
 
 filegroup(
