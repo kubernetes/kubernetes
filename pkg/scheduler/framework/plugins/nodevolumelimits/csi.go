@@ -27,7 +27,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitrans "k8s.io/csi-translation-lib"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
@@ -227,7 +227,7 @@ func (pl *CSILimits) getCSIDriverInfo(csiNode *storagev1.CSINode, pvc *v1.Persis
 func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
 	namespace := pvc.Namespace
 	pvcName := pvc.Name
-	scName := v1helper.GetPersistentVolumeClaimClass(pvc)
+	scName := pluginhelper.GetPersistentVolumeClaimClass(pvc)
 
 	// If StorageClass is not set or not found, then PVC must be using immediate binding mode
 	// and hence it must be bound before scheduling. So it is safe to not count it.

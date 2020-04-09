@@ -6,7 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
+        "//pkg/scheduler/framework/plugins/helper:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
