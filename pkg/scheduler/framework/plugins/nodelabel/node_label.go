@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -33,18 +34,6 @@ const (
 	// ErrReasonPresenceViolated is used for CheckNodeLabelPresence predicate error.
 	ErrReasonPresenceViolated = "node(s) didn't have the requested labels"
 )
-
-// Args holds the args that are used to configure the plugin.
-type Args struct {
-	// PresentLabels should be present for the node to be considered a fit for hosting the pod
-	PresentLabels []string `json:"presentLabels,omitempty"`
-	// AbsentLabels should be absent for the node to be considered a fit for hosting the pod
-	AbsentLabels []string `json:"absentLabels,omitempty"`
-	// Nodes that have labels in the list will get a higher score.
-	PresentLabelsPreference []string `json:"presentLabelsPreference,omitempty"`
-	// Nodes that don't have labels in the list will get a higher score.
-	AbsentLabelsPreference []string `json:"absentLabelsPreference,omitempty"`
-}
 
 // validateArgs validates that presentLabels and absentLabels do not conflict.
 func validateNoConflict(presentLabels []string, absentLabels []string) error {
@@ -62,7 +51,7 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := Args{}
+	args := schedulerv1alpha2.NodeLabelArgs{}
 	if err := framework.DecodeInto(plArgs, &args); err != nil {
 		return nil, err
 	}
@@ -74,14 +63,14 @@ func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.P
 	}
 	return &NodeLabel{
 		handle: handle,
-		Args:   args,
+		args:   args,
 	}, nil
 }
 
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.
 type NodeLabel struct {
 	handle framework.FrameworkHandle
-	Args
+	args   schedulerv1alpha2.NodeLabelArgs
 }
 
 var _ framework.FilterPlugin = &NodeLabel{}
@@ -116,7 +105,7 @@ func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 		}
 		return true
 	}
-	if check(pl.PresentLabels, true) && check(pl.AbsentLabels, false) {
+	if check(pl.args.PresentLabels, true) && check(pl.args.AbsentLabels, false) {
 		return nil
 	}
 
@@ -132,18 +121,18 @@ func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod
 
 	node := nodeInfo.Node()
 	score := int64(0)
-	for _, label := range pl.PresentLabelsPreference {
+	for _, label := range pl.args.PresentLabelsPreference {
 		if labels.Set(node.Labels).Has(label) {
 			score += framework.MaxNodeScore
 		}
 	}
-	for _, label := range pl.AbsentLabelsPreference {
+	for _, label := range pl.args.AbsentLabelsPreference {
 		if !labels.Set(node.Labels).Has(label) {
 			score += framework.MaxNodeScore
 		}
 	}
 	// Take average score for each label to ensure the score doesn't exceed MaxNodeScore.
-	score /= int64(len(pl.PresentLabelsPreference) + len(pl.AbsentLabelsPreference))
+	score /= int64(len(pl.args.PresentLabelsPreference) + len(pl.args.AbsentLabelsPreference))
 
 	return score, nil
 }

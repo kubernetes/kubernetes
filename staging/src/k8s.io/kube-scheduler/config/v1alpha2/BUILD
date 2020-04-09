@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "register.go",
         "types.go",
+        "types_pluginargs.go",
         "zz_generated.deepcopy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-scheduler/config/v1alpha2",

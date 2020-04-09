@@ -40,6 +40,7 @@ import (
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
@@ -48,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -165,7 +165,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 			prof.PluginConfig = append(prof.PluginConfig,
 				frameworkplugins.NewPluginConfig(
 					noderesources.FitName,
-					noderesources.FitArgs{IgnoredResources: ignoredExtendedResources},
+					schedulerv1alpha2.NodeResourcesFitArgs{IgnoredResources: ignoredExtendedResources},
 				),
 			)
 		}
@@ -281,7 +281,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	// CLI configuration.
 	if policy.HardPodAffinitySymmetricWeight != 0 {
 		v := policy.HardPodAffinitySymmetricWeight
-		args.InterPodAffinityArgs = &interpodaffinity.Args{
+		args.InterPodAffinityArgs = &schedulerv1alpha2.InterPodAffinityArgs{
 			HardPodAffinityWeight: &v,
 		}
 	}

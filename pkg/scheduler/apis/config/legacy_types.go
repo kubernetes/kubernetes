@@ -136,22 +136,6 @@ type RequestedToCapacityRatioArguments struct {
 	Resources []ResourceSpec          `json:"resources,omitempty"`
 }
 
-// UtilizationShapePoint represents single point of priority function shape
-type UtilizationShapePoint struct {
-	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
-	Utilization int32
-	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
-	Score int32
-}
-
-// ResourceSpec represents single resource for bin packing of priority RequestedToCapacityRatioArguments.
-type ResourceSpec struct {
-	// Name of the resource to be managed by RequestedToCapacityRatio function.
-	Name string
-	// Weight of the resource.
-	Weight int64
-}
-
 // ExtenderManagedResource describes the arguments of extended resources
 // managed by an extender.
 type ExtenderManagedResource struct {

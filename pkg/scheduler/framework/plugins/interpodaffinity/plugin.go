@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/utils/pointer"
 )
@@ -38,13 +39,6 @@ const (
 	MaxHardPodAffinityWeight int32 = 100
 )
 
-// Args holds the args that are used to configure the plugin.
-type Args struct {
-	// HardPodAffinityWeight is the scoring weight for existing pods with a
-	// matching hard affinity to the incoming pod.
-	HardPodAffinityWeight *int32 `json:"hardPodAffinityWeight,omitempty"`
-}
-
 var _ framework.PreFilterPlugin = &InterPodAffinity{}
 var _ framework.FilterPlugin = &InterPodAffinity{}
 var _ framework.PreScorePlugin = &InterPodAffinity{}
@@ -52,7 +46,7 @@ var _ framework.ScorePlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	Args
+	args         schedulerv1alpha2.InterPodAffinityArgs
 	sharedLister framework.SharedLister
 	sync.Mutex
 }
@@ -64,7 +58,7 @@ func (pl *InterPodAffinity) Name() string {
 
 // BuildArgs returns the args that were used to build the plugin.
 func (pl *InterPodAffinity) BuildArgs() interface{} {
-	return pl.Args
+	return pl.args
 }
 
 // New initializes a new plugin and returns it.
@@ -75,19 +69,19 @@ func New(plArgs *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin
 	pl := &InterPodAffinity{
 		sharedLister: h.SnapshotSharedLister(),
 	}
-	if err := framework.DecodeInto(plArgs, &pl.Args); err != nil {
+	if err := framework.DecodeInto(plArgs, &pl.args); err != nil {
 		return nil, err
 	}
-	if err := validateArgs(&pl.Args); err != nil {
+	if err := validateArgs(&pl.args); err != nil {
 		return nil, err
 	}
-	if pl.HardPodAffinityWeight == nil {
-		pl.HardPodAffinityWeight = pointer.Int32Ptr(DefaultHardPodAffinityWeight)
+	if pl.args.HardPodAffinityWeight == nil {
+		pl.args.HardPodAffinityWeight = pointer.Int32Ptr(DefaultHardPodAffinityWeight)
 	}
 	return pl, nil
 }
 
-func validateArgs(args *Args) error {
+func validateArgs(args *schedulerv1alpha2.InterPodAffinityArgs) error {
 	if args.HardPodAffinityWeight == nil {
 		return nil
 	}
