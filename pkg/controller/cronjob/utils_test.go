@@ -76,7 +76,8 @@ func TestGetJobFromTemplate(t *testing.T) {
 	}
 
 	var job *batchv1.Job
-	job, err := getJobFromTemplate(&sj, time.Time{})
+	expectedScheduledTime := time.Date(2020, time.April, 9, 10, 51, 0, 0, time.UTC)
+	job, err := getJobFromTemplate(&sj, expectedScheduledTime)
 	if err != nil {
 		t.Errorf("Did not expect error: %s", err)
 	}
@@ -86,8 +87,23 @@ func TestGetJobFromTemplate(t *testing.T) {
 	if len(job.ObjectMeta.Labels) != 1 {
 		t.Errorf("Wrong number of labels")
 	}
-	if len(job.ObjectMeta.Annotations) != 1 {
+
+	if len(job.ObjectMeta.Annotations) != 2 {
 		t.Errorf("Wrong number of annotations")
+	}
+
+	observedScheduledTimeAnnotation, ok := job.ObjectMeta.Annotations[jobScheduledTimeAnnotationKey]
+	if !ok {
+		t.Errorf("Generated job spec missing %v annotation", jobScheduledTimeAnnotationKey)
+	}
+
+	parsedTime, err := time.Parse(time.RFC1123Z, observedScheduledTimeAnnotation)
+	if err != nil {
+		t.Errorf("Unexpected error parsing time: %v", err)
+	}
+
+	if parsedTime.Format(time.RFC1123Z) != expectedScheduledTime.Format(time.RFC1123Z) {
+		t.Errorf("Wrong %v annotation. Expected %s, got %s.", jobScheduledTimeAnnotationKey, expectedScheduledTime.Format(time.RFC1123Z), parsedTime.Format(time.RFC1123Z))
 	}
 }
 
