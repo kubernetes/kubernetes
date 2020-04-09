@@ -123,6 +123,20 @@ func TestGetLeastRequestResource(t *testing.T) {
 			v1.ResourceMemory,
 			400 * 1024 * 1024,
 		},
+		{
+			"ephemeralStorage_exist",
+			v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("400Mi"),
+			},
+			v1.ResourceEphemeralStorage,
+			400 * 1024 * 1024,
+		},
+		{
+			"ephemeralStorage_not_found",
+			v1.ResourceList{},
+			v1.ResourceEphemeralStorage,
+			0,
+		},
 	}
 
 	for _, test := range tests {
