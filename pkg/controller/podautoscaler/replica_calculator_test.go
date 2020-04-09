@@ -1227,6 +1227,24 @@ func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcDuringRollingUpdateWithMaxSurge(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 2,
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 100},
+
+			targetUtilization:   50,
+			expectedUtilization: 10,
+			expectedValue:       numContainersPerPod * 100,
+		},
+	}
+	tc.runTest(t)
+}
+
 // TestComputedToleranceAlgImplementation is a regression test which
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
