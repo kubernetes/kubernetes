@@ -20,7 +20,7 @@ require (
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	k8s.io/gengo v0.0.0-20190822140433-26a664648505
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200316234421-82d701f24f9d
+	k8s.io/kube-openapi v0.0.0-20200410145947-bcb3869e6f29 // release-1.17
 )
 
 replace (
