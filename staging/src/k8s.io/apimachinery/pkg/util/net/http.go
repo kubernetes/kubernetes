@@ -55,6 +55,12 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 	return result
 }
 
+// IsTimeout returns true if the given error is a network timeout error
+func IsTimeout(err error) bool {
+	neterr, ok := err.(net.Error)
+	return ok && neterr != nil && neterr.Timeout()
+}
+
 // IsProbableEOF returns true if the given error resembles a connection termination
 // scenario that would justify assuming that the watch is empty.
 // These errors are what the Go http stack returns back to us which are general
