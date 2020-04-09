@@ -62,7 +62,10 @@ var (
 		kubectl alpha debug --image=myproj/debug-tools -c debugger mypod`))
 )
 
-var nameSuffixFunc = utilrand.String
+var (
+	nameSuffixFunc = utilrand.String
+	defaultEphemeralTimeout = 30 * time.Second
+)
 
 // DebugOptions holds the options for an invocation of kubectl debug.
 type DebugOptions struct {
@@ -79,6 +82,7 @@ type DebugOptions struct {
 	Quiet       bool
 	Target      string
 	TTY         bool
+	Timeout     time.Duration
 
 	builder   *resource.Builder
 	podClient corev1client.PodsGetter
@@ -122,12 +126,14 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().StringVarP(&opt.Container, "container", "c", opt.Container, i18n.T("Container name to use for debug container."))
 	cmd.Flags().StringToString("env", nil, i18n.T("Environment variables to set in the container."))
 	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("Container image to use for debug container."))
+
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", string(corev1.PullIfNotPresent), i18n.T("The image pull policy for the container."))
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
 	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, i18n.T("If true, suppress prompt messages."))
 	cmd.Flags().StringVar(&opt.Target, "target", "", i18n.T("Target processes in this container name."))
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocated a TTY for each container in the pod."))
+	cmd.Flags().DurationVarP(&opt.Timeout, "timeout", "o", defaultEphemeralTimeout, i18n.T("Ephemeral container wait timeout."))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -260,7 +266,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			opts.Config = config
 			opts.AttachFunc = attach.DefaultAttachFunc
 
-			if err := handleAttachPod(ctx, f, o.podClient, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
+			if err := handleAttachPod(ctx, f, o.podClient, debugPod.Namespace, debugPod.Name, containerName, opts, o.Timeout); err != nil {
 				return err
 			}
 		}
@@ -350,9 +356,8 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.Ephemeral
 }
 
 // waitForEphemeralContainer watches the given pod until the ephemeralContainer is running
-func waitForEphemeralContainer(ctx context.Context, podClient corev1client.PodsGetter, ns, podName, ephemeralContainerName string) (*corev1.Pod, error) {
-	// TODO: expose the timeout
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, 0*time.Second)
+func waitForEphemeralContainer(ctx context.Context, podClient corev1client.PodsGetter, ns, podName, ephemeralContainerName string, timeout time.Duration) (*corev1.Pod, error) {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, timeout)
 	defer cancel()
 
 	preconditionFunc := func(store cache.Store) (bool, error) {
@@ -418,9 +423,10 @@ func waitForEphemeralContainer(ctx context.Context, podClient corev1client.PodsG
 	return result, err
 }
 
+
 // TODO(verb): handle other types of containers
-func handleAttachPod(ctx context.Context, f cmdutil.Factory, podClient corev1client.PodsGetter, ns, podName, ephemeralContainerName string, opts *attach.AttachOptions) error {
-	pod, err := waitForEphemeralContainer(ctx, podClient, ns, podName, ephemeralContainerName)
+func handleAttachPod(ctx context.Context, f cmdutil.Factory, podClient corev1client.PodsGetter, ns, podName, ephemeralContainerName string, opts *attach.AttachOptions, timeout time.Duration) error {
+	pod, err := waitForEphemeralContainer(ctx, podClient, ns, podName, ephemeralContainerName, timeout)
 	if err != nil {
 		return err
 	}

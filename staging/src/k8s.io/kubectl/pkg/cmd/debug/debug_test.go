@@ -18,6 +18,7 @@ package debug
 
 import (
 	"fmt"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -162,5 +163,17 @@ func TestGenerateDebugContainer(t *testing.T) {
 				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
 			}
 		})
+	}
+}
+
+func TestDefaultTimeoutOption(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+
+	stream := genericclioptions.NewTestIOStreamsDiscard()
+	defer tf.Cleanup()
+
+	cmd := NewCmdDebug(tf, stream)
+	if diff := cmp.Diff(cmd.Flag("timeout").DefValue, defaultEphemeralTimeout.String()); diff != "" {
+		t.Error("unexpected diff in default value: (-want +got):\n", diff)
 	}
 }
