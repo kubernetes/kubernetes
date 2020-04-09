@@ -40,7 +40,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d
+	k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
 	k8s.io/metrics v0.0.0
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 	sigs.k8s.io/kustomize v2.0.3+incompatible

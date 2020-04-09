@@ -1761,7 +1761,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d => k8s.io/kube-openapi v0.0.0-20200401025727-01dfbe2eec3d
+# k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35 => k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
 k8s.io/kube-openapi/pkg/aggregator
