@@ -90,20 +90,18 @@ func (r *resourceAllocationScorer) score(
 
 // calculateResourceAllocatableRequest returns resources Allocatable and Requested values
 func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.Pod, resource v1.ResourceName) (int64, int64) {
-	allocatable := nodeInfo.AllocatableResource()
-	requested := nodeInfo.RequestedResource()
 	podRequest := calculatePodResourceRequest(pod, resource)
 	switch resource {
 	case v1.ResourceCPU:
-		return allocatable.MilliCPU, (nodeInfo.NonZeroRequest().MilliCPU + podRequest)
+		return nodeInfo.Allocatable.MilliCPU, (nodeInfo.NonZeroRequested.MilliCPU + podRequest)
 	case v1.ResourceMemory:
-		return allocatable.Memory, (nodeInfo.NonZeroRequest().Memory + podRequest)
+		return nodeInfo.Allocatable.Memory, (nodeInfo.NonZeroRequested.Memory + podRequest)
 
 	case v1.ResourceEphemeralStorage:
-		return allocatable.EphemeralStorage, (requested.EphemeralStorage + podRequest)
+		return nodeInfo.Allocatable.EphemeralStorage, (nodeInfo.Requested.EphemeralStorage + podRequest)
 	default:
 		if v1helper.IsScalarResourceName(resource) {
-			return allocatable.ScalarResources[resource], (requested.ScalarResources[resource] + podRequest)
+			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
 		}
 	}
 	if klog.V(10) {

@@ -278,11 +278,11 @@ func (pl *ServiceAffinity) Score(ctx context.Context, state *framework.CycleStat
 		selector = labels.NewSelector()
 	}
 
-	if len(nodeInfo.Pods()) == 0 || selector.Empty() {
+	if len(nodeInfo.Pods) == 0 || selector.Empty() {
 		return 0, nil
 	}
 	var score int64
-	for _, existingPod := range nodeInfo.Pods() {
+	for _, existingPod := range nodeInfo.Pods {
 		// Ignore pods being deleted for spreading purposes
 		// Similar to how it is done for SelectorSpreadPriority
 		if pod.Namespace == existingPod.Pod.Namespace && existingPod.Pod.DeletionTimestamp == nil {

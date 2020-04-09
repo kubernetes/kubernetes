@@ -118,7 +118,7 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 
 func fitsPorts(wantPorts []*v1.ContainerPort, nodeInfo *framework.NodeInfo) bool {
 	// try to see whether existingPorts and wantPorts will conflict or not
-	existingPorts := nodeInfo.UsedPorts()
+	existingPorts := nodeInfo.UsedPorts
 	for _, cp := range wantPorts {
 		if existingPorts.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
 			return false

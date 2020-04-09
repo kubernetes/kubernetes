@@ -102,7 +102,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	}
 
 	attachedVolumes := make(map[string]string)
-	for _, existingPod := range nodeInfo.Pods() {
+	for _, existingPod := range nodeInfo.Pods {
 		if err := pl.filterAttachableVolumes(csiNode, existingPod.Pod.Spec.Volumes, existingPod.Pod.Namespace, attachedVolumes); err != nil {
 			return framework.NewStatus(framework.Error, err.Error())
 		}
@@ -286,7 +286,7 @@ func NewCSI(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plu
 
 func getVolumeLimits(nodeInfo *framework.NodeInfo, csiNode *storagev1.CSINode) map[v1.ResourceName]int64 {
 	// TODO: stop getting values from Node object in v1.18
-	nodeVolumeLimits := nodeInfo.VolumeLimits()
+	nodeVolumeLimits := volumeLimits(nodeInfo)
 	if csiNode != nil {
 		for i := range csiNode.Spec.Drivers {
 			d := csiNode.Spec.Drivers[i]

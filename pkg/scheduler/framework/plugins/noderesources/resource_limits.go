@@ -106,14 +106,14 @@ func (rl *ResourceLimits) Score(ctx context.Context, state *framework.CycleState
 	if err != nil || nodeInfo.Node() == nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))
 	}
-	allocatableResources := nodeInfo.AllocatableResource()
+
 	podLimits, err := getPodResource(state)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, err.Error())
 	}
 
-	cpuScore := computeScore(podLimits.MilliCPU, allocatableResources.MilliCPU)
-	memScore := computeScore(podLimits.Memory, allocatableResources.Memory)
+	cpuScore := computeScore(podLimits.MilliCPU, nodeInfo.Allocatable.MilliCPU)
+	memScore := computeScore(podLimits.Memory, nodeInfo.Allocatable.Memory)
 
 	score := int64(0)
 	if cpuScore == 1 || memScore == 1 {

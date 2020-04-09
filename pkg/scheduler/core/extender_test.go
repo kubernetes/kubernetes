@@ -225,7 +225,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
 	podPriority := podutil.GetPodPriority(pod)
-	for _, p := range nodeInfoCopy.Pods() {
+	for _, p := range nodeInfoCopy.Pods {
 		if podutil.GetPodPriority(p.Pod) < podPriority {
 			potentialVictims = append(potentialVictims, p.Pod)
 			removePod(p.Pod)

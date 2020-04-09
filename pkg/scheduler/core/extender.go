@@ -287,7 +287,7 @@ func (h *HTTPExtender) convertToNodeToVictims(
 func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *extenderv1.MetaPod,
 	nodeInfo *framework.NodeInfo) (*v1.Pod, error) {
-	for _, p := range nodeInfo.Pods() {
+	for _, p := range nodeInfo.Pods {
 		if string(p.Pod.UID) == metaPod.UID {
 			return p.Pod, nil
 		}
