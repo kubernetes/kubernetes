@@ -78,3 +78,9 @@ type DebuggingConfiguration struct {
 	// enableProfiling is true.
 	EnableContentionProfiling bool
 }
+
+// FeatureGatesConfiguration holds configuration for features.
+type FeatureGatesConfiguration struct {
+	// FeatureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool
+}

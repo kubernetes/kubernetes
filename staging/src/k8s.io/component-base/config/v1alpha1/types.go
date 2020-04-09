@@ -80,3 +80,9 @@ type ClientConnectionConfiguration struct {
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
 	Burst int32 `json:"burst"`
 }
+
+// FeatureGatesConfiguration holds configuration for features.
+type FeatureGatesConfiguration struct {
+	// FeatureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+}
