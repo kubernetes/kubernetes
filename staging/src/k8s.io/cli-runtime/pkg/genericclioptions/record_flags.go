@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/evanphx/json-patch"
+	"github.com/evanphx/json-patch/v5"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 

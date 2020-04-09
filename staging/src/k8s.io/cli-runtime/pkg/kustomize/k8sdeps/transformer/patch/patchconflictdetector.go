@@ -19,7 +19,7 @@ package patch
 import (
 	"encoding/json"
 
-	"github.com/evanphx/json-patch"
+	"github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
