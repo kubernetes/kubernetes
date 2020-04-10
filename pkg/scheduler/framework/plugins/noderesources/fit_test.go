@@ -19,12 +19,12 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -346,6 +346,14 @@ func TestEnoughRequests(t *testing.T) {
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			ignoredResources:          []byte(`{"ignoredResourceGroups" : ["example.com"]}`),
+			name:                      "skip checking ignored extended resource via resource groups",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
 			pod: newResourceOverheadPod(
 				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
 				v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("13")},
@@ -384,7 +392,7 @@ func TestEnoughRequests(t *testing.T) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 
-			gotInsufficientResources := Fits(test.pod, test.nodeInfo, p.(*Fit).ignoredResources)
+			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
 			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
 				t.Errorf("insufficient resources do not match: %v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
 			}
