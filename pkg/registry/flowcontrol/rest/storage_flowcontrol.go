@@ -46,7 +46,7 @@ var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 type RESTStorageProvider struct{}
 
 // PostStartHookName is the name of the post-start-hook provided by flow-control storage
-const PostStartHookName = "apiserver/bootstrap-system-flowcontrol-configuration"
+const PostStartHookName = "priority-and-fairness-config-producer"
 
 // NewRESTStorage creates a new rest storage for flow-control api models.
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
