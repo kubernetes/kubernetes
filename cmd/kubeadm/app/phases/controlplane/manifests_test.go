@@ -1144,3 +1144,43 @@ func TestIsValidAuthzMode(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareAuthzModes(t *testing.T) {
+	var tests = []struct {
+		name   string
+		modesA []string
+		modesB []string
+		equal  bool
+	}{
+		{
+			name:   "modes match",
+			modesA: []string{"a", "b", "c"},
+			modesB: []string{"a", "b", "c"},
+			equal:  true,
+		},
+		{
+			name:   "modes order does not match",
+			modesA: []string{"a", "c", "b"},
+			modesB: []string{"a", "b", "c"},
+		},
+		{
+			name:   "modes do not match; A has less modes",
+			modesA: []string{"a", "b"},
+			modesB: []string{"a", "b", "c"},
+		},
+		{
+			name:   "modes do not match; B has less modes",
+			modesA: []string{"a", "b", "c"},
+			modesB: []string{"a", "b"},
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			equal := compareAuthzModes(rt.modesA, rt.modesB)
+			if equal != rt.equal {
+				t.Errorf("failed compareAuthzModes:\nexpected:\n%v\nsaw:\n%v", rt.equal, equal)
+			}
+		})
+	}
+}
