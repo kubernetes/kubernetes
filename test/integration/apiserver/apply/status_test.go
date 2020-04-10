@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -115,7 +114,7 @@ func TestApplyStatus(t *testing.T) {
 
 	// create CRDs so we can make sure that custom resources do not get lost
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -159,7 +158,7 @@ func TestApplyStatus(t *testing.T) {
 				}
 				name := newObj.GetName()
 				rsc := dynamicClient.Resource(mapping.Resource).Namespace(namespace)
-				_, err := rsc.Create(context.TODO(), &newObj, metav1.CreateOptions{FieldManager: "create_test"})
+				_, err := rsc.Create(&newObj, metav1.CreateOptions{FieldManager: "create_test"})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -180,7 +179,7 @@ func TestApplyStatus(t *testing.T) {
 				obj, err := dynamicClient.
 					Resource(mapping.Resource).
 					Namespace(namespace).
-					Patch(context.TODO(), name, types.ApplyPatchType, statusYAML, metav1.PatchOptions{FieldManager: "apply_status_test", Force: &True}, "status")
+					Patch(name, types.ApplyPatchType, statusYAML, metav1.PatchOptions{FieldManager: "apply_status_test", Force: &True}, "status")
 				if err != nil {
 					t.Fatalf("Failed to apply: %v", err)
 				}
@@ -197,11 +196,11 @@ func TestApplyStatus(t *testing.T) {
 				if !findManager(managedFields, "apply_status_test") {
 					t.Fatalf("Couldn't find apply_status_test: %v", managedFields)
 				}
-				if !findManager(managedFields, "create_test") {
-					t.Fatalf("Couldn't find create_test: %v", managedFields)
+				if !findManager(managedFields, "before-first-apply") {
+					t.Fatalf("Couldn't find before-first-apply: %v", managedFields)
 				}
 
-				if err := rsc.Delete(context.TODO(), name, *metav1.NewDeleteOptions(0)); err != nil {
+				if err := rsc.Delete(name, metav1.NewDeleteOptions(0)); err != nil {
 					t.Fatalf("deleting final object failed: %v", err)
 				}
 			})
