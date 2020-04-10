@@ -34,6 +34,7 @@ go_library(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
         "//cmd/kubeadm/app/util/etcd:go_default_library",
+        "//cmd/kubeadm/app/util/image:go_default_library",
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",

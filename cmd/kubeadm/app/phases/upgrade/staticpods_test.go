@@ -244,16 +244,6 @@ func (c fakeTLSEtcdClient) CheckClusterHealth() error {
 	return nil
 }
 
-func (c fakeTLSEtcdClient) GetClusterVersions() (map[string]string, error) {
-	return map[string]string{
-		"https://1.2.3.4:2379": "3.1.12",
-	}, nil
-}
-
-func (c fakeTLSEtcdClient) GetVersion() (string, error) {
-	return "3.1.12", nil
-}
-
 func (c fakeTLSEtcdClient) Sync() error { return nil }
 
 func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
@@ -283,16 +273,6 @@ func (c fakePodManifestEtcdClient) CheckClusterHealth() error {
 	}
 	_, err := tlsInfo.ClientConfig()
 	return err
-}
-
-func (c fakePodManifestEtcdClient) GetClusterVersions() (map[string]string, error) {
-	return map[string]string{
-		"https://1.2.3.4:2379": "3.1.12",
-	}, nil
-}
-
-func (c fakePodManifestEtcdClient) GetVersion() (string, error) {
-	return "3.1.12", nil
 }
 
 func (c fakePodManifestEtcdClient) Sync() error { return nil }
@@ -988,4 +968,37 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 		})
 	}
 
+}
+
+func TestGetEtcdImageTagFromStaticPod(t *testing.T) {
+	const expectedEtcdVersion = "3.1.12"
+	const etcdStaticPod = `apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - name: etcd
+    image: k8s.gcr.io/etcd:` + expectedEtcdVersion
+
+	manifestsDir, err := ioutil.TempDir("", "GetEtcdImageTagFromStaticPod-test-manifests")
+	if err != nil {
+		t.Fatalf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(manifestsDir)
+
+	if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+		t.Fatalf("Unable to create test static pod manifest: %v", err)
+	}
+
+	got, err := GetEtcdImageTagFromStaticPod(manifestsDir)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if got != expectedEtcdVersion {
+		t.Errorf("unexpected result:\n\tgot: %q\n\texpected: %q", got, expectedEtcdVersion)
+	}
 }

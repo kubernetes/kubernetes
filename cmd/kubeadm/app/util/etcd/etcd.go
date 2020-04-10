@@ -53,8 +53,6 @@ var etcdBackoff = wait.Backoff{
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
 	CheckClusterHealth() error
-	GetClusterVersions() (map[string]string, error)
-	GetVersion() (string, error)
 	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
 	Sync() error
 	AddMember(name string, peerAddrs string) ([]Member, error)
@@ -407,41 +405,6 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
 
 	return ret, nil
-}
-
-// GetVersion returns the etcd version of the cluster.
-// An error is returned if the version of all endpoints do not match
-func (c *Client) GetVersion() (string, error) {
-	var clusterVersion string
-
-	versions, err := c.GetClusterVersions()
-	if err != nil {
-		return "", err
-	}
-	for _, v := range versions {
-		if clusterVersion != "" && clusterVersion != v {
-			return "", errors.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
-		}
-		clusterVersion = v
-	}
-	if clusterVersion == "" {
-		return "", errors.New("could not determine cluster etcd version")
-	}
-	return clusterVersion, nil
-}
-
-// GetClusterVersions returns a map of the endpoints and their associated versions
-func (c *Client) GetClusterVersions() (map[string]string, error) {
-	versions := make(map[string]string)
-	statuses, err := c.getClusterStatus()
-	if err != nil {
-		return versions, err
-	}
-
-	for ep, status := range statuses {
-		versions[ep] = status.Version
-	}
-	return versions, nil
 }
 
 // CheckClusterHealth returns nil for status Up or error for status Down

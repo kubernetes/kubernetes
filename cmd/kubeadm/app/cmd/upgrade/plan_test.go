@@ -429,11 +429,7 @@ _____________________________________________________________________
 				},
 			},
 			externalEtcd: true,
-			expectedBytes: []byte(`External components that should be upgraded manually before you upgrade the control plane with 'kubeadm upgrade apply':
-COMPONENT   CURRENT   AVAILABLE
-etcd        3.0.17    3.1.12
-
-Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
+			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
 COMPONENT   CURRENT      AVAILABLE
 kubelet     1 x v1.9.2   v1.9.3
 

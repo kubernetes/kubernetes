@@ -83,6 +83,7 @@ filegroup(
         "//cmd/kubeadm/app/util/crypto:all-srcs",
         "//cmd/kubeadm/app/util/dryrun:all-srcs",
         "//cmd/kubeadm/app/util/etcd:all-srcs",
+        "//cmd/kubeadm/app/util/image:all-srcs",
         "//cmd/kubeadm/app/util/initsystem:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",
         "//cmd/kubeadm/app/util/kustomize:all-srcs",

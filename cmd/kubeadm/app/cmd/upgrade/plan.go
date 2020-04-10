@@ -32,7 +32,6 @@ import (
 	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 type planFlags struct {
@@ -73,28 +72,13 @@ func runPlan(flags *planFlags, userVersion string) error {
 		return err
 	}
 
-	var etcdClient etcdutil.ClusterInterrogator
-
 	// Currently this is the only method we have for distinguishing
 	// external etcd vs static pod etcd
 	isExternalEtcd := cfg.Etcd.External != nil
-	if isExternalEtcd {
-		etcdClient, err = etcdutil.New(
-			cfg.Etcd.External.Endpoints,
-			cfg.Etcd.External.CAFile,
-			cfg.Etcd.External.CertFile,
-			cfg.Etcd.External.KeyFile)
-	} else {
-		// Connects to local/stacked etcd existing in the cluster
-		etcdClient, err = etcdutil.NewFromCluster(client, cfg.CertificatesDir)
-	}
-	if err != nil {
-		return err
-	}
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, cfg.DNS.Type, client)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, cfg.DNS.Type, client, constants.GetStaticPodDirectory())
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -161,10 +145,6 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha
 
 	components := []outputapiv1alpha1.ComponentUpgradePlan{}
 
-	if isExternalEtcd && up.CanUpgradeEtcd() {
-		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))
-	}
-
 	if up.CanUpgradeKubelets() {
 		// The map is of the form <old-version>:<node-count>. Here all the keys are put into a slice and sorted
 		// in order to always get the right order. Then the map value is extracted separately
@@ -204,11 +184,8 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapiv1alpha1.UpgradePlan, 
 	printManualUpgradeHeader := true
 	for _, component := range plan.Components {
 		if isExternalEtcd && component.Name == constants.Etcd {
-			fmt.Fprintln(w, "External components that should be upgraded manually before you upgrade the control plane with 'kubeadm upgrade apply':")
-			fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
-			fmt.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
-			// end of external components table
-			endOfTable()
+			// Don't print etcd if it's external
+			continue
 		} else if component.Name == constants.Kubelet {
 			if printManualUpgradeHeader {
 				fmt.Fprintln(w, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
