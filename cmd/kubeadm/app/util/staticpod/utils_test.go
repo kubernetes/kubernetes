@@ -415,7 +415,7 @@ func TestComponentPod(t *testing.T) {
 							Name: "foo",
 						},
 					},
-					PriorityClassName: "system-cluster-critical",
+					PriorityClassName: "system-node-critical",
 					HostNetwork:       true,
 					Volumes:           []v1.Volume{},
 				},

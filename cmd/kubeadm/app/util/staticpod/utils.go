@@ -62,7 +62,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 		},
 		Spec: v1.PodSpec{
 			Containers:        []v1.Container{container},
-			PriorityClassName: "system-cluster-critical",
+			PriorityClassName: "system-node-critical",
 			HostNetwork:       true,
 			Volumes:           VolumeMapToSlice(volumes),
 		},
