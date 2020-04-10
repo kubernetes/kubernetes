@@ -120,7 +120,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 	default:
 		msg := "Watch failed: %v"
-		if net.IsProbableEOF(err) {
+		if net.IsProbableEOF(err) || net.IsTimeout(err) {
 			klog.V(5).Infof(msg, err)
 			// Retry
 			return false, 0
