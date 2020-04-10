@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // JobStorage includes dummy storage for Job.
@@ -67,6 +68,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		UpdateStrategy: job.Strategy,
 		DeleteStrategy: job.Strategy,
 
+		ResetFieldsProvider: job.Strategy,
+
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: job.GetAttrs}
@@ -76,6 +79,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = job.StatusStrategy
+	statusStore.ResetFieldsProvider = job.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
@@ -91,6 +95,14 @@ func (r *REST) Categories() []string {
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.
 type StatusREST struct {
 	store *genericregistry.Store
+}
+
+// ResetFieldsFor implements rest.ResetFieldsProvider.
+func (r *StatusREST) ResetFieldsFor(version string) *fieldpath.Set {
+	if r.store.ResetFieldsProvider != nil {
+		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
+	}
+	return nil
 }
 
 // New creates a new Job object.
