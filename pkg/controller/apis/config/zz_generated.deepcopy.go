@@ -110,6 +110,7 @@ func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerMa
 	out.KubeCloudShared = in.KubeCloudShared
 	out.AttachDetachController = in.AttachDetachController
 	out.CSRSigningController = in.CSRSigningController
+	out.CronJobController = in.CronJobController
 	out.DaemonSetController = in.DaemonSetController
 	out.DeploymentController = in.DeploymentController
 	out.StatefulSetController = in.StatefulSetController

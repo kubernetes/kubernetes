@@ -96,6 +96,9 @@ type KubeControllerManagerConfiguration struct {
 	// CSRSigningControllerConfiguration holds configuration for
 	// CSRSigningController related features.
 	CSRSigningController CSRSigningControllerConfiguration
+	// CronJobControllerConfiguration holds configuration for
+	// CronJobController related features
+	CronJobController CronJobControllerConfiguration
 	// DaemonSetControllerConfiguration holds configuration for DaemonSetController
 	// related features.
 	DaemonSetController DaemonSetControllerConfiguration
@@ -246,6 +249,12 @@ type CSRSigningControllerConfiguration struct {
 	// clusterSigningDuration is the length of duration signed certificates
 	// will be given.
 	ClusterSigningDuration metav1.Duration
+}
+
+// CronJobControllerConfiguration contains elements describing CronJobController.
+type CronJobControllerConfiguration struct {
+	// cronJobControllerSyncPeriod is the period for syncing cronjobs.
+	CronJobControllerSyncPeriod metav1.Duration
 }
 
 // DaemonSetControllerConfiguration contains elements describing DaemonSetController.

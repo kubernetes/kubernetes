@@ -32,6 +32,7 @@ import (
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
@@ -87,6 +88,7 @@ func TestAddFlags(t *testing.T) {
 		"--contention-profiling=true",
 		"--controller-start-interval=2m",
 		"--controllers=foo,bar",
+		"--cronjob-controller-sync-period=10s",
 		"--deployment-controller-sync-period=45s",
 		"--disable-attach-detach-reconcile-sync=true",
 		"--enable-dynamic-provisioning=false",
@@ -212,6 +214,11 @@ func TestAddFlags(t *testing.T) {
 				ClusterSigningCertFile: "/cluster-signing-cert",
 				ClusterSigningKeyFile:  "/cluster-signing-key",
 				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+			},
+		},
+		CronJobController: &CronJobControllerOptions{
+			&cronjobconfig.CronJobControllerConfiguration{
+				CronJobControllerSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		DaemonSetController: &DaemonSetControllerOptions{

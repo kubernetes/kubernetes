@@ -592,6 +592,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,C
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningControllerConfiguration,ClusterSigningKeyFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CloudProviderConfiguration,CloudConfigFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CloudProviderConfiguration,Name
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CronJobControllerConfiguration,CronJobControllerSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DaemonSetControllerConfiguration,ConcurrentDaemonSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeploymentControllerConfiguration,ConcurrentDeploymentSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeploymentControllerConfiguration,DeploymentControllerSyncPeriod
@@ -638,6 +639,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeCloudSharedConfiguration,UseServiceAccountCredentials
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,AttachDetachController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CronJobController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,DaemonSetController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,DeploymentController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,DeprecatedController

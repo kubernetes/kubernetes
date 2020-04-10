@@ -61,15 +61,18 @@ var controllerKind = batchv1beta1.SchemeGroupVersion.WithKind("CronJob")
 
 // Controller is a controller for CronJobs.
 type Controller struct {
-	kubeClient clientset.Interface
-	jobControl jobControlInterface
-	sjControl  sjControlInterface
-	podControl podControlInterface
-	recorder   record.EventRecorder
+	kubeClient     clientset.Interface
+	jobControl     jobControlInterface
+	sjControl      sjControlInterface
+	podControl     podControlInterface
+	recorder       record.EventRecorder
+	syncLoopPeriod time.Duration
 }
 
 // NewController creates and initializes a new Controller.
-func NewController(kubeClient clientset.Interface) (*Controller, error) {
+func NewController(
+	kubeClient clientset.Interface,
+	syncLoopPeriod time.Duration) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -81,11 +84,12 @@ func NewController(kubeClient clientset.Interface) (*Controller, error) {
 	}
 
 	jm := &Controller{
-		kubeClient: kubeClient,
-		jobControl: realJobControl{KubeClient: kubeClient},
-		sjControl:  &realSJControl{KubeClient: kubeClient},
-		podControl: &realPodControl{KubeClient: kubeClient},
-		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
+		kubeClient:     kubeClient,
+		jobControl:     realJobControl{KubeClient: kubeClient},
+		sjControl:      &realSJControl{KubeClient: kubeClient},
+		podControl:     &realPodControl{KubeClient: kubeClient},
+		recorder:       eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
+		syncLoopPeriod: syncLoopPeriod,
 	}
 
 	registerMetrics()
@@ -98,7 +102,7 @@ func (jm *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	klog.Infof("Starting CronJob Manager")
 	// Check things every 10 second.
-	go wait.Until(jm.syncAll, 10*time.Second, stopCh)
+	go wait.Until(jm.syncAll, jm.syncLoopPeriod, stopCh)
 	<-stopCh
 	klog.Infof("Shutting down CronJob Manager")
 }
