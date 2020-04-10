@@ -22,7 +22,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/podutils:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/manifest:go_default_library",
+        "//test/e2e/framework/manifest:go_default_library",
         "//test/utils/image:go_default_library",
     ],
 )
