@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/daemonset"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // REST implements a RESTStorage for DaemonSets
@@ -48,6 +49,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		UpdateStrategy: daemonset.Strategy,
 		DeleteStrategy: daemonset.Strategy,
 
+		ResetFieldsProvider: daemonset.Strategy,
+
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
@@ -57,6 +60,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = daemonset.StatusStrategy
+	statusStore.ResetFieldsProvider = daemonset.StatusStrategy
 
 	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, nil
 }
@@ -85,6 +89,14 @@ func (r *REST) WithCategories(categories []string) *REST {
 // StatusREST implements the REST endpoint for changing the status of a daemonset
 type StatusREST struct {
 	store *genericregistry.Store
+}
+
+// ResetFieldsFor implements rest.ResetFieldsProvider.
+func (r *StatusREST) ResetFieldsFor(version string) *fieldpath.Set {
+	if r.store.ResetFieldsProvider != nil {
+		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
+	}
+	return nil
 }
 
 // New creates a new DaemonSet object.
