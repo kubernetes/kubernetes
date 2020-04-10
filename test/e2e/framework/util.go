@@ -978,12 +978,6 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 	ExpectEqual(node.Labels[labelKey], labelValue)
 }
 
-// RemoveTaintOffNode removes the given taint from the given node.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, nil, &taint))
-	verifyThatTaintIsGone(c, nodeName, &taint)
-}
-
 // AddOrUpdateTaintOnNode adds the given taint to the given node or updates taint.
 func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
 	ExpectNoError(controller.AddOrUpdateTaintOnNode(c, nodeName, &taint))
@@ -997,15 +991,6 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string)
 
 	ginkgo.By("verifying the node doesn't have the label " + labelKey)
 	ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
-}
-
-func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
-	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
-	nodeUpdated, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-	if taintExists(nodeUpdated.Spec.Taints, taint) {
-		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
-	}
 }
 
 // ExpectNodeHasTaint expects that the node has the given taint.

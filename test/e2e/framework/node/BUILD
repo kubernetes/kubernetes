@@ -10,6 +10,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/node",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/controller:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -22,6 +23,7 @@ go_library(
         "//test/e2e/system:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],

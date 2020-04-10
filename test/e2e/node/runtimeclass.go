@@ -92,7 +92,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		}
 		framework.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
 		framework.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
-		defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
+		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass", framework.TestContext.ContainerRuntime)

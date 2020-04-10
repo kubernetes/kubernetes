@@ -65,6 +65,7 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -1604,7 +1605,7 @@ metadata:
 
 			ginkgo.By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.ToString())
-			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
+			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
 
 			ginkgo.By("verifying the node has the taint " + testTaint.ToString())
 			output := runKubectlRetryOrDie(ns, "describe", "node", nodeName)
@@ -1635,7 +1636,7 @@ metadata:
 
 			ginkgo.By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.ToString())
-			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
+			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
 
 			ginkgo.By("verifying the node has the taint " + testTaint.ToString())
 			output := runKubectlRetryOrDie(ns, "describe", "node", nodeName)
@@ -1653,7 +1654,7 @@ metadata:
 			}
 			ginkgo.By("adding another taint " + newTestTaint.ToString() + " to the node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, newTestTaint.ToString())
-			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, newTestTaint)
+			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, newTestTaint)
 
 			ginkgo.By("verifying the node has the taint " + newTestTaint.ToString())
 			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)
@@ -1671,7 +1672,7 @@ metadata:
 			}
 			ginkgo.By("adding NoExecute taint " + noExecuteTaint.ToString() + " to the node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, noExecuteTaint.ToString())
-			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, noExecuteTaint)
+			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, noExecuteTaint)
 
 			ginkgo.By("verifying the node has the taint " + noExecuteTaint.ToString())
 			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)

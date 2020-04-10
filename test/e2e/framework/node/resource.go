@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/controller"
 	schedfwk "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/system"
@@ -555,4 +557,34 @@ func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName str
 		gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 	}
 	return podLabels
+}
+
+// RemoveTaintOffNode removes the given taint from the given node.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
+	err := controller.RemoveTaintOffNode(c, nodeName, nil, &taint)
+
+	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
+	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
+	verifyThatTaintIsGone(c, nodeName, &taint)
+}
+
+func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
+	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
+	nodeUpdated, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+
+	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
+	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
+	if taintExists(nodeUpdated.Spec.Taints, taint) {
+		e2elog.Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
+	}
+}
+
+// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
+func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
 }
