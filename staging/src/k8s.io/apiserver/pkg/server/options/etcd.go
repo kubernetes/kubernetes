@@ -117,7 +117,8 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
 		"format: group/resource#servers, where servers are URLs, semicolon separated. "+
-		"Note that etcd servers overrides currently do not support CRDs.")
+		"Note that this applies only to static API types compiled into this server binary, "+
+		"so it does not affect aggregated APIs or dynamic CRDs.")
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
 		"The media type to use to store objects in storage. "+
