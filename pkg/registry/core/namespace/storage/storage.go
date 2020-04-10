@@ -87,6 +87,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 
 	finalizeStore := *store
 	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
+	finalizeStore.ResetFieldsProvider = namespace.FinalizeStrategy
 
 	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}, nil
 }
@@ -324,6 +325,14 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// ResetFieldsFor implements rest.ResetFieldsProvider.
+func (r *FinalizeREST) ResetFieldsFor(version string) *fieldpath.Set {
+	if r.store.ResetFieldsProvider != nil {
+		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
+	}
+	return nil
 }
 
 func (r *FinalizeREST) New() runtime.Object {

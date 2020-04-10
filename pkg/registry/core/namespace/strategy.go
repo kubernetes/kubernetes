@@ -61,6 +61,7 @@ func (namespaceStrategy) ResetFieldsFor(version string) *fieldpath.Set {
 var resetFieldsByVersion = map[string]*fieldpath.Set{
 	"v1": fieldpath.NewSet(
 		fieldpath.MakePathOrDie("status"),
+		fieldpath.MakePathOrDie("spec.finalizers"),
 	),
 }
 
@@ -159,6 +160,22 @@ type namespaceFinalizeStrategy struct {
 }
 
 var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (namespaceFinalizeStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersionForFinalize[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersionForFinalize = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+	),
+}
 
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
