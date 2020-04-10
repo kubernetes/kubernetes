@@ -41,6 +41,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -71,6 +72,23 @@ func (rcStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.Garba
 // NamespaceScoped returns true because all Replication Controllers need to be within a namespace.
 func (rcStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (rcStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersion[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersion = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+		// TODO: handle `pod.DropDisabledTemplateFields`
+	),
 }
 
 // PrepareForCreate clears the status of a replication controller before creation.
@@ -191,6 +209,22 @@ type rcStatusStrategy struct {
 }
 
 var StatusStrategy = rcStatusStrategy{Strategy}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (rcStatusStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersionForStatus[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersionForStatus = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("spec"),
+	),
+}
 
 func (rcStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRc := obj.(*api.ReplicationController)
