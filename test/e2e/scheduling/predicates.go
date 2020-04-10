@@ -1039,7 +1039,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 // adding the well known prefix "0::ffff:" https://tools.ietf.org/html/rfc2765
 // if the ip is IPv4 and the cluster IPFamily is IPv6, otherwise returns the same ip
 func translateIPv4ToIPv6(ip string) string {
-	if framework.TestContext.IPFamily == "ipv6" && !k8utilnet.IsIPv6String(ip) && ip != "" {
+	if framework.TestContext.IPFamily == "ipv6" && ip != "" && !k8utilnet.IsIPv6String(ip) {
 		ip = "0::ffff:" + ip
 	}
 	return ip
