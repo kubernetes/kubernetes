@@ -33,6 +33,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // strategy implements behavior for ConfigMap objects
@@ -53,6 +54,22 @@ var _ rest.RESTUpdateStrategy = Strategy
 
 func (strategy) NamespaceScoped() bool {
 	return true
+}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (strategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersion[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersion = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+	// TODO: Handle `dropDisabledFields`
+	),
 }
 
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {

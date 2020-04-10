@@ -46,6 +46,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		UpdateStrategy: configmap.Strategy,
 		DeleteStrategy: configmap.Strategy,
 
+		ResetFieldsProvider: configmap.Strategy,
+
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
