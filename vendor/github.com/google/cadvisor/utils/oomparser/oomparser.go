@@ -22,7 +22,7 @@ import (
 
 	"github.com/euank/go-kmsg-parser/kmsgparser"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

@@ -19,7 +19,7 @@ sed -i -r "s/bool\(klog\.V\(([0-9]+)\)/bool(klog.V(\1).Enabled()/" vendor/k8s.io
 sed -i "s/bool(klog.V(klog.Level(l)))/bool(klog.V(klog.Level(l)).Enabled())/" vendor/k8s.io/apiserver/pkg/storage/etcd3/logger.go
 sed -i "s/if bool(klog.V(setting.logLevel))/if bool(klog.V(setting.logLevel).Enabled())/" vendor/k8s.io/client-go/rest/request.go 
 sed -i -r "s/klog\.V\(([0-9]+)\)\s\\{/klog.V(\1).Enabled() {/" vendor/k8s.io/utils/trace/trace.go
-rg '"k8s.io/klog"' | grep "\.go" | cut -f 1 -d ':' | sort | uniq | xargs sed -i 's/\"k8s.io\/klog\"/\"k8s.io\/klog\/v2\"/'
+rg '"k8s.io/klog/v2"' | grep "\.go" | cut -f 1 -d ':' | sort | uniq | xargs sed -i 's/\"k8s.io\/klog\"/\"k8s.io\/klog\/v2\"/'
 git add .
 git commit -a -m 'hack vendored code to use klog v2'
 

@@ -28,7 +28,7 @@ import (
 	"github.com/google/cadvisor/watcher"
 	inotify "k8s.io/utils/inotify"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type rawContainerWatcher struct {

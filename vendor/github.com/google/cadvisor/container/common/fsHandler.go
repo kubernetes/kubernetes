@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/cadvisor/fs"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type FsHandler interface {

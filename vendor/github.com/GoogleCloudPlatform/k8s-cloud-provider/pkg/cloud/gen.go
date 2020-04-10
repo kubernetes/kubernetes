@@ -26,7 +26,7 @@ import (
 	"sync"
 
 	"google.golang.org/api/googleapi"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
@@ -2465,9 +2465,9 @@ func (g *GCEAddresses) List(ctx context.Context, region string, fl *filter.F) ([
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -2581,9 +2581,9 @@ func (g *GCEAddresses) AggregatedList(ctx context.Context, fl *filter.F) (map[st
 		klog.V(4).Infof("GCEAddresses.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAddresses.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -2885,9 +2885,9 @@ func (g *GCEAlphaAddresses) List(ctx context.Context, region string, fl *filter.
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -3001,9 +3001,9 @@ func (g *GCEAlphaAddresses) AggregatedList(ctx context.Context, fl *filter.F) (m
 		klog.V(4).Infof("GCEAlphaAddresses.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaAddresses.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -3305,9 +3305,9 @@ func (g *GCEBetaAddresses) List(ctx context.Context, region string, fl *filter.F
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -3421,9 +3421,9 @@ func (g *GCEBetaAddresses) AggregatedList(ctx context.Context, fl *filter.F) (ma
 		klog.V(4).Infof("GCEBetaAddresses.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaAddresses.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -3684,9 +3684,9 @@ func (g *GCEAlphaGlobalAddresses) List(ctx context.Context, fl *filter.F) ([]*al
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaGlobalAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -4016,9 +4016,9 @@ func (g *GCEGlobalAddresses) List(ctx context.Context, fl *filter.F) ([]*ga.Addr
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEGlobalAddresses.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -4378,9 +4378,9 @@ func (g *GCEBackendServices) List(ctx context.Context, fl *filter.F) ([]*ga.Back
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -4824,9 +4824,9 @@ func (g *GCEBetaBackendServices) List(ctx context.Context, fl *filter.F) ([]*bet
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -5242,9 +5242,9 @@ func (g *GCEAlphaBackendServices) List(ctx context.Context, fl *filter.F) ([]*al
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -5663,9 +5663,9 @@ func (g *GCERegionBackendServices) List(ctx context.Context, region string, fl *
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCERegionBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -6078,9 +6078,9 @@ func (g *GCEAlphaRegionBackendServices) List(ctx context.Context, region string,
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaRegionBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -6493,9 +6493,9 @@ func (g *GCEBetaRegionBackendServices) List(ctx context.Context, region string, 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaRegionBackendServices.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -6898,9 +6898,9 @@ func (g *GCEDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.D
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -7275,9 +7275,9 @@ func (g *GCERegionDisks) List(ctx context.Context, region string, fl *filter.F) 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCERegionDisks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -7649,9 +7649,9 @@ func (g *GCEFirewalls) List(ctx context.Context, fl *filter.F) ([]*ga.Firewall, 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEFirewalls.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -8027,9 +8027,9 @@ func (g *GCEForwardingRules) List(ctx context.Context, region string, fl *filter
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -8404,9 +8404,9 @@ func (g *GCEAlphaForwardingRules) List(ctx context.Context, region string, fl *f
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -8781,9 +8781,9 @@ func (g *GCEBetaForwardingRules) List(ctx context.Context, region string, fl *fi
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -9155,9 +9155,9 @@ func (g *GCEAlphaGlobalForwardingRules) List(ctx context.Context, fl *filter.F) 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaGlobalForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -9530,9 +9530,9 @@ func (g *GCEBetaGlobalForwardingRules) List(ctx context.Context, fl *filter.F) (
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaGlobalForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -9905,9 +9905,9 @@ func (g *GCEGlobalForwardingRules) List(ctx context.Context, fl *filter.F) ([]*g
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEGlobalForwardingRules.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -10280,9 +10280,9 @@ func (g *GCEHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HealthC
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -10655,9 +10655,9 @@ func (g *GCEAlphaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*alpha
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -11030,9 +11030,9 @@ func (g *GCEBetaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*beta.H
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -11408,9 +11408,9 @@ func (g *GCEAlphaRegionHealthChecks) List(ctx context.Context, region string, fl
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaRegionHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -11785,9 +11785,9 @@ func (g *GCEBetaRegionHealthChecks) List(ctx context.Context, region string, fl 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaRegionHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -12159,9 +12159,9 @@ func (g *GCEHttpHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Htt
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEHttpHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -12534,9 +12534,9 @@ func (g *GCEHttpsHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Ht
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEHttpsHealthChecks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -12942,9 +12942,9 @@ func (g *GCEInstanceGroups) List(ctx context.Context, zone string, fl *filter.F)
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEInstanceGroups.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -13087,9 +13087,9 @@ func (g *GCEInstanceGroups) ListInstances(ctx context.Context, key *meta.Key, ar
 		klog.V(4).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...) = %v, %v", ctx, key, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEInstanceGroups.ListInstances(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -13439,9 +13439,9 @@ func (g *GCEInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEInstances.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -13869,9 +13869,9 @@ func (g *GCEBetaInstances) List(ctx context.Context, zone string, fl *filter.F) 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaInstances.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -14332,9 +14332,9 @@ func (g *GCEAlphaInstances) List(ctx context.Context, zone string, fl *filter.F)
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaInstances.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -14762,9 +14762,9 @@ func (g *GCEAlphaNetworks) List(ctx context.Context, fl *filter.F) ([]*alpha.Net
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaNetworks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -15094,9 +15094,9 @@ func (g *GCEBetaNetworks) List(ctx context.Context, fl *filter.F) ([]*beta.Netwo
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaNetworks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -15426,9 +15426,9 @@ func (g *GCENetworks) List(ctx context.Context, fl *filter.F) ([]*ga.Network, er
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCENetworks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -15829,9 +15829,9 @@ func (g *GCEAlphaNetworkEndpointGroups) List(ctx context.Context, zone string, f
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaNetworkEndpointGroups.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -15945,9 +15945,9 @@ func (g *GCEAlphaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *
 		klog.V(4).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaNetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -16055,9 +16055,9 @@ func (g *GCEAlphaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context
 		klog.V(4).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -16389,9 +16389,9 @@ func (g *GCEBetaNetworkEndpointGroups) List(ctx context.Context, zone string, fl
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaNetworkEndpointGroups.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -16505,9 +16505,9 @@ func (g *GCEBetaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *f
 		klog.V(4).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaNetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -16615,9 +16615,9 @@ func (g *GCEBetaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context,
 		klog.V(4).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaNetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -16949,9 +16949,9 @@ func (g *GCENetworkEndpointGroups) List(ctx context.Context, zone string, fl *fi
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCENetworkEndpointGroups.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -17065,9 +17065,9 @@ func (g *GCENetworkEndpointGroups) AggregatedList(ctx context.Context, fl *filte
 		klog.V(4).Infof("GCENetworkEndpointGroups.AggregatedList(%v, %v) = %v, %v", ctx, fl, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCENetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -17175,9 +17175,9 @@ func (g *GCENetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context, key
 		klog.V(4).Infof("GCENetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = %v, %v", ctx, key, nil, err)
 		return nil, err
 	}
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCENetworkEndpointGroups.ListNetworkEndpoints(%v, %v, ...) = [%v items], %v", ctx, key, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -17409,9 +17409,9 @@ func (g *GCERegions) List(ctx context.Context, fl *filter.F) ([]*ga.Region, erro
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCERegions.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -17673,9 +17673,9 @@ func (g *GCERoutes) List(ctx context.Context, fl *filter.F) ([]*ga.Route, error)
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCERoutes.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -18055,9 +18055,9 @@ func (g *GCEBetaSecurityPolicies) List(ctx context.Context, fl *filter.F) ([]*be
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaSecurityPolicies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -18547,9 +18547,9 @@ func (g *GCESslCertificates) List(ctx context.Context, fl *filter.F) ([]*ga.SslC
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCESslCertificates.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -18879,9 +18879,9 @@ func (g *GCEBetaSslCertificates) List(ctx context.Context, fl *filter.F) ([]*bet
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaSslCertificates.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -19211,9 +19211,9 @@ func (g *GCEAlphaSslCertificates) List(ctx context.Context, fl *filter.F) ([]*al
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaSslCertificates.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -19546,9 +19546,9 @@ func (g *GCEAlphaRegionSslCertificates) List(ctx context.Context, region string,
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaRegionSslCertificates.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -19880,9 +19880,9 @@ func (g *GCEBetaRegionSslCertificates) List(ctx context.Context, region string, 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaRegionSslCertificates.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -20214,9 +20214,9 @@ func (g *GCEAlphaSubnetworks) List(ctx context.Context, region string, fl *filte
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaSubnetworks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -20548,9 +20548,9 @@ func (g *GCEBetaSubnetworks) List(ctx context.Context, region string, fl *filter
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaSubnetworks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -20882,9 +20882,9 @@ func (g *GCESubnetworks) List(ctx context.Context, region string, fl *filter.F) 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCESubnetworks.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -21223,9 +21223,9 @@ func (g *GCEAlphaTargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaTargetHttpProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -21598,9 +21598,9 @@ func (g *GCEBetaTargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*b
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaTargetHttpProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -21973,9 +21973,9 @@ func (g *GCETargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*ga.Ta
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCETargetHttpProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -22351,9 +22351,9 @@ func (g *GCEAlphaRegionTargetHttpProxies) List(ctx context.Context, region strin
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaRegionTargetHttpProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -22728,9 +22728,9 @@ func (g *GCEBetaRegionTargetHttpProxies) List(ctx context.Context, region string
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaRegionTargetHttpProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -23112,9 +23112,9 @@ func (g *GCETargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]*ga.T
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCETargetHttpsProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -23530,9 +23530,9 @@ func (g *GCEAlphaTargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaTargetHttpsProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -23948,9 +23948,9 @@ func (g *GCEBetaTargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]*
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaTargetHttpsProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -24369,9 +24369,9 @@ func (g *GCEAlphaRegionTargetHttpsProxies) List(ctx context.Context, region stri
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaRegionTargetHttpsProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -24789,9 +24789,9 @@ func (g *GCEBetaRegionTargetHttpsProxies) List(ctx context.Context, region strin
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaRegionTargetHttpsProxies.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -25209,9 +25209,9 @@ func (g *GCETargetPools) List(ctx context.Context, region string, fl *filter.F) 
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCETargetPools.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -25616,9 +25616,9 @@ func (g *GCEAlphaUrlMaps) List(ctx context.Context, fl *filter.F) ([]*alpha.UrlM
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaUrlMaps.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -25991,9 +25991,9 @@ func (g *GCEBetaUrlMaps) List(ctx context.Context, fl *filter.F) ([]*beta.UrlMap
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaUrlMaps.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -26366,9 +26366,9 @@ func (g *GCEUrlMaps) List(ctx context.Context, fl *filter.F) ([]*ga.UrlMap, erro
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEUrlMaps.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -26744,9 +26744,9 @@ func (g *GCEAlphaRegionUrlMaps) List(ctx context.Context, region string, fl *fil
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEAlphaRegionUrlMaps.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -27121,9 +27121,9 @@ func (g *GCEBetaRegionUrlMaps) List(ctx context.Context, region string, fl *filt
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEBetaRegionUrlMaps.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))
@@ -27407,9 +27407,9 @@ func (g *GCEZones) List(ctx context.Context, fl *filter.F) ([]*ga.Zone, error) {
 		return nil, err
 	}
 
-	if klog.V(4) {
+	if klog.V(4).Enabled() {
 		klog.V(4).Infof("GCEZones.List(%v, ..., %v) = [%v items], %v", ctx, fl, len(all), nil)
-	} else if klog.V(5) {
+	} else if klog.V(5).Enabled() {
 		var asStr []string
 		for _, o := range all {
 			asStr = append(asStr, fmt.Sprintf("%+v", o))

@@ -33,7 +33,7 @@ import (
 	"strings"
 
 	"k8s.io/gengo/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // This clarifies when a pkg path has been canonicalized.

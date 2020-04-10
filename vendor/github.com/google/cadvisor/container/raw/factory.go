@@ -26,7 +26,7 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	watch "github.com/google/cadvisor/watcher"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")

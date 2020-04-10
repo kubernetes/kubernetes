@@ -28,7 +28,7 @@ import (
 	"github.com/google/cadvisor/stats"
 
 	"github.com/mindprince/gonvml"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type nvidiaManager struct {

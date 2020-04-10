@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
