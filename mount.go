@@ -77,7 +77,7 @@ type Interface interface {
 var _ Interface = &Mounter{}
 
 // MountPoint represents a single line in /proc/mounts or /etc/fstab.
-type MountPoint struct {
+type MountPoint struct { // nolint: golint
 	Device string
 	Path   string
 	Type   string
@@ -86,7 +86,7 @@ type MountPoint struct {
 	Pass   int
 }
 
-type MountErrorType string
+type MountErrorType string // nolint: golint
 
 const (
 	FilesystemMismatch  MountErrorType = "FilesystemMismatch"
@@ -97,7 +97,7 @@ const (
 	UnknownMountError   MountErrorType = "UnknownMountError"
 )
 
-type MountError struct {
+type MountError struct { // nolint: golint
 	Type    MountErrorType
 	Message string
 }
