@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // strategy implements behavior for CustomResources.
@@ -46,6 +47,25 @@ func NewStrategy(typer runtime.ObjectTyper) strategy {
 
 func (strategy) NamespaceScoped() bool {
 	return false
+}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (strategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersion[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersion = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+	),
+	"v1beta1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+	),
 }
 
 // PrepareForCreate clears the status of a CustomResourceDefinition before creation.
@@ -138,6 +158,31 @@ func NewStatusStrategy(typer runtime.ObjectTyper) statusStrategy {
 
 func (statusStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (statusStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersionForStatus[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersionForStatus = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("spec"),
+		fieldpath.MakePathOrDie("metadata.labels"),
+		fieldpath.MakePathOrDie("metadata.annotations"),
+		fieldpath.MakePathOrDie("metadata.ownerReferences"),
+	),
+	"v1beta1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("spec"),
+		fieldpath.MakePathOrDie("metadata.labels"),
+		fieldpath.MakePathOrDie("metadata.annotations"),
+		fieldpath.MakePathOrDie("metadata.ownerReferences"),
+	),
 }
 
 func (statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

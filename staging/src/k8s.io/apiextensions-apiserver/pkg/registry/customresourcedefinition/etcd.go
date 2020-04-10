@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // rest implements a RESTStorage for API services against etcd
@@ -50,6 +51,8 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*RES
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
 		DeleteStrategy: strategy,
+
+		ResetFieldsProvider: strategy,
 
 		// TODO: define table converter that exposes more than name/creation timestamp
 		TableConvertor: rest.NewDefaultTableConvertor(apiextensions.Resource("customresourcedefinitions")),
@@ -166,9 +169,13 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 // It is based on the original REST so that we can share the same underlying store
 func NewStatusREST(scheme *runtime.Scheme, rest *REST) *StatusREST {
 	statusStore := *rest.Store
+	strategy := NewStatusStrategy(scheme)
+
 	statusStore.CreateStrategy = nil
 	statusStore.DeleteStrategy = nil
-	statusStore.UpdateStrategy = NewStatusStrategy(scheme)
+	statusStore.UpdateStrategy = strategy
+	statusStore.ResetFieldsProvider = strategy
+
 	return &StatusREST{store: &statusStore}
 }
 
@@ -177,6 +184,14 @@ type StatusREST struct {
 }
 
 var _ = rest.Patcher(&StatusREST{})
+
+// ResetFieldsFor implements rest.ResetFieldsProvider.
+func (r *StatusREST) ResetFieldsFor(version string) *fieldpath.Set {
+	if r.store.ResetFieldsProvider != nil {
+		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
+	}
+	return nil
+}
 
 func (r *StatusREST) New() runtime.Object {
 	return &apiextensions.CustomResourceDefinition{}
