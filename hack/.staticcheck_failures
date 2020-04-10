@@ -6,7 +6,6 @@ pkg/controller/podautoscaler
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
-pkg/probe/http
 pkg/registry/autoscaling/horizontalpodautoscaler/storage
 pkg/registry/core/namespace/storage
 pkg/registry/core/persistentvolumeclaim/storage
