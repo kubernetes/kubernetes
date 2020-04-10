@@ -805,7 +805,7 @@ EOF
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
       cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
-apiVersion: apiserver.k8s.io/v1alpha1
+apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
@@ -823,7 +823,7 @@ egressSelections:
 EOF
     elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
       cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
-apiVersion: apiserver.k8s.io/v1alpha1
+apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
