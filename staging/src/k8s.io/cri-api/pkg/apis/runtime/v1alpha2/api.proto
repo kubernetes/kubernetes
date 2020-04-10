@@ -523,11 +523,14 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
-// ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageID or imageDigest), but in the
-// future it will include more detailed information about the different image types.
+// ImageSpec is an internal representation of an image.
 message ImageSpec {
+    // Container's Image field (e.g. imageID or imageDigest).
     string image = 1;
+    // Unstructured key-value map holding arbitrary metadata.
+    // ImageSpec Annotations can be used to help the runtime target specific
+    // images in multi-arch images.
+    map<string, string> annotations = 2;
 }
 
 message KeyValue {
@@ -1065,6 +1068,8 @@ message Image {
     // User name that will run the command(s). This is used if UID is not set
     // and no user is specified when creating container.
     string username = 6;
+    // ImageSpec for image which includes annotations
+    ImageSpec spec = 7;
 }
 
 message ListImagesResponse {
