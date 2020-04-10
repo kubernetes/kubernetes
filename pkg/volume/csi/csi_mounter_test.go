@@ -456,8 +456,8 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if mounter == nil {
-				t.Fatal("failed to create CSI mounter")
+			if err != nil {
+				t.Fatalf("failed to create CSI mounter: %v", err)
 			}
 
 			csiMounter := mounter.(*csiMountMgr)

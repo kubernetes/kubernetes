@@ -94,7 +94,6 @@ type csiBlockMapper struct {
 	readOnly   bool
 	spec       *volume.Spec
 	podUID     types.UID
-	volumeInfo map[string]string
 }
 
 var _ volume.BlockVolumeMapper = &csiBlockMapper{}

@@ -299,7 +299,6 @@ type storageos struct {
 	pvName       string
 	volName      string
 	volNamespace string
-	secretName   string
 	readOnly     bool
 	description  string
 	pool         string

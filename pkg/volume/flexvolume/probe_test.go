@@ -65,6 +65,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 	_, fs, watcher, prober := initTestEnvironment(t)
 	prober.Probe()
 	events, err := prober.Probe()
+	assert.NoError(t, err)
 	assert.Equal(t, 0, len(events))
 
 	// Call probe after a file is added. Should return 1 event.

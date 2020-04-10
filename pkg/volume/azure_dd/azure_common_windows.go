@@ -30,6 +30,8 @@ import (
 	"k8s.io/utils/mount"
 )
 
+var winDiskNumFormat = "/dev/disk%d"
+
 func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	cmd := "Update-HostStorageCache"
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()

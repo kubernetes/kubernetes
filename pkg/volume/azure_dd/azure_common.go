@@ -64,8 +64,7 @@ var (
 		string(api.AzureManagedDisk))
 
 	// only for Windows node
-	winDiskNumRE     = regexp.MustCompile(`/dev/disk(.+)`)
-	winDiskNumFormat = "/dev/disk%d"
+	winDiskNumRE = regexp.MustCompile(`/dev/disk(.+)`)
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
