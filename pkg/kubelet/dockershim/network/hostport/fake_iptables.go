@@ -51,7 +51,7 @@ func NewFakeIPTables() *fakeIPTables {
 			string(utiliptables.TableNAT):    sets.NewString("PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"),
 			string(utiliptables.TableMangle): sets.NewString("PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"),
 		},
-		protocol: utiliptables.ProtocolIpv4,
+		protocol: utiliptables.ProtocolIPv4,
 	}
 }
 
@@ -224,7 +224,7 @@ func (f *fakeIPTables) DeleteRule(tableName utiliptables.Table, chainName utilip
 }
 
 func (f *fakeIPTables) IsIPv6() bool {
-	return f.protocol == utiliptables.ProtocolIpv6
+	return f.protocol == utiliptables.ProtocolIPv6
 }
 
 func (f *fakeIPTables) Protocol() utiliptables.Protocol {

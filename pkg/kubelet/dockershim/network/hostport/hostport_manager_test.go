@@ -387,7 +387,7 @@ func TestGetHostportChain(t *testing.T) {
 
 func TestHostportManagerIPv6(t *testing.T) {
 	iptables := NewFakeIPTables()
-	iptables.protocol = utiliptables.ProtocolIpv6
+	iptables.protocol = utiliptables.ProtocolIPv6
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
 		hostPortMap: make(map[hostport]closeable),

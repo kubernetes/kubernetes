@@ -122,8 +122,8 @@ type kubenetNetworkPlugin struct {
 
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	execer := utilexec.New()
-	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIpv4)
-	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIpv6)
+	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIPv4)
+	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIPv6)
 	return &kubenetNetworkPlugin{
 		podIPs:            make(map[kubecontainer.ContainerID]utilsets.String),
 		execer:            utilexec.New(),

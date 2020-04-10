@@ -244,7 +244,7 @@ func matchRule(chain *fakeChain, match string) bool {
 
 func TestOpenPodHostportsIPv6(t *testing.T) {
 	fakeIPTables := NewFakeIPTables()
-	fakeIPTables.protocol = utiliptables.ProtocolIpv6
+	fakeIPTables.protocol = utiliptables.ProtocolIPv6
 	fakeOpener := NewFakeSocketManager()
 
 	h := &hostportSyncer{

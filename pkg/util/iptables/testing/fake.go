@@ -62,12 +62,12 @@ type FakeIPTables struct {
 
 // NewFake returns a no-op iptables.Interface
 func NewFake() *FakeIPTables {
-	return &FakeIPTables{protocol: iptables.ProtocolIpv4}
+	return &FakeIPTables{protocol: iptables.ProtocolIPv4}
 }
 
-// NewIpv6Fake returns a no-op iptables.Interface with IsIPv6() == true
-func NewIpv6Fake() *FakeIPTables {
-	return &FakeIPTables{protocol: iptables.ProtocolIpv6}
+// NewIPv6Fake returns a no-op iptables.Interface with IsIPv6() == true
+func NewIPv6Fake() *FakeIPTables {
+	return &FakeIPTables{protocol: iptables.ProtocolIPv6}
 }
 
 // SetHasRandomFully is part of iptables.Interface
@@ -103,7 +103,7 @@ func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args
 
 // IsIPv6 is part of iptables.Interface
 func (f *FakeIPTables) IsIPv6() bool {
-	return f.protocol == iptables.ProtocolIpv6
+	return f.protocol == iptables.ProtocolIPv6
 }
 
 // Protocol is part of iptables.Interface

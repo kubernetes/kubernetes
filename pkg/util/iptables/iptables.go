@@ -92,10 +92,10 @@ type Interface interface {
 type Protocol string
 
 const (
-	// ProtocolIpv4 represents ipv4 protocol in iptables
-	ProtocolIpv4 Protocol = "IPv4"
-	// ProtocolIpv6 represents ipv6 protocol in iptables
-	ProtocolIpv6 Protocol = "IPv6"
+	// ProtocolIPv4 represents ipv4 protocol in iptables
+	ProtocolIPv4 Protocol = "IPv4"
+	// ProtocolIPv6 represents ipv6 protocol in iptables
+	ProtocolIPv6 Protocol = "IPv6"
 )
 
 // Table represents different iptable like filter,nat, mangle and raw
@@ -322,7 +322,7 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 }
 
 func (runner *runner) IsIPv6() bool {
-	return runner.protocol == ProtocolIpv6
+	return runner.protocol == ProtocolIPv6
 }
 
 func (runner *runner) Protocol() Protocol {
@@ -416,14 +416,14 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 }
 
 func iptablesSaveCommand(protocol Protocol) string {
-	if protocol == ProtocolIpv6 {
+	if protocol == ProtocolIPv6 {
 		return cmdIP6TablesSave
 	}
 	return cmdIPTablesSave
 }
 
 func iptablesRestoreCommand(protocol Protocol) string {
-	if protocol == ProtocolIpv6 {
+	if protocol == ProtocolIPv6 {
 		return cmdIP6TablesRestore
 	}
 	return cmdIPTablesRestore
@@ -431,7 +431,7 @@ func iptablesRestoreCommand(protocol Protocol) string {
 }
 
 func iptablesCommand(protocol Protocol) string {
-	if protocol == ProtocolIpv6 {
+	if protocol == ProtocolIPv6 {
 		return cmdIP6Tables
 	}
 	return cmdIPTables

@@ -68,11 +68,11 @@ func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
 }
 
 func TestIPTablesVersionCmdsIPv4(t *testing.T) {
-	testIPTablesVersionCmds(t, ProtocolIpv4)
+	testIPTablesVersionCmds(t, ProtocolIPv4)
 }
 
 func TestIPTablesVersionCmdsIPv6(t *testing.T) {
-	testIPTablesVersionCmds(t, ProtocolIpv6)
+	testIPTablesVersionCmds(t, ProtocolIPv6)
 }
 
 func testEnsureChain(t *testing.T, protocol Protocol) {
@@ -127,12 +127,12 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	}
 }
 
-func TestEnsureChainIpv4(t *testing.T) {
-	testEnsureChain(t, ProtocolIpv4)
+func TestEnsureChainIPv4(t *testing.T) {
+	testEnsureChain(t, ProtocolIPv4)
 }
 
-func TestEnsureChainIpv6(t *testing.T) {
-	testEnsureChain(t, ProtocolIpv6)
+func TestEnsureChainIPv6(t *testing.T) {
+	testEnsureChain(t, ProtocolIPv6)
 }
 
 func TestFlushChain(t *testing.T) {
@@ -153,7 +153,7 @@ func TestFlushChain(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	// Success.
 	err := runner.FlushChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -190,7 +190,7 @@ func TestDeleteChain(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	// Success.
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -226,7 +226,7 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	exists, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -262,7 +262,7 @@ func TestEnsureRuleNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	exists, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -295,7 +295,7 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -325,7 +325,7 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	_, err := runner.EnsureRule(Append, TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -352,7 +352,7 @@ func TestDeleteRuleDoesNotExist(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -385,7 +385,7 @@ func TestDeleteRuleExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -415,7 +415,7 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -445,7 +445,7 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -480,7 +480,7 @@ func TestGetIPTablesHasCheckCommand(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		ipt := New(&fexec, ProtocolIpv4)
+		ipt := New(&fexec, ProtocolIPv4)
 		runner := ipt.(*runner)
 		if testCase.Expected != runner.hasCheck {
 			t.Errorf("Expected result: %v, Got result: %v", testCase.Expected, runner.hasCheck)
@@ -494,12 +494,12 @@ func TestIPTablesCommands(t *testing.T) {
 		protocol    Protocol
 		expectedCmd string
 	}{
-		{"iptablesCommand", ProtocolIpv4, cmdIPTables},
-		{"iptablesCommand", ProtocolIpv6, cmdIP6Tables},
-		{"iptablesSaveCommand", ProtocolIpv4, cmdIPTablesSave},
-		{"iptablesSaveCommand", ProtocolIpv6, cmdIP6TablesSave},
-		{"iptablesRestoreCommand", ProtocolIpv4, cmdIPTablesRestore},
-		{"iptablesRestoreCommand", ProtocolIpv6, cmdIP6TablesRestore},
+		{"iptablesCommand", ProtocolIPv4, cmdIPTables},
+		{"iptablesCommand", ProtocolIPv6, cmdIP6Tables},
+		{"iptablesSaveCommand", ProtocolIPv4, cmdIPTablesSave},
+		{"iptablesSaveCommand", ProtocolIPv6, cmdIP6TablesSave},
+		{"iptablesRestoreCommand", ProtocolIPv4, cmdIPTablesRestore},
+		{"iptablesRestoreCommand", ProtocolIPv6, cmdIP6TablesRestore},
 	}
 	for _, testCase := range testCases {
 		var cmd string
@@ -641,7 +641,7 @@ func TestWaitFlagUnavailable(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -672,7 +672,7 @@ func TestWaitFlagOld(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -706,7 +706,7 @@ func TestWaitFlagNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -737,7 +737,7 @@ func TestWaitIntervalFlagNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec, ProtocolIpv4)
+	runner := New(&fexec, ProtocolIPv4)
 	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -817,11 +817,11 @@ COMMIT
 }
 
 func TestSaveIntoIPv4(t *testing.T) {
-	testSaveInto(t, ProtocolIpv4)
+	testSaveInto(t, ProtocolIPv4)
 }
 
 func TestSaveIntoIPv6(t *testing.T) {
-	testSaveInto(t, ProtocolIpv6)
+	testSaveInto(t, ProtocolIPv6)
 }
 
 func testRestore(t *testing.T, protocol Protocol) {
@@ -908,11 +908,11 @@ func testRestore(t *testing.T, protocol Protocol) {
 }
 
 func TestRestoreIPv4(t *testing.T) {
-	testRestore(t, ProtocolIpv4)
+	testRestore(t, ProtocolIPv4)
 }
 
 func TestRestoreIPv6(t *testing.T) {
-	testRestore(t, ProtocolIpv6)
+	testRestore(t, ProtocolIPv6)
 }
 
 // TestRestoreAll tests only the simplest use case, as flag handling code is already tested in TestRestore
@@ -932,7 +932,7 @@ func TestRestoreAll(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIpv4, TestLockfilePath)
+	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
 	defer os.Remove(TestLockfilePath)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
@@ -973,7 +973,7 @@ func TestRestoreAllWait(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIpv4, TestLockfilePath)
+	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
 	defer os.Remove(TestLockfilePath)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
@@ -1018,7 +1018,7 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIpv4, TestLockfilePath)
+	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
 	defer os.Remove(TestLockfilePath)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
@@ -1064,7 +1064,7 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 		},
 	}
 
-	runner := newInternal(&fexec, ProtocolIpv4, TestLockfilePath)
+	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
 	defer os.Remove(TestLockfilePath)
 
 	// Grab the /run lock and ensure the RestoreAll fails
@@ -1106,7 +1106,7 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 		},
 	}
 
-	runner := newInternal(&fexec, ProtocolIpv4, TestLockfilePath)
+	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
 	defer os.Remove(TestLockfilePath)
 
 	// Grab the abstract @xtables socket
@@ -1146,7 +1146,7 @@ func TestRestoreAllWaitBackportedIptablesRestore(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIpv4, TestLockfilePath)
+	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
 	defer os.Remove(TestLockfilePath)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)

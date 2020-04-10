@@ -2088,10 +2088,10 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 
 func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
 	legacyAddrs := make(map[string]bool)
-	isIpv6 := utilnet.IsIPv6(proxier.nodeIP)
+	isIPv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for _, addr := range currentBindAddrs {
 		addrIsIPv6 := utilnet.IsIPv6(net.ParseIP(addr))
-		if addrIsIPv6 && !isIpv6 || !addrIsIPv6 && isIpv6 {
+		if addrIsIPv6 && !isIPv6 || !addrIsIPv6 && isIPv6 {
 			continue
 		}
 		if _, ok := activeBindAddrs[addr]; !ok {
