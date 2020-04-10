@@ -83,44 +83,40 @@ type NodeInfo struct {
 	// Overall node information.
 	node *v1.Node
 
-	pods             []*PodInfo
-	podsWithAffinity []*PodInfo
-	usedPorts        HostPortInfo
+	// Pods running on the node.
+	Pods []*PodInfo
+
+	// The subset of pods with affinity.
+	PodsWithAffinity []*PodInfo
+
+	// Ports allocated on the node.
+	UsedPorts HostPortInfo
 
 	// Total requested resources of all pods on this node. This includes assumed
 	// pods, which scheduler has sent for binding, but may not be scheduled yet.
-	requestedResource *Resource
+	Requested *Resource
 	// Total requested resources of all pods on this node with a minimum value
 	// applied to each container's CPU and memory requests. This does not reflect
 	// the actual resource requests for this node, but is used to avoid scheduling
 	// many zero-request pods onto one node.
-	nonzeroRequest *Resource
+	NonZeroRequested *Resource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
-	allocatableResource *Resource
+	Allocatable *Resource
 
-	// Cached taints of the node for faster lookup.
-	taints    []v1.Taint
-	taintsErr error
-
-	// imageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
+	// ImageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
 	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
 	// state information.
-	imageStates map[string]*ImageStateSummary
+	ImageStates map[string]*ImageStateSummary
 
 	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
 	// scheduling cycle.
 	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
 	TransientInfo *TransientSchedulerInfo
 
-	// Cached conditions of node for faster lookup.
-	memoryPressureCondition v1.ConditionStatus
-	diskPressureCondition   v1.ConditionStatus
-	pidPressureCondition    v1.ConditionStatus
-
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
-	generation int64
+	Generation int64
 }
 
 //initializeNodeTransientInfo initializes transient information pertaining to node.
@@ -301,13 +297,13 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 // the returned object.
 func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := &NodeInfo{
-		requestedResource:   &Resource{},
-		nonzeroRequest:      &Resource{},
-		allocatableResource: &Resource{},
-		TransientInfo:       NewTransientSchedulerInfo(),
-		generation:          nextGeneration(),
-		usedPorts:           make(HostPortInfo),
-		imageStates:         make(map[string]*ImageStateSummary),
+		Requested:        &Resource{},
+		NonZeroRequested: &Resource{},
+		Allocatable:      &Resource{},
+		TransientInfo:    NewTransientSchedulerInfo(),
+		Generation:       nextGeneration(),
+		UsedPorts:        make(HostPortInfo),
+		ImageStates:      make(map[string]*ImageStateSummary),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -323,211 +319,98 @@ func (n *NodeInfo) Node() *v1.Node {
 	return n.node
 }
 
-// Pods return all pods scheduled (including assumed to be) on this node.
-func (n *NodeInfo) Pods() []*PodInfo {
-	if n == nil {
-		return nil
-	}
-	return n.pods
-}
-
-// UsedPorts returns used ports on this node.
-func (n *NodeInfo) UsedPorts() HostPortInfo {
-	if n == nil {
-		return nil
-	}
-	return n.usedPorts
-}
-
-// SetUsedPorts sets the used ports on this node.
-func (n *NodeInfo) SetUsedPorts(newUsedPorts HostPortInfo) {
-	n.usedPorts = newUsedPorts
-}
-
-// ImageStates returns the state information of all images.
-func (n *NodeInfo) ImageStates() map[string]*ImageStateSummary {
-	if n == nil {
-		return nil
-	}
-	return n.imageStates
-}
-
-// SetImageStates sets the state information of all images.
-func (n *NodeInfo) SetImageStates(newImageStates map[string]*ImageStateSummary) {
-	n.imageStates = newImageStates
-}
-
-// PodsWithAffinity return all pods with (anti)affinity constraints on this node.
-func (n *NodeInfo) PodsWithAffinity() []*PodInfo {
-	if n == nil {
-		return nil
-	}
-	return n.podsWithAffinity
-}
-
-// AllowedPodNumber returns the number of the allowed pods on this node.
-func (n *NodeInfo) AllowedPodNumber() int {
-	if n == nil || n.allocatableResource == nil {
-		return 0
-	}
-	return n.allocatableResource.AllowedPodNumber
-}
-
 // Taints returns the taints list on this node.
+// TODO(#89528): Exists only because of kubelet dependency, remove.
 func (n *NodeInfo) Taints() ([]v1.Taint, error) {
-	if n == nil {
+	if n == nil || n.node.Spec.Taints == nil {
 		return nil, nil
 	}
-	return n.taints, n.taintsErr
-}
-
-// SetTaints sets the taints list on this node.
-func (n *NodeInfo) SetTaints(newTaints []v1.Taint) {
-	n.taints = newTaints
-}
-
-// RequestedResource returns aggregated resource request of pods on this node.
-func (n *NodeInfo) RequestedResource() Resource {
-	if n == nil {
-		return emptyResource
-	}
-	return *n.requestedResource
-}
-
-// SetRequestedResource sets the aggregated resource request of pods on this node.
-func (n *NodeInfo) SetRequestedResource(newResource *Resource) {
-	n.requestedResource = newResource
-}
-
-// NonZeroRequest returns aggregated nonzero resource request of pods on this node.
-func (n *NodeInfo) NonZeroRequest() Resource {
-	if n == nil {
-		return emptyResource
-	}
-	return *n.nonzeroRequest
-}
-
-// SetNonZeroRequest sets the aggregated nonzero resource request of pods on this node.
-func (n *NodeInfo) SetNonZeroRequest(newResource *Resource) {
-	n.nonzeroRequest = newResource
+	return n.node.Spec.Taints, nil
 }
 
 // AllocatableResource returns allocatable resources on a given node.
+// TODO(#89528): Exists only because of kubelet dependency, remove.
 func (n *NodeInfo) AllocatableResource() Resource {
 	if n == nil {
 		return emptyResource
 	}
-	return *n.allocatableResource
+	return *n.Allocatable
 }
 
 // SetAllocatableResource sets the allocatableResource information of given node.
+// TODO(#89528): Exists only because of kubelet dependency, remove.
 func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
-	n.allocatableResource = allocatableResource
-	n.generation = nextGeneration()
-}
-
-// GetGeneration returns the generation on this node.
-func (n *NodeInfo) GetGeneration() int64 {
-	if n == nil {
-		return 0
-	}
-	return n.generation
-}
-
-// SetGeneration sets the generation on this node. This is for testing only.
-func (n *NodeInfo) SetGeneration(newGeneration int64) {
-	n.generation = newGeneration
+	n.Allocatable = allocatableResource
+	n.Generation = nextGeneration()
 }
 
 // Clone returns a copy of this node.
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
-		node:                    n.node,
-		requestedResource:       n.requestedResource.Clone(),
-		nonzeroRequest:          n.nonzeroRequest.Clone(),
-		allocatableResource:     n.allocatableResource.Clone(),
-		taintsErr:               n.taintsErr,
-		TransientInfo:           n.TransientInfo,
-		memoryPressureCondition: n.memoryPressureCondition,
-		diskPressureCondition:   n.diskPressureCondition,
-		pidPressureCondition:    n.pidPressureCondition,
-		usedPorts:               make(HostPortInfo),
-		imageStates:             n.imageStates,
-		generation:              n.generation,
+		node:             n.node,
+		Requested:        n.Requested.Clone(),
+		NonZeroRequested: n.NonZeroRequested.Clone(),
+		Allocatable:      n.Allocatable.Clone(),
+		TransientInfo:    n.TransientInfo,
+		UsedPorts:        make(HostPortInfo),
+		ImageStates:      n.ImageStates,
+		Generation:       n.Generation,
 	}
-	if len(n.pods) > 0 {
-		clone.pods = append([]*PodInfo(nil), n.pods...)
+	if len(n.Pods) > 0 {
+		clone.Pods = append([]*PodInfo(nil), n.Pods...)
 	}
-	if len(n.usedPorts) > 0 {
+	if len(n.UsedPorts) > 0 {
 		// HostPortInfo is a map-in-map struct
 		// make sure it's deep copied
-		for ip, portMap := range n.usedPorts {
-			clone.usedPorts[ip] = make(map[ProtocolPort]struct{})
+		for ip, portMap := range n.UsedPorts {
+			clone.UsedPorts[ip] = make(map[ProtocolPort]struct{})
 			for protocolPort, v := range portMap {
-				clone.usedPorts[ip][protocolPort] = v
+				clone.UsedPorts[ip][protocolPort] = v
 			}
 		}
 	}
-	if len(n.podsWithAffinity) > 0 {
-		clone.podsWithAffinity = append([]*PodInfo(nil), n.podsWithAffinity...)
-	}
-	if len(n.taints) > 0 {
-		clone.taints = append([]v1.Taint(nil), n.taints...)
+	if len(n.PodsWithAffinity) > 0 {
+		clone.PodsWithAffinity = append([]*PodInfo(nil), n.PodsWithAffinity...)
 	}
 	return clone
 }
 
-// VolumeLimits returns volume limits associated with the node
-func (n *NodeInfo) VolumeLimits() map[v1.ResourceName]int64 {
-	volumeLimits := map[v1.ResourceName]int64{}
-	for k, v := range n.AllocatableResource().ScalarResources {
-		if v1helper.IsAttachableVolumeResourceName(k) {
-			volumeLimits[k] = v
-		}
-	}
-	return volumeLimits
-}
-
 // String returns representation of human readable format of this NodeInfo.
 func (n *NodeInfo) String() string {
-	podKeys := make([]string, len(n.pods))
-	for i, p := range n.pods {
+	podKeys := make([]string, len(n.Pods))
+	for i, p := range n.Pods {
 		podKeys[i] = p.Pod.Name
 	}
 	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v, UsedPort: %#v, AllocatableResource:%#v}",
-		podKeys, n.requestedResource, n.nonzeroRequest, n.usedPorts, n.allocatableResource)
-}
-
-func hasPodAffinityConstraints(pod *v1.Pod) bool {
-	affinity := pod.Spec.Affinity
-	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
+		podKeys, n.Requested, n.NonZeroRequested, n.UsedPorts, n.Allocatable)
 }
 
 // AddPod adds pod information to this NodeInfo.
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	// TODO(#89528): AddPod should accept a PodInfo as an input argument.
 	podInfo := NewPodInfo(pod)
-	res, non0CPU, non0Mem := calculateResource(podInfo.Pod)
-	n.requestedResource.MilliCPU += res.MilliCPU
-	n.requestedResource.Memory += res.Memory
-	n.requestedResource.EphemeralStorage += res.EphemeralStorage
-	if n.requestedResource.ScalarResources == nil && len(res.ScalarResources) > 0 {
-		n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
+	res, non0CPU, non0Mem := calculateResource(pod)
+	n.Requested.MilliCPU += res.MilliCPU
+	n.Requested.Memory += res.Memory
+	n.Requested.EphemeralStorage += res.EphemeralStorage
+	if n.Requested.ScalarResources == nil && len(res.ScalarResources) > 0 {
+		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
 	}
 	for rName, rQuant := range res.ScalarResources {
-		n.requestedResource.ScalarResources[rName] += rQuant
+		n.Requested.ScalarResources[rName] += rQuant
 	}
-	n.nonzeroRequest.MilliCPU += non0CPU
-	n.nonzeroRequest.Memory += non0Mem
-	n.pods = append(n.pods, podInfo)
-	if hasPodAffinityConstraints(podInfo.Pod) {
-		n.podsWithAffinity = append(n.podsWithAffinity, podInfo)
+	n.NonZeroRequested.MilliCPU += non0CPU
+	n.NonZeroRequested.Memory += non0Mem
+	n.Pods = append(n.Pods, podInfo)
+	affinity := pod.Spec.Affinity
+	if affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil) {
+		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
 	}
 
 	// Consume ports when pods added.
-	n.UpdateUsedPorts(podInfo.Pod, true)
+	n.updateUsedPorts(podInfo.Pod, true)
 
-	n.generation = nextGeneration()
+	n.Generation = nextGeneration()
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
@@ -537,48 +420,48 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 		return err
 	}
 
-	for i := range n.podsWithAffinity {
-		k2, err := GetPodKey(n.podsWithAffinity[i].Pod)
+	for i := range n.PodsWithAffinity {
+		k2, err := GetPodKey(n.PodsWithAffinity[i].Pod)
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
 		}
 		if k1 == k2 {
 			// delete the element
-			n.podsWithAffinity[i] = n.podsWithAffinity[len(n.podsWithAffinity)-1]
-			n.podsWithAffinity = n.podsWithAffinity[:len(n.podsWithAffinity)-1]
+			n.PodsWithAffinity[i] = n.PodsWithAffinity[len(n.PodsWithAffinity)-1]
+			n.PodsWithAffinity = n.PodsWithAffinity[:len(n.PodsWithAffinity)-1]
 			break
 		}
 	}
-	for i := range n.pods {
-		k2, err := GetPodKey(n.pods[i].Pod)
+	for i := range n.Pods {
+		k2, err := GetPodKey(n.Pods[i].Pod)
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
 		}
 		if k1 == k2 {
 			// delete the element
-			n.pods[i] = n.pods[len(n.pods)-1]
-			n.pods = n.pods[:len(n.pods)-1]
+			n.Pods[i] = n.Pods[len(n.Pods)-1]
+			n.Pods = n.Pods[:len(n.Pods)-1]
 			// reduce the resource data
 			res, non0CPU, non0Mem := calculateResource(pod)
 
-			n.requestedResource.MilliCPU -= res.MilliCPU
-			n.requestedResource.Memory -= res.Memory
-			n.requestedResource.EphemeralStorage -= res.EphemeralStorage
-			if len(res.ScalarResources) > 0 && n.requestedResource.ScalarResources == nil {
-				n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
+			n.Requested.MilliCPU -= res.MilliCPU
+			n.Requested.Memory -= res.Memory
+			n.Requested.EphemeralStorage -= res.EphemeralStorage
+			if len(res.ScalarResources) > 0 && n.Requested.ScalarResources == nil {
+				n.Requested.ScalarResources = map[v1.ResourceName]int64{}
 			}
 			for rName, rQuant := range res.ScalarResources {
-				n.requestedResource.ScalarResources[rName] -= rQuant
+				n.Requested.ScalarResources[rName] -= rQuant
 			}
-			n.nonzeroRequest.MilliCPU -= non0CPU
-			n.nonzeroRequest.Memory -= non0Mem
+			n.NonZeroRequested.MilliCPU -= non0CPU
+			n.NonZeroRequested.Memory -= non0Mem
 
 			// Release ports when remove Pods.
-			n.UpdateUsedPorts(pod, false)
+			n.updateUsedPorts(pod, false)
 
-			n.generation = nextGeneration()
+			n.Generation = nextGeneration()
 			n.resetSlicesIfEmpty()
 			return nil
 		}
@@ -588,11 +471,11 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 
 // resets the slices to nil so that we can do DeepEqual in unit tests.
 func (n *NodeInfo) resetSlicesIfEmpty() {
-	if len(n.podsWithAffinity) == 0 {
-		n.podsWithAffinity = nil
+	if len(n.PodsWithAffinity) == 0 {
+		n.PodsWithAffinity = nil
 	}
-	if len(n.pods) == 0 {
-		n.pods = nil
+	if len(n.Pods) == 0 {
+		n.Pods = nil
 	}
 }
 
@@ -623,16 +506,16 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	return
 }
 
-// UpdateUsedPorts updates the UsedPorts of NodeInfo.
-func (n *NodeInfo) UpdateUsedPorts(pod *v1.Pod, add bool) {
+// updateUsedPorts updates the UsedPorts of NodeInfo.
+func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 	for j := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[j]
 		for k := range container.Ports {
 			podPort := &container.Ports[k]
 			if add {
-				n.usedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			} else {
-				n.usedPorts.Remove(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+				n.UsedPorts.Remove(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
 			}
 		}
 	}
@@ -641,25 +524,9 @@ func (n *NodeInfo) UpdateUsedPorts(pod *v1.Pod, add bool) {
 // SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) error {
 	n.node = node
-
-	n.allocatableResource = NewResource(node.Status.Allocatable)
-
-	n.taints = node.Spec.Taints
-	for i := range node.Status.Conditions {
-		cond := &node.Status.Conditions[i]
-		switch cond.Type {
-		case v1.NodeMemoryPressure:
-			n.memoryPressureCondition = cond.Status
-		case v1.NodeDiskPressure:
-			n.diskPressureCondition = cond.Status
-		case v1.NodePIDPressure:
-			n.pidPressureCondition = cond.Status
-		default:
-			// We ignore other conditions.
-		}
-	}
+	n.Allocatable = NewResource(node.Status.Allocatable)
 	n.TransientInfo = NewTransientSchedulerInfo()
-	n.generation = nextGeneration()
+	n.Generation = nextGeneration()
 	return nil
 }
 
@@ -686,7 +553,7 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 		if err != nil {
 			continue
 		}
-		for _, np := range n.Pods() {
+		for _, np := range n.Pods {
 			npodkey, _ := GetPodKey(np.Pod)
 			if npodkey == podKey {
 				filtered = append(filtered, p)

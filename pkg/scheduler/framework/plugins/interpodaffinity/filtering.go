@@ -228,7 +228,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*framework.Nod
 			klog.Error("node not found")
 			return
 		}
-		for _, existingPod := range nodeInfo.PodsWithAffinity() {
+		for _, existingPod := range nodeInfo.PodsWithAffinity {
 			existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod.Pod, node)
 			if err != nil {
 				errCh.SendErrorWithCancel(err, cancel)
@@ -291,7 +291,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*frame
 		}
 		nodeTopologyPairsAffinityPodsMap := make(topologyToMatchedTermCount)
 		nodeTopologyPairsAntiAffinityPodsMap := make(topologyToMatchedTermCount)
-		for _, existingPod := range nodeInfo.Pods() {
+		for _, existingPod := range nodeInfo.Pods {
 			// Check affinity terms.
 			nodeTopologyPairsAffinityPodsMap.updateWithAffinityTerms(existingPod.Pod, node, affinityTerms, 1)
 

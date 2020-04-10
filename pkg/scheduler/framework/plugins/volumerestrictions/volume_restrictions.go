@@ -119,7 +119,7 @@ func haveOverlap(a1, a2 []string) bool {
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	for _, v := range pod.Spec.Volumes {
-		for _, ev := range nodeInfo.Pods() {
+		for _, ev := range nodeInfo.Pods {
 			if isVolumeConflict(v, ev.Pod) {
 				return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 			}

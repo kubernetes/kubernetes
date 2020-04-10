@@ -239,10 +239,10 @@ func (pl *InterPodAffinity) PreScore(
 		}
 		// Unless the pod being scheduled has affinity terms, we only
 		// need to process pods with affinity in the node.
-		podsToProcess := nodeInfo.PodsWithAffinity()
+		podsToProcess := nodeInfo.PodsWithAffinity
 		if hasAffinityConstraints || hasAntiAffinityConstraints {
 			// We need to process all the pods.
-			podsToProcess = nodeInfo.Pods()
+			podsToProcess = nodeInfo.Pods
 		}
 
 		topoScore := make(scoreMap)

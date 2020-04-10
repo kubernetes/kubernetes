@@ -196,11 +196,11 @@ func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin
 
 // countMatchingPods counts pods based on namespace and matching all selectors
 func countMatchingPods(namespace string, selector labels.Selector, nodeInfo *framework.NodeInfo) int {
-	if len(nodeInfo.Pods()) == 0 || selector.Empty() {
+	if len(nodeInfo.Pods) == 0 || selector.Empty() {
 		return 0
 	}
 	count := 0
-	for _, p := range nodeInfo.Pods() {
+	for _, p := range nodeInfo.Pods {
 		// Ignore pods being deleted for spreading purposes
 		// Similar to how it is done for SelectorSpreadPriority
 		if namespace == p.Pod.Namespace && p.Pod.DeletionTimestamp == nil {

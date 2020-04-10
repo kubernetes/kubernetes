@@ -53,7 +53,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	havePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
-		if len(v.PodsWithAffinity()) > 0 {
+		if len(v.PodsWithAffinity) > 0 {
 			havePodsWithAffinityNodeInfoList = append(havePodsWithAffinityNodeInfoList, v)
 		}
 	}
@@ -86,7 +86,7 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.N
 		}
 		nodeInfo := nodeNameToInfo[node.Name]
 		nodeInfo.SetNode(node)
-		nodeInfo.SetImageStates(getNodeImageStates(node, imageExistenceMap))
+		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
 	}
 	return nodeNameToInfo
 }
@@ -153,11 +153,11 @@ func (p podLister) FilteredList(filter framework.PodFilter, selector labels.Sele
 	// pre-allocating capacity.
 	maxSize := 0
 	for _, n := range p {
-		maxSize += len(n.Pods())
+		maxSize += len(n.Pods)
 	}
 	pods := make([]*v1.Pod, 0, maxSize)
 	for _, n := range p {
-		for _, p := range n.Pods() {
+		for _, p := range n.Pods {
 			if filter(p.Pod) && selector.Matches(labels.Set(p.Pod.Labels)) {
 				pods = append(pods, p.Pod)
 			}

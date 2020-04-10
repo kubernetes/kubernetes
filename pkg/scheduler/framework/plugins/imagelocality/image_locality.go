@@ -95,14 +95,11 @@ func calculatePriority(sumScores int64) int64 {
 // the final score. Note that the init containers are not considered for it's rare for users to deploy huge init containers.
 func sumImageScores(nodeInfo *framework.NodeInfo, containers []v1.Container, totalNumNodes int) int64 {
 	var sum int64
-	imageStates := nodeInfo.ImageStates()
-
 	for _, container := range containers {
-		if state, ok := imageStates[normalizedImageName(container.Image)]; ok {
+		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
 	}
-
 	return sum
 }
 

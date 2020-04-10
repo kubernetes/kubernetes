@@ -384,7 +384,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 				maxVolumes := 5
 				nodeInfoList, _ := snapshot.NodeInfos().List()
 				for _, info := range nodeInfoList {
-					info.TransientInfo.TransNodeInfo.AllocatableVolumesCount = getExistingVolumeCountForNode(info.Pods(), maxVolumes)
+					info.TransientInfo.TransNodeInfo.AllocatableVolumesCount = getExistingVolumeCountForNode(info.Pods, maxVolumes)
 					info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
 				}
 			}

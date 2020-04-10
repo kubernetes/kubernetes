@@ -255,7 +255,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			if tpCount == nil {
 				continue
 			}
-			count := countPodsMatchSelector(nodeInfo.Pods(), constraint.Selector, pod.Namespace)
+			count := countPodsMatchSelector(nodeInfo.Pods, constraint.Selector, pod.Namespace)
 			atomic.AddInt32(tpCount, int32(count))
 		}
 	}

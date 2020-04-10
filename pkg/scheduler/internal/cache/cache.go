@@ -218,7 +218,7 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
 	for node := cache.headNode; node != nil; node = node.next {
-		if node.info.GetGeneration() <= snapshotGeneration {
+		if node.info.Generation <= snapshotGeneration {
 			// all the nodes are updated before the existing snapshot. We are done.
 			break
 		}
@@ -237,7 +237,7 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			// We track nodes that have pods with affinity, here we check if this node changed its
 			// status from having pods with affinity to NOT having pods with affinity or the other
 			// way around.
-			if (len(existing.PodsWithAffinity()) > 0) != (len(clone.PodsWithAffinity()) > 0) {
+			if (len(existing.PodsWithAffinity) > 0) != (len(clone.PodsWithAffinity) > 0) {
 				updateNodesHavePodsWithAffinity = true
 			}
 			// We need to preserve the original pointer of the NodeInfo struct since it
@@ -247,7 +247,7 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	}
 	// Update the snapshot generation with the latest NodeInfo generation.
 	if cache.headNode != nil {
-		nodeSnapshot.generation = cache.headNode.info.GetGeneration()
+		nodeSnapshot.generation = cache.headNode.info.Generation
 	}
 
 	if len(nodeSnapshot.nodeInfoMap) > len(cache.nodes) {
@@ -284,7 +284,7 @@ func (cache *schedulerCache) updateNodeInfoSnapshotList(snapshot *Snapshot, upda
 			nodeName := cache.nodeTree.next()
 			if n := snapshot.nodeInfoMap[nodeName]; n != nil {
 				snapshot.nodeInfoList = append(snapshot.nodeInfoList, n)
-				if len(n.PodsWithAffinity()) > 0 {
+				if len(n.PodsWithAffinity) > 0 {
 					snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, n)
 				}
 			} else {
@@ -293,7 +293,7 @@ func (cache *schedulerCache) updateNodeInfoSnapshotList(snapshot *Snapshot, upda
 		}
 	} else {
 		for _, n := range snapshot.nodeInfoList {
-			if len(n.PodsWithAffinity()) > 0 {
+			if len(n.PodsWithAffinity) > 0 {
 				snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, n)
 			}
 		}
@@ -322,11 +322,11 @@ func (cache *schedulerCache) ListPods(selector labels.Selector) ([]*v1.Pod, erro
 	// pre-allocating capacity.
 	maxSize := 0
 	for _, n := range cache.nodes {
-		maxSize += len(n.info.Pods())
+		maxSize += len(n.info.Pods)
 	}
 	pods := make([]*v1.Pod, 0, maxSize)
 	for _, n := range cache.nodes {
-		for _, p := range n.info.Pods() {
+		for _, p := range n.info.Pods {
 			if selector.Matches(labels.Set(p.Pod.Labels)) {
 				pods = append(pods, p.Pod)
 			}
@@ -664,7 +664,7 @@ func (cache *schedulerCache) addNodeImageStates(node *v1.Node, nodeInfo *framewo
 			}
 		}
 	}
-	nodeInfo.SetImageStates(newSum)
+	nodeInfo.ImageStates = newSum
 }
 
 // removeNodeImageStates removes the given node record from image entries having the node
