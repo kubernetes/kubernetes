@@ -53,6 +53,7 @@ type DeploymentStorage struct {
 	Rollback   *RollbackREST
 }
 
+// NewStorage returns new instance of DeploymentStorage.
 func NewStorage(optsGetter generic.RESTOptionsGetter) (DeploymentStorage, error) {
 	deploymentRest, deploymentStatusRest, deploymentRollbackRest, err := NewREST(optsGetter)
 	if err != nil {
@@ -67,6 +68,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (DeploymentStorage, error)
 	}, nil
 }
 
+// REST implements a RESTStorage for Deployments.
 type REST struct {
 	*genericregistry.Store
 	categories []string
@@ -111,6 +113,7 @@ func (r *REST) Categories() []string {
 	return r.categories
 }
 
+// WithCategories sets categories for REST.
 func (r *REST) WithCategories(categories []string) *REST {
 	r.categories = categories
 	return r
@@ -121,6 +124,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New returns empty Deployment object.
 func (r *StatusREST) New() runtime.Object {
 	return &apps.Deployment{}
 }
@@ -163,6 +167,7 @@ func (r *RollbackREST) New() runtime.Object {
 
 var _ = rest.NamedCreater(&RollbackREST{})
 
+// Create runs rollback for deployment
 func (r *RollbackREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	rollback, ok := obj.(*apps.DeploymentRollback)
 	if !ok {
@@ -230,6 +235,7 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 	return finalDeployment, err
 }
 
+// ScaleREST implements a Scale for Deployment.
 type ScaleREST struct {
 	store *genericregistry.Store
 }
@@ -238,6 +244,7 @@ type ScaleREST struct {
 var _ = rest.Patcher(&ScaleREST{})
 var _ = rest.GroupVersionKindProvider(&ScaleREST{})
 
+// GroupVersionKind returns GroupVersionKind for Deployment Scale object
 func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	switch containingGV {
 	case extensionsv1beta1.SchemeGroupVersion:
@@ -256,6 +263,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
 
+// Get retrieves object from Scale storage.
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
@@ -269,6 +277,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, nil
 }
 
+// Update alters scale subset of Deployment object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {

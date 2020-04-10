@@ -49,6 +49,7 @@ type ReplicaSetStorage struct {
 	Scale      *ScaleREST
 }
 
+// NewStorage returns new instance of ReplicaSetStorage.
 func NewStorage(optsGetter generic.RESTOptionsGetter) (ReplicaSetStorage, error) {
 	replicaSetRest, replicaSetStatusRest, err := NewREST(optsGetter)
 	if err != nil {
@@ -62,6 +63,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (ReplicaSetStorage, error)
 	}, nil
 }
 
+// REST implements a RESTStorage for ReplicaSet.
 type REST struct {
 	*genericregistry.Store
 	categories []string
@@ -108,6 +110,7 @@ func (r *REST) Categories() []string {
 	return r.categories
 }
 
+// WithCategories sets categories for REST.
 func (r *REST) WithCategories(categories []string) *REST {
 	r.categories = categories
 	return r
@@ -118,6 +121,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New returns empty ReplicaSet object.
 func (r *StatusREST) New() runtime.Object {
 	return &apps.ReplicaSet{}
 }
@@ -134,6 +138,7 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// ScaleREST implements a Scale for Deployment.
 type ScaleREST struct {
 	store *genericregistry.Store
 }
@@ -142,6 +147,7 @@ type ScaleREST struct {
 var _ = rest.Patcher(&ScaleREST{})
 var _ = rest.GroupVersionKindProvider(&ScaleREST{})
 
+// GroupVersionKind returns GroupVersionKind for ReplicaSet Scale object
 func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	switch containingGV {
 	case extensionsv1beta1.SchemeGroupVersion:
@@ -160,6 +166,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
 
+// Get retrieves object from Scale storage.
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
@@ -173,6 +180,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, err
 }
 
+// Update alters scale subset of ReplicaSet object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
