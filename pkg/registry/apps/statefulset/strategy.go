@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
@@ -63,6 +64,23 @@ func (statefulSetStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) r
 // NamespaceScoped returns true because all StatefulSet' need to be within a namespace.
 func (statefulSetStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (statefulSetStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersion[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersion = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+		// TODO: handle `pod.DropDisabledTemplateFields`
+	),
 }
 
 // PrepareForCreate clears the status of an StatefulSet before creation.
@@ -132,6 +150,22 @@ type statefulSetStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = statefulSetStatusStrategy{Strategy}
+
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (statefulSetStatusStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersionForStatus[version]
+	if !ok {
+		return nil
+	}
+	return set
+}
+
+var resetFieldsByVersionForStatus = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("spec"),
+	),
+}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (statefulSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
