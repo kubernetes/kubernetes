@@ -325,8 +325,8 @@ func (j *TestJig) WaitForEndpointOnNode(nodeName string) error {
 	})
 }
 
-// WaitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
-func (j *TestJig) WaitForAvailableEndpoint(timeout time.Duration) error {
+// waitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
+func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
 	endpointSelector := fields.OneTermEqualSelector("metadata.name", j.Name)
 	stopCh := make(chan struct{})
@@ -842,7 +842,7 @@ func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod
 	clusterIP := svc.Spec.ClusterIP
 	servicePorts := svc.Spec.Ports
 
-	err := j.WaitForAvailableEndpoint(ServiceEndpointsTimeout)
+	err := j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
 	if err != nil {
 		return err
 	}
@@ -875,7 +875,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 		return err
 	}
 
-	err = j.WaitForAvailableEndpoint(ServiceEndpointsTimeout)
+	err = j.waitForAvailableEndpoint(ServiceEndpointsTimeout)
 	if err != nil {
 		return err
 	}
