@@ -116,6 +116,7 @@ filegroup(
         "//test/e2e/framework/kubelet:all-srcs",
         "//test/e2e/framework/kubesystem:all-srcs",
         "//test/e2e/framework/log:all-srcs",
+        "//test/e2e/framework/manifest:all-srcs",
         "//test/e2e/framework/metrics:all-srcs",
         "//test/e2e/framework/network:all-srcs",
         "//test/e2e/framework/node:all-srcs",
