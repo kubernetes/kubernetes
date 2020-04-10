@@ -19,6 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
+	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 )
 
@@ -47,6 +48,41 @@ func (o *JobControllerOptions) ApplyTo(cfg *jobconfig.JobControllerConfiguration
 
 // Validate checks validation of JobControllerOptions.
 func (o *JobControllerOptions) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
+	errs := []error{}
+	return errs
+}
+
+// CronJobControllerOptions holds the CronJobController options.
+type CronJobControllerOptions struct {
+	*cronjobconfig.CronJobControllerConfiguration
+}
+
+// AddFlags adds flags related to CronJobController for controller manager to the specified FlagSet.
+func (o *CronJobControllerOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
+	fs.DurationVar(&o.CronJobControllerSyncPeriod.Duration, "cronjob-controller-sync-period", o.CronJobControllerSyncPeriod.Duration, "Period for syncing cronjobs.")
+}
+
+// ApplyTo fills up CronJobController config with options.
+func (o *CronJobControllerOptions) ApplyTo(cfg *cronjobconfig.CronJobControllerConfiguration) error {
+	if o == nil {
+		return nil
+	}
+
+	cfg.CronJobControllerSyncPeriod = o.CronJobControllerSyncPeriod
+
+	return nil
+}
+
+// Validate checks validation of CronJobControllerOptions.
+func (o *CronJobControllerOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}

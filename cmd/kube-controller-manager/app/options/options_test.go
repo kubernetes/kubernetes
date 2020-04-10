@@ -34,6 +34,7 @@ import (
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
@@ -82,6 +83,7 @@ var args = []string{
 	"--contention-profiling=true",
 	"--controller-start-interval=2m",
 	"--controllers=foo,bar",
+	"--cronjob-controller-sync-period=10s",
 	"--deployment-controller-sync-period=45s",
 	"--disable-attach-detach-reconcile-sync=true",
 	"--enable-dynamic-provisioning=false",
@@ -208,6 +210,11 @@ func TestAddFlags(t *testing.T) {
 			&attachdetachconfig.AttachDetachControllerConfiguration{
 				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
 				DisableAttachDetachReconcilerSync: true,
+			},
+		},
+		CronJobController: &CronJobControllerOptions{
+			&cronjobconfig.CronJobControllerConfiguration{
+				CronJobControllerSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		CSRSigningController: &CSRSigningControllerOptions{
@@ -454,6 +461,9 @@ func TestApplyTo(t *testing.T) {
 			AttachDetachController: attachdetachconfig.AttachDetachControllerConfiguration{
 				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
 				DisableAttachDetachReconcilerSync: true,
+			},
+			CronJobController: cronjobconfig.CronJobControllerConfiguration{
+				CronJobControllerSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 			},
 			CSRSigningController: csrsigningconfig.CSRSigningControllerConfiguration{
 				ClusterSigningCertFile: "/cluster-signing-cert",

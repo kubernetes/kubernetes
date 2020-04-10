@@ -48,6 +48,7 @@ func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
 	}
 	cjc, err := cronjob.NewController(
 		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
+		ctx.ComponentConfig.CronJobController.CronJobControllerSyncPeriod.Duration,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating CronJob controller: %v", err)
