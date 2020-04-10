@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller"
-	schedfwk "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/system"
 )
@@ -393,8 +392,6 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		},
 	}
 
-	nodeInfo := schedfwk.NewNodeInfo()
-
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -403,6 +400,7 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 		}
 	}
 
+	n := node
 	if len(nonblockingTaintsMap) > 0 {
 		nodeCopy := node.DeepCopy()
 		nodeCopy.Spec.Taints = []v1.Taint{}
@@ -411,18 +409,9 @@ func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) boo
 				nodeCopy.Spec.Taints = append(nodeCopy.Spec.Taints, v)
 			}
 		}
-		nodeInfo.SetNode(nodeCopy)
-	} else {
-		nodeInfo.SetNode(node)
+		n = nodeCopy
 	}
-
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		e2elog.Failf("Can't test predicates for node %s: %v", node.Name, err)
-		return false
-	}
-
-	return toleratesTaintsWithNoScheduleNoExecuteEffects(taints, fakePod.Spec.Tolerations)
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, fakePod.Spec.Tolerations)
 }
 
 func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {

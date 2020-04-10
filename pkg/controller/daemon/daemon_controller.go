@@ -53,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/utils/integer"
 )
 
@@ -1200,14 +1199,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 		return false, false, nil
 	}
 
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
-	nodeInfo.SetNode(node)
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		klog.Warningf("failed to get node %q taints: %v", node.Name, err)
-		return false, false, err
-	}
-
+	taints := node.Spec.Taints
 	fitsNodeName, fitsNodeAffinity, fitsTaints := Predicates(pod, node, taints)
 	if !fitsNodeName || !fitsNodeAffinity {
 		return false, false, nil
