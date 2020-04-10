@@ -425,6 +425,20 @@ package_group(
     ],
 )
 
+package_group(
+    name = "vendor_githubcom_prometheus_CONSUMERS",
+    packages = [
+        "//cluster/images/etcd-version-monitor",
+        "//pkg/scheduler/framework/v1alpha1",
+        "//pkg/volume/util/operationexecutor",
+        "//staging/src/k8s.io/apiserver/pkg/admission/metrics",
+        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics",
+        "//staging/src/k8s.io/component-base/metrics/...",
+        "//test/e2e_node",
+        "//vendor/...",
+    ],
+)
+
 # Added by ./hack/verify-bazel.sh; should be excluded from
 # that script since it makes no sense here.
 filegroup(

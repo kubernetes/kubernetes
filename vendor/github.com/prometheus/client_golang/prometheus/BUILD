@@ -30,7 +30,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_golang/prometheus",
     importpath = "github.com/prometheus/client_golang/prometheus",
-    visibility = ["//staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list"],
+    visibility = ["//build/visible_to:vendor_githubcom_prometheus_CONSUMERS"],
     deps = [
         "//vendor/github.com/beorn7/perks/quantile:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
