@@ -6,7 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter",
     importpath = "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/klog:go_default_library"],
+    deps = ["//vendor/k8s.io/klog/v2:go_default_library"],
 )
 
 filegroup(
