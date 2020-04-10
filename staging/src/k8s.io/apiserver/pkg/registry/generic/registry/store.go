@@ -47,7 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned

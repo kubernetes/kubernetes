@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const nsTimeFmt = "2006-01-02 15:04:05.000000000"
@@ -499,7 +499,7 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	if len(queue.requests) == 0 && queue.requestsExecuting == 0 {
 		// the queue’s virtual start time is set to the virtual time.
 		queue.virtualStart = qs.virtualTime
-		if klog.V(6) {
+		if klog.V(6).Enabled() {
 			klog.Infof("QS(%s) at r=%s v=%.9fs: initialized queue %d virtual start time due to request %#+v %#+v", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), queue.virtualStart, queue.index, request.descr1, request.descr2)
 		}
 	}
@@ -538,7 +538,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, fsName string, 
 	req.decision.SetLocked(decisionExecute)
 	qs.totRequestsExecuting++
 	metrics.AddRequestsExecuting(qs.qCfg.Name, fsName, 1)
-	if klog.V(5) {
+	if klog.V(5).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.virtualTime, fsName, descr1, descr2, qs.totRequestsExecuting)
 	}
 	return req
@@ -568,7 +568,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	queue.requestsExecuting++
 	metrics.AddRequestsInQueues(qs.qCfg.Name, request.fsName, -1)
 	metrics.AddRequestsExecuting(qs.qCfg.Name, request.fsName, 1)
-	if klog.V(6) {
+	if klog.V(6).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: dispatching request %#+v %#+v from queue %d with virtual start time %.9fs, queue will have %d waiting & %d executing", qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.virtualTime, request.descr1, request.descr2, queue.index, queue.virtualStart, len(queue.requests), queue.requestsExecuting)
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G
@@ -651,7 +651,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	metrics.AddRequestsExecuting(qs.qCfg.Name, r.fsName, -1)
 
 	if r.queue == nil {
-		if klog.V(6) {
+		if klog.V(6).Enabled() {
 			klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, qs will have %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, qs.totRequestsExecuting)
 		}
 		return
@@ -666,7 +666,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	// request has finished, remove from requests executing
 	r.queue.requestsExecuting--
 
-	if klog.V(6) {
+	if klog.V(6).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: request %#+v %#+v finished, adjusted queue %d virtual start time to %.9fs due to service time %.9fs, queue will have %d waiting & %d executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, r.descr1, r.descr2, r.queue.index, r.queue.virtualStart, S, len(r.queue.requests), r.queue.requestsExecuting)
 	}
 

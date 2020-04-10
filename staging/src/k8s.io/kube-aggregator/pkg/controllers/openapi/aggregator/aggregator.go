@@ -26,7 +26,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/server"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"

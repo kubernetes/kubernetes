@@ -25,7 +25,7 @@ import (
 
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
 )

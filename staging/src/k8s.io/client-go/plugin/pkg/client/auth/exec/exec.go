@@ -46,7 +46,7 @@ import (
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/connrotation"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"

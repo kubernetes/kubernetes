@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/informers"
 	networkingv1beta1listers "k8s.io/client-go/listers/networking/v1beta1"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/features"
 )

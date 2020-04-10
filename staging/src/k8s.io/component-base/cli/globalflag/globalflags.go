@@ -24,11 +24,11 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/component-base/logs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
-// against the global flagsets from "flag" and "k8s.io/klog".
+// against the global flagsets from "flag" and "k8s.io/klog/v2".
 // We do this in order to prevent unwanted flags from leaking into the component's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet, name string) {
 	addKlogFlags(fs)

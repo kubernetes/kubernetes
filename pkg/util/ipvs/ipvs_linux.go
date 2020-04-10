@@ -28,7 +28,7 @@ import (
 	"time"
 
 	libipvs "github.com/moby/ipvs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 

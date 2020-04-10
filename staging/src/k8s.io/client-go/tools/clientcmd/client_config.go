@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/imdario/mergo"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"

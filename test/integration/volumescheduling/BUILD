@@ -32,7 +32,7 @@ go_test(
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils/image:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

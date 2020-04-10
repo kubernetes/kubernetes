@@ -19,7 +19,7 @@ package flexvolume
 import (
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	"k8s.io/apimachinery/pkg/types"

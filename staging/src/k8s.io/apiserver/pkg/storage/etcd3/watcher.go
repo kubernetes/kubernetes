@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 
 	"go.etcd.io/etcd/clientv3"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

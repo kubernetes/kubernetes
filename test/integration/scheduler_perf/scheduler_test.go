@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

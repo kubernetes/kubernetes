@@ -27,7 +27,7 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
 )

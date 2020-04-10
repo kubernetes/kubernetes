@@ -12,7 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/admit",
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

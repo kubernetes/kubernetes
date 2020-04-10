@@ -23,7 +23,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

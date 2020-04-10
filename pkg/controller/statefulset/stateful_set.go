@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.

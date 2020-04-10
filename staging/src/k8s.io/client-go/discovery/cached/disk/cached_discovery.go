@@ -26,7 +26,7 @@ import (
 	"time"
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

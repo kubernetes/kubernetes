@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	typedv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	"k8s.io/client-go/tools/record/util"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
