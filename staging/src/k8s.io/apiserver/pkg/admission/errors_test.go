@@ -48,6 +48,46 @@ func TestNewForbidden(t *testing.T) {
 	}
 }
 
+func TestNewNotFound(t *testing.T) {
+	attributes := NewAttributesRecord(
+		&fakeObj{},
+		nil,
+		schema.GroupVersionKind{Group: "foo", Version: "bar", Kind: "Baz"},
+		"",
+		"",
+		schema.GroupVersionResource{Group: "foo", Version: "bar", Resource: "baz"},
+		"",
+		Create,
+		nil,
+		false,
+		nil)
+	expectedErr := `baz.foo "Unknown/errorGettingName" not found`
+
+	actualErr := NewNotFound(attributes)
+	if actualErr.Error() != expectedErr {
+		t.Errorf("expected %v, got %v", expectedErr, actualErr)
+	}
+
+	attributes = NewAttributesRecord(
+		&fakeObj{},
+		nil,
+		schema.GroupVersionKind{Group: "foo", Version: "bar", Kind: "Baz"},
+		"",
+		"Bob",
+		schema.GroupVersionResource{Group: "foo", Version: "bar", Resource: "baz"},
+		"",
+		Create,
+		nil,
+		false,
+		nil)
+	expectedErr = `baz.foo "Bob" not found`
+
+	actualErr = NewNotFound(attributes)
+	if actualErr.Error() != expectedErr {
+		t.Errorf("expected %v, got %v", expectedErr, actualErr)
+	}
+}
+
 type fakeObj struct{}
 type fakeObjKind struct{}
 
