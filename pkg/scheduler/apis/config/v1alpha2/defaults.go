@@ -28,7 +28,6 @@ import (
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/master/ports"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -51,7 +50,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 	// 2. If there is a value set, attempt to split it. If it's just a port (ie, ":1234"), default to 0.0.0.0 with that port
 	// 3. If splitting the value fails, check if the value is even a valid IP. If so, use that with the default port.
 	// Otherwise use the default bind address
-	defaultBindAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.InsecureSchedulerPort))
+	defaultBindAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(config.DefaultInsecureSchedulerPort))
 	if obj.HealthzBindAddress == nil {
 		obj.HealthzBindAddress = &defaultBindAddress
 	} else {
@@ -65,7 +64,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 			// Something went wrong splitting the host/port, could just be a missing port so check if the
 			// existing value is a valid IP address. If so, use that with the default scheduler port
 			if host := net.ParseIP(*obj.HealthzBindAddress); host != nil {
-				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(ports.InsecureSchedulerPort))
+				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.HealthzBindAddress = &hostPort
 			} else {
 				// TODO: in v1beta1 we should let this error instead of stomping with a default value
@@ -87,7 +86,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 			// Something went wrong splitting the host/port, could just be a missing port so check if the
 			// existing value is a valid IP address. If so, use that with the default scheduler port
 			if host := net.ParseIP(*obj.MetricsBindAddress); host != nil {
-				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(ports.InsecureSchedulerPort))
+				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(config.DefaultInsecureSchedulerPort))
 				obj.MetricsBindAddress = &hostPort
 			} else {
 				// TODO: in v1beta1 we should let this error instead of stomping with a default value
