@@ -36,6 +36,7 @@ go_library(
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/master/ports:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",

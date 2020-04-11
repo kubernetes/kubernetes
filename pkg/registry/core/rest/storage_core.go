@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -338,9 +339,10 @@ type componentStatusStorage struct {
 }
 
 func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
+	// this is fragile, which assumes that the default port is being used
 	serversToValidate := map[string]*componentstatus.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.InsecureKubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: ports.InsecureSchedulerPort, Path: "/healthz"},
+		"scheduler":          {Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultInsecureSchedulerPort, Path: "/healthz"},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {

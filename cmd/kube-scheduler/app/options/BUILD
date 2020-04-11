@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/client/leaderelectionconfig:go_default_library",
-        "//pkg/master/ports:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",

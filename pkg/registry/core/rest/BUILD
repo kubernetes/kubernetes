@@ -48,6 +48,7 @@ go_library(
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/registry/core/service/storage:go_default_library",
         "//pkg/registry/core/serviceaccount/storage:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",

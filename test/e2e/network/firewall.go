@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/master/ports"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -218,7 +219,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		masterAddresses := framework.GetAllMasterAddresses(cs)
 		for _, masterAddress := range masterAddresses {
 			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, firewallTestTCPTimeout)
+			assertNotReachableHTTPTimeout(masterAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
 		}
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)
