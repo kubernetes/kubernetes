@@ -263,6 +263,8 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	// if change.previous equal to change.current, it means no change
 	if reflect.DeepEqual(change.previous, change.current) {
 		delete(sct.items, namespacedName)
+	} else {
+		klog.V(2).Infof("Service %s updated: %d ports", namespacedName, len(change.current))
 	}
 	metrics.ServiceChangesPending.Set(float64(len(sct.items)))
 	return len(sct.items) > 0

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilnet "k8s.io/utils/net"
 
 	"k8s.io/klog"
@@ -287,4 +288,15 @@ func ShuffleStrings(s []string) []string {
 		shuffled[j] = s[i]
 	}
 	return shuffled
+}
+
+// EnsureSysctl sets a kernel sysctl to a given numeric value.
+func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
+	if oldVal, _ := sysctl.GetSysctl(name); oldVal != newVal {
+		if err := sysctl.SetSysctl(name, newVal); err != nil {
+			return fmt.Errorf("can't set sysctl %s to %d: %v", name, newVal, err)
+		}
+		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
+	}
+	return nil
 }

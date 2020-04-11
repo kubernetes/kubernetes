@@ -199,7 +199,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 		klog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
 	}()
 
-	hostportPodMap, err := gatherAllHostports(activePodPortMappings, h.iptables.IsIpv6())
+	hostportPodMap, err := gatherAllHostports(activePodPortMappings, h.iptables.IsIPv6())
 	if err != nil {
 		return err
 	}

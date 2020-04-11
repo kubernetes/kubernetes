@@ -269,10 +269,8 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
-		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
-		}
+	if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
+		return nil, err
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -285,12 +283,13 @@ func NewProxier(ipt utiliptables.Interface,
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
+	klog.V(2).Infof("iptables(%s) masquerade mark: %s", ipt.Protocol(), masqueradeMark)
 
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
-	isIPv6 := ipt.IsIpv6()
+	isIPv6 := ipt.IsIPv6()
 	proxier := &Proxier{
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:               make(proxy.ServiceMap),
@@ -319,15 +318,25 @@ func NewProxier(ipt utiliptables.Interface,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        utilproxy.RealNetwork{},
 	}
+
 	burstSyncs := 2
-	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
+	klog.V(2).Infof("iptables(%s) sync params: minSyncPeriod=%v, syncPeriod=%v, burstSyncs=%d",
+		ipt.Protocol(), minSyncPeriod, syncPeriod, burstSyncs)
 	// We pass syncPeriod to ipt.Monitor, which will call us only if it needs to.
 	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner anyway though.
 	// time.Hour is arbitrary.
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, time.Hour, burstSyncs)
+
 	go ipt.Monitor(utiliptables.Chain("KUBE-PROXY-CANARY"),
 		[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
 		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
+
+	if ipt.HasRandomFully() {
+		klog.V(2).Infof("iptables(%s) supports --random-fully", ipt.Protocol())
+	} else {
+		klog.V(2).Infof("iptables(%s) does not support --random-fully", ipt.Protocol())
+	}
+
 	return proxier, nil
 }
 
@@ -787,7 +796,7 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
+		klog.V(2).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 
 	localAddrs, err := utilproxy.GetLocalAddrs()
@@ -818,7 +827,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	klog.V(3).Info("Syncing iptables rules")
+	klog.V(2).Info("Syncing iptables rules")
 
 	success := false
 	defer func() {
@@ -1459,7 +1468,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil {
 		klog.Errorf("Failed to get node ip address matching nodeport cidr")
 	} else {
-		isIPv6 := proxier.iptables.IsIpv6()
+		isIPv6 := proxier.iptables.IsIPv6()
 		for address := range addresses {
 			// TODO(thockin, m1093782566): If/when we have dual-stack support we will want to distinguish v4 from v6 zero-CIDRs.
 			if utilproxy.IsZeroCIDR(address) {

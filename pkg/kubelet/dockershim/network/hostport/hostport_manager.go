@@ -88,10 +88,10 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		return fmt.Errorf("invalid or missing IP of pod %s", podFullName)
 	}
 	podIP := podPortMapping.IP.String()
-	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
+	isIPv6 := utilnet.IsIPv6(podPortMapping.IP)
 
-	if isIpv6 != hm.iptables.IsIpv6() {
-		return fmt.Errorf("HostPortManager IP family mismatch: %v, isIPv6 - %v", podIP, isIpv6)
+	if isIPv6 != hm.iptables.IsIPv6() {
+		return fmt.Errorf("HostPortManager IP family mismatch: %v, isIPv6 - %v", podIP, isIPv6)
 	}
 
 	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
@@ -180,9 +180,9 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 	// create a new conntrack entry without any DNAT. That will result in blackhole of the traffic even after correct
 	// iptables rules have been added back.
 	if hm.execer != nil && hm.conntrackFound {
-		klog.Infof("Starting to delete udp conntrack entries: %v, isIPv6 - %v", conntrackPortsToRemove, isIpv6)
+		klog.Infof("Starting to delete udp conntrack entries: %v, isIPv6 - %v", conntrackPortsToRemove, isIPv6)
 		for _, port := range conntrackPortsToRemove {
-			err = conntrack.ClearEntriesForPort(hm.execer, port, isIpv6, v1.ProtocolUDP)
+			err = conntrack.ClearEntriesForPort(hm.execer, port, isIPv6, v1.ProtocolUDP)
 			if err != nil {
 				klog.Errorf("Failed to clear udp conntrack for port %d, error: %v", port, err)
 			}

@@ -523,10 +523,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	httpClient := &http.Client{}
 	parsedNodeIP := net.ParseIP(nodeIP)
-	protocol := utilipt.ProtocolIpv4
+	protocol := utilipt.ProtocolIPv4
 	if utilnet.IsIPv6(parsedNodeIP) {
 		klog.V(0).Infof("IPv6 node IP (%s), assume IPv6 operation", nodeIP)
-		protocol = utilipt.ProtocolIpv6
+		protocol = utilipt.ProtocolIPv6
 	}
 
 	klet := &Kubelet{

@@ -137,7 +137,7 @@ func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName 
 	if natInterfaceName != "" && natInterfaceName != "lo" {
 		// Need to SNAT traffic from localhost
 		localhost := "127.0.0.0/8"
-		if iptables.IsIpv6() {
+		if iptables.IsIPv6() {
 			localhost = "::1/128"
 		}
 		args = []string{"-m", "comment", "--comment", "SNAT for localhost access to hostports", "-o", natInterfaceName, "-s", localhost, "-j", "MASQUERADE"}

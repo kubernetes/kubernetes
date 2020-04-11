@@ -347,10 +347,8 @@ func NewProxier(ipt utiliptables.Interface,
 	kernelHandler KernelHandler,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
-		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
-		}
+	if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
+		return nil, err
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -361,10 +359,8 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	// Set the conntrack sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlVSConnTrack); val != 1 {
-		if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
-		}
+	if err := utilproxy.EnsureSysctl(sysctl, sysctlVSConnTrack, 1); err != nil {
+		return nil, err
 	}
 
 	kernelVersionStr, err := kernelHandler.GetKernelVersion()
@@ -379,47 +375,35 @@ func NewProxier(ipt utiliptables.Interface,
 		klog.Errorf("can't set sysctl %s, kernel version must be at least %s", sysctlConnReuse, connReuseMinSupportedKernelVersion)
 	} else {
 		// Set the connection reuse mode
-		if val, _ := sysctl.GetSysctl(sysctlConnReuse); val != 0 {
-			if err := sysctl.SetSysctl(sysctlConnReuse, 0); err != nil {
-				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlConnReuse, err)
-			}
+		if err := utilproxy.EnsureSysctl(sysctl, sysctlConnReuse, 0); err != nil {
+			return nil, err
 		}
 	}
 
 	// Set the expire_nodest_conn sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlExpireNoDestConn); val != 1 {
-		if err := sysctl.SetSysctl(sysctlExpireNoDestConn, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireNoDestConn, err)
-		}
+	if err := utilproxy.EnsureSysctl(sysctl, sysctlExpireNoDestConn, 1); err != nil {
+		return nil, err
 	}
 
 	// Set the expire_quiescent_template sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlExpireQuiescentTemplate); val != 1 {
-		if err := sysctl.SetSysctl(sysctlExpireQuiescentTemplate, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlExpireQuiescentTemplate, err)
-		}
+	if err := utilproxy.EnsureSysctl(sysctl, sysctlExpireQuiescentTemplate, 1); err != nil {
+		return nil, err
 	}
 
 	// Set the ip_forward sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlForward); val != 1 {
-		if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
-		}
+	if err := utilproxy.EnsureSysctl(sysctl, sysctlForward, 1); err != nil {
+		return nil, err
 	}
 
 	if strictARP {
 		// Set the arp_ignore sysctl we need for
-		if val, _ := sysctl.GetSysctl(sysctlArpIgnore); val != 1 {
-			if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
-				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
-			}
+		if err := utilproxy.EnsureSysctl(sysctl, sysctlArpIgnore, 1); err != nil {
+			return nil, err
 		}
 
 		// Set the arp_announce sysctl we need for
-		if val, _ := sysctl.GetSysctl(sysctlArpAnnounce); val != 2 {
-			if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
-				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
-			}
+		if err := utilproxy.EnsureSysctl(sysctl, sysctlArpAnnounce, 2); err != nil {
+			return nil, err
 		}
 	}
 
@@ -490,7 +474,8 @@ func NewProxier(ipt utiliptables.Interface,
 		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, isIPv6, is.comment)
 	}
 	burstSyncs := 2
-	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
+	klog.V(2).Infof("ipvs(%s) sync params: minSyncPeriod=%v, syncPeriod=%v, burstSyncs=%d",
+		ipt.Protocol(), minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
@@ -2103,10 +2088,10 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 
 func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
 	legacyAddrs := make(map[string]bool)
-	isIpv6 := utilnet.IsIPv6(proxier.nodeIP)
+	isIPv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for _, addr := range currentBindAddrs {
-		addrIsIpv6 := utilnet.IsIPv6(net.ParseIP(addr))
-		if addrIsIpv6 && !isIpv6 || !addrIsIpv6 && isIpv6 {
+		addrIsIPv6 := utilnet.IsIPv6(net.ParseIP(addr))
+		if addrIsIPv6 && !isIPv6 || !addrIsIPv6 && isIPv6 {
 			continue
 		}
 		if _, ok := activeBindAddrs[addr]; !ok {

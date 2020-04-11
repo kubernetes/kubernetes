@@ -40,7 +40,7 @@ type fakeTable struct {
 type fakeIPTables struct {
 	tables        map[string]*fakeTable
 	builtinChains map[string]sets.String
-	ipv6          bool
+	protocol      utiliptables.Protocol
 }
 
 func NewFakeIPTables() *fakeIPTables {
@@ -51,7 +51,7 @@ func NewFakeIPTables() *fakeIPTables {
 			string(utiliptables.TableNAT):    sets.NewString("PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"),
 			string(utiliptables.TableMangle): sets.NewString("PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"),
 		},
-		ipv6: false,
+		protocol: utiliptables.ProtocolIPv4,
 	}
 }
 
@@ -223,8 +223,12 @@ func (f *fakeIPTables) DeleteRule(tableName utiliptables.Table, chainName utilip
 	return nil
 }
 
-func (f *fakeIPTables) IsIpv6() bool {
-	return f.ipv6
+func (f *fakeIPTables) IsIPv6() bool {
+	return f.protocol == utiliptables.ProtocolIPv6
+}
+
+func (f *fakeIPTables) Protocol() utiliptables.Protocol {
+	return f.protocol
 }
 
 func saveChain(chain *fakeChain, data *bytes.Buffer) {
