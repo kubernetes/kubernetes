@@ -90,6 +90,18 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		fakeReq = fakeReq.WithContext(authenticator.WithAudiences(fakeReq.Context(), auds))
 	}
 
+	// propagate cancellation of parent context
+	cancelCtx, cancel := context.WithCancel(fakeReq.Context())
+	defer cancel()
+	fakeReq = fakeReq.WithContext(cancelCtx)
+	go func() {
+		select {
+		case <-ctx.Done():
+			cancel()
+		case <-cancelCtx.Done():
+		}
+	}()
+
 	resp, ok, err := r.tokenAuthenticator.AuthenticateRequest(fakeReq)
 	tokenReview.Status.Authenticated = ok
 	if err != nil {
@@ -109,7 +121,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 			Extra:    map[string]authentication.ExtraValue{},
 		}
 		for k, v := range resp.User.GetExtra() {
-			tokenReview.Status.User.Extra[k] = authentication.ExtraValue(v)
+			tokenReview.Status.User.Extra[k] = v
 		}
 		tokenReview.Status.Audiences = resp.Audiences
 	}
