@@ -151,6 +151,7 @@ const (
 	FlagCertFile         = "client-certificate"
 	FlagKeyFile          = "client-key"
 	FlagCAFile           = "certificate-authority"
+	FlagCAData           = "certificate-authority-data"
 	FlagEmbedCerts       = "embed-certs"
 	FlagBearerToken      = "token"
 	FlagImpersonate      = "as"
