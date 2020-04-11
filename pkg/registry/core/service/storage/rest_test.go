@@ -1336,6 +1336,16 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
 				}},
 			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo-second-ip",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "2001:db7::", TargetRef: &api.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault}}},
+					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
+				}},
+			},
 		},
 	}
 	pods := &api.PodList{
@@ -1402,6 +1412,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
+	// Test a simple id (using second ip).
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:80", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
 	// Test a name + port.
 	location, _, err = redirector.ResourceLocation(ctx, "foo:p")
 	if err != nil {
@@ -1411,6 +1433,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Unexpected nil: %v", location)
 	}
 	if e, a := "//1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a name + port (using second ip).
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:p")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:93", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
@@ -1426,6 +1460,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
+	// Test a name + port number (service port 93 -> target port 80, using second ip)
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:93")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:80", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
 	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93)
 	location, _, err = redirector.ResourceLocation(ctx, "foo:9393")
 	if err != nil {
@@ -1435,6 +1481,18 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Unexpected nil: %v", location)
 	}
 	if e, a := "//1.2.3.4:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test a name + port number (service port 9393 -> target port "p" -> endpoint port 93, using second ip)
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:9393")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//[2001:db7::]:93", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
@@ -1450,8 +1508,26 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 
+	// Test a scheme + name + port (using second ip).
+	location, _, err = redirector.ResourceLocation(ctx, "https:foo-second-ip:p")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "https://[2001:db7::]:93", location.String(); e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
 	// Test a non-existent name + port.
 	location, _, err = redirector.ResourceLocation(ctx, "foo:q")
+	if err == nil {
+		t.Errorf("Unexpected nil error")
+	}
+
+	// Test a non-existent name + port (using second ip).
+	location, _, err = redirector.ResourceLocation(ctx, "foo-second-ip:q")
 	if err == nil {
 		t.Errorf("Unexpected nil error")
 	}
