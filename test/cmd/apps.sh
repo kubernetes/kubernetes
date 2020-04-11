@@ -584,6 +584,10 @@ run_rs_tests() {
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
   kube::test::get_object_assert 'rs frontend' "{{${rs_replicas_field:?}}}" '3'
+  # Dry-run Command
+  kubectl scale --dry-run=client --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]:?}"
+  kubectl scale --dry-run=server --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'rs frontend' "{{${rs_replicas_field:?}}}" '3'
   # Command
   kubectl scale --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]:?}"
   # Post-condition: 2 replicas
@@ -593,6 +597,12 @@ run_rs_tests() {
   kubectl create -f hack/testdata/scale-deploy-1.yaml "${kube_flags[@]:?}"
   kubectl create -f hack/testdata/scale-deploy-2.yaml "${kube_flags[@]:?}"
   kubectl create -f hack/testdata/scale-deploy-3.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'
+  # Test kubectl scale --all with dry run
+  kubectl scale deploy --replicas=3 --all --dry-run=client
+  kubectl scale deploy --replicas=3 --all --dry-run=server
   kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '1'
   kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '1'
   kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'

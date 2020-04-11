@@ -37,10 +37,10 @@ type Scaler interface {
 	// retries in the event of resource version mismatch (if retry is not nil),
 	// and optionally waits until the status of the resource matches newSize (if wait is not nil)
 	// TODO: Make the implementation of this watch-based (#56075) once #31345 is fixed.
-	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams, gvr schema.GroupVersionResource) error
+	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams, gvr schema.GroupVersionResource, dryRun bool) error
 	// ScaleSimple does a simple one-shot attempt at scaling - not useful on its own, but
 	// a necessary building block for Scale
-	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, gvr schema.GroupVersionResource) (updatedResourceVersion string, err error)
+	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, gvr schema.GroupVersionResource, dryRun bool) (updatedResourceVersion string, err error)
 }
 
 // NewScaler get a scaler for a given resource
@@ -79,9 +79,9 @@ func NewRetryParams(interval, timeout time.Duration) *RetryParams {
 }
 
 // ScaleCondition is a closure around Scale that facilitates retries via util.wait
-func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name string, count uint, updatedResourceVersion *string, gvr schema.GroupVersionResource) wait.ConditionFunc {
+func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name string, count uint, updatedResourceVersion *string, gvr schema.GroupVersionResource, dryRun bool) wait.ConditionFunc {
 	return func() (bool, error) {
-		rv, err := r.ScaleSimple(namespace, name, precondition, count, gvr)
+		rv, err := r.ScaleSimple(namespace, name, precondition, count, gvr, dryRun)
 		if updatedResourceVersion != nil {
 			*updatedResourceVersion = rv
 		}
@@ -115,7 +115,7 @@ type genericScaler struct {
 var _ Scaler = &genericScaler{}
 
 // ScaleSimple updates a scale of a given resource. It returns the resourceVersion of the scale if the update was successful.
-func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, gvr schema.GroupVersionResource) (updatedResourceVersion string, err error) {
+func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, gvr schema.GroupVersionResource, dryRun bool) (updatedResourceVersion string, err error) {
 	if preconditions != nil {
 		scale, err := s.scaleNamespacer.Scales(namespace).Get(context.TODO(), gvr.GroupResource(), name, metav1.GetOptions{})
 		if err != nil {
@@ -125,7 +125,11 @@ func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 			return "", err
 		}
 		scale.Spec.Replicas = int32(newSize)
-		updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(context.TODO(), gvr.GroupResource(), scale, metav1.UpdateOptions{})
+		updateOptions := metav1.UpdateOptions{}
+		if dryRun {
+			updateOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(context.TODO(), gvr.GroupResource(), scale, updateOptions)
 		if err != nil {
 			return "", err
 		}
@@ -133,7 +137,11 @@ func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 	}
 
 	patch := []byte(fmt.Sprintf(`{"spec":{"replicas":%d}}`, newSize))
-	updatedScale, err := s.scaleNamespacer.Scales(namespace).Patch(context.TODO(), gvr, name, types.MergePatchType, patch, metav1.PatchOptions{})
+	patchOptions := metav1.PatchOptions{}
+	if dryRun {
+		patchOptions.DryRun = []string{metav1.DryRunAll}
+	}
+	updatedScale, err := s.scaleNamespacer.Scales(namespace).Patch(context.TODO(), gvr, name, types.MergePatchType, patch, patchOptions)
 	if err != nil {
 		return "", err
 	}
@@ -142,12 +150,12 @@ func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 
 // Scale updates a scale of a given resource to a new size, with optional precondition check (if preconditions is not nil),
 // optional retries (if retry is not nil), and then optionally waits for the status to reach desired count.
-func (s *genericScaler) Scale(namespace, resourceName string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams, gvr schema.GroupVersionResource) error {
+func (s *genericScaler) Scale(namespace, resourceName string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams, gvr schema.GroupVersionResource, dryRun bool) error {
 	if retry == nil {
 		// make it try only once, immediately
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
-	cond := ScaleCondition(s, preconditions, namespace, resourceName, newSize, nil, gvr)
+	cond := ScaleCondition(s, preconditions, namespace, resourceName, newSize, nil, gvr, dryRun)
 	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
