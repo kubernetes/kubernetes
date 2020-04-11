@@ -12,7 +12,7 @@ func CreateMergePatch(originalJSON, modifiedJSON []byte) ([]byte, error) {
 	return jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
 }
 
-// MergePatch delegates to jsonpatch.CreateMergePatch
+// MergePatch delegates to jsonpatch.MergePatch
 func MergePatch(docData, patchData []byte) ([]byte, error) {
 	return jsonpatch.MergePatch(docData, patchData)
 }
