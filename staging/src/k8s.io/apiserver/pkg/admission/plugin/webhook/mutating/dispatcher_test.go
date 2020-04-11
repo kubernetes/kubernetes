@@ -21,8 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/util/jsonpatch"
 )
 
 func TestMutationAnnotationValue(t *testing.T) {

@@ -28,7 +28,6 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
@@ -38,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/jsonpatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"

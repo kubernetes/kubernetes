@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/jsonpatch"
 	"sigs.k8s.io/yaml"
 )
 

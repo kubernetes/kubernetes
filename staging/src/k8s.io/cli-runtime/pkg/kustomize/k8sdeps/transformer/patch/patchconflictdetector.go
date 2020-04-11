@@ -19,8 +19,8 @@ package patch
 import (
 	"encoding/json"
 
-	"github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/jsonpatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/kustomize/pkg/resource"
