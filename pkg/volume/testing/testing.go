@@ -415,7 +415,9 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volume.VolumesAttached = make(map[string]types.NodeName)
 	volume.DeviceMountState = make(map[string]string)
 	volume.VolumeMountState = make(map[string]string)
-	*list = append(*list, volume)
+	if list != nil {
+		*list = append(*list, volume)
+	}
 	return volume
 }
 
