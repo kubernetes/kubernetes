@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -754,7 +754,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
-				FeatureGates:      map[string]bool{string(features.IPv6DualStack): true},
+				FeatureGates:      map[string]bool{features.IPv6DualStack: true},
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -788,7 +788,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
-				FeatureGates:      map[string]bool{string(features.IPv6DualStack): true},
+				FeatureGates:      map[string]bool{features.IPv6DualStack: true},
 			},
 			expected: []string{
 				"kube-controller-manager",
