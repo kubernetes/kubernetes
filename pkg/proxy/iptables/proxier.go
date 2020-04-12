@@ -290,6 +290,11 @@ func NewProxier(ipt utiliptables.Interface,
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
 
 	isIPv6 := ipt.IsIPv6()
+	var incorrectAddresses []string
+	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, isIPv6)
+	if len(incorrectAddresses) > 0 {
+		klog.Warning("NodePortAddresses of wrong family; ", incorrectAddresses)
+	}
 	proxier := &Proxier{
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:               make(proxy.ServiceMap),
@@ -357,16 +362,17 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
+	nodePortAddresses4, nodePortAddresses6 := utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, false)
 	ipv4Proxier, err := NewProxier(ipt[0], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
-		nodeIP[0], recorder, healthzServer, nodePortAddresses)
+		nodeIP[0], recorder, healthzServer, nodePortAddresses4)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(ipt[1], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
-		nodeIP[1], recorder, healthzServer, nodePortAddresses)
+		nodeIP[1], recorder, healthzServer, nodePortAddresses6)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
