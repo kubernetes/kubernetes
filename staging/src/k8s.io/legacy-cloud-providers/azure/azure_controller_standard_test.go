@@ -19,6 +19,7 @@ limitations under the License.
 package azure
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -28,7 +29,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 var (
@@ -59,7 +63,13 @@ func TestStandardAttachDisk(t *testing.T) {
 	for i, test := range testCases {
 		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
-		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
+		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		err := vmSet.AttachDisk(true, "",
 			"uri", test.nodeName, 0, compute.CachingTypesReadOnly, "", false)
@@ -99,7 +109,13 @@ func TestStandardDetachDisk(t *testing.T) {
 	for i, test := range testCases {
 		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
-		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
+		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		err := vmSet.DetachDisk(test.diskName, "", test.nodeName)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
@@ -152,7 +168,13 @@ func TestGetDataDisks(t *testing.T) {
 	for i, test := range testCases {
 		testCloud := GetTestCloud(ctrl)
 		vmSet := testCloud.vmSet
-		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
+		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Not("vm1"), gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		dataDisks, err := vmSet.GetDataDisks(test.nodeName, test.crt)
 		assert.Equal(t, test.expectedDataDisks, dataDisks, "TestCase[%d]: %s", i, test.desc)

@@ -20,14 +20,20 @@ package azure
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/legacy-cloud-providers/azure/clients/diskclient/mockdiskclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 	"k8s.io/utils/pointer"
 )
 
@@ -40,12 +46,14 @@ func TestCommonAttachDisk(t *testing.T) {
 		vmList          map[string]string
 		nodeName        types.NodeName
 		isDataDisksFull bool
+		existedDisk     compute.Disk
 		expectedLun     int32
 		expectedErr     bool
 	}{
 		{
 			desc:        "LUN -1 and error shall be returned if there's no such instance corresponding to given nodeName",
 			nodeName:    "vm1",
+			existedDisk: compute.Disk{Name: to.StringPtr("disk-name")},
 			expectedLun: -1,
 			expectedErr: true,
 		},
@@ -54,6 +62,7 @@ func TestCommonAttachDisk(t *testing.T) {
 			vmList:          map[string]string{"vm1": "PowerState/Running"},
 			nodeName:        "vm1",
 			isDataDisksFull: true,
+			existedDisk:     compute.Disk{Name: to.StringPtr("disk-name")},
 			expectedLun:     -1,
 			expectedErr:     true,
 		},
@@ -61,6 +70,15 @@ func TestCommonAttachDisk(t *testing.T) {
 			desc:        "correct LUN and no error shall be returned if everything is good",
 			vmList:      map[string]string{"vm1": "PowerState/Running"},
 			nodeName:    "vm1",
+			existedDisk: compute.Disk{Name: to.StringPtr("disk-name")},
+			expectedLun: 1,
+			expectedErr: false,
+		},
+		{
+			desc:        "an error shall be returned if there's no matching disk",
+			vmList:      map[string]string{"vm1": "PowerState/Running"},
+			nodeName:    "vm1",
+			existedDisk: compute.Disk{Name: to.StringPtr("disk-name-1")},
 			expectedLun: -1,
 			expectedErr: true,
 		},
@@ -76,9 +94,21 @@ func TestCommonAttachDisk(t *testing.T) {
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
 		}
-		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
-			testCloud.SubscriptionID, testCloud.ResourceGroup)
-		setTestVirtualMachines(testCloud, test.vmList, test.isDataDisksFull)
+		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
+			testCloud.SubscriptionID, testCloud.ResourceGroup, *test.existedDisk.Name)
+		expectedVMs := setTestVirtualMachines(testCloud, test.vmList, test.isDataDisksFull)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
+		if len(expectedVMs) == 0 {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		}
+		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+		mockDisksClient := testCloud.DisksClient.(*mockdiskclient.MockInterface)
+		mockDisksClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "disk-name").Return(test.existedDisk, nil).AnyTimes()
+		mockDisksClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Not("disk-name")).Return(compute.Disk{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 
 		lun, err := common.AttachDisk(true, "", diskURI, test.nodeName, compute.CachingTypesReadOnly)
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
@@ -130,7 +160,15 @@ func TestCommonDetachDisk(t *testing.T) {
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
-		setTestVirtualMachines(testCloud, test.vmList, false)
+		expectedVMs := setTestVirtualMachines(testCloud, test.vmList, false)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
+		if len(expectedVMs) == 0 {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		}
+		mockVMsClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		err := common.DetachDisk(test.diskName, diskURI, test.nodeName)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, err: %v", i, test.desc, err)
@@ -172,7 +210,11 @@ func TestGetDiskLun(t *testing.T) {
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
 		}
-		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
 
 		lun, err := common.GetDiskLun(test.diskName, test.diskURI, "vm1")
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
@@ -214,7 +256,11 @@ func TestGetNextDiskLun(t *testing.T) {
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
 		}
-		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
+		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
 
 		lun, err := common.GetNextDiskLun("vm1")
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
@@ -259,7 +305,12 @@ func TestDisksAreAttached(t *testing.T) {
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
 		}
-		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
+		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		for _, vm := range expectedVMs {
+			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
+		}
+		mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, "vm2", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 
 		attached, err := common.DisksAreAttached(test.diskNames, test.nodeName)
 		assert.Equal(t, test.expectedAttached, attached, "TestCase[%d]: %s", i, test.desc)
@@ -267,7 +318,7 @@ func TestDisksAreAttached(t *testing.T) {
 	}
 }
 
-func TestFilteredDetatchingDisks(t *testing.T) {
+func TestFilteredDetachingDisks(t *testing.T) {
 
 	disks := []compute.DataDisk{
 		{
@@ -448,10 +499,10 @@ func TestCheckDiskExists(t *testing.T) {
 	newDiskName := "newdisk"
 	newDiskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
 		testCloud.SubscriptionID, testCloud.ResourceGroup, newDiskName)
-	fDC := newFakeDisksClient()
-	rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
-	assert.Equal(t, rerr == nil, true, "return error: %v", rerr)
-	testCloud.DisksClient = fDC
+
+	mockDisksClient := testCloud.DisksClient.(*mockdiskclient.MockInterface)
+	mockDisksClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, newDiskName).Return(compute.Disk{}, nil).AnyTimes()
+	mockDisksClient.EXPECT().Get(gomock.Any(), gomock.Not(testCloud.ResourceGroup), gomock.Any()).Return(compute.Disk{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 
 	testCases := []struct {
 		diskURI        string
@@ -503,10 +554,10 @@ func TestFilterNonExistingDisks(t *testing.T) {
 		testCloud.SubscriptionID, testCloud.ResourceGroup)
 	newDiskName := "newdisk"
 	newDiskURI := diskURIPrefix + newDiskName
-	fDC := newFakeDisksClient()
-	rerr := fDC.CreateOrUpdate(ctx, testCloud.ResourceGroup, newDiskName, compute.Disk{})
-	assert.Equal(t, rerr == nil, true, "return error: %v", rerr)
-	testCloud.DisksClient = fDC
+
+	mockDisksClient := testCloud.DisksClient.(*mockdiskclient.MockInterface)
+	mockDisksClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, newDiskName).Return(compute.Disk{}, nil).AnyTimes()
+	mockDisksClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, gomock.Not(newDiskName)).Return(compute.Disk{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 
 	disks := []compute.DataDisk{
 		{
