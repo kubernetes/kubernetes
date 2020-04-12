@@ -1579,6 +1579,20 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 
 }
 
+func TestFailedParseParamsSummaryHandler(t *testing.T) {
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/summary", "invalid/content/type", nil)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+	v, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Contains(t, string(v), "parse form failed")
+
+}
+
 func TestTrimURLPath(t *testing.T) {
 	tests := []struct {
 		path, expected string
