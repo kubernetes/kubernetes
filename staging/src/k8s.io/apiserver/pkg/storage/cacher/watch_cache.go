@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -44,6 +45,20 @@ const (
 	// resourceVersionTooHighRetrySeconds is the seconds before a operation should be retried by the client
 	// after receiving a 'too high resource version' error.
 	resourceVersionTooHighRetrySeconds = 1
+
+	// eventFreshDuration is time duration of events we want to keep.
+	eventFreshDuration = 5 * time.Minute
+
+	// defaultLowerBoundCapacity is a default value for event cache capacity's lower bound.
+	// 100 is minimum in NewHeuristicWatchCacheSizes.
+	// TODO: Figure out, to what value we can decreased it.
+	defaultLowerBoundCapacity = 100
+
+	// defaultUpperBoundCapacity  should be able to keep eventFreshDuration of history.
+	// With the current 102400 value though, it's not enough for leases in 5k-node cluster,
+	// but that is conscious decision.
+	// TODO: Validate if the current value is high enough for large scale clusters.
+	defaultUpperBoundCapacity = 100 * 1024
 )
 
 // watchCacheEvent is a single "watch event" that is send to users of
@@ -60,6 +75,7 @@ type watchCacheEvent struct {
 	PrevObjFields   fields.Set
 	Key             string
 	ResourceVersion uint64
+	RecordTime      time.Time
 }
 
 // Computing a key of an object is generally non-trivial (it performs
@@ -126,6 +142,12 @@ type watchCache struct {
 	// Maximum size of history window.
 	capacity int
 
+	// upper bound of capacity since event cache has a dynamic size.
+	upperBoundCapacity int
+
+	// lower bound of capacity since event cache has a dynamic size.
+	lowerBoundCapacity int
+
 	// keyFunc is used to get a key in the underlying storage for a given object.
 	keyFunc func(runtime.Object) (string, error)
 
@@ -165,6 +187,9 @@ type watchCache struct {
 
 	// An underlying storage.Versioner.
 	versioner storage.Versioner
+
+	// cacher's objectType.
+	objectType reflect.Type
 }
 
 func newWatchCache(
@@ -173,12 +198,16 @@ func newWatchCache(
 	eventHandler func(*watchCacheEvent),
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
 	versioner storage.Versioner,
-	indexers *cache.Indexers) *watchCache {
+	indexers *cache.Indexers,
+	objectType reflect.Type) *watchCache {
 	wc := &watchCache{
-		capacity:            capacity,
-		keyFunc:             keyFunc,
-		getAttrsFunc:        getAttrsFunc,
-		cache:               make([]*watchCacheEvent, capacity),
+		capacity:     capacity,
+		keyFunc:      keyFunc,
+		getAttrsFunc: getAttrsFunc,
+		cache:        make([]*watchCacheEvent, capacity),
+		// TODO get rid of them once we stop passing capacity as a parameter to watch cache.
+		lowerBoundCapacity:  min(capacity, defaultLowerBoundCapacity),
+		upperBoundCapacity:  max(capacity, defaultUpperBoundCapacity),
 		startIndex:          0,
 		endIndex:            0,
 		store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
@@ -187,6 +216,7 @@ func newWatchCache(
 		eventHandler:        eventHandler,
 		clock:               clock.RealClock{},
 		versioner:           versioner,
+		objectType:          objectType,
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc
@@ -260,6 +290,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		ObjFields:       elem.Fields,
 		Key:             key,
 		ResourceVersion: resourceVersion,
+		RecordTime:      w.clock.Now(),
 	}
 
 	if err := func() error {
@@ -301,12 +332,55 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 
 // Assumes that lock is already held for write.
 func (w *watchCache) updateCache(event *watchCacheEvent) {
-	if w.endIndex == w.startIndex+w.capacity {
+	w.resizeCacheLocked(event.RecordTime)
+	if w.isCacheFullLocked() {
 		// Cache is full - remove the oldest element.
 		w.startIndex++
 	}
 	w.cache[w.endIndex%w.capacity] = event
 	w.endIndex++
+}
+
+// resizeCacheLocked resizes the cache if necessary:
+// - increases capacity by 2x if cache is full and all cached events occurred within last eventFreshDuration.
+// - decreases capacity by 2x when recent quarter of events occurred outside of eventFreshDuration(protect watchCache from flapping).
+func (w *watchCache) resizeCacheLocked(eventTime time.Time) {
+	if w.isCacheFullLocked() && eventTime.Sub(w.cache[w.startIndex%w.capacity].RecordTime) < eventFreshDuration {
+		capacity := min(w.capacity*2, w.upperBoundCapacity)
+		if capacity > w.capacity {
+			w.doCacheResizeLocked(capacity)
+		}
+		return
+	}
+	if w.isCacheFullLocked() && eventTime.Sub(w.cache[(w.endIndex-w.capacity/4)%w.capacity].RecordTime) > eventFreshDuration {
+		capacity := max(w.capacity/2, w.lowerBoundCapacity)
+		if capacity < w.capacity {
+			w.doCacheResizeLocked(capacity)
+		}
+		return
+	}
+}
+
+// isCacheFullLocked used to judge whether watchCacheEvent is full.
+// Assumes that lock is already held for write.
+func (w *watchCache) isCacheFullLocked() bool {
+	return w.endIndex == w.startIndex+w.capacity
+}
+
+// doCacheResizeLocked resize watchCache's event array with different capacity.
+// Assumes that lock is already held for write.
+func (w *watchCache) doCacheResizeLocked(capacity int) {
+	newCache := make([]*watchCacheEvent, capacity)
+	if capacity < w.capacity {
+		// adjust startIndex if cache capacity shrink.
+		w.startIndex = w.endIndex - capacity
+	}
+	for i := w.startIndex; i < w.endIndex; i++ {
+		newCache[i%capacity] = w.cache[i%w.capacity]
+	}
+	w.cache = newCache
+	recordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
+	w.capacity = capacity
 }
 
 // List returns list of pointers to <storeElement> objects.

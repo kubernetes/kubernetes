@@ -315,10 +315,11 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	clock := clock.RealClock{}
+	objType := reflect.TypeOf(obj)
 	cacher := &Cacher{
 		ready:          newReady(),
 		storage:        config.Storage,
-		objectType:     reflect.TypeOf(obj),
+		objectType:     objType,
 		versioner:      config.Versioner,
 		newFunc:        config.NewFunc,
 		indexedTrigger: indexedTrigger,
@@ -349,7 +350,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	watchCache := newWatchCache(
-		config.CacheCapacity, config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers)
+		config.CacheCapacity, config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, objType)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
