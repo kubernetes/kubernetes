@@ -28,7 +28,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -215,13 +215,17 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 // If "only_cpu_and_memory" GET param is true then only cpu and memory is returned in response.
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	onlyCPUAndMemory := false
-	request.Request.ParseForm()
+	var err error
+	err = request.Request.ParseForm()
+	if err != nil {
+		handleError(response, "/stats/summary", err)
+		return
+	}
 	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
 		len(onlyCluAndMemoryParam) == 1 && onlyCluAndMemoryParam[0] == "true" {
 		onlyCPUAndMemory = true
 	}
 	var summary *statsapi.Summary
-	var err error
 	if onlyCPUAndMemory {
 		summary, err = h.summaryProvider.GetCPUAndMemoryStats()
 	} else {
