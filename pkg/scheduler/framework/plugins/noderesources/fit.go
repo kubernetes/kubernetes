@@ -26,8 +26,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var _ framework.PreFilterPlugin = &Fit{}
@@ -113,7 +113,7 @@ func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(schedutil.PodOverhead) {
 		result.Add(pod.Spec.Overhead)
 	}
 

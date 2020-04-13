@@ -24,8 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // BalancedAllocation is a score plugin that calculates the difference between the cpu and memory fraction
@@ -89,7 +89,7 @@ func balancedResourceScorer(requested, allocable resourceToValueMap, includeVolu
 		return 0
 	}
 
-	if includeVolumes && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && allocatableVolumes > 0 {
+	if includeVolumes && utilfeature.DefaultFeatureGate.Enabled(schedutil.BalanceAttachedNodeVolumes) && allocatableVolumes > 0 {
 		volumeFraction := float64(requestedVolumes) / float64(allocatableVolumes)
 		if volumeFraction >= 1 {
 			// if requested >= capacity, the corresponding host should never be preferred.

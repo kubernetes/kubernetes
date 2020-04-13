@@ -32,11 +32,11 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 type testCase struct {
@@ -1307,8 +1307,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			featureGates: map[featuregate.Feature]bool{
-				features.EvenPodsSpread:                 false,
-				features.ResourceLimitsPriorityFunction: true,
+				schedutil.EvenPodsSpread:                 false,
+				schedutil.ResourceLimitsPriorityFunction: true,
 			},
 			wantPlugins: map[string][]config.Plugin{
 				"QueueSortPlugin": {{Name: "PrioritySort"}},

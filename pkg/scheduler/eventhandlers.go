@@ -20,9 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
-
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -30,8 +27,10 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 func (sched *Scheduler) onPvAdd(obj interface{}) {
@@ -411,7 +410,7 @@ func addAllEventHandlers(
 		},
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedutil.CSINodeInfo) {
 		informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    sched.onCSINodeAdd,

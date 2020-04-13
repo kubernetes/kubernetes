@@ -30,6 +30,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "clock.go",
+        "features.go",
         "non_zero.go",
         "topologies.go",
         "utils.go",
@@ -42,6 +43,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

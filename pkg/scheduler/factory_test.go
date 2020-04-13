@@ -40,7 +40,6 @@ import (
 	"k8s.io/client-go/tools/events"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	apicore "k8s.io/kubernetes/pkg/apis/core"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -53,6 +52,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -508,7 +508,7 @@ func newConfigFactoryWithFrameworkRegistry(
 		podInitialBackoffSeconds: podInitialBackoffDurationSeconds,
 		podMaxBackoffSeconds:     podMaxBackoffDurationSeconds,
 		StopEverything:           stopCh,
-		enableNonPreempting:      utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
+		enableNonPreempting:      utilfeature.DefaultFeatureGate.Enabled(schedutil.NonPreemptingPriority),
 		registry:                 registry,
 		profiles: []schedulerapi.KubeSchedulerProfile{
 			{SchedulerName: testSchedulerName},

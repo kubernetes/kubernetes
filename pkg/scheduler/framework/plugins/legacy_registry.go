@@ -24,7 +24,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -423,7 +423,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 	// The following two features are the last ones to be supported as predicate/priority.
 	// Once they graduate to GA, there will be no more checking for feature gates here.
 	// Only register EvenPodsSpread predicate & priority if the feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedutil.EvenPodsSpread) {
 		klog.Infof("Registering EvenPodsSpread predicate and priority function")
 
 		registry.registerPredicateConfigProducer(EvenPodsSpreadPred,
@@ -444,7 +444,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedutil.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
 
 		registry.registerPriorityConfigProducer(ResourceLimitsPriority,

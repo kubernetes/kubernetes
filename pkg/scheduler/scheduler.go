@@ -36,7 +36,6 @@ import (
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
@@ -46,6 +45,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -279,7 +279,7 @@ func New(client clientset.Interface,
 		bindTimeoutSeconds:       options.bindTimeoutSeconds,
 		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
 		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
-		enableNonPreempting:      utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
+		enableNonPreempting:      utilfeature.DefaultFeatureGate.Enabled(schedutil.NonPreemptingPriority),
 		profiles:                 append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
 		registry:                 registry,
 		nodeInfoSnapshot:         snapshot,

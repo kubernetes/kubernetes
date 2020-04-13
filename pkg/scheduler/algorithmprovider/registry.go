@@ -22,7 +22,6 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // ClusterAutoscalerProvider defines the default autoscaler provider
@@ -146,7 +146,7 @@ func getClusterAutoscalerConfig() *schedulerapi.Plugins {
 
 func applyFeatureGates(config *schedulerapi.Plugins) {
 	// Only add EvenPodsSpread if the feature is enabled.
-	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedutil.EvenPodsSpread) {
 		klog.Infof("Registering EvenPodsSpread predicate and priority function")
 		f := schedulerapi.Plugin{Name: podtopologyspread.Name}
 		config.PreFilter.Enabled = append(config.PreFilter.Enabled, f)
@@ -157,7 +157,7 @@ func applyFeatureGates(config *schedulerapi.Plugins) {
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedutil.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
 		s := schedulerapi.Plugin{Name: noderesources.ResourceLimitsName}
 		config.PreScore.Enabled = append(config.PreScore.Enabled, s)

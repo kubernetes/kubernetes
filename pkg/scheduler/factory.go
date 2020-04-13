@@ -42,7 +42,6 @@ import (
 	"k8s.io/klog"
 	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -56,6 +55,7 @@ import (
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -523,7 +523,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 
 // GetPodDisruptionBudgetLister returns pdb lister from the given informer factory. Returns nil if PodDisruptionBudget feature is disabled.
 func GetPodDisruptionBudgetLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
+	if utilfeature.DefaultFeatureGate.Enabled(schedutil.PodDisruptionBudget) {
 		return informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister()
 	}
 	return nil

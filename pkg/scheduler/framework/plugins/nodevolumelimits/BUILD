@@ -11,8 +11,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/util:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
@@ -37,9 +37,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/features:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/framework/v1alpha1/fake:go_default_library",
+        "//pkg/scheduler/util:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",

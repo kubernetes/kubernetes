@@ -33,9 +33,8 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -260,7 +259,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
 		return framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded)
 	}
-	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
+	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(schedutil.BalanceAttachedNodeVolumes) {
 		nodeInfo.TransientInfo.TransientLock.Lock()
 		defer nodeInfo.TransientInfo.TransientLock.Unlock()
 		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = maxAttachLimit - numExistingVolumes
@@ -517,7 +516,7 @@ func getMaxEBSVolume(nodeInstanceType string) int {
 
 // getCSINodeListerIfEnabled returns the CSINode lister or nil if the feature is disabled
 func getCSINodeListerIfEnabled(factory informers.SharedInformerFactory) storagelisters.CSINodeLister {
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
+	if !utilfeature.DefaultFeatureGate.Enabled(schedutil.CSINodeInfo) {
 		return nil
 	}
 	return factory.Storage().V1().CSINodes().Lister()

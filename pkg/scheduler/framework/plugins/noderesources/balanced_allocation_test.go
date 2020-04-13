@@ -26,9 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // getExistingVolumeCountForNode gets the current number of volumes on node.
@@ -45,7 +45,7 @@ func getExistingVolumeCountForNode(podInfos []*framework.PodInfo, maxVolumes int
 
 func TestNodeResourcesBalancedAllocation(t *testing.T) {
 	// Enable volumesOnNodeForBalancing to do balanced node resource allocation
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, schedutil.BalanceAttachedNodeVolumes, true)()
 	podwithVol1 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
