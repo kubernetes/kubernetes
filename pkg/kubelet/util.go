@@ -18,6 +18,8 @@ package kubelet
 
 import (
 	"os"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 // dirExists returns true if the path exists and represents a directory.
@@ -27,4 +29,19 @@ func dirExists(path string) bool {
 		return false
 	}
 	return s.IsDir()
+}
+
+func isHostPathDevice(volumeName string, volumes []v1.Volume) (string, bool) {
+	for _, volume := range volumes {
+		if volume.Name == volumeName {
+			if volume.HostPath != nil {
+				switch *volume.HostPath.Type {
+				case v1.HostPathBlockDev, v1.HostPathCharDev:
+					return volume.HostPath.Path, true
+				}
+			}
+			break
+		}
+	}
+	return "", false
 }

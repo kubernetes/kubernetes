@@ -177,6 +177,7 @@ go_test(
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
+        "util_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

@@ -127,6 +127,20 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 	return devices, nil
 }
 
+// liftHostPathDevices will lift all hostpath defined devices specified in the path of the container as device volumes
+func (kl *Kubelet) liftHostPathDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
+	var devices []kubecontainer.DeviceInfo
+	for _, hostPathDevice := range container.VolumeMounts {
+		if pathOnHost, isDevice := isHostPathDevice(hostPathDevice.Name, pod.Spec.Volumes); isDevice {
+			// Currently there is no readonly option for hostpath volumes
+			permission := "mrw"
+			klog.V(4).Infof("HostPath Device will be attached to container %q. Path on host: %v", container.Name, pathOnHost)
+			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: pathOnHost, PathInContainer: hostPathDevice.MountPath, Permissions: permission})
+		}
+	}
+	return devices, nil
+}
+
 // makeMounts determines the mount points for the given container.
 func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain string, podIPs []string, podVolumes kubecontainer.VolumeMap, hu hostutil.HostUtils, subpather subpath.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
 	// Kubernetes only mounts on /etc/hosts if:
@@ -140,6 +154,10 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 	mounts := []kubecontainer.Mount{}
 	var cleanupAction func()
 	for i, mount := range container.VolumeMounts {
+		if _, isDevice := isHostPathDevice(mount.Name, pod.Spec.Volumes); isDevice {
+			continue
+		}
+
 		// do not mount /etc/hosts if container is already mounting on the path
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
@@ -459,6 +477,12 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		return nil, nil, err
 	}
 	opts.Devices = append(opts.Devices, blkVolumes...)
+
+	hostPathDevices, err := kl.liftHostPathDevices(pod, container)
+	if err != nil {
+		return nil, nil, err
+	}
+	opts.Devices = append(opts.Devices, hostPathDevices...)
 
 	envs, err := kl.makeEnvironmentVariables(pod, container, podIP, podIPs)
 	if err != nil {
