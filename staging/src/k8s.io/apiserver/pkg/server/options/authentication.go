@@ -196,6 +196,9 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
 	allErrors := []error{}
 	allErrors = append(allErrors, s.RequestHeader.Validate()...)
 
