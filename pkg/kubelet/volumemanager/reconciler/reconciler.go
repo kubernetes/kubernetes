@@ -389,8 +389,10 @@ func (rc *reconciler) syncStates() {
 		klog.Errorf("Cannot get volumes from disk %v", err)
 		return
 	}
-	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)
-	volumeNeedReport := []v1.UniqueVolumeName{}
+
+	// reconstructedVolume maybe have same volumeName
+	var volumesNeedUpdate []*reconstructedVolume
+	var volumeNeedReport []v1.UniqueVolumeName
 	for _, volume := range podVolumes {
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
 			klog.V(4).Infof("Volume exists in actual state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
@@ -429,7 +431,7 @@ func (rc *reconciler) syncStates() {
 		klog.V(2).Infof(
 			"Reconciler sync states: could not find pod information in desired state, update it in actual state: %+v",
 			reconstructedVolume)
-		volumesNeedUpdate[reconstructedVolume.volumeName] = reconstructedVolume
+		volumesNeedUpdate = append(volumesNeedUpdate, reconstructedVolume)
 	}
 
 	if len(volumesNeedUpdate) > 0 {
@@ -597,15 +599,18 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 }
 
 // updateDevicePath gets the node status to retrieve volume device path information.
-func (rc *reconciler) updateDevicePath(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) {
+func (rc *reconciler) updateDevicePath(volumesNeedUpdate []*reconstructedVolume) {
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		klog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
 	} else {
+		volumesNeedUpdateMap := make(map[v1.UniqueVolumeName]*reconstructedVolume, len(volumesNeedUpdate))
+		for _, volume := range volumesNeedUpdate {
+			volumesNeedUpdateMap[volume.volumeName] = volume
+		}
 		for _, attachedVolume := range node.Status.VolumesAttached {
-			if volume, exists := volumesNeedUpdate[attachedVolume.Name]; exists {
+			if volume, exists := volumesNeedUpdateMap[attachedVolume.Name]; exists {
 				volume.devicePath = attachedVolume.DevicePath
-				volumesNeedUpdate[attachedVolume.Name] = volume
 				klog.V(4).Infof("Update devicePath from node status for volume (%q): %q", attachedVolume.Name, volume.devicePath)
 			}
 		}
@@ -627,7 +632,7 @@ func getDeviceMountPath(volume *reconstructedVolume) (string, error) {
 	}
 }
 
-func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
+func (rc *reconciler) updateStates(volumesNeedUpdate []*reconstructedVolume) error {
 	// Get the node status to retrieve volume device path information.
 	rc.updateDevicePath(volumesNeedUpdate)
 
