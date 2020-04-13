@@ -99,6 +99,24 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 		})
 
 		ginkgo.It("should support a 'default-deny-all' policy [Feature:NetworkPolicy]", func() {
+			nsA := f.Namespace
+			nsBName := f.BaseName + "-b"
+			nsB, err := f.CreateNamespace(nsBName, map[string]string{
+				"ns-name": nsBName,
+			})
+
+			ginkgo.By("Creating a simple server in another namespace that serves on port 80 and 81.")
+			_, serviceB := createServerPodAndService(f, nsB, "pod-b", []int{80, 81})
+
+			ginkgo.By("Waiting for pod ready", func() {
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, framework.PodStartTimeout)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("Creating client-a, which should be able to contact the server in another namespace.", func() {
+				testCanConnect(f, nsA, "client-a", serviceB, 80)
+			})
+
 			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "default-deny-all",
@@ -111,13 +129,17 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 				},
 			}
 
-			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
+			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			defer cleanupNetworkPolicy(f, policy)
 
-			// Create a pod with name 'client-cannot-connect', which will attempt to communicate with the server,
-			// but should not be able to now that isolation is on.
-			testCannotConnect(f, f.Namespace, "client-cannot-connect", service, 80)
+			ginkgo.By("Creating client-to-a, which should not be able to contact the server in the same namespace, Ingress check.", func() {
+				testCannotConnect(f, nsA, "client-to-a", service, 80)
+			})
+
+			ginkgo.By("Creating client-to-b, which should not be able to contact the server in another namespace, Egress check.", func() {
+				testCannotConnect(f, nsA, "client-to-b", serviceB, 80)
+			})
 		})
 
 		ginkgo.It("should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy]", func() {
