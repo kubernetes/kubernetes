@@ -104,12 +104,13 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
 				"ns-name": nsBName,
 			})
+			framework.ExpectNoError(err, "Error occurred while creating namespace-b.")
 
 			ginkgo.By("Creating a simple server in another namespace that serves on port 80 and 81.")
-			_, serviceB := createServerPodAndService(f, nsB, "pod-b", []int{80, 81})
+			podB, serviceB := createServerPodAndService(f, nsB, "pod-b", []int{80, 81})
 
 			ginkgo.By("Waiting for pod ready", func() {
-				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podServer.Name, f.Namespace.Name, framework.PodStartTimeout)
+				err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podB.Name, nsB.Name, framework.PodStartTimeout)
 				framework.ExpectNoError(err)
 			})
 
