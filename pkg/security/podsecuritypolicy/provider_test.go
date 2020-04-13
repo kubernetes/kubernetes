@@ -546,13 +546,13 @@ func TestValidateContainerFailures(t *testing.T) {
 
 	failNilAppArmorPod := defaultPod()
 	v1FailInvalidAppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
+	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, v1.AppArmorBetaProfileNamePrefix+"foo")
 	failInvalidAppArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
 
 	failAppArmorPSP := defaultPSP()
 	failAppArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 
 	failPrivPod := defaultPod()
@@ -1033,10 +1033,10 @@ func TestValidateContainerSuccess(t *testing.T) {
 
 	appArmorPSP := defaultPSP()
 	appArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	v1AppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
+	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, v1.AppArmorBetaProfileRuntimeDefault)
 	appArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1AppArmorPod, appArmorPod, nil)
 

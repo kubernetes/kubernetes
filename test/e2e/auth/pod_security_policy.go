@@ -29,7 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -173,7 +172,7 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		ginkgo.By("Running a custom AppArmor profile pod", func() {
 			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.
-			aa.Annotations[apparmor.ContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
+			aa.Annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
 			tester(aa)
 		})
 	}
@@ -256,8 +255,8 @@ func restrictedPod(name string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
-				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
+				v1.SeccompPodAnnotationKey:                            v1.SeccompProfileRuntimeDefault,
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "pause": v1.AppArmorBetaProfileRuntimeDefault,
 			},
 		},
 		Spec: v1.PodSpec{
@@ -316,10 +315,10 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
-				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
-				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
-				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
+				seccomp.AllowedProfilesAnnotationKey:        v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:         v1.SeccompProfileRuntimeDefault,
+				v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
+				v1.AppArmorBetaDefaultProfileAnnotationKey:  v1.AppArmorBetaProfileRuntimeDefault,
 			},
 		},
 		Spec: policyv1beta1.PodSecurityPolicySpec{

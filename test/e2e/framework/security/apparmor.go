@@ -36,14 +36,6 @@ const (
 
 	loaderLabelKey   = "name"
 	loaderLabelValue = "e2e-apparmor-loader"
-
-	// TODO: import this from the k8s.io/api once it's moved there (ref: https://github.com/kubernetes/kubernetes/pull/89198)
-	// Unconfined profile
-	profileNameUnconfined = "unconfined"
-
-	// TODO: import this from the k8s.io/api once it's moved there (ref: https://github.com/kubernetes/kubernetes/pull/89198)
-	// The prefix to an annotation key specifying a container profile.
-	containerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 )
 
 // LoadAppArmorProfiles creates apparmor-profiles ConfigMap and apparmor-loader ReplicationController.
@@ -71,7 +63,7 @@ elif [[ $(< /proc/self/attr/current) != "%[3]s" ]]; then
 fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+nsName)
 
 	if unconfined {
-		profile = profileNameUnconfined
+		profile = v1.AppArmorBetaProfileNameUnconfined
 		testCmd = `
 if cat /proc/sysrq-trigger 2>&1 | grep 'Permission denied'; then
   echo 'FAILURE: reading /proc/sysrq-trigger should be allowed'
@@ -105,7 +97,7 @@ done`, testCmd)
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-apparmor-",
 			Annotations: map[string]string{
-				containerAnnotationKeyPrefix + "test": profile,
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
 			},
 			Labels: map[string]string{
 				"test": "apparmor",

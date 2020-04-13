@@ -53,11 +53,11 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor
 			f := framework.NewDefaultFramework("apparmor-test")
 
 			ginkgo.It("should reject an unloaded profile", func() {
-				status := runAppArmorTest(f, false, apparmor.ProfileNamePrefix+"non-existent-profile")
+				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
 				expectSoftRejection(status)
 			})
 			ginkgo.It("should enforce a profile blocking writes", func() {
-				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
+				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor
 
 			})
 			ginkgo.It("should enforce a permissive profile", func() {
-				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
+				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor
 			f := framework.NewDefaultFramework("apparmor-test")
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func() {
-				status := runAppArmorTest(f, false, apparmor.ProfileRuntimeDefault)
+				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileRuntimeDefault)
 				expectSoftRejection(status)
 			})
 		})
@@ -180,7 +180,7 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("test-apparmor-%s", strings.Replace(profile, "/", "-", -1)),
 			Annotations: map[string]string{
-				apparmor.ContainerAnnotationKeyPrefix + "test": profile,
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
 			},
 		},
 		Spec: v1.PodSpec{
