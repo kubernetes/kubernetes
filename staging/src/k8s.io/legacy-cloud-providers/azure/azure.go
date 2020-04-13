@@ -47,6 +47,7 @@ import (
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 	"k8s.io/legacy-cloud-providers/azure/clients/diskclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/fileclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -234,7 +236,7 @@ type Cloud struct {
 	StorageAccountClient            storageaccountclient.Interface
 	DisksClient                     diskclient.Interface
 	SnapshotsClient                 snapshotclient.Interface
-	FileClient                      FileClient
+	FileClient                      fileclient.Interface
 	VirtualMachineScaleSetsClient   vmssclient.Interface
 	VirtualMachineScaleSetVMsClient vmssvmclient.Interface
 	VirtualMachineSizesClient       vmsizeclient.Interface
@@ -590,7 +592,7 @@ func (az *Cloud) configAzureClients(
 	az.SecurityGroupsClient = securitygroupclient.New(securityGroupClientConfig)
 	az.PublicIPAddressesClient = publicipclient.New(publicIPClientConfig)
 	// fileClient is not based on armclient, but it's still backoff retried.
-	az.FileClient = newAzureFileClient(&az.Environment, azClientConfig.Backoff)
+	az.FileClient = fileclient.NewAzureFileClient(&az.Environment, azClientConfig.Backoff)
 }
 
 func (az *Cloud) getAzureClientConfig(servicePrincipalToken *adal.ServicePrincipalToken) *azclients.ClientConfig {

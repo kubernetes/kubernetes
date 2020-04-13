@@ -413,11 +413,11 @@ func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
 		if len(matches) == 7 {
 			resourceGroupName := matches[1]
 			virtualMachineScaleSetName := matches[2]
-			virtualmachineIndex := matches[3]
+			virtualMachineIndex := matches[3]
 			networkInterfaceName := matches[4]
 			IPConfigurationName := matches[5]
 			publicIPAddressName := matches[6]
-			pip, existsPip, err := ss.getVMSSPublicIPAddress(resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName)
+			pip, existsPip, err := ss.getVMSSPublicIPAddress(resourceGroupName, virtualMachineScaleSetName, virtualMachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName)
 			if err != nil {
 				klog.Errorf("ss.getVMSSPublicIPAddress() failed with error: %v", err)
 				return "", "", err

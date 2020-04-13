@@ -29,6 +29,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/diskclient:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/fileclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/interfaceclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/publicipclient:all-srcs",

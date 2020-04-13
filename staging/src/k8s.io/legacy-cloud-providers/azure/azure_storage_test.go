@@ -22,13 +22,20 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/golang/mock/gomock"
+
+	"k8s.io/legacy-cloud-providers/azure/clients/fileclient/mockfileclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/storageaccountclient/mockstorageaccountclient"
 )
 
 func TestCreateFileShare(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	cloud := &Cloud{}
-	fake := newFakeStorageAccountClient()
-	cloud.StorageAccountClient = fake
-	cloud.FileClient = &fakeFileClient{}
+	mockFileClient := mockfileclient.NewMockInterface(ctrl)
+	mockFileClient.EXPECT().CreateFileShare(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	cloud.FileClient = mockFileClient
 
 	name := "baz"
 	sku := "sku"
@@ -115,9 +122,11 @@ func TestCreateFileShare(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fake.Accounts = test.accounts
-		fake.Keys = test.keys
-		fake.Err = test.err
+		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
+		cloud.StorageAccountClient = mockStorageAccountsClient
+		mockStorageAccountsClient.EXPECT().ListKeys(gomock.Any(), "rg", gomock.Any()).Return(test.keys, nil).AnyTimes()
+		mockStorageAccountsClient.EXPECT().ListByResourceGroup(gomock.Any(), "rg").Return(test.accounts, nil).AnyTimes()
+		mockStorageAccountsClient.EXPECT().Create(gomock.Any(), "rg", gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 		account, key, err := cloud.CreateFileShare(test.name, test.acct, test.acctType, test.acctKind, "rg", test.loc, test.gb)
 		if test.expectErr && err == nil {
