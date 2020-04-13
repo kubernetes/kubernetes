@@ -22,6 +22,7 @@ import (
 	"k8s.io/klog"
 )
 
+// MakeTempDirOrDie creates a new temporary directory or die in case of failure.
 func MakeTempDirOrDie(prefix string, baseDir string) string {
 	if baseDir == "" {
 		baseDir = "/tmp"

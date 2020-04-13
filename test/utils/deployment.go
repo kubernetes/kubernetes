@@ -34,8 +34,10 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
+// LogfFn is a signature function for logging.
 type LogfFn func(format string, args ...interface{})
 
+// LogReplicaSetsOfDeployment logs the ReplicaSet of a Deployment.
 func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, logf LogfFn) {
 	if newRS != nil {
 		logf(spew.Sprintf("New ReplicaSet %q of Deployment %q:\n%+v", newRS.Name, deployment.Name, *newRS))
@@ -50,6 +52,7 @@ func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.R
 	}
 }
 
+// LogPodsOfDeployment logs a pod of a deployment.
 func LogPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsList []*apps.ReplicaSet, logf LogfFn) {
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
@@ -153,14 +156,14 @@ func checkRollingUpdateStatus(c clientset.Interface, deployment *apps.Deployment
 	return "", nil
 }
 
-// Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
-// Rolling update strategy should not be broken during a rolling update.
+// WaitForDeploymentCompleteAndCheckRolling waits for the deployment to complete and makes sure that
+// the rolling update strategy is not broken during the rolling update.
 func WaitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *apps.Deployment, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
 	rolling := true
 	return waitForDeploymentCompleteMaybeCheckRolling(c, d, rolling, logf, pollInterval, pollTimeout)
 }
 
-// Waits for the deployment to complete, and don't check if rolling update strategy is broken.
+// WaitForDeploymentComplete waits for the deployment to complete, and don't check if rolling update strategy is broken.
 // Rolling update strategy is used only during a rolling update, and can be violated in other situations,
 // such as shortly after a scaling event or the deployment is just created.
 func WaitForDeploymentComplete(c clientset.Interface, d *apps.Deployment, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
@@ -251,7 +254,7 @@ func checkRevisionAndImage(deployment *apps.Deployment, newRS *apps.ReplicaSet, 
 		return fmt.Errorf("deployment %q doesn't have the required image %s set", deployment.Name, image)
 	}
 	if !containsImage(newRS.Spec.Template.Spec.Containers, image) {
-		return fmt.Errorf("new replica set %q doesn't have the required image %s.", newRS.Name, image)
+		return fmt.Errorf("new replica set %q doesn't have the required image %s", newRS.Name, image)
 	}
 	return nil
 }
@@ -265,8 +268,10 @@ func containsImage(containers []v1.Container, imageName string) bool {
 	return false
 }
 
+// UpdateDeploymentFunc is a signature function for update a deployment.
 type UpdateDeploymentFunc func(d *apps.Deployment)
 
+// UpdateDeploymentWithRetries updates a deployment retrying on failure.
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateDeploymentFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.Deployment, error) {
 	var deployment *apps.Deployment
 	var updateErr error
@@ -290,6 +295,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 	return deployment, pollErr
 }
 
+// WaitForObservedDeployment waits for an observed deployment.
 func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
 	return deploymentutil.WaitForObservedDeployment(func() (*apps.Deployment, error) {
 		return c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
@@ -315,7 +321,7 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 	return nil
 }
 
-// WaitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
+// WaitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas.
 func WaitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64, pollInterval, pollTimeout time.Duration) error {
 	var deployment *apps.Deployment
 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
@@ -332,6 +338,7 @@ func WaitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentNa
 	return nil
 }
 
+// WaitForDeploymentWithCondition waits for a deployment given a condition.
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType apps.DeploymentConditionType, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
 	var deployment *apps.Deployment
 	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {

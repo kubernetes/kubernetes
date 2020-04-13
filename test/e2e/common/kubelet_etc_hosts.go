@@ -38,6 +38,7 @@ const (
 
 var etcHostsImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
+// KubeletManagedHostConfig holds host managed Pod informations.
 type KubeletManagedHostConfig struct {
 	hostNetworkPod *v1.Pod
 	pod            *v1.Pod

@@ -65,8 +65,8 @@ func removePtr(replicas *int32) int32 {
 	return *replicas
 }
 
+// WaitUntilPodIsScheduled waits until the Pod is scheduled.
 func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
-	// Wait until it's scheduled
 	p, err := c.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{ResourceVersion: "0"})
 	if err == nil && p.Spec.NodeName != "" {
 		return p, nil
@@ -80,9 +80,10 @@ func WaitUntilPodIsScheduled(c clientset.Interface, name, namespace string, time
 			return p, nil
 		}
 	}
-	return nil, fmt.Errorf("Timed out after %v when waiting for pod %v/%v to start.", timeout, namespace, name)
+	return nil, fmt.Errorf("Timed out after %v when waiting for pod %v/%v to start", timeout, namespace, name)
 }
 
+// RunPodAndGetNodeName create a new Pod and returns the pod name.
 func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Duration) (string, error) {
 	name := pod.Name
 	namespace := pod.Namespace
@@ -96,6 +97,7 @@ func RunPodAndGetNodeName(c clientset.Interface, pod *v1.Pod, timeout time.Durat
 	return p.Spec.NodeName, nil
 }
 
+// RunObjectConfig ReplicationController interface.
 type RunObjectConfig interface {
 	Run() error
 	GetName() string
@@ -111,6 +113,7 @@ type RunObjectConfig interface {
 	GetGroupVersionResource() schema.GroupVersionResource
 }
 
+// RCConfig is a ReplicationController config
 type RCConfig struct {
 	Affinity                      *v1.Affinity
 	Client                        clientset.Interface
@@ -123,8 +126,8 @@ type RCConfig struct {
 	Timeout                       time.Duration
 	PodStatusFile                 *os.File
 	Replicas                      int
-	CpuRequest                    int64 // millicores
-	CpuLimit                      int64 // millicores
+	CPURequest                    int64 // millicores
+	CPULimit                      int64 // millicores
 	MemRequest                    int64 // bytes
 	MemLimit                      int64 // bytes
 	GpuLimit                      int64 // count
@@ -183,21 +186,25 @@ type RCConfig struct {
 	ServiceAccountTokenProjections int
 }
 
-func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
-	if rc.LogFunc != nil {
-		rc.LogFunc(fmt, args...)
+// RCConfigLog logs the ReplicationController config.
+func (config *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
+	if config.LogFunc != nil {
+		config.LogFunc(fmt, args...)
 	}
 	klog.Infof(fmt, args...)
 }
 
+// DeploymentConfig defines a structure for a Deployment.
 type DeploymentConfig struct {
 	RCConfig
 }
 
+// ReplicaSetConfig defines a structure for a ReplicaSet.
 type ReplicaSetConfig struct {
 	RCConfig
 }
 
+// JobConfig defines a structure for a Job.
 type JobConfig struct {
 	RCConfig
 }
@@ -210,7 +217,7 @@ type podInfo struct {
 	phase       string
 }
 
-// PodDiff is a map of pod name to podInfos
+// PodDiff is a map of pod name to podInfos.
 type PodDiff map[string]*podInfo
 
 // Print formats and prints the give PodDiff.
@@ -281,7 +288,7 @@ func Diff(oldPods []*v1.Pod, curPods []*v1.Pod) PodDiff {
 	return podInfoMap
 }
 
-// RunDeployment Launches (and verifies correctness) of a Deployment
+// RunDeployment launches (and verifies correctness) of a Deployment
 // and will wait for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling Cleanup).
@@ -293,18 +300,22 @@ func RunDeployment(config DeploymentConfig) error {
 	return config.start()
 }
 
+// Run an existent Deployment.
 func (config *DeploymentConfig) Run() error {
 	return RunDeployment(*config)
 }
 
+// GetKind returns the group Kind of the Deployment.
 func (config *DeploymentConfig) GetKind() schema.GroupKind {
 	return extensionsinternal.Kind("Deployment")
 }
 
+// GetGroupResource returns the GroupResource of the Deployment.
 func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
 	return extensionsinternal.Resource("deployments")
 }
 
+// GetGroupVersionResource returns the GroupVersionResource of the Deployment.
 func (config *DeploymentConfig) GetGroupVersionResource() schema.GroupVersionResource {
 	return extensionsinternal.SchemeGroupVersion.WithResource("deployments")
 }
@@ -375,18 +386,22 @@ func RunReplicaSet(config ReplicaSetConfig) error {
 	return config.start()
 }
 
+// Run an existent ReplicaSet.
 func (config *ReplicaSetConfig) Run() error {
 	return RunReplicaSet(*config)
 }
 
+// GetKind returns the Kind of the ReplicaSet.
 func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
 	return extensionsinternal.Kind("ReplicaSet")
 }
 
+// GetGroupResource returns the GroupResource of the ReplicaSet.
 func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
 	return extensionsinternal.Resource("replicasets")
 }
 
+// GetGroupVersionResource returns the GroupVersionResource of the ReplicaSet.
 func (config *ReplicaSetConfig) GetGroupVersionResource() schema.GroupVersionResource {
 	return extensionsinternal.SchemeGroupVersion.WithResource("replicasets")
 }
@@ -441,7 +456,7 @@ func (config *ReplicaSetConfig) create() error {
 	return nil
 }
 
-// RunJob baunches (and verifies correctness) of a Job
+// RunJob launches (and verifies correctness) of a Job
 // and will wait for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling Cleanup).
@@ -453,18 +468,22 @@ func RunJob(config JobConfig) error {
 	return config.start()
 }
 
+// Run a Job.
 func (config *JobConfig) Run() error {
 	return RunJob(*config)
 }
 
+// GetKind returns the group Kind of the Job.
 func (config *JobConfig) GetKind() schema.GroupKind {
 	return batchinternal.Kind("Job")
 }
 
+// GetGroupResource returns the GroupResource of the Job.
 func (config *JobConfig) GetGroupResource() schema.GroupResource {
 	return batchinternal.Resource("jobs")
 }
 
+// GetGroupVersionResource returns the GroupVersionResource of the Job.
 func (config *JobConfig) GetGroupVersionResource() schema.GroupVersionResource {
 	return batchinternal.SchemeGroupVersion.WithResource("jobs")
 }
@@ -515,7 +534,7 @@ func (config *JobConfig) create() error {
 	return nil
 }
 
-// RunRC Launches (and verifies correctness) of a Replication Controller
+// RunRC launches (and verifies correctness) of a Replication Controller
 // and will wait for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling Cleanup).
@@ -527,50 +546,62 @@ func RunRC(config RCConfig) error {
 	return config.start()
 }
 
+// Run a ReplicationController.
 func (config *RCConfig) Run() error {
 	return RunRC(*config)
 }
 
+// GetName returns the name of the ReplicationController.
 func (config *RCConfig) GetName() string {
 	return config.Name
 }
 
+// GetNamespace returns the namespace of the ReplicationController.
 func (config *RCConfig) GetNamespace() string {
 	return config.Namespace
 }
 
+// GetKind returns the group kind of the ReplicationController.
 func (config *RCConfig) GetKind() schema.GroupKind {
 	return api.Kind("ReplicationController")
 }
 
+// GetGroupResource returns the GroupResource of the ReplicationController.
 func (config *RCConfig) GetGroupResource() schema.GroupResource {
 	return api.Resource("replicationcontrollers")
 }
 
+// GetGroupVersionResource returns the GroupVersionResource of the ReplicationController.
 func (config *RCConfig) GetGroupVersionResource() schema.GroupVersionResource {
 	return api.SchemeGroupVersion.WithResource("replicationcontrollers")
 }
 
+// GetClient returns an Interface from the ReplicationController config.
 func (config *RCConfig) GetClient() clientset.Interface {
 	return config.Client
 }
 
+// GetScalesGetter returns the ScalesGetter.
 func (config *RCConfig) GetScalesGetter() scaleclient.ScalesGetter {
 	return config.ScalesGetter
 }
 
+// SetClient set a client Interface for the ReplicationController config.
 func (config *RCConfig) SetClient(c clientset.Interface) {
 	config.Client = c
 }
 
+// SetScalesClient set a ScalesGetter for the ReplicationController config.
 func (config *RCConfig) SetScalesClient(getter scaleclient.ScalesGetter) {
 	config.ScalesGetter = getter
 }
 
+// GetReplicas returns the Replicas from the config.
 func (config *RCConfig) GetReplicas() int {
 	return config.Replicas
 }
 
+// GetLabelValue returns the labels from the config.
 func (config *RCConfig) GetLabelValue(key string) (string, bool) {
 	value, found := config.Labels[key]
 	return value, found
@@ -657,20 +688,20 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 		c := &template.Spec.Containers[0]
 		c.Ports = append(c.Ports, v1.ContainerPort{Name: k, ContainerPort: int32(v), HostPort: int32(v)})
 	}
-	if config.CpuLimit > 0 || config.MemLimit > 0 || config.GpuLimit > 0 {
+	if config.CPULimit > 0 || config.MemLimit > 0 || config.GpuLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits = v1.ResourceList{}
 	}
-	if config.CpuLimit > 0 {
-		template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CpuLimit, resource.DecimalSI)
+	if config.CPULimit > 0 {
+		template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CPULimit, resource.DecimalSI)
 	}
 	if config.MemLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
 	}
-	if config.CpuRequest > 0 || config.MemRequest > 0 {
+	if config.CPURequest > 0 || config.MemRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests = v1.ResourceList{}
 	}
-	if config.CpuRequest > 0 {
-		template.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)
+	if config.CPURequest > 0 {
+		template.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CPURequest, resource.DecimalSI)
 	}
 	if config.MemRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)
@@ -692,6 +723,7 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 	}
 }
 
+// RCStartupStatus holds the replication controller status
 type RCStartupStatus struct {
 	Expected              int
 	Terminating           int
@@ -707,11 +739,13 @@ type RCStartupStatus struct {
 	ContainerRestartNodes sets.String
 }
 
+// String returns an human readable status.
 func (s *RCStartupStatus) String(name string) string {
 	return fmt.Sprintf("%v Pods: %d out of %d created, %d running, %d pending, %d waiting, %d inactive, %d terminating, %d unknown, %d runningButNotReady ",
 		name, len(s.Created), s.Expected, s.Running, s.Pending, s.Waiting, s.Inactive, s.Terminating, s.Unknown, s.RunningButNotReady)
 }
 
+// ComputeRCStartupStatus fill the ReplicationController start up status.
 func ComputeRCStartupStatus(pods []*v1.Pod, expected int) RCStartupStatus {
 	startupStatus := RCStartupStatus{
 		Expected:              expected,
@@ -855,7 +889,7 @@ func (config *RCConfig) start() error {
 	return nil
 }
 
-// Simplified version of RunRC, that does not create RC, but creates plain Pods.
+// StartPods is a simplified version of RunRC, that does not create RC, but creates plain Pods.
 // Optionally waits for pods to start running (if waitForRunning == true).
 // The number of replicas must be non-zero.
 func StartPods(c clientset.Interface, replicas int, namespace string, podNamePrefix string,
@@ -886,13 +920,13 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 	return nil
 }
 
-// Wait up to 10 minutes for all matching pods to become Running and at least one
+// WaitForPodsWithLabelRunning waits up to 10 minutes for all matching pods to become Running and at least one
 // matching pod exists.
 func WaitForPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector) error {
 	return WaitForEnoughPodsWithLabelRunning(c, ns, label, -1)
 }
 
-// Wait up to 10 minutes for at least 'replicas' many pods to be Running and at least
+// WaitForEnoughPodsWithLabelRunning waits up to 10 minutes for at least 'replicas' many pods to be Running and at least
 // one matching pod exists. If 'replicas' is < 0, wait for all matching pods running.
 func WaitForEnoughPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector, replicas int) error {
 	running := false
@@ -925,16 +959,19 @@ func WaitForEnoughPodsWithLabelRunning(c clientset.Interface, ns string, label l
 	return nil
 }
 
+// CountToStrategy defines an initial structure for Node strategy.
 type CountToStrategy struct {
 	Count    int
 	Strategy PrepareNodeStrategy
 }
 
+// TestNodePreparer interface for Node preparer.
 type TestNodePreparer interface {
 	PrepareNodes() error
 	CleanupNodes() error
 }
 
+// PrepareNodeStrategy interface for prepare a Node strategy.
 type PrepareNodeStrategy interface {
 	// Modify pre-created Node objects before the test starts.
 	PreparePatch(node *v1.Node) []byte
@@ -948,27 +985,33 @@ type PrepareNodeStrategy interface {
 	CleanupDependentObjects(nodeName string, client clientset.Interface) error
 }
 
+// TrivialNodePrepareStrategy default strategy.
 type TrivialNodePrepareStrategy struct{}
 
 var _ PrepareNodeStrategy = &TrivialNodePrepareStrategy{}
 
+// PreparePatch modifies a pre-created Node object.
 func (*TrivialNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
 	return []byte{}
 }
 
+// CleanupNode cleans up Node modifications.
 func (*TrivialNodePrepareStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	nodeCopy := *node
 	return &nodeCopy
 }
 
+// PrepareDependentObjects creates or modify objects that depend on the Node.
 func (*TrivialNodePrepareStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
 	return nil
 }
 
+// CleanupDependentObjects cleans up any dependent objects.
 func (*TrivialNodePrepareStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
 	return nil
 }
 
+// LabelNodePrepareStrategy Label Node prepare strategy.
 type LabelNodePrepareStrategy struct {
 	LabelKey      string
 	LabelValues   []string
@@ -977,6 +1020,7 @@ type LabelNodePrepareStrategy struct {
 
 var _ PrepareNodeStrategy = &LabelNodePrepareStrategy{}
 
+// NewLabelNodePrepareStrategy returns a new Label Node strategy.
 func NewLabelNodePrepareStrategy(labelKey string, labelValues ...string) *LabelNodePrepareStrategy {
 	return &LabelNodePrepareStrategy{
 		LabelKey:    labelKey,
@@ -984,6 +1028,7 @@ func NewLabelNodePrepareStrategy(labelKey string, labelValues ...string) *LabelN
 	}
 }
 
+// PreparePatch modifies a pre-created Node object.
 func (s *LabelNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
 	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, s.LabelValues[s.roundRobinIdx])
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
@@ -994,6 +1039,7 @@ func (s *LabelNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
 	return []byte(patch)
 }
 
+// CleanupNode cleans up Node modifications for this strategy.
 func (s *LabelNodePrepareStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	nodeCopy := node.DeepCopy()
 	if node.Labels != nil && len(node.Labels[s.LabelKey]) != 0 {
@@ -1002,10 +1048,12 @@ func (s *LabelNodePrepareStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	return nodeCopy
 }
 
+// PrepareDependentObjects creates or modify objects that depend on the Node for this strategy.
 func (*LabelNodePrepareStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
 	return nil
 }
 
+// CleanupDependentObjects cleans up any dependent objects for this strategy.
 func (*LabelNodePrepareStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
 	return nil
 }
@@ -1024,6 +1072,7 @@ type NodeAllocatableStrategy struct {
 
 var _ PrepareNodeStrategy = &NodeAllocatableStrategy{}
 
+// NewNodeAllocatableStrategy returns a new Node allocatable strategy.
 func NewNodeAllocatableStrategy(nodeAllocatable map[v1.ResourceName]string, csiNodeAllocatable map[string]*storagev1beta1.VolumeNodeResources, migratedPlugins []string) *NodeAllocatableStrategy {
 	return &NodeAllocatableStrategy{
 		NodeAllocatable:    nodeAllocatable,
@@ -1032,6 +1081,7 @@ func NewNodeAllocatableStrategy(nodeAllocatable map[v1.ResourceName]string, csiN
 	}
 }
 
+// PreparePatch modifies a pre-created Node object.
 func (s *NodeAllocatableStrategy) PreparePatch(node *v1.Node) []byte {
 	newNode := node.DeepCopy()
 	for name, value := range s.NodeAllocatable {
@@ -1054,6 +1104,7 @@ func (s *NodeAllocatableStrategy) PreparePatch(node *v1.Node) []byte {
 	return patch
 }
 
+// CleanupNode cleans up Node modifications for this strategy.
 func (s *NodeAllocatableStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	nodeCopy := node.DeepCopy()
 	for name := range s.NodeAllocatable {
@@ -1118,6 +1169,7 @@ func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode,
 	return err
 }
 
+// PrepareDependentObjects creates or modify objects that depend on the Node for this strategy.
 func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
 	csiNode, err := client.StorageV1beta1().CSINodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1129,6 +1181,7 @@ func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client 
 	return s.updateCSINode(csiNode, client)
 }
 
+// CleanupDependentObjects cleans up Node modifications for this strategy.
 func (s *NodeAllocatableStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
 	csiNode, err := client.StorageV1beta1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
@@ -1148,25 +1201,28 @@ func (s *NodeAllocatableStrategy) CleanupDependentObjects(nodeName string, clien
 	return s.updateCSINode(csiNode, client)
 }
 
-// UniqueNodeLabelStrategy sets a unique label for each node.
+// UniqueNodeLabelStrategy sets a unique Label for each Node.
 type UniqueNodeLabelStrategy struct {
 	LabelKey string
 }
 
 var _ PrepareNodeStrategy = &UniqueNodeLabelStrategy{}
 
+// NewUniqueNodeLabelStrategy defines a unique Node Label strategy
 func NewUniqueNodeLabelStrategy(labelKey string) *UniqueNodeLabelStrategy {
 	return &UniqueNodeLabelStrategy{
 		LabelKey: labelKey,
 	}
 }
 
+// PreparePatch modifies a pre-created Node object.
 func (s *UniqueNodeLabelStrategy) PreparePatch(*v1.Node) []byte {
 	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.LabelKey, string(uuid.NewUUID()))
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 	return []byte(patch)
 }
 
+// CleanupNode cleans up Node modifications for this strategy.
 func (s *UniqueNodeLabelStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	nodeCopy := node.DeepCopy()
 	if node.Labels != nil && len(node.Labels[s.LabelKey]) != 0 {
@@ -1175,14 +1231,17 @@ func (s *UniqueNodeLabelStrategy) CleanupNode(node *v1.Node) *v1.Node {
 	return nodeCopy
 }
 
+// PrepareDependentObjects creates or modify objects that depend on the Node for this strategy.
 func (*UniqueNodeLabelStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
 	return nil
 }
 
+// CleanupDependentObjects cleans up Node modifications for this strategy.
 func (*UniqueNodeLabelStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
 	return nil
 }
 
+// DoPrepareNode prepare a Node using the strategy function.
 func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNodeStrategy) error {
 	var err error
 	patch := strategy.PreparePatch(node)
@@ -1217,6 +1276,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 	return nil
 }
 
+// DoCleanupNode applies the cleanup Node strategy function.
 func DoCleanupNode(client clientset.Interface, nodeName string, strategy PrepareNodeStrategy) error {
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
@@ -1256,31 +1316,38 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 	return nil
 }
 
+// TestPodCreateStrategy signature for Pod create strategy.
 type TestPodCreateStrategy func(client clientset.Interface, namespace string, podCount int) error
 
+// CountToPodStrategy defines a multiple Pod config.
 type CountToPodStrategy struct {
 	Count    int
 	Strategy TestPodCreateStrategy
 }
 
+// TestPodCreatorConfig is a mapping for holding multiple strategies.
 type TestPodCreatorConfig map[string][]CountToPodStrategy
 
+// NewTestPodCreatorConfig creates a new Pod creator config.
 func NewTestPodCreatorConfig() *TestPodCreatorConfig {
 	config := make(TestPodCreatorConfig)
 	return &config
 }
 
+// AddStrategy adds a new strategy in an existent config.
 func (c *TestPodCreatorConfig) AddStrategy(
 	namespace string, podCount int, strategy TestPodCreateStrategy) {
 	(*c)[namespace] = append((*c)[namespace], CountToPodStrategy{Count: podCount, Strategy: strategy})
 }
 
+// TestPodCreator defines a PodCreator.
 type TestPodCreator struct {
 	Client clientset.Interface
 	// namespace -> count -> strategy
 	Config *TestPodCreatorConfig
 }
 
+// NewTestPodCreator returns a PodCreator strategy.
 func NewTestPodCreator(client clientset.Interface, config *TestPodCreatorConfig) *TestPodCreator {
 	return &TestPodCreator{
 		Client: client,
@@ -1288,6 +1355,7 @@ func NewTestPodCreator(client clientset.Interface, config *TestPodCreatorConfig)
 	}
 }
 
+// CreatePods creates the Pod using a pre-configured strategy.
 func (c *TestPodCreator) CreatePods() error {
 	for ns, v := range *(c.Config) {
 		for _, countToStrategy := range v {
@@ -1299,6 +1367,7 @@ func (c *TestPodCreator) CreatePods() error {
 	return nil
 }
 
+// MakePodSpec returns the base Pod specification.
 func MakePodSpec() v1.PodSpec {
 	return v1.PodSpec{
 		Containers: []v1.Container{{
@@ -1326,6 +1395,7 @@ func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1
 	return nil
 }
 
+// CreatePod creates a pre-defined number of Pods.
 func CreatePod(client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod) error {
 	var createError error
 	lock := sync.Mutex{}
@@ -1345,6 +1415,7 @@ func CreatePod(client clientset.Interface, namespace string, podCount int, podTe
 	return createError
 }
 
+// CreatePodWithPersistentVolume creates a pre-defined number of Pods with a PersistentVolume.
 func CreatePodWithPersistentVolume(client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod, count int, bindVolume bool) error {
 	var createError error
 	lock := sync.Mutex{}
@@ -1451,6 +1522,7 @@ func createController(client clientset.Interface, controllerName, namespace stri
 	return nil
 }
 
+// NewCustomCreatePodStrategy returns a custom TestPodCreateStrategy.
 func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
 		return CreatePod(client, namespace, podCount, podTemplate)
@@ -1460,6 +1532,7 @@ func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 // volumeFactory creates an unique PersistentVolume for given integer.
 type volumeFactory func(uniqueID int) *v1.PersistentVolume
 
+// NewCreatePodWithPersistentVolumeStrategy returns a new TestPodCreateStrategy with a binded persistent volume.
 func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
 		return CreatePodWithPersistentVolume(client, namespace, claimTemplate, factory, podTemplate, podCount, true /* bindVolume */)
@@ -1480,6 +1553,7 @@ func makeUnboundPersistentVolumeClaim(storageClass string) *v1.PersistentVolumeC
 	}
 }
 
+// NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy returns a new TestPodCreateStrategy with an unbinded PersistentVolume.
 func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
 		volumeBindingMode := storage.VolumeBindingWaitForFirstConsumer
@@ -1506,6 +1580,7 @@ func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFac
 	}
 }
 
+// NewSimpleCreatePodStrategy returns a simple TestPodCreateStrategy.
 func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 	basePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1516,6 +1591,7 @@ func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 	return NewCustomCreatePodStrategy(basePod)
 }
 
+// NewSimpleWithControllerCreatePodStrategy returns a TestPodCreateStrategy with a ReplicationController.
 func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
 		basePod := &v1.Pod{
@@ -1532,6 +1608,7 @@ func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCrea
 	}
 }
 
+// SecretConfig holds the config to create a Secret.
 type SecretConfig struct {
 	Content   map[string]string
 	Client    clientset.Interface
@@ -1541,6 +1618,7 @@ type SecretConfig struct {
 	LogFunc func(fmt string, args ...interface{})
 }
 
+// Run creates a new Secret while retrying on failure.
 func (config *SecretConfig) Run() error {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1559,6 +1637,7 @@ func (config *SecretConfig) Run() error {
 	return nil
 }
 
+// Stop deletes the Secret while retrying on failure.
 func (config *SecretConfig) Stop() error {
 	if err := DeleteResourceWithRetries(config.Client, api.Kind("Secret"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting secret: %v", err)
@@ -1590,6 +1669,7 @@ func attachSecrets(template *v1.PodTemplateSpec, secretNames []string) {
 	template.Spec.Containers[0].VolumeMounts = mounts
 }
 
+// ConfigMapConfig holds the config to create a ConfigMap.
 type ConfigMapConfig struct {
 	Content   map[string]string
 	Client    clientset.Interface
@@ -1599,6 +1679,7 @@ type ConfigMapConfig struct {
 	LogFunc func(fmt string, args ...interface{})
 }
 
+// Run create a new ConfigMap while retrying on failure.
 func (config *ConfigMapConfig) Run() error {
 	configMap := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1617,6 +1698,7 @@ func (config *ConfigMapConfig) Run() error {
 	return nil
 }
 
+// Stop deletes the ConfigMap while retrying on failure.
 func (config *ConfigMapConfig) Stop() error {
 	if err := DeleteResourceWithRetries(config.Client, api.Kind("ConfigMap"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting configmap: %v", err)
@@ -1708,6 +1790,7 @@ func attachServiceAccountTokenProjection(template *v1.PodTemplateSpec, name stri
 		})
 }
 
+// DaemonConfig holds the config to create a DaemonSet.
 type DaemonConfig struct {
 	Client    clientset.Interface
 	Name      string
@@ -1719,6 +1802,7 @@ type DaemonConfig struct {
 	Timeout time.Duration
 }
 
+// Run creates a new DaemonSet while retrying on failure.
 func (config *DaemonConfig) Run() error {
 	if config.Image == "" {
 		config.Image = "k8s.gcr.io/pause:3.2"

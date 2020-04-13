@@ -35,6 +35,7 @@ const (
 	waitRetryTimeout    = 5 * time.Minute
 )
 
+// RetryErrorCondition is a wrapper for retrying on a condition.
 func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
 	return func() (bool, error) {
 		done, err := condition()
@@ -45,6 +46,7 @@ func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
 	}
 }
 
+// ScaleResourceWithRetries scales a resource while retrying on failure.
 func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, name string, size uint, gvr schema.GroupVersionResource) error {
 	scaler := scale.NewScaler(scalesGetter)
 	preconditions := &scale.ScalePrecondition{

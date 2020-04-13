@@ -28,8 +28,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
+// UpdateReplicaSetFunc is a type definition for a function that accepts RelicaSet.
 type UpdateReplicaSetFunc func(d *apps.ReplicaSet)
 
+// UpdateReplicaSetWithRetries updates a ReplicaSet retrying of failure.
 func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.ReplicaSet, error) {
 	var rs *apps.ReplicaSet
 	var updateErr error
@@ -53,7 +55,7 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 	return rs, pollErr
 }
 
-// Verify .Status.Replicas is equal to .Spec.Replicas
+// WaitRSStable verifies if .Status.Replicas is equal to .Spec.Replicas.
 func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
 	desiredGeneration := rs.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
@@ -68,6 +70,7 @@ func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaS
 	return nil
 }
 
+// UpdateReplicaSetStatusWithRetries update a ReplicaSet status while retrying on failure.
 func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.ReplicaSet, error) {
 	var rs *apps.ReplicaSet
 	var updateErr error

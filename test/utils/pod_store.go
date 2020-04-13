@@ -31,13 +31,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// Convenient wrapper around cache.Store that returns list of v1.Pod instead of interface{}.
+// PodStore is convenient wrapper around cache.Store that returns list of v1.Pod instead of interface{}.
 type PodStore struct {
 	cache.Store
 	stopCh    chan struct{}
 	Reflector *cache.Reflector
 }
 
+// NewPodStore creates a new PodStore.
 func NewPodStore(c clientset.Interface, namespace string, label labels.Selector, field fields.Selector) (*PodStore, error) {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -68,6 +69,7 @@ func NewPodStore(c clientset.Interface, namespace string, label labels.Selector,
 	return &PodStore{Store: store, stopCh: stopCh, Reflector: reflector}, nil
 }
 
+// List the pods on an existent PodStore.
 func (s *PodStore) List() []*v1.Pod {
 	objects := s.Store.List()
 	pods := make([]*v1.Pod, 0)
@@ -77,6 +79,7 @@ func (s *PodStore) List() []*v1.Pod {
 	return pods
 }
 
+// Stop an existent PodStore.
 func (s *PodStore) Stop() {
 	close(s.stopCh)
 }

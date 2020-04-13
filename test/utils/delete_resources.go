@@ -57,6 +57,7 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, nam
 	}
 }
 
+// DeleteResourceWithRetries deletes a resource while retrying on failure.
 func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
 	deleteFunc := func() (bool, error) {
 		err := deleteResource(c, kind, namespace, name, options)

@@ -34,6 +34,7 @@ const (
 	retries = 5
 )
 
+// AddLabelsToNode patches a list of labels in a particular node.
 func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]string) error {
 	tokens := make([]string, 0, len(labels))
 	for k, v := range labels {
@@ -79,9 +80,8 @@ func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []stri
 		if err != nil {
 			if !apierrors.IsConflict(err) {
 				return err
-			} else {
-				klog.V(2).Infof("Conflict when trying to remove a labels %v from %v", labelKeys, nodeName)
 			}
+			klog.V(2).Infof("Conflict when trying to remove a labels %v from %v", labelKeys, nodeName)
 		} else {
 			break
 		}
