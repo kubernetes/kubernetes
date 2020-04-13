@@ -599,9 +599,7 @@ func validateNodeIP(nodeIP net.IP) error {
 	for _, addr := range addrs {
 		var ip net.IP
 		switch v := addr.(type) {
-		case *net.IPNet:
-			ip = v.IP
-		case *net.IPAddr:
+		case *net.IPNet, *net.IPAddr:
 			ip = v.IP
 		}
 		if ip != nil && ip.Equal(nodeIP) {
