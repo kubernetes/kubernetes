@@ -19,11 +19,9 @@ package cm
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
@@ -222,13 +220,12 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 
 // getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems
 func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
-	content, err := ioutil.ReadFile(filepath.Join(util.CgroupRoot, "cgroup.controllers"))
+	controllers, err := libcontainercgroups.GetAllSubsystems()
 	if err != nil {
 		return nil, err
 	}
 
 	mounts := []libcontainercgroups.Mount{}
-	controllers := strings.Fields(string(content))
 	mountPoints := make(map[string]string, len(controllers))
 	for _, controller := range controllers {
 		mountPoints[controller] = util.CgroupRoot
