@@ -836,6 +836,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			Tolerations:                   conf.Tolerations,
 			PriorityClassName:             conf.PriorityClassName,
 			TerminationGracePeriodSeconds: &gracePeriod,
+			NodeName:                      config.NodeName,
 		},
 	}
 	// TODO: setting the Pod's nodeAffinity instead of setting .spec.nodeName works around the
