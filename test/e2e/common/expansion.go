@@ -417,6 +417,8 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		pod := newPod([]string{"/bin/sh", "-ec", "sleep 100000"}, envVars, subpathMounts, volumes)
 		pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 		pod.ObjectMeta.Annotations = map[string]string{"mysubpath": "foo"}
+		sideContainerName := "side-container"
+		pod.Spec.Containers = append(pod.Spec.Containers, newContainer(sideContainerName, []string{"/bin/sh", "-ec", "sleep 100000"}, envVars, subpathMounts))
 		suffix := string(uuid.NewUUID())
 		pod.Spec.InitContainers = []v1.Container{newContainer(
 			fmt.Sprintf("init-volume-%s", suffix), []string{"sh", "-c", "mkdir -p /volume_mount/foo; touch /volume_mount/foo/test.log"}, nil, mounts)}
@@ -512,9 +514,8 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 
 	// Fix liveness probe
 	ginkgo.By("Rewriting the file")
-	stdout, _, err = f.ExecShellInPodWithFullOutput(pod.Name, fmt.Sprintf("echo test-after > %v", volumeMount))
+	stdout = f.ExecShellInContainer(pod.Name, pod.Spec.Containers[1].Name, fmt.Sprintf("echo test-after > %v", volumeMount))
 	framework.Logf("Pod exec output: %v", stdout)
-	framework.ExpectNoError(err, "while rewriting the probe file")
 
 	// Wait for container restarts to stabilize
 	ginkgo.By("Waiting for container to stop restarting")
