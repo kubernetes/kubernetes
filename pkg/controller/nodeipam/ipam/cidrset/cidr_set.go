@@ -158,14 +158,13 @@ func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 }
 
 func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
+	if cidr == nil {
+		return -1, -1, fmt.Errorf("error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
+	}
 	begin, end = 0, s.maxCIDRs-1
 	cidrMask := cidr.Mask
 	maskSize, _ := cidrMask.Size()
 	var ipSize int
-
-	if cidr == nil {
-		return -1, -1, fmt.Errorf("error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
-	}
 
 	if !s.clusterCIDR.Contains(cidr.IP.Mask(s.clusterCIDR.Mask)) && !cidr.Contains(s.clusterCIDR.IP.Mask(cidr.Mask)) {
 		return -1, -1, fmt.Errorf("cidr %v is out the range of cluster cidr %v", cidr, s.clusterCIDR)
