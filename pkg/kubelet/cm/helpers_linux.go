@@ -276,9 +276,11 @@ func GetPodCgroupNameSuffix(podUID types.UID) string {
 }
 
 // NodeAllocatableRoot returns the literal cgroup path for the node allocatable cgroup
-func NodeAllocatableRoot(cgroupRoot, cgroupDriver string) string {
-	root := ParseCgroupfsToCgroupName(cgroupRoot)
-	nodeAllocatableRoot := NewCgroupName(root, defaultNodeAllocatableCgroupName)
+func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver string) string {
+	nodeAllocatableRoot := ParseCgroupfsToCgroupName(cgroupRoot)
+	if cgroupsPerQOS {
+		nodeAllocatableRoot = NewCgroupName(nodeAllocatableRoot, defaultNodeAllocatableCgroupName)
+	}
 	if libcontainerCgroupManagerType(cgroupDriver) == libcontainerSystemd {
 		return nodeAllocatableRoot.ToSystemd()
 	}
