@@ -143,6 +143,12 @@ const (
 	//
 	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
 	SelectorIndex featuregate.Feature = "SelectorIndex"
+
+	// owner: @liggitt
+	// beta: v1.19
+	//
+	// Allows sending warning headers in API responses.
+	WarningHeaders featuregate.Feature = "WarningHeaders"
 )
 
 func init() {
@@ -168,4 +174,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
 	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
 	SelectorIndex:           {Default: false, PreRelease: featuregate.Alpha},
+	WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
 }
