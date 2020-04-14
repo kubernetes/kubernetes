@@ -13,6 +13,7 @@ go_library(
         "register.go",
         "types.go",
         "types_swagger_doc_generated.go",
+        "zz_generated.apistatus.go",
         "zz_generated.deepcopy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/api/extensions/v1beta1",
