@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
@@ -391,7 +391,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 }
 
 // UpdatePluginResources updates node resources based on devices already allocated to pods.
-func (m *ManagerImpl) UpdatePluginResources(node *framework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+func (m *ManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
 
 	m.mutex.Lock()
@@ -924,8 +924,8 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 // and if necessary, updates allocatableResource in nodeInfo to at least equal to
 // the allocated capacity. This allows pods that have already been scheduled on
 // the node to pass GeneralPredicates admission checking even upon device plugin failure.
-func (m *ManagerImpl) sanitizeNodeAllocatable(node *framework.NodeInfo) {
-	var newAllocatableResource *framework.Resource
+func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulerframework.NodeInfo) {
+	var newAllocatableResource *schedulerframework.Resource
 	allocatableResource := node.Allocatable
 	if allocatableResource.ScalarResources == nil {
 		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)

@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // ManagerStub provides a simple stub implementation for the Device Manager.
@@ -50,7 +50,7 @@ func (h *ManagerStub) Allocate(pod *v1.Pod, container *v1.Container) error {
 }
 
 // UpdatePluginResources simply returns nil.
-func (h *ManagerStub) UpdatePluginResources(node *framework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+func (h *ManagerStub) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	return nil
 }
 

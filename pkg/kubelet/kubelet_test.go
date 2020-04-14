@@ -67,7 +67,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
@@ -658,7 +658,7 @@ func TestHandlePluginResources(t *testing.T) {
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
-	updatePluginResourcesFunc := func(node *framework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	updatePluginResourcesFunc := func(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 		// Maps from resourceName to the value we use to set node.allocatableResource[resourceName].
 		// A resource with invalid value (< 0) causes the function to return an error
 		// to emulate resource Allocation failure.

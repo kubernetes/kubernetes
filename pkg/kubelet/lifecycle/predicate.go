@@ -28,12 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
 
-type pluginResourceUpdateFuncType func(*framework.NodeInfo, *PodAdmitAttributes) error
+type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error
 
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
@@ -69,7 +69,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 	admitPod := attrs.Pod
 	pods := attrs.OtherPods
-	nodeInfo := framework.NewNodeInfo(pods...)
+	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
@@ -155,7 +155,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 }
 
-func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *framework.NodeInfo) *v1.Pod {
+func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
 	podCopy := pod.DeepCopy()
 	for i, c := range pod.Spec.Containers {
 		// We only handle requests in Requests but not Limits because the
@@ -219,7 +219,7 @@ func (e *PredicateFailureError) GetReason() string {
 }
 
 // GeneralPredicates checks a group of predicates that the kubelet cares about.
-func GeneralPredicates(pod *v1.Pod, nodeInfo *framework.NodeInfo) ([]PredicateFailureReason, error) {
+func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
 	if nodeInfo.Node() == nil {
 		return nil, fmt.Errorf("node not found")
 	}
