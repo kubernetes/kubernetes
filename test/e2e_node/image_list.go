@@ -31,6 +31,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -171,7 +172,7 @@ func PrePullAllImages() error {
 
 // getGPUDevicePluginImage returns the image of GPU device plugin.
 func getGPUDevicePluginImage() string {
-	ds, err := framework.DsFromManifest(e2egpu.GPUDevicePluginDSYAML)
+	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
 	if err != nil {
 		klog.Errorf("Failed to parse the device plugin image: %v", err)
 		return ""
@@ -194,7 +195,7 @@ func getSRIOVDevicePluginImage() string {
 		klog.Errorf("Failed to read the device plugin manifest: %v", err)
 		return ""
 	}
-	ds, err := framework.DsFromData(data)
+	ds, err := e2emanifest.DaemonSetFromData(data)
 	if err != nil {
 		klog.Errorf("Failed to parse the device plugin image: %v", err)
 		return ""
