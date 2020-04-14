@@ -208,9 +208,7 @@ func retrieveCRDManifestFileContents(f *framework.Framework, node v1.Node) strin
 	}
 	f.PodClient().CreateSync(pod)
 
-	// using powershell and using forward slashes avoids the nightmare of having to properly
-	// escape quotes and backward slashes
-	output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "powershell", "Get-Content", strings.ReplaceAll(gmsaCrdManifestPath, `\`, "/"))
+	output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "cmd", "/S", "/C", fmt.Sprintf("type %s", gmsaCrdManifestPath))
 	if err != nil {
 		framework.Failf("failed to retrieve the contents of %q on node %q: %v", gmsaCrdManifestPath, node.Name, err)
 	}
