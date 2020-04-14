@@ -70,11 +70,6 @@ const (
 	// in 1.16 when the ServiceNodeExclusion gate is on.
 	labelNodeRoleExcludeBalancer = "node.kubernetes.io/exclude-from-external-load-balancers"
 
-	// labelAlphaNodeRoleExcludeBalancer specifies that the node should be
-	// exclude from load balancers created by a cloud provider. This label is deprecated and will
-	// be removed in 1.18.
-	labelAlphaNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
-
 	// serviceNodeExclusionFeature is the feature gate name that
 	// enables nodes to exclude themselves from service load balancers
 	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L178
@@ -618,10 +613,6 @@ func getNodeConditionPredicate() NodeConditionPredicate {
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(serviceNodeExclusionFeature) {
-			// Will be removed in 1.18
-			if _, hasExcludeBalancerLabel := node.Labels[labelAlphaNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
-				return false
-			}
 			if _, hasExcludeBalancerLabel := node.Labels[labelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}
