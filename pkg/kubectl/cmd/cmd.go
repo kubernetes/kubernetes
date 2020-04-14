@@ -353,7 +353,7 @@ func NewDefaultPluginHandler(validPrefixes []string) *DefaultPluginHandler {
 	}
 }
 
-// Lookup implements PluginHandler
+// Lookup implements DefaultPluginHandler
 func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
 	for _, prefix := range h.ValidPrefixes {
 		path, err := exec.LookPath(fmt.Sprintf("%s-%s", prefix, filename))
@@ -366,7 +366,7 @@ func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
 	return "", false
 }
 
-// Execute implements PluginHandler
+// Execute implements DefaultPluginHandler
 func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environment []string) error {
 
 	// Windows does not support exec syscall.
