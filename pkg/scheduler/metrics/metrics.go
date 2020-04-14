@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	volumeschedulingmetrics "k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
 )
 
 const (
@@ -44,6 +43,9 @@ const (
 	// Binding - binding operation label value
 	Binding = "binding"
 	// E2eScheduling - e2e scheduling operation label value
+
+	// VolumeSchedulerSubsystem - subsystem name used by scheduler
+	VolumeSchedulerSubsystem = "scheduler_volume"
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
@@ -224,6 +226,38 @@ var (
 		},
 		[]string{"result"})
 
+	// VolumeBindingRequestSchedulerBinderCache tracks the number of volume binder cache operations.
+	VolumeBindingRequestSchedulerBinderCache = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      VolumeSchedulerSubsystem,
+			Name:           "binder_cache_requests_total",
+			Help:           "Total number for request volume binding cache",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation"},
+	)
+	// VolumeSchedulingStageLatency tracks the latency of volume scheduling operations.
+	VolumeSchedulingStageLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      VolumeSchedulerSubsystem,
+			Name:           "scheduling_duration_seconds",
+			Help:           "Volume scheduling stage latency",
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation"},
+	)
+	// VolumeSchedulingStageFailed tracks the number of failed volume scheduling operations.
+	VolumeSchedulingStageFailed = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      VolumeSchedulerSubsystem,
+			Name:           "scheduling_stage_error_total",
+			Help:           "Volume scheduling stage error count",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation"},
+	)
+
 	CacheSize = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -257,12 +291,20 @@ var (
 
 var registerMetrics sync.Once
 
+// RegisterVolumeSchedulingMetrics is used for scheduler, because the volume binding cache is a library
+// used by scheduler process.
+func RegisterVolumeSchedulingMetrics() {
+	legacyregistry.MustRegister(VolumeBindingRequestSchedulerBinderCache)
+	legacyregistry.MustRegister(VolumeSchedulingStageLatency)
+	legacyregistry.MustRegister(VolumeSchedulingStageFailed)
+}
+
 // Register all metrics.
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		RegisterMetrics(metricsList...)
-		volumeschedulingmetrics.RegisterVolumeSchedulingMetrics()
+		RegisterVolumeSchedulingMetrics()
 		PodScheduleSuccesses = scheduleAttempts.With(metrics.Labels{"result": "scheduled"})
 		PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
 		PodScheduleErrors = scheduleAttempts.With(metrics.Labels{"result": "error"})
