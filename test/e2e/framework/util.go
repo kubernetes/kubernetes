@@ -22,10 +22,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -41,21 +39,17 @@ import (
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -1238,51 +1232,6 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 		l, _ := RunKubectl(ns, "logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
 		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
 	}
-}
-
-// DsFromManifest reads a .json/yaml file and returns the daemonset in it.
-func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
-	Logf("Parsing ds from %v", url)
-
-	var response *http.Response
-	var err error
-
-	for i := 1; i <= 5; i++ {
-		response, err = http.Get(url)
-		if err == nil && response.StatusCode == 200 {
-			break
-		}
-		time.Sleep(time.Duration(i) * time.Second)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get url: %v", err)
-	}
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
-	}
-	defer response.Body.Close()
-
-	data, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to read html response body: %v", err)
-	}
-	return DsFromData(data)
-}
-
-// DsFromData reads a byte slice and returns the daemonset in it.
-func DsFromData(data []byte) (*appsv1.DaemonSet, error) {
-	var ds appsv1.DaemonSet
-	dataJSON, err := utilyaml.ToJSON(data)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse data to json: %v", err)
-	}
-
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), dataJSON, &ds)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
-	}
-	return &ds, nil
 }
 
 // PrettyPrintJSON converts metrics to JSON format.
