@@ -1,13 +1,11 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: multidimpodautoscalers.autoscaling.k8s.io
+  name: multidimpodautoscalers.autoscaling.gke.io
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
-  annotations:
-    "api-approved.kubernetes.io": "unapproved.*"
 spec:
-  group: autoscaling.k8s.io
+  group: autoscaling.gke.io
   scope: Namespaced
   names:
     plural: multidimpodautoscalers
