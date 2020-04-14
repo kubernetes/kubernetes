@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -622,6 +623,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		verbOverrider, needOverride := storage.(StorageMetricsOverride)
 
+		// accumulate endpoint-level warnings
+		enableWarningHeaders := utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders)
+		warnings := []string{}
+
 		switch action.Verb {
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
@@ -636,6 +641,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			} else {
 				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+			}
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
 
 			doc := "read the specified " + kind
@@ -667,6 +675,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -699,6 +710,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "replace " + subresource + " of the specified " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -729,6 +743,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -751,6 +768,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				handler = restfulCreateResource(creater, reqScope, admit)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			article := GetArticleForNoun(kind, " ")
 			doc := "create" + article + kind
 			if isSubresource {
@@ -784,6 +804,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				deleteReturnType = producedObject
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -807,6 +830,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -834,6 +860,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -854,6 +883,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			if enableWarningHeaders {
+				handler = utilwarning.AddWarningsHandler(handler, warnings)
+			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -877,6 +909,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
 				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
+				if enableWarningHeaders {
+					handler = utilwarning.AddWarningsHandler(handler, warnings)
+				}
 				route := ws.Method(method).Path(action.Path).
 					To(handler).
 					Doc(doc).
