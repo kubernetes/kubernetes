@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "fuzzer.go",
         "install.go",
-        "pod_specs.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/api/testing",
     deps = [
