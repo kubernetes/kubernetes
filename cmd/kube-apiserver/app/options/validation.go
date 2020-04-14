@@ -75,7 +75,7 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 			errs = append(errs, errors.New("--service-cluster-ip-range and --secondary-service-cluster-ip-range must be of different IP family"))
 		}
 
-		// should be smallish sized cidr, this thing is kept in etcd
+		// Should be smallish sized cidr, this thing is kept in etcd
 		// bigger cidr (specially those offered by IPv6) will add no value
 		// significantly increase snapshotting time.
 		var ones, bits = options.SecondaryServiceClusterIPRange.Mask.Size()
@@ -130,7 +130,7 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
-		// we know we need the alpha API enabled.  There are only a few ways to turn it on
+		// We need the alpha API enabled.  There are only a few ways to turn it on
 		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
 		switch {
 		case strings.Contains(enabledAPIString, "api/all=true"):
@@ -144,7 +144,7 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 		}
 	}
 
-	return []error{}
+	return nil
 }
 
 // Validate checks ServerRunOptions and return a slice of found errs.
