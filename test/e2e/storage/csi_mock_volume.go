@@ -813,7 +813,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(params)
 				defer cleanup()
 
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
 				defer cancel()
 				pvcWatch, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Watch(ctx, metav1.ListOptions{})
 				framework.ExpectNoError(err, "create PVC watch")
@@ -831,7 +831,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "failed to start pod")
 				err = e2epod.DeletePodWithWait(m.cs, pod)
 				framework.ExpectNoError(err, "failed to delete pod")
-				err = m.cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(context.TODO(), claim.Name, metav1.DeleteOptions{})
+				err = m.cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "failed to delete claim")
 
 				normal := []csiCall{}
@@ -851,7 +851,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				var calls []mockCSICall
-				err = wait.Poll(time.Second, csiPodRunningTimeout, func() (done bool, err error) {
+				err = wait.PollImmediateUntil(time.Second, func() (done bool, err error) {
 					c, index, err := compareCSICalls(deterministicCalls, expected, m.cs, f.Namespace.Name, driverPodName, driverContainerName)
 					if err != nil {
 						return true, fmt.Errorf("error waiting for expected CSI calls: %s", err)
@@ -866,7 +866,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						return true, nil
 					}
 					return false, nil
-				})
+				}, ctx.Done())
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
 
 				// The capacity error is dealt with in two different ways.
@@ -908,7 +908,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 							// skip further checks instead of treating it as a test failure.
 							framework.Failf("PVC watch failed prematurely: %v", event.Object)
 						}
-					case <-time.After(10 * time.Second):
+					case <-ctx.Done():
 						framework.Failf("Timeout while waiting to observe PVC list")
 					}
 				}
