@@ -39,7 +39,6 @@ func TestCommandsGenerated(t *testing.T) {
 	expectedFlags := []string{
 		"cert-dir",
 		"config",
-		"use-api",
 	}
 
 	expectedCommands := []string{
