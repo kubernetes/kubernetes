@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/deprecation"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	versioninfo "k8s.io/component-base/version"
 )
 
 const (
@@ -624,8 +626,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		verbOverrider, needOverride := storage.(StorageMetricsOverride)
 
 		// accumulate endpoint-level warnings
-		enableWarningHeaders := utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders)
-		warnings := []string{}
+		var (
+			enableWarningHeaders = utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders)
+
+			warnings   []string
+			deprecated bool
+		)
+
+		{
+			versionedPtrWithGVK := versionedPtr.DeepCopyObject()
+			versionedPtrWithGVK.GetObjectKind().SetGroupVersionKind(fqKindToRegister)
+			currentMajor, currentMinor, _ := deprecation.MajorMinor(versioninfo.Get())
+			deprecated = deprecation.IsDeprecated(versionedPtrWithGVK, currentMajor, currentMinor)
+			if deprecated {
+				warnings = append(warnings, deprecation.WarningMessage(versionedPtrWithGVK))
+			}
+		}
 
 		switch action.Verb {
 		case "GET": // Get a resource.
