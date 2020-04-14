@@ -127,6 +127,7 @@ type genericScheduler struct {
 	schedulingQueue          internalqueue.SchedulingQueue
 	extenders                []SchedulerExtender
 	nodeInfoSnapshot         *internalcache.Snapshot
+	nomPodsSnapshot          *internalqueue.NomPodsSnapshot
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                policylisters.PodDisruptionBudgetLister
 	disablePreemption        bool
@@ -135,11 +136,14 @@ type genericScheduler struct {
 	nextStartNodeIndex       int
 }
 
-// snapshot snapshots scheduler cache and node infos for all fit and priority
-// functions.
+// snapshot snapshots scheduler cache and node infos for Filter and Score plugins.
 func (g *genericScheduler) snapshot() error {
-	// Used for all fit and priority funcs.
-	return g.cache.UpdateSnapshot(g.nodeInfoSnapshot)
+	// Used for all Filter and Score plugins.
+	if err := g.cache.UpdateSnapshot(g.nodeInfoSnapshot); err != nil {
+		return err
+	}
+	g.schedulingQueue.UpdateNomPodsSnapshot(g.nomPodsSnapshot)
+	return nil
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -354,7 +358,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
 func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName string) []*v1.Pod {
-	pods := g.schedulingQueue.NominatedPodsForNode(nodeName)
+	pods := g.nomPodsSnapshot.PodsForNode(nodeName)
 
 	if len(pods) == 0 {
 		return nil
@@ -527,7 +531,7 @@ func (g *genericScheduler) addNominatedPods(ctx context.Context, prof *profile.P
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPods := g.schedulingQueue.NominatedPodsForNode(nodeInfo.Node().Name)
+	nominatedPods := g.nomPodsSnapshot.PodsForNode(nodeInfo.Node().Name)
 	if len(nominatedPods) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -1115,6 +1119,7 @@ func NewGenericScheduler(
 		schedulingQueue:          podQueue,
 		extenders:                extenders,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
+		nomPodsSnapshot:          internalqueue.NewEmptyNomPodsSnapshot(),
 		pvcLister:                pvcLister,
 		pdbLister:                pdbLister,
 		disablePreemption:        disablePreemption,

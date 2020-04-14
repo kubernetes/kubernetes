@@ -82,6 +82,7 @@ type SchedulingQueue interface {
 	MoveAllToActiveOrBackoffQueue(event string)
 	AssignedPodAdded(pod *v1.Pod)
 	AssignedPodUpdated(pod *v1.Pod)
+	// Deprecated. Prefer to get from NomPodsSnapshot.
 	NominatedPodsForNode(nodeName string) []*v1.Pod
 	PendingPods() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
@@ -96,6 +97,8 @@ type SchedulingQueue interface {
 	NumUnschedulablePods() int
 	// Run starts the goroutines managing the queue.
 	Run()
+	// UpdateNomPodsSnapshot clones internal nominated Pods to the given <snapshot>.
+	UpdateNomPodsSnapshot(snapshot *NomPodsSnapshot)
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -150,6 +153,20 @@ type PriorityQueue struct {
 	// closed indicates that the queue is closed.
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
 	closed bool
+}
+
+// UpdateNomPodsSnapshot updates the given <snapshot> to be consistent with p.nominatedPods.nominatedPods.
+func (p *PriorityQueue) UpdateNomPodsSnapshot(snapshot *NomPodsSnapshot) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	for k := range p.nominatedPods.nominatedPods {
+		// TODO: should we deep clone?
+		snapshot.nominatedPods[k] = p.nominatedPods.nominatedPods[k]
+	}
+	for k, v := range p.nominatedPods.nominatedPodToNode {
+		snapshot.nominatedPodToNode[k] = v
+	}
 }
 
 type priorityQueueOptions struct {

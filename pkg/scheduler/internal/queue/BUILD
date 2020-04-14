@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "events.go",
         "scheduling_queue.go",
+        "snapshot.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/queue",
     visibility = ["//pkg/scheduler:__subpackages__"],
