@@ -214,6 +214,7 @@ type mockCSIDriver struct {
 	podInfo             *bool
 	attachable          bool
 	attachLimit         int
+	enableTopology      bool
 	enableNodeExpansion bool
 	javascriptHooks     map[string]string
 }
@@ -224,6 +225,7 @@ type CSIMockDriverOpts struct {
 	DisableAttach       bool
 	PodInfo             *bool
 	AttachLimit         int
+	EnableTopology      bool
 	EnableResizing      bool
 	EnableNodeExpansion bool
 	JavascriptHooks     map[string]string
@@ -272,6 +274,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		},
 		manifests:           driverManifests,
 		podInfo:             driverOpts.PodInfo,
+		enableTopology:      driverOpts.EnableTopology,
 		attachable:          !driverOpts.DisableAttach,
 		attachLimit:         driverOpts.AttachLimit,
 		enableNodeExpansion: driverOpts.EnableNodeExpansion,
@@ -313,6 +316,10 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	containerArgs := []string{"--name=csi-mock-" + f.UniqueName}
 	if !m.attachable {
 		containerArgs = append(containerArgs, "--disable-attach")
+	}
+
+	if m.enableTopology {
+		containerArgs = append(containerArgs, "--enable-topology")
 	}
 
 	if m.attachLimit > 0 {
