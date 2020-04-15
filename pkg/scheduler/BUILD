@@ -125,7 +125,6 @@ filegroup(
         "//pkg/scheduler/internal/parallelize:all-srcs",
         "//pkg/scheduler/internal/queue:all-srcs",
         "//pkg/scheduler/metrics:all-srcs",
-        "//pkg/scheduler/nodeinfo:all-srcs",
         "//pkg/scheduler/profile:all-srcs",
         "//pkg/scheduler/testing:all-srcs",
         "//pkg/scheduler/util:all-srcs",

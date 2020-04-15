@@ -32,10 +32,7 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var (
-	emptyResource = Resource{}
-	generation    int64
-)
+var generation int64
 
 // PodInfo is a wrapper to a Pod with additional information for purposes such as tracking
 // the timestamp when it's added to the queue or recording per-pod metrics.
@@ -317,31 +314,6 @@ func (n *NodeInfo) Node() *v1.Node {
 		return nil
 	}
 	return n.node
-}
-
-// Taints returns the taints list on this node.
-// TODO(#89528): Exists only because of kubelet dependency, remove.
-func (n *NodeInfo) Taints() ([]v1.Taint, error) {
-	if n == nil || n.node.Spec.Taints == nil {
-		return nil, nil
-	}
-	return n.node.Spec.Taints, nil
-}
-
-// AllocatableResource returns allocatable resources on a given node.
-// TODO(#89528): Exists only because of kubelet dependency, remove.
-func (n *NodeInfo) AllocatableResource() Resource {
-	if n == nil {
-		return emptyResource
-	}
-	return *n.Allocatable
-}
-
-// SetAllocatableResource sets the allocatableResource information of given node.
-// TODO(#89528): Exists only because of kubelet dependency, remove.
-func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
-	n.Allocatable = allocatableResource
-	n.Generation = nextGeneration()
 }
 
 // Clone returns a copy of this node.

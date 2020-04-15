@@ -67,7 +67,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
@@ -658,7 +658,7 @@ func TestHandlePluginResources(t *testing.T) {
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
-	updatePluginResourcesFunc := func(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	updatePluginResourcesFunc := func(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 		// Maps from resourceName to the value we use to set node.allocatableResource[resourceName].
 		// A resource with invalid value (< 0) causes the function to return an error
 		// to emulate resource Allocation failure.
@@ -670,8 +670,7 @@ func TestHandlePluginResources(t *testing.T) {
 			failedResource:   resourceQuantityInvalid,
 		}
 		pod := attrs.Pod
-		allocatableResource := node.AllocatableResource()
-		newAllocatableResource := allocatableResource.Clone()
+		newAllocatableResource := node.Allocatable.Clone()
 		for _, container := range pod.Spec.Containers {
 			for resource := range container.Resources.Requests {
 				newQuantity, exist := updateResourceMap[resource]
@@ -684,7 +683,7 @@ func TestHandlePluginResources(t *testing.T) {
 				newAllocatableResource.ScalarResources[resource] = newQuantity.Value()
 			}
 		}
-		node.SetAllocatableResource(newAllocatableResource)
+		node.Allocatable = newAllocatableResource
 		return nil
 	}
 

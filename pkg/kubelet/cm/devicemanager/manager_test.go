@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 const (
@@ -889,12 +889,12 @@ func TestUpdatePluginResources(t *testing.T) {
 			},
 		},
 	}
-	nodeInfo := &schedulernodeinfo.NodeInfo{}
+	nodeInfo := &schedulerframework.NodeInfo{}
 	nodeInfo.SetNode(cachedNode)
 
 	testManager.UpdatePluginResources(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
 
-	allocatableScalarResources := nodeInfo.AllocatableResource().ScalarResources
+	allocatableScalarResources := nodeInfo.Allocatable.ScalarResources
 	// allocatable in nodeInfo is less than needed, should update
 	as.Equal(1, int(allocatableScalarResources[v1.ResourceName(resourceName1)]))
 	// allocatable in nodeInfo is more than needed, should skip updating

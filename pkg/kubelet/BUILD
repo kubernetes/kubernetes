@@ -213,7 +213,7 @@ go_test(
         "//pkg/kubelet/util/queue:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
-        "//pkg/scheduler/nodeinfo:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/awsebs:go_default_library",
