@@ -276,8 +276,11 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 	return results, nil
 }
 
-func (j *JSONPath) evalMap(input []reflect.Value) ([]reflect.Value, error) {
+func (j *JSONPath) evalMap(input []reflect.Value, hasAsterisk bool) ([]reflect.Value, error) {
 	result := []reflect.Value{}
+	if !hasAsterisk {
+		return nil, fmt.Errorf("map[string]int not allowed")
+	}
 
 	for _, value := range input {
 		value, isNil := template.Indirect(value)
@@ -297,6 +300,8 @@ func (j *JSONPath) evalMap(input []reflect.Value) ([]reflect.Value, error) {
 // evalArray evaluates ArrayNode
 func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
+	fmt.Println("params are")
+	fmt.Println(node.Params)
 	for _, value := range input {
 
 		value, isNil := template.Indirect(value)
@@ -305,7 +310,7 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 		}
 		if value.Kind() != reflect.Array && value.Kind() != reflect.Slice {
 			if value.Kind() == reflect.Map {
-				return j.evalMap(input)
+				return j.evalMap(input, node.HasAsterisk)
 			}
 			return input, fmt.Errorf("%v is not array or slice", value.Type())
 		}

@@ -68,6 +68,7 @@ type Node interface {
 // ListNode holds a sequence of nodes.
 type ListNode struct {
 	NodeType
+	HasAsterisk bool
 	Nodes []Node // The element nodes in lexical order.
 }
 
@@ -138,13 +139,15 @@ type ParamsEntry struct {
 // ArrayNode holds start, end, step information for array index selection
 type ArrayNode struct {
 	NodeType
+	HasAsterisk bool
 	Params [3]ParamsEntry // start, end, step
 }
 
-func newArray(params [3]ParamsEntry) *ArrayNode {
+func newArray(params [3]ParamsEntry, hasAsterisk bool) *ArrayNode {
 	return &ArrayNode{
 		NodeType: NodeArray,
 		Params:   params,
+		HasAsterisk: hasAsterisk,
 	}
 }
 

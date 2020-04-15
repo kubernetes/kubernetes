@@ -214,7 +214,7 @@ func (p *Parser) parseIdentifier(cur *ListNode) error {
 	return p.parseInsideAction(cur)
 }
 
-// parseRecursive scans the recursive desent operator ..
+// parseRecursive scans the recursive descent operator ..
 func (p *Parser) parseRecursive(cur *ListNode) error {
 	p.pos += len("..")
 	p.consumeText()
@@ -266,10 +266,11 @@ Loop:
 	text := p.consumeText()
 	text = text[1 : len(text)-1]
 	if text == "*" {
+		cur.HasAsterisk = true
 		text = ":"
 	}
 
-	//union operator
+	// union operator
 	strs := strings.Split(text, ",")
 	if len(strs) > 1 {
 		union := []*ListNode{}
@@ -330,7 +331,7 @@ Loop:
 			}
 		}
 	}
-	cur.append(newArray(params))
+	cur.append(newArray(params, cur.HasAsterisk))
 	return p.parseInsideAction(cur)
 }
 

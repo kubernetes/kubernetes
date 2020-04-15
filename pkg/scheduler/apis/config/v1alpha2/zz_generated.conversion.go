@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1alpha1 "k8s.io/component-base/config/v1alpha1"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	v1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -221,7 +220,8 @@ func autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	if err := Convert_v1alpha2_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ClientConnection, &out.ClientConnection, 0); err != nil {
 		return err
 	}
 	if err := v1.Convert_Pointer_string_To_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
@@ -230,7 +230,8 @@ func autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	if err := v1.Convert_Pointer_string_To_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.DebuggingConfiguration, &out.DebuggingConfiguration, 0); err != nil {
 		return err
 	}
 	if err := v1.Convert_Pointer_bool_To_bool(&in.DisablePreemption, &out.DisablePreemption, s); err != nil {
@@ -268,7 +269,8 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConf
 	if err := Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha2_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ClientConnection, &out.ClientConnection, 0); err != nil {
 		return err
 	}
 	if err := v1.Convert_string_To_Pointer_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
@@ -277,7 +279,8 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConf
 	if err := v1.Convert_string_To_Pointer_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.DebuggingConfiguration, &out.DebuggingConfiguration, 0); err != nil {
 		return err
 	}
 	if err := v1.Convert_bool_To_Pointer_bool(&in.DisablePreemption, &out.DisablePreemption, s); err != nil {
@@ -311,7 +314,8 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConf
 }
 
 func autoConvert_v1alpha2_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(in *v1alpha2.KubeSchedulerLeaderElectionConfiguration, out *config.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := v1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, 0); err != nil {
 		return err
 	}
 	return nil
@@ -323,7 +327,8 @@ func Convert_v1alpha2_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSch
 }
 
 func autoConvert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha2_KubeSchedulerLeaderElectionConfiguration(in *config.KubeSchedulerLeaderElectionConfiguration, out *v1alpha2.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := v1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, 0); err != nil {
 		return err
 	}
 	return nil
