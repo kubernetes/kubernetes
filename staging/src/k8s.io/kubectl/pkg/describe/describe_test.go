@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchv1 "k8s.io/api/batch/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -2730,8 +2731,14 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
-		// TODO(jchaloup): add tests for:
-		// - JobDescriber
+		"JobDescriber": &JobDescriber{
+			fake.NewSimpleClientset(&batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 		"IngressDescriber": &IngressDescriber{
 			fake.NewSimpleClientset(&networkingv1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
