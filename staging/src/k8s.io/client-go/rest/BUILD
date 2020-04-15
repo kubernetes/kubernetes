@@ -55,6 +55,7 @@ go_library(
         "transport.go",
         "url_utils.go",
         "urlbackoff.go",
+        "warnings.go",
         "zz_generated.deepcopy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/rest",
