@@ -58,32 +58,36 @@ func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 // and converts the AzureFile source to a CSIPersistentVolumeSource
 func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureFile == nil {
-		return nil, fmt.Errorf("volume is nil or AWS EBS not defined on volume")
+		return nil, fmt.Errorf("volume is nil or Azure File not defined on volume")
 	}
 
-	azureSource := volume.AzureFile
+	var (
+		azureSource = volume.AzureFile
 
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			// Must be unique per disk as it is used as the unique part of the
-			// staging path
-			Name: fmt.Sprintf("%s-%s", AzureFileDriverName, azureSource.ShareName),
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CSI: &v1.CSIPersistentVolumeSource{
-					VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", azureSource.SecretName, azureSource.ShareName),
-					ReadOnly:         azureSource.ReadOnly,
-					VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
-					NodePublishSecretRef: &v1.SecretReference{
-						Name:      azureSource.ShareName,
-						Namespace: "default",
+		pv = &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				// Must be unique per disk as it is used as the unique part of the
+				// staging path
+				Name: fmt.Sprintf("%s-%s", AzureFileDriverName, azureSource.ShareName),
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					CSI: &v1.CSIPersistentVolumeSource{
+						Driver:           AzureFileDriverName,
+						VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", azureSource.SecretName, azureSource.ShareName),
+						ReadOnly:         azureSource.ReadOnly,
+						VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
+						NodePublishSecretRef: &v1.SecretReference{
+							Name:      azureSource.ShareName,
+							Namespace: "default",
+						},
 					},
 				},
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
 			},
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
-		},
-	}
+		}
+	)
+
 	return pv, nil
 }
 
@@ -94,24 +98,28 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		return nil, fmt.Errorf("pv is nil or Azure File source not defined on pv")
 	}
 
-	azureSource := pv.Spec.PersistentVolumeSource.AzureFile
+	var (
+		azureSource = pv.Spec.PersistentVolumeSource.AzureFile
+		volumeID    = fmt.Sprintf(volumeIDTemplate, "", azureSource.SecretName, azureSource.ShareName)
 
-	volumeID := fmt.Sprintf(volumeIDTemplate, "", azureSource.SecretName, azureSource.ShareName)
-	// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
-	csiSource := &v1.CSIPersistentVolumeSource{
-		VolumeHandle:     volumeID,
-		ReadOnly:         azureSource.ReadOnly,
-		VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
-	}
+		// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
+		csiSource = &v1.CSIPersistentVolumeSource{
+			Driver: AzureFileDriverName,
+			NodePublishSecretRef: &v1.SecretReference{
+				Name: azureSource.ShareName,
+			},
+			ReadOnly:         azureSource.ReadOnly,
+			VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
+			VolumeHandle:     volumeID,
+		}
+	)
 
-	csiSource.NodePublishSecretRef = &v1.SecretReference{
-		Name:      azureSource.ShareName,
-		Namespace: *azureSource.SecretNamespace,
+	if azureSource.SecretNamespace != nil {
+		csiSource.NodePublishSecretRef.Namespace = *azureSource.SecretNamespace
 	}
 
 	pv.Spec.PersistentVolumeSource.AzureFile = nil
 	pv.Spec.PersistentVolumeSource.CSI = csiSource
-	pv.Spec.AccessModes = backwardCompatibleAccessModes(pv.Spec.AccessModes)
 
 	return pv, nil
 }
