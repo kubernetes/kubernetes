@@ -74,7 +74,7 @@ type DebugOptions struct {
 	Image       string
 	Interactive bool
 	Namespace   string
-	PodNames    []string
+	TargetNames []string
 	PullPolicy  corev1.PullPolicy
 	Quiet       bool
 	Target      string
@@ -89,9 +89,9 @@ type DebugOptions struct {
 // NewDebugOptions returns a DebugOptions initialized with default values.
 func NewDebugOptions(streams genericclioptions.IOStreams) *DebugOptions {
 	return &DebugOptions{
-		Args:      []string{},
-		IOStreams: streams,
-		PodNames:  []string{},
+		Args:        []string{},
+		IOStreams:   streams,
+		TargetNames: []string{},
 	}
 }
 
@@ -139,10 +139,10 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	// Arguments
 	argsLen := cmd.ArgsLenAtDash()
-	o.PodNames = args
+	o.TargetNames = args
 	// If there is a dash and there are args after the dash, extract the args.
 	if argsLen >= 0 && len(args) > argsLen {
-		o.PodNames, o.Args = args[:argsLen], args[argsLen:]
+		o.TargetNames, o.Args = args[:argsLen], args[argsLen:]
 	}
 
 	// Attach
@@ -187,7 +187,7 @@ func (o *DebugOptions) Validate(cmd *cobra.Command) error {
 	}
 
 	// Name
-	if len(o.PodNames) == 0 {
+	if len(o.TargetNames) == 0 {
 		return fmt.Errorf("NAME is required for debug")
 	}
 
@@ -209,38 +209,35 @@ func (o *DebugOptions) Validate(cmd *cobra.Command) error {
 
 // Run executes a kubectl debug.
 func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
+	ctx := context.Background()
+
 	r := o.builder.
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-		NamespaceParam(o.Namespace).DefaultNamespace().ResourceNames("pods", o.PodNames...).
+		NamespaceParam(o.Namespace).DefaultNamespace().ResourceNames("pods", o.TargetNames...).
 		Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
 
-	ctx := context.Background()
 	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			// TODO(verb): configurable early return
 			return err
 		}
 
-		pods := o.podClient.Pods(info.Namespace)
-		ec, err := pods.GetEphemeralContainers(ctx, info.Name, metav1.GetOptions{})
-		if err != nil {
-			// The pod has already been fetched at this point, so a NotFound error indicates the ephemeralcontainers subresource wasn't found.
-			if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound {
-				return fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
-			}
-			return err
+		var (
+			debugPod      *corev1.Pod
+			containerName string
+			visitErr      error
+		)
+		switch obj := info.Object.(type) {
+		case *corev1.Pod:
+			debugPod, containerName, visitErr = o.visitPod(ctx, obj)
+		default:
+			visitErr = fmt.Errorf("%q not supported by debug", info.Mapping.GroupVersionKind)
 		}
-		klog.V(2).Infof("existing ephemeral containers: %v", ec.EphemeralContainers)
-
-		debugContainer := o.generateDebugContainer(info.Object.(*corev1.Pod))
-		klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
-		ec.EphemeralContainers = append(ec.EphemeralContainers, *debugContainer)
-		_, err = pods.UpdateEphemeralContainers(ctx, info.Name, ec, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("error updating ephemeral containers: %v", err)
+		if visitErr != nil {
+			return visitErr
 		}
 
 		if o.Attach {
@@ -251,6 +248,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 					TTY:       o.TTY,
 					Quiet:     o.Quiet,
 				},
+				// TODO(verb): kubectl prints an incorrect "Session ended" message for debug containers.
 				CommandName: cmd.Parent().CommandPath() + " attach",
 
 				Attach: &attach.DefaultRemoteAttach{},
@@ -262,12 +260,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			opts.Config = config
 			opts.AttachFunc = attach.DefaultAttachFunc
 
-			attachablePod, err := polymorphichelpers.AttachablePodForObjectFn(f, info.Object, opts.GetPodTimeout)
-			if err != nil {
-				return err
-			}
-			err = handleAttachPod(ctx, f, o.podClient, attachablePod.Namespace, attachablePod.Name, debugContainer.Name, opts)
-			if err != nil {
+			if err := handleAttachPod(ctx, f, o.podClient, debugPod.Namespace, debugPod.Name, containerName, opts); err != nil {
 				return err
 			}
 		}
@@ -276,6 +269,33 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	})
 
 	return err
+}
+
+// visitPod handles debugging for pod targets by (depending on options):
+//   1. Creating an ephemeral debug container in an existing pod, OR
+//   2. Making a copy of pod with certain attributes changed (NOT YET IMPLEMENTED)
+// visitPod returns a pod and debug container name for subsequent attach, if applicable.
+func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
+	pods := o.podClient.Pods(pod.Namespace)
+	ec, err := pods.GetEphemeralContainers(ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		// The pod has already been fetched at this point, so a NotFound error indicates the ephemeralcontainers subresource wasn't found.
+		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound {
+			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
+		}
+		return nil, "", err
+	}
+	klog.V(2).Infof("existing ephemeral containers: %v", ec.EphemeralContainers)
+
+	debugContainer := o.generateDebugContainer(pod)
+	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
+	ec.EphemeralContainers = append(ec.EphemeralContainers, *debugContainer)
+	_, err = pods.UpdateEphemeralContainers(ctx, pod.Name, ec, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, "", fmt.Errorf("error updating ephemeral containers: %v", err)
+	}
+
+	return pod, debugContainer.Name, nil
 }
 
 func containerNames(pod *corev1.Pod) map[string]bool {
@@ -398,6 +418,7 @@ func waitForEphemeralContainer(ctx context.Context, podClient corev1client.PodsG
 	return result, err
 }
 
+// TODO(verb): handle other types of containers
 func handleAttachPod(ctx context.Context, f cmdutil.Factory, podClient corev1client.PodsGetter, ns, podName, ephemeralContainerName string, opts *attach.AttachOptions) error {
 	pod, err := waitForEphemeralContainer(ctx, podClient, ns, podName, ephemeralContainerName)
 	if err != nil {
