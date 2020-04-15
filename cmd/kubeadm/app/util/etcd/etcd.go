@@ -113,7 +113,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	// synchronizes client's endpoints with the known endpoints from the etcd membership.
 	err = etcdClient.Sync()
 	if err != nil {
-		return nil, errors.Wrap(err, "error syncing endpoints with etc")
+		return nil, errors.Wrap(err, "error syncing endpoints with etcd")
 	}
 	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
 

@@ -58,7 +58,7 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 		r.AddDirsToClean(etcdDataDir)
 		if cfg != nil {
 			if err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg); err != nil {
-				klog.Warningf("[reset] failed to remove etcd member: %v\n.Please manually remove this etcd member using etcdctl", err)
+				klog.Warningf("[reset] failed to remove etcd member: %v, please manually remove this etcd member using etcdctl", err)
 			}
 		}
 	} else {
