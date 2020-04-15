@@ -336,7 +336,17 @@ func autoConvert_v1alpha2_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in
 	} else {
 		out.Plugins = nil
 	}
-	out.PluginConfig = *(*[]config.PluginConfig)(unsafe.Pointer(&in.PluginConfig))
+	if in.PluginConfig != nil {
+		in, out := &in.PluginConfig, &out.PluginConfig
+		*out = make([]config.PluginConfig, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha2_PluginConfig_To_config_PluginConfig(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PluginConfig = nil
+	}
 	return nil
 }
 
@@ -358,7 +368,17 @@ func autoConvert_config_KubeSchedulerProfile_To_v1alpha2_KubeSchedulerProfile(in
 	} else {
 		out.Plugins = nil
 	}
-	out.PluginConfig = *(*[]v1alpha2.PluginConfig)(unsafe.Pointer(&in.PluginConfig))
+	if in.PluginConfig != nil {
+		in, out := &in.PluginConfig, &out.PluginConfig
+		*out = make([]v1alpha2.PluginConfig, len(*in))
+		for i := range *in {
+			if err := Convert_config_PluginConfig_To_v1alpha2_PluginConfig(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.PluginConfig = nil
+	}
 	return nil
 }
 
@@ -441,7 +461,9 @@ func Convert_config_Plugin_To_v1alpha2_Plugin(in *config.Plugin, out *v1alpha2.P
 
 func autoConvert_v1alpha2_PluginConfig_To_config_PluginConfig(in *v1alpha2.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
 	out.Name = in.Name
-	out.Args = in.Args
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Args, &out.Args, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -452,7 +474,9 @@ func Convert_v1alpha2_PluginConfig_To_config_PluginConfig(in *v1alpha2.PluginCon
 
 func autoConvert_config_PluginConfig_To_v1alpha2_PluginConfig(in *config.PluginConfig, out *v1alpha2.PluginConfig, s conversion.Scope) error {
 	out.Name = in.Name
-	out.Args = in.Args
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Args, &out.Args, s); err != nil {
+		return err
+	}
 	return nil
 }
 

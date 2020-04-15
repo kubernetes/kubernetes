@@ -65,6 +65,6 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &NodeUnschedulable{}, nil
 }

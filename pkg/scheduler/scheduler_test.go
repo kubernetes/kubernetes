@@ -388,7 +388,7 @@ type fakeNodeSelector struct {
 	fakeNodeSelectorArgs
 }
 
-func newFakeNodeSelector(args *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func newFakeNodeSelector(args runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	pl := &fakeNodeSelector{}
 	if err := framework.DecodeInto(args, &pl.fakeNodeSelectorArgs); err != nil {
 		return nil, err
@@ -455,7 +455,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 					}},
 				PluginConfig: []schedulerapi.PluginConfig{
 					{Name: "FakeNodeSelector",
-						Args: runtime.Unknown{Raw: []byte(`{"nodeName":"machine2"}`)},
+						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine2"}`)},
 					},
 				},
 			},
@@ -468,7 +468,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 					}},
 				PluginConfig: []schedulerapi.PluginConfig{
 					{Name: "FakeNodeSelector",
-						Args: runtime.Unknown{Raw: []byte(`{"nodeName":"machine3"}`)},
+						Args: &runtime.Unknown{Raw: []byte(`{"nodeName":"machine3"}`)},
 					},
 				},
 			},

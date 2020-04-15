@@ -63,7 +63,7 @@ func TestNewProfile(t *testing.T) {
 				PluginConfig: []config.PluginConfig{
 					{
 						Name: "QueueSort",
-						Args: runtime.Unknown{Raw: []byte("{}")},
+						Args: &runtime.Unknown{Raw: []byte("{}")},
 					},
 				},
 			},
@@ -153,7 +153,7 @@ func TestNewMap(t *testing.T) {
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "Bind2",
-							Args: runtime.Unknown{Raw: []byte("{}")},
+							Args: &runtime.Unknown{Raw: []byte("{}")},
 						},
 					},
 				},
@@ -215,7 +215,7 @@ func TestNewMap(t *testing.T) {
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "QueueSort",
-							Args: runtime.Unknown{Raw: []byte("{}")},
+							Args: &runtime.Unknown{Raw: []byte("{}")},
 						},
 					},
 				},
@@ -304,7 +304,7 @@ func (p *fakePlugin) Bind(context.Context, *framework.CycleState, *v1.Pod, strin
 	return nil
 }
 
-func newFakePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func newFakePlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &fakePlugin{}, nil
 }
 

@@ -25,11 +25,18 @@ import (
 )
 
 // PluginFactory is a function that builds a plugin.
-type PluginFactory = func(configuration *runtime.Unknown, f FrameworkHandle) (Plugin, error)
+type PluginFactory = func(configuration runtime.Object, f FrameworkHandle) (Plugin, error)
 
 // DecodeInto decodes configuration whose type is *runtime.Unknown to the interface into.
-func DecodeInto(configuration *runtime.Unknown, into interface{}) error {
-	if configuration == nil || configuration.Raw == nil {
+func DecodeInto(obj runtime.Object, into interface{}) error {
+	if obj == nil {
+		return nil
+	}
+	configuration, ok := obj.(*runtime.Unknown)
+	if !ok {
+		return fmt.Errorf("want args of type runtime.Unknown, got %T", obj)
+	}
+	if configuration.Raw == nil {
 		return nil
 	}
 

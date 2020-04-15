@@ -87,6 +87,6 @@ func (pl *NodePreferAvoidPods) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &NodePreferAvoidPods{handle: h}, nil
 }

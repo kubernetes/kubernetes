@@ -128,7 +128,7 @@ func (rl *ResourceLimits) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewResourceLimits initializes a new plugin and returns it.
-func NewResourceLimits(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func NewResourceLimits(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &ResourceLimits{handle: h}, nil
 }
 

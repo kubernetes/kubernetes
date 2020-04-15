@@ -63,7 +63,7 @@ func (f *Fit) Name() string {
 }
 
 // NewFit initializes a new plugin and returns it.
-func NewFit(plArgs *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewFit(plArgs runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	args := &schedulerv1alpha2.NodeResourcesFitArgs{}
 	if err := framework.DecodeInto(plArgs, args); err != nil {
 		return nil, err

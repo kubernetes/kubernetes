@@ -342,7 +342,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 // mergePluginConfigsFromPolicy merges the giving plugin configs ensuring that,
 // if a plugin name is repeated, the arguments are the same.
 func mergePluginConfigsFromPolicy(pc1, pc2 []schedulerapi.PluginConfig) ([]schedulerapi.PluginConfig, error) {
-	args := make(map[string]runtime.Unknown)
+	args := make(map[string]runtime.Object)
 	for _, c := range pc1 {
 		args[c.Name] = c.Args
 	}

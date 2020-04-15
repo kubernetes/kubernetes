@@ -63,7 +63,7 @@ func (la *LeastAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewLeastAllocated initializes a new plugin and returns it.
-func NewLeastAllocated(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func NewLeastAllocated(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &LeastAllocated{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{

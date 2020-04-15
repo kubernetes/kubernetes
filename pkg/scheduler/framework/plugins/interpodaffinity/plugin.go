@@ -62,7 +62,7 @@ func (pl *InterPodAffinity) BuildArgs() interface{} {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}

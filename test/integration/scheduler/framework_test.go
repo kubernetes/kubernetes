@@ -136,7 +136,7 @@ var _ framework.PermitPlugin = &PermitPlugin{}
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) framework.PluginFactory {
-	return func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		return plugin, nil
 	}
 }
@@ -454,7 +454,7 @@ func (pp *PermitPlugin) reset() {
 
 // newPermitPlugin returns a factory for permit plugin with specified PermitPlugin.
 func newPermitPlugin(permitPlugin *PermitPlugin) framework.PluginFactory {
-	return func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		permitPlugin.fh = fh
 		return permitPlugin, nil
 	}
@@ -860,16 +860,16 @@ func TestBindPlugin(t *testing.T) {
 	postBindPlugin := &PostBindPlugin{name: "mock-post-bind-plugin"}
 	// Create a plugin registry for testing. Register an unreserve, a bind plugin and a postBind plugin.
 	registry := framework.Registry{
-		unreservePlugin.Name(): func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		unreservePlugin.Name(): func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return unreservePlugin, nil
 		},
-		bindPlugin1.Name(): func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		bindPlugin1.Name(): func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return bindPlugin1, nil
 		},
-		bindPlugin2.Name(): func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		bindPlugin2.Name(): func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return bindPlugin2, nil
 		},
-		postBindPlugin.Name(): func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		postBindPlugin.Name(): func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return postBindPlugin, nil
 		},
 	}

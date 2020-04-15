@@ -61,7 +61,7 @@ func (ma *MostAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewMostAllocated initializes a new plugin and returns it.
-func NewMostAllocated(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func NewMostAllocated(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &MostAllocated{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{

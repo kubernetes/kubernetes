@@ -91,7 +91,7 @@ func NewRecorderFactory(b events.EventBroadcaster) RecorderFactory {
 type cfgValidator struct {
 	m             Map
 	queueSort     string
-	queueSortArgs runtime.Unknown
+	queueSortArgs runtime.Object
 }
 
 func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
@@ -108,7 +108,7 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
 		return fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", cfg.SchedulerName)
 	}
 	queueSort := cfg.Plugins.QueueSort.Enabled[0].Name
-	var queueSortArgs runtime.Unknown
+	var queueSortArgs runtime.Object
 	for _, plCfg := range cfg.PluginConfig {
 		if plCfg.Name == queueSort {
 			queueSortArgs = plCfg.Args
@@ -123,7 +123,7 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
 		return fmt.Errorf("different queue sort plugins for profile %q: %q, first: %q", cfg.SchedulerName, queueSort, v.queueSort)
 	}
 	if !cmp.Equal(v.queueSortArgs, queueSortArgs) {
-		return fmt.Errorf("different queue sort plugin args for profile %q: %s", cfg.SchedulerName, queueSortArgs.Raw)
+		return fmt.Errorf("different queue sort plugin args for profile %q", cfg.SchedulerName)
 	}
 	return nil
 }

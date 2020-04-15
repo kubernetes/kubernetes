@@ -59,6 +59,6 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &NodeName{}, nil
 }

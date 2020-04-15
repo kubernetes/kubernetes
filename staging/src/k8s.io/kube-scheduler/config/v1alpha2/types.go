@@ -200,5 +200,5 @@ type PluginConfig struct {
 	// Name defines the name of plugin being configured
 	Name string `json:"name"`
 	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
-	Args runtime.Unknown `json:"args,omitempty"`
+	Args runtime.RawExtension `json:"args,omitempty"`
 }

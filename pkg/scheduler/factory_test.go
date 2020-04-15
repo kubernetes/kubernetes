@@ -250,7 +250,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	for _, cfg := range factory.profiles[0].PluginConfig {
 		if cfg.Name == interpodaffinity.Name {
 			foundAffinityCfg = true
-			wantArgs := runtime.Unknown{Raw: []byte(`{"hardPodAffinityWeight":10}`)}
+			wantArgs := &runtime.Unknown{Raw: []byte(`{"hardPodAffinityWeight":10}`)}
 
 			if diff := cmp.Diff(wantArgs, cfg.Args); diff != "" {
 				t.Errorf("wrong InterPodAffinity args (-want, +got): %s", diff)
