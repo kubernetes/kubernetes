@@ -807,7 +807,7 @@ func TestSyncResourceQuota(t *testing.T) {
 			}
 		}
 		if usage == nil {
-			t.Errorf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
+			t.Fatalf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
 		}
 
 		// ensure usage is as expected
