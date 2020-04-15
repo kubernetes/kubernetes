@@ -21,6 +21,11 @@ set -o pipefail
 TASK=$1
 WHAT=$2
 
+# Connecting to a Remote Docker requires certificates for authentication, which can be found
+# at this path. By default, they can be found in the ${HOME} folder. We're expecting to find
+# here ".docker-${os_version}" folders which contains the necessary certificates.
+DOCKER_CERT_BASE_PATH="${DOCKER_CERT_BASE_PATH:-${HOME}}"
+
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
@@ -150,8 +155,8 @@ build() {
       # The node requires TLS authentication, and thus it is expected that the
       # ca.pem, cert.pem, key.pem files can be found in the ${HOME}/.docker-${os_version} folder.
       # TODO(claudiub): add "build --isolation=hyperv" once GCE introduces Hyper-V support.
-      docker --tlsverify --tlscacert "${HOME}/.docker-${os_version}/ca.pem" \
-        --tlscert "${HOME}/.docker-${os_version}/cert.pem" --tlskey "${HOME}/.docker-${os_version}/key.pem" \
+      docker --tlsverify --tlscacert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/ca.pem" \
+        --tlscert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/cert.pem" --tlskey "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/key.pem" \
         -H "${REMOTE_DOCKER_URL}" build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}" \
         --build-arg BASEIMAGE="${BASEIMAGE}" -f $dockerfile_name .
     fi
@@ -187,8 +192,8 @@ push() {
       docker push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
     elif [[ -n "${REMOTE_DOCKER_URL:-}" ]]; then
       # NOTE(claudiub): We're pushing the image we built on the remote Windows node.
-      docker --tlsverify --tlscacert "${HOME}/.docker-${os_version}/ca.pem" \
-        --tlscert "${HOME}/.docker-${os_version}/cert.pem" --tlskey "${HOME}/.docker-${os_version}/key.pem" \
+      docker --tlsverify --tlscacert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/ca.pem" \
+        --tlscert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/cert.pem" --tlskey "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/key.pem" \
         -H "${REMOTE_DOCKER_URL}" push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}"
     else
       echo "Cannot push the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_${os_version} should be set, containing the URL to a Windows docker daemon."
