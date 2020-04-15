@@ -26,6 +26,14 @@ import (
 	"sync"
 )
 
+// Interface manages the allocation of items out of a range. Interface
+// should be threadsafe.
+type Interface interface {
+	Occupy(*net.IPNet) error
+	AllocateNext() (*net.IPNet, error)
+	Release(*net.IPNet) error
+}
+
 // CidrSet manages a set of CIDR ranges from which blocks of IPs can
 // be allocated from.
 type CidrSet struct {
@@ -39,6 +47,8 @@ type CidrSet struct {
 	subNetMaskSize  int
 }
 
+var _ Interface = &CidrSet{}
+
 const (
 	// The subnet mask size cannot be greater than 16 more than the cluster mask size
 	// TODO: https://github.com/kubernetes/kubernetes/issues/44918
@@ -48,6 +58,8 @@ const (
 	clusterSubnetMaxDiff = 16
 	// halfIPv6Len is the half of the IPv6 length
 	halfIPv6Len = net.IPv6len / 2
+	// Using the map CIDRset we can have until 2^64 ranges
+	clusterMapSubnetMaxDiff = 64
 )
 
 var (
@@ -262,4 +274,212 @@ func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
 	}
 
 	return 0, fmt.Errorf("invalid IP: %v", ip)
+}
+
+// Map manages a set of CIDR ranges from which blocks of IPs can
+// be allocated from.
+type Map struct {
+	sync.Mutex
+	clusterCIDR   *net.IPNet
+	nodeMask      net.IPMask
+	maxCIDRs      uint64
+	nextCandidate uint64
+	used          map[uint64]bool
+}
+
+var _ Interface = &Map{}
+
+// NewMapCIDRSet creates a new CidrSet based on a map[uint64]bool.
+func NewMapCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) (*Map, error) {
+	clusterMask := clusterCIDR.Mask
+	clusterMaskSize, clusterMaskLen := clusterMask.Size()
+	// Normalize the cluster IP
+	clusterCIDR.IP.Mask(clusterCIDR.Mask)
+	// Find the maximum number
+	var maxCIDRs uint64
+	if (clusterCIDR.IP.To4() == nil) && (subNetMaskSize-clusterMaskSize >= clusterMapSubnetMaxDiff) {
+		return nil, ErrCIDRSetSubNetTooBig
+	}
+	maxCIDRs = 1 << uint64(subNetMaskSize-clusterMaskSize)
+	return &Map{
+		clusterCIDR: clusterCIDR,
+		maxCIDRs:    maxCIDRs,
+		nodeMask:    net.CIDRMask(subNetMaskSize, clusterMaskLen),
+		used:        make(map[uint64]bool),
+	}, nil
+}
+
+// Occupy marks the given CIDR range as used.
+// Occupy does not check if the CIDR range was previously used.
+func (m *Map) Occupy(cidr *net.IPNet) error {
+	m.Lock()
+	defer m.Unlock()
+	// validate that CIDR belongs to the Cluster CIDR ranges
+	if err := m.validate(cidr); err != nil {
+		return err
+	}
+
+	// allocate the corresponding subnets
+	ipKeys := m.calculateBeginEndOffset(cidr)
+	if ipKeys == nil || len(ipKeys) > int(m.maxCIDRs) {
+		return fmt.Errorf("CIDR %v can not be allocated", cidr)
+	}
+	for _, ipKey := range ipKeys {
+		// Occupy does not check if the CIDR range was previously used.
+		// if _, ok := m.used[ipKey]; ok {
+		// 	return fmt.Errorf("CIDR %v already in use", cidr)
+		// }
+		m.used[ipKey] = true
+	}
+
+	return nil
+}
+
+// Release marks the given CIDR range as free.
+// Release doesn't fail if the cidr was already free.
+func (m *Map) Release(cidr *net.IPNet) error {
+	m.Lock()
+	defer m.Unlock()
+	// validate that CIDR belongs to the Cluster CIDR ranges
+	if err := m.validate(cidr); err != nil {
+		return err
+	}
+
+	// allocate the corresponding subnets
+	ipKeys := m.calculateBeginEndOffset(cidr)
+	if ipKeys == nil {
+		return fmt.Errorf("CIDR %v can not be allocated", cidr)
+	}
+	for _, ipKey := range ipKeys {
+		if _, ok := m.used[ipKey]; ok {
+			delete(m.used, ipKey)
+		}
+	}
+
+	return nil
+}
+
+// AllocateNext allocates a free CIDR range and returns it.
+func (m *Map) AllocateNext() (*net.IPNet, error) {
+	m.Lock()
+	defer m.Unlock()
+	if uint64(len(m.used)) >= m.maxCIDRs {
+		return nil, ErrCIDRRangeNoCIDRsRemaining
+	}
+
+	var i uint64
+	for i = 0; i < m.maxCIDRs; i++ {
+		candidate := (i + m.nextCandidate) % m.maxCIDRs
+		if _, ok := m.used[candidate]; !ok {
+			m.used[candidate] = true
+			m.nextCandidate = (candidate + 1) % m.maxCIDRs
+			cidr := &net.IPNet{IP: m.addIPOffset(candidate), Mask: m.nodeMask}
+			return cidr, nil
+		}
+
+	}
+	return nil, ErrCIDRRangeNoCIDRsRemaining
+
+}
+
+func (m *Map) validate(cidr *net.IPNet) error {
+	if cidr == nil {
+		return fmt.Errorf("cidr is nil")
+	}
+	if !m.clusterCIDR.Contains(cidr.IP.Mask(m.clusterCIDR.Mask)) && !cidr.Contains(m.clusterCIDR.IP.Mask(cidr.Mask)) {
+		return fmt.Errorf("cidr %v is out the range of cluster cidr %v", cidr, m.clusterCIDR)
+	}
+	return nil
+
+}
+
+// A cluster has assigned a ClusterCIDR with mask X that is split into
+// different CIDRs assigned to the nodes with mask Y
+// The number of nodeCIDRs is equal to 2^(X-Y), i.e.:
+// a clusterCIDR 192.168.0.0/16 with nodes subnets of /24 gives 2^8 = 256 node subnets
+
+// cluster mask --->|
+// 11000000.10101000.00000000.00000000
+//                           |<-- subnetMask
+//        bitmap --->|       |<-- offset
+//
+// base = 192.168.0.0
+// offset = 0.0.0.255
+// subnet1 = 192.168.0.0/24
+// subnet2 = 192.168.1.0/24
+// ...
+// subnet256 = 192.168.255.0/24
+//
+// The bits needed to identify a CIDR are the ones between the cluster cidr network address
+// and the node mask cidr.
+
+// addIPOffset adds the provided integer offset to a base big.Int representing a
+// net.IP and shifting the node-mask-bits
+func (m *Map) addIPOffset(offset uint64) net.IP {
+	base := big.NewInt(0)
+	// Get the offset
+	ones, bits := m.nodeMask.Size()
+	bigOffset := big.NewInt(int64(offset))
+	bigOffset.Lsh(bigOffset, uint(bits-ones))
+	// Get the Cluster IP as base and add it to the offset
+	if bits == 128 {
+		base.SetBytes(m.clusterCIDR.IP.To16())
+	} else {
+		base.SetBytes(m.clusterCIDR.IP.To4())
+	}
+	r := base.Add(base, bigOffset).Bytes()
+	if bits != 128 {
+		return net.IP(r)
+	}
+	// BigInt may return less than 16 bytes sometimes
+	r = append(make([]byte, 16), r...)
+	return net.IP(r[len(r)-16:])
+}
+
+// calculateIPOffset calculates the integer offset of ip from base such that
+// base + offset >> node-mask-bits = ip. It requires ip >= base.
+func (m *Map) calculateIPOffset(ip net.IP) uint64 {
+	// Obtain the cluster IP BigInt as base
+	base := big.NewInt(0).SetBytes(m.clusterCIDR.IP.To16())
+	ones, bits := m.nodeMask.Size()
+	// The CIDR IP minus the base is the offset
+	bigOffset := big.NewInt(0).SetBytes(ip.To16())
+	bigOffset.Sub(bigOffset, base)
+	// We don't take into consideration the bits of the mask
+	offset := bigOffset.Rsh(bigOffset, uint(bits-ones)).Uint64()
+	return offset
+}
+
+// calculateBeginEndOffset calculates the integer offsets corresponding to the CIDR
+// If the CIDR mask is shorter than the Node mask, then it returns all the offsets
+// of the overlapping subnets.
+// If it's greater it returns the offset of the corresponding subnet.
+func (m *Map) calculateBeginEndOffset(cidr *net.IPNet) []uint64 {
+	var ipKeys []uint64
+	cidrMaskSize, _ := cidr.Mask.Size()
+	clusterMaskSize, _ := m.clusterCIDR.Mask.Size()
+	maskSize, _ := m.nodeMask.Size()
+	// If the cidr is greater than the cluster cidr
+	// allocate all the subnets that belong to the cluster
+	if cidrMaskSize < clusterMaskSize {
+		cidr = m.clusterCIDR
+		cidrMaskSize = clusterMaskSize
+	}
+	// allocate the first subnet, corresponding to the cidr IP subnet address
+	// if the cidr subnet smaller than the ones allowed by the node mask we return only this subnet
+	ipKey := m.calculateIPOffset(cidr.IP.Mask(m.nodeMask))
+	ipKeys = append(ipKeys, ipKey)
+
+	// if the CIDR mask is shorter than the node mask
+	// we have to allocate all the overlapping subnets
+	if cidrMaskSize < maskSize {
+		// TODO this overflows if maskSize - cidrMaskSize > 63
+		end := 1 << uint64(maskSize-cidrMaskSize)
+		var i uint64
+		// append each subsequent subnet
+		for i = 1; i < uint64(end); i++ {
+			ipKeys = append(ipKeys, ipKey+i)
+		}
+	}
+	return ipKeys
 }
