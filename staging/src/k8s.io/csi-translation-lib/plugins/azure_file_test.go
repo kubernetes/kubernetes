@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetFileShareInfo(t *testing.T) {
@@ -66,6 +69,151 @@ func TestGetFileShareInfo(t *testing.T) {
 			!reflect.DeepEqual(result3, test.expected3) || !reflect.DeepEqual(result4, test.expected4) {
 			t.Errorf("input: %q, getFileShareInfo result1: %q, expected1: %q, result2: %q, expected2: %q, result3: %q, expected3: %q, result4: %q, expected4: %q", test.options, result1, test.expected1, result2, test.expected2,
 				result3, test.expected3, result4, test.expected4)
+		}
+	}
+}
+
+func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
+	translator := NewAzureFileCSITranslator()
+
+	cases := []struct {
+		name   string
+		volume *corev1.Volume
+		expVol *corev1.PersistentVolume
+		expErr bool
+	}{
+		{
+			name:   "empty volume",
+			expErr: true,
+		},
+		{
+			name:   "no azure file volume",
+			volume: &corev1.Volume{},
+			expErr: true,
+		},
+		{
+			name: "azure file volume",
+			volume: &corev1.Volume{
+				VolumeSource: corev1.VolumeSource{
+					AzureFile: &corev1.AzureFileVolumeSource{
+						ReadOnly:   true,
+						SecretName: "secretname",
+						ShareName:  "sharename",
+					},
+				},
+			},
+			expVol: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "file.csi.azure.com-sharename",
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver: "file.csi.azure.com",
+							NodePublishSecretRef: &corev1.SecretReference{
+								Name:      "sharename",
+								Namespace: "default",
+							},
+							ReadOnly:         true,
+							VolumeAttributes: map[string]string{azureFileShareName: "sharename"},
+							VolumeHandle:     "#secretname#sharename",
+						},
+					},
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Logf("Testing %v", tc.name)
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.volume)
+		if err != nil && !tc.expErr {
+			t.Errorf("Did not expect error but got: %v", err)
+		}
+
+		if err == nil && tc.expErr {
+			t.Errorf("Expected error, but did not get one.")
+		}
+
+		if !reflect.DeepEqual(got, tc.expVol) {
+			t.Errorf("Got parameters: %v, expected :%v", got, tc.expVol)
+		}
+	}
+}
+
+func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
+	translator := NewAzureFileCSITranslator()
+
+	secretNamespace := "secretnamespace"
+
+	cases := []struct {
+		name   string
+		volume *corev1.PersistentVolume
+		expVol *corev1.PersistentVolume
+		expErr bool
+	}{
+		{
+			name:   "empty volume",
+			expErr: true,
+		},
+		{
+			name:   "no azure file volume",
+			volume: &corev1.PersistentVolume{},
+			expErr: true,
+		},
+		{
+			name: "azure file volume",
+			volume: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "file.csi.azure.com-sharename",
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						AzureFile: &corev1.AzureFilePersistentVolumeSource{
+							ShareName:       "sharename",
+							SecretName:      "secretname",
+							SecretNamespace: &secretNamespace,
+							ReadOnly:        true,
+						},
+					},
+				},
+			},
+			expVol: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "file.csi.azure.com-sharename",
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver:   "file.csi.azure.com",
+							ReadOnly: true,
+							NodePublishSecretRef: &corev1.SecretReference{
+								Name:      "sharename",
+								Namespace: secretNamespace,
+							},
+							VolumeAttributes: map[string]string{azureFileShareName: "sharename"},
+							VolumeHandle:     "#secretname#sharename",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Logf("Testing %v", tc.name)
+		got, err := translator.TranslateInTreePVToCSI(tc.volume)
+		if err != nil && !tc.expErr {
+			t.Errorf("Did not expect error but got: %v", err)
+		}
+
+		if err == nil && tc.expErr {
+			t.Errorf("Expected error, but did not get one.")
+		}
+
+		if !reflect.DeepEqual(got, tc.expVol) {
+			t.Errorf("Got parameters: %v, expected :%v", got, tc.expVol)
 		}
 	}
 }
