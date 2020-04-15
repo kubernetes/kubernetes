@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
@@ -94,6 +96,32 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 
+	// Enable bindata file lookup as fallback.
+	testfiles.AddFileSource(testfiles.BindataFileSource{
+		Asset:      generated.Asset,
+		AssetNames: generated.AssetNames,
+	})
+	if framework.TestContext.ListConformanceTests {
+		var tests []struct {
+			Testname    string `yaml:"testname"`
+			Codename    string `yaml:"codename"`
+			Description string `yaml:"description"`
+			Release     string `yaml:"release"`
+			File        string `yaml:"file"`
+		}
+
+		data := testfiles.ReadOrDie("test/conformance/testdata/conformance.yaml")
+		if err := yaml.Unmarshal(data, &tests); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := yaml.NewEncoder(os.Stdout).Encode(tests); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
 	framework.AfterReadingAllFlags(&framework.TestContext)
 
 	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
@@ -104,12 +132,6 @@ func TestMain(m *testing.M) {
 	if framework.TestContext.RepoRoot != "" {
 		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}
-
-	// Enable bindata file lookup as fallback.
-	testfiles.AddFileSource(testfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
 
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
