@@ -45,6 +45,7 @@ import (
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
 	"k8s.io/klog"
+	"k8s.io/utils/pointer"
 )
 
 type cadvisorClient struct {
@@ -99,8 +100,14 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}
 
+	duration := maxHousekeepingInterval
+	housekeepingConfig := manager.HouskeepingConfig{
+		Interval:     &duration,
+		AllowDynamic: pointer.BoolPtr(allowDynamicHousekeeping),
+	}
+
 	// Create the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, includedMetrics, http.DefaultClient, cgroupRoots)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, housekeepingConfig, includedMetrics, http.DefaultClient, cgroupRoots, "")
 	if err != nil {
 		return nil, err
 	}
