@@ -39,8 +39,8 @@ import (
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/master/ports"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
+	utilflag "k8s.io/utils/flag"
 )
 
 const defaultRootDir = "/var/lib/kubelet"

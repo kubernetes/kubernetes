@@ -36,7 +36,6 @@ go_library(
         "//pkg/proxy/util:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/filesystem:go_default_library",
-        "//pkg/util/flag:go_default_library",
         "//pkg/util/ipset:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/ipvs:go_default_library",
@@ -76,6 +75,7 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
+        "//vendor/k8s.io/utils/flag:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/proxy/metrics:go_default_library",

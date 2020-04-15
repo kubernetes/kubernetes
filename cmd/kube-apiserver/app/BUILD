@@ -29,7 +29,6 @@ go_library(
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/serviceaccount:go_default_library",
-        "//pkg/util/flag:go_default_library",
         "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
@@ -81,6 +80,7 @@ go_library(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/flag:go_default_library",
     ],
 )
 
