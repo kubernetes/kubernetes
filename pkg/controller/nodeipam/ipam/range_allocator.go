@@ -87,7 +87,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	cidrSets := make([]cidrset.Interface, len(allocatorParams.ClusterCIDRs))
 	for idx, cidr := range allocatorParams.ClusterCIDRs {
 		var cidrSet cidrset.Interface
-		cidrSet, err := cidrset.NewCIDRSet(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
+		cidrSet, err := cidrset.NewMapCIDRSet(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
 		if err != nil {
 			return nil, err
 		}
