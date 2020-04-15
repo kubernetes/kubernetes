@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -28,10 +29,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/controller"
+	clientretry "k8s.io/client-go/util/retry"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/system"
 )
@@ -61,6 +65,13 @@ var (
 	notReadyTaintTemplate = &v1.Taint{
 		Key:    v1.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
+	}
+
+	// updateTaintBackOff contains the maximum retries and the wait interval between two retries.
+	updateTaintBackOff = wait.Backoff{
+		Steps:    5,
+		Duration: 100 * time.Millisecond,
+		Jitter:   1.0,
 	}
 )
 
@@ -550,11 +561,124 @@ func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName str
 
 // RemoveTaintOffNode removes the given taint from the given node.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	err := controller.RemoveTaintOffNode(c, nodeName, nil, &taint)
+	err := removeNodeTaint(c, nodeName, nil, &taint)
 
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 	verifyThatTaintIsGone(c, nodeName, &taint)
+}
+
+// removeNodeTaint is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func removeNodeTaint(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+	if len(taints) == 0 {
+		return nil
+	}
+	// Short circuit for limiting amount of API calls.
+	if node != nil {
+		match := false
+		for _, taint := range taints {
+			if taintExists(node.Spec.Taints, taint) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return nil
+		}
+	}
+
+	firstTry := true
+	return clientretry.RetryOnConflict(updateTaintBackOff, func() error {
+		var err error
+		var oldNode *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+
+		var newNode *v1.Node
+		oldNodeCopy := oldNode
+		updated := false
+		for _, taint := range taints {
+			curNewNode, ok, err := removeTaint(oldNodeCopy, taint)
+			if err != nil {
+				return fmt.Errorf("failed to remove taint of node")
+			}
+			updated = updated || ok
+			newNode = curNewNode
+			oldNodeCopy = curNewNode
+		}
+		if !updated {
+			return nil
+		}
+		return patchNodeTaints(c, nodeName, oldNode, newNode)
+	})
+}
+
+// patchNodeTaints patches node's taints.
+func patchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
+	oldData, err := json.Marshal(oldNode)
+	if err != nil {
+		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
+	}
+
+	newTaints := newNode.Spec.Taints
+	newNodeClone := oldNode.DeepCopy()
+	newNodeClone.Spec.Taints = newTaints
+	newData, err := json.Marshal(newNodeClone)
+	if err != nil {
+		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNodeClone, nodeName, err)
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+	if err != nil {
+		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
+	}
+
+	_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	return err
+}
+
+// removeTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
+// false otherwise.
+func removeTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+	newNode := node.DeepCopy()
+	nodeTaints := newNode.Spec.Taints
+	if len(nodeTaints) == 0 {
+		return newNode, false, nil
+	}
+
+	if !taintExists(nodeTaints, taint) {
+		return newNode, false, nil
+	}
+
+	newTaints, _ := deleteTaint(nodeTaints, taint)
+	newNode.Spec.Taints = newTaints
+	return newNode, true, nil
+}
+
+// deleteTaint removes all the taints that have the same key and effect to given taintToDelete.
+func deleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) {
+	var newTaints []v1.Taint
+	deleted := false
+	for i := range taints {
+		if taintToDelete.MatchTaint(&taints[i]) {
+			deleted = true
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, deleted
 }
 
 func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
