@@ -15,6 +15,8 @@ go_library(
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/go.etcd.io/etcd/pkg/transport:go_default_library",
+        "//vendor/go.uber.org/zap:go_default_library",
+        "//vendor/go.uber.org/zap/zapcore:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

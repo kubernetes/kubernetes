@@ -30,6 +30,8 @@ import (
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/pkg/transport"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -48,6 +50,31 @@ var etcdBackoff = wait.Backoff{
 	Duration: 50 * time.Millisecond,
 	Factor:   2.0,
 	Jitter:   0.1,
+}
+
+// nopZapLoggerConfig defines a nop zap logger configuration
+var nopZapLoggerConfig = zap.Config{
+	Level: zap.NewAtomicLevelAt(zap.FatalLevel + 1),
+
+	Encoding: "json",
+
+	EncoderConfig: zapcore.EncoderConfig{
+		TimeKey:        "ts",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	},
+
+	// Use "/dev/null" to discard all
+	OutputPaths:      []string{"/dev/null"},
+	ErrorOutputPaths: []string{"/dev/null"},
 }
 
 // ClusterInterrogator is an interface to get etcd cluster related information
@@ -222,7 +249,8 @@ func (c *Client) Sync() error {
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
 		},
-		TLS: c.TLS,
+		TLS:       c.TLS,
+		LogConfig: &nopZapLoggerConfig,
 	})
 	if err != nil {
 		return err
@@ -266,7 +294,8 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
 		},
-		TLS: c.TLS,
+		TLS:       c.TLS,
+		LogConfig: &nopZapLoggerConfig,
 	})
 	if err != nil {
 		return 0, err
@@ -307,7 +336,8 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
 		},
-		TLS: c.TLS,
+		TLS:       c.TLS,
+		LogConfig: &nopZapLoggerConfig,
 	})
 	if err != nil {
 		return nil, err
@@ -357,7 +387,8 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
 		},
-		TLS: c.TLS,
+		TLS:       c.TLS,
+		LogConfig: &nopZapLoggerConfig,
 	})
 	if err != nil {
 		return nil, err
@@ -421,7 +452,8 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
 		},
-		TLS: c.TLS,
+		TLS:       c.TLS,
+		LogConfig: &nopZapLoggerConfig,
 	})
 	if err != nil {
 		return nil, err
