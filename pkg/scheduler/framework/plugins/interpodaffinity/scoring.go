@@ -137,7 +137,7 @@ func (pl *InterPodAffinity) processExistingPod(state *preScoreState, existingPod
 		// For every hard pod affinity term of <existingPod>, if <pod> matches the term,
 		// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 		// value as that of <existingPod>'s node by the constant <ipa.hardPodAffinityWeight>
-		if *pl.args.HardPodAffinityWeight > 0 {
+		if pl.args.HardPodAffinityWeight > 0 {
 			terms := existingPodAffinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 			// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
 			//if len(existingPodAffinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
@@ -145,7 +145,7 @@ func (pl *InterPodAffinity) processExistingPod(state *preScoreState, existingPod
 			//}
 			for i := range terms {
 				term := &terms[i]
-				processedTerm, err := newWeightedAffinityTerm(existingPod, term, *pl.args.HardPodAffinityWeight)
+				processedTerm, err := newWeightedAffinityTerm(existingPod, term, pl.args.HardPodAffinityWeight)
 				if err != nil {
 					return err
 				}

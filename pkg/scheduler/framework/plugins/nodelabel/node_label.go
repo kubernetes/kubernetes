@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -51,8 +51,8 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 
 // New initializes a new plugin and returns it.
 func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := schedulerv1alpha2.NodeLabelArgs{}
-	if err := framework.DecodeInto(plArgs, &args); err != nil {
+	args, err := getArgs(plArgs)
+	if err != nil {
 		return nil, err
 	}
 	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
@@ -67,10 +67,21 @@ func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plu
 	}, nil
 }
 
+func getArgs(obj runtime.Object) (config.NodeLabelArgs, error) {
+	if obj == nil {
+		return config.NodeLabelArgs{}, nil
+	}
+	ptr, ok := obj.(*config.NodeLabelArgs)
+	if !ok {
+		return config.NodeLabelArgs{}, fmt.Errorf("want args to be of type NodeLabelArgs, got %T", obj)
+	}
+	return *ptr, nil
+}
+
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.
 type NodeLabel struct {
 	handle framework.FrameworkHandle
-	args   schedulerv1alpha2.NodeLabelArgs
+	args   config.NodeLabelArgs
 }
 
 var _ framework.FilterPlugin = &NodeLabel{}

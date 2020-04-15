@@ -20,38 +20,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 func TestNew(t *testing.T) {
 	cases := []struct {
-		name     string
-		args     runtime.Unknown
-		wantErr  string
-		wantArgs schedulerv1alpha2.PodTopologySpreadArgs
+		name    string
+		args    config.PodTopologySpreadArgs
+		wantErr string
 	}{
 		{name: "empty args"},
 		{
 			name: "valid constraints",
-			args: runtime.Unknown{
-				ContentType: runtime.ContentTypeYAML,
-				Raw: []byte(`defaultConstraints:
-  - maxSkew: 1
-    topologyKey: "node"
-    whenUnsatisfiable: "ScheduleAnyway"
-  - maxSkew: 5
-    topologyKey: "zone"
-    whenUnsatisfiable: "DoNotSchedule"
-`),
-			},
-			wantArgs: schedulerv1alpha2.PodTopologySpreadArgs{
+			args: config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{
 						MaxSkew:           1,
@@ -68,66 +55,75 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name: "repeated constraints",
-			args: runtime.Unknown{
-				ContentType: runtime.ContentTypeYAML,
-				Raw: []byte(`defaultConstraints:
-  - maxSkew: 1
-    topologyKey: "node"
-    whenUnsatisfiable: "ScheduleAnyway"
-  - maxSkew: 5
-    topologyKey: "node"
-    whenUnsatisfiable: "ScheduleAnyway"
-`),
+			args: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+					},
+					{
+						MaxSkew:           5,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+					},
+				},
 			},
 			wantErr: "Duplicate value",
 		},
 		{
 			name: "unknown whenUnsatisfiable",
-			args: runtime.Unknown{
-				ContentType: runtime.ContentTypeYAML,
-				Raw: []byte(`defaultConstraints:
-  - maxSkew: 1
-    topologyKey: "node"
-    whenUnsatisfiable: "Unknown"
-`),
+			args: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: "Unknown",
+					},
+				},
 			},
 			wantErr: "Unsupported value",
 		},
 		{
 			name: "negative maxSkew",
-			args: runtime.Unknown{
-				ContentType: runtime.ContentTypeYAML,
-				Raw: []byte(`defaultConstraints:
-  - maxSkew: -1
-    topologyKey: "node"
-    whenUnsatisfiable: "ScheduleAnyway"
-`),
+			args: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           -1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+					},
+				},
 			},
 			wantErr: "must be greater than zero",
 		},
 		{
 			name: "empty topologyKey",
-			args: runtime.Unknown{
-				ContentType: runtime.ContentTypeYAML,
-				Raw: []byte(`defaultConstraints:
-  - maxSkew: 1
-    whenUnsatisfiable: "ScheduleAnyway"
-`),
+			args: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+					},
+				},
 			},
 			wantErr: "can not be empty",
 		},
 		{
 			name: "with label selector",
-			args: runtime.Unknown{
-				ContentType: runtime.ContentTypeYAML,
-				Raw: []byte(`defaultConstraints:
-  - maxSkew: 1
-    topologyKey: "rack"
-    whenUnsatisfiable: "ScheduleAnyway"
-    labelSelector:
-      matchLabels:
-        foo: "bar"
-`),
+			args: config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "rack",
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
 			},
 			wantErr: "constraint must not define a selector",
 		},
@@ -142,7 +138,7 @@ func TestNew(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			pl, err := New(&tc.args, f)
+			_, err = New(&tc.args, f)
 			if len(tc.wantErr) != 0 {
 				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 					t.Errorf("must fail, got error %q, want %q", err, tc.wantErr)
@@ -151,10 +147,6 @@ func TestNew(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatal(err)
-			}
-			plObj := pl.(*PodTopologySpread)
-			if diff := cmp.Diff(tc.wantArgs, plObj.BuildArgs()); diff != "" {
-				t.Errorf("wrong plugin build args (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -64,12 +64,11 @@ func (s *preFilterState) Clone() framework.StateData {
 
 // New initializes a new plugin and returns it.
 func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := schedulerv1alpha2.ServiceAffinityArgs{}
-	if err := framework.DecodeInto(plArgs, &args); err != nil {
+	args, err := getArgs(plArgs)
+	if err != nil {
 		return nil, err
 	}
-	informerFactory := handle.SharedInformerFactory()
-	serviceLister := informerFactory.Core().V1().Services().Lister()
+	serviceLister := handle.SharedInformerFactory().Core().V1().Services().Lister()
 
 	return &ServiceAffinity{
 		sharedLister:  handle.SnapshotSharedLister(),
@@ -78,9 +77,20 @@ func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plu
 	}, nil
 }
 
+func getArgs(obj runtime.Object) (config.ServiceAffinityArgs, error) {
+	if obj == nil {
+		return config.ServiceAffinityArgs{}, nil
+	}
+	ptr, ok := obj.(*config.ServiceAffinityArgs)
+	if !ok {
+		return config.ServiceAffinityArgs{}, fmt.Errorf("want args to be of type ServiceAffinityArgs, got %T", obj)
+	}
+	return *ptr, nil
+}
+
 // ServiceAffinity is a plugin that checks service affinity.
 type ServiceAffinity struct {
-	args          schedulerv1alpha2.ServiceAffinityArgs
+	args          config.ServiceAffinityArgs
 	sharedLister  framework.SharedLister
 	serviceLister corelisters.ServiceLister
 }

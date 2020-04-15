@@ -19,7 +19,6 @@ go_library(
         "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/apis/config/v1alpha2:go_default_library",
         "//pkg/scheduler/apis/config/validation:go_default_library",
-        "//pkg/scheduler/framework/plugins:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

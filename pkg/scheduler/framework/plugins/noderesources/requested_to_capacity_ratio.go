@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -49,8 +48,8 @@ type functionShapePoint struct {
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
 func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &schedulerv1alpha2.RequestedToCapacityRatioArgs{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
+	args, err := getRequestedToCapacityRatioArgs(plArgs)
+	if err != nil {
 		return nil, err
 	}
 
@@ -90,6 +89,17 @@ func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Framewo
 			resourceToWeightMap,
 		},
 	}, nil
+}
+
+func getRequestedToCapacityRatioArgs(obj runtime.Object) (config.RequestedToCapacityRatioArgs, error) {
+	if obj == nil {
+		return config.RequestedToCapacityRatioArgs{}, nil
+	}
+	ptr, ok := obj.(*config.RequestedToCapacityRatioArgs)
+	if !ok {
+		return config.RequestedToCapacityRatioArgs{}, fmt.Errorf("want args to be of type RequestedToCapacityRatioArgs, got %T", obj)
+	}
+	return *ptr, nil
 }
 
 // RequestedToCapacityRatio is a score plugin that allow users to apply bin packing
