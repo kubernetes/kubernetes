@@ -40,6 +40,10 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_CertificateSigningRequest(in *v1beta1.CertificateSigningRequest) {
 	SetDefaults_CertificateSigningRequestSpec(&in.Spec)
+	for i := range in.Status.Conditions {
+		a := &in.Status.Conditions[i]
+		SetDefaults_CertificateSigningRequestCondition(a)
+	}
 }
 
 func SetObjectDefaults_CertificateSigningRequestList(in *v1beta1.CertificateSigningRequestList) {

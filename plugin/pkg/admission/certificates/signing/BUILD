@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/apis/certificates:go_default_library",
         "//plugin/pkg/admission/certificates:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",

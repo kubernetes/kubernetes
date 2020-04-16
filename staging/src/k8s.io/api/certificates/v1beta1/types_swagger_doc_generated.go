@@ -38,10 +38,12 @@ func (CertificateSigningRequest) SwaggerDoc() map[string]string {
 }
 
 var map_CertificateSigningRequestCondition = map[string]string{
-	"type":           "request approval state, currently Approved or Denied.",
-	"reason":         "brief reason for the request state",
-	"message":        "human readable message with details about the request state",
-	"lastUpdateTime": "timestamp for the last update to this condition",
+	"type":               "type of the condition. Known conditions include \"Approved\", \"Denied\", and \"Failed\".",
+	"status":             "Status of the condition, one of True, False, Unknown. Approved, Denied, and Failed conditions may not be \"False\" or \"Unknown\". Defaults to \"True\". If unset, should be treated as \"True\".",
+	"reason":             "brief reason for the request state",
+	"message":            "human readable message with details about the request state",
+	"lastUpdateTime":     "timestamp for the last update to this condition",
+	"lastTransitionTime": "lastTransitionTime is the time the condition last transitioned from one status to another. If unset, when a new condition type is added or an existing condition's status is changed, the server defaults this to the current time.",
 }
 
 func (CertificateSigningRequestCondition) SwaggerDoc() map[string]string {

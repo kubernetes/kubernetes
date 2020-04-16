@@ -12,9 +12,16 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/certificates/validation",
     deps = [
         "//pkg/apis/certificates:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 
@@ -37,7 +44,11 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )

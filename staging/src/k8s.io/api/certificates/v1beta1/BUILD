@@ -19,6 +19,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/api/certificates/v1beta1",
     importpath = "k8s.io/api/certificates/v1beta1",
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
