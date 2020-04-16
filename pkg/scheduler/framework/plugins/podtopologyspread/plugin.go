@@ -19,7 +19,7 @@ package podtopologyspread
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/informers"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -39,22 +40,9 @@ var (
 	supportedScheduleActions = sets.NewString(string(v1.DoNotSchedule), string(v1.ScheduleAnyway))
 )
 
-// Args holds the arguments to configure the plugin.
-type Args struct {
-	// DefaultConstraints defines topology spread constraints to be applied to
-	// pods that don't define any in `pod.spec.topologySpreadConstraints`.
-	// `topologySpreadConstraint.labelSelectors` must be empty, as they are
-	// deduced the pods' membership to Services, Replication Controllers, Replica
-	// Sets or Stateful Sets.
-	// Empty by default.
-	// +optional
-	// +listType=atomic
-	DefaultConstraints []v1.TopologySpreadConstraint `json:"defaultConstraints"`
-}
-
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
-	Args
+	args             schedulerv1alpha2.PodTopologySpreadArgs
 	sharedLister     framework.SharedLister
 	services         corelisters.ServiceLister
 	replicationCtrls corelisters.ReplicationControllerLister
@@ -79,7 +67,7 @@ func (pl *PodTopologySpread) Name() string {
 
 // BuildArgs returns the arguments used to build the plugin.
 func (pl *PodTopologySpread) BuildArgs() interface{} {
-	return pl.Args
+	return pl.args
 }
 
 // New initializes a new plugin and returns it.
@@ -88,13 +76,13 @@ func New(args runtime.Object, h framework.FrameworkHandle) (framework.Plugin, er
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
 	pl := &PodTopologySpread{sharedLister: h.SnapshotSharedLister()}
-	if err := framework.DecodeInto(args, &pl.Args); err != nil {
+	if err := framework.DecodeInto(args, &pl.args); err != nil {
 		return nil, err
 	}
-	if err := validateArgs(&pl.Args); err != nil {
+	if err := validateArgs(&pl.args); err != nil {
 		return nil, err
 	}
-	if len(pl.DefaultConstraints) != 0 {
+	if len(pl.args.DefaultConstraints) != 0 {
 		if h.SharedInformerFactory() == nil {
 			return nil, fmt.Errorf("SharedInformerFactory is nil")
 		}
@@ -113,7 +101,7 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 // validateArgs replicates the validation from
 // pkg/apis/core/validation.validateTopologySpreadConstraints.
 // This has the additional check for .labelSelector to be nil.
-func validateArgs(args *Args) error {
+func validateArgs(args *schedulerv1alpha2.PodTopologySpreadArgs) error {
 	var allErrs field.ErrorList
 	path := field.NewPath("defaultConstraints")
 	for i, c := range args.DefaultConstraints {

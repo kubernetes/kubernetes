@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -34,7 +35,7 @@ func TestNew(t *testing.T) {
 		name     string
 		args     runtime.Unknown
 		wantErr  string
-		wantArgs Args
+		wantArgs schedulerv1alpha2.PodTopologySpreadArgs
 	}{
 		{name: "empty args"},
 		{
@@ -50,7 +51,7 @@ func TestNew(t *testing.T) {
     whenUnsatisfiable: "DoNotSchedule"
 `),
 			},
-			wantArgs: Args{
+			wantArgs: schedulerv1alpha2.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{
 						MaxSkew:           1,
