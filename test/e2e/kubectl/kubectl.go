@@ -854,6 +854,71 @@ metadata:
 		})
 	})
 
+	ginkgo.Describe("Kubectl diff", func() {
+		/*
+			Release : v1.18
+			Testname: Kubectl, diff Deployment
+			Description: Create a Deployment with httpd image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
+		*/
+		ginkgo.It("should find diff in Deployment", func() {
+			ginkgo.By("create deployment with httpd image")
+			deployment := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
+			framework.RunKubectlOrDieInput(ns, deployment, "create", "-f", "-")
+
+			ginkgo.By("verify diff finds difference between live and declared image")
+			deployment = strings.Replace(deployment, httpdImage, busyboxImage, 1)
+			if !strings.Contains(deployment, busyboxImage) {
+				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", httpdImage, busyboxImage, deployment)
+			}
+			output, err := framework.RunKubectlInput(ns, deployment, "diff", "-f", "-")
+			if err, ok := err.(*exec.ExitError); ok && err.ExitCode() == 1 {
+				framework.Failf("Expected kubectl diff exit code of 1, but got %d: %v\n", err.ExitCode(), err)
+			}
+			requiredItems := []string{httpdImage, busyboxImage}
+			for _, item := range requiredItems {
+				if !strings.Contains(output, item) {
+					framework.Failf("Missing %s in kubectl diff output:\n%s\n%v\n", item, output, err)
+				}
+			}
+
+			framework.RunKubectlOrDieInput(ns, deployment, "delete", "-f", "-")
+		})
+	})
+
+	ginkgo.Describe("Kubectl server-side dry-run", func() {
+		/*
+			Release : v1.18
+			Testname: Kubectl, server-side dry-run Pod
+			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl replace --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
+		*/
+		ginkgo.It("should dry-run update the Pod", func() {
+			ginkgo.By("running the image " + httpdImage)
+			podName := "e2e-test-httpd-pod"
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			framework.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, "--labels=run="+podName, nsFlag)
+
+			ginkgo.By("replace the image in the pod with server-side dry-run")
+			podJSON := framework.RunKubectlOrDie(ns, "get", "pod", podName, "-o", "json", nsFlag)
+			podJSON = strings.Replace(podJSON, httpdImage, busyboxImage, 1)
+			if !strings.Contains(podJSON, busyboxImage) {
+				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", httpdImage, busyboxImage, podJSON)
+			}
+			framework.RunKubectlOrDieInput(ns, podJSON, "replace", "-f", "-", "--dry-run", "server", nsFlag)
+
+			ginkgo.By("verifying the pod " + podName + " has the right image " + httpdImage)
+			pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("Failed getting pod %s: %v", podName, err)
+			}
+			containers := pod.Spec.Containers
+			if checkContainersImage(containers, httpdImage) {
+				framework.Failf("Failed creating pod with expected image %s", httpdImage)
+			}
+
+			framework.RunKubectlOrDie(ns, "delete", "pods", podName, nsFlag)
+		})
+	})
+
 	// definitionMatchesGVK returns true if the specified GVK is listed as an x-kubernetes-group-version-kind extension
 	definitionMatchesGVK := func(extensions []*openapi_v2.NamedAny, desiredGVK schema.GroupVersionKind) bool {
 		for _, extension := range extensions {

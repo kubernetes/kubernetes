@@ -637,7 +637,7 @@ func (b KubectlBuilder) Exec() (string, error) {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)
 			}
-			return "", uexec.CodeExitError{
+			return stdout.String(), uexec.CodeExitError{
 				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
 				Code: rc,
 			}
