@@ -19,6 +19,7 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 
@@ -99,7 +100,7 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 // Helper that wraps NewAllocatorCIDRRange, for creating a range backed by an in-memory store.
 func NewCIDRRange(cidr *net.IPNet) (*Range, error) {
 	return NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
-		return allocator.NewAllocationMap(max, rangeSpec), nil
+		return allocator.NewAllocation(max, rangeSpec), nil
 	})
 }
 
@@ -274,13 +275,10 @@ func RangeSize(subnet *net.IPNet) int64 {
 	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 127 {
 		return 0
 	}
-	// For IPv6, the max size will be limited to 65536
-	// This is due to the allocator keeping track of all the
-	// allocated IP's in a bitmap. This will keep the size of
-	// the bitmap to 64k.
-	if bits == 128 && (bits-ones) >= 16 {
-		return int64(1) << uint(16)
-	} else {
-		return int64(1) << uint(bits-ones)
+	// For IPv6, the max size will be limited to /64
+	// because we use a map[int64]
+	if bits == 128 && (bits-ones) >= 64 {
+		return math.MaxInt64
 	}
+	return int64(1) << uint(bits-ones)
 }
