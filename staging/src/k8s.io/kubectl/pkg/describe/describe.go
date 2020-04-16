@@ -3261,10 +3261,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}
-	status, err := extractCSRStatus(csr)
-	if err != nil {
-		return "", err
-	}
+	status := extractCSRStatus(csr)
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
@@ -4843,16 +4840,16 @@ func formatEndpoints(endpoints *corev1.Endpoints, ports sets.String) string {
 	return ret
 }
 
-func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) (string, error) {
-	var approved, denied bool
+func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) string {
+	var approved, denied, failed bool
 	for _, c := range csr.Status.Conditions {
 		switch c.Type {
 		case certificatesv1beta1.CertificateApproved:
 			approved = true
 		case certificatesv1beta1.CertificateDenied:
 			denied = true
-		default:
-			return "", fmt.Errorf("unknown csr condition %q", c)
+		case certificatesv1beta1.CertificateFailed:
+			failed = true
 		}
 	}
 	var status string
@@ -4864,10 +4861,13 @@ func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) (strin
 	} else {
 		status += "Pending"
 	}
+	if failed {
+		status += ",Failed"
+	}
 	if len(csr.Status.Certificate) > 0 {
 		status += ",Issued"
 	}
-	return status, nil
+	return status
 }
 
 // backendStringer behaves just like a string interface and converts the given backend to a string.

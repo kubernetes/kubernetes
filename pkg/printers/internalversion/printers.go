@@ -1781,10 +1781,7 @@ func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest,
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	status, err := extractCSRStatus(obj)
-	if err != nil {
-		return nil, err
-	}
+	status := extractCSRStatus(obj)
 	signerName := "<none>"
 	if obj.Spec.SignerName != "" {
 		signerName = obj.Spec.SignerName
@@ -1793,16 +1790,16 @@ func printCertificateSigningRequest(obj *certificates.CertificateSigningRequest,
 	return []metav1.TableRow{row}, nil
 }
 
-func extractCSRStatus(csr *certificates.CertificateSigningRequest) (string, error) {
-	var approved, denied bool
+func extractCSRStatus(csr *certificates.CertificateSigningRequest) string {
+	var approved, denied, failed bool
 	for _, c := range csr.Status.Conditions {
 		switch c.Type {
 		case certificates.CertificateApproved:
 			approved = true
 		case certificates.CertificateDenied:
 			denied = true
-		default:
-			return "", fmt.Errorf("unknown csr condition %q", c)
+		case certificates.CertificateFailed:
+			failed = true
 		}
 	}
 	var status string
@@ -1814,10 +1811,13 @@ func extractCSRStatus(csr *certificates.CertificateSigningRequest) (string, erro
 	} else {
 		status += "Pending"
 	}
+	if failed {
+		status += ",Failed"
+	}
 	if len(csr.Status.Certificate) > 0 {
 		status += ",Issued"
 	}
-	return status, nil
+	return status
 }
 
 func printCertificateSigningRequestList(list *certificates.CertificateSigningRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
