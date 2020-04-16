@@ -265,6 +265,9 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		location = *req.URL
 		location.Scheme = h.Location.Scheme
 		location.Host = h.Location.Host
+	} else {
+		// Even when not using the request location, we want to preserve the querystring
+		location.RawQuery = req.URL.RawQuery
 	}
 
 	clone := utilnet.CloneRequest(req)

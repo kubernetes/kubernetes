@@ -504,6 +504,47 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 }
 
+func TestProxyUpgradePreservesQuerystring(t *testing.T) {
+	backend := http.NewServeMux()
+	backend.Handle("/server/path", websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		body := make([]byte, 5)
+		ws.Read(body)
+		ws.Write([]byte("hello " + string(body) + " " + ws.Request().URL.Query().Get("foo")))
+	}))
+	backendServer := httptest.NewServer(backend)
+	defer backendServer.Close()
+
+	serverURL, _ := url.Parse(backendServer.URL)
+	serverURL.Path = "/server/path"
+	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: &tls.Config{
+		NextProtos:         []string{"http2", "http/1.1"},
+		InsecureSkipVerify: true,
+	}})
+	proxyHandler := NewUpgradeAwareHandler(serverURL, proxyTransport, false, false, &noErrorsAllowed{t: t})
+	proxy := httptest.NewServer(proxyHandler)
+	defer proxy.Close()
+
+	ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/original/path?foo=bar", "", "http://127.0.0.1/")
+	if err != nil {
+		t.Fatalf("websocket dial err: %s", err)
+	}
+	defer ws.Close()
+
+	if _, err := ws.Write([]byte("world")); err != nil {
+		t.Fatalf("write err: %s", err)
+	}
+
+	response := make([]byte, 20)
+	n, err := ws.Read(response)
+	if err != nil {
+		t.Fatalf("read err: %s", err)
+	}
+	if e, a := "hello world bar", string(response[0:n]); e != a {
+		t.Fatalf("expected '%#v', got '%#v'", e, a)
+	}
+}
+
 type noErrorsAllowed struct {
 	t *testing.T
 }
