@@ -966,16 +966,12 @@ function build-kubelet-config {
 # cat the Kubelet config yaml in common between masters, linux nodes, and
 # windows nodes
 function print-common-kubelet-config {
-  declare quoted_dns_server_ip
   declare quoted_dns_domain
-  quoted_dns_server_ip=$(yaml-quote "${DNS_SERVER_IP}")
   quoted_dns_domain=$(yaml-quote "${DNS_DOMAIN}")
   cat <<EOF
 kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
 cgroupRoot: /
-clusterDNS:
-  - ${quoted_dns_server_ip}
 clusterDomain: ${quoted_dns_domain}
 readOnlyPort: 10255
 EOF
@@ -1014,6 +1010,8 @@ authentication:
     enabled: true
 authorization:
   mode: AlwaysAllow
+clusterDNS:
+  - 169.254.169.254
 EOF
   if [[ "${REGISTER_MASTER_KUBELET:-false}" == "false" ]]; then
      # Note: Standalone mode is used by GKE
@@ -1027,6 +1025,9 @@ EOF
 
 # cat the Kubelet config yaml in common between linux nodes and windows nodes
 function print-common-node-kubelet-config {
+  declare quoted_dns_server_ip
+  quoted_dns_server_ip=$(yaml-quote "${DNS_SERVER_IP}")
+
   cat <<EOF
 enableDebuggingHandlers: true
 EOF
@@ -1037,6 +1038,8 @@ EOF
       quoted_hairpin_mode=$(yaml-quote "${HAIRPIN_MODE}")
       cat <<EOF
 hairpinMode: ${quoted_hairpin_mode}
+clusterDNS:
+  - ${quoted_dns_server_ip}
 EOF
   fi
 }
