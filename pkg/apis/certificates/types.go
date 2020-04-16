@@ -72,6 +72,28 @@ type CertificateSigningRequestSpec struct {
 	Extra map[string]ExtraValue
 }
 
+// Built in signerName values that are honoured by kube-controller-manager.
+// None of these usages are related to ServiceAccount token secrets
+// `.data[ca.crt]` in any way.
+const (
+	// Signs certificates that will be honored as client-certs by the
+	// kube-apiserver. Never auto-approved by kube-controller-manager.
+	KubeAPIServerClientSignerName = "kubernetes.io/kube-apiserver-client"
+
+	// Signs client certificates that will be honored as client-certs by the
+	// kube-apiserver for a kubelet.
+	// May be auto-approved by kube-controller-manager.
+	KubeAPIServerClientKubeletSignerName = "kubernetes.io/kube-apiserver-client-kubelet"
+
+	// Signs serving certificates that are honored as a valid kubelet serving
+	// certificate by the kube-apiserver, but has no other guarantees.
+	KubeletServingSignerName = "kubernetes.io/kubelet-serving"
+
+	// Has no guarantees for trust at all. Some distributions may honor these
+	// as client certs, but that behavior is not standard kubernetes behavior.
+	LegacyUnknownSignerName = "kubernetes.io/legacy-unknown"
+)
+
 // ExtraValue masks the value so protobuf can generate
 type ExtraValue []string
 
