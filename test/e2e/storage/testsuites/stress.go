@@ -51,6 +51,8 @@ type stressTest struct {
 	// stop and wait for any async routines
 	wg      sync.WaitGroup
 	stopChs []chan struct{}
+
+	testOptions StressTestOptions
 }
 
 var _ TestSuite = &stressTestSuite{}
@@ -59,8 +61,7 @@ var _ TestSuite = &stressTestSuite{}
 func InitStressTestSuite() TestSuite {
 	return &stressTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name:       "stress",
-			FeatureTag: "[Feature: VolumeStress]",
+			Name: "stress",
 			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.BlockVolModeDynamicPV,
@@ -84,14 +85,16 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 
 	ginkgo.BeforeEach(func() {
 		// Check preconditions.
-		ok := false
-		_, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+		if dInfo.StressTestOptions == nil {
+			e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
+		}
+
+		if _, ok := driver.(DynamicPVTestDriver); !ok {
+			e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
 		}
 
 		if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
+			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
 		}
 	})
 
@@ -111,6 +114,7 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 		l.resources = []*VolumeResource{}
 		l.pods = []*v1.Pod{}
 		l.stopChs = []chan struct{}{}
+		l.testOptions = *dInfo.StressTestOptions
 
 		return l
 	}
@@ -140,12 +144,6 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 	}
 
 	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func() {
-		const (
-			numPods = 10
-			// number of times each Pod should start
-			numPodStarts = 10
-		)
-
 		var err error
 
 		l := init()
@@ -153,30 +151,36 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 			cleanup(l)
 		}()
 
-		for i := 0; i < numPods; i++ {
-			framework.Logf("Creating resources for pod %v/%v", i, numPods)
+		for i := 0; i < l.testOptions.NumPods; i++ {
+			framework.Logf("Creating resources for pod %v/%v", i, l.testOptions.NumPods-1)
 			r := CreateVolumeResource(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
 			l.resources = append(l.resources, r)
-			l.pods = append(l.pods, e2epod.MakeSecPod(f.Namespace.Name,
-				[]*v1.PersistentVolumeClaim{r.Pvc},
-				nil, false, "", false, false, e2epv.SELinuxLabel, nil))
+			podConfig := e2epod.Config{
+				NS:           f.Namespace.Name,
+				PVCs:         []*v1.PersistentVolumeClaim{r.Pvc},
+				SeLinuxLabel: e2epv.SELinuxLabel,
+			}
+			pod, err := e2epod.MakeSecPod(&podConfig)
+			framework.ExpectNoError(err)
+
+			l.pods = append(l.pods, pod)
 			l.stopChs = append(l.stopChs, make(chan struct{}))
 		}
 
 		// Restart pod repeatedly
-		for i := 0; i < numPods; i++ {
+		for i := 0; i < l.testOptions.NumPods; i++ {
 			podIndex := i
 			l.wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
 				defer l.wg.Done()
-				for j := 0; j < numPodStarts; j++ {
+				for j := 0; j < l.testOptions.NumRestarts; j++ {
 					select {
 					case <-l.stopChs[podIndex]:
 						return
 					default:
 						pod := l.pods[podIndex]
-						framework.Logf("Pod %v, Iteration %v/%v", podIndex, j, numPodStarts)
+						framework.Logf("Pod %v, Iteration %v/%v", podIndex, j, l.testOptions.NumRestarts-1)
 						_, err = cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 						framework.ExpectNoError(err)
 

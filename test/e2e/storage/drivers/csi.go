@@ -426,6 +426,10 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
+			StressTestOptions: &testsuites.StressTestOptions{
+				NumPods:     10,
+				NumRestarts: 10,
+			},
 		},
 	}
 }
