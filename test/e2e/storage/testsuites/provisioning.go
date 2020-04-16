@@ -693,8 +693,7 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	} else {
 		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
 	}
-	e2epod.DeletePodOrFail(c, pod.Namespace, pod.Name)
-	e2epod.WaitForPodNoLongerRunningInNamespace(c, pod.Name, pod.Namespace)
+	e2epod.DeletePodWithWait(c, pod)
 }
 
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {
