@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "bitmap.go",
         "interfaces.go",
+        "map.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/core/service/allocator",
@@ -20,6 +21,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "bitmap_test.go",
+        "map_test.go",
         "utils_test.go",
     ],
     embed = [":go_default_library"],

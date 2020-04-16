@@ -22,24 +22,24 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func TestAllocate(t *testing.T) {
+func TestMapAllocate(t *testing.T) {
 	max := 10
-	m := NewAllocationMap(max, "test")
+	m := NewAllocation(max, "test")
 
 	if _, ok, _ := m.AllocateNext(); !ok {
 		t.Fatalf("unexpected error")
 	}
-	if m.count != 1 {
-		t.Errorf("expect to get %d, but got %d", 1, m.count)
+	if len(m.allocated) != 1 {
+		t.Errorf("expect to get %d, but got %d", 1, len(m.allocated))
 	}
 	if f := m.Free(); f != max-1 {
 		t.Errorf("expect to get %d, but got %d", max-1, f)
 	}
 }
 
-func TestAllocateMax(t *testing.T) {
+func TestMapAllocateMax(t *testing.T) {
 	max := 10
-	m := NewAllocationMap(max, "test")
+	m := NewAllocation(max, "test")
 	for i := 0; i < max; i++ {
 		if _, ok, _ := m.AllocateNext(); !ok {
 			t.Fatalf("unexpected error")
@@ -54,8 +54,8 @@ func TestAllocateMax(t *testing.T) {
 	}
 }
 
-func TestAllocateError(t *testing.T) {
-	m := NewAllocationMap(10, "test")
+func TestMapAllocateError(t *testing.T) {
+	m := NewAllocation(10, "test")
 	if ok, _ := m.Allocate(3); !ok {
 		t.Errorf("error allocate offset %v", 3)
 	}
@@ -64,9 +64,9 @@ func TestAllocateError(t *testing.T) {
 	}
 }
 
-func TestRelease(t *testing.T) {
+func TestMapRelease(t *testing.T) {
 	offset := 3
-	m := NewAllocationMap(10, "test")
+	m := NewAllocation(10, "test")
 	if ok, _ := m.Allocate(offset); !ok {
 		t.Errorf("error allocate offset %v", offset)
 	}
@@ -84,7 +84,7 @@ func TestRelease(t *testing.T) {
 	}
 }
 
-func TestForEach(t *testing.T) {
+func TestMapForEach(t *testing.T) {
 	testCases := []sets.Int{
 		sets.NewInt(),
 		sets.NewInt(0),
@@ -93,7 +93,7 @@ func TestForEach(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		m := NewAllocationMap(10, "test")
+		m := NewAllocation(10, "test")
 		for offset := range tc {
 			if ok, _ := m.Allocate(offset); !ok {
 				t.Errorf("[%d] error allocate offset %v", i, offset)
@@ -115,29 +115,29 @@ func TestForEach(t *testing.T) {
 	}
 }
 
-func TestSnapshotAndRestore(t *testing.T) {
+func TestMapSnapshotAndRestore(t *testing.T) {
 	offset := 3
-	m := NewAllocationMap(10, "test")
+	m := NewAllocation(10, "test")
 	if ok, _ := m.Allocate(offset); !ok {
 		t.Errorf("error allocate offset %v", offset)
 	}
 	spec, bytes := m.Snapshot()
 
-	m2 := NewAllocationMap(10, "test")
+	m2 := NewAllocation(10, "test")
 	err := m2.Restore(spec, bytes)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if m2.count != 1 {
-		t.Errorf("expect count to %d, but got %d", 0, m.count)
+	if len(m2.allocated) != 1 {
+		t.Errorf("expect count to %d, but got %d", 0, len(m.allocated))
 	}
 	if !m2.Has(offset) {
 		t.Errorf("expect offset %v allocated", offset)
 	}
 }
 
-func TestContiguousAllocation(t *testing.T) {
+func TestMapContiguousAllocation(t *testing.T) {
 	max := 10
 	m := NewContiguousAllocationMap(max, "test")
 
@@ -156,15 +156,15 @@ func TestContiguousAllocation(t *testing.T) {
 	}
 }
 
-func benchmarkBitmap(max int, b *testing.B) {
+func benchmarkMap(max int, b *testing.B) {
 	m := NewAllocationMap(max, "test")
 	for n := 0; n < b.N; n++ {
 		m.AllocateNext()
 	}
 }
 
-func BenchmarkBitmap1000(b *testing.B)     { benchmarkBitmap(1000, b) }
-func BenchmarkBitmap10000(b *testing.B)    { benchmarkBitmap(10000, b) }
-func BenchmarkBitmap100000(b *testing.B)   { benchmarkBitmap(100000, b) }
-func BenchmarkBitmap1000000(b *testing.B)  { benchmarkBitmap(1000000, b) }
-func BenchmarkBitmap10000000(b *testing.B) { benchmarkBitmap(10000000, b) }
+func BenchmarkMap1000(b *testing.B)     { benchmarkMap(1000, b) }
+func BenchmarkMap10000(b *testing.B)    { benchmarkMap(10000, b) }
+func BenchmarkMap100000(b *testing.B)   { benchmarkMap(100000, b) }
+func BenchmarkMap1000000(b *testing.B)  { benchmarkMap(1000000, b) }
+func BenchmarkMap10000000(b *testing.B) { benchmarkMap(10000000, b) }
