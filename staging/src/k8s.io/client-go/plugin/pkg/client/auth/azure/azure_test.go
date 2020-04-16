@@ -119,11 +119,11 @@ func TestAzureAuthProvider(t *testing.T) {
 			}
 			azureProvider := provider.(*azureAuthProvider)
 			if azureProvider == nil {
-				t.Errorf("newAzureAuthProvider should return an instance of type azureAuthProvider")
+				t.Fatalf("newAzureAuthProvider should return an instance of type azureAuthProvider")
 			}
 			ts := azureProvider.tokenSource.(*azureTokenSource)
 			if ts == nil {
-				t.Errorf("azureAuthProvider should be an instance of azureTokenSource")
+				t.Fatalf("azureAuthProvider should be an instance of azureTokenSource")
 			}
 			if ts.configMode != v.expectedConfigMode {
 				t.Errorf("expected configMode: %d, actual: %d", v.expectedConfigMode, ts.configMode)
