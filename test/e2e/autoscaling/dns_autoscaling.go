@@ -25,7 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -58,6 +58,7 @@ var _ = SIGDescribe("[ProportionalScaling] DNS horizontal autoscaling", func() {
 	var DNSParams3 DNSParamsLinear
 
 	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "azure")
 		c = f.ClientSet
 
 		nodes, err := e2enode.GetReadySchedulableNodes(c)
@@ -261,7 +262,7 @@ var _ = SIGDescribe("[ProportionalScaling] DNS horizontal autoscaling", func() {
 		err = waitForScalerPodToRestart(c, DNSdefaultTimeout, 1)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Replace the dns autoscaling parameters with legitmate testing parameters")
+		ginkgo.By("Replace the dns autoscaling parameters with legitimate testing parameters")
 		err = updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
 		framework.ExpectNoError(err)
 
@@ -445,7 +446,7 @@ func waitForScalerPodToRestart(c clientset.Interface, timeout time.Duration, res
 	condition := func() (bool, error) {
 		pod, err := c.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), scalerPodName, metav1.GetOptions{})
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
