@@ -16,7 +16,10 @@ limitations under the License.
 
 package certificates
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -113,11 +116,17 @@ type RequestConditionType string
 const (
 	CertificateApproved RequestConditionType = "Approved"
 	CertificateDenied   RequestConditionType = "Denied"
+	CertificateFailed   RequestConditionType = "Failed"
 )
 
 type CertificateSigningRequestCondition struct {
-	// request approval state, currently Approved or Denied.
+	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
 	Type RequestConditionType
+	// Status of the condition, one of True, False, Unknown.
+	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// If unset, should be treated as "True".
+	// +optional
+	Status api.ConditionStatus
 	// brief reason for the request state
 	// +optional
 	Reason string
@@ -127,6 +136,9 @@ type CertificateSigningRequestCondition struct {
 	// timestamp for the last update to this condition
 	// +optional
 	LastUpdateTime metav1.Time
+	// lastTransitionTime is the time the condition last transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

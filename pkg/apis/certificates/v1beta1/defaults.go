@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -38,6 +39,12 @@ func SetDefaults_CertificateSigningRequestSpec(obj *certificatesv1beta1.Certific
 	if obj.SignerName == nil {
 		signerName := DefaultSignerNameFromSpec(obj)
 		obj.SignerName = &signerName
+	}
+}
+
+func SetDefaults_CertificateSigningRequestCondition(obj *certificatesv1beta1.CertificateSigningRequestCondition) {
+	if len(obj.Status) == 0 {
+		obj.Status = v1.ConditionTrue
 	}
 }
 
