@@ -75,7 +75,7 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 	scheme := cloud.SchemeInternal
 	options := getILBOptions(svc)
-	if g.isLegacyNetwork {
+	if g.IsLegacyNetwork() {
 		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
 		options = ILBOptions{}
 	}
