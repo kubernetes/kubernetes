@@ -39,29 +39,11 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
 )
 
-/*
- * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
- *
- * Promoting the stability level of the metric is a responsibility of the component owner, since it
- * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
- * the metric stability policy.
- */
 var (
-	initCounter = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Name:           "apiserver_init_events_total",
-			Help:           "Counter of init events processed in watchcache broken by resource type",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"resource"},
-	)
 	emptyFunc = func() {}
 )
 
@@ -70,10 +52,6 @@ const (
 	// initial and resync watch lists to storage.
 	storageWatchListPageSize = int64(10000)
 )
-
-func init() {
-	legacyregistry.MustRegister(initCounter)
-}
 
 // Config contains the configuration for a given Cache.
 type Config struct {
