@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha2
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,7 +34,7 @@ type InterPodAffinityArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeLabelArgs holds arguments that used to configure the NodeLabel plugin.
+// NodeLabelArgs holds arguments used to configure the NodeLabel plugin.
 type NodeLabelArgs struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -61,6 +62,23 @@ type NodeResourcesFitArgs struct {
 	// should ignore.
 	// +listType=atomic
 	IgnoredResources []string `json:"ignoredResources,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodTopologySpreadArgs holds arguments used to configure the PodTopologySpread plugin.
+type PodTopologySpreadArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// DefaultConstraints defines topology spread constraints to be applied to
+	// pods that don't define any in `pod.spec.topologySpreadConstraints`.
+	// `topologySpreadConstraint.labelSelectors` must be empty, as they are
+	// deduced the pods' membership to Services, Replication Controllers, Replica
+	// Sets or Stateful Sets.
+	// Empty by default.
+	// +optional
+	// +listType=atomic
+	DefaultConstraints []v1.TopologySpreadConstraint `json:"defaultConstraints"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

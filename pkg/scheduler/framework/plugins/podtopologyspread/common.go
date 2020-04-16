@@ -42,7 +42,7 @@ type topologySpreadConstraint struct {
 // .DefaultConstraints and the selectors from the services, replication
 // controllers, replica sets and stateful sets that match the pod.
 func (pl *PodTopologySpread) defaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
-	constraints, err := filterTopologySpreadConstraints(pl.DefaultConstraints, action)
+	constraints, err := filterTopologySpreadConstraints(pl.args.DefaultConstraints, action)
 	if err != nil || len(constraints) == 0 {
 		return nil, err
 	}
