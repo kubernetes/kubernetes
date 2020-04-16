@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "cacher.go",
         "caching_object.go",
+        "metrics.go",
         "time_budget.go",
         "util.go",
         "watch_cache.go",
