@@ -285,7 +285,7 @@ __EOF__
   # Pre-Condition: namepace does not exist and no POD exists
   output_message=$(! kubectl get namespace multi-resource-ns 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'namespaces "multi-resource-ns" not found'
-  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  kube::test::wait_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # First pass, namespace is created, but pod is not (since namespace does not exist yet).
   output_message=$(! kubectl apply -f hack/testdata/multi-resource-1.yaml 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'namespaces "multi-resource-ns" not found'
