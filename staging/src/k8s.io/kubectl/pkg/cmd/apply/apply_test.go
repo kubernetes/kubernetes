@@ -1382,3 +1382,31 @@ func TestForceApply(t *testing.T) {
 		})
 	}
 }
+
+func TestDontAllowForceApplyWithServerDryRun(t *testing.T) {
+	expectedError := "error: --dry-run=server cannot be used with --force"
+
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		panic(str)
+	})
+	defer func() {
+		actualError := recover()
+		if expectedError != actualError {
+			t.Fatalf(`expected error "%s", but got "%s"`, expectedError, actualError)
+		}
+	}()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("dry-run", "server")
+	cmd.Flags().Set("force", "true")
+	cmd.Run(cmd, []string{})
+
+	t.Fatalf(`expected error "%s"`, expectedError)
+}
