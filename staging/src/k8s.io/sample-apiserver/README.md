@@ -155,13 +155,7 @@ only this superuser group is authorized.
    openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
    ```
 
-3. As curl requires client certificates in p12 format with password, do the conversion:
-
-   ``` shell
-   openssl pkcs12 -export -in ./client.crt -inkey ./client.key -out client.p12 -passout pass:password
-   ```
-
-4. With these keys and certs in-place, we start the server:
+3. With these keys and certs in-place, we start the server:
 
    ``` shell
    etcd &
@@ -183,10 +177,10 @@ only this superuser group is authorized.
    member. `system:masters` is the superuser group such that delegated
    authorization is skipped.
 
-5. Use curl to access the server using the client certificate in p12 format for authentication:
+4. Use curl to access the server using the client certificate in pem format for authentication:
 
    ``` shell
-   curl -fv -k --cert client.p12:password \
+   curl -k --cert client.crt --key client.key \
       https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
 
