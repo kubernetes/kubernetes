@@ -19,10 +19,12 @@ package network
 import (
 	"context"
 	"strings"
+	"time"
 
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -73,14 +75,19 @@ var _ = SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass2.Name)
 
-		_, err = createBasicIngress(cs, f.Namespace.Name)
-		if err == nil {
-			framework.Failf("Expected error creating Ingress")
-		}
-
+		// the admission controller may take a few seconds to observe both ingress classes
 		expectedErr := "2 default IngressClasses were found, only 1 allowed"
-		if !strings.Contains(err.Error(), expectedErr) {
-			framework.Failf("Expected error to contain %s, got %s", expectedErr, err.Error())
+		var lastErr error
+		if err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+			defer cs.NetworkingV1beta1().Ingresses(f.Namespace.Name).Delete(context.TODO(), "ingress1", metav1.DeleteOptions{})
+			_, err := createBasicIngress(cs, f.Namespace.Name)
+			if err == nil {
+				return false, nil
+			}
+			lastErr = err
+			return strings.Contains(err.Error(), expectedErr), nil
+		}); err != nil {
+			framework.Failf("Expected error to contain %s, got %s", expectedErr, lastErr.Error())
 		}
 	})
 
