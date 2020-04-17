@@ -56,10 +56,26 @@ func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 			t.Errorf("in %s, execute error %v", test.name, err)
 		}
 		out := buf.String()
-		if out != test.expect {
+		if out != test.expect && !elementsExistsInSlice(strings.Split(out, " "), strings.Split(test.expect, " "))  {
 			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
 		}
 	}
+}
+
+func elementsExistsInSlice(a, b []string) bool {
+	for _, e := range a {
+		found := false
+		for _, ele := range b {
+			if e == ele {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return found
+		}
+	}
+	return true
 }
 
 // testJSONPathSortOutput test cases related to map, the results may print in random order
@@ -272,6 +288,9 @@ func TestStructInput(t *testing.T) {
 		{"recurarray", "{..Book[2]}", storeData,
 			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false},
 		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, `{"Color":"red","Price":19.95,"IsNew":true}`, false},
+		{"objects", "{.Labels[*]}", storeData, "10 15 20", false},
+		{"objects", "{$.Employees[*]}", storeData, "manager clerk", false},
+		{"invalid object", "{.Labels[a]}", storeData, "in invalid object, parse {.Labels[a]} error invalid array index a", true},
 	}
 
 	testJSONPath(storeTests, false, t)
@@ -284,7 +303,7 @@ func TestStructInput(t *testing.T) {
 	failStoreTests := []jsonpathTest{
 		{"invalid identifier", "{hello}", storeData, "unrecognized identifier hello", false},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found", false},
-		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice", false},
+		{"invalid object", "{.Labels[0]}", storeData, "invalid jsonpath for objects. Index should be an asterisk when applied over an object", false},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>", false},
 		{"redundant end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end", false},
 	}

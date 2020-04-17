@@ -279,7 +279,7 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 func (j *JSONPath) evalMap(input []reflect.Value, hasAsterisk bool) ([]reflect.Value, error) {
 	result := []reflect.Value{}
 	if !hasAsterisk {
-		return nil, fmt.Errorf("map[string]int not allowed")
+		return nil, fmt.Errorf("invalid jsonpath for objects. Index should be an asterisk when applied over an object")
 	}
 
 	for _, value := range input {
@@ -300,8 +300,6 @@ func (j *JSONPath) evalMap(input []reflect.Value, hasAsterisk bool) ([]reflect.V
 // evalArray evaluates ArrayNode
 func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.Value, error) {
 	result := []reflect.Value{}
-	fmt.Println("params are")
-	fmt.Println(node.Params)
 	for _, value := range input {
 
 		value, isNil := template.Indirect(value)
