@@ -41,6 +41,8 @@ const (
 
 // Conditions
 const (
+	// Deprecated, see the DanglingPriorityLevelConfigurationReference
+	// field of FlowSchemaStatus instead
 	FlowSchemaConditionDangling = "Dangling"
 
 	PriorityLevelConfigurationConditionConcurrencyShared = "ConcurrencyShared"
@@ -296,6 +298,17 @@ type FlowSchemaStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []FlowSchemaCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
+
+	// `controllerSemVer` holds the semantic version of the controller
+	// that set the status.  A controller of lesser semantic version
+	// is not allowed to subsequently update the status.
+	ControllerSemVer string `json:"controllerSemVer,omitempty" protobuf:"bytes,2,opt,name=controllerSemVer"`
+
+	// `evaluatedPriorityLevelConfigurationReference` reports what the
+	// kube-apiservers think of the Spec's reference to a priority
+	// level.  Absent, until a server sets it.
+	// +optional
+	EvaluatedPriorityLevelConfigurationReference *EvaluatedPriorityLevelConfigurationReference `json:"evaluatedPriorityLevelConfigurationReference,omitempty" protobuf:"bytes,3,opt,name=evaluatedPriorityLevelConfigurationReference"`
 }
 
 // FlowSchemaCondition describes conditions for a FlowSchema.
@@ -317,6 +330,18 @@ type FlowSchemaCondition struct {
 
 // FlowSchemaConditionType is a valid value for FlowSchemaStatusCondition.Type
 type FlowSchemaConditionType string
+
+// EvaluatedPriorityLevelConfigurationReference is a report on whether
+// a PriorityLevelConfigurationReference refers to something that
+// exists
+type EvaluatedPriorityLevelConfigurationReference struct {
+	// `reference` is the reference being reported upon
+	Reference PriorityLevelConfigurationReference `json:"reference" protobuf:"bytes,1,name=reference"`
+
+	// `exists` reports whether the referenced priority level
+	// configuration object exists
+	Exists bool `json:"exists" protobuf:"varint,2,name=exists"`
+}
 
 // +genclient
 // +genclient:nonNamespaced

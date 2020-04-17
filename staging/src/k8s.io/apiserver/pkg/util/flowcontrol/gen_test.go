@@ -212,6 +212,7 @@ func genFS(t *testing.T, rng *rand.Rand, name string, mayMatchClusterScope bool,
 	fs.Status.Conditions = []fcv1a1.FlowSchemaCondition{{
 		Type:   fcv1a1.FlowSchemaConditionDangling,
 		Status: dangleStatus}}
+	fs.Status.EvaluatedPriorityLevelConfigurationReference = &fcv1a1.EvaluatedPriorityLevelConfigurationReference{fs.Spec.PriorityLevelConfiguration, dangleStatus == fcv1a1.ConditionFalse}
 	fs.Spec.MatchingPrecedence = rng.Int31n(9997) + 2
 	if rng.Float32() < 0.8 {
 		fdmt := fcv1a1.FlowDistinguisherMethodType(pickSetString(rng, flowDistinguisherMethodTypes))

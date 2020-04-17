@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/blang/semver"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -324,7 +326,27 @@ func ValidateFlowSchemaStatus(status *flowcontrol.FlowSchemaStatus, fldPath *fie
 
 // ValidateFlowSchemaStatusUpdate validates the update of status for the flow-schema.
 func ValidateFlowSchemaStatusUpdate(old, fs *flowcontrol.FlowSchema) field.ErrorList {
-	return ValidateFlowSchemaStatus(&fs.Status, field.NewPath("status"))
+	statusPath := field.NewPath("status")
+	allErrs := ValidateFlowSchemaStatus(&fs.Status, statusPath)
+	if compareSemVerStrToStr(fs.Status.ControllerSemVer, old.Status.ControllerSemVer) < 0 {
+		allErrs = append(allErrs, field.Forbidden(statusPath.Child("controllerSemVer"), fmt.Sprintf("may not replace controller semantic version %q with lesser value %q", old.Status.ControllerSemVer, fs.Status.ControllerSemVer)))
+	}
+	return allErrs
+}
+
+func compareSemVerStrToStr(xStr, yStr string) int {
+	x, xErr := semver.ParseTolerant(xStr)
+	y, yErr := semver.ParseTolerant(yStr)
+	if xErr != nil {
+		if yErr != nil {
+			return 0
+		}
+		return -1
+	}
+	if yErr != nil {
+		return 1
+	}
+	return x.Compare(y)
 }
 
 // ValidateFlowSchemaCondition validates condition in the flow-schema's status.

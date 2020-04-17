@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -1220,6 +1221,104 @@ func TestValidateFlowSchemaStatus(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			errs := ValidateFlowSchemaStatus(testCase.status, field.NewPath("status"))
+			if !assert.ElementsMatch(t, testCase.expectedErrors, errs) {
+				t.Logf("mismatch: %v", cmp.Diff(testCase.expectedErrors, errs))
+			}
+		})
+	}
+}
+
+func TestFlowSchemaStatusUpdate(t *testing.T) {
+	semverPath := field.NewPath("status").Child("controllerSemVer")
+	testCases := []struct {
+		name           string
+		old, new       *flowcontrol.FlowSchema
+		expectedErrors field.ErrorList
+	}{
+		{
+			name: "AOK",
+			old: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.1"}},
+			new: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.1"}},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "none-to-none",
+			old: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{}},
+			new: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{}},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "new-over-old",
+			old: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.1"}},
+			new: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.2"}},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "new-over-none",
+			old: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{}},
+			new: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.2"}},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "old-over-new",
+			old: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.1"}},
+			new: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.0"}},
+			expectedErrors: field.ErrorList{field.Forbidden(semverPath, fmt.Sprintf("may not replace controller semantic version %q with lesser value %q", "v1.1", "v1.0"))},
+		},
+		{
+			name: "none-over-some",
+			old: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{
+					ControllerSemVer: "v1.1"}},
+			new: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo"},
+				Status: flowcontrol.FlowSchemaStatus{}},
+			expectedErrors: field.ErrorList{field.Forbidden(semverPath, fmt.Sprintf("may not replace controller semantic version %q with lesser value %q", "v1.1", ""))},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errs := ValidateFlowSchemaStatusUpdate(testCase.old, testCase.new)
 			if !assert.ElementsMatch(t, testCase.expectedErrors, errs) {
 				t.Logf("mismatch: %v", cmp.Diff(testCase.expectedErrors, errs))
 			}

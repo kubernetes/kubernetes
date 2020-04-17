@@ -28,6 +28,18 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
+// EvaluatedPriorityLevelConfigurationReference is a report on whether
+// a PriorityLevelConfigurationReference refers to something that
+// exists
+message EvaluatedPriorityLevelConfigurationReference {
+  // `reference` is the reference being reported upon
+  optional PriorityLevelConfigurationReference reference = 1;
+
+  // `exists` reports whether the referenced priority level
+  // configuration object exists
+  optional bool exists = 2;
+}
+
 // FlowDistinguisherMethod specifies the method of a flow distinguisher.
 message FlowDistinguisherMethod {
   // `type` is the type of flow distinguisher method
@@ -121,6 +133,17 @@ message FlowSchemaStatus {
   // +listMapKey=type
   // +optional
   repeated FlowSchemaCondition conditions = 1;
+
+  // `controllerSemVer` holds the semantic version of the controller
+  // that set the status.  A controller of lesser semantic version
+  // is not allowed to subsequently update the status.
+  optional string controllerSemVer = 2;
+
+  // `evaluatedPriorityLevelConfigurationReference` reports what the
+  // kube-apiservers think of the Spec's reference to a priority
+  // level.  Absent, until a server sets it.
+  // +optional
+  optional EvaluatedPriorityLevelConfigurationReference evaluatedPriorityLevelConfigurationReference = 3;
 }
 
 // GroupSubject holds detailed information for group-kind subject.
