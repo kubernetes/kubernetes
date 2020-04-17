@@ -443,9 +443,8 @@ func TestWatch(t *testing.T) {
 		t.Fatalf("Expected no direct error, got %v", err)
 	}
 	defer tooOldWatcher.Stop()
-	// Ensure we get a "Gone" error
-	expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
-	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedResourceExpiredError)
+	// Events happens in eventFreshDuration, cache expand without event "Gone".
+	verifyWatchEvent(t, tooOldWatcher, watch.Added, podFoo)
 
 	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
 	if err != nil {

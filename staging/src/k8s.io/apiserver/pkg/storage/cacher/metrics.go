@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,25 @@ var (
 	initCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name:           "apiserver_init_events_total",
-			Help:           "Counter of init events processed in watchcache broken by resource type",
+			Help:           "Counter of init events processed in watchcache broken by resource type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	watchCacheCapacityIncreaseTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "watch_cache_capacity_increase_total",
+			Help:           "Total number of watch cache capacity increase events broken by resource type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
+	watchCacheCapacityDecreaseTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "watch_cache_capacity_decrease_total",
+			Help:           "Total number of watch cache capacity decrease events broken by resource type.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource"},
@@ -42,4 +60,15 @@ var (
 
 func init() {
 	legacyregistry.MustRegister(initCounter)
+	legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
+	legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
+}
+
+// recordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
+func recordsWatchCacheCapacityChange(objType string, old, new int) {
+	if old < new {
+		watchCacheCapacityIncreaseTotal.WithLabelValues(objType).Inc()
+		return
+	}
+	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()
 }
