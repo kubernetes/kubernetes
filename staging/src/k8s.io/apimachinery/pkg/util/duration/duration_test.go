@@ -77,6 +77,8 @@ func TestHumanDurationBoundaries(t *testing.T) {
 		{d: 2 * 365 * 24 * time.Hour, want: "2y"},
 		{d: 2*365*24*time.Hour + 23*time.Hour, want: "2y"},
 		{d: 2*365*24*time.Hour + 23*time.Hour + 59*time.Minute, want: "2y"},
+		{d: 2*365*24*time.Hour + 24*time.Hour - time.Millisecond, want: "2y"},
+		{d: 2*365*24*time.Hour + 24*time.Hour, want: "2y1d"},
 		{d: 3 * 365 * 24 * time.Hour, want: "3y"},
 		{d: 4 * 365 * 24 * time.Hour, want: "4y"},
 		{d: 5 * 365 * 24 * time.Hour, want: "5y"},
