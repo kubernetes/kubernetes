@@ -24,11 +24,10 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
-# Install tools we need, but only from vendor/...
-pushd "${KUBE_ROOT}" >/dev/null
-  GO111MODULE=on GOFLAGS=-mod=vendor go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-  GO111MODULE=on GOFLAGS=-mod=vendor go install github.com/bazelbuild/buildtools/buildozer
-  GO111MODULE=on GOFLAGS=-mod=vendor go install k8s.io/repo-infra/cmd/kazel
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+  GO111MODULE=on go install github.com/bazelbuild/buildtools/buildozer
+  GO111MODULE=on go install k8s.io/repo-infra/cmd/kazel
 popd >/dev/null
 
 # Find all of the staging repos.
@@ -104,3 +103,6 @@ buildozer -quiet 'set clinkopts select({"@io_bazel_rules_go//go/platform:linux":
 if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi
+
+# Avoid bazel stuff in tools/ directory
+rm hack/tools/BUILD

@@ -114,32 +114,6 @@ github.com/aws/aws-sdk-go/service/elbv2
 github.com/aws/aws-sdk-go/service/kms
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
-# github.com/bazelbuild/bazel-gazelle v0.19.1-0.20191105222053-70208cbdc798 => github.com/bazelbuild/bazel-gazelle v0.19.1-0.20191105222053-70208cbdc798
-github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-github.com/bazelbuild/bazel-gazelle/config
-github.com/bazelbuild/bazel-gazelle/flag
-github.com/bazelbuild/bazel-gazelle/internal/version
-github.com/bazelbuild/bazel-gazelle/internal/wspace
-github.com/bazelbuild/bazel-gazelle/label
-github.com/bazelbuild/bazel-gazelle/language
-github.com/bazelbuild/bazel-gazelle/language/go
-github.com/bazelbuild/bazel-gazelle/language/proto
-github.com/bazelbuild/bazel-gazelle/merger
-github.com/bazelbuild/bazel-gazelle/pathtools
-github.com/bazelbuild/bazel-gazelle/repo
-github.com/bazelbuild/bazel-gazelle/resolve
-github.com/bazelbuild/bazel-gazelle/rule
-github.com/bazelbuild/bazel-gazelle/walk
-# github.com/bazelbuild/buildtools v0.0.0-20190917191645-69366ca98f89 => github.com/bazelbuild/buildtools v0.0.0-20190917191645-69366ca98f89
-github.com/bazelbuild/buildtools/api_proto
-github.com/bazelbuild/buildtools/build
-github.com/bazelbuild/buildtools/build_proto
-github.com/bazelbuild/buildtools/buildozer
-github.com/bazelbuild/buildtools/edit
-github.com/bazelbuild/buildtools/file
-github.com/bazelbuild/buildtools/lang
-github.com/bazelbuild/buildtools/tables
-github.com/bazelbuild/buildtools/wspace
 # github.com/beorn7/perks v1.0.0 => github.com/beorn7/perks v1.0.0
 github.com/beorn7/perks/quantile
 # github.com/blang/semver v3.5.0+incompatible => github.com/blang/semver v3.5.0+incompatible
@@ -950,7 +924,6 @@ golang.org/x/tools/go/internal/packagesdriver
 golang.org/x/tools/go/packages
 golang.org/x/tools/go/types/objectpath
 golang.org/x/tools/go/types/typeutil
-golang.org/x/tools/go/vcs
 golang.org/x/tools/imports
 golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gopathwalk
@@ -1928,8 +1901,6 @@ k8s.io/metrics/pkg/client/custom_metrics/fake
 k8s.io/metrics/pkg/client/custom_metrics/scheme
 k8s.io/metrics/pkg/client/external_metrics
 k8s.io/metrics/pkg/client/external_metrics/fake
-# k8s.io/repo-infra v0.0.1-alpha.1 => k8s.io/repo-infra v0.0.1-alpha.1
-k8s.io/repo-infra/cmd/kazel
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 k8s.io/sample-apiserver/pkg/admission/wardleinitializer

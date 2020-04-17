@@ -20,8 +20,6 @@ limitations under the License.
 package tools
 
 import (
-	_ "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
-	_ "github.com/bazelbuild/buildtools/buildozer"
 	_ "github.com/cespare/prettybench"
 	_ "github.com/client9/misspell/cmd/misspell"
 	_ "github.com/go-bindata/go-bindata/go-bindata"
@@ -37,5 +35,4 @@ import (
 	_ "k8s.io/gengo/examples/import-boss/generators"
 	_ "k8s.io/gengo/examples/set-gen/generators"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
-	_ "k8s.io/repo-infra/cmd/kazel"
 )
