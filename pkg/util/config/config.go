@@ -42,17 +42,14 @@ type Mux struct {
 	// Invoked when an update is sent to a source.
 	merger Merger
 
-	// Sources and their lock.
-	sourceLock sync.RWMutex
-	// Maps source names to channels
-	sources map[string]chan interface{}
+	// sync.Map source names to channels
+	sources sync.Map
 }
 
 // NewMux creates a new mux that can merge changes from multiple sources.
 func NewMux(merger Merger) *Mux {
 	mux := &Mux{
-		sources: make(map[string]chan interface{}),
-		merger:  merger,
+		merger: merger,
 	}
 	return mux
 }
@@ -66,14 +63,13 @@ func (m *Mux) Channel(source string) chan interface{} {
 	if len(source) == 0 {
 		panic("Channel given an empty name")
 	}
-	m.sourceLock.Lock()
-	defer m.sourceLock.Unlock()
-	channel, exists := m.sources[source]
+
+	channel, exists := m.sources.Load(source)
 	if exists {
-		return channel
+		return channel.(chan interface{})
 	}
 	newChannel := make(chan interface{})
-	m.sources[source] = newChannel
+	m.sources.Store(source, newChannel)
 	go wait.Until(func() { m.listen(source, newChannel) }, 0, wait.NeverStop)
 	return newChannel
 }
