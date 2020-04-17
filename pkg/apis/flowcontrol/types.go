@@ -223,8 +223,11 @@ type ServiceAccountSubject struct {
 // ResourcePolicyRule matches a resource request if and only if: (a)
 // at least one member of verbs matches the request, (b) at least one
 // member of apiGroups matches the request, (c) at least one member of
-// resources matches the request, and (d) least one member of
-// namespaces matches the request.
+// resources matches the request, and (d) either (d1) clusterScope is
+// true and the request does not specify a namepace (which happens
+// when the resource is cluster-scoped or the request is for all
+// namespaces) or (d2) the request specifes a namespace and at least
+// one member of namespaces matches the request.
 type ResourcePolicyRule struct {
 	// `verbs` is a list of matching verbs and may not be empty.
 	// "*" matches all verbs and, if present, must be the only entry.
@@ -239,28 +242,32 @@ type ResourcePolicyRule struct {
 	APIGroups []string
 
 	// `resources` is a list of matching resources (i.e., lowercase
-	// and plural) with, if desired, subresource.  For example, [
-	// "services", "nodes/status" ].  This list may not be empty.
-	// "*" matches all resources and, if present, must be the only entry.
+	// and plural identification of a Kind of object) with, if
+	// desired, subresource.  For example, [ "services",
+	// "nodes/status" ].  This list may not be empty.  "*" matches all
+	// resources and, if present, must be the only entry.
 	// Required.
 	// +listType=set
 	Resources []string
 
 	// `clusterScope` indicates whether to match requests that do not
-	// specify a namespace (which happens either because the resource
-	// is not namespaced or the request targets all namespaces).
+	// specify a namespace in the URL's path (which happens either
+	// because the resource is not namespaced or the request targets
+	// all namespaces).
 	// If this field is omitted or false then the `namespaces` field
 	// must contain a non-empty list.
 	// +optional
 	ClusterScope bool
 
 	// `namespaces` is a list of target namespaces that restricts
-	// matches.  A request that specifies a target namespace matches
-	// only if either (a) this list contains that target namespace or
-	// (b) this list contains "*".  Note that "*" matches any
-	// specified namespace but does not match a request that _does
-	// not specify_ a namespace (see the `clusterScope` field for
-	// that).
+	// matches.  A request that specifies a target namespace in the
+	// URL's path matches only if either (a) this list contains that
+	// target namespace or (b) this list contains "*".  Note that "*"
+	// matches any specified namespace but does not match a request
+	// that _does not specify_ a namespace in the URL's path (see the
+	// `clusterScope` field for that).  Note that a namespace
+	// specified in a field selector in the URL's query paraneter is
+	// not considered here.
 	// This list may be empty, but only if `clusterScope` is true.
 	// +optional
 	// +listType=set

@@ -52,7 +52,10 @@ type PolicyRule struct {
 	// Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups.
 	// '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.
 	Resources []string
-	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+	// ResourceNames is an optional white list of object names that the rule applies to.  An empty set means that everything is allowed.
+	// The object name is taken from the request URL's path if present
+	// there, otherwise from the relevant field selectoer in the URL's
+	// query if present there, otherwise is the empty string.
 	ResourceNames []string
 
 	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
@@ -106,6 +109,9 @@ type Role struct {
 // RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace.
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
 // namespace only have effect in that namespace.
+// The namespace of the request is taken fromn the request URL's path
+// if present there, otherwise is the empty string; a namespace
+// specified in a field selector is ignored.
 type RoleBinding struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta

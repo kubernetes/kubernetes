@@ -83,7 +83,7 @@ var map_PolicyRule = map[string]string{
 	"verbs":           "Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.",
 	"apiGroups":       "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.",
 	"resources":       "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.",
-	"resourceNames":   "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.",
+	"resourceNames":   "ResourceNames is an optional white list of object names that the rule applies to.  An empty set means that everything is allowed. The object name is taken from the request URL's path if present there, otherwise from the relevant field selectoer in the URL's query if present there, otherwise is the empty string.",
 	"nonResourceURLs": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding. Rules can either apply to API resources (such as \"pods\" or \"secrets\") or non-resource URL paths (such as \"/api\"),  but not both.",
 }
 
@@ -102,7 +102,7 @@ func (Role) SwaggerDoc() map[string]string {
 }
 
 var map_RoleBinding = map[string]string{
-	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
+	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace. The namespace of the request is taken fromn the request URL's path if present there, otherwise is the empty string; a namespace specified in a field selector is ignored.",
 	"metadata": "Standard object's metadata.",
 	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
