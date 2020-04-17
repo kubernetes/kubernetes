@@ -27,6 +27,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
 
