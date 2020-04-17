@@ -361,21 +361,20 @@ func (g *Cloud) CurrentNodeName(ctx context.Context, hostname string) (types.Nod
 	return types.NodeName(hostname), nil
 }
 
-// AliasRanges returns a list of CIDR ranges that are assigned to the
+// AliasRangesByProviderID returns a list of CIDR ranges that are assigned to the
 // `node` for allocation to pods. Returns a list of the form
 // "<ip>/<netmask>".
-func (g *Cloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err error) {
+func (g *Cloud) AliasRangesByProviderID(providerID string) (cidrs []string, err error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	var instance *gceInstance
-	instance, err = g.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	_, zone, name, err := splitProviderID(providerID)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	var res *computebeta.Instance
-	res, err = g.c.BetaInstances().Get(ctx, meta.ZonalKey(instance.Name, lastComponent(instance.Zone)))
+	res, err = g.c.BetaInstances().Get(ctx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
 	if err != nil {
 		return
 	}
@@ -388,28 +387,29 @@ func (g *Cloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err error)
 	return
 }
 
-// AddAliasToInstance adds an alias to the given instance from the named
+// AddAliasToInstanceByProviderID adds an alias to the given instance from the named
 // secondary range.
-func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) error {
+func (g *Cloud) AddAliasToInstanceByProviderID(providerID string, alias *net.IPNet) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	v1instance, err := g.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	_, zone, name, err := splitProviderID(providerID)
 	if err != nil {
 		return err
 	}
-	instance, err := g.c.BetaInstances().Get(ctx, meta.ZonalKey(v1instance.Name, lastComponent(v1instance.Zone)))
+
+	instance, err := g.c.BetaInstances().Get(ctx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
 	if err != nil {
 		return err
 	}
 
 	switch len(instance.NetworkInterfaces) {
 	case 0:
-		return fmt.Errorf("instance %q has no network interfaces", nodeName)
+		return fmt.Errorf("instance %q has no network interfaces", providerID)
 	case 1:
 	default:
 		klog.Warningf("Instance %q has more than one network interface, using only the first (%v)",
-			nodeName, instance.NetworkInterfaces)
+			providerID, instance.NetworkInterfaces)
 	}
 
 	iface := &computebeta.NetworkInterface{}
@@ -420,7 +420,7 @@ func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) er
 		SubnetworkRangeName: g.secondaryRangeName,
 	})
 
-	mc := newInstancesMetricContext("add_alias", v1instance.Zone)
+	mc := newInstancesMetricContext("add_alias", zone)
 	err = g.c.BetaInstances().UpdateNetworkInterface(ctx, meta.ZonalKey(instance.Name, lastComponent(instance.Zone)), iface.Name, iface)
 	return mc.Observe(err)
 }

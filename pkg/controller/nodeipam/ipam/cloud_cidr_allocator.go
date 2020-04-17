@@ -249,8 +249,11 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		klog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", nodeName, err)
 		return err
 	}
+	if node.Spec.ProviderID == "" {
+		return fmt.Errorf("node %s doesn't have providerID", nodeName)
+	}
 
-	cidrs, err := ca.cloud.AliasRanges(types.NodeName(nodeName))
+	cidrs, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
 	if err != nil {
 		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: %v", err)
