@@ -32,7 +32,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
 	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"

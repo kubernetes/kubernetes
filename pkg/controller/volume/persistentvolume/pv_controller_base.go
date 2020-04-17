@@ -47,7 +47,7 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // This file contains the controller base functionality, i.e. framework to

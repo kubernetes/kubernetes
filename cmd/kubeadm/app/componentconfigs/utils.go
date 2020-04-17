@@ -17,7 +17,7 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // warnDefaultComponentConfigValue prints a warning if the user modified a field in a certain

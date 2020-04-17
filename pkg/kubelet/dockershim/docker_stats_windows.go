@@ -24,7 +24,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {

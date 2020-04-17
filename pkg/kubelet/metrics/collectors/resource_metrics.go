@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"k8s.io/component-base/metrics"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	summary "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 )

@@ -27,7 +27,7 @@ import (
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	fcclientv1a1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"

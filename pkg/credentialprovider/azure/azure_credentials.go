@@ -32,7 +32,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/spf13/pflag"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/legacy-cloud-providers/azure/auth"
 	"sigs.k8s.io/yaml"

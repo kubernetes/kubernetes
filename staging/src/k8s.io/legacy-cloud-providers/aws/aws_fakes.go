@@ -29,7 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/kms"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // FakeAWSServices is an fake AWS session used for testing

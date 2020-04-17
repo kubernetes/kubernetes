@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Options contains details about which streams are required for

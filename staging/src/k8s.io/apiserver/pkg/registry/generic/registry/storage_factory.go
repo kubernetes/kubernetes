@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,7 +53,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 			klog.V(5).Infof("Storage caching is disabled for %s", objectTypeToString(newFunc()))
 			return s, d, nil
 		}
-		if klog.V(5) {
+		if klog.V(5).Enabled() {
 			klog.Infof("Storage caching is enabled for %s with capacity %v", objectTypeToString(newFunc()), capacity)
 		}
 

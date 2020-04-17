@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // EventFunc does some work that needs to be done at or after the
@@ -80,7 +80,7 @@ type waitGroupCounter struct {
 var _ counter.GoRoutineCounter = (*waitGroupCounter)(nil)
 
 func (wgc *waitGroupCounter) Add(delta int) {
-	if klog.V(7) {
+	if klog.V(7).Enabled() {
 		var pcs [5]uintptr
 		nCallers := runtime.Callers(2, pcs[:])
 		frames := runtime.CallersFrames(pcs[:nCallers])

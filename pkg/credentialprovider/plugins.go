@@ -21,7 +21,7 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // All registered credential providers.

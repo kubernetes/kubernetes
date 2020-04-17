@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ==================================================================

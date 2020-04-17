@@ -19,7 +19,7 @@ limitations under the License.
 package kubelet
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/config"

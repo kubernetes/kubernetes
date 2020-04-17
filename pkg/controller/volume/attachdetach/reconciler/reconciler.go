@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
@@ -228,7 +228,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 	for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
 		if rc.actualStateOfWorld.IsVolumeAttachedToNode(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			if klog.V(5) {
+			if klog.V(5).Enabled() {
 				klog.Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
 			}
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
@@ -239,7 +239,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 
 			// Don't even try to start an operation if there is already one running for the given volume and node.
 			if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "" /* podName */, volumeToAttach.NodeName) {
-				if klog.V(10) {
+				if klog.V(10).Enabled() {
 					klog.Infof("Operation for volume %q is already running for node %q. Can't start attach", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
 				continue
@@ -249,7 +249,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 
 			// Don't even try to start an operation if there is already one running for the given volume
 			if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "" /* podName */, "" /* nodeName */) {
-				if klog.V(10) {
+				if klog.V(10).Enabled() {
 					klog.Infof("Operation for volume %q is already running. Can't start attach for %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
 				continue
@@ -267,7 +267,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 		}
 
 		// Volume/Node doesn't exist, spawn a goroutine to attach it
-		if klog.V(5) {
+		if klog.V(5).Enabled() {
 			klog.Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
 		}
 		err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)

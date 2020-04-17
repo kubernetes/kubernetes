@@ -43,7 +43,7 @@ import (
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	volumes_v3 "github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type volumeService interface {

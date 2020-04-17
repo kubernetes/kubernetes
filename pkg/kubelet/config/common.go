@@ -43,7 +43,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/hash"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

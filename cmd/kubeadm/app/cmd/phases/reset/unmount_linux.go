@@ -23,7 +23,7 @@ import (
 	"strings"
 	"syscall"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // unmountKubeletDirectory unmounts all paths that contain KubeletRunDirectory

@@ -32,7 +32,7 @@ import (
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilnet "k8s.io/utils/net"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

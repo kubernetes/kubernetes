@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/pod"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -799,7 +799,7 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 }
 
 func debugLogObservations(logPrefix string, observations signalObservations) {
-	if !klog.V(3) {
+	if !klog.V(3).Enabled() {
 		return
 	}
 	for k, v := range observations {
@@ -812,7 +812,7 @@ func debugLogObservations(logPrefix string, observations signalObservations) {
 }
 
 func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
-	if !klog.V(3) {
+	if !klog.V(3).Enabled() {
 		return
 	}
 	for i := range thresholds {

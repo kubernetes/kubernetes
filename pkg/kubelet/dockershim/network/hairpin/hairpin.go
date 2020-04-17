@@ -27,7 +27,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 )
 

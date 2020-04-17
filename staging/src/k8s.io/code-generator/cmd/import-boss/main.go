@@ -26,7 +26,7 @@ import (
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/import-boss/generators"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func main() {
