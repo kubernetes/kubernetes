@@ -5235,3 +5235,11 @@ type TopologySpreadConstraint struct {
 	// +optional
 	LabelSelector *metav1.LabelSelector
 }
+
+// PodAssignVerdict defines structure for kubelet answer
+// TODO define better place
+type PodAssignVerdict struct {
+	Ok bool `json:"Ok"`
+	Reason string `json:"Reason"`
+	Message string `json:"Message"`
+}
