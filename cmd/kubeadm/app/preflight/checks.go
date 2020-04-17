@@ -803,7 +803,9 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 				loopCount--
 				return false, err
 			}
-			defer r.Body.Close()
+			if r != nil {
+				defer r.Body.Close()
+			}
 
 			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {
 				loopCount--

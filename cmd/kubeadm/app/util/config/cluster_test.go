@@ -748,6 +748,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			// Test expected values in InitConfiguration
 			if cfg == nil {
 				t.Errorf("unexpected nil return value")
+				return
 			}
 			if cfg.ClusterConfiguration.KubernetesVersion != k8sVersionString {
 				t.Errorf("invalid ClusterConfiguration.KubernetesVersion")
