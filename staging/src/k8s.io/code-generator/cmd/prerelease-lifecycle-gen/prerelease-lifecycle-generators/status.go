@@ -43,6 +43,8 @@ const (
 	introducedTagName = tagEnabledName + ":introduced"
 	deprecatedTagName = tagEnabledName + ":deprecated"
 	removedTagName    = tagEnabledName + ":removed"
+
+	replacementTagName = tagEnabledName + ":replacement"
 )
 
 // enabledTagValue holds parameters from a tagName tag.
@@ -61,7 +63,7 @@ func tagExists(tagName string, t *types.Type) bool {
 	return rawTag != nil
 }
 
-func extractKubeVersionTag(tagName string, t *types.Type) (*tagValue, int64, int64, error) {
+func extractKubeVersionTag(tagName string, t *types.Type) (*tagValue, int, int, error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
 	rawTag := extractTag(tagName, comments)
 	if rawTag == nil || len(rawTag.value) == 0 {
@@ -72,28 +74,64 @@ func extractKubeVersionTag(tagName string, t *types.Type) (*tagValue, int64, int
 	if len(splitValue) != 2 || len(splitValue[0]) == 0 || len(splitValue[0]) == 0 {
 		return nil, -1, -1, fmt.Errorf("%v format must match %v=xx.yy tag", t, tagName)
 	}
-	major, err := strconv.ParseInt(splitValue[0], 10, 64)
+	major, err := strconv.ParseInt(splitValue[0], 10, 32)
 	if err != nil {
 		return nil, -1, -1, fmt.Errorf("%v format must match %v=xx.yy : %w", t, tagName, err)
 	}
-	minor, err := strconv.ParseInt(splitValue[1], 10, 64)
+	minor, err := strconv.ParseInt(splitValue[1], 10, 32)
 	if err != nil {
 		return nil, -1, -1, fmt.Errorf("%v format must match %v=xx.yy : %w", t, tagName, err)
 	}
 
-	return rawTag, major, minor, nil
+	return rawTag, int(major), int(minor), nil
 }
 
-func extractIntroducedTag(t *types.Type) (*tagValue, int64, int64, error) {
+func extractIntroducedTag(t *types.Type) (*tagValue, int, int, error) {
 	return extractKubeVersionTag(introducedTagName, t)
 }
 
-func extractDeprecatedTag(t *types.Type) (*tagValue, int64, int64, error) {
+func extractDeprecatedTag(t *types.Type) (*tagValue, int, int, error) {
 	return extractKubeVersionTag(deprecatedTagName, t)
 }
 
-func extractRemovedTag(t *types.Type) (*tagValue, int64, int64, error) {
+func extractRemovedTag(t *types.Type) (*tagValue, int, int, error) {
 	return extractKubeVersionTag(removedTagName, t)
+}
+
+func extractReplacementTag(t *types.Type) (group, version, kind string, hasReplacement bool, err error) {
+	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
+
+	tagVals := types.ExtractCommentTags("+", comments)[replacementTagName]
+	if len(tagVals) == 0 {
+		// No match for the tag.
+		return "", "", "", false, nil
+	}
+	// If there are multiple values, abort.
+	if len(tagVals) > 1 {
+		return "", "", "", false, fmt.Errorf("Found %d %s tags: %q", len(tagVals), replacementTagName, tagVals)
+	}
+	tagValue := tagVals[0]
+	parts := strings.Split(tagValue, ",")
+	if len(parts) != 3 {
+		return "", "", "", false, fmt.Errorf(`%s value must be "<group>,<version>,<kind>", got %q`, replacementTagName, tagValue)
+	}
+	group, version, kind = parts[0], parts[1], parts[2]
+	if len(version) == 0 || len(kind) == 0 {
+		return "", "", "", false, fmt.Errorf(`%s value must be "<group>,<version>,<kind>", got %q`, replacementTagName, tagValue)
+	}
+	// sanity check the group
+	if strings.ToLower(group) != group {
+		return "", "", "", false, fmt.Errorf(`replacement group must be all lower-case, got %q`, group)
+	}
+	// sanity check the version
+	if !strings.HasPrefix(version, "v") || strings.ToLower(version) != version {
+		return "", "", "", false, fmt.Errorf(`replacement version must start with "v" and be all lower-case, got %q`, version)
+	}
+	// sanity check the kind
+	if strings.ToUpper(kind[:1]) != kind[:1] {
+		return "", "", "", false, fmt.Errorf(`replacement kind must start with uppercase-letter, got %q`, kind)
+	}
+	return group, version, kind, true, nil
 }
 
 func extractTag(tagName string, comments []string) *tagValue {
@@ -182,7 +220,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			klog.V(5).Infof("  skipping package")
 			continue
 		}
-		klog.Infof("Generating package %q", pkg.Path)
+		klog.V(3).Infof("Generating package %q", pkg.Path)
 
 		// If the pkg-scoped tag says to generate, we can skip scanning types.
 		if !pkgNeedsGeneration {
@@ -356,7 +394,7 @@ func (g *genPreleaseLifecycle) Imports(c *generator.Context) (imports []string) 
 	return importLines
 }
 
-func argsFromType(t *types.Type) (generator.Args, error) {
+func (g *genPreleaseLifecycle) argsFromType(c *generator.Context, t *types.Type) (generator.Args, error) {
 	a := generator.Args{
 		"type": t,
 	}
@@ -396,6 +434,20 @@ func argsFromType(t *types.Type) (generator.Args, error) {
 		With("removedMajor", removedMajor).
 		With("removedMinor", removedMinor)
 
+	replacementGroup, replacementVersion, replacementKind, hasReplacement, err := extractReplacementTag(t)
+	if err != nil {
+		return nil, err
+	}
+	if hasReplacement {
+		gvkType := c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionKind"})
+		g.imports.AddType(gvkType)
+		a = a.
+			With("replacementGroup", replacementGroup).
+			With("replacementVersion", replacementVersion).
+			With("replacementKind", replacementKind).
+			With("GroupVersionKind", gvkType)
+	}
+
 	return a, nil
 }
 
@@ -404,32 +456,41 @@ func (g *genPreleaseLifecycle) Init(c *generator.Context, w io.Writer) error {
 }
 
 func (g *genPreleaseLifecycle) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
-	klog.Infof("Generating prerelease-lifecycle for type %v", t)
+	klog.V(3).Infof("Generating prerelease-lifecycle for type %v", t)
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	args, err := argsFromType(t)
+	args, err := g.argsFromType(c, t)
 	if err != nil {
 		return err
 	}
 
-	if versionedMethodOrDie("Introduced", t) == nil {
-		sw.Do("// Introduced is an autogenerated function, returning the release in which the API struct was introduced as int versions of major and minor for comparison.\n", args)
+	if versionedMethodOrDie("APILifecycleIntroduced", t) == nil {
+		sw.Do("// APILifecycleIntroduced is an autogenerated function, returning the release in which the API struct was introduced as int versions of major and minor for comparison.\n", args)
 		sw.Do("// It is controlled by \""+introducedTagName+"\" tags in types.go.\n", args)
-		sw.Do("func (in *$.type|intrapackage$) Introduced() (int64, int64) {\n", args)
+		sw.Do("func (in *$.type|intrapackage$) APILifecycleIntroduced() (major, minor int) {\n", args)
 		sw.Do("    return $.introducedMajor$, $.introducedMinor$\n", args)
 		sw.Do("}\n\n", nil)
 	}
-	if versionedMethodOrDie("Deprecated", t) == nil {
-		sw.Do("// Deprecated is an autogenerated function, returning the release in which the API struct was or will be deprecated as int versions of major and minor for comparison.\n", args)
+	if versionedMethodOrDie("APILifecycleDeprecated", t) == nil {
+		sw.Do("// APILifecycleDeprecated is an autogenerated function, returning the release in which the API struct was or will be deprecated as int versions of major and minor for comparison.\n", args)
 		sw.Do("// It is controlled by \""+deprecatedTagName+"\" tags in types.go or  \""+introducedTagName+"\" plus three minor.\n", args)
-		sw.Do("func (in *$.type|intrapackage$) Deprecated() (int64, int64) {\n", args)
+		sw.Do("func (in *$.type|intrapackage$) APILifecycleDeprecated() (major, minor int) {\n", args)
 		sw.Do("    return $.deprecatedMajor$, $.deprecatedMinor$\n", args)
 		sw.Do("}\n\n", nil)
 	}
-	if versionedMethodOrDie("Removed", t) == nil {
-		sw.Do("// Removed is an autogenerated function, returning the release in which the API is no longer served as int versions of major and minor for comparison.\n", args)
+	if _, hasReplacement := args["replacementKind"]; hasReplacement {
+		if versionedMethodOrDie("APILifecycleReplacement", t) == nil {
+			sw.Do("// APILifecycleReplacement is an autogenerated function, returning the group, version, and kind that should be used instead of this deprecated type.\n", args)
+			sw.Do("// It is controlled by \""+replacementTagName+"=<group>,<version>,<kind>\" tags in types.go.\n", args)
+			sw.Do("func (in *$.type|intrapackage$) APILifecycleReplacement() ($.GroupVersionKind|raw$) {\n", args)
+			sw.Do("    return $.GroupVersionKind|raw${Group:\"$.replacementGroup$\", Version:\"$.replacementVersion$\", Kind:\"$.replacementKind$\"}\n", args)
+			sw.Do("}\n\n", nil)
+		}
+	}
+	if versionedMethodOrDie("APILifecycleRemoved", t) == nil {
+		sw.Do("// APILifecycleRemoved is an autogenerated function, returning the release in which the API is no longer served as int versions of major and minor for comparison.\n", args)
 		sw.Do("// It is controlled by \""+removedTagName+"\" tags in types.go or  \""+deprecatedTagName+"\" plus three minor.\n", args)
-		sw.Do("func (in *$.type|intrapackage$) Removed() (int64, int64) {\n", args)
+		sw.Do("func (in *$.type|intrapackage$) APILifecycleRemoved() (major, minor int) {\n", args)
 		sw.Do("    return $.removedMajor$, $.removedMinor$\n", args)
 		sw.Do("}\n\n", nil)
 	}
