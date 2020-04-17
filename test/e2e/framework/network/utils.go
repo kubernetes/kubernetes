@@ -29,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -43,6 +44,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -613,7 +615,7 @@ func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.S
 	_, err := config.getServiceClient().Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
-	err = framework.WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
+	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
 	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
@@ -976,4 +978,30 @@ func UnblockNetwork(from string, to string) {
 		framework.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
 			"required on host %s: remove rule %s, if exists", from, iptablesRule)
 	}
+}
+
+// WaitForService waits until the service appears (exist == true), or disappears (exist == false)
+func WaitForService(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		_, err := c.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		switch {
+		case err == nil:
+			framework.Logf("Service %s in namespace %s found.", name, namespace)
+			return exist, nil
+		case apierrors.IsNotFound(err):
+			framework.Logf("Service %s in namespace %s disappeared.", name, namespace)
+			return !exist, nil
+		case !testutils.IsRetryableAPIError(err):
+			framework.Logf("Non-retryable failure while getting service.")
+			return false, err
+		default:
+			framework.Logf("Get service %s in namespace %s failed: %v", name, namespace, err)
+			return false, nil
+		}
+	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for service %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
 }
