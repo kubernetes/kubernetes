@@ -149,6 +149,10 @@ const (
 	//
 	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
 	SelectorIndex featuregate.Feature = "SelectorIndex"
+
+	// alpha: v1.19
+	// Allows to drain node with pod that has more than one Pod Disruption Budget
+	DrainWithMultiPDB featuregate.Feature = "DrainWithMultiPDB"
 )
 
 func init() {
@@ -175,4 +179,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
 	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
 	SelectorIndex:           {Default: false, PreRelease: featuregate.Alpha},
+	DrainWithMultiPDB:       {Default: false, PreRelease: featuregate.Alpha},
 }
