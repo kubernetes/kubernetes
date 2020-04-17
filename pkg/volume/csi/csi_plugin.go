@@ -17,14 +17,13 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"time"
-
-	"context"
 
 	"k8s.io/klog"
 
@@ -229,10 +228,10 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		// This function prevents Kubelet from posting Ready status until CSINodeInfo
+		// This function prevents Kubelet from posting Ready status until CSINode
 		// is both installed and initialized
 		if err := initializeCSINode(host); err != nil {
-			return errors.New(log("failed to initialize CSINodeInfo: %v", err))
+			return errors.New(log("failed to initialize CSINode: %v", err))
 		}
 	}
 
@@ -242,20 +241,27 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 func initializeCSINode(host volume.VolumeHost) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
-		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINodeInfo initialization, not running on kubelet")
+		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
 		return nil
 	}
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		// Kubelet running in standalone mode. Skip CSINodeInfo initialization
-		klog.Warning("Skipping CSINodeInfo initialization, kubelet running in standalone mode")
+		// Kubelet running in standalone mode. Skip CSINode initialization
+		klog.Warning("Skipping CSINode initialization, kubelet running in standalone mode")
 		return nil
 	}
 
-	kvh.SetKubeletError(errors.New("CSINodeInfo is not yet initialized"))
+	kvh.SetKubeletError(errors.New("CSINode is not yet initialized"))
 
 	go func() {
 		defer utilruntime.HandleCrash()
+
+		// First wait indefinitely to talk to Kube APIServer
+		nodeName := host.GetNodeName()
+		err := waitForAPIServerForever(kubeClient, nodeName)
+		if err != nil {
+			klog.Fatalf("Failed to initialize CSINode while waiting for API server to report ok: %v", err)
+		}
 
 		// Backoff parameters tuned to retry over 140 seconds. Will fail and restart the Kubelet
 		// after max retry steps.
@@ -265,12 +271,12 @@ func initializeCSINode(host volume.VolumeHost) error {
 			Factor:   6.0,
 			Jitter:   0.1,
 		}
-		err := wait.ExponentialBackoff(initBackoff, func() (bool, error) {
-			klog.V(4).Infof("Initializing migrated drivers on CSINodeInfo")
+		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {
+			klog.V(4).Infof("Initializing migrated drivers on CSINode")
 			err := nim.InitializeCSINodeWithAnnotation()
 			if err != nil {
-				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINodeInfo: %v", err))
-				klog.Errorf("Failed to initialize CSINodeInfo: %v", err)
+				kvh.SetKubeletError(fmt.Errorf("Failed to initialize CSINode: %v", err))
+				klog.Errorf("Failed to initialize CSINode: %v", err)
 				return false, nil
 			}
 
@@ -284,7 +290,7 @@ func initializeCSINode(host volume.VolumeHost) error {
 			// using CSI for all Migrated volume plugins. Then all the CSINode initialization
 			// code can be dropped from Kubelet.
 			// Kill the Kubelet process and allow it to restart to retry initialization
-			klog.Fatalf("Failed to initialize CSINodeInfo after retrying")
+			klog.Fatalf("Failed to initialize CSINode after retrying: %v", err)
 		}
 	}()
 	return nil
@@ -928,4 +934,29 @@ func isV0Version(version string) bool {
 	}
 
 	return parsedVersion.Major() == 0
+}
+
+// waitForAPIServerForever waits forever to get a CSINode instance as a proxy
+// for a healthy APIServer
+func waitForAPIServerForever(client clientset.Interface, nodeName types.NodeName) error {
+	var lastErr error
+	err := wait.PollImmediateInfinite(time.Second, func() (bool, error) {
+		// Get a CSINode from API server to make sure 1) kubelet can reach API server
+		// and 2) it has enough permissions. Kubelet may have restricted permissions
+		// when it's bootstrapping TLS.
+		// https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
+		_, lastErr = client.StorageV1().CSINodes().Get(string(nodeName), meta.GetOptions{})
+		if lastErr == nil || apierrs.IsNotFound(lastErr) {
+			// API server contacted
+			return true, nil
+		}
+		klog.V(2).Infof("Failed to contact API server when waiting for CSINode publishing: %s", lastErr)
+		return false, nil
+	})
+	if err != nil {
+		// In theory this is unreachable, but just in case:
+		return fmt.Errorf("%v: %v", err, lastErr)
+	}
+
+	return nil
 }
