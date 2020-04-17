@@ -17,7 +17,9 @@ limitations under the License.
 package allocator
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -153,6 +155,45 @@ func TestMapContiguousAllocation(t *testing.T) {
 
 	if _, ok, _ := m.AllocateNext(); ok {
 		t.Errorf("unexpected success")
+	}
+}
+
+func TestSizeSnapshotAndRestore(t *testing.T) {
+	// 1M IPs
+	max := 1000000
+	m := NewAllocation(max, "test")
+	// Allocate all
+	start := time.Now()
+	for i := 0; i < max; i++ {
+		_, ok, _ := m.AllocateNext()
+		if !ok {
+			t.Fatalf("unexpected error")
+		}
+
+	}
+	elapsed := time.Since(start)
+	fmt.Printf("Fill the map took %s\n", elapsed)
+
+	start = time.Now()
+	spec, bytes := m.Snapshot()
+	elapsed = time.Since(start)
+	fmt.Printf("Size snapshot: %d bytes in %v\n", len(bytes), elapsed)
+
+	m2 := NewAllocation(max, "test")
+	// Check the time to load a snapshot
+	start = time.Now()
+	err := m2.Restore(spec, bytes)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	elapsed = time.Since(start)
+	fmt.Printf("Load the snapshot took %s\n", elapsed)
+
+	if len(m2.allocated) != max {
+		t.Errorf("expect count to %d, but got %d", 0, len(m.allocated))
+	}
+	if !m2.Has(10) {
+		t.Errorf("expect offset %v allocated", 10)
 	}
 }
 
