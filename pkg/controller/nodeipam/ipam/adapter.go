@@ -21,6 +21,7 @@ package ipam
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 
 	"k8s.io/klog"
@@ -60,8 +61,12 @@ func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
 	return ret
 }
 
-func (a *adapter) Alias(ctx context.Context, nodeName string) (*net.IPNet, error) {
-	cidrs, err := a.cloud.AliasRanges(types.NodeName(nodeName))
+func (a *adapter) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
+	if node.Spec.ProviderID == "" {
+		return nil, fmt.Errorf("node %s doesn't have providerID", node.Name)
+	}
+
+	cidrs, err := a.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +77,7 @@ func (a *adapter) Alias(ctx context.Context, nodeName string) (*net.IPNet, error
 	case 1:
 		break
 	default:
-		klog.Warningf("Node %q has more than one alias assigned (%v), defaulting to the first", nodeName, cidrs)
+		klog.Warningf("Node %q has more than one alias assigned (%v), defaulting to the first", node.Name, cidrs)
 	}
 
 	_, cidrRange, err := net.ParseCIDR(cidrs[0])
@@ -83,8 +88,12 @@ func (a *adapter) Alias(ctx context.Context, nodeName string) (*net.IPNet, error
 	return cidrRange, nil
 }
 
-func (a *adapter) AddAlias(ctx context.Context, nodeName string, cidrRange *net.IPNet) error {
-	return a.cloud.AddAliasToInstance(types.NodeName(nodeName), cidrRange)
+func (a *adapter) AddAlias(ctx context.Context, node *v1.Node, cidrRange *net.IPNet) error {
+	if node.Spec.ProviderID == "" {
+		return fmt.Errorf("node %s doesn't have providerID", node.Name)
+	}
+
+	return a.cloud.AddAliasToInstanceByProviderID(node.Spec.ProviderID, cidrRange)
 }
 
 func (a *adapter) Node(ctx context.Context, name string) (*v1.Node, error) {
