@@ -14,6 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script runs `make test` command with some args for benchmark test.
+# The "true" target of this makerule is `hack/make-rules/test.sh`.
+# Args:
+#   WHAT: Directory names to test.  All *_test.go files under these
+#     directories will be run.  If not specified, "everything" will be tested.
+# Usage: `hack/benchmark-go.sh`.
+# Example: `hack/benchmark-go.sh WHAT=./pkg/kubelet`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

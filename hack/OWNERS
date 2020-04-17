@@ -6,30 +6,33 @@ reviewers:
   - eparis
   - fejta
   - ixdy
-  - jbeda
   - juanvallejo
+  - hwdef
   - lavalamp
-  - zmerlynn
-  - sttts
-  - gmarek
-  - vishh
+  - SataQiu
   - spiffxp
+  - sttts
+  - vishh
+  - xichengliudui
+  - zmerlynn
+  - mikedanese
 approvers:
+  - bentheelder
   - cblecker
   - deads2k
+  - dims # for local-up-cluster related files
   - eparis
   - fejta
   - ixdy
-  - jbeda
   - lavalamp
-  - madhusudancs
-  - pwittrock
-  - shashidharatd
-  - zmerlynn
-  - sttts
-  - gmarek
-  - vishh
   - liggitt
+  - pwittrock
+  - SataQiu
   - soltysh # for sig-cli related stuff
-  - dims # for local-up-cluster related files
   - spiffxp
+  - sttts
+  - vishh
+  - zmerlynn
+  - mikedanese
+emeritus_approvers:
+  - jbeda

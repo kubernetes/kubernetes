@@ -16,9 +16,20 @@ limitations under the License.
 
 package windows
 
-import "github.com/onsi/ginkgo"
+import (
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+
+	"github.com/onsi/ginkgo"
+)
 
 // SIGDescribe annotates the test with the SIG label.
 func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-windows] "+text, body)
+	return ginkgo.Describe("[sig-windows] "+text, func() {
+		ginkgo.BeforeEach(func() {
+			// all tests in this package are Windows specific
+			e2eskipper.SkipUnlessNodeOSDistroIs("windows")
+		})
+
+		body()
+	})
 }

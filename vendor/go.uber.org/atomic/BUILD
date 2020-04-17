@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "atomic.go",
-        "error.go",
         "string.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/go.uber.org/atomic",

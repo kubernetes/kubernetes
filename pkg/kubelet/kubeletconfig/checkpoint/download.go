@@ -17,6 +17,7 @@ limitations under the License.
 package checkpoint
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -26,8 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -108,8 +108,9 @@ func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, 
 // DecodeRemoteConfigSource is a helper for using the apimachinery to decode serialized RemoteConfigSources;
 // e.g. the metadata stored by checkpoint/store/fsstore.go
 func DecodeRemoteConfigSource(data []byte) (RemoteConfigSource, error) {
-	// decode the remote config source
-	_, codecs, err := scheme.NewSchemeAndCodecs()
+	// Decode the remote config source. We want this to be non-strict
+	// so we don't error out on newer API keys.
+	_, codecs, err := scheme.NewSchemeAndCodecs(serializer.DisableStrict)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +192,7 @@ func (r *remoteConfigMap) Download(client clientset.Interface, store cache.Store
 	// if we didn't find the ConfigMap in the in-memory store, download it from the API server
 	if cm == nil {
 		utillog.Infof("attempting to download %s", r.APIPath())
-		cm, err = client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Get(r.source.ConfigMap.Name, metav1.GetOptions{})
+		cm, err = client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Get(context.TODO(), r.source.ConfigMap.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, status.DownloadError, fmt.Errorf("%s, error: %v", status.DownloadError, err)
 		}
@@ -213,26 +214,14 @@ func (r *remoteConfigMap) Download(client clientset.Interface, store cache.Store
 
 func (r *remoteConfigMap) Informer(client clientset.Interface, handler cache.ResourceEventHandlerFuncs) cache.SharedInformer {
 	// select ConfigMap by name
-	fieldselector := fields.OneTermEqualSelector("metadata.name", r.source.ConfigMap.Name)
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", r.source.ConfigMap.Name)
 
 	// add some randomness to resync period, which can help avoid controllers falling into lock-step
 	minResyncPeriod := 15 * time.Minute
 	factor := rand.Float64() + 1
 	resyncPeriod := time.Duration(float64(minResyncPeriod.Nanoseconds()) * factor)
 
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (kuberuntime.Object, error) {
-			return client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).List(metav1.ListOptions{
-				FieldSelector: fieldselector.String(),
-			})
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Watch(metav1.ListOptions{
-				FieldSelector:   fieldselector.String(),
-				ResourceVersion: options.ResourceVersion,
-			})
-		},
-	}
+	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", r.source.ConfigMap.Namespace, fieldSelector)
 
 	informer := cache.NewSharedInformer(lw, &apiv1.ConfigMap{}, resyncPeriod)
 	informer.AddEventHandler(handler)

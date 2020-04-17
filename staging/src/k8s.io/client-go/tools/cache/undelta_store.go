@@ -31,6 +31,7 @@ type UndeltaStore struct {
 // Assert that it implements the Store interface.
 var _ Store = &UndeltaStore{}
 
+// Add inserts an object into the store and sends complete state by calling PushFunc.
 // Note about thread safety.  The Store implementation (cache.cache) uses a lock for all methods.
 // In the functions below, the lock gets released and reacquired betweend the {Add,Delete,etc}
 // and the List.  So, the following can happen, resulting in two identical calls to PushFunc.
@@ -41,7 +42,6 @@ var _ Store = &UndeltaStore{}
 // 3                                         Store.Add(b)
 // 4               Store.List() -> [a,b]
 // 5                                         Store.List() -> [a,b]
-
 func (u *UndeltaStore) Add(obj interface{}) error {
 	if err := u.Store.Add(obj); err != nil {
 		return err
@@ -50,6 +50,7 @@ func (u *UndeltaStore) Add(obj interface{}) error {
 	return nil
 }
 
+// Update sets an item in the cache to its updated state and sends complete state by calling PushFunc.
 func (u *UndeltaStore) Update(obj interface{}) error {
 	if err := u.Store.Update(obj); err != nil {
 		return err
@@ -58,6 +59,7 @@ func (u *UndeltaStore) Update(obj interface{}) error {
 	return nil
 }
 
+// Delete removes an item from the cache and sends complete state by calling PushFunc.
 func (u *UndeltaStore) Delete(obj interface{}) error {
 	if err := u.Store.Delete(obj); err != nil {
 		return err
@@ -66,6 +68,10 @@ func (u *UndeltaStore) Delete(obj interface{}) error {
 	return nil
 }
 
+// Replace will delete the contents of current store, using instead the given list.
+// 'u' takes ownership of the list, you should not reference the list again
+// after calling this function.
+// The new contents complete state will be sent by calling PushFunc after replacement.
 func (u *UndeltaStore) Replace(list []interface{}, resourceVersion string) error {
 	if err := u.Store.Replace(list, resourceVersion); err != nil {
 		return err

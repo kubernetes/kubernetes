@@ -19,6 +19,7 @@ package config
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -35,7 +36,7 @@ type CloudControllerManagerConfiguration struct {
 
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
-	ServiceController kubectrlmgrconfig.ServiceControllerConfiguration
+	ServiceController serviceconfig.ServiceControllerConfiguration
 
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration

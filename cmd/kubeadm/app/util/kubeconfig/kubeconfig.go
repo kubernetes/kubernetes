@@ -18,6 +18,7 @@ package kubeconfig
 
 import (
 	"fmt"
+	"io/ioutil"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -79,7 +80,8 @@ func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 
 // ToClientSet converts a KubeConfig object to a client
 func ToClientSet(config *clientcmdapi.Config) (*clientset.Clientset, error) {
-	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
+	overrides := clientcmd.ConfigOverrides{Timeout: "10s"}
+	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &overrides).ClientConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
 	}
@@ -111,4 +113,93 @@ func GetClusterFromKubeConfig(config *clientcmdapi.Config) *clientcmdapi.Cluster
 		return config.Clusters[config.Contexts[config.CurrentContext].Cluster]
 	}
 	return nil
+}
+
+// HasAuthenticationCredentials returns true if the current user has valid authentication credentials for
+// token authentication, basic authentication or X509 authentication
+func HasAuthenticationCredentials(config *clientcmdapi.Config) bool {
+	authInfo := getCurrentAuthInfo(config)
+	if authInfo == nil {
+		return false
+	}
+
+	// token authentication
+	if len(authInfo.Token) != 0 {
+		return true
+	}
+
+	// basic authentication
+	if len(authInfo.Username) != 0 && len(authInfo.Password) != 0 {
+		return true
+	}
+
+	// X509 authentication
+	if (len(authInfo.ClientCertificate) != 0 || len(authInfo.ClientCertificateData) != 0) &&
+		(len(authInfo.ClientKey) != 0 || len(authInfo.ClientKeyData) != 0) {
+		return true
+	}
+
+	return false
+}
+
+// EnsureAuthenticationInfoAreEmbedded check if some authentication info are provided as external key/certificate
+// files, and eventually embeds such files into the kubeconfig file
+func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
+	authInfo := getCurrentAuthInfo(config)
+	if authInfo == nil {
+		return errors.New("invalid kubeconfig file. AuthInfo is not defined for the current user")
+	}
+
+	if len(authInfo.ClientCertificateData) == 0 && len(authInfo.ClientCertificate) != 0 {
+		clientCert, err := ioutil.ReadFile(authInfo.ClientCertificate)
+		if err != nil {
+			return errors.Wrap(err, "error while reading client cert file defined in kubeconfig")
+		}
+		authInfo.ClientCertificateData = clientCert
+		authInfo.ClientCertificate = ""
+	}
+	if len(authInfo.ClientKeyData) == 0 && len(authInfo.ClientKey) != 0 {
+		clientKey, err := ioutil.ReadFile(authInfo.ClientKey)
+		if err != nil {
+			return errors.Wrap(err, "error while reading client key file defined in kubeconfig")
+		}
+		authInfo.ClientKeyData = clientKey
+		authInfo.ClientKey = ""
+	}
+
+	return nil
+}
+
+// EnsureCertificateAuthorityIsEmbedded check if the certificate authority is provided as an external
+// file and eventually embeds it into the kubeconfig
+func EnsureCertificateAuthorityIsEmbedded(cluster *clientcmdapi.Cluster) error {
+	if cluster == nil {
+		return errors.New("received nil value for Cluster")
+	}
+
+	if len(cluster.CertificateAuthorityData) == 0 && len(cluster.CertificateAuthority) != 0 {
+		ca, err := ioutil.ReadFile(cluster.CertificateAuthority)
+		if err != nil {
+			return errors.Wrap(err, "error while reading certificate authority file defined in kubeconfig")
+		}
+		cluster.CertificateAuthorityData = ca
+		cluster.CertificateAuthority = ""
+	}
+
+	return nil
+}
+
+// getCurrentAuthInfo returns current authInfo, if defined
+func getCurrentAuthInfo(config *clientcmdapi.Config) *clientcmdapi.AuthInfo {
+	if config == nil || config.CurrentContext == "" ||
+		len(config.Contexts) == 0 || config.Contexts[config.CurrentContext] == nil {
+		return nil
+	}
+	user := config.Contexts[config.CurrentContext].AuthInfo
+
+	if user == "" || len(config.AuthInfos) == 0 || config.AuthInfos[user] == nil {
+		return nil
+	}
+
+	return config.AuthInfos[user]
 }

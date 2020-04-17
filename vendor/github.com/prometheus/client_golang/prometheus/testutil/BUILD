@@ -5,7 +5,7 @@ go_library(
     srcs = ["testutil.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_golang/prometheus/testutil",
     importpath = "github.com/prometheus/client_golang/prometheus/testutil",
-    visibility = ["//visibility:public"],
+    visibility = ["//build/visible_to:vendor_githubcom_prometheus_CONSUMERS"],
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/internal:go_default_library",

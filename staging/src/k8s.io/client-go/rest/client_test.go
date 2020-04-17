@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -27,12 +28,11 @@ import (
 
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -55,15 +55,17 @@ func TestSerializer(t *testing.T) {
 	contentConfig := ContentConfig{
 		ContentType:          "application/json",
 		GroupVersion:         &gv,
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 	}
 
-	serializer, err := createSerializers(contentConfig)
+	n := runtime.NewClientNegotiator(contentConfig.NegotiatedSerializer, gv)
+	d, err := n.Decoder("application/json", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	// bytes based on actual return from API server when encoding an "unversioned" object
-	obj, err := runtime.Decode(serializer.Decoder, []byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success"}`))
+	obj, err := runtime.Decode(d, []byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success"}`))
 	t.Log(obj)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +80,7 @@ func TestDoRequestSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().Prefix("test").Do().Raw()
+	body, err := c.Get().Prefix("test").Do(context.Background()).Raw()
 
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
 		expStatus: status, testBody: true, testBodyErrorIsNotNil: false}
@@ -106,7 +108,7 @@ func TestDoRequestFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	err = c.Get().Do().Error()
+	err = c.Get().Do(context.Background()).Error()
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -145,7 +147,7 @@ func TestDoRawRequestFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().Do().Raw()
+	body, err := c.Get().Do(context.Background()).Raw()
 
 	if err == nil || body == nil {
 		t.Errorf("unexpected non-error: %#v", body)
@@ -169,7 +171,7 @@ func TestDoRequestCreated(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
 
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
 		expStatus: status, testBody: false}
@@ -184,7 +186,7 @@ func TestDoRequestNotCreated(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
 		expStatus: expectedStatus, testBody: false}
 	validate(testParam, t, body, fakeHandler)
@@ -199,7 +201,7 @@ func TestDoRequestAcceptedNoContentReturned(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
 		testBody: false}
 	validate(testParam, t, body, fakeHandler)
@@ -213,7 +215,7 @@ func TestBadRequest(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	body, err := c.Get().Prefix("test").Do(context.Background()).WasCreated(&created).Raw()
 	testParam := TestParam{actualError: err, expectingError: true, expCreated: false,
 		testBody: true}
 	validate(testParam, t, body, fakeHandler)
@@ -334,7 +336,7 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         &v1.SchemeGroupVersion,
-			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 		},
 		Username: "user",
 		Password: "pass",

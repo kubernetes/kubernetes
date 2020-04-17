@@ -18,13 +18,13 @@
 
 // Package grpclog defines logging for grpc.
 //
-// All logs in transport package only go to verbose level 2.
+// All logs in transport and grpclb packages only go to verbose level 2.
 // All logs in other packages in grpc are logged in spite of the verbosity level.
 //
 // In the default logger,
 // severity level can be set by environment variable GRPC_GO_LOG_SEVERITY_LEVEL,
 // verbosity level can be set by GRPC_GO_LOG_VERBOSITY_LEVEL.
-package grpclog
+package grpclog // import "google.golang.org/grpc/grpclog"
 
 import "os"
 
@@ -89,7 +89,7 @@ func Fatal(args ...interface{}) {
 }
 
 // Fatalf logs to the FATAL log. Arguments are handled in the manner of fmt.Printf.
-// It calles os.Exit() with exit code 1.
+// It calls os.Exit() with exit code 1.
 func Fatalf(format string, args ...interface{}) {
 	logger.Fatalf(format, args...)
 	// Make sure fatal logs will exit.

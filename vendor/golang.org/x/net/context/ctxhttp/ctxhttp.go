@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build go1.7
-
 // Package ctxhttp provides helper functions for performing context-aware HTTP requests.
-package ctxhttp
+package ctxhttp // import "golang.org/x/net/context/ctxhttp"
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
-
-	"golang.org/x/net/context"
 )
 
 // Do sends an HTTP request with the provided http.Client and returns

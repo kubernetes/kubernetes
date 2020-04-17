@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -62,6 +62,9 @@ type ImageStats struct {
 type Runtime interface {
 	// Type returns the type of the container runtime.
 	Type() string
+
+	//SupportsSingleFileMapping returns whether the container runtime supports single file mappings or not.
+	SupportsSingleFileMapping() bool
 
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
@@ -273,8 +276,8 @@ type PodStatus struct {
 	Name string
 	// Namespace of the pod.
 	Namespace string
-	// IP of the pod.
-	IP string
+	// All IPs assigned to this pod
+	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
 	// Status of the pod sandbox.

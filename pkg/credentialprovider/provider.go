@@ -33,18 +33,10 @@ type DockerConfigProvider interface {
 	Enabled() bool
 	// Provide returns docker configuration.
 	// Implementations can be blocking - e.g. metadata server unavailable.
-	Provide() DockerConfig
-	// LazyProvide() gets called after URL matches have been performed, so the
-	// location used as the key in DockerConfig would be redundant.
-	LazyProvide() *DockerConfigEntry
-}
-
-func LazyProvide(creds LazyAuthConfiguration) AuthConfig {
-	if creds.Provider != nil {
-		entry := *creds.Provider.LazyProvide()
-		return DockerConfigEntryToLazyAuthConfiguration(entry).AuthConfig
-	}
-	return creds.AuthConfig
+	// The image is passed in as context in the event that the
+	// implementation depends on information in the image name to return
+	// credentials; implementations are safe to ignore the image.
+	Provide(image string) DockerConfig
 }
 
 // A DockerConfigProvider that simply reads the .dockercfg file
@@ -78,7 +70,7 @@ func (d *defaultDockerConfigProvider) Enabled() bool {
 }
 
 // Provide implements dockerConfigProvider
-func (d *defaultDockerConfigProvider) Provide() DockerConfig {
+func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
 	// Read the standard Docker credentials from .dockercfg
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
@@ -88,23 +80,13 @@ func (d *defaultDockerConfigProvider) Provide() DockerConfig {
 	return DockerConfig{}
 }
 
-// LazyProvide implements dockerConfigProvider. Should never be called.
-func (d *defaultDockerConfigProvider) LazyProvide() *DockerConfigEntry {
-	return nil
-}
-
 // Enabled implements dockerConfigProvider
 func (d *CachingDockerConfigProvider) Enabled() bool {
 	return d.Provider.Enabled()
 }
 
-// LazyProvide implements dockerConfigProvider. Should never be called.
-func (d *CachingDockerConfigProvider) LazyProvide() *DockerConfigEntry {
-	return nil
-}
-
 // Provide implements dockerConfigProvider
-func (d *CachingDockerConfigProvider) Provide() DockerConfig {
+func (d *CachingDockerConfigProvider) Provide(image string) DockerConfig {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -114,7 +96,7 @@ func (d *CachingDockerConfigProvider) Provide() DockerConfig {
 	}
 
 	klog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
-	d.cacheDockerConfig = d.Provider.Provide()
+	d.cacheDockerConfig = d.Provider.Provide(image)
 	d.expiration = time.Now().Add(d.Lifetime)
 	return d.cacheDockerConfig
 }

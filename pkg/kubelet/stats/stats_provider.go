@@ -22,7 +22,7 @@ import (
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -42,8 +42,10 @@ func NewCRIStatsProvider(
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	logMetricsService LogMetricsService,
+	osInterface kubecontainer.OSInterface,
 ) *StatsProvider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer, runtimeService, imageService, logMetricsService))
+	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
+		runtimeService, imageService, logMetricsService, osInterface))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -112,7 +114,7 @@ func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*st
 	}
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
 	s := cadvisorInfoToContainerStats(cgroupName, info, nil, nil)
-	n := cadvisorInfoToNetworkStats(cgroupName, info)
+	n := cadvisorInfoToNetworkStats(info)
 	return s, n, nil
 }
 

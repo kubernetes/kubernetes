@@ -9,6 +9,8 @@ Golint requires a
 
     go get -u golang.org/x/lint/golint
 
+To find out where `golint` was installed you can run `go list -f {{.Target}} golang.org/x/lint/golint`. For `golint` to be used globally add that directory to the `$PATH` environment setting.
+
 ## Usage
 
 Invoke `golint` with one or more filenames, directories, or packages named

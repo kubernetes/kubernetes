@@ -11,19 +11,20 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/validating",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
-        "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/configuration:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/util:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )
 
@@ -34,6 +35,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -44,6 +44,7 @@ const (
 	Trap
 	Allow
 	Trace
+	Log
 )
 
 // Operator is a comparison operator to be used when matching syscall arguments in Seccomp
@@ -272,26 +273,23 @@ func (hooks Hooks) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// HookState is the payload provided to a hook on execution.
-type HookState specs.State
-
 type Hook interface {
 	// Run executes the hook with the provided state.
-	Run(HookState) error
+	Run(*specs.State) error
 }
 
 // NewFunctionHook will call the provided function when the hook is run.
-func NewFunctionHook(f func(HookState) error) FuncHook {
+func NewFunctionHook(f func(*specs.State) error) FuncHook {
 	return FuncHook{
 		run: f,
 	}
 }
 
 type FuncHook struct {
-	run func(HookState) error
+	run func(*specs.State) error
 }
 
-func (f FuncHook) Run(s HookState) error {
+func (f FuncHook) Run(s *specs.State) error {
 	return f.run(s)
 }
 
@@ -314,7 +312,7 @@ type CommandHook struct {
 	Command
 }
 
-func (c Command) Run(s HookState) error {
+func (c Command) Run(s *specs.State) error {
 	b, err := json.Marshal(s)
 	if err != nil {
 		return err

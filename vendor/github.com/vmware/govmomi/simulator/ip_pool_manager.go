@@ -30,8 +30,8 @@ import (
 )
 
 var ipPool = MustNewIpPool(&types.IpPool{
-	Id:   1,
-	Name: "ip-pool",
+	Id:                     1,
+	Name:                   "ip-pool",
 	AvailableIpv4Addresses: 250,
 	AvailableIpv6Addresses: 250,
 	AllocatedIpv6Addresses: 0,

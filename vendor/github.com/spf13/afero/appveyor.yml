@@ -12,4 +12,4 @@ build_script:
 
     go build github.com/spf13/afero
 test_script:
-- cmd: go test -v github.com/spf13/afero
+- cmd: go test -race -v github.com/spf13/afero/...

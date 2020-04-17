@@ -24,33 +24,31 @@ import (
 )
 
 const (
-	// The OS/Arch labels are promoted to GA in 1.14. kubelet applies both beta
+	// LabelOS is a label to indicate the operating system of the node.
+	// The OS labels are promoted to GA in 1.14. kubelet applies both beta
 	// and GA labels to ensure backward compatibility.
-	// TODO: stop applying the beta OS/Arch labels in Kubernetes 1.18.
-	LabelOS   = "beta.kubernetes.io/os"
+	// TODO: stop applying the beta OS labels in Kubernetes 1.18.
+	LabelOS = "beta.kubernetes.io/os"
+	// LabelArch is a label to indicate the architecture of the node.
+	// The Arch labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta Arch labels in Kubernetes 1.18.
 	LabelArch = "beta.kubernetes.io/arch"
-
-	// GA versions of the legacy beta labels.
-	// TODO: update kubelet and controllers to set both beta and GA labels, then export these constants
-	labelZoneFailureDomainGA = "failure-domain.kubernetes.io/zone"
-	labelZoneRegionGA        = "failure-domain.kubernetes.io/region"
-	labelInstanceTypeGA      = "kubernetes.io/instance-type"
 )
 
 var kubeletLabels = sets.NewString(
 	v1.LabelHostname,
+	v1.LabelZoneFailureDomainStable,
+	v1.LabelZoneRegionStable,
 	v1.LabelZoneFailureDomain,
 	v1.LabelZoneRegion,
 	v1.LabelInstanceType,
+	v1.LabelInstanceTypeStable,
 	v1.LabelOSStable,
 	v1.LabelArchStable,
 
 	LabelOS,
 	LabelArch,
-
-	labelZoneFailureDomainGA,
-	labelZoneRegionGA,
-	labelInstanceTypeGA,
 )
 
 var kubeletLabelNamespaces = sets.NewString(

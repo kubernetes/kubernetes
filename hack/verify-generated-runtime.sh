@@ -14,12 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of container runtime API is needed or not.
+# We should run `hack/update-generated-runtime.sh` if container runtime API is
+# out of date.
+# Usage: `hack/verify-generated-runtime.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/cri/runtime/v1alpha2"
+KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env

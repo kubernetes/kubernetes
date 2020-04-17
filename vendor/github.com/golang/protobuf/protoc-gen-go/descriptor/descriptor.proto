@@ -417,6 +417,17 @@ message FileOptions {
   // determining the namespace.
   optional string php_namespace = 41;
 
+
+  // Use this option to change the namespace of php generated metadata classes.
+  // Default is empty. When this option is empty, the proto file name will be used
+  // for determining the namespace.
+  optional string php_metadata_namespace = 44;
+
+  // Use this option to change the package of ruby generated classes. Default
+  // is empty. When this option is not set, the package name will be used for
+  // determining the ruby package.
+  optional string ruby_package = 45;
+
   // The parser stores options it doesn't recognize here.
   // See the documentation for the "Options" section above.
   repeated UninterpretedOption uninterpreted_option = 999;

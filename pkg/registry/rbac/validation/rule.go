@@ -34,7 +34,7 @@ import (
 )
 
 type AuthorizationRuleResolver interface {
-	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namepsace
+	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namespace
 	// of the role binding, the empty string if a cluster role binding.
 	GetRoleReferenceRules(roleRef rbacv1.RoleRef, namespace string) ([]rbacv1.PolicyRule, error)
 
@@ -286,7 +286,8 @@ func appliesToUser(user user.Info, subject rbacv1.Subject, namespace string) boo
 		if len(saNamespace) == 0 {
 			return false
 		}
-		return serviceaccount.MakeUsername(saNamespace, subject.Name) == user.GetName()
+		// use a more efficient comparison for RBAC checking
+		return serviceaccount.MatchesUsername(saNamespace, subject.Name, user.GetName())
 	default:
 		return false
 	}

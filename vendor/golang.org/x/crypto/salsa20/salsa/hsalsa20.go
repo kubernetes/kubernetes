@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package salsa provides low-level access to functions in the Salsa family.
-package salsa
+package salsa // import "golang.org/x/crypto/salsa20/salsa"
 
 // Sigma is the Salsa20 constant for 256-bit keys.
 var Sigma = [16]byte{'e', 'x', 'p', 'a', 'n', 'd', ' ', '3', '2', '-', 'b', 'y', 't', 'e', ' ', 'k'}

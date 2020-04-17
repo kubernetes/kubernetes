@@ -22,8 +22,11 @@ import (
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -79,5 +82,32 @@ func TestSetDefaultAttachRequired(t *testing.T) {
 		t.Errorf("Expected PodInfoOnMount to be defaulted to: %+v, got: nil", defaultPodInfo)
 	} else if *outPodInfo != defaultPodInfo {
 		t.Errorf("Expected PodInfoOnMount to be defaulted to: %+v, got: %+v", defaultPodInfo, outPodInfo)
+	}
+}
+
+func TestSetDefaultVolumeLifecycleModesEnabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	driver := &storagev1beta1.CSIDriver{}
+
+	// field should be defaulted
+	defaultMode := storagev1beta1.VolumeLifecyclePersistent
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
+	outModes := output.Spec.VolumeLifecycleModes
+	if len(outModes) != 1 {
+		t.Errorf("Expected VolumeLifecycleModes to be defaulted to: %+v, got: %+v", defaultMode, outModes)
+	} else if outModes[0] != defaultMode {
+		t.Errorf("Expected VolumeLifecycleModes to be defaulted to: %+v, got: %+v", defaultMode, outModes)
+	}
+}
+
+func TestSetDefaultVolumeLifecycleModesDisabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, false)()
+	driver := &storagev1beta1.CSIDriver{}
+
+	// field should not be defaulted
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
+	outModes := output.Spec.VolumeLifecycleModes
+	if outModes != nil {
+		t.Errorf("Expected VolumeLifecycleModes to remain nil, got: %+v", outModes)
 	}
 }

@@ -17,16 +17,19 @@ limitations under the License.
 package disruption
 
 import (
+	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -37,10 +40,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	policyclientset "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -49,8 +52,6 @@ import (
 
 	"k8s.io/klog"
 )
-
-const statusUpdateRetries = 2
 
 // DeletionTimeout sets maximum time from the moment a pod is added to DisruptedPods in PDB.Status
 // to the time when the pod is expected to be seen by PDB controller as having been marked for deletion.
@@ -67,6 +68,9 @@ type updater func(*policy.PodDisruptionBudget) error
 
 type DisruptionController struct {
 	kubeClient clientset.Interface
+	mapper     apimeta.RESTMapper
+
+	scaleNamespacer scaleclient.ScalesGetter
 
 	pdbLister       policylisters.PodDisruptionBudgetLister
 	pdbListerSynced cache.InformerSynced
@@ -105,7 +109,7 @@ type controllerAndScale struct {
 
 // podControllerFinder is a function type that maps a pod to a list of
 // controllers and their scale.
-type podControllerFinder func(*v1.Pod) (*controllerAndScale, error)
+type podControllerFinder func(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error)
 
 func NewDisruptionController(
 	podInformer coreinformers.PodInformer,
@@ -115,6 +119,8 @@ func NewDisruptionController(
 	dInformer appsv1informers.DeploymentInformer,
 	ssInformer appsv1informers.StatefulSetInformer,
 	kubeClient clientset.Interface,
+	restMapper apimeta.RESTMapper,
+	scaleNamespacer scaleclient.ScalesGetter,
 ) *DisruptionController {
 	dc := &DisruptionController{
 		kubeClient:   kubeClient,
@@ -157,19 +163,19 @@ func NewDisruptionController(
 	dc.ssLister = ssInformer.Lister()
 	dc.ssListerSynced = ssInformer.Informer().HasSynced
 
+	dc.mapper = restMapper
+	dc.scaleNamespacer = scaleNamespacer
+
 	return dc
 }
 
-// TODO(mml): When controllerRef is implemented (#2210), we *could* simply
-// return controllers without their scales, and access scale type-generically
-// via the scale subresource.  That may not be as much of a win as it sounds,
-// however.  We are accessing everything through the pkg/client/cache API that
-// we have to set up and tune to the types we know we'll be accessing anyway,
-// and we may well need further tweaks just to be able to access scale
-// subresources.
+// The workload resources do implement the scale subresource, so it would
+// be possible to only check the scale subresource here. But since there is no
+// way to take advantage of listers with scale subresources, we use the workload
+// resources directly and only fall back to the scale subresource when needed.
 func (dc *DisruptionController) finders() []podControllerFinder {
 	return []podControllerFinder{dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
-		dc.getPodStatefulSet}
+		dc.getPodStatefulSet, dc.getScaleController}
 }
 
 var (
@@ -180,15 +186,12 @@ var (
 )
 
 // getPodReplicaSet finds a replicaset which has no matching deployments.
-func (dc *DisruptionController) getPodReplicaSet(pod *v1.Pod) (*controllerAndScale, error) {
-	controllerRef := metav1.GetControllerOf(pod)
-	if controllerRef == nil {
-		return nil, nil
+func (dc *DisruptionController) getPodReplicaSet(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
+	if !ok || err != nil {
+		return nil, err
 	}
-	if controllerRef.Kind != controllerKindRS.Kind {
-		return nil, nil
-	}
-	rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
+	rs, err := dc.rsLister.ReplicaSets(namespace).Get(controllerRef.Name)
 	if err != nil {
 		// The only possible error is NotFound, which is ok here.
 		return nil, nil
@@ -204,16 +207,13 @@ func (dc *DisruptionController) getPodReplicaSet(pod *v1.Pod) (*controllerAndSca
 	return &controllerAndScale{rs.UID, *(rs.Spec.Replicas)}, nil
 }
 
-// getPodStatefulSet returns the statefulset managing the given pod.
-func (dc *DisruptionController) getPodStatefulSet(pod *v1.Pod) (*controllerAndScale, error) {
-	controllerRef := metav1.GetControllerOf(pod)
-	if controllerRef == nil {
-		return nil, nil
+// getPodStatefulSet returns the statefulset referenced by the provided controllerRef.
+func (dc *DisruptionController) getPodStatefulSet(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+	ok, err := verifyGroupKind(controllerRef, controllerKindSS.Kind, []string{"apps"})
+	if !ok || err != nil {
+		return nil, err
 	}
-	if controllerRef.Kind != controllerKindSS.Kind {
-		return nil, nil
-	}
-	ss, err := dc.ssLister.StatefulSets(pod.Namespace).Get(controllerRef.Name)
+	ss, err := dc.ssLister.StatefulSets(namespace).Get(controllerRef.Name)
 	if err != nil {
 		// The only possible error is NotFound, which is ok here.
 		return nil, nil
@@ -226,15 +226,12 @@ func (dc *DisruptionController) getPodStatefulSet(pod *v1.Pod) (*controllerAndSc
 }
 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
-func (dc *DisruptionController) getPodDeployment(pod *v1.Pod) (*controllerAndScale, error) {
-	controllerRef := metav1.GetControllerOf(pod)
-	if controllerRef == nil {
-		return nil, nil
+func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
+	if !ok || err != nil {
+		return nil, err
 	}
-	if controllerRef.Kind != controllerKindRS.Kind {
-		return nil, nil
-	}
-	rs, err := dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
+	rs, err := dc.rsLister.ReplicaSets(namespace).Get(controllerRef.Name)
 	if err != nil {
 		// The only possible error is NotFound, which is ok here.
 		return nil, nil
@@ -246,8 +243,10 @@ func (dc *DisruptionController) getPodDeployment(pod *v1.Pod) (*controllerAndSca
 	if controllerRef == nil {
 		return nil, nil
 	}
-	if controllerRef.Kind != controllerKindDep.Kind {
-		return nil, nil
+
+	ok, err = verifyGroupKind(controllerRef, controllerKindDep.Kind, []string{"apps", "extensions"})
+	if !ok || err != nil {
+		return nil, err
 	}
 	deployment, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
 	if err != nil {
@@ -260,15 +259,12 @@ func (dc *DisruptionController) getPodDeployment(pod *v1.Pod) (*controllerAndSca
 	return &controllerAndScale{deployment.UID, *(deployment.Spec.Replicas)}, nil
 }
 
-func (dc *DisruptionController) getPodReplicationController(pod *v1.Pod) (*controllerAndScale, error) {
-	controllerRef := metav1.GetControllerOf(pod)
-	if controllerRef == nil {
-		return nil, nil
+func (dc *DisruptionController) getPodReplicationController(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+	ok, err := verifyGroupKind(controllerRef, controllerKindRC.Kind, []string{""})
+	if !ok || err != nil {
+		return nil, err
 	}
-	if controllerRef.Kind != controllerKindRC.Kind {
-		return nil, nil
-	}
-	rc, err := dc.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
+	rc, err := dc.rcLister.ReplicationControllers(namespace).Get(controllerRef.Name)
 	if err != nil {
 		// The only possible error is NotFound, which is ok here.
 		return nil, nil
@@ -279,6 +275,55 @@ func (dc *DisruptionController) getPodReplicationController(pod *v1.Pod) (*contr
 	return &controllerAndScale{rc.UID, *(rc.Spec.Replicas)}, nil
 }
 
+func (dc *DisruptionController) getScaleController(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+	gv, err := schema.ParseGroupVersion(controllerRef.APIVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	gk := schema.GroupKind{
+		Group: gv.Group,
+		Kind:  controllerRef.Kind,
+	}
+
+	mapping, err := dc.mapper.RESTMapping(gk, gv.Version)
+	if err != nil {
+		return nil, err
+	}
+	gr := mapping.Resource.GroupResource()
+
+	scale, err := dc.scaleNamespacer.Scales(namespace).Get(context.TODO(), gr, controllerRef.Name, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if scale.UID != controllerRef.UID {
+		return nil, nil
+	}
+	return &controllerAndScale{scale.UID, scale.Spec.Replicas}, nil
+}
+
+func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, expectedGroups []string) (bool, error) {
+	gv, err := schema.ParseGroupVersion(controllerRef.APIVersion)
+	if err != nil {
+		return false, err
+	}
+
+	if controllerRef.Kind != expectedKind {
+		return false, nil
+	}
+
+	for _, group := range expectedGroups {
+		if group == gv.Group {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer dc.queue.ShutDown()
@@ -286,7 +331,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting disruption controller")
 	defer klog.Infof("Shutting down disruption controller")
 
-	if !controller.WaitForCacheSync("disruption", stopCh, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	if !cache.WaitForNamedCacheSync("disruption", stopCh, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
 		return
 	}
 
@@ -316,7 +361,19 @@ func (dc *DisruptionController) updateDb(old, cur interface{}) {
 }
 
 func (dc *DisruptionController) removeDb(obj interface{}) {
-	pdb := obj.(*policy.PodDisruptionBudget)
+	pdb, ok := obj.(*policy.PodDisruptionBudget)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			klog.Errorf("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		pdb, ok = tombstone.Obj.(*policy.PodDisruptionBudget)
+		if !ok {
+			klog.Errorf("Tombstone contained object that is not a pdb %+v", obj)
+			return
+		}
+	}
 	klog.V(4).Infof("remove DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
 }
@@ -485,7 +542,13 @@ func (dc *DisruptionController) sync(key string) error {
 		return err
 	}
 
-	if err := dc.trySync(pdb); err != nil {
+	err = dc.trySync(pdb)
+	// If the reason for failure was a conflict, then allow this PDB update to be
+	// requeued without triggering the failSafe logic.
+	if errors.IsConflict(err) {
+		return err
+	}
+	if err != nil {
 		klog.Errorf("Failed to sync pdb %s/%s: %v", pdb.Namespace, pdb.Name, err)
 		return dc.failSafe(pdb)
 	}
@@ -583,10 +646,23 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 	// 1. Find the controller for each pod.  If any pod has 0 controllers,
 	// that's an error. With ControllerRef, a pod can only have 1 controller.
 	for _, pod := range pods {
+		controllerRef := metav1.GetControllerOf(pod)
+		if controllerRef == nil {
+			err = fmt.Errorf("found no controller ref for pod %q", pod.Name)
+			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllerRef", err.Error())
+			return
+		}
+
+		// If we already know the scale of the controller there is no need to do anything.
+		if _, found := controllerScale[controllerRef.UID]; found {
+			continue
+		}
+
+		// Check all the supported controllers to find the desired scale.
 		foundController := false
 		for _, finder := range dc.finders() {
 			var controllerNScale *controllerAndScale
-			controllerNScale, err = finder(pod)
+			controllerNScale, err = finder(controllerRef, pod.Namespace)
 			if err != nil {
 				return
 			}
@@ -639,7 +715,7 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 	result := make(map[string]metav1.Time)
 	var recheckTime *time.Time
 
-	if disruptedPods == nil || len(disruptedPods) == 0 {
+	if disruptedPods == nil {
 		return result, recheckTime
 	}
 	for _, pod := range pods {
@@ -668,14 +744,14 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 	return result, recheckTime
 }
 
-// failSafe is an attempt to at least update the PodDisruptionsAllowed field to
+// failSafe is an attempt to at least update the DisruptionsAllowed field to
 // 0 if everything else has failed.  This is one place we
 // implement the  "fail open" part of the design since if we manage to update
 // this field correctly, we will prevent the /evict handler from approving an
 // eviction when it may be unsafe to do so.
 func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error {
 	newPdb := pdb.DeepCopy()
-	newPdb.Status.PodDisruptionsAllowed = 0
+	newPdb.Status.DisruptionsAllowed = 0
 	return dc.getUpdater()(newPdb)
 }
 
@@ -694,48 +770,28 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 	if pdb.Status.CurrentHealthy == currentHealthy &&
 		pdb.Status.DesiredHealthy == desiredHealthy &&
 		pdb.Status.ExpectedPods == expectedCount &&
-		pdb.Status.PodDisruptionsAllowed == disruptionsAllowed &&
-		reflect.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) &&
+		pdb.Status.DisruptionsAllowed == disruptionsAllowed &&
+		apiequality.Semantic.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) &&
 		pdb.Status.ObservedGeneration == pdb.Generation {
 		return nil
 	}
 
 	newPdb := pdb.DeepCopy()
 	newPdb.Status = policy.PodDisruptionBudgetStatus{
-		CurrentHealthy:        currentHealthy,
-		DesiredHealthy:        desiredHealthy,
-		ExpectedPods:          expectedCount,
-		PodDisruptionsAllowed: disruptionsAllowed,
-		DisruptedPods:         disruptedPods,
-		ObservedGeneration:    pdb.Generation,
+		CurrentHealthy:     currentHealthy,
+		DesiredHealthy:     desiredHealthy,
+		ExpectedPods:       expectedCount,
+		DisruptionsAllowed: disruptionsAllowed,
+		DisruptedPods:      disruptedPods,
+		ObservedGeneration: pdb.Generation,
 	}
 
 	return dc.getUpdater()(newPdb)
 }
 
-// refresh tries to re-GET the given PDB.  If there are any errors, it just
-// returns the old PDB.  Intended to be used in a retry loop where it runs a
-// bounded number of times.
-func refresh(pdbClient policyclientset.PodDisruptionBudgetInterface, pdb *policy.PodDisruptionBudget) *policy.PodDisruptionBudget {
-	newPdb, err := pdbClient.Get(pdb.Name, metav1.GetOptions{})
-	if err == nil {
-		return newPdb
-	}
-	return pdb
-
-}
-
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
-	pdbClient := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace)
-	st := pdb.Status
-
-	var err error
-	for i, pdb := 0, pdb; i < statusUpdateRetries; i, pdb = i+1, refresh(pdbClient, pdb) {
-		pdb.Status = st
-		if _, err = pdbClient.UpdateStatus(pdb); err == nil {
-			break
-		}
-	}
-
+	// If this update fails, don't retry it. Allow the failure to get handled &
+	// retried in `processNextWorkItem()`.
+	_, err := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).UpdateStatus(context.TODO(), pdb, metav1.UpdateOptions{})
 	return err
 }

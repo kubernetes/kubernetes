@@ -55,6 +55,12 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 	return result
 }
 
+// IsTimeout returns true if the given error is a network timeout error
+func IsTimeout(err error) bool {
+	neterr, ok := err.(net.Error)
+	return ok && neterr != nil && neterr.Timeout()
+}
+
 // IsProbableEOF returns true if the given error resembles a connection termination
 // scenario that would justify assuming that the watch is empty.
 // These errors are what the Go http stack returns back to us which are general
@@ -101,6 +107,9 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 	if t.TLSHandshakeTimeout == 0 {
 		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
 	}
+	if t.IdleConnTimeout == 0 {
+		t.IdleConnTimeout = defaultTransport.IdleConnTimeout
+	}
 	return t
 }
 
@@ -111,12 +120,27 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
 		klog.Infof("HTTP2 has been explicitly disabled")
-	} else {
+	} else if allowsHTTP2(t) {
 		if err := http2.ConfigureTransport(t); err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
 	}
 	return t
+}
+
+func allowsHTTP2(t *http.Transport) bool {
+	if t.TLSClientConfig == nil || len(t.TLSClientConfig.NextProtos) == 0 {
+		// the transport expressed no NextProto preference, allow
+		return true
+	}
+	for _, p := range t.TLSClientConfig.NextProtos {
+		if p == http2.NextProtoTLS {
+			// the transport explicitly allowed http/2
+			return true
+		}
+	}
+	// the transport explicitly set NextProtos and excluded http/2
+	return false
 }
 
 type RoundTripperWrapper interface {
@@ -188,13 +212,17 @@ func GetHTTPClient(req *http.Request) string {
 	return "unknown"
 }
 
-// SourceIPs splits the comma separated X-Forwarded-For header or returns the X-Real-Ip header or req.RemoteAddr,
-// in that order, ignoring invalid IPs. It returns nil if all of these are empty or invalid.
+// SourceIPs splits the comma separated X-Forwarded-For header and joins it with
+// the X-Real-Ip header and/or req.RemoteAddr, ignoring invalid IPs.
+// The X-Real-Ip is omitted if it's already present in the X-Forwarded-For chain.
+// The req.RemoteAddr is always the last IP in the returned list.
+// It returns nil if all of these are empty or invalid.
 func SourceIPs(req *http.Request) []net.IP {
+	var srcIPs []net.IP
+
 	hdr := req.Header
 	// First check the X-Forwarded-For header for requests via proxy.
 	hdrForwardedFor := hdr.Get("X-Forwarded-For")
-	forwardedForIPs := []net.IP{}
 	if hdrForwardedFor != "" {
 		// X-Forwarded-For can be a csv of IPs in case of multiple proxies.
 		// Use the first valid one.
@@ -202,38 +230,49 @@ func SourceIPs(req *http.Request) []net.IP {
 		for _, part := range parts {
 			ip := net.ParseIP(strings.TrimSpace(part))
 			if ip != nil {
-				forwardedForIPs = append(forwardedForIPs, ip)
+				srcIPs = append(srcIPs, ip)
 			}
 		}
-	}
-	if len(forwardedForIPs) > 0 {
-		return forwardedForIPs
 	}
 
 	// Try the X-Real-Ip header.
 	hdrRealIp := hdr.Get("X-Real-Ip")
 	if hdrRealIp != "" {
 		ip := net.ParseIP(hdrRealIp)
-		if ip != nil {
-			return []net.IP{ip}
+		// Only append the X-Real-Ip if it's not already contained in the X-Forwarded-For chain.
+		if ip != nil && !containsIP(srcIPs, ip) {
+			srcIPs = append(srcIPs, ip)
 		}
 	}
 
-	// Fallback to Remote Address in request, which will give the correct client IP when there is no proxy.
+	// Always include the request Remote Address as it cannot be easily spoofed.
+	var remoteIP net.IP
 	// Remote Address in Go's HTTP server is in the form host:port so we need to split that first.
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err == nil {
-		if remoteIP := net.ParseIP(host); remoteIP != nil {
-			return []net.IP{remoteIP}
+		remoteIP = net.ParseIP(host)
+	}
+	// Fallback if Remote Address was just IP.
+	if remoteIP == nil {
+		remoteIP = net.ParseIP(req.RemoteAddr)
+	}
+
+	// Don't duplicate remote IP if it's already the last address in the chain.
+	if remoteIP != nil && (len(srcIPs) == 0 || !remoteIP.Equal(srcIPs[len(srcIPs)-1])) {
+		srcIPs = append(srcIPs, remoteIP)
+	}
+
+	return srcIPs
+}
+
+// Checks whether the given IP address is contained in the list of IPs.
+func containsIP(ips []net.IP, ip net.IP) bool {
+	for _, v := range ips {
+		if v.Equal(ip) {
+			return true
 		}
 	}
-
-	// Fallback if Remote Address was just IP.
-	if remoteIP := net.ParseIP(req.RemoteAddr); remoteIP != nil {
-		return []net.IP{remoteIP}
-	}
-
-	return nil
+	return false
 }
 
 // Extracts and returns the clients IP from the given request.

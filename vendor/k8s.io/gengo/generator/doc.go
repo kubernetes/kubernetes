@@ -28,4 +28,4 @@ limitations under the License.
 // package. Additionally, all naming systems in the Context will be added as
 // functions to the parsed template, so that they can be called directly from
 // your templates!
-package generator
+package generator // import "k8s.io/gengo/generator"

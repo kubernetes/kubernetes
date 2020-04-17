@@ -15,6 +15,7 @@
 package runtime
 
 import (
+	"bufio"
 	"io"
 	"net/http"
 	"strings"
@@ -42,7 +43,68 @@ func AllowsBody(r *http.Request) bool {
 
 // HasBody returns true if this method needs a content-type
 func HasBody(r *http.Request) bool {
-	return len(r.TransferEncoding) > 0 || r.ContentLength > 0
+	// happy case: we have a content length set
+	if r.ContentLength > 0 {
+		return true
+	}
+
+	if r.Header.Get(http.CanonicalHeaderKey("content-length")) != "" {
+		// in this case, no Transfer-Encoding should be present
+		// we have a header set but it was explicitly set to 0, so we assume no body
+		return false
+	}
+
+	rdr := newPeekingReader(r.Body)
+	r.Body = rdr
+	return rdr.HasContent()
+}
+
+func newPeekingReader(r io.ReadCloser) *peekingReader {
+	if r == nil {
+		return nil
+	}
+	return &peekingReader{
+		underlying: bufio.NewReader(r),
+		orig:       r,
+	}
+}
+
+type peekingReader struct {
+	underlying interface {
+		Buffered() int
+		Peek(int) ([]byte, error)
+		Read([]byte) (int, error)
+	}
+	orig io.ReadCloser
+}
+
+func (p *peekingReader) HasContent() bool {
+	if p == nil {
+		return false
+	}
+	if p.underlying.Buffered() > 0 {
+		return true
+	}
+	b, err := p.underlying.Peek(1)
+	if err != nil {
+		return false
+	}
+	return len(b) > 0
+}
+
+func (p *peekingReader) Read(d []byte) (int, error) {
+	if p == nil {
+		return 0, io.EOF
+	}
+	return p.underlying.Read(d)
+}
+
+func (p *peekingReader) Close() error {
+	p.underlying = nil
+	if p.orig != nil {
+		return p.orig.Close()
+	}
+	return nil
 }
 
 // JSONRequest creates a new http request with json headers set

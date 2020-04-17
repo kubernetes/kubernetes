@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "fake_ingress.go",
+        "fake_ingressclass.go",
         "fake_networking_client.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/networking/v1beta1/fake",

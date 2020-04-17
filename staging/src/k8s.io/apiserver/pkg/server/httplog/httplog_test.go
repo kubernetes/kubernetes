@@ -56,22 +56,24 @@ func TestStatusIsNot(t *testing.T) {
 	}
 }
 
-func TestNewLogged(t *testing.T) {
+func TestWithLogging(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		NewLogged(req, &w)
+	var handler http.Handler
+	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	handler = WithLogging(WithLogging(handler, DefaultStacktracePred), DefaultStacktracePred)
+
+	func() {
 		defer func() {
 			if r := recover(); r == nil {
-				t.Errorf("Expected NewLogged to panic")
+				t.Errorf("Expected newLogged to panic")
 			}
 		}()
-		NewLogged(req, &w)
-	}
-	w := httptest.NewRecorder()
-	handler(w, req)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+	}()
 }
 
 func TestLogOf(t *testing.T) {
@@ -81,21 +83,23 @@ func TestLogOf(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			var want string
-			if makeLogger {
-				NewLogged(req, &w)
-				want = "*httplog.respLogger"
-			} else {
-				want = "*httplog.passthroughLogger"
-			}
+		var want string
+		var handler http.Handler
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			got := reflect.TypeOf(LogOf(r, w)).String()
 			if want != got {
 				t.Errorf("Expected %v, got %v", want, got)
 			}
+		})
+		if makeLogger {
+			handler = WithLogging(handler, DefaultStacktracePred)
+			want = "*httplog.respLogger"
+		} else {
+			want = "*httplog.passthroughLogger"
 		}
+
 		w := httptest.NewRecorder()
-		handler(w, req)
+		handler.ServeHTTP(w, req)
 	}
 }
 
@@ -106,18 +110,20 @@ func TestUnlogged(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			want := w
-			if makeLogger {
-				NewLogged(req, &w)
+
+		origWriter := httptest.NewRecorder()
+		var handler http.Handler
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got := Unlogged(r, w)
+			if origWriter != got {
+				t.Errorf("Expected origin writer, got %#v", got)
 			}
-			got := Unlogged(w)
-			if want != got {
-				t.Errorf("Expected %v, got %v", want, got)
-			}
+		})
+		if makeLogger {
+			handler = WithLogging(handler, DefaultStacktracePred)
 		}
-		w := httptest.NewRecorder()
-		handler(w, req)
+
+		handler.ServeHTTP(origWriter, req)
 	}
 }
 
@@ -134,7 +140,7 @@ func TestLoggedStatus(t *testing.T) {
 	}
 
 	var tw http.ResponseWriter = new(testResponseWriter)
-	logger := NewLogged(req, &tw)
+	logger := newLogged(req, tw)
 	logger.Write(nil)
 
 	if logger.status != http.StatusOK {
@@ -142,7 +148,7 @@ func TestLoggedStatus(t *testing.T) {
 	}
 
 	tw = new(testResponseWriter)
-	logger = NewLogged(req, &tw)
+	logger = newLogged(req, tw)
 	logger.WriteHeader(http.StatusForbidden)
 	logger.Write(nil)
 

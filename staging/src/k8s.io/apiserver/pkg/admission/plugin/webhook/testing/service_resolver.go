@@ -33,7 +33,7 @@ func NewServiceResolver(base url.URL) webhook.ServiceResolver {
 	return &serviceResolver{base}
 }
 
-func (f serviceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+func (f serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	if namespace == "failResolve" {
 		return nil, fmt.Errorf("couldn't resolve service location")
 	}

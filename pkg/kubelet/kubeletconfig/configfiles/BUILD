@@ -43,6 +43,8 @@ go_test(
         "//pkg/kubelet/kubeletconfig/util/test:go_default_library",
         "//pkg/util/filesystem:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

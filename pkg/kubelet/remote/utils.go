@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // maxMsgSize use 16MB as the default message size limit.

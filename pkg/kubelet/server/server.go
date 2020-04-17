@@ -25,22 +25,22 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"path"
 	"reflect"
 	goruntime "runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/metrics"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,13 +54,17 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/logs"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -73,6 +77,7 @@ import (
 const (
 	metricsPath         = "/metrics"
 	cadvisorMetricsPath = "/metrics/cadvisor"
+	resourceMetricsPath = "/metrics/resource"
 	proberMetricsPath   = "/metrics/probes"
 	specPath            = "/spec/"
 	statsPath           = "/stats/"
@@ -84,6 +89,7 @@ type Server struct {
 	auth                       AuthInterface
 	host                       HostInterface
 	restfulCont                containerInterface
+	metricsBuckets             map[string]bool
 	resourceAnalyzer           stats.ResourceAnalyzer
 	redirectContainerStreaming bool
 }
@@ -131,15 +137,18 @@ func ListenAndServeKubeletServer(
 	port uint,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
+	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
 	redirectContainerStreaming bool,
 	criHandler http.Handler) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
+		ReadTimeout:    4 * 60 * time.Minute,
+		WriteTimeout:   4 * 60 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	if tlsOptions != nil {
@@ -154,9 +163,9 @@ func ListenAndServeKubeletServer(
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint) {
+func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, false, false, false, nil)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -207,6 +216,7 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
+	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
 	redirectContainerStreaming bool,
@@ -216,12 +226,13 @@ func NewServer(
 		resourceAnalyzer:           resourceAnalyzer,
 		auth:                       auth,
 		restfulCont:                &filteringContainer{Container: restful.NewContainer()},
+		metricsBuckets:             make(map[string]bool),
 		redirectContainerStreaming: redirectContainerStreaming,
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	server.InstallDefaultHandlers()
+	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints)
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers(criHandler)
 		if enableContentionProfiling {
@@ -252,7 +263,7 @@ func (s *Server) InstallAuthFilter() {
 		attrs := s.auth.GetRequestAttributes(info.User, req.Request)
 
 		// Authorize
-		decision, _, err := s.auth.Authorize(attrs)
+		decision, _, err := s.auth.Authorize(req.Request.Context(), attrs)
 		if err != nil {
 			msg := fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
 			klog.Errorf(msg, err)
@@ -271,14 +282,32 @@ func (s *Server) InstallAuthFilter() {
 	})
 }
 
+// addMetricsBucketMatcher adds a regexp matcher and the relevant bucket to use when
+// it matches. Please be aware this is not thread safe and should not be used dynamically
+func (s *Server) addMetricsBucketMatcher(bucket string) {
+	s.metricsBuckets[bucket] = true
+}
+
+// getMetricBucket find the appropriate metrics reporting bucket for the given path
+func (s *Server) getMetricBucket(path string) string {
+	root := getURLRootPath(path)
+	if s.metricsBuckets[root] == true {
+		return root
+	}
+	return "Invalid path"
+}
+
 // InstallDefaultHandlers registers the default set of supported HTTP request
 // patterns with the restful Container.
-func (s *Server) InstallDefaultHandlers() {
+func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
+	s.addMetricsBucketMatcher("healthz")
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.LogHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
 	)
+
+	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
 	ws.
 		Path("/pods").
@@ -288,11 +317,19 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer))
-	s.restfulCont.Handle(metricsPath, prometheus.Handler())
+	s.addMetricsBucketMatcher("stats")
+	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer, enableCAdvisorJSONEndpoints))
+
+	s.addMetricsBucketMatcher("metrics")
+	s.addMetricsBucketMatcher("metrics/cadvisor")
+	s.addMetricsBucketMatcher("metrics/probes")
+	s.addMetricsBucketMatcher("metrics/resource/v1alpha1")
+	s.addMetricsBucketMatcher("metrics/resource")
+	//lint:ignore SA1019 https://github.com/kubernetes/enhancements/issues/1206
+	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
-	r := prometheus.NewRegistry()
+	r := compbasemetrics.NewKubeRegistry()
 
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:         struct{}{},
@@ -303,28 +340,50 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
 		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:              struct{}{},
+		cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
-	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
+	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
-		promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+	)
+
+	// deprecated endpoint which will be removed in release 1.20.0+.
+	s.addMetricsBucketMatcher("metrics/resource/v1alpha1")
+	v1alpha1ResourceRegistry := compbasemetrics.NewKubeRegistry()
+	v1alpha1ResourceRegistry.CustomMustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
+	s.restfulCont.Handle(path.Join(resourceMetricsPath, v1alpha1.Version),
+		compbasemetrics.HandlerFor(v1alpha1ResourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+	)
+
+	s.addMetricsBucketMatcher("metrics/resource")
+	resourceRegistry := compbasemetrics.NewKubeRegistry()
+	resourceRegistry.CustomMustRegister(collectors.NewResourceMetricsCollector(s.resourceAnalyzer))
+	s.restfulCont.Handle(resourceMetricsPath,
+		compbasemetrics.HandlerFor(resourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
 	// prober metrics are exposed under a different endpoint
-	p := prometheus.NewRegistry()
+
+	s.addMetricsBucketMatcher("metrics/probes")
+	p := compbasemetrics.NewKubeRegistry()
+	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
 	s.restfulCont.Handle(proberMetricsPath,
-		promhttp.HandlerFor(p, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
-	ws = new(restful.WebService)
-	ws.
-		Path(specPath).
-		Produces(restful.MIME_JSON)
-	ws.Route(ws.GET("").
-		To(s.getSpec).
-		Operation("getSpec").
-		Writes(cadvisorapi.MachineInfo{}))
-	s.restfulCont.Add(ws)
+	s.addMetricsBucketMatcher("spec")
+	if enableCAdvisorJSONEndpoints {
+		ws := new(restful.WebService)
+		ws.
+			Path(specPath).
+			Produces(restful.MIME_JSON)
+		ws.Route(ws.GET("").
+			To(s.getSpec).
+			Operation("getSpec").
+			Writes(cadvisorapi.MachineInfo{}))
+		s.restfulCont.Add(ws)
+	}
 }
 
 const pprofBasePath = "/debug/pprof/"
@@ -333,6 +392,7 @@ const pprofBasePath = "/debug/pprof/"
 func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	klog.Infof("Adding debug handlers to kubelet server.")
 
+	s.addMetricsBucketMatcher("run")
 	ws := new(restful.WebService)
 	ws.
 		Path("/run")
@@ -344,6 +404,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getRun"))
 	s.restfulCont.Add(ws)
 
+	s.addMetricsBucketMatcher("exec")
 	ws = new(restful.WebService)
 	ws.
 		Path("/exec")
@@ -361,6 +422,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getExec"))
 	s.restfulCont.Add(ws)
 
+	s.addMetricsBucketMatcher("attach")
 	ws = new(restful.WebService)
 	ws.
 		Path("/attach")
@@ -378,6 +440,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getAttach"))
 	s.restfulCont.Add(ws)
 
+	s.addMetricsBucketMatcher("portForward")
 	ws = new(restful.WebService)
 	ws.
 		Path("/portForward")
@@ -395,6 +458,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getPortForward"))
 	s.restfulCont.Add(ws)
 
+	s.addMetricsBucketMatcher("logs")
 	ws = new(restful.WebService)
 	ws.
 		Path(logsPath)
@@ -407,6 +471,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
 	s.restfulCont.Add(ws)
 
+	s.addMetricsBucketMatcher("containerLogs")
 	ws = new(restful.WebService)
 	ws.
 		Path("/containerLogs")
@@ -415,8 +480,10 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getContainerLogs"))
 	s.restfulCont.Add(ws)
 
+	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
 
+	s.addMetricsBucketMatcher("debug")
 	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
 		name := strings.TrimPrefix(req.Request.URL.Path, pprofBasePath)
 		switch name {
@@ -432,7 +499,6 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 			pprof.Index(resp, req.Request)
 		}
 	}
-
 	// Setup pprof handlers.
 	ws = new(restful.WebService).Path(pprofBasePath)
 	ws.Route(ws.GET("/{subpath:*}").To(func(req *restful.Request, resp *restful.Response) {
@@ -445,6 +511,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	s.restfulCont.Handle("/debug/flags/v", routes.StringFlagPutHandler(logs.GlogSetter))
 
 	// The /runningpods endpoint is used for testing only.
+	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
 	ws.
 		Path("/runningpods/").
@@ -454,6 +521,7 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		Operation("getRunningPods"))
 	s.restfulCont.Add(ws)
 
+	s.addMetricsBucketMatcher("cri")
 	if criHandler != nil {
 		s.restfulCont.Handle("/cri/", criHandler)
 	}
@@ -465,6 +533,14 @@ func (s *Server) InstallDebuggingDisabledHandlers() {
 		http.Error(w, "Debug endpoints are disabled.", http.StatusMethodNotAllowed)
 	})
 
+	s.addMetricsBucketMatcher("run")
+	s.addMetricsBucketMatcher("exec")
+	s.addMetricsBucketMatcher("attach")
+	s.addMetricsBucketMatcher("portForward")
+	s.addMetricsBucketMatcher("containerLogs")
+	s.addMetricsBucketMatcher("runningpods")
+	s.addMetricsBucketMatcher("pprof")
+	s.addMetricsBucketMatcher("logs")
 	paths := []string{
 		"/run/", "/exec/", "/attach/", "/portForward/", "/containerLogs/",
 		"/runningpods/", pprofBasePath, logsPath}
@@ -538,22 +614,7 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 	// Check if containerName is valid.
-	containerExists := false
-	for _, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			containerExists = true
-			break
-		}
-	}
-	if !containerExists {
-		for _, container := range pod.Spec.InitContainers {
-			if container.Name == containerName {
-				containerExists = true
-				break
-			}
-		}
-	}
-	if !containerExists {
+	if kubecontainer.GetContainerSpec(pod, containerName) == nil {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("container %q not found in pod %q", containerName, podID))
 		return
 	}
@@ -659,9 +720,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 	}
 }
 
-type responder struct {
-	errorMessage string
-}
+type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	klog.Errorf("Error while proxying request: %v", err)
@@ -798,20 +857,70 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
+// getURLRootPath trims a URL path.
+// For paths in the format of "/metrics/xxx", "metrics/xxx" is returned;
+// For all other paths, the first part of the path is returned.
+func getURLRootPath(path string) string {
+	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 3)
+	if len(parts) == 0 {
+		return path
+	}
+
+	if parts[0] == "metrics" && len(parts) > 1 {
+		return fmt.Sprintf("%s/%s", parts[0], parts[1])
+
+	}
+	return parts[0]
+}
+
+var longRunningRequestPathMap = map[string]bool{
+	"exec":        true,
+	"attach":      true,
+	"portforward": true,
+	"debug":       true,
+}
+
+// isLongRunningRequest determines whether the request is long-running or not.
+func isLongRunningRequest(path string) bool {
+	_, ok := longRunningRequestPathMap[path]
+	return ok
+}
+
+var statusesNoTracePred = httplog.StatusIsNot(
+	http.StatusOK,
+	http.StatusFound,
+	http.StatusMovedPermanently,
+	http.StatusTemporaryRedirect,
+	http.StatusBadRequest,
+	http.StatusNotFound,
+	http.StatusSwitchingProtocols,
+)
+
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer httplog.NewLogged(req, &w).StacktraceWhen(
-		httplog.StatusIsNot(
-			http.StatusOK,
-			http.StatusFound,
-			http.StatusMovedPermanently,
-			http.StatusTemporaryRedirect,
-			http.StatusBadRequest,
-			http.StatusNotFound,
-			http.StatusSwitchingProtocols,
-		),
-	).Log()
-	s.restfulCont.ServeHTTP(w, req)
+	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred)
+
+	// monitor http requests
+	var serverType string
+	if s.auth == nil {
+		serverType = "readonly"
+	} else {
+		serverType = "readwrite"
+	}
+
+	method, path := req.Method, s.getMetricBucket(req.URL.Path)
+
+	longRunning := strconv.FormatBool(isLongRunningRequest(path))
+
+	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
+
+	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
+	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
+
+	startTime := time.Now()
+	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+
+	handler.ServeHTTP(w, req)
 }
 
 // prometheusHostAdapter adapts the HostInterface to the interface expected by the
@@ -865,10 +974,8 @@ func containerPrometheusLabelsFunc(s stats.Provider) metrics.ContainerLabelsFunc
 			metrics.LabelID:    c.Name,
 			metrics.LabelName:  name,
 			metrics.LabelImage: image,
-			"pod_name":         podName,
 			"pod":              podName,
 			"namespace":        namespace,
-			"container_name":   containerName,
 			"container":        containerName,
 		}
 		return set

@@ -21,9 +21,12 @@ DEB_ARCH=$(dpkg --print-architecture)
 # /etc/apt/sources.list which is "deb http://deb.debian.org/debian jessie-updates main"
 
 case ${DEB_ARCH} in
-    arm64|ppc64el)
-        sed -i '/debian-security/d' /etc/apt/sources.list
-        ;;
+    s390x|arm64|ppc64el)
+        # we have to use the archive mirrors.
+        # See: https://lists.debian.org/debian-devel-announce/2019/03/msg00006.html
+        echo "deb http://archive.debian.org/debian/ jessie main contrib non-free" | tee /etc/apt/sources.list
+        echo "deb-src http://archive.debian.org/debian/ jessie main contrib non-free" | tee -a /etc/apt/sources.list
+       ;;
 esac
 
 exit 0

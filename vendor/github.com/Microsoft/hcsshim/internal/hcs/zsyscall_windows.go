@@ -56,13 +56,13 @@ var (
 	procHcsOpenProcess                     = modvmcompute.NewProc("HcsOpenProcess")
 	procHcsCloseProcess                    = modvmcompute.NewProc("HcsCloseProcess")
 	procHcsTerminateProcess                = modvmcompute.NewProc("HcsTerminateProcess")
-
-	procHcsGetProcessInfo            = modvmcompute.NewProc("HcsGetProcessInfo")
-	procHcsGetProcessProperties      = modvmcompute.NewProc("HcsGetProcessProperties")
-	procHcsModifyProcess             = modvmcompute.NewProc("HcsModifyProcess")
-	procHcsGetServiceProperties      = modvmcompute.NewProc("HcsGetServiceProperties")
-	procHcsRegisterProcessCallback   = modvmcompute.NewProc("HcsRegisterProcessCallback")
-	procHcsUnregisterProcessCallback = modvmcompute.NewProc("HcsUnregisterProcessCallback")
+	procHcsSignalProcess                   = modvmcompute.NewProc("HcsSignalProcess")
+	procHcsGetProcessInfo                  = modvmcompute.NewProc("HcsGetProcessInfo")
+	procHcsGetProcessProperties            = modvmcompute.NewProc("HcsGetProcessProperties")
+	procHcsModifyProcess                   = modvmcompute.NewProc("HcsModifyProcess")
+	procHcsGetServiceProperties            = modvmcompute.NewProc("HcsGetServiceProperties")
+	procHcsRegisterProcessCallback         = modvmcompute.NewProc("HcsRegisterProcessCallback")
+	procHcsUnregisterProcessCallback       = modvmcompute.NewProc("HcsUnregisterProcessCallback")
 )
 
 func hcsEnumerateComputeSystems(query string, computeSystems **uint16, result **uint16) (hr error) {
@@ -417,10 +417,10 @@ func hcsSignalProcess(process hcsProcess, options string, result **uint16) (hr e
 }
 
 func _hcsSignalProcess(process hcsProcess, options *uint16, result **uint16) (hr error) {
-	if hr = procHcsTerminateProcess.Find(); hr != nil {
+	if hr = procHcsSignalProcess.Find(); hr != nil {
 		return
 	}
-	r0, _, _ := syscall.Syscall(procHcsTerminateProcess.Addr(), 3, uintptr(process), uintptr(unsafe.Pointer(options)), uintptr(unsafe.Pointer(result)))
+	r0, _, _ := syscall.Syscall(procHcsSignalProcess.Addr(), 3, uintptr(process), uintptr(unsafe.Pointer(options)), uintptr(unsafe.Pointer(result)))
 	if int32(r0) < 0 {
 		if r0&0x1fff0000 == 0x00070000 {
 			r0 &= 0xffff

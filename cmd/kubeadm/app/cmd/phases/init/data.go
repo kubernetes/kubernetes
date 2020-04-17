@@ -30,6 +30,7 @@ type InitData interface {
 	UploadCerts() bool
 	CertificateKey() string
 	SetCertificateKey(key string)
+	SkipCertificateKeyPrint() bool
 	Cfg() *kubeadmapi.InitConfiguration
 	DryRun() bool
 	SkipTokenPrint() bool
@@ -44,4 +45,5 @@ type InitData interface {
 	OutputWriter() io.Writer
 	Client() (clientset.Interface, error)
 	Tokens() []string
+	KustomizeDir() string
 }

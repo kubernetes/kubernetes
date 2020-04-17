@@ -40,6 +40,7 @@ const (
 	InterfaceConstraint NetworkPolicyType = "InterfaceConstraint"
 	ProviderAddress     NetworkPolicyType = "ProviderAddress"
 	RemoteSubnetRoute   NetworkPolicyType = "RemoteSubnetRoute"
+	HostRoute           NetworkPolicyType = "HostRoute"
 )
 
 // NetworkPolicy is a collection of Policy settings for a Network.

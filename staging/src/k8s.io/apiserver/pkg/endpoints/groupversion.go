@@ -20,7 +20,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,6 +72,8 @@ type APIGroupVersion struct {
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
 
+	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
+
 	// Authorizer determines whether a user is allowed to make a certain request. The Handler does a preliminary
 	// authorization check using the request URI but it may be necessary to make additional checks, such as in
 	// the create-on-update case
@@ -80,10 +82,6 @@ type APIGroupVersion struct {
 	Admit admission.Interface
 
 	MinRequestTimeout time.Duration
-
-	// EnableAPIResponseCompression indicates whether API Responses should support compression
-	// if the client requests it via Accept-Encoding
-	EnableAPIResponseCompression bool
 
 	// OpenAPIModels exposes the OpenAPI models to each individual handler.
 	OpenAPIModels openapiproto.Models
@@ -99,10 +97,9 @@ type APIGroupVersion struct {
 func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
-		group:                        g,
-		prefix:                       prefix,
-		minRequestTimeout:            g.MinRequestTimeout,
-		enableAPIResponseCompression: g.EnableAPIResponseCompression,
+		group:             g,
+		prefix:            prefix,
+		minRequestTimeout: g.MinRequestTimeout,
 	}
 
 	apiResources, ws, registrationErrors := installer.Install()

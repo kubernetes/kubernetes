@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -30,32 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
-
-func stagingClientPod(name, value string) v1.Pod {
-	return v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"name": "foo",
-				"time": value,
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.Nginx),
-					Ports: []v1.ContainerPort{{ContainerPort: 80}},
-				},
-			},
-		},
-	}
-}
 
 func testingPod(name, value string) v1.Pod {
 	return v1.Pod{
@@ -89,7 +70,7 @@ func testingPod(name, value string) v1.Pod {
 
 func observeCreation(w watch.Interface) {
 	select {
-	case event, _ := <-w.ResultChan():
+	case event := <-w.ResultChan():
 		if event.Type != watch.Added {
 			framework.Failf("Failed to observe the creation: %v", event)
 		}
@@ -98,41 +79,13 @@ func observeCreation(w watch.Interface) {
 	}
 }
 
-func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
-	// output to give us a duration to failure.  Maybe we aren't getting the
-	// full timeout for some reason.  My guess would be watch failure
-	framework.Logf("Starting to observe pod deletion")
-	deleted := false
-	timeout := false
-	timer := time.After(framework.DefaultPodDeletionTimeout)
-	for !deleted && !timeout {
-		select {
-		case event, normal := <-w.ResultChan():
-			if !normal {
-				framework.Failf("The channel was closed unexpectedly")
-				return
-			}
-			if event.Type == watch.Deleted {
-				obj = event.Object
-				deleted = true
-			}
-		case <-timer:
-			timeout = true
-		}
-	}
-	if !deleted {
-		framework.Failf("Failed to observe pod deletion")
-	}
-	return
-}
-
 func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool) {
 	timer := time.After(30 * time.Second)
 	updated := false
 	timeout := false
 	for !updated && !timeout {
 		select {
-		case event, _ := <-w.ResultChan():
+		case event := <-w.ResultChan():
 			if event.Type == watch.Modified {
 				if expectedUpdate(event.Object) {
 					updated = true
@@ -145,66 +98,65 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 	if !updated {
 		framework.Failf("Failed to observe pod update")
 	}
-	return
 }
 
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
+	ginkgo.It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-		By("constructing the pod")
+		ginkgo.By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		podCopy := testingPod(name, value)
 		pod := &podCopy
-		By("setting up watch")
+		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(0))
+		framework.ExpectEqual(len(pods.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(options)
+		w, err := podClient.Watch(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
-		By("creating the pod")
-		pod, err = podClient.Create(pod)
+		ginkgo.By("creating the pod")
+		pod, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
 
-		By("verifying the pod is in kubernetes")
+		ginkgo.By("verifying the pod is in kubernetes")
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pod.ResourceVersion,
 		}
-		pods, err = podClient.List(options)
+		pods, err = podClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
-		By("verifying pod creation was observed")
+		ginkgo.By("verifying pod creation was observed")
 		observeCreation(w)
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
-		By("deleting the pod gracefully")
+		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
-		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
+		if err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 
-		By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
+		ginkgo.By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
 		observerUpdate(w, func(obj runtime.Object) bool {
 			pod := obj.(*v1.Pod)
 			return pod.ObjectMeta.DeletionTimestamp != nil && *pod.ObjectMeta.DeletionGracePeriodSeconds == gracePeriod
@@ -263,65 +215,65 @@ func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 
-	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 	})
 
-	It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {
+	ginkgo.It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {
 		cronJobClient := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name)
-		By("constructing the cronJob")
+		ginkgo.By("constructing the cronJob")
 		name := "cronjob" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		cronJob := newTestingCronJob(name, value)
-		By("setting up watch")
+		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
-		cronJobs, err := cronJobClient.List(options)
+		cronJobs, err := cronJobClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		Expect(len(cronJobs.Items)).To(Equal(0))
+		framework.ExpectEqual(len(cronJobs.Items), 0)
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
 		}
-		w, err := cronJobClient.Watch(options)
+		w, err := cronJobClient.Watch(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
-		By("creating the cronJob")
-		cronJob, err = cronJobClient.Create(cronJob)
+		ginkgo.By("creating the cronJob")
+		cronJob, err = cronJobClient.Create(context.TODO(), cronJob, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create cronJob: %v", err)
 		}
 
-		By("verifying the cronJob is in kubernetes")
+		ginkgo.By("verifying the cronJob is in kubernetes")
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJob.ResourceVersion,
 		}
-		cronJobs, err = cronJobClient.List(options)
+		cronJobs, err = cronJobClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		Expect(len(cronJobs.Items)).To(Equal(1))
+		framework.ExpectEqual(len(cronJobs.Items), 1)
 
-		By("verifying cronJob creation was observed")
+		ginkgo.By("verifying cronJob creation was observed")
 		observeCreation(w)
 
-		By("deleting the cronJob")
+		ginkgo.By("deleting the cronJob")
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
-		if err := cronJobClient.Delete(cronJob.Name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
+		if err := cronJobClient.Delete(context.TODO(), cronJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
 			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 
 		options = metav1.ListOptions{LabelSelector: selector}
-		cronJobs, err = cronJobClient.List(options)
+		cronJobs, err = cronJobClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
-		Expect(len(cronJobs.Items)).To(Equal(0))
+		framework.ExpectEqual(len(cronJobs.Items), 0)
 	})
 })

@@ -116,7 +116,6 @@ func (conn *Conn) Auth(methods []Auth) error {
 						return err
 					}
 					go conn.inWorker()
-					go conn.outWorker()
 					return nil
 				}
 			}

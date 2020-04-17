@@ -69,6 +69,9 @@ The following message:
 given to the size plugin, will generate the following code:
 
   func (m *B) Size() (n int) {
+	if m == nil {
+		return 0
+	}
 	var l int
 	_ = l
 	l = m.A.Size()
@@ -138,6 +141,7 @@ type size struct {
 	atleastOne bool
 	localName  string
 	typesPkg   generator.Single
+	bitsPkg    generator.Single
 }
 
 func NewSize() *size {
@@ -185,14 +189,7 @@ func keySize(fieldNumber int32, wireType int) int {
 func (p *size) sizeVarint() {
 	p.P(`
 	func sov`, p.localName, `(x uint64) (n int) {
-		for {
-			n++
-			x >>= 7
-			if x == 0 {
-				break
-			}
-		}
-		return n
+                return (`, p.bitsPkg.Use(), `.Len64(x | 1) + 6)/ 7
 	}`)
 }
 
@@ -203,18 +200,32 @@ func (p *size) sizeZigZag() {
 }
 
 func (p *size) std(field *descriptor.FieldDescriptorProto, name string) (string, bool) {
+	ptr := ""
+	if gogoproto.IsNullable(field) {
+		ptr = "*"
+	}
 	if gogoproto.IsStdTime(field) {
-		if gogoproto.IsNullable(field) {
-			return p.typesPkg.Use() + `.SizeOfStdTime(*` + name + `)`, true
-		} else {
-			return p.typesPkg.Use() + `.SizeOfStdTime(` + name + `)`, true
-		}
+		return p.typesPkg.Use() + `.SizeOfStdTime(` + ptr + name + `)`, true
 	} else if gogoproto.IsStdDuration(field) {
-		if gogoproto.IsNullable(field) {
-			return p.typesPkg.Use() + `.SizeOfStdDuration(*` + name + `)`, true
-		} else {
-			return p.typesPkg.Use() + `.SizeOfStdDuration(` + name + `)`, true
-		}
+		return p.typesPkg.Use() + `.SizeOfStdDuration(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdDouble(field) {
+		return p.typesPkg.Use() + `.SizeOfStdDouble(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdFloat(field) {
+		return p.typesPkg.Use() + `.SizeOfStdFloat(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdInt64(field) {
+		return p.typesPkg.Use() + `.SizeOfStdInt64(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdUInt64(field) {
+		return p.typesPkg.Use() + `.SizeOfStdUInt64(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdInt32(field) {
+		return p.typesPkg.Use() + `.SizeOfStdInt32(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdUInt32(field) {
+		return p.typesPkg.Use() + `.SizeOfStdUInt32(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdBool(field) {
+		return p.typesPkg.Use() + `.SizeOfStdBool(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdString(field) {
+		return p.typesPkg.Use() + `.SizeOfStdString(` + ptr + name + `)`, true
+	} else if gogoproto.IsStdBytes(field) {
+		return p.typesPkg.Use() + `.SizeOfStdBytes(` + ptr + name + `)`, true
 	}
 	return "", false
 }
@@ -444,7 +455,7 @@ func (p *size) generateField(proto3 bool, file *generator.FileDescriptor, messag
 				sum = append(sum, strconv.Itoa(valueKeySize))
 				sum = append(sum, `soz`+p.localName+`(uint64(v))`)
 			case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-				stdSizeCall, stdOk := p.std(field, "v")
+				stdSizeCall, stdOk := p.std(m.ValueAliasField, "v")
 				if nullable {
 					p.P(`l = 0`)
 					p.P(`if v != nil {`)
@@ -572,6 +583,7 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 	p.localName = generator.FileName(file)
 	p.typesPkg = p.NewImport("github.com/gogo/protobuf/types")
 	protoPkg := p.NewImport("github.com/gogo/protobuf/proto")
+	p.bitsPkg = p.NewImport("math/bits")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = p.NewImport("github.com/golang/protobuf/proto")
 	}
@@ -595,6 +607,11 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 		ccTypeName := generator.CamelCaseSlice(message.TypeName())
 		p.P(`func (m *`, ccTypeName, `) `, sizeName, `() (n int) {`)
 		p.In()
+		p.P(`if m == nil {`)
+		p.In()
+		p.P(`return 0`)
+		p.Out()
+		p.P(`}`)
 		p.P(`var l int`)
 		p.P(`_ = l`)
 		oneofs := make(map[string]struct{})
@@ -650,6 +667,11 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 			ccTypeName := p.OneOfTypeName(message, f)
 			p.P(`func (m *`, ccTypeName, `) `, sizeName, `() (n int) {`)
 			p.In()
+			p.P(`if m == nil {`)
+			p.In()
+			p.P(`return 0`)
+			p.Out()
+			p.P(`}`)
 			p.P(`var l int`)
 			p.P(`_ = l`)
 			vanity.TurnOffNullableForNativeTypes(f)

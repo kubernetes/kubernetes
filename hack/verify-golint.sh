@@ -14,11 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks coding style for go language files in each
+# Kubernetes package by golint.
+# Usage: `hack/verify-golint.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
@@ -44,12 +48,12 @@ export IFS=$'\n'
 # NOTE: when "go list -e ./..." is run within GOPATH, it turns the k8s.io/kubernetes
 # as the prefix, however if we run it outside it returns the full path of the file
 # with a leading underscore. We'll need to support both scenarios for all_packages.
-all_packages=(
-  $(go list -e ./... | egrep -v "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_\(${KUBE_ROOT}/\)\{0,1\}||")
-)
-failing_packages=(
-  $(cat $failure_file)
-)
+all_packages=()
+while IFS='' read -r line; do all_packages+=("$line"); done < <(go list -e ./... | grep -vE "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_\(${KUBE_ROOT}/\)\{0,1\}||")
+# The regex below removes any "#" character and anything behind it and including any
+# whitespace before it. Then it removes empty lines.
+failing_packages=()
+while IFS='' read -r line; do failing_packages+=("$line"); done < <(sed -e 's/[[:blank:]]*#.*//' -e '/^$/d' "$failure_file")
 unset IFS
 errors=()
 not_failing=()
@@ -63,13 +67,13 @@ for p in "${all_packages[@]}"; do
   # completely.
   # Ref: https://github.com/kubernetes/kubernetes/pull/67675
   # Ref: https://github.com/golang/lint/issues/68
-  failedLint=$(ls "$p"/*.go | egrep -v "(zz_generated.*.go|generated.pb.go|generated.proto|types_swagger_doc_generated.go)" | xargs -L1 golint 2>/dev/null)
+  failedLint=$(find "$p"/*.go | grep -vE "(zz_generated.*.go|generated.pb.go|generated.proto|types_swagger_doc_generated.go)" | xargs -L1 golint 2>/dev/null)
   kube::util::array_contains "$p" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
     errors+=( "${failedLint}" )
   fi
   if [[ -z "${failedLint}" ]] && [[ "${in_failing}" -eq "0" ]]; then
-    not_failing+=( $p )
+    not_failing+=( "$p" )
   fi
 done
 
@@ -94,7 +98,7 @@ else
     echo 'checking by adding it to hack/.golint_failures (if your reviewer is okay with it).'
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
@@ -106,7 +110,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#gone[@]} -gt 0 ]]; then
@@ -118,5 +122,5 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi

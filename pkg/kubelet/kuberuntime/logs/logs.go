@@ -26,15 +26,15 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog"
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 
@@ -49,13 +49,9 @@ import (
 const (
 	// timeFormat is the time format used in the log.
 	timeFormat = time.RFC3339Nano
-	// blockSize is the block size used in tail.
-	blockSize = 1024
 
-	// stateCheckPeriod is the period to check container state while following
-	// the container log. Kubelet should not keep following the log when the
-	// container is not running.
-	stateCheckPeriod = 5 * time.Second
+	// logForceCheckPeriod is the period to check for a new read
+	logForceCheckPeriod = 1 * time.Second
 )
 
 var (
@@ -168,13 +164,24 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	return nil
 }
 
+// jsonLog is a log message, typically a single entry from a given log stream.
+// since the data structure is originally from docker, we should be careful to
+// with any changes to jsonLog
+type jsonLog struct {
+	// Log is the log message
+	Log string `json:"log,omitempty"`
+	// Stream is the log source
+	Stream string `json:"stream,omitempty"`
+	// Created is the created timestamp of log
+	Created time.Time `json:"time"`
+}
+
 // parseDockerJSONLog parses logs in Docker JSON log format. Docker JSON log format
 // example:
 //   {"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
 //   {"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
 func parseDockerJSONLog(log []byte, msg *logMessage) error {
-	var l = &jsonlog.JSONLog{}
-	l.Reset()
+	var l = &jsonLog{}
 
 	// TODO: JSON decoding is fairly expensive, we should evaluate this.
 	if err := json.Unmarshal(log, l); err != nil {
@@ -268,6 +275,16 @@ func (w *logWriter) write(msg *logMessage) error {
 // Note that containerID is only needed when following the log, or else
 // just pass in empty string "".
 func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
+	// fsnotify has different behavior for symlinks in different platform,
+	// for example it follows symlink on Linux, but not on Windows,
+	// so we explicitly resolve symlinks before reading the logs.
+	// There shouldn't be security issue because the container log
+	// path is owned by kubelet and the container runtime.
+	evaluated, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return fmt.Errorf("failed to try resolving symlinks in path %q: %v", path, err)
+	}
+	path = evaluated
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
@@ -289,6 +306,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	var watcher *fsnotify.Watcher
 	var parse parseFunc
 	var stop bool
+	found := true
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
 	for {
@@ -302,6 +320,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 				return fmt.Errorf("failed to read log file %q: %v", path, err)
 			}
 			if opts.follow {
+				// The container is not running, we got to the end of the log.
+				if !found {
+					return nil
+				}
 				// Reset seek so that if this is an incomplete line,
 				// it will be read again.
 				if _, err := f.Seek(-int64(len(l)), io.SeekCurrent); err != nil {
@@ -316,11 +338,35 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 					if err := watcher.Add(f.Name()); err != nil {
 						return fmt.Errorf("failed to watch file %q: %v", f.Name(), err)
 					}
+					// If we just created the watcher, try again to read as we might have missed
+					// the event.
+					continue
 				}
+				var recreated bool
 				// Wait until the next log change.
-				if found, err := waitLogs(ctx, containerID, watcher, runtimeService); !found {
+				found, recreated, err = waitLogs(ctx, containerID, watcher, runtimeService)
+				if err != nil {
 					return err
 				}
+				if recreated {
+					newF, err := os.Open(path)
+					if err != nil {
+						if os.IsNotExist(err) {
+							continue
+						}
+						return fmt.Errorf("failed to open log file %q: %v", path, err)
+					}
+					f.Close()
+					if err := watcher.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
+						klog.Errorf("failed to remove file watch %q: %v", f.Name(), err)
+					}
+					f = newF
+					if err := watcher.Add(f.Name()); err != nil {
+						return fmt.Errorf("failed to watch file %q: %v", f.Name(), err)
+					}
+					r = bufio.NewReader(f)
+				}
+				// If the container exited consume data until the next EOF
 				continue
 			}
 			// Should stop after writing the remaining content.
@@ -370,35 +416,42 @@ func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 	return true, nil
 }
 
-// waitLogs wait for the next log write. It returns a boolean and an error. The boolean
-// indicates whether a new log is found; the error is error happens during waiting new logs.
-func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, error) {
+// waitLogs wait for the next log write. It returns two booleans and an error. The first boolean
+// indicates whether a new log is found; the second boolean if the log file was recreated;
+// the error is error happens during waiting new logs.
+func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	// no need to wait if the pod is not running
 	if running, err := isContainerRunning(id, runtimeService); !running {
-		return false, err
+		return false, false, err
 	}
 	errRetry := 5
 	for {
 		select {
 		case <-ctx.Done():
-			return false, fmt.Errorf("context cancelled")
+			return false, false, fmt.Errorf("context cancelled")
 		case e := <-w.Events:
 			switch e.Op {
 			case fsnotify.Write:
-				return true, nil
+				return true, false, nil
+			case fsnotify.Create:
+				fallthrough
+			case fsnotify.Rename:
+				fallthrough
+			case fsnotify.Remove:
+				fallthrough
+			case fsnotify.Chmod:
+				return true, true, nil
 			default:
 				klog.Errorf("Unexpected fsnotify event: %v, retrying...", e)
 			}
 		case err := <-w.Errors:
 			klog.Errorf("Fsnotify watch error: %v, %d error retries remaining", err, errRetry)
 			if errRetry == 0 {
-				return false, err
+				return false, false, err
 			}
 			errRetry--
-		case <-time.After(stateCheckPeriod):
-			if running, err := isContainerRunning(id, runtimeService); !running {
-				return false, err
-			}
+		case <-time.After(logForceCheckPeriod):
+			return true, false, nil
 		}
 	}
 }

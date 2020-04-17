@@ -23,6 +23,8 @@ type call struct {
 type singleflight struct {
 	sync.Mutex                  // protects m
 	m          map[string]*call // lazily initialized
+
+	dontDeleteForTesting bool // this is only to be used by TestConcurrentExchanges
 }
 
 // Do executes and returns the results of the given function, making
@@ -49,9 +51,11 @@ func (g *singleflight) Do(key string, fn func() (*Msg, time.Duration, error)) (v
 	c.val, c.rtt, c.err = fn()
 	c.wg.Done()
 
-	g.Lock()
-	delete(g.m, key)
-	g.Unlock()
+	if !g.dontDeleteForTesting {
+		g.Lock()
+		delete(g.m, key)
+		g.Unlock()
+	}
 
 	return c.val, c.rtt, c.err, c.dups > 0
 }

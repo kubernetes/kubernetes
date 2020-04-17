@@ -22,6 +22,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -36,7 +37,7 @@ func GetDriverNameWithFeatureTags(driver TestDriver) string {
 	return fmt.Sprintf("[Driver: %s]%s", dInfo.Name, dInfo.FeatureTag)
 }
 
-// CreateVolume creates volume for test unless dynamicPV test
+// CreateVolume creates volume for test unless dynamicPV or CSI ephemeral inline volume test
 func CreateVolume(driver TestDriver, config *PerTestConfig, volType testpatterns.TestVolType) TestVolume {
 	switch volType {
 	case testpatterns.InlineVolume:
@@ -45,6 +46,8 @@ func CreateVolume(driver TestDriver, config *PerTestConfig, volType testpatterns
 		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
 			return pDriver.CreateVolume(config, volType)
 		}
+	case testpatterns.CSIInlineVolume:
+		fallthrough
 	case testpatterns.DynamicPV:
 		// No need to create volume
 	default:
@@ -71,8 +74,8 @@ func GetStorageClass(
 			Kind: "StorageClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// Name must be unique, so let's base it on namespace name
-			Name: ns + "-" + suffix,
+			// Name must be unique, so let's base it on namespace name and use GenerateName
+			Name: names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
 		},
 		Provisioner:       provisioner,
 		Parameters:        parameters,
@@ -96,8 +99,9 @@ func GetSnapshotClass(
 				// Name must be unique, so let's base it on namespace name
 				"name": ns + "-" + suffix,
 			},
-			"snapshotter": snapshotter,
-			"parameters":  parameters,
+			"driver":         snapshotter,
+			"parameters":     parameters,
+			"deletionPolicy": "Delete",
 		},
 	}
 

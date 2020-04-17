@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"strconv"
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -178,28 +178,6 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 	return endpoint, nil
 }
 
-type hostPortPair struct {
-	host string
-	port int
-}
-
-func isValidEndpoint(hpp *hostPortPair) bool {
-	return hpp.host != "" && hpp.port > 0
-}
-
-func flattenValidEndpoints(endpoints []hostPortPair) []string {
-	// Convert Endpoint objects into strings for easier use later.  Ignore
-	// the protocol field - we'll get that from the Service objects.
-	var result []string
-	for i := range endpoints {
-		hpp := &endpoints[i]
-		if isValidEndpoint(hpp) {
-			result = append(result, net.JoinHostPort(hpp.host, strconv.Itoa(hpp.port)))
-		}
-	}
-	return result
-}
-
 // Remove any session affinity records associated to a particular endpoint (for example when a pod goes down).
 func removeSessionAffinityByEndpoint(state *balancerState, svcPort proxy.ServicePortName, endpoint string) {
 	for _, affinity := range state.affinity.affinityMap {
@@ -233,33 +211,15 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort proxy.ServicePortName, newEn
 	}
 }
 
-// buildPortsToEndpointsMap builds a map of portname -> all ip:ports for that
-// portname. Explode Endpoints.Subsets[*] into this structure.
-func buildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]hostPortPair {
-	portsToEndpoints := map[string][]hostPortPair{}
-	for i := range endpoints.Subsets {
-		ss := &endpoints.Subsets[i]
-		for i := range ss.Ports {
-			port := &ss.Ports[i]
-			for i := range ss.Addresses {
-				addr := &ss.Addresses[i]
-				portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortPair{addr.IP, int(port.Port)})
-				// Ignore the protocol field - we'll get that from the Service objects.
-			}
-		}
-	}
-	return portsToEndpoints
-}
-
 func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
-	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
+	portsToEndpoints := util.BuildPortsToEndpointsMap(endpoints)
 
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
 	for portname := range portsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
-		newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+		newEndpoints := portsToEndpoints[portname]
 		state, exists := lb.services[svcPort]
 
 		if !exists || state == nil || len(newEndpoints) > 0 {
@@ -270,7 +230,7 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
 			// if one does not already exist.  The affinity will be updated
 			// later, once NewService is called.
 			state = lb.newServiceInternal(svcPort, v1.ServiceAffinity(""), 0)
-			state.endpoints = slice.ShuffleStrings(newEndpoints)
+			state.endpoints = util.ShuffleStrings(newEndpoints)
 
 			// Reset the round-robin index.
 			state.index = 0
@@ -279,8 +239,8 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
 }
 
 func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
-	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
-	oldPortsToEndpoints := buildPortsToEndpointsMap(oldEndpoints)
+	portsToEndpoints := util.BuildPortsToEndpointsMap(endpoints)
+	oldPortsToEndpoints := util.BuildPortsToEndpointsMap(oldEndpoints)
 	registeredEndpoints := make(map[proxy.ServicePortName]bool)
 
 	lb.lock.Lock()
@@ -288,7 +248,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 
 	for portname := range portsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
-		newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+		newEndpoints := portsToEndpoints[portname]
 		state, exists := lb.services[svcPort]
 
 		curEndpoints := []string{}
@@ -304,7 +264,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 			// if one does not already exist.  The affinity will be updated
 			// later, once NewService is called.
 			state = lb.newServiceInternal(svcPort, v1.ServiceAffinity(""), 0)
-			state.endpoints = slice.ShuffleStrings(newEndpoints)
+			state.endpoints = util.ShuffleStrings(newEndpoints)
 
 			// Reset the round-robin index.
 			state.index = 0
@@ -326,7 +286,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 }
 
 func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *v1.Endpoints) {
-	portsToEndpoints := buildPortsToEndpointsMap(endpoints)
+	portsToEndpoints := util.BuildPortsToEndpointsMap(endpoints)
 
 	lb.lock.Lock()
 	defer lb.lock.Unlock()

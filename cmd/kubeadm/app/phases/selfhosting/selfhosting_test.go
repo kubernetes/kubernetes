@@ -26,7 +26,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
@@ -52,6 +52,7 @@ spec:
     - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
     - --advertise-address=192.168.1.115
     - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
+    - --insecure-port=0
     - --experimental-bootstrap-token-auth=true
     - --requestheader-username-headers=X-Remote-User
     - --requestheader-extra-headers-prefix=X-Remote-Extra-
@@ -134,6 +135,7 @@ spec:
         - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
         - --advertise-address=$(HOST_IP)
         - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
+        - --insecure-port=0
         - --experimental-bootstrap-token-auth=true
         - --requestheader-username-headers=X-Remote-User
         - --requestheader-extra-headers-prefix=X-Remote-Extra-
@@ -228,8 +230,8 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /healthz
-        port: 10252
-        scheme: HTTP
+        port: 10257
+        scheme: HTTPS
       initialDelaySeconds: 15
       timeoutSeconds: 15
     name: kube-controller-manager
@@ -305,8 +307,8 @@ spec:
           httpGet:
             host: 127.0.0.1
             path: /healthz
-            port: 10252
-            scheme: HTTP
+            port: 10257
+            scheme: HTTPS
           initialDelaySeconds: 15
           timeoutSeconds: 15
         name: kube-controller-manager
@@ -377,8 +379,8 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /healthz
-        port: 10251
-        scheme: HTTP
+        port: 10259
+        scheme: HTTPS
       initialDelaySeconds: 15
       timeoutSeconds: 15
     name: kube-scheduler
@@ -429,8 +431,8 @@ spec:
           httpGet:
             host: 127.0.0.1
             path: /healthz
-            port: 10251
-            scheme: HTTP
+            port: 10259
+            scheme: HTTPS
           initialDelaySeconds: 15
           timeoutSeconds: 15
         name: kube-scheduler
@@ -501,7 +503,7 @@ func TestBuildDaemonSet(t *testing.T) {
 			}
 
 			ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
-			dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
+			dsBytes, err := kubeadmutil.MarshalToYaml(ds, apps.SchemeGroupVersion)
 			if err != nil {
 				t.Fatalf("failed to marshal daemonset to YAML: %v", err)
 			}

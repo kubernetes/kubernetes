@@ -3,13 +3,25 @@
 This addon runs a node-local-dns pod on all cluster nodes. The pod runs CoreDNS as the dns cache. It runs with `hostNetwork:True` and creates a dedicated dummy interface with a link local ip(169.254.20.10/32 by default) to listen for DNS queries. The cache instances connect to clusterDNS in case of cache misses.
 
 Design details [here](https://git.k8s.io/enhancements/keps/sig-network/0030-nodelocal-dns-cache.md)
+KEP to graduate to beta [here](https://git.k8s.io/enhancements/keps/sig-network/20190424-NodeLocalDNS-beta-proposal.md)
+
+This feature is graduating to Beta in release 1.15.
 
 ## nodelocaldns addon template
 
 This directory contains the addon config yaml - `nodelocaldns.yaml`
 The variables will be substituted by the configure scripts when the yaml is copied into master.
-To create a GCE cluster with nodelocaldns enabled, use  the command:
-`KUBE_ENABLE_NODELOCAL_DNS=true go run hack/e2e.go -v --up`
+
+We have the following variables in the yaml:  
+`__PILLAR__DNS__SERVER__` - set to kube-dns service IP.   
+`__PILLAR__LOCAL__DNS__`  - set to the link-local IP(169.254.20.10 by default).    
+`__PILLAR__DNS__DOMAIN__` - set to the cluster domain(cluster.local by default).   
+
+The following variables will be set by the node-cache images - k8s.gcr.io/k8s-dns-node-cache:1.15.6 or later.
+The values will be determined by reading the kube-dns configMap for custom
+Upstream server configuration.  
+`__PILLAR__CLUSTER__DNS__` - Upstream server for in-cluster queries.   
+`__PILLAR__UPSTREAM__SERVERS__` - Upstream servers for external queries.  
 
 ### Network policy and DNS connectivity
 

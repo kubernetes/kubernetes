@@ -9,6 +9,8 @@ go_library(
         "command.go",
         "command_notwin.go",
         "command_win.go",
+        "powershell_completions.go",
+        "shell_completions.go",
         "zsh_completions.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/spf13/cobra",

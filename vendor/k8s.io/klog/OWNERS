@@ -1,5 +1,13 @@
-# See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
-
+# See the OWNERS docs at https://go.k8s.io/owners
+reviewers:
+  - jayunit100
+  - hoegaarden
+  - andyxning
+  - neolit123
+  - pohly
+  - yagonobre
+  - vincepri
+  - detiber
 approvers:
   - dims
   - thockin

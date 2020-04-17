@@ -137,6 +137,30 @@ func (c *Manager) GetTag(ctx context.Context, id string) (*Tag, error) {
 
 }
 
+// GetTagForCategory fetches the tag information for the given identifier in the given category.
+func (c *Manager) GetTagForCategory(ctx context.Context, id, category string) (*Tag, error) {
+	if category == "" {
+		return c.GetTag(ctx, id)
+	}
+
+	ids, err := c.ListTagsForCategory(ctx, category)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		tag, err := c.GetTag(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("get tag for category %s %s: %s", category, id, err)
+		}
+		if tag.ID == id || tag.Name == id {
+			return tag, nil
+		}
+	}
+
+	return nil, fmt.Errorf("tag %q not found in category %q", id, category)
+}
+
 // ListTags returns all tag IDs in the system.
 func (c *Manager) ListTags(ctx context.Context) ([]string, error) {
 	url := internal.URL(c, internal.TagPath)

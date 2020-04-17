@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var limitrangesResource = schema.GroupVersionResource{Group: "", Version: "v1", 
 var limitrangesKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "LimitRange"}
 
 // Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
-func (c *FakeLimitRanges) Get(name string, options v1.GetOptions) (result *corev1.LimitRange, err error) {
+func (c *FakeLimitRanges) Get(ctx context.Context, name string, options v1.GetOptions) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(limitrangesResource, c.ns, name), &corev1.LimitRange{})
 
@@ -50,7 +52,7 @@ func (c *FakeLimitRanges) Get(name string, options v1.GetOptions) (result *corev
 }
 
 // List takes label and field selectors, and returns the list of LimitRanges that match those selectors.
-func (c *FakeLimitRanges) List(opts v1.ListOptions) (result *corev1.LimitRangeList, err error) {
+func (c *FakeLimitRanges) List(ctx context.Context, opts v1.ListOptions) (result *corev1.LimitRangeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(limitrangesResource, limitrangesKind, c.ns, opts), &corev1.LimitRangeList{})
 
@@ -72,14 +74,14 @@ func (c *FakeLimitRanges) List(opts v1.ListOptions) (result *corev1.LimitRangeLi
 }
 
 // Watch returns a watch.Interface that watches the requested limitRanges.
-func (c *FakeLimitRanges) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeLimitRanges) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(limitrangesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *FakeLimitRanges) Create(limitRange *corev1.LimitRange) (result *corev1.LimitRange, err error) {
+func (c *FakeLimitRanges) Create(ctx context.Context, limitRange *corev1.LimitRange, opts v1.CreateOptions) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(limitrangesResource, c.ns, limitRange), &corev1.LimitRange{})
 
@@ -90,7 +92,7 @@ func (c *FakeLimitRanges) Create(limitRange *corev1.LimitRange) (result *corev1.
 }
 
 // Update takes the representation of a limitRange and updates it. Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *FakeLimitRanges) Update(limitRange *corev1.LimitRange) (result *corev1.LimitRange, err error) {
+func (c *FakeLimitRanges) Update(ctx context.Context, limitRange *corev1.LimitRange, opts v1.UpdateOptions) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(limitrangesResource, c.ns, limitRange), &corev1.LimitRange{})
 
@@ -101,7 +103,7 @@ func (c *FakeLimitRanges) Update(limitRange *corev1.LimitRange) (result *corev1.
 }
 
 // Delete takes name of the limitRange and deletes it. Returns an error if one occurs.
-func (c *FakeLimitRanges) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeLimitRanges) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(limitrangesResource, c.ns, name), &corev1.LimitRange{})
 
@@ -109,15 +111,15 @@ func (c *FakeLimitRanges) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeLimitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(limitrangesResource, c.ns, listOptions)
+func (c *FakeLimitRanges) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(limitrangesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.LimitRangeList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched limitRange.
-func (c *FakeLimitRanges) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.LimitRange, err error) {
+func (c *FakeLimitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, pt, data, subresources...), &corev1.LimitRange{})
 

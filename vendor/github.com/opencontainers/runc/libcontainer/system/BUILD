@@ -29,6 +29,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
         ],
@@ -52,6 +55,18 @@ go_library(
         ],
         "//conditions:default": [],
     }) + select({
+        "@io_bazel_rules_go//go/platform:android_386": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:android_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:android_arm": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:android_arm64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux_386": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

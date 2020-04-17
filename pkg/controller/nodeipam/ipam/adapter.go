@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -23,14 +25,14 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/legacy-cloud-providers/gce"
 	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
@@ -86,7 +88,7 @@ func (a *adapter) AddAlias(ctx context.Context, nodeName string, cidrRange *net.
 }
 
 func (a *adapter) Node(ctx context.Context, name string) (*v1.Node, error) {
-	return a.k8s.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	return a.k8s.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (a *adapter) UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRange *net.IPNet) error {
@@ -101,7 +103,7 @@ func (a *adapter) UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRang
 		return err
 	}
 
-	_, err = a.k8s.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, bytes)
+	_, err = a.k8s.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	return err
 }
 

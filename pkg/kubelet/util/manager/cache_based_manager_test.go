@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -24,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +57,7 @@ func noObjectTTL() (time.Duration, bool) {
 
 func getSecret(fakeClient clientset.Interface) GetObjectFunc {
 	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().Secrets(namespace).Get(name, opts)
+		return fakeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, opts)
 	}
 }
 
@@ -389,7 +390,7 @@ func TestCacheInvalidation(t *testing.T) {
 		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
-	// Fetch both secrets - this should triggger get operations.
+	// Fetch both secrets - this should trigger get operations.
 	store.Get("ns1", "s1")
 	store.Get("ns1", "s10")
 	store.Get("ns1", "s2")
@@ -427,6 +428,41 @@ func TestCacheInvalidation(t *testing.T) {
 	actions = fakeClient.Actions()
 	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
 	fakeClient.ClearActions()
+}
+
+func TestRegisterIdempotence(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
+	manager := newCacheBasedSecretManager(store)
+
+	s1 := secretsToAttach{
+		imagePullSecretNames: []string{"s1"},
+	}
+
+	refs := func(ns, name string) int {
+		store.lock.Lock()
+		defer store.lock.Unlock()
+		item, ok := store.items[objectKey{ns, name}]
+		if !ok {
+			return 0
+		}
+		return item.refCount
+	}
+
+	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
+	assert.Equal(t, 1, refs("ns1", "s1"))
+	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
+	assert.Equal(t, 1, refs("ns1", "s1"))
+	manager.RegisterPod(podWithSecrets("ns1", "name2", s1))
+	assert.Equal(t, 2, refs("ns1", "s1"))
+
+	manager.UnregisterPod(podWithSecrets("ns1", "name1", s1))
+	assert.Equal(t, 1, refs("ns1", "s1"))
+	manager.UnregisterPod(podWithSecrets("ns1", "name1", s1))
+	assert.Equal(t, 1, refs("ns1", "s1"))
+	manager.UnregisterPod(podWithSecrets("ns1", "name2", s1))
+	assert.Equal(t, 0, refs("ns1", "s1"))
 }
 
 func TestCacheRefcounts(t *testing.T) {

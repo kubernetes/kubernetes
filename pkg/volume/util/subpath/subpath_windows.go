@@ -26,7 +26,7 @@ import (
 	"syscall"
 
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 	"k8s.io/utils/nsenter"
 )
 
@@ -267,7 +267,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 
 	dirs := strings.Split(rel, string(filepath.Separator))
 
-	parent := base
+	var parent string
 	currentPath := base
 	for i, dir := range dirs {
 		parent = currentPath

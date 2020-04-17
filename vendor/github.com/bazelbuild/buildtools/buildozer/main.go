@@ -20,11 +20,16 @@ import (
 	"os"
 	"strings"
 
+	"github.com/bazelbuild/buildtools/build"
 	"github.com/bazelbuild/buildtools/edit"
 	"github.com/bazelbuild/buildtools/tables"
 )
 
 var (
+	buildVersion     = "redacted"
+	buildScmRevision = "redacted"
+
+	version           = flag.Bool("version", false, "Print the version of buildozer")
 	stdout            = flag.Bool("stdout", false, "write changed BUILD file to stdout")
 	buildifier        = flag.String("buildifier", "", "format output using a specific buildifier binary. If empty, use built-in formatter")
 	parallelism       = flag.Int("P", 0, "number of cores to use for concurrent actions")
@@ -38,6 +43,7 @@ var (
 	editVariables     = flag.Bool("edit-variables", false, "For attributes that simply assign a variable (e.g. hdrs = LIB_HDRS), edit the build variable instead of appending to the attribute.")
 	isPrintingProto   = flag.Bool("output_proto", false, "output serialized devtools.buildozer.Output protos instead of human-readable strings.")
 	tablesPath        = flag.String("tables", "", "path to JSON file with custom table definitions which will replace the built-in tables")
+	addTablesPath     = flag.String("add_tables", "", "path to JSON file with custom table definitions which will be merged with the built-in tables")
 
 	shortenLabelsFlag  = flag.Bool("shorten_labels", true, "convert added labels to short form, e.g. //foo:bar => :bar")
 	deleteWithComments = flag.Bool("delete_with_comments", true, "If a list attribute should be deleted even if there is a comment attached to it")
@@ -60,6 +66,12 @@ func stringList(name, help string) func() []string {
 func main() {
 	flag.Parse()
 
+	if *version {
+		fmt.Printf("buildozer version: %s \n", buildVersion)
+		fmt.Printf("buildozer scm revision: %s \n", buildScmRevision)
+		os.Exit(0)
+	}
+
 	if *tablesPath != "" {
 		if err := tables.ParseAndUpdateJSONDefinitions(*tablesPath, false); err != nil {
 			fmt.Fprintf(os.Stderr, "buildifier: failed to parse %s for -tables: %s\n", *tablesPath, err)
@@ -67,9 +79,19 @@ func main() {
 		}
 	}
 
+	if *addTablesPath != "" {
+		if err := tables.ParseAndUpdateJSONDefinitions(*addTablesPath, true); err != nil {
+			fmt.Fprintf(os.Stderr, "buildifier: failed to parse %s for -add_tables: %s\n", *addTablesPath, err)
+			os.Exit(2)
+		}
+	}
+
+	if !(*shortenLabelsFlag) {
+		build.DisableRewrites = []string{"label"}
+	}
 	edit.ShortenLabelsFlag = *shortenLabelsFlag
 	edit.DeleteWithComments = *deleteWithComments
-	edit.Opts = edit.Options{
+	opts := &edit.Options{
 		Stdout:            *stdout,
 		Buildifier:        *buildifier,
 		Parallelism:       *parallelism,
@@ -83,5 +105,5 @@ func main() {
 		EditVariables:     *editVariables,
 		IsPrintingProto:   *isPrintingProto,
 	}
-	os.Exit(edit.Buildozer(flag.Args()))
+	os.Exit(edit.Buildozer(opts, flag.Args()))
 }

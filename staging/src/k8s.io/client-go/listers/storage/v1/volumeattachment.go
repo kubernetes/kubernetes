@@ -26,10 +26,13 @@ import (
 )
 
 // VolumeAttachmentLister helps list VolumeAttachments.
+// All objects returned here must be treated as read-only.
 type VolumeAttachmentLister interface {
 	// List lists all VolumeAttachments in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.VolumeAttachment, err error)
 	// Get retrieves the VolumeAttachment from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.VolumeAttachment, error)
 	VolumeAttachmentListerExpansion
 }

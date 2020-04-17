@@ -56,8 +56,8 @@ func TestFindPairInterfaceOfContainerInterface(t *testing.T) {
 	}
 	for _, test := range tests {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test.output), test.err },
+			CombinedOutputScript: []fakeexec.FakeAction{
+				func() ([]byte, []byte, error) { return []byte(test.output), nil, test.err },
 			},
 		}
 		fexec := fakeexec.FakeExec{

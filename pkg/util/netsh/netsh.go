@@ -21,7 +21,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/klog"
@@ -54,7 +53,6 @@ const (
 
 // runner implements Interface in terms of exec("netsh").
 type runner struct {
-	mu   sync.Mutex
 	exec utilexec.Interface
 }
 

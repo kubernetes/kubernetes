@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,6 +74,7 @@ func TestParseResolvConf(t *testing.T) {
 		{"search ", []string{}, []string{}, []string{}, false}, // search empty
 		{"search foo", []string{}, []string{"foo"}, []string{}, false},
 		{"search foo bar", []string{}, []string{"foo", "bar"}, []string{}, false},
+		{"search foo. bar", []string{}, []string{"foo", "bar"}, []string{}, false},
 		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}, []string{}, false},
 		{"search foo\nsearch bar", []string{}, []string{"bar"}, []string{}, false},
 		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}, []string{}, false},

@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -100,11 +101,14 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := rt.RoundTrip(req)
 
 	if err != nil {
-		message := fmt.Sprintf("Error: '%s'\nTrying to reach: '%v'", err.Error(), req.URL.String())
+		message := fmt.Sprintf("Error trying to reach service: '%v'", err.Error())
 		resp = &http.Response{
+			Header:     http.Header{},
 			StatusCode: http.StatusServiceUnavailable,
 			Body:       ioutil.NopCloser(strings.NewReader(message)),
 		}
+		resp.Header.Set("Content-Type", "text/plain; charset=utf-8")
+		resp.Header.Set("X-Content-Type-Options", "nosniff")
 		return resp, nil
 	}
 
@@ -231,7 +235,18 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 		gzw := gzip.NewWriter(writer)
 		defer gzw.Close()
 		writer = gzw
-	// TODO: support flate, other encodings.
+	case "deflate":
+		var err error
+		reader = flate.NewReader(reader)
+		flw, err := flate.NewWriter(writer, flate.BestCompression)
+		if err != nil {
+			return nil, fmt.Errorf("errorf making flate writer: %v", err)
+		}
+		defer func() {
+			flw.Close()
+			flw.Flush()
+		}()
+		writer = flw
 	case "":
 		// This is fine
 	default:

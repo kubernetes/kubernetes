@@ -26,6 +26,9 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 const (
@@ -75,16 +78,20 @@ type LogsSizeVerifier struct {
 	workers       []*LogSizeGatherer
 }
 
+// SingleLogSummary is a structure for handling average generation rate and number of probes.
 type SingleLogSummary struct {
 	AverageGenerationRate int
 	NumberOfProbes        int
 }
 
+// LogSizeDataTimeseries is map of timestamped size.
 type LogSizeDataTimeseries map[string]map[string][]TimestampedSize
 
+// LogsSizeDataSummary is map of log summary.
 // node -> file -> data
 type LogsSizeDataSummary map[string]map[string]SingleLogSummary
 
+// PrintHumanReadable returns string of log size data summary.
 // TODO: make sure that we don't need locking here
 func (s *LogsSizeDataSummary) PrintHumanReadable() string {
 	buf := &bytes.Buffer{}
@@ -100,14 +107,17 @@ func (s *LogsSizeDataSummary) PrintHumanReadable() string {
 	return buf.String()
 }
 
+// PrintJSON returns the summary of log size data with JSON format.
 func (s *LogsSizeDataSummary) PrintJSON() string {
 	return PrettyPrintJSON(*s)
 }
 
+// SummaryKind returns the summary of log size data summary.
 func (s *LogsSizeDataSummary) SummaryKind() string {
 	return "LogSizeSummary"
 }
 
+// LogsSizeData is a structure for handling timeseries of log size data and lock.
 type LogsSizeData struct {
 	data LogSizeDataTimeseries
 	lock sync.Mutex
@@ -133,7 +143,7 @@ func prepareData(masterAddress string, nodeAddresses []string) *LogsSizeData {
 	}
 }
 
-func (d *LogsSizeData) AddNewData(ip, path string, timestamp time.Time, size int) {
+func (d *LogsSizeData) addNewData(ip, path string, timestamp time.Time, size int) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.data[ip][path] = append(
@@ -147,7 +157,7 @@ func (d *LogsSizeData) AddNewData(ip, path string, timestamp time.Time, size int
 
 // NewLogsVerifier creates a new LogsSizeVerifier which will stop when stopChannel is closed
 func NewLogsVerifier(c clientset.Interface, stopChannel chan bool) *LogsSizeVerifier {
-	nodeAddresses, err := NodeSSHHosts(c)
+	nodeAddresses, err := e2essh.NodeSSHHosts(c)
 	ExpectNoError(err)
 	masterAddress := GetMasterHost() + ":22"
 
@@ -197,26 +207,27 @@ func (s *LogsSizeVerifier) GetSummary() *LogsSizeDataSummary {
 }
 
 // Run starts log size gathering. It starts a gorouting for every worker and then blocks until stopChannel is closed
-func (v *LogsSizeVerifier) Run() {
-	v.workChannel <- WorkItem{
-		ip:                v.masterAddress,
+func (s *LogsSizeVerifier) Run() {
+	s.workChannel <- WorkItem{
+		ip:                s.masterAddress,
 		paths:             masterLogsToCheck,
 		backoffMultiplier: 1,
 	}
-	for _, node := range v.nodeAddresses {
-		v.workChannel <- WorkItem{
+	for _, node := range s.nodeAddresses {
+		s.workChannel <- WorkItem{
 			ip:                node,
 			paths:             nodeLogsToCheck,
 			backoffMultiplier: 1,
 		}
 	}
-	for _, worker := range v.workers {
+	for _, worker := range s.workers {
 		go worker.Run()
 	}
-	<-v.stopChannel
-	v.wg.Wait()
+	<-s.stopChannel
+	s.wg.Wait()
 }
 
+// Run starts log size gathering.
 func (g *LogSizeGatherer) Run() {
 	for g.Work() {
 	}
@@ -242,7 +253,7 @@ func (g *LogSizeGatherer) Work() bool {
 		return false
 	case workItem = <-g.workChannel:
 	}
-	sshResult, err := SSH(
+	sshResult, err := e2essh.SSH(
 		fmt.Sprintf("ls -l %v | awk '{print $9, $5}' | tr '\n' ' '", strings.Join(workItem.paths, " ")),
 		workItem.ip,
 		TestContext.Provider,
@@ -270,7 +281,7 @@ func (g *LogSizeGatherer) Work() bool {
 			Logf("Error during conversion to int: %v, skipping data. Error: %v", results[i+1], err)
 			continue
 		}
-		g.data.AddNewData(workItem.ip, path, now, size)
+		g.data.addNewData(workItem.ip, path, now, size)
 	}
 	go g.pushWorkItem(workItem)
 	return true

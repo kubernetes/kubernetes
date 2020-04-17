@@ -22,10 +22,10 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
-	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
@@ -37,10 +37,12 @@ import (
 	certificatesfuzzer "k8s.io/kubernetes/pkg/apis/certificates/fuzzer"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
+	discoveryfuzzer "k8s.io/kubernetes/pkg/apis/discovery/fuzzer"
 	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
 	networkingfuzzer "k8s.io/kubernetes/pkg/apis/networking/fuzzer"
 	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
 	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"
+	schedulingfuzzer "k8s.io/kubernetes/pkg/apis/scheduling/fuzzer"
 	storagefuzzer "k8s.io/kubernetes/pkg/apis/storage/fuzzer"
 )
 
@@ -91,7 +93,6 @@ func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 // FuzzerFuncs is a list of fuzzer functions
 var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
-	genericfuzzer.Funcs,
 	overrideGenericFuncs,
 	corefuzzer.Funcs,
 	extensionsfuzzer.Funcs,
@@ -105,4 +106,7 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	auditregistrationfuzzer.Funcs,
 	storagefuzzer.Funcs,
 	networkingfuzzer.Funcs,
+	metafuzzer.Funcs,
+	schedulingfuzzer.Funcs,
+	discoveryfuzzer.Funcs,
 )

@@ -17,12 +17,13 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,11 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 
 	"k8s.io/klog"
-)
-
-const (
-	// period to relist statefulsets and verify pets
-	statefulSetResyncPeriod = 30 * time.Second
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -121,7 +117,7 @@ func NewStatefulSetController(
 	ssc.podLister = podInformer.Lister()
 	ssc.podListerSynced = podInformer.Informer().HasSynced
 
-	setInformer.Informer().AddEventHandlerWithResyncPeriod(
+	setInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: ssc.enqueueStatefulSet,
 			UpdateFunc: func(old, cur interface{}) {
@@ -134,7 +130,6 @@ func NewStatefulSetController(
 			},
 			DeleteFunc: ssc.enqueueStatefulSet,
 		},
-		statefulSetResyncPeriod,
 	)
 	ssc.setLister = setInformer.Lister()
 	ssc.setListerSynced = setInformer.Informer().HasSynced
@@ -151,7 +146,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting stateful set controller")
 	defer klog.Infof("Shutting down statefulset controller")
 
-	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
+	if !cache.WaitForNamedCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 
@@ -201,7 +196,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
-		// Periodic resync will send update events for all known pods.
+		// In the event of a re-list we may receive update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
@@ -249,8 +244,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new StatefulSet will not be woken up till the periodic resync.
+	// the deleted key/value. Note that this value might be stale.
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -295,10 +289,15 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 		return isMemberOf(set, pod)
 	}
 
-	// If any adoptions are attempted, we should first recheck for deletion with
-	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
+	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, ssc.canAdoptFunc(set))
+	return cm.ClaimPods(pods, filter)
+}
+
+// If any adoptions are attempted, we should first recheck for deletion with
+// an uncached quorum read sometime after listing Pods/ControllerRevisions (see #42639).
+func (ssc *StatefulSetController) canAdoptFunc(set *apps.StatefulSet) func() error {
+	return controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(context.TODO(), set.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -307,9 +306,6 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 		}
 		return fresh, nil
 	})
-
-	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, canAdoptFunc)
-	return cm.ClaimPods(pods, filter)
 }
 
 // adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.
@@ -318,22 +314,18 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 	if err != nil {
 		return err
 	}
-	hasOrphans := false
+	orphanRevisions := make([]*apps.ControllerRevision, 0)
 	for i := range revisions {
 		if metav1.GetControllerOf(revisions[i]) == nil {
-			hasOrphans = true
-			break
+			orphanRevisions = append(orphanRevisions, revisions[i])
 		}
 	}
-	if hasOrphans {
-		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
+	if len(orphanRevisions) > 0 {
+		canAdoptErr := ssc.canAdoptFunc(set)()
+		if canAdoptErr != nil {
+			return fmt.Errorf("can't adopt ControllerRevisions: %v", canAdoptErr)
 		}
-		if fresh.UID != set.UID {
-			return fmt.Errorf("original StatefulSet %v/%v is gone: got uid %v, wanted %v", set.Namespace, set.Name, fresh.UID, set.UID)
-		}
-		return ssc.control.AdoptOrphanRevisions(set, revisions)
+		return ssc.control.AdoptOrphanRevisions(set, orphanRevisions)
 	}
 	return nil
 }

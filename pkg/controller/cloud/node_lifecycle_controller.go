@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,10 +35,10 @@ import (
 	v1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	cloudproviderapi "k8s.io/cloud-provider/api"
+	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
@@ -45,7 +46,7 @@ const (
 )
 
 var ShutdownTaint = &v1.Taint{
-	Key:    schedulerapi.TaintNodeShutdown,
+	Key:    cloudproviderapi.TaintNodeShutdown,
 	Effect: v1.TaintEffectNoSchedule,
 }
 
@@ -115,7 +116,7 @@ func (c *CloudNodeLifecycleController) Run(stopCh <-chan struct{}) {
 }
 
 // MonitorNodes checks to see if nodes in the cluster have been deleted
-// or shutdown. If deleeted, it deletes the node resource. If shutdown it
+// or shutdown. If deleted, it deletes the node resource. If shutdown it
 // applies a shutdown taint to the node
 func (c *CloudNodeLifecycleController) MonitorNodes() {
 	instances, ok := c.cloud.Instances()
@@ -133,7 +134,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 	for _, node := range nodes {
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
-		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
+		if _, c := cloudnodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
 			status = c.Status
 		}
 
@@ -166,7 +167,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 
 		// At this point the node has NotReady status, we need to check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node
-		exists, err := ensureNodeExistsByProviderID(instances, node)
+		exists, err := ensureNodeExistsByProviderID(context.TODO(), instances, node)
 		if err != nil {
 			klog.Errorf("error checking if node %s exists: %v", node.Name, err)
 			continue
@@ -190,7 +191,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 			fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
 			"Node %s event: %s", node.Name, deleteNodeEvent)
 
-		if err := c.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
+		if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("unable to delete node %q: %v", node.Name, err)
 		}
 	}

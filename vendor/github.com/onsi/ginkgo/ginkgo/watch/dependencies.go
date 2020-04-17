@@ -77,7 +77,7 @@ func (d Dependencies) resolveAndAdd(deps []string, depth int) {
 		if err != nil {
 			continue
 		}
-		if pkg.Goroot == false && !ginkgoAndGomegaFilter.Match([]byte(pkg.Dir)) {
+		if !pkg.Goroot && !ginkgoAndGomegaFilter.Match([]byte(pkg.Dir)) {
 			d.addDepIfNotPresent(pkg.Dir, depth)
 		}
 	}

@@ -1,14 +1,21 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- dchen1107
 - michmike
 - patricklang
+- benmoss
+- ddebroy
 reviewers:
 - adelina-t
 - bclau
-- benmoss
+- chewong
 - dineshgovindasamy
 - feiskyer
+- ksubrmnn
 - madhanrm
+- marosset
 - yujuhong
+emeritus_approvers:
+- dchen1107
+labels:
+- sig/windows

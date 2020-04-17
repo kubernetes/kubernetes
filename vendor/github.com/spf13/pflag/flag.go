@@ -57,9 +57,9 @@ that give one-letter shorthands for flags. You can use these by appending
 	var ip = flag.IntP("flagname", "f", 1234, "help message")
 	var flagvar bool
 	func init() {
-		flag.BoolVarP("boolname", "b", true, "help message")
+		flag.BoolVarP(&flagvar, "boolname", "b", true, "help message")
 	}
-	flag.VarP(&flagVar, "varname", "v", 1234, "help message")
+	flag.VarP(&flagval, "varname", "v", "help message")
 Shorthand letters can be used with single dashes on the command line.
 Boolean shorthand flags can be combined with other shorthand flags.
 
@@ -188,6 +188,18 @@ type Value interface {
 	String() string
 	Set(string) error
 	Type() string
+}
+
+// SliceValue is a secondary interface to all flags which hold a list
+// of values.  This allows full control over the value of list flags,
+// and avoids complicated marshalling and unmarshalling to csv.
+type SliceValue interface {
+	// Append adds the specified value to the end of the flag value list.
+	Append(string) error
+	// Replace will fully overwrite any data currently in the flag value list.
+	Replace([]string) error
+	// GetSlice returns the flag value list as an array of strings.
+	GetSlice() []string
 }
 
 // sortFlags returns the flags as a slice in lexicographical sorted order.
@@ -925,13 +937,16 @@ func stripUnknownFlagValue(args []string) []string {
 	}
 
 	first := args[0]
-	if first[0] == '-' {
+	if len(first) > 0 && first[0] == '-' {
 		//--unknown --next-flag ...
 		return args
 	}
 
 	//--unknown arg ... (args will be arg ...)
-	return args[1:]
+	if len(args) > 1 {
+		return args[1:]
+	}
+	return nil
 }
 
 func (f *FlagSet) parseLongArg(s string, args []string, fn parseFunc) (a []string, err error) {
@@ -990,11 +1005,12 @@ func (f *FlagSet) parseLongArg(s string, args []string, fn parseFunc) (a []strin
 }
 
 func (f *FlagSet) parseSingleShortArg(shorthands string, args []string, fn parseFunc) (outShorts string, outArgs []string, err error) {
+	outArgs = args
+
 	if strings.HasPrefix(shorthands, "test.") {
 		return
 	}
 
-	outArgs = args
 	outShorts = shorthands[1:]
 	c := shorthands[0]
 

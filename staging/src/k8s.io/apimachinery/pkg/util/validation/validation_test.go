@@ -355,6 +355,75 @@ func TestIsValidIP(t *testing.T) {
 	}
 }
 
+func TestIsValidIPv4Address(t *testing.T) {
+	goodValues := []string{
+		"1.1.1.1",
+		"1.1.1.01",
+		"255.0.0.1",
+		"1.0.0.0",
+		"0.0.0.0",
+	}
+	for _, val := range goodValues {
+		if msgs := IsValidIPv4Address(field.NewPath(""), val); len(msgs) != 0 {
+			t.Errorf("expected %q to be valid IPv4 address: %v", val, msgs)
+		}
+	}
+
+	badValues := []string{
+		"[2001:db8:0:1]:80",
+		"myhost.mydomain",
+		"-1.0.0.0",
+		"[2001:db8:0:1]",
+		"a",
+		"2001:4860:4860::8888",
+		"::fff:1.1.1.1",
+		"::1",
+		"2a00:79e0:2:0:f1c3:e797:93c1:df80",
+		"::",
+	}
+	for _, val := range badValues {
+		if msgs := IsValidIPv4Address(field.NewPath(""), val); len(msgs) == 0 {
+			t.Errorf("expected %q to be invalid IPv4 address", val)
+		}
+	}
+}
+
+func TestIsValidIPv6Address(t *testing.T) {
+	goodValues := []string{
+		"2001:4860:4860::8888",
+		"2a00:79e0:2:0:f1c3:e797:93c1:df80",
+		"2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+		"::fff:1.1.1.1",
+		"::1",
+		"::",
+	}
+
+	for _, val := range goodValues {
+		if msgs := IsValidIPv6Address(field.NewPath(""), val); len(msgs) != 0 {
+			t.Errorf("expected %q to be valid IPv6 address: %v", val, msgs)
+		}
+	}
+
+	badValues := []string{
+		"1.1.1.1",
+		"1.1.1.01",
+		"255.0.0.1",
+		"1.0.0.0",
+		"0.0.0.0",
+		"[2001:db8:0:1]:80",
+		"myhost.mydomain",
+		"2001:0db8:85a3:0000:0000:8a2e:0370:7334:2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+		"-1.0.0.0",
+		"[2001:db8:0:1]",
+		"a",
+	}
+	for _, val := range badValues {
+		if msgs := IsValidIPv6Address(field.NewPath(""), val); len(msgs) == 0 {
+			t.Errorf("expected %q to be invalid IPv6 address", val)
+		}
+	}
+}
+
 func TestIsHTTPHeaderName(t *testing.T) {
 	goodValues := []string{
 		// Common ones
@@ -477,8 +546,85 @@ func TestIsWildcardDNS1123Subdomain(t *testing.T) {
 	}
 }
 
+func TestIsFullyQualifiedDomainName(t *testing.T) {
+	goodValues := []string{
+		"a.com",
+		"k8s.io",
+		"dev.k8s.io",
+		"dev.k8s.io.",
+		"foo.example.com",
+		"this.is.a.really.long.fqdn",
+		"bbc.co.uk",
+		"10.0.0.1", // DNS labels can start with numbers and there is no requirement for letters.
+		"hyphens-are-good.k8s.io",
+		strings.Repeat("a", 246) + ".k8s.io",
+	}
+	for _, val := range goodValues {
+		if err := IsFullyQualifiedDomainName(field.NewPath(""), val).ToAggregate(); err != nil {
+			t.Errorf("expected no errors for %q: %v", val, err)
+		}
+	}
+
+	badValues := []string{
+		".",
+		"...",
+		".io",
+		"com",
+		".com",
+		"Dev.k8s.io",
+		".foo.example.com",
+		"*.example.com",
+		"*.bar.com",
+		"*.foo.bar.com",
+		"underscores_are_bad.k8s.io",
+		"foo@bar.example.com",
+		"http://foo.example.com",
+		strings.Repeat("a", 247) + ".k8s.io",
+	}
+	for _, val := range badValues {
+		if err := IsFullyQualifiedDomainName(field.NewPath(""), val).ToAggregate(); err == nil {
+			t.Errorf("expected errors for %q", val)
+		}
+	}
+}
+
 func TestIsFullyQualifiedName(t *testing.T) {
-	tests := []struct {
+	goodValues := []string{
+		"dev.k8s.io",
+		"foo.example.com",
+		"this.is.a.really.long.fqdn",
+		"bbc.co.uk",
+		"10.0.0.1", // DNS labels can start with numbers and there is no requirement for letters.
+		"hyphens-are-good.k8s.io",
+		strings.Repeat("a", 246) + ".k8s.io",
+	}
+	for _, val := range goodValues {
+		if err := IsFullyQualifiedName(field.NewPath(""), val).ToAggregate(); err != nil {
+			t.Errorf("expected no errors for %q: %v", val, err)
+		}
+	}
+
+	badValues := []string{
+		"...",
+		"dev.k8s.io.",
+		".io",
+		"Dev.k8s.io",
+		"k8s.io",
+		"*.example.com",
+		"*.bar.com",
+		"*.foo.bar.com",
+		"underscores_are_bad.k8s.io",
+		"foo@bar.example.com",
+		"http://foo.example.com",
+		strings.Repeat("a", 247) + ".k8s.io",
+	}
+	for _, val := range badValues {
+		if err := IsFullyQualifiedName(field.NewPath(""), val).ToAggregate(); err == nil {
+			t.Errorf("expected errors for %q", val)
+		}
+	}
+
+	messageTests := []struct {
 		name       string
 		targetName string
 		err        string
@@ -487,6 +633,16 @@ func TestIsFullyQualifiedName(t *testing.T) {
 			name:       "name needs to be fully qualified, i.e., contains at least 2 dots",
 			targetName: "k8s.io",
 			err:        "should be a domain with at least three segments separated by dots",
+		},
+		{
+			name:       "name should not include scheme",
+			targetName: "http://foo.k8s.io",
+			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
+		},
+		{
+			name:       "email should be invalid",
+			targetName: "example@foo.k8s.io",
+			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
 		},
 		{
 			name:       "name cannot be empty",
@@ -499,7 +655,7 @@ func TestIsFullyQualifiedName(t *testing.T) {
 			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
 		},
 	}
-	for _, tc := range tests {
+	for _, tc := range messageTests {
 		err := IsFullyQualifiedName(field.NewPath(""), tc.targetName).ToAggregate()
 		switch {
 		case tc.err == "" && err != nil:
@@ -508,6 +664,53 @@ func TestIsFullyQualifiedName(t *testing.T) {
 			t.Errorf("%q: unexpected no error, expected %s", tc.name, tc.err)
 		case tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err):
 			t.Errorf("%q: expected %s, got %v", tc.name, tc.err, err)
+		}
+	}
+}
+
+func TestIsDomainPrefixedPath(t *testing.T) {
+	goodValues := []string{
+		"a/b",
+		"a/b/c/d",
+		"a.com/foo",
+		"a.b.c.d/foo",
+		"k8s.io/foo/bar",
+		"k8s.io/FOO/BAR",
+		"dev.k8s.io/more/path",
+		"this.is.a.really.long.fqdn/even/longer/path/just/because",
+		"bbc.co.uk/path/goes/here",
+		"10.0.0.1/foo",
+		"hyphens-are-good.k8s.io/and-in-paths-too",
+		strings.Repeat("a", 240) + ".k8s.io/a",
+		"k8s.io/" + strings.Repeat("a", 240),
+	}
+	for _, val := range goodValues {
+		if err := IsDomainPrefixedPath(field.NewPath(""), val).ToAggregate(); err != nil {
+			t.Errorf("expected no errors for %q: %v", val, err)
+		}
+	}
+
+	badValues := []string{
+		".",
+		"...",
+		"/b",
+		"com",
+		".com",
+		"a.b.c.d/foo?a=b",
+		"a.b.c.d/foo#a",
+		"Dev.k8s.io",
+		".foo.example.com",
+		"*.example.com",
+		"example.com/foo{}[]@^`",
+		"underscores_are_bad.k8s.io",
+		"underscores_are_bad.k8s.io/foo",
+		"foo@bar.example.com",
+		"foo@bar.example.com/foo",
+		strings.Repeat("a", 247) + ".k8s.io",
+	}
+	for _, val := range badValues {
+		if err := IsDomainPrefixedPath(field.NewPath(""), val).ToAggregate(); err == nil {
+			t.Errorf("expected errors for %q", val)
 		}
 	}
 }

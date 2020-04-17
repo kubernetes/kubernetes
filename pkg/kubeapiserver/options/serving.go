@@ -60,7 +60,7 @@ func DefaultAdvertiseAddress(s *genericoptions.ServerRunOptions, insecure *gener
 	}
 
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := utilnet.ChooseBindAddress(insecure.BindAddress)
+		hostIP, err := utilnet.ResolveBindAddress(insecure.BindAddress)
 		if err != nil {
 			return fmt.Errorf("unable to find suitable network address.error='%v'. "+
 				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this", err)

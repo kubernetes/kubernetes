@@ -33,6 +33,7 @@ var _ InitData = &testInitData{}
 func (t *testInitData) UploadCerts() bool                    { return false }
 func (t *testInitData) CertificateKey() string               { return "" }
 func (t *testInitData) SetCertificateKey(key string)         {}
+func (t *testInitData) SkipCertificateKeyPrint() bool        { return false }
 func (t *testInitData) Cfg() *kubeadmapi.InitConfiguration   { return nil }
 func (t *testInitData) DryRun() bool                         { return false }
 func (t *testInitData) SkipTokenPrint() bool                 { return false }
@@ -47,3 +48,4 @@ func (t *testInitData) ExternalCA() bool                     { return false }
 func (t *testInitData) OutputWriter() io.Writer              { return nil }
 func (t *testInitData) Client() (clientset.Interface, error) { return nil, nil }
 func (t *testInitData) Tokens() []string                     { return nil }
+func (t *testInitData) KustomizeDir() string                 { return "" }

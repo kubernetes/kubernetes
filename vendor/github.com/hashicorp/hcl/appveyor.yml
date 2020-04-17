@@ -4,7 +4,7 @@ clone_folder: c:\gopath\src\github.com\hashicorp\hcl
 environment:
   GOPATH: c:\gopath
 init:
-  - git config --global core.autocrlf true
+  - git config --global core.autocrlf false
 install:
 - cmd: >-
     echo %Path%
@@ -12,5 +12,8 @@ install:
     go version
 
     go env
+
+    go get -t ./...
+
 build_script:
 - cmd: go test -v ./...

@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -28,7 +29,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
@@ -36,7 +38,27 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
+
+// unretriableError is an error used temporarily while we are migrating from the
+// ClusterStatus struct to an annotation Pod based information. When performing
+// the upgrade of all control plane nodes with `kubeadm upgrade apply` and
+// `kubeadm upgrade node` we don't want to retry as if we were hitting connectivity
+// issues when the pod annotation is missing on the API server pods. This error will
+// be used in such scenario, for failing fast, and falling back to the ClusterStatus
+// retrieval in those cases.
+type unretriableError struct {
+	err error
+}
+
+func newUnretriableError(err error) *unretriableError {
+	return &unretriableError{err: err}
+}
+
+func (ue *unretriableError) Error() string {
+	return fmt.Sprintf("unretriable error: %s", ue.err.Error())
+}
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
 func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, logPrefix string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
@@ -60,7 +82,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
 func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get config map")
 	}
@@ -78,7 +100,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	}
 
 	// gets the component configs from the corresponding config maps
-	if err := getComponentConfigs(client, &initcfg.ClusterConfiguration); err != nil {
+	if err := componentconfigs.FetchFromCluster(&initcfg.ClusterConfiguration, client); err != nil {
 		return nil, errors.Wrap(err, "failed to get component configs")
 	}
 
@@ -89,10 +111,19 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		if err := getNodeRegistration(kubeconfigDir, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
-		// gets the APIEndpoint for the current node from then ClusterStatus in the kubeadm-config ConfigMap
-		if err := getAPIEndpoint(configMap.Data, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
+		// gets the APIEndpoint for the current node
+		if err := getAPIEndpoint(client, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
 			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
+	} else {
+		// In the case where newControlPlane is true we don't go through getNodeRegistration() and initcfg.NodeRegistration.CRISocket is empty.
+		// This forces DetectCRISocket() to be called later on, and if there is more than one CRI installed on the system, it will error out,
+		// while asking for the user to provide an override for the CRI socket. Even if the user provides an override, the call to
+		// DetectCRISocket() can happen too early and thus ignore it (while still erroring out).
+		// However, if newControlPlane == true, initcfg.NodeRegistration is not used at all and it's overwritten later on.
+		// Thus it's necessary to supply some default value, that will avoid the call to DetectCRISocket() and as
+		// initcfg.NodeRegistration is discarded, setting whatever value here is harmless.
+		initcfg.NodeRegistration.CRISocket = constants.DefaultDockerCRISocket
 	}
 	return initcfg, nil
 }
@@ -105,10 +136,10 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 		return errors.Wrap(err, "failed to get node name from kubelet config")
 	}
 
-	// gets the corresponding node and retrives attributes stored there.
-	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	// gets the corresponding node and retrieves attributes stored there.
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "faild to get corresponding node")
+		return errors.Wrap(err, "failed to get corresponding node")
 	}
 
 	criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
@@ -126,7 +157,7 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 	return nil
 }
 
-// getNodeNameFromConfig gets the node name from a kubelet config file
+// getNodeNameFromKubeletConfig gets the node name from a kubelet config file
 // TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
 //       information in the local kubelet config.yaml
 func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
@@ -138,7 +169,14 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 	}
 
 	// gets the info about the current user
-	authInfo := config.AuthInfos[config.Contexts[config.CurrentContext].AuthInfo]
+	currentContext, exists := config.Contexts[config.CurrentContext]
+	if !exists {
+		return "", errors.Errorf("invalid kubeconfig file %s: missing context %s", fileName, config.CurrentContext)
+	}
+	authInfo, exists := config.AuthInfos[currentContext.AuthInfo]
+	if !exists {
+		return "", errors.Errorf("invalid kubeconfig file %s: missing AuthInfo %s", fileName, currentContext.AuthInfo)
+	}
 
 	// gets the X509 certificate with current user credentials
 	var certs []*x509.Certificate
@@ -153,7 +191,7 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 			return "", err
 		}
 	} else {
-		return "", errors.New("invalid kubelet.conf. X509 certificate expected")
+		return "", errors.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
 	}
 
 	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
@@ -164,45 +202,95 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 	return strings.TrimPrefix(cert.Subject.CommonName, constants.NodesUserPrefix), nil
 }
 
-// getAPIEndpoint returns the APIEndpoint for the current node
-func getAPIEndpoint(data map[string]string, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
-	// gets the ClusterStatus from kubeadm-config
-	clusterStatus, err := unmarshalClusterStatus(data)
+func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
+	return getAPIEndpointWithBackoff(client, nodeName, apiEndpoint, constants.StaticPodMirroringDefaultRetry)
+}
+
+func getAPIEndpointWithBackoff(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint, backoff wait.Backoff) error {
+	var err error
+	var errs []error
+
+	if err = getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, backoff); err == nil {
+		return nil
+	}
+	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName))
+
+	// NB: this is a fallback when there is no annotation found in the API server pod that contains
+	//     the API endpoint, and so we fallback to reading the ClusterStatus struct present in the
+	//     kubeadm-config ConfigMap. This can happen for example, when performing the first
+	//     `kubeadm upgrade apply` and `kubeadm upgrade node` cycle on the whole cluster. This logic
+	//     will be removed when the cluster status struct is removed from the kubeadm-config ConfigMap.
+	if err = getAPIEndpointFromClusterStatus(client, nodeName, apiEndpoint); err == nil {
+		return nil
+	}
+	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using cluster status", nodeName))
+
+	return errorsutil.NewAggregate(errs)
+}
+
+func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint, backoff wait.Backoff) error {
+	var rawAPIEndpoint string
+	var lastErr error
+	// Let's tolerate some unexpected transient failures from the API server or load balancers. Also, if
+	// static pods were not yet mirrored into the API server we want to wait for this propagation.
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		rawAPIEndpoint, lastErr = getRawAPIEndpointFromPodAnnotationWithoutRetry(client, nodeName)
+		// TODO (ereslibre): this logic will need tweaking once that we get rid of the ClusterStatus, since we won't have
+		// the ClusterStatus safety net, we will want to remove the UnretriableError and not make the distinction here
+		// anymore.
+		if _, ok := lastErr.(*unretriableError); ok {
+			// Fail fast scenario, to be removed once we get rid of the ClusterStatus
+			return true, errors.Wrapf(lastErr, "API server Pods exist, but no API endpoint annotations were found")
+		}
+		return lastErr == nil, nil
+	})
 	if err != nil {
 		return err
 	}
-
-	// gets the APIEndpoint for the current machine from the ClusterStatus
-	e, ok := clusterStatus.APIEndpoints[nodeName]
-	if !ok {
-		return errors.New("failed to get APIEndpoint information for this node")
+	parsedAPIEndpoint, err := kubeadmapi.APIEndpointFromString(rawAPIEndpoint)
+	if err != nil {
+		return errors.Wrapf(err, "could not parse API endpoint for node %q", nodeName)
 	}
-
-	apiEndpoint.AdvertiseAddress = e.AdvertiseAddress
-	apiEndpoint.BindPort = e.BindPort
+	*apiEndpoint = parsedAPIEndpoint
 	return nil
 }
 
-// getComponentConfigs gets the component configs from the corresponding config maps
-func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubeadmapi.ClusterConfiguration) error {
-	// some config maps is versioned, so we need the KubernetesVersion for getting the right config map
-	k8sVersion := version.MustParseGeneric(clusterConfiguration.KubernetesVersion)
-	for kind, registration := range componentconfigs.Known {
-		obj, err := registration.GetFromConfigMap(client, k8sVersion)
-		if err != nil {
-			return err
-		}
-
-		if ok := registration.SetToInternalConfig(obj, clusterConfiguration); !ok {
-			return errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
-		}
+func getRawAPIEndpointFromPodAnnotationWithoutRetry(client clientset.Interface, nodeName string) (string, error) {
+	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
+		context.TODO(),
+		metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("spec.nodeName=%s", nodeName),
+			LabelSelector: fmt.Sprintf("component=%s,tier=%s", constants.KubeAPIServer, constants.ControlPlaneTier),
+		},
+	)
+	if err != nil {
+		return "", errors.Wrap(err, "could not retrieve list of pods to determine api server endpoints")
 	}
-	return nil
+	if len(podList.Items) != 1 {
+		return "", errors.Errorf("API server pod for node name %q has %d entries, only one was expected", nodeName, len(podList.Items))
+	}
+	if apiServerEndpoint, ok := podList.Items[0].Annotations[constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey]; ok {
+		return apiServerEndpoint, nil
+	}
+	return "", newUnretriableError(errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey))
+}
+
+// TODO: remove after 1.20, when the ClusterStatus struct is removed from the kubeadm-config ConfigMap.
+func getAPIEndpointFromClusterStatus(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
+	clusterStatus, err := GetClusterStatus(client)
+	if err != nil {
+		return errors.Wrap(err, "could not retrieve cluster status")
+	}
+	if statusAPIEndpoint, ok := clusterStatus.APIEndpoints[nodeName]; ok {
+		*apiEndpoint = statusAPIEndpoint
+		return nil
+	}
+	return errors.Errorf("could not find node %s in the cluster status", nodeName)
 }
 
 // GetClusterStatus returns the kubeadm cluster status read from the kubeadm-config ConfigMap
 func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, error) {
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if apierrors.IsNotFound(err) {
 		return &kubeadmapi.ClusterStatus{}, nil
 	}
@@ -210,7 +298,7 @@ func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, er
 		return nil, err
 	}
 
-	clusterStatus, err := unmarshalClusterStatus(configMap.Data)
+	clusterStatus, err := UnmarshalClusterStatus(configMap.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +306,8 @@ func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, er
 	return clusterStatus, nil
 }
 
-func unmarshalClusterStatus(data map[string]string) (*kubeadmapi.ClusterStatus, error) {
+// UnmarshalClusterStatus takes raw ConfigMap.Data and converts it to a ClusterStatus object
+func UnmarshalClusterStatus(data map[string]string) (*kubeadmapi.ClusterStatus, error) {
 	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
 	if !ok {
 		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)

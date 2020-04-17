@@ -120,3 +120,32 @@ func IsMissingVersion(err error) bool {
 	_, ok := err.(*missingVersionErr)
 	return ok
 }
+
+// strictDecodingError is a base error type that is returned by a strict Decoder such
+// as UniversalStrictDecoder.
+type strictDecodingError struct {
+	message string
+	data    string
+}
+
+// NewStrictDecodingError creates a new strictDecodingError object.
+func NewStrictDecodingError(message string, data string) error {
+	return &strictDecodingError{
+		message: message,
+		data:    data,
+	}
+}
+
+func (e *strictDecodingError) Error() string {
+	return fmt.Sprintf("strict decoder error for %s: %s", e.data, e.message)
+}
+
+// IsStrictDecodingError returns true if the error indicates that the provided object
+// strictness violations.
+func IsStrictDecodingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*strictDecodingError)
+	return ok
+}

@@ -21,7 +21,7 @@ func Build(r *request.Request) {
 		"Version": {r.ClientInfo.APIVersion},
 	}
 	if err := queryutil.Parse(body, r.Params, false); err != nil {
-		r.Error = awserr.New("SerializationError", "failed encoding Query request", err)
+		r.Error = awserr.New(request.ErrCodeSerialization, "failed encoding Query request", err)
 		return
 	}
 

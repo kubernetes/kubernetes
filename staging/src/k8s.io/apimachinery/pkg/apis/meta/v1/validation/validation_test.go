@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -103,7 +105,7 @@ func TestValidDryRun(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v", test), func(t *testing.T) {
-			if errs := validateDryRun(field.NewPath("dryRun"), test); len(errs) != 0 {
+			if errs := ValidateDryRun(field.NewPath("dryRun"), test); len(errs) != 0 {
 				t.Errorf("%v should be a valid dry-run value: %v", test, errs)
 			}
 		})
@@ -118,10 +120,176 @@ func TestInvalidDryRun(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v", test), func(t *testing.T) {
-			if len(validateDryRun(field.NewPath("dryRun"), test)) == 0 {
+			if len(ValidateDryRun(field.NewPath("dryRun"), test)) == 0 {
 				t.Errorf("%v shouldn't be a valid dry-run value", test)
 			}
 		})
 	}
 
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func TestValidPatchOptions(t *testing.T) {
+	tests := []struct {
+		opts      metav1.PatchOptions
+		patchType types.PatchType
+	}{
+		{
+			opts: metav1.PatchOptions{
+				Force:        boolPtr(true),
+				FieldManager: "kubectl",
+			},
+			patchType: types.ApplyPatchType,
+		},
+		{
+			opts: metav1.PatchOptions{
+				FieldManager: "kubectl",
+			},
+			patchType: types.ApplyPatchType,
+		},
+		{
+			opts:      metav1.PatchOptions{},
+			patchType: types.MergePatchType,
+		},
+		{
+			opts: metav1.PatchOptions{
+				FieldManager: "patcher",
+			},
+			patchType: types.MergePatchType,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test.opts), func(t *testing.T) {
+			errs := ValidatePatchOptions(&test.opts, test.patchType)
+			if len(errs) != 0 {
+				t.Fatalf("Expected no failures, got: %v", errs)
+			}
+		})
+	}
+}
+
+func TestInvalidPatchOptions(t *testing.T) {
+	tests := []struct {
+		opts      metav1.PatchOptions
+		patchType types.PatchType
+	}{
+		// missing manager
+		{
+			opts:      metav1.PatchOptions{},
+			patchType: types.ApplyPatchType,
+		},
+		// force on non-apply
+		{
+			opts: metav1.PatchOptions{
+				Force: boolPtr(true),
+			},
+			patchType: types.MergePatchType,
+		},
+		// manager and force on non-apply
+		{
+			opts: metav1.PatchOptions{
+				FieldManager: "kubectl",
+				Force:        boolPtr(false),
+			},
+			patchType: types.MergePatchType,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test.opts), func(t *testing.T) {
+			errs := ValidatePatchOptions(&test.opts, test.patchType)
+			if len(errs) == 0 {
+				t.Fatal("Expected failures, got none.")
+			}
+		})
+	}
+}
+
+func TestValidateFieldManagerValid(t *testing.T) {
+	tests := []string{
+		"filedManager",
+		"你好", // Hello
+		"🍔",
+	}
+
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			errs := ValidateFieldManager(test, field.NewPath("fieldManager"))
+			if len(errs) != 0 {
+				t.Errorf("Validation failed: %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateFieldManagerInvalid(t *testing.T) {
+	tests := []string{
+		"field\nmanager", // Contains invalid character \n
+		"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // Has 129 chars
+	}
+
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			errs := ValidateFieldManager(test, field.NewPath("fieldManager"))
+			if len(errs) == 0 {
+				t.Errorf("Validation should have failed")
+			}
+		})
+	}
+}
+
+func TestValidateMangedFieldsInvalid(t *testing.T) {
+	tests := []metav1.ManagedFieldsEntry{
+		{
+			Operation: metav1.ManagedFieldsOperationUpdate,
+			// FieldsType is missing
+		},
+		{
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			FieldsType: "RandomVersion",
+		},
+		{
+			Operation:  "RandomOperation",
+			FieldsType: "FieldsV1",
+		},
+		{
+			// Operation is missing
+			FieldsType: "FieldsV1",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%#v", test), func(t *testing.T) {
+			errs := ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"))
+			if len(errs) == 0 {
+				t.Errorf("Validation should have failed")
+			}
+		})
+	}
+}
+
+func TestValidateMangedFieldsValid(t *testing.T) {
+	tests := []metav1.ManagedFieldsEntry{
+		{
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			FieldsType: "FieldsV1",
+		},
+		{
+			Operation:  metav1.ManagedFieldsOperationApply,
+			FieldsType: "FieldsV1",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%#v", test), func(t *testing.T) {
+			err := ValidateManagedFields([]metav1.ManagedFieldsEntry{test}, field.NewPath("managedFields"))
+			if err != nil {
+				t.Errorf("Validation failed: %v", err)
+			}
+		})
+	}
 }

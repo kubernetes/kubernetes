@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -33,7 +34,7 @@ func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 
 	err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
 		healthStatus := 0
-		result := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		result := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
 		if result.Error() != nil {
 			lastErr = fmt.Errorf("failed to get apiserver /healthz status: %v", result.Error())
 			return false, nil

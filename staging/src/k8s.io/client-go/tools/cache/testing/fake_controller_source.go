@@ -18,11 +18,13 @@ package framework
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +61,10 @@ type FakeControllerSource struct {
 	Items       map[nnu]runtime.Object
 	changes     []watch.Event // one change per resourceVersion
 	Broadcaster *watch.Broadcaster
+	lastRV      int
+
+	// Set this to simulate an error on List()
+	ListError error
 }
 
 type FakePVControllerSource struct {
@@ -73,6 +79,16 @@ type FakePVCControllerSource struct {
 type nnu struct {
 	namespace, name string
 	uid             types.UID
+}
+
+// ResetWatch simulates connection problems; creates a new Broadcaster and flushes
+// the change queue so that clients have to re-list and watch.
+func (f *FakeControllerSource) ResetWatch() {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.Broadcaster.Shutdown()
+	f.Broadcaster = watch.NewBroadcaster(100, watch.WaitIfChannelFull)
+	f.changes = []watch.Event{}
 }
 
 // Add adds an object to the set and sends an add event to watchers.
@@ -129,8 +145,8 @@ func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 		panic(err) // this is test code only
 	}
 
-	resourceVersion := len(f.changes) + 1
-	accessor.SetResourceVersion(strconv.Itoa(resourceVersion))
+	f.lastRV += 1
+	accessor.SetResourceVersion(strconv.Itoa(f.lastRV))
 	f.changes = append(f.changes, e)
 	key := f.key(accessor)
 	switch e.Type {
@@ -161,6 +177,11 @@ func (f *FakeControllerSource) getListItemsLocked() ([]runtime.Object, error) {
 func (f *FakeControllerSource) List(options metav1.ListOptions) (runtime.Object, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+
+	if f.ListError != nil {
+		return nil, f.ListError
+	}
+
 	list, err := f.getListItemsLocked()
 	if err != nil {
 		return nil, err
@@ -173,8 +194,7 @@ func (f *FakeControllerSource) List(options metav1.ListOptions) (runtime.Object,
 	if err != nil {
 		return nil, err
 	}
-	resourceVersion := len(f.changes)
-	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
+	listAccessor.SetResourceVersion(strconv.Itoa(f.lastRV))
 	return listObj, nil
 }
 
@@ -194,8 +214,7 @@ func (f *FakePVControllerSource) List(options metav1.ListOptions) (runtime.Objec
 	if err != nil {
 		return nil, err
 	}
-	resourceVersion := len(f.changes)
-	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
+	listAccessor.SetResourceVersion(strconv.Itoa(f.lastRV))
 	return listObj, nil
 }
 
@@ -215,8 +234,7 @@ func (f *FakePVCControllerSource) List(options metav1.ListOptions) (runtime.Obje
 	if err != nil {
 		return nil, err
 	}
-	resourceVersion := len(f.changes)
-	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
+	listAccessor.SetResourceVersion(strconv.Itoa(f.lastRV))
 	return listObj, nil
 }
 
@@ -229,9 +247,27 @@ func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interfac
 	if err != nil {
 		return nil, err
 	}
-	if rc < len(f.changes) {
+	if rc < f.lastRV {
+		// if the change queue was flushed...
+		if len(f.changes) == 0 {
+			return nil, apierrors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", rc, f.lastRV))
+		}
+
+		// get the RV of the oldest object in the change queue
+		oldestRV, err := meta.NewAccessor().ResourceVersion(f.changes[0].Object)
+		if err != nil {
+			panic(err)
+		}
+		oldestRC, err := strconv.Atoi(oldestRV)
+		if err != nil {
+			panic(err)
+		}
+		if rc < oldestRC {
+			return nil, apierrors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", rc, oldestRC))
+		}
+
 		changes := []watch.Event{}
-		for _, c := range f.changes[rc:] {
+		for _, c := range f.changes[rc-oldestRC+1:] {
 			// Must make a copy to allow clients to modify the
 			// object.  Otherwise, if they make a change and write
 			// it back, they will inadvertently change the our
@@ -240,7 +276,7 @@ func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interfac
 			changes = append(changes, watch.Event{Type: c.Type, Object: c.Object.DeepCopyObject()})
 		}
 		return f.Broadcaster.WatchWithPrefix(changes), nil
-	} else if rc > len(f.changes) {
+	} else if rc > f.lastRV {
 		return nil, errors.New("resource version in the future not supported by this fake")
 	}
 	return f.Broadcaster.Watch(), nil

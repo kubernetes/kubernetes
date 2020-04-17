@@ -20,16 +20,16 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
-var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
-	var rc *common.ResourceConsumer
+var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
+	var rc *e2eautoscaling.ResourceConsumer
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
@@ -37,37 +37,37 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 
 	SIGDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
-		It(titleUp, func() {
-			scaleUp("test-deployment", common.KindDeployment, false, rc, f)
+		ginkgo.It(titleUp, func() {
+			scaleUp("test-deployment", e2eautoscaling.KindDeployment, false, rc, f)
 		})
-		It(titleDown, func() {
-			scaleDown("test-deployment", common.KindDeployment, false, rc, f)
+		ginkgo.It(titleDown, func() {
+			scaleDown("test-deployment", e2eautoscaling.KindDeployment, false, rc, f)
 		})
 	})
 
 	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via ReplicaSets
-		It(titleUp, func() {
-			scaleUp("rs", common.KindReplicaSet, false, rc, f)
+		ginkgo.It(titleUp, func() {
+			scaleUp("rs", e2eautoscaling.KindReplicaSet, false, rc, f)
 		})
-		It(titleDown, func() {
-			scaleDown("rs", common.KindReplicaSet, false, rc, f)
+		ginkgo.It(titleDown, func() {
+			scaleDown("rs", e2eautoscaling.KindReplicaSet, false, rc, f)
 		})
 	})
 
 	// These tests take ~20 minutes each.
 	SIGDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
-		It(titleUp+" and verify decision stability", func() {
-			scaleUp("rc", common.KindRC, true, rc, f)
+		ginkgo.It(titleUp+" and verify decision stability", func() {
+			scaleUp("rc", e2eautoscaling.KindRC, true, rc, f)
 		})
-		It(titleDown+" and verify decision stability", func() {
-			scaleDown("rc", common.KindRC, true, rc, f)
+		ginkgo.It(titleDown+" and verify decision stability", func() {
+			scaleDown("rc", e2eautoscaling.KindRC, true, rc, f)
 		})
 	})
 
 	SIGDescribe("ReplicationController light", func() {
-		It("Should scale from 1 pod to 2 pods", func() {
+		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
 				totalInitialCPUUsage:        150,
@@ -77,9 +77,9 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 				maxPods:                     2,
 				firstScale:                  2,
 			}
-			scaleTest.run("rc-light", common.KindRC, rc, f)
+			scaleTest.run("rc-light", e2eautoscaling.KindRC, rc, f)
 		})
-		It("Should scale from 2 pods to 1 pod", func() {
+		ginkgo.It("Should scale from 2 pods to 1 pod [Slow]", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    2,
 				totalInitialCPUUsage:        50,
@@ -89,7 +89,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 				maxPods:                     2,
 				firstScale:                  1,
 			}
-			scaleTest.run("rc-light", common.KindRC, rc, f)
+			scaleTest.run("rc-light", e2eautoscaling.KindRC, rc, f)
 		})
 	})
 })
@@ -114,12 +114,12 @@ type HPAScaleTest struct {
 // The first state change is due to the CPU being consumed initially, which HPA responds to by changing pod counts.
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
-func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *common.ResourceConsumer, f *framework.Framework) {
+func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *e2eautoscaling.ResourceConsumer, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
-	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+	rc = e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter)
 	defer rc.CleanUp()
-	hpa := common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
-	defer common.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
+	hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
+	defer e2eautoscaling.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
 
 	rc.WaitForReplicas(scaleTest.firstScale, timeToWait)
 	if scaleTest.firstScaleStasis > 0 {
@@ -131,7 +131,7 @@ func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc
 	}
 }
 
-func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
+func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc *e2eautoscaling.ResourceConsumer, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
@@ -151,7 +151,7 @@ func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc 
 	scaleTest.run(name, kind, rc, f)
 }
 
-func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
+func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, rc *e2eautoscaling.ResourceConsumer, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wardle-server
+  namespace: wardle
+  labels:
+    apiserver: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      apiserver: "true"
+  template:
+    metadata:
+      labels:
+        apiserver: "true"
+    spec:
+      serviceAccountName: apiserver
+      containers:
+      - name: wardle-server
+        # build from staging/src/k8s.io/sample-apiserver/artifacts/simple-image/Dockerfile
+        # or
+        # docker pull gcr.io/kubernetes-e2e-test-images/sample-apiserver:1.17
+        # docker tag gcr.io/kubernetes-e2e-test-images/sample-apiserver:1.17 kube-sample-apiserver:latest
+        image: kube-sample-apiserver:latest
+        imagePullPolicy: Never
+        args: [ "--etcd-servers=http://localhost:2379" ]
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.4.7

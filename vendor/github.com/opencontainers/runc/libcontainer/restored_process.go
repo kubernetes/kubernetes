@@ -76,6 +76,9 @@ func (p *restoredProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
+func (p *restoredProcess) forwardChildLogs() {
+}
+
 // nonChildProcess represents a process where the calling process is not
 // the parent process.  This process is created when a factory loads a container from
 // a persisted state.
@@ -119,4 +122,7 @@ func (p *nonChildProcess) externalDescriptors() []string {
 
 func (p *nonChildProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
+}
+
+func (p *nonChildProcess) forwardChildLogs() {
 }

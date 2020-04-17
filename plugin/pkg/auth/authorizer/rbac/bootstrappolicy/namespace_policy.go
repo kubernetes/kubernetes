@@ -77,7 +77,7 @@ func init() {
 		ObjectMeta: metav1.ObjectMeta{Name: "extension-apiserver-authentication-reader"},
 		Rules: []rbacv1.PolicyRule{
 			// this particular config map is exposed and contains authentication configuration information
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("configmaps").Names("extension-apiserver-authentication").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("configmaps").Names("extension-apiserver-authentication").RuleOrDie(),
 		},
 	})
 	addNamespaceRole(metav1.NamespaceSystem, rbacv1.Role{

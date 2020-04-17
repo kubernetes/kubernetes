@@ -24,6 +24,7 @@ import (
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/utils/pointer"
 )
 
 func TestHookClientConfigForSink(t *testing.T) {
@@ -48,6 +49,7 @@ func TestHookClientConfigForSink(t *testing.T) {
 								Name:      "test",
 								Path:      &path,
 								Namespace: "test",
+								Port:      pointer.Int32Ptr(123),
 							},
 						},
 					},
@@ -60,6 +62,7 @@ func TestHookClientConfigForSink(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 					Path:      path,
+					Port:      123,
 				},
 			},
 		},

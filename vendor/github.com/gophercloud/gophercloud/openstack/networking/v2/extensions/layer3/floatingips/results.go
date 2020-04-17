@@ -56,11 +56,13 @@ type commonResult struct {
 
 // Extract will extract a FloatingIP resource from a result.
 func (r commonResult) Extract() (*FloatingIP, error) {
-	var s struct {
-		FloatingIP *FloatingIP `json:"floatingip"`
-	}
+	var s FloatingIP
 	err := r.ExtractInto(&s)
-	return s.FloatingIP, err
+	return &s, err
+}
+
+func (r commonResult) ExtractInto(v interface{}) error {
+	return r.Result.ExtractIntoStructPtr(v, "floatingip")
 }
 
 // CreateResult represents the result of a create operation. Call its Extract
@@ -122,4 +124,8 @@ func ExtractFloatingIPs(r pagination.Page) ([]FloatingIP, error) {
 	}
 	err := (r.(FloatingIPPage)).ExtractInto(&s)
 	return s.FloatingIPs, err
+}
+
+func ExtractFloatingIPsInto(r pagination.Page, v interface{}) error {
+	return r.(FloatingIPPage).Result.ExtractIntoSlicePtr(v, "floatingips")
 }

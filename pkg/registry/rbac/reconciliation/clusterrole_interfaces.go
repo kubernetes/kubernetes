@@ -17,6 +17,7 @@ limitations under the License.
 package reconciliation
 
 import (
+	"context"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,7 +80,7 @@ type ClusterRoleModifier struct {
 }
 
 func (c ClusterRoleModifier) Get(namespace, name string) (RuleOwner, error) {
-	ret, err := c.Client.Get(name, metav1.GetOptions{})
+	ret, err := c.Client.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +88,7 @@ func (c ClusterRoleModifier) Get(namespace, name string) (RuleOwner, error) {
 }
 
 func (c ClusterRoleModifier) Create(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Create(in.(ClusterRoleRuleOwner).ClusterRole)
+	ret, err := c.Client.Create(context.TODO(), in.(ClusterRoleRuleOwner).ClusterRole, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func (c ClusterRoleModifier) Create(in RuleOwner) (RuleOwner, error) {
 }
 
 func (c ClusterRoleModifier) Update(in RuleOwner) (RuleOwner, error) {
-	ret, err := c.Client.Update(in.(ClusterRoleRuleOwner).ClusterRole)
+	ret, err := c.Client.Update(context.TODO(), in.(ClusterRoleRuleOwner).ClusterRole, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}

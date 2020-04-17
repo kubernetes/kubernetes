@@ -34,7 +34,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["namer_test.go"],
+    srcs = [
+        "cmd_test.go",
+        "namer_test.go",
+    ],
     embed = [":go_default_library"],
 )
 

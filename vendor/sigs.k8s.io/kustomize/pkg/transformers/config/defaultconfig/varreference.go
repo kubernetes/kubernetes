@@ -100,10 +100,63 @@ varReference:
 - path: spec/containers/env/value
   kind: Pod
 
+- path: spec/initContainers/command
+  kind: Pod
+
+- path: spec/initContainers/args
+  kind: Pod
+
+- path: spec/initContainers/env/value
+  kind: Pod
+
 - path: spec/rules/host
   kind: Ingress
 
 - path: spec/tls/hosts
   kind: Ingress
+
+- path: spec/template/spec/containers/volumeMounts/mountPath
+  kind: StatefulSet
+
+- path: spec/template/spec/initContainers/volumeMounts/mountPath
+  kind: StatefulSet
+
+- path: spec/containers/volumeMounts/mountPath
+  kind: Pod
+
+- path: spec/initContainers/volumeMounts/mountPath
+  kind: Pod
+
+- path: spec/template/spec/containers/volumeMounts/mountPath
+  kind: ReplicaSet
+
+- path: spec/template/spec/initContainers/volumeMounts/mountPath
+  kind: ReplicaSet
+
+- path: spec/template/spec/containers/volumeMounts/mountPath
+  kind: Job
+
+- path: spec/template/spec/initContainers/volumeMounts/mountPath
+  kind: Job
+
+- path: spec/template/spec/containers/volumeMounts/mountPath
+  kind: CronJob
+
+- path: spec/template/spec/initContainers/volumeMounts/mountPath
+  kind: CronJob
+
+- path: spec/template/spec/containers/volumeMounts/mountPath
+  kind: DaemonSet
+
+- path: spec/template/spec/initContainers/volumeMounts/mountPath
+  kind: DaemonSet
+
+- path: spec/template/spec/containers/volumeMounts/mountPath
+  kind: Deployment
+
+- path: spec/template/spec/initContainers/volumeMounts/mountPath
+  kind: Deployment
+
+- path: metadata/labels
 `
 )

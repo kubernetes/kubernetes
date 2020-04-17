@@ -18,7 +18,6 @@ package main
 
 import (
 	goflag "flag"
-	"fmt"
 	"math/rand"
 	"os"
 	"time"
@@ -26,8 +25,8 @@ import (
 	"github.com/spf13/pflag"
 
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubectl/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
-	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 
 	// Import to initialize client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -48,7 +47,6 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }

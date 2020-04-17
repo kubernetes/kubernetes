@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -26,10 +27,12 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -106,70 +109,146 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 }
 
 // GetNodeIP returns the ip of node with the provided hostname
+// If required, wait for the node to be defined.
 func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
-	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
-	if err != nil {
-		klog.Warningf("Failed to retrieve node info: %v", err)
-		return nil
+	backoff := wait.Backoff{
+		Steps:    6,
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.2,
 	}
-	nodeIP, err = GetNodeHostIP(node)
-	if err != nil {
-		klog.Warningf("Failed to retrieve node IP: %v", err)
-		return nil
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), hostname, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf("Failed to retrieve node info: %v", err)
+			return false, nil
+		}
+		nodeIP, err = GetNodeHostIP(node)
+		if err != nil {
+			klog.Errorf("Failed to retrieve node IP: %v", err)
+			return false, err
+		}
+		return true, nil
+	})
+	if err == nil {
+		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
 	}
 	return nodeIP
 }
 
 // GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
 // it returns empty-string for no zone.
+// Since there are currently two separate zone keys:
+//   * "failure-domain.beta.kubernetes.io/zone"
+//   * "topology.kubernetes.io/zone"
+// GetZoneKey will first check failure-domain.beta.kubernetes.io/zone and if not exists, will then check
+// topology.kubernetes.io/zone
 func GetZoneKey(node *v1.Node) string {
 	labels := node.Labels
 	if labels == nil {
 		return ""
 	}
 
-	region, _ := labels[v1.LabelZoneRegion]
-	failureDomain, _ := labels[v1.LabelZoneFailureDomain]
+	// TODO: prefer stable labels for zone in v1.18
+	zone, ok := labels[v1.LabelZoneFailureDomain]
+	if !ok {
+		zone, _ = labels[v1.LabelZoneFailureDomainStable]
+	}
 
-	if region == "" && failureDomain == "" {
+	// TODO: prefer stable labels for region in v1.18
+	region, ok := labels[v1.LabelZoneRegion]
+	if !ok {
+		region, _ = labels[v1.LabelZoneRegionStable]
+	}
+
+	if region == "" && zone == "" {
 		return ""
 	}
 
 	// We include the null character just in case region or failureDomain has a colon
 	// (We do assume there's no null characters in a region or failureDomain)
 	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
-	return region + ":\x00:" + failureDomain
+	return region + ":\x00:" + zone
+}
+
+type nodeForConditionPatch struct {
+	Status nodeStatusForPatch `json:"status"`
+}
+
+type nodeStatusForPatch struct {
+	Conditions []v1.NodeCondition `json:"conditions"`
 }
 
 // SetNodeCondition updates specific node condition with patch operation.
 func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.NodeCondition) error {
 	generatePatch := func(condition v1.NodeCondition) ([]byte, error) {
-		raw, err := json.Marshal(&[]v1.NodeCondition{condition})
+		patch := nodeForConditionPatch{
+			Status: nodeStatusForPatch{
+				Conditions: []v1.NodeCondition{
+					condition,
+				},
+			},
+		}
+		patchBytes, err := json.Marshal(&patch)
 		if err != nil {
 			return nil, err
 		}
-		return []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw)), nil
+		return patchBytes, nil
 	}
 	condition.LastHeartbeatTime = metav1.NewTime(time.Now())
 	patch, err := generatePatch(condition)
 	if err != nil {
 		return nil
 	}
-	_, err = c.CoreV1().Nodes().PatchStatus(string(node), patch)
+	_, err = c.CoreV1().Nodes().PatchStatus(context.TODO(), string(node), patch)
 	return err
+}
+
+type nodeForCIDRMergePatch struct {
+	Spec nodeSpecForMergePatch `json:"spec"`
+}
+
+type nodeSpecForMergePatch struct {
+	PodCIDR  string   `json:"podCIDR"`
+	PodCIDRs []string `json:"podCIDRs,omitempty"`
 }
 
 // PatchNodeCIDR patches the specified node's CIDR to the given value.
 func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) error {
-	raw, err := json.Marshal(cidr)
+	patch := nodeForCIDRMergePatch{
+		Spec: nodeSpecForMergePatch{
+			PodCIDR: cidr,
+		},
+	}
+	patchBytes, err := json.Marshal(&patch)
 	if err != nil {
 		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
 	}
 
-	patchBytes := []byte(fmt.Sprintf(`{"spec":{"podCIDR":%s}}`, raw))
+	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("failed to patch node CIDR: %v", err)
+	}
+	return nil
+}
 
-	if _, err := c.CoreV1().Nodes().Patch(string(node), types.StrategicMergePatchType, patchBytes); err != nil {
+// PatchNodeCIDRs patches the specified node.CIDR=cidrs[0] and node.CIDRs to the given value.
+func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) error {
+	// set the pod cidrs list and set the old pod cidr field
+	patch := nodeForCIDRMergePatch{
+		Spec: nodeSpecForMergePatch{
+			PodCIDR:  cidrs[0],
+			PodCIDRs: cidrs,
+		},
+	}
+
+	patchBytes, err := json.Marshal(&patch)
+	if err != nil {
+		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
+	}
+	klog.V(4).Infof("cidrs patch bytes are:%s", string(patchBytes))
+	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}
 	return nil
@@ -182,7 +261,7 @@ func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode 
 		return nil, nil, err
 	}
 
-	updatedNode, err := c.Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes, "status")
+	updatedNode, err := c.Nodes().Patch(context.TODO(), string(nodeName), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to patch status %q for node %q: %v", patchBytes, nodeName, err)
 	}
@@ -195,12 +274,21 @@ func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, n
 		return nil, fmt.Errorf("failed to Marshal oldData for node %q: %v", nodeName, err)
 	}
 
+	// NodeStatus.Addresses is incorrectly annotated as patchStrategy=merge, which
+	// will cause strategicpatch.CreateTwoWayMergePatch to create an incorrect patch
+	// if it changed.
+	manuallyPatchAddresses := (len(oldNode.Status.Addresses) > 0) && !equality.Semantic.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses)
+
 	// Reset spec to make sure only patch for Status or ObjectMeta is generated.
 	// Note that we don't reset ObjectMeta here, because:
 	// 1. This aligns with Nodes().UpdateStatus().
 	// 2. Some component does use this to update node annotations.
-	newNode.Spec = oldNode.Spec
-	newData, err := json.Marshal(newNode)
+	diffNode := newNode.DeepCopy()
+	diffNode.Spec = oldNode.Spec
+	if manuallyPatchAddresses {
+		diffNode.Status.Addresses = oldNode.Status.Addresses
+	}
+	newData, err := json.Marshal(diffNode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Marshal newData for node %q: %v", nodeName, err)
 	}
@@ -209,5 +297,63 @@ func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, n
 	if err != nil {
 		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for node %q: %v", nodeName, err)
 	}
+	if manuallyPatchAddresses {
+		patchBytes, err = fixupPatchForNodeStatusAddresses(patchBytes, newNode.Status.Addresses)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fix up NodeAddresses in patch for node %q: %v", nodeName, err)
+		}
+	}
+
 	return patchBytes, nil
+}
+
+// fixupPatchForNodeStatusAddresses adds a replace-strategy patch for Status.Addresses to
+// the existing patch
+func fixupPatchForNodeStatusAddresses(patchBytes []byte, addresses []v1.NodeAddress) ([]byte, error) {
+	// Given patchBytes='{"status": {"conditions": [ ... ], "phase": ...}}' and
+	// addresses=[{"type": "InternalIP", "address": "10.0.0.1"}], we need to generate:
+	//
+	//   {
+	//     "status": {
+	//       "conditions": [ ... ],
+	//       "phase": ...,
+	//       "addresses": [
+	//         {
+	//           "type": "InternalIP",
+	//           "address": "10.0.0.1"
+	//         },
+	//         {
+	//           "$patch": "replace"
+	//         }
+	//       ]
+	//     }
+	//   }
+
+	var patchMap map[string]interface{}
+	if err := json.Unmarshal(patchBytes, &patchMap); err != nil {
+		return nil, err
+	}
+
+	addrBytes, err := json.Marshal(addresses)
+	if err != nil {
+		return nil, err
+	}
+	var addrArray []interface{}
+	if err := json.Unmarshal(addrBytes, &addrArray); err != nil {
+		return nil, err
+	}
+	addrArray = append(addrArray, map[string]interface{}{"$patch": "replace"})
+
+	status := patchMap["status"]
+	if status == nil {
+		status = map[string]interface{}{}
+		patchMap["status"] = status
+	}
+	statusMap, ok := status.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected data in patch")
+	}
+	statusMap["addresses"] = addrArray
+
+	return json.Marshal(patchMap)
 }

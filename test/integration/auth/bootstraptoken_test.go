@@ -47,7 +47,7 @@ func (b bootstrapSecrets) Get(name string) (*corev1.Secret, error) {
 
 // TestBootstrapTokenAuth tests the bootstrap token auth provider
 func TestBootstrapTokenAuth(t *testing.T) {
-	tokenID, err := bootstraputil.GenerateTokenId()
+	tokenID, err := bootstraputil.GenerateTokenID()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -160,11 +160,11 @@ func TestBootstrapTokenAuth(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", test.name)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := test.request.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", test.name)

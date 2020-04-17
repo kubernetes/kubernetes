@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of swagger type documentation is needed or
+# not. We should run `hack/update-generated-swagger-docs.sh` if swagger type
+# documentation is out of date.
+# Usage: `hack/verify-generated-swagger-docs.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

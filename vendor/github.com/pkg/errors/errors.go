@@ -6,7 +6,7 @@
 //             return err
 //     }
 //
-// which applied recursively up the call stack results in error reports
+// which when applied recursively up the call stack results in error reports
 // without context or debugging information. The errors package allows
 // programmers to add context to the failure path in their code in a way
 // that does not destroy the original value of the error.
@@ -15,16 +15,17 @@
 //
 // The errors.Wrap function returns a new error that adds context to the
 // original error by recording a stack trace at the point Wrap is called,
-// and the supplied message. For example
+// together with the supplied message. For example
 //
 //     _, err := ioutil.ReadAll(r)
 //     if err != nil {
 //             return errors.Wrap(err, "read failed")
 //     }
 //
-// If additional control is required the errors.WithStack and errors.WithMessage
-// functions destructure errors.Wrap into its component operations of annotating
-// an error with a stack trace and an a message, respectively.
+// If additional control is required, the errors.WithStack and
+// errors.WithMessage functions destructure errors.Wrap into its component
+// operations: annotating an error with a stack trace and with a message,
+// respectively.
 //
 // Retrieving the cause of an error
 //
@@ -38,7 +39,7 @@
 //     }
 //
 // can be inspected by errors.Cause. errors.Cause will recursively retrieve
-// the topmost error which does not implement causer, which is assumed to be
+// the topmost error that does not implement causer, which is assumed to be
 // the original cause. For example:
 //
 //     switch err := errors.Cause(err).(type) {
@@ -48,16 +49,16 @@
 //             // unknown error
 //     }
 //
-// causer interface is not exported by this package, but is considered a part
-// of stable public API.
+// Although the causer interface is not exported by this package, it is
+// considered a part of its stable public interface.
 //
 // Formatted printing of errors
 //
 // All error values returned from this package implement fmt.Formatter and can
-// be formatted by the fmt package. The following verbs are supported
+// be formatted by the fmt package. The following verbs are supported:
 //
 //     %s    print the error. If the error has a Cause it will be
-//           printed recursively
+//           printed recursively.
 //     %v    see %s
 //     %+v   extended format. Each Frame of the error's StackTrace will
 //           be printed in detail.
@@ -65,13 +66,13 @@
 // Retrieving the stack trace of an error or wrapper
 //
 // New, Errorf, Wrap, and Wrapf record a stack trace at the point they are
-// invoked. This information can be retrieved with the following interface.
+// invoked. This information can be retrieved with the following interface:
 //
 //     type stackTracer interface {
 //             StackTrace() errors.StackTrace
 //     }
 //
-// Where errors.StackTrace is defined as
+// The returned errors.StackTrace type is defined as
 //
 //     type StackTrace []Frame
 //
@@ -81,12 +82,12 @@
 //
 //     if err, ok := err.(stackTracer); ok {
 //             for _, f := range err.StackTrace() {
-//                     fmt.Printf("%+s:%d", f)
+//                     fmt.Printf("%+s:%d\n", f, f)
 //             }
 //     }
 //
-// stackTracer interface is not exported by this package, but is considered a part
-// of stable public API.
+// Although the stackTracer interface is not exported by this package, it is
+// considered a part of its stable public interface.
 //
 // See the documentation for Frame.Format for more details.
 package errors
@@ -158,6 +159,9 @@ type withStack struct {
 
 func (w *withStack) Cause() error { return w.error }
 
+// Unwrap provides compatibility for Go 1.13 error chains.
+func (w *withStack) Unwrap() error { return w.error }
+
 func (w *withStack) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
@@ -192,7 +196,7 @@ func Wrap(err error, message string) error {
 }
 
 // Wrapf returns an error annotating err with a stack trace
-// at the point Wrapf is call, and the format specifier.
+// at the point Wrapf is called, and the format specifier.
 // If err is nil, Wrapf returns nil.
 func Wrapf(err error, format string, args ...interface{}) error {
 	if err == nil {
@@ -220,6 +224,18 @@ func WithMessage(err error, message string) error {
 	}
 }
 
+// WithMessagef annotates err with the format specifier.
+// If err is nil, WithMessagef returns nil.
+func WithMessagef(err error, format string, args ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+	return &withMessage{
+		cause: err,
+		msg:   fmt.Sprintf(format, args...),
+	}
+}
+
 type withMessage struct {
 	cause error
 	msg   string
@@ -227,6 +243,9 @@ type withMessage struct {
 
 func (w *withMessage) Error() string { return w.msg + ": " + w.cause.Error() }
 func (w *withMessage) Cause() error  { return w.cause }
+
+// Unwrap provides compatibility for Go 1.13 error chains.
+func (w *withMessage) Unwrap() error { return w.cause }
 
 func (w *withMessage) Format(s fmt.State, verb rune) {
 	switch verb {

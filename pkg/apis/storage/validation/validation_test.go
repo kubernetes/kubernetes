@@ -21,9 +21,14 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -32,6 +37,15 @@ var (
 	immediateMode2      = storage.VolumeBindingImmediate
 	waitingMode         = storage.VolumeBindingWaitForFirstConsumer
 	invalidMode         = storage.VolumeBindingMode("foo")
+	inlineSpec          = api.PersistentVolumeSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		PersistentVolumeSource: api.PersistentVolumeSource{
+			CSI: &api.CSIPersistentVolumeSource{
+				Driver:       "com.test.foo",
+				VolumeHandle: "foobar",
+			},
+		},
+	}
 )
 
 func TestValidateStorageClass(t *testing.T) {
@@ -138,15 +152,26 @@ func TestValidateStorageClass(t *testing.T) {
 }
 
 func TestVolumeAttachmentValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "pv-name"
 	empty := ""
-	successCases := []storage.VolumeAttachment{
+	migrationEnabledSuccessCases := []storage.VolumeAttachment{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
 				Source: storage.VolumeAttachmentSource{
 					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-inlinespec"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
 				},
 				NodeName: "mynode",
 			},
@@ -175,14 +200,38 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-inlinespec-and-status"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
 	}
 
-	for _, volumeAttachment := range successCases {
+	for _, volumeAttachment := range migrationEnabledSuccessCases {
 		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+			t.Errorf("expected success: %v %v", volumeAttachment, errs)
 		}
 	}
-	errorCases := []storage.VolumeAttachment{
+	migrationEnabledErrorCases := []storage.VolumeAttachment{
 		{
 			// Empty attacher name
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -277,16 +326,95 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				},
 			},
 		},
+		{
+			// VolumeAttachmentSource with no PersistentVolumeName nor InlineSpec
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source:   storage.VolumeAttachmentSource{},
+			},
+		},
+		{
+			// VolumeAttachmentSource with PersistentVolumeName and InlineSpec
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+					InlineVolumeSpec:     &inlineSpec,
+				},
+			},
+		},
+		{
+			// VolumeAttachmentSource with InlineSpec without CSI PV Source
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+					InlineVolumeSpec: &api.PersistentVolumeSpec{
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						PersistentVolumeSource: api.PersistentVolumeSource{
+							FlexVolume: &api.FlexPersistentVolumeSource{
+								Driver: "kubernetes.io/blue",
+								FSType: "ext4",
+							},
+						},
+						StorageClassName: "test-storage-class",
+					},
+				},
+			},
+		},
 	}
 
-	for _, volumeAttachment := range errorCases {
+	for _, volumeAttachment := range migrationEnabledErrorCases {
 		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %v", volumeAttachment)
+			t.Errorf("expected failure for test: %v", volumeAttachment)
+		}
+	}
+
+	// validate with CSIMigration disabled
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
+
+	migrationDisabledSuccessCases := []storage.VolumeAttachment{
+		{
+			// PVName specified with migration disabled
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+			},
+		},
+		{
+			// InlineSpec specified with migration disabled
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
+				},
+			},
+		},
+	}
+	for _, volumeAttachment := range migrationDisabledSuccessCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %v %v", volumeAttachment, errs)
 		}
 	}
 }
 
 func TestVolumeAttachmentUpdateValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "foo"
 	newVolumeName := "bar"
 
@@ -294,21 +422,18 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: storage.VolumeAttachmentSpec{
 			Attacher: "myattacher",
-			Source: storage.VolumeAttachmentSource{
-				PersistentVolumeName: &volumeName,
-			},
+			Source:   storage.VolumeAttachmentSource{},
 			NodeName: "mynode",
 		},
 	}
+
 	successCases := []storage.VolumeAttachment{
 		{
 			// no change
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
-				Source: storage.VolumeAttachmentSource{
-					PersistentVolumeName: &volumeName,
-				},
+				Source:   storage.VolumeAttachmentSource{},
 				NodeName: "mynode",
 			},
 		},
@@ -317,9 +442,7 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
-				Source: storage.VolumeAttachmentSource{
-					PersistentVolumeName: &volumeName,
-				},
+				Source:   storage.VolumeAttachmentSource{},
 				NodeName: "mynode",
 			},
 			Status: storage.VolumeAttachmentStatus{
@@ -340,10 +463,28 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 	}
 
 	for _, volumeAttachment := range successCases {
+		volumeAttachment.Spec.Source = storage.VolumeAttachmentSource{}
+		old.Spec.Source = storage.VolumeAttachmentSource{}
+		// test scenarios with PersistentVolumeName set
+		volumeAttachment.Spec.Source.PersistentVolumeName = &volumeName
+		old.Spec.Source.PersistentVolumeName = &volumeName
+		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) != 0 {
+			t.Errorf("expected success: %+v", errs)
+		}
+
+		volumeAttachment.Spec.Source = storage.VolumeAttachmentSource{}
+		old.Spec.Source = storage.VolumeAttachmentSource{}
+		// test scenarios with InlineVolumeSpec set
+		volumeAttachment.Spec.Source.InlineVolumeSpec = &inlineSpec
+		old.Spec.Source.InlineVolumeSpec = &inlineSpec
 		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) != 0 {
 			t.Errorf("expected success: %+v", errs)
 		}
 	}
+
+	// reset old's source with volumeName in case it was left with something else by earlier tests
+	old.Spec.Source = storage.VolumeAttachmentSource{}
+	old.Spec.Source.PersistentVolumeName = &volumeName
 
 	errorCases := []storage.VolumeAttachment{
 		{
@@ -358,7 +499,7 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 			},
 		},
 		{
-			// change volume
+			// change source volume name
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
@@ -377,6 +518,17 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 					PersistentVolumeName: &volumeName,
 				},
 				NodeName: "anothernode",
+			},
+		},
+		{
+			// change source
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
+				},
+				NodeName: "mynode",
 			},
 		},
 		{
@@ -992,6 +1144,34 @@ func TestCSINodeValidation(t *testing.T) {
 			},
 		},
 		{
+			// Volume limits being zero
+			ObjectMeta: metav1.ObjectMeta{Name: "foo11"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(0)},
+					},
+				},
+			},
+		},
+		{
+			// Volume limits with positive number
+			ObjectMeta: metav1.ObjectMeta{Name: "foo11"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(1)},
+					},
+				},
+			},
+		},
+		{
 			// topology key names with -, _, and dot .
 			ObjectMeta: metav1.ObjectMeta{Name: "foo8"},
 			Spec: storage.CSINodeSpec{
@@ -1208,6 +1388,20 @@ func TestCSINodeValidation(t *testing.T) {
 			},
 		},
 		{
+			// Volume limits with negative number
+			ObjectMeta: metav1.ObjectMeta{Name: "foo11"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(-1)},
+					},
+				},
+			},
+		},
+		{
 			// topology prefix should be lower case
 			ObjectMeta: metav1.ObjectMeta{Name: "foo14"},
 			Spec: storage.CSINodeSpec{
@@ -1248,6 +1442,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 					Name:         "io.kubernetes.storage.csi.driver-2",
 					NodeID:       nodeID,
 					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 				},
 			},
 		},
@@ -1268,6 +1463,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 					},
 				},
 			},
@@ -1299,11 +1495,13 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 					},
 					{
 						Name:         "io.kubernetes.storage.csi.driver-3",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(30)},
 					},
 				},
 			},
@@ -1322,6 +1520,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.new-driver",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(30)},
 					},
 				},
 			},
@@ -1349,6 +1548,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 					},
 				},
 			},
@@ -1360,13 +1560,90 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Drivers: []storage.CSINodeDriver{
 					{
 						Name:         "io.kubernetes.storage.csi.driver-1",
-						NodeID:       "nodeB",
+						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
 					},
 					{
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to set a previously unset allocatable
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to update allocatable with a different volume limit
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(21)},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to update allocatable with an empty volume limit
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: nil},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to remove allocatable
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
 					},
 				},
 			},
@@ -1449,6 +1726,49 @@ func TestCSIDriverValidation(t *testing.T) {
 				PodInfoOnMount: &notPodInfoOnMount,
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecyclePersistent,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecycleEphemeral,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecycleEphemeral,
+					storage.VolumeLifecyclePersistent,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecycleEphemeral,
+					storage.VolumeLifecyclePersistent,
+					storage.VolumeLifecycleEphemeral,
+				},
+			},
+		},
 	}
 
 	for _, csiDriver := range successCases {
@@ -1487,10 +1807,112 @@ func TestCSIDriverValidation(t *testing.T) {
 				PodInfoOnMount: nil,
 			},
 		},
+		{
+			// invalid mode
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					"no-such-mode",
+				},
+			},
+		},
 	}
 
 	for _, csiDriver := range errorCases {
 		if errs := ValidateCSIDriver(&csiDriver); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", csiDriver)
+		}
+	}
+}
+
+func TestCSIDriverValidationUpdate(t *testing.T) {
+	driverName := "test-driver"
+	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
+	invalidName := "-invalid-@#$%^&*()-"
+	attachRequired := true
+	attachNotRequired := false
+	podInfoOnMount := true
+	notPodInfoOnMount := false
+	old := storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired: &attachNotRequired,
+			PodInfoOnMount: &notPodInfoOnMount,
+			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+				storage.VolumeLifecycleEphemeral,
+				storage.VolumeLifecyclePersistent,
+			},
+		},
+	}
+
+	// Currently there is only one success case: exactly the same
+	// as the existing object.
+	successCases := []storage.CSIDriver{old}
+	for _, csiDriver := range successCases {
+		if errs := ValidateCSIDriverUpdate(&csiDriver, &old); len(errs) != 0 {
+			t.Errorf("expected success for %+v: %v", csiDriver, errs)
+		}
+	}
+
+	errorCases := []storage.CSIDriver{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: invalidName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachRequired,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: longName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+			},
+		},
+		{
+			// AttachRequired not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: nil,
+				PodInfoOnMount: &podInfoOnMount,
+			},
+		},
+		{
+			// AttachRequired not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: nil,
+			},
+		},
+		{
+			// invalid mode
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					"no-such-mode",
+				},
+			},
+		},
+		{
+			// different modes
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecycleEphemeral,
+				},
+			},
+		},
+	}
+
+	for _, csiDriver := range errorCases {
+		if errs := ValidateCSIDriverUpdate(&csiDriver, &old); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %v", csiDriver)
 		}
 	}

@@ -14,12 +14,14 @@ import (
 	"github.com/cyphar/filepath-securejoin"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/configs/validate"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	"github.com/opencontainers/runc/libcontainer/mount"
 	"github.com/opencontainers/runc/libcontainer/utils"
+	"github.com/pkg/errors"
 
 	"golang.org/x/sys/unix"
 )
@@ -51,11 +53,34 @@ func InitArgs(args ...string) func(*LinuxFactory) error {
 // SystemdCgroups is an options func to configure a LinuxFactory to return
 // containers that use systemd to create and manage cgroups.
 func SystemdCgroups(l *LinuxFactory) error {
-	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
-		return &systemd.Manager{
-			Cgroups: config,
-			Paths:   paths,
+	systemdCgroupsManager, err := systemd.NewSystemdCgroupsManager()
+	if err != nil {
+		return err
+	}
+	l.NewCgroupsManager = systemdCgroupsManager
+	return nil
+}
+
+func getUnifiedPath(paths map[string]string) string {
+	unifiedPath := ""
+	for k, v := range paths {
+		if unifiedPath == "" {
+			unifiedPath = v
+		} else if v != unifiedPath {
+			panic(errors.Errorf("expected %q path to be unified path %q, got %q", k, unifiedPath, v))
 		}
+	}
+	// can be empty
+	return unifiedPath
+}
+
+func cgroupfs2(l *LinuxFactory, rootless bool) error {
+	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
+		m, err := fs2.NewManager(config, getUnifiedPath(paths), rootless)
+		if err != nil {
+			panic(err)
+		}
+		return m
 	}
 	return nil
 }
@@ -64,6 +89,9 @@ func SystemdCgroups(l *LinuxFactory) error {
 // that use the native cgroups filesystem implementation to create and manage
 // cgroups.
 func Cgroupfs(l *LinuxFactory) error {
+	if cgroups.IsCgroup2UnifiedMode() {
+		return cgroupfs2(l, false)
+	}
 	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
 		return &fs.Manager{
 			Cgroups: config,
@@ -80,6 +108,9 @@ func Cgroupfs(l *LinuxFactory) error {
 // during rootless container (including euid=0 in userns) setup (while still allowing cgroup usage if
 // they've been set up properly).
 func RootlessCgroupfs(l *LinuxFactory) error {
+	if cgroups.IsCgroup2UnifiedMode() {
+		return cgroupfs2(l, true)
+	}
 	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
 		return &fs.Manager{
 			Cgroups:  config,

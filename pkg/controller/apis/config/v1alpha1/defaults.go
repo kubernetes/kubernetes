@@ -23,6 +23,27 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	csrsigningconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1"
+	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
+	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
+	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
+	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
+	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
+	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
+	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
+	nodeipamconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/nodeipam/config/v1alpha1"
+	nodelifecycleconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/nodelifecycle/config/v1alpha1"
+	poautosclerconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/podautoscaler/config/v1alpha1"
+	podgcconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/podgc/config/v1alpha1"
+	replicasetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replicaset/config/v1alpha1"
+	replicationconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/replication/config/v1alpha1"
+	resourcequotaconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/resourcequota/config/v1alpha1"
+	serviceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/service/config/v1alpha1"
+	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
+	statefulsetconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/statefulset/config/v1alpha1"
+	ttlafterfinishedconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config/v1alpha1"
+	attachdetachconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config/v1alpha1"
+	persistentvolumeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config/v1alpha1"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -31,24 +52,8 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.AttachDetachController.ReconcilerSyncLoopPeriod == zero {
-		obj.AttachDetachController.ReconcilerSyncLoopPeriod = metav1.Duration{Duration: 60 * time.Second}
-	}
 	if obj.DeprecatedController.RegisterRetryCount == 0 {
 		obj.DeprecatedController.RegisterRetryCount = 10
-	}
-	if obj.NodeIPAMController.NodeCIDRMaskSize == 0 {
-		obj.NodeIPAMController.NodeCIDRMaskSize = 24
-	}
-	if obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod == zero {
-		obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
-	}
-	if obj.SAController.ConcurrentSATokenSyncs == 0 {
-		obj.SAController.ConcurrentSATokenSyncs = 5
-	}
-	if obj.TTLAfterFinishedController.ConcurrentTTLSyncs <= 0 {
-		obj.TTLAfterFinishedController.ConcurrentTTLSyncs = 5
 	}
 
 	// These defaults override the recommended defaults from the componentbaseconfigv1alpha1 package that are applied automatically
@@ -62,6 +67,48 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 
 	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
 	RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
+	// Use the default RecommendedDefaultHPAControllerConfiguration options
+	attachdetachconfigv1alpha1.RecommendedDefaultAttachDetachControllerConfiguration(&obj.AttachDetachController)
+	// Use the default RecommendedDefaultCSRSigningControllerConfiguration options
+	csrsigningconfigv1alpha1.RecommendedDefaultCSRSigningControllerConfiguration(&obj.CSRSigningController)
+	// Use the default RecommendedDefaultDaemonSetControllerConfiguration options
+	daemonconfigv1alpha1.RecommendedDefaultDaemonSetControllerConfiguration(&obj.DaemonSetController)
+	// Use the default RecommendedDefaultDeploymentControllerConfiguration options
+	deploymentconfigv1alpha1.RecommendedDefaultDeploymentControllerConfiguration(&obj.DeploymentController)
+	// Use the default RecommendedDefaultStatefulSetControllerConfiguration options
+	statefulsetconfigv1alpha1.RecommendedDefaultStatefulSetControllerConfiguration(&obj.StatefulSetController)
+	// Use the default RecommendedDefaultEndpointControllerConfiguration options
+	endpointconfigv1alpha1.RecommendedDefaultEndpointControllerConfiguration(&obj.EndpointController)
+	// Use the default RecommendedDefaultEndpointSliceControllerConfiguration options
+	endpointsliceconfigv1alpha1.RecommendedDefaultEndpointSliceControllerConfiguration(&obj.EndpointSliceController)
+	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
+	garbagecollectorconfigv1alpha1.RecommendedDefaultGarbageCollectorControllerConfiguration(&obj.GarbageCollectorController)
+	// Use the default RecommendedDefaultJobControllerConfiguration options
+	jobconfigv1alpha1.RecommendedDefaultJobControllerConfiguration(&obj.JobController)
+	// Use the default RecommendedDefaultNamespaceControllerConfiguration options
+	namespaceconfigv1alpha1.RecommendedDefaultNamespaceControllerConfiguration(&obj.NamespaceController)
+	// Use the default RecommendedDefaultNodeIPAMControllerConfiguration options
+	nodeipamconfigv1alpha1.RecommendedDefaultNodeIPAMControllerConfiguration(&obj.NodeIPAMController)
+	// Use the default RecommendedDefaultHPAControllerConfiguration options
+	poautosclerconfigv1alpha1.RecommendedDefaultHPAControllerConfiguration(&obj.HPAController)
+	// Use the default RecommendedDefaultNodeLifecycleControllerConfiguration options
+	nodelifecycleconfigv1alpha1.RecommendedDefaultNodeLifecycleControllerConfiguration(&obj.NodeLifecycleController)
+	// Use the default RecommendedDefaultPodGCControllerConfiguration options
+	podgcconfigv1alpha1.RecommendedDefaultPodGCControllerConfiguration(&obj.PodGCController)
+	// Use the default RecommendedDefaultReplicaSetControllerConfiguration options
+	replicasetconfigv1alpha1.RecommendedDefaultReplicaSetControllerConfiguration(&obj.ReplicaSetController)
+	// Use the default RecommendedDefaultReplicationControllerConfiguration options
+	replicationconfigv1alpha1.RecommendedDefaultReplicationControllerConfiguration(&obj.ReplicationController)
+	// Use the default RecommendedDefaultResourceQuotaControllerConfiguration options
+	resourcequotaconfigv1alpha1.RecommendedDefaultResourceQuotaControllerConfiguration(&obj.ResourceQuotaController)
+	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
+	serviceconfigv1alpha1.RecommendedDefaultServiceControllerConfiguration(&obj.ServiceController)
+	// Use the default RecommendedDefaultSAControllerConfiguration options
+	serviceaccountconfigv1alpha1.RecommendedDefaultSAControllerConfiguration(&obj.SAController)
+	// Use the default RecommendedDefaultTTLAfterFinishedControllerConfiguration options
+	ttlafterfinishedconfigv1alpha1.RecommendedDefaultTTLAfterFinishedControllerConfiguration(&obj.TTLAfterFinishedController)
+	// Use the default RecommendedDefaultPersistentVolumeBinderControllerConfiguration options
+	persistentvolumeconfigv1alpha1.RecommendedDefaultPersistentVolumeBinderControllerConfiguration(&obj.PersistentVolumeBinderController)
 }
 
 func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.GenericControllerManagerConfiguration) {
@@ -77,6 +124,10 @@ func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrcon
 	}
 	if len(obj.Controllers) == 0 {
 		obj.Controllers = []string{"*"}
+	}
+
+	if len(obj.LeaderElection.ResourceLock) == 0 {
+		obj.LeaderElection.ResourceLock = "endpointsleases"
 	}
 
 	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
@@ -97,173 +148,5 @@ func SetDefaults_KubeCloudSharedConfiguration(obj *kubectrlmgrconfigv1alpha1.Kub
 	}
 	if obj.RouteReconciliationPeriod == zero {
 		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}
-	}
-}
-
-func SetDefaults_ServiceControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ServiceControllerConfiguration) {
-	if obj.ConcurrentServiceSyncs == 0 {
-		obj.ConcurrentServiceSyncs = 1
-	}
-}
-
-func SetDefaults_CSRSigningControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.CSRSigningControllerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.ClusterSigningCertFile == "" {
-		obj.ClusterSigningCertFile = "/etc/kubernetes/ca/ca.pem"
-	}
-	if obj.ClusterSigningKeyFile == "" {
-		obj.ClusterSigningKeyFile = "/etc/kubernetes/ca/ca.key"
-	}
-	if obj.ClusterSigningDuration == zero {
-		obj.ClusterSigningDuration = metav1.Duration{Duration: 365 * 24 * time.Hour}
-	}
-}
-
-func SetDefaults_DeploymentControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.DeploymentControllerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.ConcurrentDeploymentSyncs == 0 {
-		obj.ConcurrentDeploymentSyncs = 5
-	}
-	if obj.DeploymentControllerSyncPeriod == zero {
-		obj.DeploymentControllerSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
-	}
-}
-
-func SetDefaults_DaemonSetControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.DaemonSetControllerConfiguration) {
-	if obj.ConcurrentDaemonSetSyncs == 0 {
-		obj.ConcurrentDaemonSetSyncs = 2
-	}
-}
-
-func SetDefaults_EndpointControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.EndpointControllerConfiguration) {
-	if obj.ConcurrentEndpointSyncs == 0 {
-		obj.ConcurrentEndpointSyncs = 5
-	}
-}
-
-func SetDefaults_GarbageCollectorControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.GarbageCollectorControllerConfiguration) {
-	if obj.EnableGarbageCollector == nil {
-		obj.EnableGarbageCollector = utilpointer.BoolPtr(true)
-	}
-	if obj.ConcurrentGCSyncs == 0 {
-		obj.ConcurrentGCSyncs = 20
-	}
-}
-
-func SetDefaults_HPAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.HPAControllerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.HorizontalPodAutoscalerUseRESTClients == nil {
-		obj.HorizontalPodAutoscalerUseRESTClients = utilpointer.BoolPtr(true)
-	}
-	if obj.HorizontalPodAutoscalerSyncPeriod == zero {
-		obj.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
-	}
-	if obj.HorizontalPodAutoscalerUpscaleForbiddenWindow == zero {
-		obj.HorizontalPodAutoscalerUpscaleForbiddenWindow = metav1.Duration{Duration: 3 * time.Minute}
-	}
-	if obj.HorizontalPodAutoscalerDownscaleStabilizationWindow == zero {
-		obj.HorizontalPodAutoscalerDownscaleStabilizationWindow = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.HorizontalPodAutoscalerCPUInitializationPeriod == zero {
-		obj.HorizontalPodAutoscalerCPUInitializationPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.HorizontalPodAutoscalerInitialReadinessDelay == zero {
-		obj.HorizontalPodAutoscalerInitialReadinessDelay = metav1.Duration{Duration: 30 * time.Second}
-	}
-	if obj.HorizontalPodAutoscalerDownscaleForbiddenWindow == zero {
-		obj.HorizontalPodAutoscalerDownscaleForbiddenWindow = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.HorizontalPodAutoscalerTolerance == 0 {
-		obj.HorizontalPodAutoscalerTolerance = 0.1
-	}
-}
-
-func SetDefaults_JobControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.JobControllerConfiguration) {
-	if obj.ConcurrentJobSyncs == 0 {
-		obj.ConcurrentJobSyncs = 5
-	}
-}
-
-func SetDefaults_NamespaceControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.NamespaceControllerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.ConcurrentNamespaceSyncs == 0 {
-		obj.ConcurrentNamespaceSyncs = 10
-	}
-	if obj.NamespaceSyncPeriod == zero {
-		obj.NamespaceSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-}
-
-func SetDefaults_NodeLifecycleControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.NodeLifecycleControllerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.PodEvictionTimeout == zero {
-		obj.PodEvictionTimeout = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.NodeMonitorGracePeriod == zero {
-		obj.NodeMonitorGracePeriod = metav1.Duration{Duration: 40 * time.Second}
-	}
-	if obj.NodeStartupGracePeriod == zero {
-		obj.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
-	}
-	if obj.EnableTaintManager == nil {
-		obj.EnableTaintManager = utilpointer.BoolPtr(true)
-	}
-}
-
-func SetDefaults_PodGCControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.PodGCControllerConfiguration) {
-	if obj.TerminatedPodGCThreshold == 0 {
-		obj.TerminatedPodGCThreshold = 12500
-	}
-}
-
-func SetDefaults_ReplicaSetControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ReplicaSetControllerConfiguration) {
-	if obj.ConcurrentRSSyncs == 0 {
-		obj.ConcurrentRSSyncs = 5
-	}
-}
-
-func SetDefaults_ReplicationControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ReplicationControllerConfiguration) {
-	if obj.ConcurrentRCSyncs == 0 {
-		obj.ConcurrentRCSyncs = 5
-	}
-}
-
-func SetDefaults_ResourceQuotaControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ResourceQuotaControllerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.ConcurrentResourceQuotaSyncs == 0 {
-		obj.ConcurrentResourceQuotaSyncs = 5
-	}
-	if obj.ResourceQuotaSyncPeriod == zero {
-		obj.ResourceQuotaSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-}
-
-func SetDefaults_PersistentVolumeRecyclerConfiguration(obj *kubectrlmgrconfigv1alpha1.PersistentVolumeRecyclerConfiguration) {
-	if obj.MaximumRetry == 0 {
-		obj.MaximumRetry = 3
-	}
-	if obj.MinimumTimeoutNFS == 0 {
-		obj.MinimumTimeoutNFS = 300
-	}
-	if obj.IncrementTimeoutNFS == 0 {
-		obj.IncrementTimeoutNFS = 30
-	}
-	if obj.MinimumTimeoutHostPath == 0 {
-		obj.MinimumTimeoutHostPath = 60
-	}
-	if obj.IncrementTimeoutHostPath == 0 {
-		obj.IncrementTimeoutHostPath = 30
-	}
-}
-
-func SetDefaults_VolumeConfiguration(obj *kubectrlmgrconfigv1alpha1.VolumeConfiguration) {
-	if obj.EnableHostPathProvisioning == nil {
-		obj.EnableHostPathProvisioning = utilpointer.BoolPtr(false)
-	}
-	if obj.EnableDynamicProvisioning == nil {
-		obj.EnableDynamicProvisioning = utilpointer.BoolPtr(true)
-	}
-	if obj.FlexVolumePluginDir == "" {
-		obj.FlexVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 	}
 }

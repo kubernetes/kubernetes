@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	"sigs.k8s.io/kustomize/pkg/ifc"
 	internal "sigs.k8s.io/kustomize/pkg/internal/error"
@@ -94,10 +95,14 @@ func (rf *Factory) SliceFromBytes(in []byte) ([]*Resource, error) {
 	for len(kunStructs) > 0 {
 		u := kunStructs[0]
 		kunStructs = kunStructs[1:]
-		if u.GetKind() == "List" {
+		if strings.HasSuffix(u.GetKind(), "List") {
 			items := u.Map()["items"]
 			itemsSlice, ok := items.([]interface{})
 			if !ok {
+				if items == nil {
+					// an empty list
+					continue
+				}
 				return nil, fmt.Errorf("items in List is type %T, expected array", items)
 			}
 			for _, item := range itemsSlice {

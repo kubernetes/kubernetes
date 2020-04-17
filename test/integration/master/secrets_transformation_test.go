@@ -90,6 +90,10 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 			t.Errorf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
 			continue
 		}
+		test.secret, err = test.createSecret(testSecret, testNamespace)
+		if err != nil {
+			t.Fatalf("Failed to create test secret, error: %v", err)
+		}
 		test.run(tt.unSealFunc, tt.transformerPrefix)
 		test.cleanUp()
 	}

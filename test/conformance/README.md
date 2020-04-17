@@ -8,8 +8,8 @@ require review by sig-architecture.
 To update the list, run
 
 ```console
-$ bazel build //test/conformance:list_conformance_tests
-$ cp bazel-genfiles/test/conformance/conformance.txt test/conformance/testdata
+bazel build //test/conformance:list_conformance_tests
+cp bazel-bin/test/conformance/conformance.yaml test/conformance/testdata
 ```
 
 Add the changed file to your PR, then send for review.

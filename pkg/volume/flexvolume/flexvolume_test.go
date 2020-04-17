@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"text/template"
 
@@ -74,70 +74,17 @@ exit 1
 echo -n $@ &> {{.OutputFile}}
 `
 
-const execScriptTempl2 = `#!/usr/bin/env bash
-if [ "$1" == "init" -a $# -eq 1 ]; then
-  echo -n '{
-    "status": "Success"
-  }'
-  exit 0
-fi
-
-if [ "$1" == "getvolumename" -a $# -eq 2 ]; then
-  echo -n '{
-    "status": "Success",
-    "volumeName": "fakevolume"
-  }'
-  exit 0
-elif [ "$1" == "mount" -a $# -eq 4 ]; then
-  PATH=$2
-  /bin/mkdir -p $PATH
-  if [ $? -ne 0 ]; then
-    echo -n '{
-      "status": "Failure",
-      "reason": "Failed to create $PATH"
-    }'
-    exit 1
-  fi
-  echo -n '{
-    "status": "Success"
-  }'
-  exit 0
-elif [ "$1" == "unmount" -a $# -eq 2 ]; then
-  PATH=$2
-  /bin/rm -r $PATH
-  if [ $? -ne 0 ]; then
-    echo -n '{
-      "status": "Failure",
-      "reason": "Failed to cleanup $PATH"
-    }'
-    exit 1
-  fi
-  echo -n '{
-    "status": "Success"
-  }'
-  exit 0
-fi
-
-echo -n '{
-  "status": "Not Supported"
-}'
-exit 1
-
-# Direct the arguments to a file to be tested against later
-echo -n $@ &> {{.OutputFile}}
-`
-
 func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, execScriptTempl string, execTemplateData *map[string]interface{}) {
 	vendoredName := plugName
 	if vendorName != "" {
 		vendoredName = fmt.Sprintf("%s~%s", vendorName, plugName)
 	}
-	pluginDir := path.Join(tmpDir, vendoredName)
+	pluginDir := filepath.Join(tmpDir, vendoredName)
 	err := os.MkdirAll(pluginDir, 0777)
 	if err != nil {
 		t.Errorf("Failed to create plugin: %v", err)
 	}
-	pluginExec := path.Join(pluginDir, plugName)
+	pluginExec := filepath.Join(pluginDir, plugName)
 	f, err := os.Create(pluginExec)
 	if err != nil {
 		t.Errorf("Failed to install plugin")
@@ -149,7 +96,7 @@ func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, e
 	if execTemplateData == nil {
 		execTemplateData = &map[string]interface{}{
 			"DevicePath": "/dev/sdx",
-			"OutputFile": path.Join(pluginDir, plugName+".out"),
+			"OutputFile": filepath.Join(pluginDir, plugName+".out"),
 		}
 	}
 
@@ -176,12 +123,12 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	runner := exec.New()
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost("fake", nil, nil))
-	plugin, err := plugMgr.FindPluginByName("flexvolume-kubernetes.io/fakeAttacher")
+	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost(t, "fake", nil, nil))
+	plugin, err := plugMgr.FindPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
 	}
-	if plugin.GetPluginName() != "flexvolume-kubernetes.io/fakeAttacher" {
+	if plugin.GetPluginName() != "kubernetes.io/fakeAttacher" {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
 	}
 	if !plugin.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{FlexVolume: &v1.FlexVolumeSource{Driver: "kubernetes.io/fakeAttacher"}}}}) {
@@ -205,9 +152,9 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	runner := exec.New()
 	installPluginUnderTest(t, "kubernetes.io", "fakeAttacher", tmpDir, execScriptTempl1, nil)
-	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(nil, GetDynamicPluginProber(tmpDir, runner), volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
-	plugin, err := plugMgr.FindPersistentPluginByName("flexvolume-kubernetes.io/fakeAttacher")
+	plugin, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fakeAttacher")
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
 	}

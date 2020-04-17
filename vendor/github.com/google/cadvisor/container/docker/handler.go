@@ -25,11 +25,11 @@ import (
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
+	dockerutil "github.com/google/cadvisor/container/docker/utils"
 	containerlibcontainer "github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	dockerutil "github.com/google/cadvisor/utils/docker"
 	"github.com/google/cadvisor/zfs"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -51,7 +51,6 @@ const (
 )
 
 type dockerContainerHandler struct {
-
 	// machineInfoFactory provides info.MachineInfo
 	machineInfoFactory info.MachineInfoFactory
 
@@ -253,11 +252,16 @@ func newDockerContainerHandler(
 
 	// split env vars to get metadata map.
 	for _, exposedEnv := range metadataEnvs {
+		if exposedEnv == "" {
+			// if no dockerEnvWhitelist provided, len(metadataEnvs) == 1, metadataEnvs[0] == ""
+			continue
+		}
+
 		for _, envVar := range ctnr.Config.Env {
 			if envVar != "" {
 				splits := strings.SplitN(envVar, "=", 2)
-				if len(splits) == 2 && splits[0] == exposedEnv {
-					handler.envs[strings.ToLower(exposedEnv)] = splits[1]
+				if len(splits) == 2 && strings.HasPrefix(splits[0], exposedEnv) {
+					handler.envs[strings.ToLower(splits[0])] = splits[1]
 				}
 			}
 		}

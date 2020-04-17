@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -31,19 +31,9 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
-# Handle case where OS has sha#sum commands, instead of shasum.
-if which shasum >/dev/null 2>&1; then
-  SHA1SUM="shasum -a1"
-elif which sha1sum >/dev/null 2>&1; then
-  SHA1SUM="sha1sum"
-else
-  echo "Failed to find shasum or sha1sum utility." >&2
-  exit 1
-fi
-
 kube::test::find_dirs() {
   (
-    cd ${KUBE_ROOT}
+    cd "${KUBE_ROOT}"
     find -L . -not \( \
         \( \
           -path './_artifacts/*' \
@@ -65,58 +55,22 @@ kube::test::find_dirs() {
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
 
-    find -L . \
-        -path './_output' -prune \
-        -o -path './vendor/k8s.io/client-go/*' \
-        -o -path './vendor/k8s.io/apiserver/*' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
-
-    # run tests for client-go
-    find ./staging/src/k8s.io/client-go -name '*_test.go' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
-
-    # run tests for apiserver
-    find ./staging/src/k8s.io/apiserver -name '*_test.go' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
-
-    # run tests for apimachinery
-    find ./staging/src/k8s.io/apimachinery -name '*_test.go' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
-
-    find ./staging/src/k8s.io/kube-aggregator -name '*_test.go' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
-
-    find ./staging/src/k8s.io/apiextensions-apiserver -not \( \
-        \( \
-          -path '*/test/integration/*' \
-        \) -prune \
-      \) -name '*_test.go' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
-
-    find ./staging/src/k8s.io/sample-apiserver -name '*_test.go' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
-
-    find ./staging/src/k8s.io/cli-runtime -name '*_test.go' \
-      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+    find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
   )
 }
 
-KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 120s}
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
+# The directory to save test coverage reports to, if generating them. If unset,
+# a semi-predictable temporary directory will be used.
+KUBE_COVER_REPORT_DIR="${KUBE_COVER_REPORT_DIR:-}"
 # How many 'go test' instances to run simultaneously when running tests in
 # coverage mode.
 KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
-# Lists of API Versions of each groups that should be tested, groups are
-# separated by comma, lists are separated by semicolon. e.g.,
-# "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
-# FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
-# ONLY the last version is tested in each group.
-ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$)
-KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
@@ -161,12 +115,12 @@ while getopts "hp:i:" opt ; do
       kube::test::usage
       exit 1
       ;;
-    ?)
+    :)
+      kube::log::usage "Option -${OPTARG} <value>"
       kube::test::usage
       exit 1
       ;;
-    :)
-      kube::log::usage "Option -${OPTARG} <value>"
+    ?)
       kube::test::usage
       exit 1
       ;;
@@ -175,15 +129,17 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
+testargs=()
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
 
-# The go-junit-report tool needs full test case information to produce a
+# The junit report tool needs full test case information to produce a
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   goflags+=(-v)
+  goflags+=(-json)
   # Show only summary lines by matching lines like "status package/test"
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
@@ -202,9 +158,13 @@ for arg; do
   fi
 done
 if [[ ${#testcases[@]} -eq 0 ]]; then
-  testcases=($(kube::test::find_dirs))
+  while IFS='' read -r line; do testcases+=("$line"); done < <(kube::test::find_dirs)
 fi
 set -- "${testcases[@]+${testcases[@]}}"
+
+if [[ -n "${KUBE_RACE}" ]] ; then
+  goflags+=("${KUBE_RACE}")
+fi
 
 junitFilenamePrefix() {
   if [[ -z "${KUBE_JUNIT_REPORT_DIR}" ]]; then
@@ -212,13 +172,7 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  # This filename isn't parsed by anything, and we must avoid
-  # exceeding 255 character filename limit. KUBE_TEST_API
-  # barely fits there and in coverage mode test names are
-  # appended to generated file names, easily exceeding
-  # 255 chars in length. So let's just use a sha1 hash of it.
-  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
-  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_HASH}_$(kube::util::sortable_date)"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
 verifyAndSuggestPackagePath() {
@@ -235,7 +189,8 @@ verifyAndSuggestPackagePath() {
     # Because k8s sets a localized $GOPATH for testing, seeing the actual
     # directory can be confusing. Instead, just show $GOPATH if it exists in the
     # $specified_package_path.
-    local printable_package_path=$(echo "${specified_package_path}" | sed "s|${GOPATH}|\${GOPATH}|")
+    local printable_package_path
+    printable_package_path=${specified_package_path//${GOPATH}/\$\{GOPATH\}}
     kube::log::error "specified test path '${printable_package_path}' does not exist"
 
     if [ -d "${alternative_package_path}" ]; then
@@ -246,7 +201,7 @@ verifyAndSuggestPackagePath() {
 }
 
 verifyPathsToPackagesUnderTest() {
-  local packages_under_test=($@)
+  local packages_under_test=("$@")
 
   for package_path in "${packages_under_test[@]}"; do
     local local_package_path="${package_path}"
@@ -266,19 +221,19 @@ produceJUnitXMLReport() {
     return
   fi
 
-  local test_stdout_filenames
   local junit_xml_filename
-  test_stdout_filenames=$(ls ${junit_filename_prefix}*.stdout)
   junit_xml_filename="${junit_filename_prefix}.xml"
-  if ! command -v go-junit-report >/dev/null 2>&1; then
-    kube::log::error "go-junit-report not found; please install with " \
-      "go get -u github.com/jstemmer/go-junit-report"
+
+  if ! command -v gotestsum >/dev/null 2>&1; then
+    kube::log::error "gotestsum not found; please install with " \
+      "GO111MODULE=off go install k8s.io/kubernetes/vendor/gotest.tools/gotestsum"
     return
   fi
-  cat ${test_stdout_filenames} | go-junit-report > "${junit_xml_filename}"
+  gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
-    rm ${test_stdout_filenames}
+    rm "${junit_filename_prefix}"*.stdout
   fi
+
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
@@ -293,7 +248,7 @@ runTests() {
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
-      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@}" \
+     "${KUBE_TIMEOUT}" "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
      | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
@@ -302,8 +257,11 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
+  if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
+    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+  else
+    cover_report_dir="${KUBE_COVER_REPORT_DIR}"
+  fi
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
@@ -324,21 +282,20 @@ runTests() {
   # vendor/k8s.io/client-go/1.4/rest: causes cover internal errors
   #                            https://github.com/golang/go/issues/16540
   cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
-  for path in $(echo ${cover_ignore_dirs} | sed 's/|/ /g'); do
+  for path in ${cover_ignore_dirs//|/ }; do
       echo -e "skipped\tk8s.io/kubernetes/${path}"
   done
 
   printf "%s\n" "${@}" \
     | grep -Ev ${cover_ignore_dirs} \
-    | xargs -I{} -n 1 -P ${KUBE_COVERPROCS} \
+    | xargs -I{} -n 1 -P "${KUBE_COVERPROCS}" \
     bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
-      go test ${goflags[@]:+${goflags[@]}} \
-        ${KUBE_RACE} \
+      go test ${goflags[*]:+${goflags[*]}} \
         ${KUBE_TIMEOUT} \
         -cover -covermode=\"${KUBE_COVERMODE}\" \
         -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
         \"\${_pkg}\" \
-        ${testargs[@]:+${testargs[@]}} \
+        ${testargs[*]:+${testargs[*]}} \
       | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
       | grep \"${go_test_grep_pattern}\"" \
     {} \
@@ -356,9 +313,9 @@ runTests() {
 
     # Include all coverage reach data in the combined profile, but exclude the
     # 'mode' lines, as there should be only one.
-    for x in `find "${cover_report_dir}" -name "${cover_profile}"`; do
-      cat ${x} | grep -h -v "^mode:" || true
-    done
+    while IFS='' read -r x; do
+      grep -h -v "^mode:" < "${x}" || true
+    done < <(find "${cover_report_dir}" -name "${cover_profile}")
   } >"${COMBINED_COVER_PROFILE}"
 
   coverage_html_file="${cover_report_dir}/combined-coverage.html"
@@ -381,7 +338,8 @@ reportCoverageToCoveralls() {
 checkFDs() {
   # several unittests panic when httptest cannot open more sockets
   # due to the low default files limit on OS X.  Warn about low limit.
-  local fileslimit="$(ulimit -n)"
+  local fileslimit
+  fileslimit="$(ulimit -n)"
   if [[ ${fileslimit} -lt 1000 ]]; then
     echo "WARNING: ulimit -n (files) should be at least 1000, is ${fileslimit}, may cause test failure";
   fi
@@ -389,16 +347,7 @@ checkFDs() {
 
 checkFDs
 
-
-# Convert the CSVs to arrays.
-IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-apiVersionsCount=${#apiVersions[@]}
-for (( i=0; i<${apiVersionsCount}; i++ )); do
-  apiVersion=${apiVersions[i]}
-  echo "Running tests for APIVersion: ${apiVersion}"
-  # KUBE_TEST_API sets the version of each group to be tested.
-  KUBE_TEST_API="${apiVersion}" runTests "$@"
-done
+runTests "$@"
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.

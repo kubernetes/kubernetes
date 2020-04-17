@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,11 +30,12 @@ import (
 )
 
 // NewTestServer returns a webhook test HTTPS server with fixed webhook test certs.
-func NewTestServer(t *testing.T) *httptest.Server {
+func NewTestServer(t testing.TB) *httptest.Server {
 	// Create the test webhook server
 	sCert, err := tls.X509KeyPair(testcerts.ServerCert, testcerts.ServerKey)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		t.FailNow()
 	}
 	rootCAs := x509.NewCertPool()
 	rootCAs.AppendCertsFromPEM(testcerts.CACert)
@@ -49,7 +49,7 @@ func NewTestServer(t *testing.T) *httptest.Server {
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("got req: %v\n", r.URL.Path)
+	// fmt.Printf("got req: %v\n", r.URL.Path)
 	switch r.URL.Path {
 	case "/internalErr":
 		http.Error(w, "webhook internal server error", http.StatusInternalServerError)
@@ -66,6 +66,9 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
 			Response: &v1beta1.AdmissionResponse{
 				Allowed: false,
+				Result: &metav1.Status{
+					Code: http.StatusForbidden,
+				},
 			},
 		})
 	case "/disallowReason":
@@ -75,6 +78,18 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Allowed: false,
 				Result: &metav1.Status{
 					Message: "you shall not pass",
+					Code:    http.StatusForbidden,
+				},
+			},
+		})
+	case "/shouldNotBeCalled":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Message: "doesn't expect labels to match object selector",
+					Code:    http.StatusForbidden,
 				},
 			},
 		})
@@ -132,6 +147,13 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				AuditAnnotations: map[string]string{
 					"invalid*key": "value1",
 				},
+			},
+		})
+	case "/noop":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: true,
 			},
 		})
 	default:

@@ -111,7 +111,7 @@ type VolumeSource struct {
 	// +optional
 	FlexVolume *FlexVolumeSource
 
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
+	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
 	// +optional
 	Cinder *CinderVolumeSource
 
@@ -154,9 +154,12 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
+	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver (Alpha feature).
+	// +optional
+	CSI *CSIVolumeSource
 }
 
-// Similar to VolumeSource but meant for the administrator who creates PVs.
+// PersistentVolumeSource is similar to VolumeSource but meant for the administrator who creates PVs.
 // Exactly one of its members must be set.
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
@@ -193,7 +196,7 @@ type PersistentVolumeSource struct {
 	// provisioned/attached using an exec based plugin.
 	// +optional
 	FlexVolume *FlexPersistentVolumeSource
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine
+	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
 	// +optional
 	Cinder *CinderPersistentVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
@@ -226,14 +229,15 @@ type PersistentVolumeSource struct {
 	// +optional
 	Local *LocalVolumeSource
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
+	// More info: https://examples.k8s.io/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
-	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver.
+	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver.
 	// +optional
 	CSI *CSIPersistentVolumeSource
 }
 
+// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
 type PersistentVolumeClaimVolumeSource struct {
 	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume
 	ClaimName string
@@ -252,10 +256,9 @@ const (
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PersistentVolume struct captures the details of the implementation of PV storage
 type PersistentVolume struct {
 	metav1.TypeMeta
 	// +optional
@@ -270,6 +273,7 @@ type PersistentVolume struct {
 	Status PersistentVolumeStatus
 }
 
+// PersistentVolumeSpec has most of the details required to define a persistent volume
 type PersistentVolumeSpec struct {
 	// Resources represents the actual resources of the volume
 	Capacity ResourceList
@@ -298,7 +302,6 @@ type PersistentVolumeSpec struct {
 	MountOptions []string
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -339,6 +342,7 @@ const (
 	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
 )
 
+// PersistentVolumeStatus represents the status of PV storage
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	// +optional
@@ -353,6 +357,7 @@ type PersistentVolumeStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PersistentVolumeList represents a list of PVs
 type PersistentVolumeList struct {
 	metav1.TypeMeta
 	// +optional
@@ -360,7 +365,6 @@ type PersistentVolumeList struct {
 	Items []PersistentVolume
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -380,6 +384,7 @@ type PersistentVolumeClaim struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// PersistentVolumeClaimList represents the list of PV claims
 type PersistentVolumeClaimList struct {
 	metav1.TypeMeta
 	// +optional
@@ -410,14 +415,17 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string
 	// volumeMode defines what type of volume is required by the claim.
 	// Value of Filesystem is implied when not included in claim spec.
-	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
-	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
-	// enabled and currently VolumeSnapshot is the only supported data source.
-	// If the provisioner can support VolumeSnapshot data source, it will create
-	// a new volume and data will be restored to the volume at the same time.
-	// If the provisioner does not support VolumeSnapshot data source, volume will
+	// This field can be used to specify either:
+	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot - Beta)
+	// * An existing PVC (PersistentVolumeClaim)
+	// * An existing custom resource/object that implements data population (Alpha)
+	// In order to use VolumeSnapshot object types, the appropriate feature gate
+	// must be enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
+	// If the provisioner or an external controller can support the specified data source,
+	// it will create a new volume based on the contents of the specified data source.
+	// If the specified data source is not supported, the volume will
 	// not be created and the failure will be reported as an event.
 	// In the future, we plan to support more data source types and the behavior
 	// of the provisioner may change.
@@ -425,6 +433,8 @@ type PersistentVolumeClaimSpec struct {
 	DataSource *TypedLocalObjectReference
 }
 
+// PersistentVolumeClaimConditionType defines the condition of PV claim.
+// Valid values are either "Resizing" or "FileSystemResizePending".
 type PersistentVolumeClaimConditionType string
 
 // These are valid conditions of Pvc
@@ -435,6 +445,7 @@ const (
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
 )
 
+// PersistentVolumeClaimCondition represents the current condition of PV claim
 type PersistentVolumeClaimCondition struct {
 	Type   PersistentVolumeClaimConditionType
 	Status ConditionStatus
@@ -448,6 +459,7 @@ type PersistentVolumeClaimCondition struct {
 	Message string
 }
 
+// PersistentVolumeClaimStatus represents the status of PV claim
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	// +optional
@@ -462,8 +474,10 @@ type PersistentVolumeClaimStatus struct {
 	Conditions []PersistentVolumeClaimCondition
 }
 
+// PersistentVolumeAccessMode defines various access modes for PV.
 type PersistentVolumeAccessMode string
 
+// These are the valid values for PersistentVolumeAccessMode
 const (
 	// can be mounted read/write mode to exactly 1 host
 	ReadWriteOnce PersistentVolumeAccessMode = "ReadWriteOnce"
@@ -473,8 +487,10 @@ const (
 	ReadWriteMany PersistentVolumeAccessMode = "ReadWriteMany"
 )
 
+// PersistentVolumePhase defines the phase in which a PV is
 type PersistentVolumePhase string
 
+// These are the valid values for PersistentVolumePhase
 const (
 	// used for PersistentVolumes that are not available
 	VolumePending PersistentVolumePhase = "Pending"
@@ -491,8 +507,10 @@ const (
 	VolumeFailed PersistentVolumePhase = "Failed"
 )
 
+// PersistentVolumeClaimPhase defines the phase of PV claim
 type PersistentVolumeClaimPhase string
 
+// These are the valid value for PersistentVolumeClaimPhase
 const (
 	// used for PersistentVolumeClaims that are not yet bound
 	ClaimPending PersistentVolumeClaimPhase = "Pending"
@@ -504,8 +522,10 @@ const (
 	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
 
+// HostPathType defines the type of host path for PV
 type HostPathType string
 
+// These are the valid values for HostPathType
 const (
 	// For backwards compatible, leave it empty if unset
 	HostPathUnset HostPathType = ""
@@ -527,7 +547,7 @@ const (
 	HostPathBlockDev HostPathType = "BlockDevice"
 )
 
-// Represents a host path mapped into a pod.
+// HostPathVolumeSource represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
 	// If the path is a symlink, it will follow the link to the real path.
@@ -536,7 +556,7 @@ type HostPathVolumeSource struct {
 	Type *HostPathType
 }
 
-// Represents an empty directory for a pod.
+// EmptyDirVolumeSource represents an empty directory for a pod.
 // Empty directory volumes support ownership management and SELinux relabeling.
 type EmptyDirVolumeSource struct {
 	// TODO: Longer term we want to represent the selection of underlying
@@ -560,10 +580,12 @@ type EmptyDirVolumeSource struct {
 // StorageMedium defines ways that storage can be allocated to a volume.
 type StorageMedium string
 
+// These are the valid value for StorageMedium
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
-	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
+	StorageMediumDefault         StorageMedium = ""           // use whatever the default is for the node
+	StorageMediumMemory          StorageMedium = "Memory"     // use memory (tmpfs)
+	StorageMediumHugePages       StorageMedium = "HugePages"  // use hugepages
+	StorageMediumHugePagesPrefix StorageMedium = "HugePages-" // prefix for full medium notation HugePages-<size>
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -578,7 +600,7 @@ const (
 	ProtocolSCTP Protocol = "SCTP"
 )
 
-// Represents a Persistent Disk resource in Google Compute Engine.
+// GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist before mounting to a container. The disk must
 // also be in the same GCE project and zone as the kubelet. A GCE PD
@@ -604,7 +626,7 @@ type GCEPersistentDiskVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents an ISCSI disk.
+// ISCSIVolumeSource represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
 type ISCSIVolumeSource struct {
@@ -700,7 +722,7 @@ type ISCSIPersistentVolumeSource struct {
 	InitiatorName *string
 }
 
-// Represents a Fibre Channel volume.
+// FCVolumeSource represents a Fibre Channel volume.
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSource struct {
@@ -752,7 +774,7 @@ type FlexPersistentVolumeSource struct {
 	Options map[string]string
 }
 
-// FlexVolume represents a generic volume resource that is
+// FlexVolumeSource represents a generic volume resource that is
 // provisioned/attached using an exec based plugin.
 type FlexVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
@@ -778,7 +800,7 @@ type FlexVolumeSource struct {
 	Options map[string]string
 }
 
-// Represents a Persistent Disk resource in AWS.
+// AWSElasticBlockStoreVolumeSource represents a Persistent Disk resource in AWS.
 //
 // An AWS EBS disk must exist before mounting to a container. The disk
 // must also be in the same AWS zone as the kubelet. An AWS EBS disk
@@ -804,7 +826,7 @@ type AWSElasticBlockStoreVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents a volume that is populated with the contents of a git repository.
+// GitRepoVolumeSource represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
 //
@@ -826,7 +848,7 @@ type GitRepoVolumeSource struct {
 	// TODO: Consider credentials here.
 }
 
-// Adapts a Secret into a volume.
+// SecretVolumeSource adapts a Secret into a volume.
 //
 // The contents of the target Secret's Data field will be presented in a volume
 // as files using the keys in the Data field as the file names.
@@ -856,7 +878,7 @@ type SecretVolumeSource struct {
 	Optional *bool
 }
 
-// Adapts a secret into a projected volume.
+// SecretProjection adapts a secret into a projected volume.
 //
 // The contents of the target Secret's Data field will be presented in a
 // projected volume as files using the keys in the Data field as the file names.
@@ -878,7 +900,7 @@ type SecretProjection struct {
 	Optional *bool
 }
 
-// Represents an NFS mount that lasts the lifetime of a pod.
+// NFSVolumeSource represents an NFS mount that lasts the lifetime of a pod.
 // NFS volumes do not support ownership management or SELinux relabeling.
 type NFSVolumeSource struct {
 	// Server is the hostname or IP address of the NFS server
@@ -893,7 +915,7 @@ type NFSVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents a Quobyte mount that lasts the lifetime of a pod.
+// QuobyteVolumeSource represents a Quobyte mount that lasts the lifetime of a pod.
 // Quobyte volumes do not support ownership management or SELinux relabeling.
 type QuobyteVolumeSource struct {
 	// Registry represents a single or multiple Quobyte Registry services
@@ -925,7 +947,7 @@ type QuobyteVolumeSource struct {
 	Tenant string
 }
 
-// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// GlusterfsVolumeSource represents a Glusterfs mount that lasts the lifetime of a pod.
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 type GlusterfsVolumeSource struct {
 	// Required: EndpointsName is the endpoint name that details Glusterfs topology
@@ -940,31 +962,31 @@ type GlusterfsVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents a Glusterfs mount that lasts the lifetime of a pod.
+// GlusterfsPersistentVolumeSource represents a Glusterfs mount that lasts the lifetime of a pod.
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 type GlusterfsPersistentVolumeSource struct {
 	// EndpointsName is the endpoint name that details Glusterfs topology.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	EndpointsName string
 
 	// Path is the Glusterfs volume path.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	Path string
 
 	// ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
 	// Defaults to false.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	// +optional
 	ReadOnly bool
 
 	// EndpointsNamespace is the namespace that contains Glusterfs endpoint.
 	// If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
-	// More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	// +optional
 	EndpointsNamespace *string
 }
 
-// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBDVolumeSource represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDVolumeSource struct {
 	// Required: CephMonitors is a collection of Ceph monitors
@@ -995,7 +1017,7 @@ type RBDVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBDPersistentVolumeSource represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDPersistentVolumeSource struct {
 	// Required: CephMonitors is a collection of Ceph monitors
@@ -1026,12 +1048,12 @@ type RBDPersistentVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents a cinder volume resource in Openstack. A Cinder volume
+// CinderVolumeSource represents a cinder volume resource in Openstack. A Cinder volume
 // must exist before mounting to a container. The volume must also be
 // in the same region as the kubelet. Cinder volumes support ownership
 // management and SELinux relabeling.
 type CinderVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
+	// Unique id of the volume used to identify the cinder volume.
 	VolumeID string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1048,12 +1070,12 @@ type CinderVolumeSource struct {
 	SecretRef *LocalObjectReference
 }
 
-// Represents a cinder volume resource in Openstack. A Cinder volume
+// CinderPersistentVolumeSource represents a cinder volume resource in Openstack. A Cinder volume
 // must exist before mounting to a container. The volume must also be
 // in the same region as the kubelet. Cinder volumes support ownership
 // management and SELinux relabeling.
 type CinderPersistentVolumeSource struct {
-	// Unique id of the volume used to identify the cinder volume
+	// Unique id of the volume used to identify the cinder volume.
 	VolumeID string
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1070,7 +1092,7 @@ type CinderPersistentVolumeSource struct {
 	SecretRef *SecretReference
 }
 
-// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// CephFSVolumeSource represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
@@ -1104,7 +1126,7 @@ type SecretReference struct {
 	Namespace string
 }
 
-// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// CephFSPersistentVolumeSource represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSPersistentVolumeSource struct {
 	// Required: Monitors is a collection of Ceph monitors
@@ -1127,7 +1149,7 @@ type CephFSPersistentVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents a Flocker volume mounted by the Flocker agent.
+// FlockerVolumeSource represents a Flocker volume mounted by the Flocker agent.
 // One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
 type FlockerVolumeSource struct {
@@ -1140,7 +1162,7 @@ type FlockerVolumeSource struct {
 	DatasetUUID string
 }
 
-// Represents a volume containing downward API info.
+// DownwardAPIVolumeSource represents a volume containing downward API info.
 // Downward API volumes support ownership management and SELinux relabeling.
 type DownwardAPIVolumeSource struct {
 	// Items is a list of DownwardAPIVolume file
@@ -1155,7 +1177,7 @@ type DownwardAPIVolumeSource struct {
 	DefaultMode *int32
 }
 
-// Represents a single file containing information from the downward API
+// DownwardAPIVolumeFile represents a single file containing information from the downward API
 type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string
@@ -1174,7 +1196,7 @@ type DownwardAPIVolumeFile struct {
 	Mode *int32
 }
 
-// Represents downward API info for projecting into a projected volume.
+// DownwardAPIProjection represents downward API info for projecting into a projected volume.
 // Note that this is identical to a downwardAPI volume source without the default
 // mode.
 type DownwardAPIProjection struct {
@@ -1183,7 +1205,7 @@ type DownwardAPIProjection struct {
 	Items []DownwardAPIVolumeFile
 }
 
-// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+// AzureFileVolumeSource azureFile represents an Azure File Service mount on the host and bind mount to the pod.
 type AzureFileVolumeSource struct {
 	// the name of secret that contains Azure Storage Account Name and Key
 	SecretName string
@@ -1195,7 +1217,7 @@ type AzureFileVolumeSource struct {
 	ReadOnly bool
 }
 
-// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+// AzureFilePersistentVolumeSource represents an Azure File Service mount on the host and bind mount to the pod.
 type AzureFilePersistentVolumeSource struct {
 	// the name of secret that contains Azure Storage Account Name and Key
 	SecretName string
@@ -1211,7 +1233,7 @@ type AzureFilePersistentVolumeSource struct {
 	SecretNamespace *string
 }
 
-// Represents a vSphere volume resource.
+// VsphereVirtualDiskVolumeSource represents a vSphere volume resource.
 type VsphereVirtualDiskVolumeSource struct {
 	// Path that identifies vSphere volume vmdk
 	VolumePath string
@@ -1228,7 +1250,7 @@ type VsphereVirtualDiskVolumeSource struct {
 	StoragePolicyID string
 }
 
-// Represents a Photon Controller persistent disk resource.
+// PhotonPersistentDiskVolumeSource represents a Photon Controller persistent disk resource.
 type PhotonPersistentDiskVolumeSource struct {
 	// ID that identifies Photon Controller persistent disk
 	PdID string
@@ -1253,9 +1275,13 @@ type PortworxVolumeSource struct {
 	ReadOnly bool
 }
 
+// AzureDataDiskCachingMode defines the caching mode for Azure data disk
 type AzureDataDiskCachingMode string
+
+// AzureDataDiskKind defines the kind of Azure data disk
 type AzureDataDiskKind string
 
+// Defines cache mode and kinds for Azure data disk
 const (
 	AzureDataDiskCachingNone      AzureDataDiskCachingMode = "None"
 	AzureDataDiskCachingReadOnly  AzureDataDiskCachingMode = "ReadOnly"
@@ -1266,7 +1292,7 @@ const (
 	AzureManagedDisk       AzureDataDiskKind = "Managed"
 )
 
-// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+// AzureDiskVolumeSource represents an Azure Data Disk mount on the host and bind mount to the pod.
 type AzureDiskVolumeSource struct {
 	// The Name of the data disk in the blob storage
 	DiskName string
@@ -1363,7 +1389,7 @@ type ScaleIOPersistentVolumeSource struct {
 	ReadOnly bool
 }
 
-// Represents a StorageOS persistent volume resource.
+// StorageOSVolumeSource represents a StorageOS persistent volume resource.
 type StorageOSVolumeSource struct {
 	// VolumeName is the human-readable name of the StorageOS volume.  Volume
 	// names are only unique within a namespace.
@@ -1391,7 +1417,7 @@ type StorageOSVolumeSource struct {
 	SecretRef *LocalObjectReference
 }
 
-// Represents a StorageOS persistent volume resource.
+// StorageOSPersistentVolumeSource represents a StorageOS persistent volume resource.
 type StorageOSPersistentVolumeSource struct {
 	// VolumeName is the human-readable name of the StorageOS volume.  Volume
 	// names are only unique within a namespace.
@@ -1419,7 +1445,7 @@ type StorageOSPersistentVolumeSource struct {
 	SecretRef *ObjectReference
 }
 
-// Adapts a ConfigMap into a volume.
+// ConfigMapVolumeSource adapts a ConfigMap into a volume.
 //
 // The contents of the target ConfigMap's Data field will be presented in a
 // volume as files using the keys in the Data field as the file names, unless
@@ -1443,12 +1469,12 @@ type ConfigMapVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
 
-// Adapts a ConfigMap into a projected volume.
+// ConfigMapProjection adapts a ConfigMap into a projected volume.
 //
 // The contents of the target ConfigMap's Data field will be presented in a
 // projected volume as files using the keys in the Data field as the file names,
@@ -1466,7 +1492,7 @@ type ConfigMapProjection struct {
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
@@ -1493,7 +1519,7 @@ type ServiceAccountTokenProjection struct {
 	Path string
 }
 
-// Represents a projected volume source
+// ProjectedVolumeSource represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
 	Sources []VolumeProjection
@@ -1506,7 +1532,7 @@ type ProjectedVolumeSource struct {
 	DefaultMode *int32
 }
 
-// Projection that may be projected along with other supported volume types
+// VolumeProjection that may be projected along with other supported volume types
 type VolumeProjection struct {
 	// all types below are the supported types for projection into the same volume
 
@@ -1520,7 +1546,7 @@ type VolumeProjection struct {
 	ServiceAccountToken *ServiceAccountTokenProjection
 }
 
-// Maps a string key to a path within a volume.
+// KeyToPath maps a string key to a path within a volume.
 type KeyToPath struct {
 	// The key to project.
 	Key string
@@ -1538,7 +1564,7 @@ type KeyToPath struct {
 	Mode *int32
 }
 
-// Local represents directly-attached storage with node affinity (Beta feature)
+// LocalVolumeSource represents directly-attached storage with node affinity (Beta feature)
 type LocalVolumeSource struct {
 	// The full path to the volume on the node.
 	// It can be either a directory or block device (disk, partition, ...).
@@ -1552,7 +1578,7 @@ type LocalVolumeSource struct {
 	FSType *string
 }
 
-// Represents storage that is managed by an external CSI volume driver.
+// CSIPersistentVolumeSource represents storage that is managed by an external CSI volume driver.
 type CSIPersistentVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	// Required.
@@ -1601,6 +1627,47 @@ type CSIPersistentVolumeSource struct {
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodePublishSecretRef *SecretReference
+
+	// ControllerExpandSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// ControllerExpandVolume call.
+	// This is an alpha field and requires enabling ExpandCSIVolumes feature gate.
+	// This field is optional, and may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	ControllerExpandSecretRef *SecretReference
+}
+
+// CSIVolumeSource represents a source location of a volume to mount, managed by an external CSI driver
+type CSIVolumeSource struct {
+	// Driver is the name of the CSI driver that handles this volume.
+	// Consult with your admin for the correct name as registered in the cluster.
+	// Required.
+	Driver string
+
+	// Specifies a read-only configuration for the volume.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly *bool
+
+	// Filesystem type to mount. Ex. "ext4", "xfs", "ntfs".
+	// If not provided, the empty value is passed to the associated CSI driver
+	// which will determine the default filesystem to apply.
+	// +optional
+	FSType *string
+
+	// VolumeAttributes stores driver-specific properties that are passed to the CSI
+	// driver. Consult your driver's documentation for supported values.
+	// +optional
+	VolumeAttributes map[string]string
+
+	// NodePublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// NodePublishVolume and NodeUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secret references are passed.
+	// +optional
+	NodePublishSecretRef *LocalObjectReference
 }
 
 // ContainerPort represents a network port in a single container
@@ -1648,7 +1715,6 @@ type VolumeMount struct {
 	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.
-	// This field is alpha in 1.14.
 	// +optional
 	SubPathExpr string
 }
@@ -1709,7 +1775,7 @@ type EnvVar struct {
 // Only one of its fields may be set.
 type EnvVarSource struct {
 	// Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
-	// metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
+	// metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
 	// +optional
 	FieldRef *ObjectFieldSelector
 	// Selects a resource of the container: only resources limits and requests
@@ -1746,13 +1812,13 @@ type ResourceFieldSelector struct {
 	Divisor resource.Quantity
 }
 
-// Selects a key from a ConfigMap.
+// ConfigMapKeySelector selects a key from a ConfigMap.
 type ConfigMapKeySelector struct {
 	// The ConfigMap to select from.
 	LocalObjectReference
 	// The key to select.
 	Key string
-	// Specify whether the ConfigMap or it's key must be defined
+	// Specify whether the ConfigMap or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -1763,7 +1829,7 @@ type SecretKeySelector struct {
 	LocalObjectReference
 	// The key of the secret to select from.  Must be a valid secret key.
 	Key string
-	// Specify whether the Secret or it's key must be defined
+	// Specify whether the Secret or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -1880,7 +1946,7 @@ type Probe struct {
 	// +optional
 	PeriodSeconds int32
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
-	// Must be 1 for liveness.
+	// Must be 1 for liveness and startup.
 	// +optional
 	SuccessThreshold int32
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
@@ -1898,6 +1964,16 @@ const (
 	PullNever PullPolicy = "Never"
 	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "IfNotPresent"
+)
+
+// PreemptionPolicy describes a policy for if/when to preempt a pod.
+type PreemptionPolicy string
+
+const (
+	// PreemptLowerPriority means that pod can preempt other pods with lower priority.
+	PreemptLowerPriority PreemptionPolicy = "PreemptLowerPriority"
+	// PreemptNever means that pod never preempts other pods with lower priority.
+	PreemptNever PreemptionPolicy = "Never"
 )
 
 // TerminationMessagePolicy describes how termination messages are retrieved from a container.
@@ -1980,13 +2056,14 @@ type Container struct {
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
-	// This is a beta feature.
 	// +optional
 	VolumeDevices []VolumeDevice
 	// +optional
 	LivenessProbe *Probe
 	// +optional
 	ReadinessProbe *Probe
+	// +optional
+	StartupProbe *Probe
 	// +optional
 	Lifecycle *Lifecycle
 	// Required.
@@ -2036,7 +2113,7 @@ type Lifecycle struct {
 	// +optional
 	PostStart *Handler
 	// PreStop is called immediately before a container is terminated due to an
-	// API request or management event such as liveness probe failure,
+	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
 	// container crashes or exits. The reason for termination is passed to the
 	// handler. The Pod's termination grace period countdown begins before the
@@ -2050,6 +2127,7 @@ type Lifecycle struct {
 
 // The below types are used by kube_client and api_server.
 
+// ConditionStatus defines conditions of resources
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
@@ -2062,6 +2140,7 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
+// ContainerStateWaiting represents the waiting state of a container
 type ContainerStateWaiting struct {
 	// A brief CamelCase string indicating details about why the container is in waiting state.
 	// +optional
@@ -2071,11 +2150,13 @@ type ContainerStateWaiting struct {
 	Message string
 }
 
+// ContainerStateRunning represents the running state of a container
 type ContainerStateRunning struct {
 	// +optional
 	StartedAt metav1.Time
 }
 
+// ContainerStateTerminated represents the terminated state of a container
 type ContainerStateTerminated struct {
 	ExitCode int32
 	// +optional
@@ -2104,6 +2185,7 @@ type ContainerState struct {
 	Terminated *ContainerStateTerminated
 }
 
+// ContainerStatus represents the status of a container
 type ContainerStatus struct {
 	// Each container in a pod must have a unique name.
 	Name string
@@ -2120,6 +2202,7 @@ type ContainerStatus struct {
 	ImageID      string
 	// +optional
 	ContainerID string
+	Started     *bool
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -2145,6 +2228,7 @@ const (
 	PodUnknown PodPhase = "Unknown"
 )
 
+// PodConditionType defines the condition of pod
 type PodConditionType string
 
 // These are valid conditions of pod.
@@ -2163,6 +2247,7 @@ const (
 	ContainersReady PodConditionType = "ContainersReady"
 )
 
+// PodCondition represents pod's condition
 type PodCondition struct {
 	Type   PodConditionType
 	Status ConditionStatus
@@ -2182,6 +2267,7 @@ type PodCondition struct {
 // is RestartPolicyAlways.
 type RestartPolicy string
 
+// These are valid restart policies
 const (
 	RestartPolicyAlways    RestartPolicy = "Always"
 	RestartPolicyOnFailure RestartPolicy = "OnFailure"
@@ -2223,7 +2309,7 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
-// A node selector represents the union of the results of one or more label queries
+// NodeSelector represents the union of the results of one or more label queries
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
 type NodeSelector struct {
@@ -2231,6 +2317,7 @@ type NodeSelector struct {
 	NodeSelectorTerms []NodeSelectorTerm
 }
 
+// NodeSelectorTerm represents expressions and fields required to select nodes.
 // A null or empty node selector term matches no objects. The requirements of
 // them are ANDed.
 // The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
@@ -2241,7 +2328,7 @@ type NodeSelectorTerm struct {
 	MatchFields []NodeSelectorRequirement
 }
 
-// A node selector requirement is a selector that contains values, a key, and an operator
+// NodeSelectorRequirement is a selector that contains values, a key, and an operator
 // that relates the key and values.
 type NodeSelectorRequirement struct {
 	// The label key that the selector applies to.
@@ -2258,10 +2345,11 @@ type NodeSelectorRequirement struct {
 	Values []string
 }
 
-// A node selector operator is the set of operators that can be used in
+// NodeSelectorOperator is the set of operators that can be used in
 // a node selector requirement.
 type NodeSelectorOperator string
 
+// These are valid values of NodeSelectorOperator
 const (
 	NodeSelectorOpIn           NodeSelectorOperator = "In"
 	NodeSelectorOpNotIn        NodeSelectorOperator = "NotIn"
@@ -2271,7 +2359,7 @@ const (
 	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
 )
 
-// A topology selector term represents the result of label queries.
+// TopologySelectorTerm represents the result of label queries.
 // A null or empty topology selector term matches no objects.
 // The requirements of them are ANDed.
 // It provides a subset of functionality as NodeSelectorTerm.
@@ -2282,7 +2370,7 @@ type TopologySelectorTerm struct {
 	MatchLabelExpressions []TopologySelectorLabelRequirement
 }
 
-// A topology selector requirement is a selector that matches given label.
+// TopologySelectorLabelRequirement is a selector that matches given label.
 // This is an alpha feature and may change in the future.
 type TopologySelectorLabelRequirement struct {
 	// The label key that the selector applies to.
@@ -2305,7 +2393,7 @@ type Affinity struct {
 	PodAntiAffinity *PodAntiAffinity
 }
 
-// Pod affinity is a group of inter pod affinity scheduling rules.
+// PodAffinity is a group of inter pod affinity scheduling rules.
 type PodAffinity struct {
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// If the affinity requirements specified by this field are not met at
@@ -2340,7 +2428,7 @@ type PodAffinity struct {
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm
 }
 
-// Pod anti affinity is a group of inter pod anti affinity scheduling rules.
+// PodAntiAffinity is a group of inter pod anti affinity scheduling rules.
 type PodAntiAffinity struct {
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// If the anti-affinity requirements specified by this field are not met at
@@ -2375,7 +2463,8 @@ type PodAntiAffinity struct {
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm
 }
 
-// The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
+// WeightedPodAffinityTerm represents the weights of all of the matched WeightedPodAffinityTerm
+// fields are added per-node to find the most preferred node(s)
 type WeightedPodAffinityTerm struct {
 	// weight associated with matching the corresponding podAffinityTerm,
 	// in the range 1-100.
@@ -2384,7 +2473,7 @@ type WeightedPodAffinityTerm struct {
 	PodAffinityTerm PodAffinityTerm
 }
 
-// Defines a set of pods (namely those matching the labelSelector
+// PodAffinityTerm defines a set of pods (namely those matching the labelSelector
 // relative to the given namespace(s)) that this pod should be
 // co-located (affinity) or not co-located (anti-affinity) with,
 // where co-located is defined as running on a node whose value of
@@ -2406,7 +2495,7 @@ type PodAffinityTerm struct {
 	TopologyKey string
 }
 
-// Node affinity is a group of node affinity scheduling rules.
+// NodeAffinity is a group of node affinity scheduling rules.
 type NodeAffinity struct {
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
 	// If the affinity requirements specified by this field are not met at
@@ -2437,7 +2526,7 @@ type NodeAffinity struct {
 	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTerm
 }
 
-// An empty preferred scheduling term matches all objects with implicit weight 0
+// PreferredSchedulingTerm represents an empty preferred scheduling term matches all objects with implicit weight 0
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 type PreferredSchedulingTerm struct {
 	// Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
@@ -2446,6 +2535,7 @@ type PreferredSchedulingTerm struct {
 	Preference NodeSelectorTerm
 }
 
+// Taint represents taint that can be applied to the node.
 // The node this Taint is attached to has the "effect" on
 // any pod that does not tolerate the Taint.
 type Taint struct {
@@ -2464,8 +2554,10 @@ type Taint struct {
 	TimeAdded *metav1.Time
 }
 
+// TaintEffect defines the effects of Taint
 type TaintEffect string
 
+// These are valid values for TaintEffect
 const (
 	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
 	// but allow all pods submitted to Kubelet without going through the scheduler
@@ -2487,6 +2579,7 @@ const (
 	TaintEffectNoExecute TaintEffect = "NoExecute"
 )
 
+// Toleration represents the toleration object that can be attached to a pod.
 // The pod this Toleration is attached to tolerates any taint that matches
 // the triple <key,value,effect> using the matching operator <operator>.
 type Toleration struct {
@@ -2516,9 +2609,10 @@ type Toleration struct {
 	TolerationSeconds *int64
 }
 
-// A toleration operator is the set of operators that can be used in a toleration.
+// TolerationOperator is the set of operators that can be used in a toleration.
 type TolerationOperator string
 
+// These are valid values for TolerationOperator
 const (
 	TolerationOpExists TolerationOperator = "Exists"
 	TolerationOpEqual  TolerationOperator = "Equal"
@@ -2537,6 +2631,13 @@ type PodSpec struct {
 	InitContainers []Container
 	// List of containers belonging to the pod.
 	Containers []Container
+	// List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
+	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
+	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
+	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
+	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
+	// +optional
+	EphemeralContainers []EphemeralContainer
 	// +optional
 	RestartPolicy RestartPolicy
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
@@ -2621,6 +2722,12 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+	// +optional
+	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
@@ -2637,14 +2744,30 @@ type PodSpec struct {
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
 	RuntimeClassName *string
+	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
+	// This field will be autopopulated at admission time by the RuntimeClass admission controller. If
+	// the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests.
+	// The RuntimeClass admission controller will reject Pod create requests which have the overhead already
+	// set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value
+	// defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero.
+	// More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
+	// This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.
+	// +optional
+	Overhead ResourceList
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
 	// If not specified, the default is true.
 	// +optional
 	EnableServiceLinks *bool
+	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
+	// domains. Scheduler will schedule pods in a way which abides by the constraints.
+	// This field is only honored by clusters that enable the EvenPodsSpread feature.
+	// All topologySpreadConstraints are ANDed.
+	// +optional
+	TopologySpreadConstraints []TopologySpreadConstraint
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -2661,6 +2784,22 @@ type Sysctl struct {
 	// Value of a property to set
 	Value string
 }
+
+// PodFSGroupChangePolicy holds policies that will be used for applying fsGroup to a volume
+// when volume is mounted.
+type PodFSGroupChangePolicy string
+
+const (
+	// FSGroupChangeOnRootMismatch indicates that volume's ownership and permissions will be changed
+	// only when permission and ownership of root directory does not match with expected
+	// permissions on the volume. This can help shorten the time it takes to change
+	// ownership and permissions of a volume.
+	FSGroupChangeOnRootMismatch PodFSGroupChangePolicy = "OnRootMismatch"
+	// FSGroupChangeAlways indicates that volume's ownership and permissions
+	// should always be changed whenever volume is mounted inside a Pod. This the default
+	// behavior.
+	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
+)
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
@@ -2687,7 +2826,6 @@ type PodSecurityContext struct {
 	// in the same pod, and the first process in each container will not be assigned PID 1.
 	// HostPID and ShareProcessNamespace cannot both be set.
 	// Optional: Default to false.
-	// This field is beta-level and may be disabled with the PodShareProcessNamespace feature.
 	// +k8s:conversion-gen=false
 	// +optional
 	ShareProcessNamespace *bool
@@ -2698,6 +2836,11 @@ type PodSecurityContext struct {
 	// takes precedence for that container.
 	// +optional
 	SELinuxOptions *SELinuxOptions
+	// The Windows specific settings applied to all containers.
+	// If unspecified, the options within a container's SecurityContext will be used.
+	// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
@@ -2737,6 +2880,14 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64
+	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+	// before being exposed inside Pod. This field will only apply to
+	// volume types which support fsGroup based ownership(and permissions).
+	// It will have no effect on ephemeral volume types such as: secret, configmaps
+	// and emptydir.
+	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
+	// +optional
+	FSGroupChangePolicy *PodFSGroupChangePolicy
 	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
@@ -2746,6 +2897,7 @@ type PodSecurityContext struct {
 // PodQOSClass defines the supported qos classes of Pods.
 type PodQOSClass string
 
+// These are valid values for PodQOSClass
 const (
 	// PodQOSGuaranteed is the Guaranteed qos class.
 	PodQOSGuaranteed PodQOSClass = "Guaranteed"
@@ -2784,6 +2936,124 @@ type PodDNSConfigOption struct {
 	Value *string
 }
 
+// PodIP represents the IP address of a pod.
+// IP address information. Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within
+//        the cluster.
+type PodIP struct {
+	IP string
+}
+
+// EphemeralContainerCommon is a copy of all fields in Container to be inlined in
+// EphemeralContainer. This separate type allows easy conversion from EphemeralContainer
+// to Container and allows separate documentation for the fields of EphemeralContainer.
+// When a new field is added to Container it must be added here as well.
+type EphemeralContainerCommon struct {
+	// Required: This must be a DNS_LABEL.  Each container in a pod must
+	// have a unique name.
+	Name string
+	// Required.
+	Image string
+	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
+	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
+	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
+	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
+	// +optional
+	Command []string
+	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
+	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
+	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
+	// +optional
+	Args []string
+	// Optional: Defaults to Docker's default.
+	// +optional
+	WorkingDir string
+	// Ports are not allowed for ephemeral containers.
+	// +optional
+	Ports []ContainerPort
+	// List of sources to populate environment variables in the container.
+	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+	// will be reported as an event when the container is starting. When a key exists in multiple
+	// sources, the value associated with the last source will take precedence.
+	// Values defined by an Env with a duplicate key will take precedence.
+	// Cannot be updated.
+	// +optional
+	EnvFrom []EnvFromSource
+	// +optional
+	Env []EnvVar
+	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
+	// already allocated to the pod.
+	// +optional
+	Resources ResourceRequirements
+	// +optional
+	VolumeMounts []VolumeMount
+	// volumeDevices is the list of block devices to be used by the container.
+	// +optional
+	VolumeDevices []VolumeDevice
+	// Probes are not allowed for ephemeral containers.
+	// +optional
+	LivenessProbe *Probe
+	// Probes are not allowed for ephemeral containers.
+	// +optional
+	ReadinessProbe *Probe
+	// Probes are not allowed for ephemeral containers.
+	// +optional
+	StartupProbe *Probe
+	// Lifecycle is not allowed for ephemeral containers.
+	// +optional
+	Lifecycle *Lifecycle
+	// Required.
+	// +optional
+	TerminationMessagePath string
+	// +optional
+	TerminationMessagePolicy TerminationMessagePolicy
+	// Required: Policy for pulling images for this container
+	ImagePullPolicy PullPolicy
+	// SecurityContext is not allowed for ephemeral containers.
+	// +optional
+	SecurityContext *SecurityContext
+
+	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
+	// and shouldn't be used for general purpose containers.
+	// +optional
+	Stdin bool
+	// +optional
+	StdinOnce bool
+	// +optional
+	TTY bool
+}
+
+// EphemeralContainerCommon converts to Container. All fields must be kept in sync between
+// these two types.
+var _ = Container(EphemeralContainerCommon{})
+
+// An EphemeralContainer is a temporary container that may be added to an existing pod for
+// user-initiated activities such as debugging. Ephemeral containers have no resource or
+// scheduling guarantees, and they will not be restarted when they exit or when a pod is
+// removed or restarted. If an ephemeral container causes a pod to exceed its resource
+// allocation, the pod may be evicted.
+// Ephemeral containers may not be added by directly updating the pod spec. They must be added
+// via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
+// once added.
+// This is an alpha feature enabled by the EphemeralContainers feature flag.
+type EphemeralContainer struct {
+	// Ephemeral containers have all of the fields of Container, plus additional fields
+	// specific to ephemeral containers. Fields in common with Container are in the
+	// following inlined struct so than an EphemeralContainer may easily be converted
+	// to a Container.
+	EphemeralContainerCommon
+
+	// If set, the name of the container from PodSpec that this ephemeral container targets.
+	// The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
+	// If not set then the ephemeral container is run in whatever namespaces are shared
+	// for the pod. Note that the container runtime must support this feature.
+	// +optional
+	TargetContainerName string
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -2804,11 +3074,13 @@ type PodStatus struct {
 	// give the resources on this node to a higher priority pod that is created after preemption.
 	// +optional
 	NominatedNodeName string
-
 	// +optional
 	HostIP string
+
+	// PodIPs holds all of the known IP addresses allocated to the pod. Pods may be assigned AT MOST
+	// one value for each of IPv4 and IPv6.
 	// +optional
-	PodIP string
+	PodIPs []PodIP
 
 	// Date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.
@@ -2829,6 +3101,11 @@ type PodStatus struct {
 	// when we have done this.
 	// +optional
 	ContainerStatuses []ContainerStatus
+
+	// Status for any ephemeral containers that have run in this pod.
+	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
+	// +optional
+	EphemeralContainerStatuses []ContainerStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -2844,7 +3121,6 @@ type PodStatusResult struct {
 	Status PodStatus
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
@@ -2874,7 +3150,6 @@ type PodTemplateSpec struct {
 	Spec PodSpec
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -2955,6 +3230,7 @@ type ReplicationControllerStatus struct {
 	Conditions []ReplicationControllerCondition
 }
 
+// ReplicationControllerConditionType defines the conditions of a replication controller.
 type ReplicationControllerConditionType string
 
 // These are valid conditions of a replication controller.
@@ -2982,9 +3258,6 @@ type ReplicationControllerCondition struct {
 	Message string
 }
 
-// +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -3031,7 +3304,7 @@ type ServiceList struct {
 	Items []Service
 }
 
-// Session Affinity Type string
+// ServiceAffinity Type string
 type ServiceAffinity string
 
 const (
@@ -3067,7 +3340,7 @@ type ClientIPConfig struct {
 	TimeoutSeconds *int32
 }
 
-// Service Type string describes ingress methods for a service
+// ServiceType string describes ingress methods for a service
 type ServiceType string
 
 const (
@@ -3090,7 +3363,7 @@ const (
 	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
-// Service External Traffic Policy Type string
+// ServiceExternalTrafficPolicyType string
 type ServiceExternalTrafficPolicyType string
 
 const (
@@ -3129,6 +3402,19 @@ type LoadBalancerIngress struct {
 	// +optional
 	Hostname string
 }
+
+// IPFamily represents the IP Family (IPv4 or IPv6). This type is used
+// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+type IPFamily string
+
+const (
+	// IPv4Protocol indicates that this IP is IPv4 protocol
+	IPv4Protocol IPFamily = "IPv4"
+	// IPv6Protocol indicates that this IP is IPv6 protocol
+	IPv6Protocol IPFamily = "IPv6"
+	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
+	MaxServiceTopologyKeys = 16
+)
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
@@ -3230,8 +3516,34 @@ type ServiceSpec struct {
 	// of peer discovery.
 	// +optional
 	PublishNotReadyAddresses bool
+
+	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+	// IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
+	// available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
+	// Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
+	// allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
+	// this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+	// cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+	// +optional
+	IPFamily *IPFamily
+
+	// topologyKeys is a preference-order list of topology keys which
+	// implementations of services should use to preferentially sort endpoints
+	// when accessing this Service, it can not be used at the same time as
+	// externalTrafficPolicy=Local.
+	// Topology keys must be valid label keys and at most 16 keys may be specified.
+	// Endpoints are chosen based on the first topology key with available backends.
+	// If this field is specified and all entries have no backends that match
+	// the topology of the client, the service has no backends for that client
+	// and connections should fail.
+	// The special value "*" may be used to mean "any topology". This catch-all
+	// value, if used, only makes sense as the last value in the list.
+	// If this is not specified or empty, no topology constraints will be applied.
+	// +optional
+	TopologyKeys []string
 }
 
+// ServicePort represents the port on which the service is exposed
 type ServicePort struct {
 	// Optional if only one ServicePort is defined on this service: The
 	// name of this port within the service.  This must be a DNS_LABEL.
@@ -3241,6 +3553,17 @@ type ServicePort struct {
 
 	// The IP protocol for this port.  Supports "TCP", "UDP", and "SCTP".
 	Protocol Protocol
+
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// This is a beta field that is guarded by the ServiceAppProtocol feature
+	// gate and enabled by default.
+	// +optional
+	AppProtocol *string
 
 	// The port that will be exposed on the service.
 	Port int32
@@ -3258,7 +3581,6 @@ type ServicePort struct {
 	NodePort int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -3278,7 +3600,6 @@ type Service struct {
 	Status ServiceStatus
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceAccount binds together:
@@ -3316,7 +3637,6 @@ type ServiceAccountList struct {
 	Items []ServiceAccount
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
@@ -3385,6 +3705,17 @@ type EndpointPort struct {
 
 	// The IP protocol for this port.
 	Protocol Protocol
+
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// This is a beta field that is guarded by the ServiceAppProtocol feature
+	// gate and enabled by default.
+	// +optional
+	AppProtocol *string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -3400,10 +3731,11 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
-	// PodCIDR represents the pod IP range assigned to the node
+	// PodCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. It may
+	// contain AT MOST one value for each of IPv4 and IPv6.
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
 	// +optional
-	PodCIDR string
+	PodCIDRs []string
 
 	// ID of the node assigned by the cloud provider
 	// Note: format is "<ProviderName>://<ProviderSpecificNodeID>"
@@ -3426,7 +3758,7 @@ type NodeSpec struct {
 	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.
 	// see: https://issues.k8s.io/61966
 	// +optional
-	DoNotUse_ExternalID string
+	DoNotUseExternalID string
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
@@ -3434,6 +3766,7 @@ type NodeConfigSource struct {
 	ConfigMap *ConfigMapNodeConfigSource
 }
 
+// ConfigMapNodeConfigSource represents the config map of a node
 type ConfigMapNodeConfigSource struct {
 	// Namespace is the metadata.namespace of the referenced ConfigMap.
 	// This field is required in all cases.
@@ -3485,7 +3818,7 @@ type NodeSystemInfo struct {
 	MachineID string
 	// SystemUUID reported by the node. For unique machine identification
 	// MachineID is preferred. This field is specific to Red Hat hosts
-	// https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html
+	// https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
 	SystemUUID string
 	// Boot ID reported by the node.
 	BootID string
@@ -3589,6 +3922,7 @@ type NodeStatus struct {
 	Config *NodeConfigStatus
 }
 
+// UniqueVolumeName defines the name of attached volume
 type UniqueVolumeName string
 
 // AttachedVolume describes a volume attached to a node
@@ -3610,7 +3944,7 @@ type AvoidPods struct {
 	PreferAvoidPods []PreferAvoidPodsEntry
 }
 
-// Describes a class of pods that should avoid this node.
+// PreferAvoidPodsEntry describes a class of pods that should avoid this node.
 type PreferAvoidPodsEntry struct {
 	// The class of pods.
 	PodSignature PodSignature
@@ -3625,7 +3959,7 @@ type PreferAvoidPodsEntry struct {
 	Message string
 }
 
-// Describes the class of pods that should avoid this node.
+// PodSignature describes the class of pods that should avoid this node.
 // Exactly one field should be set.
 type PodSignature struct {
 	// Reference to controller whose pods should avoid this node.
@@ -3633,7 +3967,7 @@ type PodSignature struct {
 	PodController *metav1.OwnerReference
 }
 
-// Describe a container image
+// ContainerImage describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
 	Names []string
@@ -3642,6 +3976,7 @@ type ContainerImage struct {
 	SizeBytes int64
 }
 
+// NodePhase defines the phase in which a node is in
 type NodePhase string
 
 // These are the valid phases of node.
@@ -3654,6 +3989,7 @@ const (
 	NodeTerminated NodePhase = "Terminated"
 )
 
+// NodeConditionType defines node's condition
 type NodeConditionType string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -3662,9 +3998,6 @@ type NodeConditionType string
 const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionType = "Ready"
-	// NodeOutOfDisk means the kubelet will not accept new pods due to insufficient free disk
-	// space on the node.
-	NodeOutOfDisk NodeConditionType = "OutOfDisk"
 	// NodeMemoryPressure means the kubelet is under pressure due to insufficient available memory.
 	NodeMemoryPressure NodeConditionType = "MemoryPressure"
 	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.
@@ -3673,6 +4006,7 @@ const (
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
 )
 
+// NodeCondition represents the node's condition
 type NodeCondition struct {
 	Type   NodeConditionType
 	Status ConditionStatus
@@ -3686,8 +4020,10 @@ type NodeCondition struct {
 	Message string
 }
 
+// NodeAddressType defines the node's address type
 type NodeAddressType string
 
+// These are valid values of node address type
 const (
 	NodeHostName    NodeAddressType = "Hostname"
 	NodeExternalIP  NodeAddressType = "ExternalIP"
@@ -3696,13 +4032,14 @@ const (
 	NodeInternalDNS NodeAddressType = "InternalDNS"
 )
 
+// NodeAddress represents node's address
 type NodeAddress struct {
 	Type    NodeAddressType
 	Address string
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	// +optional
@@ -3730,19 +4067,17 @@ const (
 )
 
 const (
-	// Default namespace prefix.
+	// ResourceDefaultNamespacePrefix is the default namespace prefix.
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
-	// Name prefix for huge page resources (alpha).
+	// ResourceHugePagesPrefix is the name prefix for huge page resources (alpha).
 	ResourceHugePagesPrefix = "hugepages-"
-	// Name prefix for storage resource limits
+	// ResourceAttachableVolumesPrefix is the name prefix for storage resource limits
 	ResourceAttachableVolumesPrefix = "attachable-volumes-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Node is a worker node in Kubernetes
@@ -3792,8 +4127,11 @@ type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
 	// +optional
 	Phase NamespacePhase
+	// +optional
+	Conditions []NamespaceCondition
 }
 
+// NamespacePhase defines the phase in which the namespace is
 type NamespacePhase string
 
 // These are the valid phases of a namespace.
@@ -3804,11 +4142,33 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
-// +genclient
-// +genclient:nonNamespaced
+// NamespaceConditionType defines constants reporting on status during namespace lifetime and deletion progress
+type NamespaceConditionType string
+
+// These are valid conditions of a namespace.
+const (
+	NamespaceDeletionDiscoveryFailure NamespaceConditionType = "NamespaceDeletionDiscoveryFailure"
+	NamespaceDeletionContentFailure   NamespaceConditionType = "NamespaceDeletionContentFailure"
+	NamespaceDeletionGVParsingFailure NamespaceConditionType = "NamespaceDeletionGroupVersionParsingFailure"
+)
+
+// NamespaceCondition contains details about state of namespace.
+type NamespaceCondition struct {
+	// Type of namespace controller condition.
+	Type NamespaceConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status ConditionStatus
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// A namespace provides a scope for Names.
+// Namespace provides a scope for Names.
 // Use of multiple namespaces is optional
 type Namespace struct {
 	metav1.TypeMeta
@@ -3847,6 +4207,20 @@ type Binding struct {
 
 	// Target is the object to bind to.
 	Target ObjectReference
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// EphemeralContainers is a list of ephemeral containers used with the Pod ephemeralcontainers subresource.
+type EphemeralContainers struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// A list of ephemeral containers associated with this pod. New ephemeral containers
+	// may be appended to this list, but existing ephemeral containers may not be removed
+	// or modified.
+	EphemeralContainers []EphemeralContainer
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -3888,6 +4262,15 @@ type PodLogOptions struct {
 	// log output. This may not display a complete final line of logging, and may return
 	// slightly more or slightly less than the specified limit.
 	LimitBytes *int64
+
+	// insecureSkipTLSVerifyBackend indicates that the apiserver should not confirm the validity of the
+	// serving certificate of the backend it is connecting to.  This will make the HTTPS connection between the apiserver
+	// and the backend insecure. This means the apiserver cannot verify the log data it is receiving came from the real
+	// kubelet.  If the kubelet is configured to verify the apiserver's TLS credentials, it does not mean the
+	// connection to the real kubelet is vulnerable to a man in the middle attack (e.g. an attacker could not intercept
+	// the actual log data coming from the real kubelet).
+	// +optional
+	InsecureSkipTLSVerifyBackend bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4037,12 +4420,14 @@ type TypedLocalObjectReference struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// SerializedReference represents a serialized object reference
 type SerializedReference struct {
 	metav1.TypeMeta
 	// +optional
 	Reference ObjectReference
 }
 
+// EventSource represents the source from which an event is generated
 type EventSource struct {
 	// Component from which the event is generated.
 	// +optional
@@ -4060,7 +4445,6 @@ const (
 	EventTypeWarning string = "Warning"
 )
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Event is a report of an event somewhere in the cluster.
@@ -4131,17 +4515,21 @@ type Event struct {
 	ReportingInstance string
 }
 
+// EventSeries represents a series ov events
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32
 	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime
 	// State of this Series: Ongoing or Finished
+	// Deprecated. Planned removal for 1.18
 	State EventSeriesState
 }
 
+// EventSeriesState defines the state of event series
 type EventSeriesState string
 
+// These are valid values of event series state
 const (
 	EventSeriesStateOngoing  EventSeriesState = "Ongoing"
 	EventSeriesStateFinished EventSeriesState = "Finished"
@@ -4164,15 +4552,15 @@ type EventList struct {
 // List holds a list of objects, which may not be known by the server.
 type List metainternalversion.List
 
-// A type of object that is limited
+// LimitType defines a type of object that is limited
 type LimitType string
 
 const (
-	// Limit that applies to all pods in a namespace
+	// LimitTypePod defines limit that applies to all pods in a namespace
 	LimitTypePod LimitType = "Pod"
-	// Limit that applies to all containers in a namespace
+	// LimitTypeContainer defines limit that applies to all containers in a namespace
 	LimitTypeContainer LimitType = "Container"
-	// Limit that applies to all persistent volume claims in a namespace
+	// LimitTypePersistentVolumeClaim defines limit that applies to all persistent volume claims in a namespace
 	LimitTypePersistentVolumeClaim LimitType = "PersistentVolumeClaim"
 )
 
@@ -4204,7 +4592,6 @@ type LimitRangeSpec struct {
 	Limits []LimitRangeItem
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
@@ -4275,9 +4662,10 @@ const (
 	DefaultResourceRequestsPrefix = "requests."
 )
 
-// A ResourceQuotaScope defines a filter that must match each object tracked by a quota
+// ResourceQuotaScope defines a filter that must match each object tracked by a quota
 type ResourceQuotaScope string
 
+// These are valid values for resource quota spec
 const (
 	// Match all pod objects where spec.activeDeadlineSeconds
 	ResourceQuotaScopeTerminating ResourceQuotaScope = "Terminating"
@@ -4306,7 +4694,7 @@ type ResourceQuotaSpec struct {
 	ScopeSelector *ScopeSelector
 }
 
-// A scope selector represents the AND of the selectors represented
+// ScopeSelector represents the AND of the selectors represented
 // by the scoped-resource selector terms.
 type ScopeSelector struct {
 	// A list of scope selector requirements by scope of the resources.
@@ -4314,7 +4702,7 @@ type ScopeSelector struct {
 	MatchExpressions []ScopedResourceSelectorRequirement
 }
 
-// A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+// ScopedResourceSelectorRequirement is a selector that contains values, a scope name, and an operator
 // that relates the scope name and values.
 type ScopedResourceSelectorRequirement struct {
 	// The name of the scope that the selector applies to.
@@ -4330,10 +4718,11 @@ type ScopedResourceSelectorRequirement struct {
 	Values []string
 }
 
-// A scope selector operator is the set of operators that can be used in
+// ScopeSelectorOperator is the set of operators that can be used in
 // a scope selector requirement.
 type ScopeSelectorOperator string
 
+// These are the valid values for ScopeSelectorOperator
 const (
 	ScopeSelectorOpIn           ScopeSelectorOperator = "In"
 	ScopeSelectorOpNotIn        ScopeSelectorOperator = "NotIn"
@@ -4351,7 +4740,6 @@ type ResourceQuotaStatus struct {
 	Used ResourceList
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -4381,7 +4769,6 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
@@ -4390,6 +4777,12 @@ type Secret struct {
 	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta
+
+	// Immutable field, if set, ensures that data stored in the Secret cannot
+	// be updated (only object metadata can be modified).
+	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+	// +optional
+	Immutable *bool
 
 	// Data contains the secret data. Each key must consist of alphanumeric
 	// characters, '-', '_' or '.'. The serialized form of the secret data is a
@@ -4403,10 +4796,13 @@ type Secret struct {
 	Type SecretType
 }
 
+// MaxSecretSize represents the max secret size.
 const MaxSecretSize = 1 * 1024 * 1024
 
+// SecretType defines the types of secrets
 type SecretType string
 
+// These are the valid values for SecretType
 const (
 	// SecretTypeOpaque is the default; arbitrary user-defined data
 	SecretTypeOpaque SecretType = "Opaque"
@@ -4441,14 +4837,14 @@ const (
 	// DockerConfigKey is the key of the required data for SecretTypeDockercfg secrets
 	DockerConfigKey = ".dockercfg"
 
-	// SecretTypeDockerConfigJson contains a dockercfg file that follows the same format rules as ~/.docker/config.json
+	// SecretTypeDockerConfigJSON contains a dockercfg file that follows the same format rules as ~/.docker/config.json
 	//
 	// Required fields:
 	// - Secret.Data[".dockerconfigjson"] - a serialized ~/.docker/config.json file
-	SecretTypeDockerConfigJson SecretType = "kubernetes.io/dockerconfigjson"
+	SecretTypeDockerConfigJSON SecretType = "kubernetes.io/dockerconfigjson"
 
-	// DockerConfigJsonKey is the key of the required data for SecretTypeDockerConfigJson secrets
-	DockerConfigJsonKey = ".dockerconfigjson"
+	// DockerConfigJSONKey is the key of the required data for SecretTypeDockerConfigJson secrets
+	DockerConfigJSONKey = ".dockerconfigjson"
 
 	// SecretTypeBasicAuth contains data needed for basic authentication.
 	//
@@ -4493,6 +4889,7 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// SecretList represents the list of secrets
 type SecretList struct {
 	metav1.TypeMeta
 	// +optional
@@ -4501,7 +4898,6 @@ type SecretList struct {
 	Items []Secret
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ConfigMap holds configuration data for components or applications to consume.
@@ -4509,6 +4905,12 @@ type ConfigMap struct {
 	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta
+
+	// Immutable field, if set, ensures that data stored in the ConfigMap cannot
+	// be updated (only object metadata can be modified).
+	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+	// +optional
+	Immutable *bool
 
 	// Data contains the configuration data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
@@ -4582,7 +4984,7 @@ const (
 	PortForwardRequestIDHeader = "requestID"
 )
 
-// Type and constants for component health validation.
+// ComponentConditionType defines type and constants for component health validation.
 type ComponentConditionType string
 
 // These are the valid conditions for the component.
@@ -4590,6 +4992,7 @@ const (
 	ComponentHealthy ComponentConditionType = "Healthy"
 )
 
+// ComponentCondition represents the condition of a component
 type ComponentCondition struct {
 	Type   ComponentConditionType
 	Status ConditionStatus
@@ -4599,8 +5002,6 @@ type ComponentCondition struct {
 	Error string
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
@@ -4615,6 +5016,7 @@ type ComponentStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ComponentStatusList represents the list of component statuses
 type ComponentStatusList struct {
 	metav1.TypeMeta
 	// +optional
@@ -4642,6 +5044,11 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	SELinuxOptions *SELinuxOptions
+	// The Windows specific settings applied to all containers.
+	// If unspecified, the options from the PodSecurityContext will be used.
+	// If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -4678,6 +5085,7 @@ type SecurityContext struct {
 	ProcMount *ProcMountType
 }
 
+// ProcMountType defines the type of proc mount
 type ProcMountType string
 
 const (
@@ -4708,6 +5116,26 @@ type SELinuxOptions struct {
 	Level string
 }
 
+// WindowsSecurityContextOptions contain Windows-specific options and credentials.
+type WindowsSecurityContextOptions struct {
+	// GMSACredentialSpecName is the name of the GMSA credential spec to use.
+	// +optional
+	GMSACredentialSpecName *string
+
+	// GMSACredentialSpec is where the GMSA admission webhook
+	// (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+	// GMSA credential spec named by the GMSACredentialSpecName field.
+	// +optional
+	GMSACredentialSpec *string
+
+	// The UserName in Windows to run the entrypoint of the container process.
+	// Defaults to the user specified in image metadata if unspecified.
+	// May also be set in PodSecurityContext. If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// +optional
+	RunAsUserName *string
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RangeAllocation is an opaque API object (not exposed to end users) that can be persisted to record
@@ -4733,12 +5161,77 @@ type RangeAllocation struct {
 }
 
 const (
-	// "default-scheduler" is the name of default scheduler.
+	// DefaultSchedulerName defines the name of default scheduler.
 	DefaultSchedulerName = "default-scheduler"
 
+	// DefaultHardPodAffinitySymmetricWeight is the weight of implicit PreferredDuringScheduling affinity rule.
+	//
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// When the --hard-pod-affinity-weight scheduler flag is not specified,
 	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
 	DefaultHardPodAffinitySymmetricWeight int32 = 1
 )
+
+// UnsatisfiableConstraintAction defines the actions that can be taken for an
+// unsatisfiable constraint.
+type UnsatisfiableConstraintAction string
+
+const (
+	// DoNotSchedule instructs the scheduler not to schedule the pod
+	// when constraints are not satisfied.
+	DoNotSchedule UnsatisfiableConstraintAction = "DoNotSchedule"
+	// ScheduleAnyway instructs the scheduler to schedule the pod
+	// even if constraints are not satisfied.
+	ScheduleAnyway UnsatisfiableConstraintAction = "ScheduleAnyway"
+)
+
+// TopologySpreadConstraint specifies how to spread matching pods among the given topology.
+type TopologySpreadConstraint struct {
+	// MaxSkew describes the degree to which pods may be unevenly distributed.
+	// It's the maximum permitted difference between the number of matching pods in
+	// any two topology domains of a given topology type.
+	// For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
+	// labelSelector spread as 1/1/0:
+	// +-------+-------+-------+
+	// | zone1 | zone2 | zone3 |
+	// +-------+-------+-------+
+	// |   P   |   P   |       |
+	// +-------+-------+-------+
+	// - if MaxSkew is 1, incoming pod can only be scheduled to zone3 to become 1/1/1;
+	// scheduling it onto zone1(zone2) would make the ActualSkew(2-0) on zone1(zone2)
+	// violate MaxSkew(1).
+	// - if MaxSkew is 2, incoming pod can be scheduled onto any zone.
+	// It's a required field. Default value is 1 and 0 is not allowed.
+	MaxSkew int32
+	// TopologyKey is the key of node labels. Nodes that have a label with this key
+	// and identical values are considered to be in the same topology.
+	// We consider each <key, value> as a "bucket", and try to put balanced number
+	// of pods into each bucket.
+	// It's a required field.
+	TopologyKey string
+	// WhenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
+	// the spread constraint.
+	// - DoNotSchedule (default) tells the scheduler not to schedule it
+	// - ScheduleAnyway tells the scheduler to still schedule it
+	// It's considered as "Unsatisfiable" if and only if placing incoming pod on any
+	// topology violates "MaxSkew".
+	// For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
+	// labelSelector spread as 3/1/1:
+	// +-------+-------+-------+
+	// | zone1 | zone2 | zone3 |
+	// +-------+-------+-------+
+	// | P P P |   P   |   P   |
+	// +-------+-------+-------+
+	// If WhenUnsatisfiable is set to DoNotSchedule, incoming pod can only be scheduled
+	// to zone2(zone3) to become 3/2/1(3/1/2) as ActualSkew(2-1) on zone2(zone3) satisfies
+	// MaxSkew(1). In other words, the cluster can still be imbalanced, but scheduler
+	// won't make it *more* imbalanced.
+	// It's a required field.
+	WhenUnsatisfiable UnsatisfiableConstraintAction
+	// LabelSelector is used to find matching pods.
+	// Pods that match this label selector are counted to determine the number of pods
+	// in their corresponding topology domain.
+	// +optional
+	LabelSelector *metav1.LabelSelector
+}

@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"time"
 
 	v1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -37,14 +38,14 @@ type PriorityClassesGetter interface {
 
 // PriorityClassInterface has methods to work with PriorityClass resources.
 type PriorityClassInterface interface {
-	Create(*v1beta1.PriorityClass) (*v1beta1.PriorityClass, error)
-	Update(*v1beta1.PriorityClass) (*v1beta1.PriorityClass, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta1.PriorityClass, error)
-	List(opts v1.ListOptions) (*v1beta1.PriorityClassList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PriorityClass, err error)
+	Create(ctx context.Context, priorityClass *v1beta1.PriorityClass, opts v1.CreateOptions) (*v1beta1.PriorityClass, error)
+	Update(ctx context.Context, priorityClass *v1beta1.PriorityClass, opts v1.UpdateOptions) (*v1beta1.PriorityClass, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.PriorityClass, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PriorityClassList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PriorityClass, err error)
 	PriorityClassExpansion
 }
 
@@ -61,19 +62,19 @@ func newPriorityClasses(c *SchedulingV1beta1Client) *priorityClasses {
 }
 
 // Get takes name of the priorityClass, and returns the corresponding priorityClass object, and an error if there is any.
-func (c *priorityClasses) Get(name string, options v1.GetOptions) (result *v1beta1.PriorityClass, err error) {
+func (c *priorityClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PriorityClass, err error) {
 	result = &v1beta1.PriorityClass{}
 	err = c.client.Get().
 		Resource("priorityclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
-func (c *priorityClasses) List(opts v1.ListOptions) (result *v1beta1.PriorityClassList, err error) {
+func (c *priorityClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PriorityClassList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -83,13 +84,13 @@ func (c *priorityClasses) List(opts v1.ListOptions) (result *v1beta1.PriorityCla
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested priorityClasses.
-func (c *priorityClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *priorityClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -99,66 +100,69 @@ func (c *priorityClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
-func (c *priorityClasses) Create(priorityClass *v1beta1.PriorityClass) (result *v1beta1.PriorityClass, err error) {
+func (c *priorityClasses) Create(ctx context.Context, priorityClass *v1beta1.PriorityClass, opts v1.CreateOptions) (result *v1beta1.PriorityClass, err error) {
 	result = &v1beta1.PriorityClass{}
 	err = c.client.Post().
 		Resource("priorityclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityClass).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a priorityClass and updates it. Returns the server's representation of the priorityClass, and an error, if there is any.
-func (c *priorityClasses) Update(priorityClass *v1beta1.PriorityClass) (result *v1beta1.PriorityClass, err error) {
+func (c *priorityClasses) Update(ctx context.Context, priorityClass *v1beta1.PriorityClass, opts v1.UpdateOptions) (result *v1beta1.PriorityClass, err error) {
 	result = &v1beta1.PriorityClass{}
 	err = c.client.Put().
 		Resource("priorityclasses").
 		Name(priorityClass.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityClass).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the priorityClass and deletes it. Returns an error if one occurs.
-func (c *priorityClasses) Delete(name string, options *v1.DeleteOptions) error {
+func (c *priorityClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("priorityclasses").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *priorityClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *priorityClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("priorityclasses").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched priorityClass.
-func (c *priorityClasses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PriorityClass, err error) {
+func (c *priorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PriorityClass, err error) {
 	result = &v1beta1.PriorityClass{}
 	err = c.client.Patch(pt).
 		Resource("priorityclasses").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

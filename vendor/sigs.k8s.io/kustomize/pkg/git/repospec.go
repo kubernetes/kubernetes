@@ -24,6 +24,13 @@ import (
 	"sigs.k8s.io/kustomize/pkg/fs"
 )
 
+// Used as a temporary non-empty occupant of the cloneDir
+// field, as something distinguishable from the empty string
+// in various outputs (especially tests). Not using an
+// actual directory name here, as that's a temporary directory
+// with a unique name that isn't created until clone time.
+const notCloned = fs.ConfirmedDir("/notCloned")
+
 // RepoSpec specifies a git repository and a branch and path therein.
 type RepoSpec struct {
 	// Raw, original spec, used to look for cycles.
@@ -88,7 +95,7 @@ func NewRepoSpecFromUrl(n string) (*RepoSpec, error) {
 	}
 	return &RepoSpec{
 		raw: n, host: host, orgRepo: orgRepo,
-		path: path, ref: gitRef}, nil
+		cloneDir: notCloned, path: path, ref: gitRef}, nil
 }
 
 const (

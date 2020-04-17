@@ -38,9 +38,10 @@ type FsInfo struct {
 type Node struct {
 	Id int `json:"node_id"`
 	// Per-node memory
-	Memory uint64  `json:"memory"`
-	Cores  []Core  `json:"cores"`
-	Caches []Cache `json:"caches"`
+	Memory    uint64          `json:"memory"`
+	HugePages []HugePagesInfo `json:"hugepages"`
+	Cores     []Core          `json:"cores"`
+	Caches    []Cache         `json:"caches"`
 }
 
 type Core struct {
@@ -160,11 +161,22 @@ type MachineInfo struct {
 	// The number of cores in this machine.
 	NumCores int `json:"num_cores"`
 
+	// The number of physical cores in this machine.
+	NumPhysicalCores int `json:"num_physical_cores"`
+
+	// The number of cpu sockets in this machine.
+	NumSockets int `json:"num_sockets"`
+
 	// Maximum clock speed for the cores, in KHz.
 	CpuFrequency uint64 `json:"cpu_frequency_khz"`
 
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
+
+	// Memory capacity and number of DIMMs by memory type
+	MemoryByType map[string]*MemoryInfo `json:"memory_by_type"`
+
+	NVMInfo NVMInfo `json:"nvm"`
 
 	// HugePages on this machine.
 	HugePages []HugePagesInfo `json:"hugepages"`
@@ -199,6 +211,25 @@ type MachineInfo struct {
 
 	// ID of cloud instance (e.g. instance-1) given to it by the cloud provider.
 	InstanceID InstanceID `json:"instance_id"`
+}
+
+type MemoryInfo struct {
+	// The amount of memory (in bytes).
+	Capacity uint64 `json:"capacity"`
+
+	// Number of memory DIMMs.
+	DimmCount uint `json:"dimm_count"`
+}
+
+type NVMInfo struct {
+	// The total NVM capacity in bytes for memory mode.
+	MemoryModeCapacity uint64 `json:"memory_mode_capacity"`
+
+	//The total NVM capacity in bytes for app direct mode.
+	AppDirectModeCapacity uint64 `json:"app direct_mode_capacity"`
+
+	// Average power budget in watts for NVM devices configured in BIOS.
+	AvgPowerBudget uint `json:"avg_power_budget"`
 }
 
 type VersionInfo struct {

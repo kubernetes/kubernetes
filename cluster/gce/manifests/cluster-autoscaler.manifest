@@ -17,7 +17,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "k8s.gcr.io/cluster-autoscaler:v1.13.0",
+                "image": "k8s.gcr.io/cluster-autoscaler:v1.18.0",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
@@ -27,14 +27,16 @@
                     "periodSeconds": 60
                 },
                 "command": [
-                    "./run.sh",
+                    "/cluster-autoscaler",
                     "--kubernetes=https://127.0.0.1:443",
                     "--v=4",
-                    "--logtostderr=true",
+                    "--logtostderr=false",
+                    "--log-file=/var/log/cluster-autoscaler.log",
+                    "--log-file-max-size=0",
                     "--write-status-configmap=true",
                     "--balance-similar-node-groups=true",
-		    "--expendable-pods-priority-cutoff=-10",
-                    "{{params}}"
+                    "--expendable-pods-priority-cutoff=-10",
+                    {{params}}
                 ],
                 "env": [
                     {

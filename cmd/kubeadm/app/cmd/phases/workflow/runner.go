@@ -18,7 +18,6 @@ package workflow
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -308,7 +307,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	// adds the phases subcommand
 	phaseCommand := &cobra.Command{
 		Use:   "phase",
-		Short: fmt.Sprintf("use this command to invoke single phase of the %s workflow", cmd.Name()),
+		Short: fmt.Sprintf("Use this command to invoke single phase of the %s workflow", cmd.Name()),
 	}
 
 	cmd.AddCommand(phaseCommand)
@@ -336,20 +335,17 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			Long:    p.Long,
 			Example: p.Example,
 			Aliases: p.Aliases,
-			Run: func(cmd *cobra.Command, args []string) {
+			RunE: func(cmd *cobra.Command, args []string) error {
 				// if the phase has subphases, print the help and exits
 				if len(p.Phases) > 0 {
 					cmd.Help()
-					return
+					return nil
 				}
 
 				// overrides the command triggering the Runner using the phaseCmd
 				e.runCmd = cmd
 				e.Options.FilterPhases = []string{phaseSelector}
-				if err := e.Run(args); err != nil {
-					fmt.Fprintln(os.Stderr, err)
-					os.Exit(1)
-				}
+				return e.Run(args)
 			},
 		}
 
@@ -372,6 +368,12 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 		// if this phase has children (not a leaf) it doesn't accept any args
 		if len(p.Phases) > 0 {
 			phaseCmd.Args = cobra.NoArgs
+		} else {
+			if p.ArgsValidator == nil {
+				phaseCmd.Args = cmd.Args
+			} else {
+				phaseCmd.Args = p.ArgsValidator
+			}
 		}
 
 		// adds the command to parent

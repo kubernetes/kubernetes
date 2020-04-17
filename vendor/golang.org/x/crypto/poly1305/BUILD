@@ -3,13 +3,16 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "bits_compat.go",
+        "bits_go1.13.go",
+        "mac_noasm.go",
         "poly1305.go",
         "sum_amd64.go",
         "sum_amd64.s",
-        "sum_arm.go",
-        "sum_arm.s",
+        "sum_generic.go",
         "sum_noasm.go",
-        "sum_ref.go",
+        "sum_ppc64le.go",
+        "sum_ppc64le.s",
         "sum_s390x.go",
         "sum_s390x.s",
         "sum_vmsl_s390x.s",
@@ -17,6 +20,12 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/poly1305",
     importpath = "golang.org/x/crypto/poly1305",
     visibility = ["//visibility:public"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:s390x": [
+            "//vendor/golang.org/x/sys/cpu:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

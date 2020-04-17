@@ -17,6 +17,7 @@ limitations under the License.
 package finalizer
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -25,7 +26,9 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,11 +38,22 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 )
+
+// OverlappingBuiltInResources returns the set of built-in group/resources that are persisted
+// in storage paths that overlap with CRD storage paths, and should not be deleted
+// by this controller if an associated CRD is deleted.
+func OverlappingBuiltInResources() map[schema.GroupResource]bool {
+	return map[schema.GroupResource]bool{
+		{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             true,
+		{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: true,
+	}
+}
 
 // CRDFinalizer is a controller that finalizes the CRD by deleting all the CRs associated with it.
 type CRDFinalizer struct {
@@ -65,7 +79,7 @@ type ListerCollectionDeleter interface {
 type CRClientGetter interface {
 	// GetCustomResourceListerCollectionDeleter gets the ListerCollectionDeleter for the given CRD
 	// UID.
-	GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (ListerCollectionDeleter, error)
+	GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (ListerCollectionDeleter, error)
 }
 
 // NewCRDFinalizer creates a new CRDFinalizer.
@@ -102,65 +116,75 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	// no work to do
-	if cachedCRD.DeletionTimestamp.IsZero() || !apiextensions.CRDHasFinalizer(cachedCRD, apiextensions.CustomResourceCleanupFinalizer) {
+	if cachedCRD.DeletionTimestamp.IsZero() || !apiextensionshelpers.CRDHasFinalizer(cachedCRD, apiextensionsv1.CustomResourceCleanupFinalizer) {
 		return nil
 	}
 
 	crd := cachedCRD.DeepCopy()
 
 	// update the status condition.  This cleanup could take a while.
-	apiextensions.SetCRDCondition(crd, apiextensions.CustomResourceDefinitionCondition{
-		Type:    apiextensions.Terminating,
-		Status:  apiextensions.ConditionTrue,
+	apiextensionshelpers.SetCRDCondition(crd, apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:    apiextensionsv1.Terminating,
+		Status:  apiextensionsv1.ConditionTrue,
 		Reason:  "InstanceDeletionInProgress",
 		Message: "CustomResource deletion is in progress",
 	})
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 
 	// Now we can start deleting items.  We should use the REST API to ensure that all normal admission runs.
 	// Since we control the endpoints, we know that delete collection works. No need to delete if not established.
-	if apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+	if OverlappingBuiltInResources()[schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}] {
+		// Skip deletion, explain why, and proceed to remove the finalizer and delete the CRD
+		apiextensionshelpers.SetCRDCondition(crd, apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Terminating,
+			Status:  apiextensionsv1.ConditionFalse,
+			Reason:  "OverlappingBuiltInResource",
+			Message: "instances overlap with built-in resources in storage",
+		})
+	} else if apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
 		cond, deleteErr := c.deleteInstances(crd)
-		apiextensions.SetCRDCondition(crd, cond)
+		apiextensionshelpers.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
-			crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
-			if err != nil {
+			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{}); err != nil {
 				utilruntime.HandleError(err)
 			}
 			return deleteErr
 		}
 	} else {
-		apiextensions.SetCRDCondition(crd, apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.Terminating,
-			Status:  apiextensions.ConditionFalse,
+		apiextensionshelpers.SetCRDCondition(crd, apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Terminating,
+			Status:  apiextensionsv1.ConditionFalse,
 			Reason:  "NeverEstablished",
 			Message: "resource was never established",
 		})
 	}
 
-	apiextensions.CRDRemoveFinalizer(crd, apiextensions.CustomResourceCleanupFinalizer)
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
-	if err != nil {
-		return err
+	apiextensionshelpers.CRDRemoveFinalizer(crd, apiextensionsv1.CustomResourceCleanupFinalizer)
+	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
 	}
-
-	// and now issue another delete, which should clean it all up if no finalizers remain or no-op if they do
-	return c.crdClient.CustomResourceDefinitions().Delete(crd.Name, nil)
+	return err
 }
 
-func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefinition) (apiextensions.CustomResourceDefinitionCondition, error) {
+func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefinition) (apiextensionsv1.CustomResourceDefinitionCondition, error) {
 	// Now we can start deleting items. While it would be ideal to use a REST API client, doing so
 	// could incorrectly delete a ThirdPartyResource with the same URL as the CustomResource, so we go
 	// directly to the storage instead. Since we control the storage, we know that delete collection works.
 	crClient, err := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd)
 	if err != nil {
 		err = fmt.Errorf("unable to find a custom resource client for %s.%s: %v", crd.Status.AcceptedNames.Plural, crd.Spec.Group, err)
-		return apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.Terminating,
-			Status:  apiextensions.ConditionTrue,
+		return apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Terminating,
+			Status:  apiextensionsv1.ConditionTrue,
 			Reason:  "InstanceDeletionFailed",
 			Message: fmt.Sprintf("could not list instances: %v", err),
 		}, err
@@ -169,9 +193,9 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 	ctx := genericapirequest.NewContext()
 	allResources, err := crClient.List(ctx, nil)
 	if err != nil {
-		return apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.Terminating,
-			Status:  apiextensions.ConditionTrue,
+		return apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Terminating,
+			Status:  apiextensionsv1.ConditionTrue,
 			Reason:  "InstanceDeletionFailed",
 			Message: fmt.Sprintf("could not list instances: %v", err),
 		}, err
@@ -191,15 +215,15 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		// don't retry deleting the same namespace
 		deletedNamespaces.Insert(metadata.GetNamespace())
 		nsCtx := genericapirequest.WithNamespace(ctx, metadata.GetNamespace())
-		if _, err := crClient.DeleteCollection(nsCtx, nil, nil); err != nil {
+		if _, err := crClient.DeleteCollection(nsCtx, rest.ValidateAllObjectFunc, nil, nil); err != nil {
 			deleteErrors = append(deleteErrors, err)
 			continue
 		}
 	}
 	if deleteError := utilerrors.NewAggregate(deleteErrors); deleteError != nil {
-		return apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.Terminating,
-			Status:  apiextensions.ConditionTrue,
+		return apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Terminating,
+			Status:  apiextensionsv1.ConditionTrue,
 			Reason:  "InstanceDeletionFailed",
 			Message: fmt.Sprintf("could not issue all deletes: %v", deleteError),
 		}, deleteError
@@ -220,16 +244,16 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		return false, nil
 	})
 	if err != nil {
-		return apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.Terminating,
-			Status:  apiextensions.ConditionTrue,
+		return apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Terminating,
+			Status:  apiextensionsv1.ConditionTrue,
 			Reason:  "InstanceDeletionCheck",
 			Message: fmt.Sprintf("could not confirm zero CustomResources remaining: %v", err),
 		}, err
 	}
-	return apiextensions.CustomResourceDefinitionCondition{
-		Type:    apiextensions.Terminating,
-		Status:  apiextensions.ConditionFalse,
+	return apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:    apiextensionsv1.Terminating,
+		Status:  apiextensionsv1.ConditionFalse,
 		Reason:  "InstanceDeletionCompleted",
 		Message: "removed all instances",
 	}, nil
@@ -278,10 +302,10 @@ func (c *CRDFinalizer) processNextWorkItem() bool {
 	return true
 }
 
-func (c *CRDFinalizer) enqueue(obj *apiextensions.CustomResourceDefinition) {
+func (c *CRDFinalizer) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 
@@ -289,18 +313,18 @@ func (c *CRDFinalizer) enqueue(obj *apiextensions.CustomResourceDefinition) {
 }
 
 func (c *CRDFinalizer) addCustomResourceDefinition(obj interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	// only queue deleted things
-	if !castObj.DeletionTimestamp.IsZero() && apiextensions.CRDHasFinalizer(castObj, apiextensions.CustomResourceCleanupFinalizer) {
+	if !castObj.DeletionTimestamp.IsZero() && apiextensionshelpers.CRDHasFinalizer(castObj, apiextensionsv1.CustomResourceCleanupFinalizer) {
 		c.enqueue(castObj)
 	}
 }
 
 func (c *CRDFinalizer) updateCustomResourceDefinition(oldObj, newObj interface{}) {
-	oldCRD := oldObj.(*apiextensions.CustomResourceDefinition)
-	newCRD := newObj.(*apiextensions.CustomResourceDefinition)
+	oldCRD := oldObj.(*apiextensionsv1.CustomResourceDefinition)
+	newCRD := newObj.(*apiextensionsv1.CustomResourceDefinition)
 	// only queue deleted things that haven't been finalized by us
-	if newCRD.DeletionTimestamp.IsZero() || !apiextensions.CRDHasFinalizer(newCRD, apiextensions.CustomResourceCleanupFinalizer) {
+	if newCRD.DeletionTimestamp.IsZero() || !apiextensionshelpers.CRDHasFinalizer(newCRD, apiextensionsv1.CustomResourceCleanupFinalizer) {
 		return
 	}
 
@@ -318,8 +342,8 @@ func (c *CRDFinalizer) updateCustomResourceDefinition(oldObj, newObj interface{}
 	newCopy := newCRD.DeepCopy()
 	oldCopy.ResourceVersion = ""
 	newCopy.ResourceVersion = ""
-	apiextensions.RemoveCRDCondition(oldCopy, apiextensions.Terminating)
-	apiextensions.RemoveCRDCondition(newCopy, apiextensions.Terminating)
+	apiextensionshelpers.RemoveCRDCondition(oldCopy, apiextensionsv1.Terminating)
+	apiextensionshelpers.RemoveCRDCondition(newCopy, apiextensionsv1.Terminating)
 
 	if !reflect.DeepEqual(oldCopy, newCopy) {
 		c.enqueue(newCRD)

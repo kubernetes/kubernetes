@@ -1,5 +1,11 @@
 #cloud-config
 
+users:
+- name: etcd
+  homedir: /var/etcd
+  lock_passwd: true
+  ssh_redirect_user: true
+
 write_files:
   - path: /etc/systemd/system/kube-master-installation.service
     permissions: 0644
@@ -83,10 +89,10 @@ write_files:
     owner: root
     content: |
       [Unit]
-      Description=Hourly kube-logrotate invocation
+      Description=kube-logrotate invocation
 
       [Timer]
-      OnCalendar=hourly
+      OnCalendar=*-*-* *:00/5:00
 
       [Install]
       WantedBy=kubernetes.target

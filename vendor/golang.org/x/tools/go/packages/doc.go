@@ -70,7 +70,7 @@ according to the conventions of the underlying build system.
 See the Example function for typical usage.
 
 */
-package packages
+package packages // import "golang.org/x/tools/go/packages"
 
 /*
 

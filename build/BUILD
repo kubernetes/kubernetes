@@ -1,9 +1,10 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load(":code_generation_test.bzl", "code_generation_test_suite")
-load(":platforms.bzl", "for_platforms")
+load(":container.bzl", "multi_arch_container", "multi_arch_container_push")
+load(":platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
 
 code_generation_test_suite(
     name = "code_generation_tests",
@@ -19,9 +20,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//build/debs:all-srcs",
         "//build/release-tars:all-srcs",
-        "//build/rpms:all-srcs",
         "//build/visible_to:all-srcs",
     ],
     tags = ["automanaged"],
@@ -30,65 +29,68 @@ filegroup(
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
-    "cloud-controller-manager": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
-        "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
-    },
     "kube-apiserver": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": select(for_platforms(
-            for_node = "@debian-base-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": select(for_platforms(
-            for_node = "@debian-iptables-{ARCH}//image",
-            only_os = "linux",
-        )),
+        "base": "@debian-iptables-{ARCH}//image",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
 
-[container_image(
-    name = binary + "-internal",
+[pkg_tar(
+    name = "%s-data-%s.tar" % (binary, arch),
+    srcs = select({"@io_bazel_rules_go//go/platform:" + arch: ["//cmd/" + binary]}),
+    mode = "0755",
+    package_dir = "/usr/bin",
+    tags = ["manual"],
+    visibility = ["//visibility:private"],
+) for binary in DOCKERIZED_BINARIES.keys() for arch in SERVER_PLATFORMS["linux"]]
+
+# When pushing to gcr.io, we want to use an arch, since the archless name is now used for a
+# manifest list. Bazel doesn't support manifest lists (yet), so we can't do that either.
+[multi_arch_container(
+    name = binary,
+    architectures = SERVER_PLATFORMS["linux"],
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
-    debs = select(for_platforms(
-        for_node = ["//build/debs:%s-{ARCH}.deb" % binary],
-        only_os = "linux",
-    )),
+    # Since the multi_arch_container macro replaces the {ARCH} format string,
+    # we need to escape the stamping vars.
+    docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
+    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
     stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
         # but the debs install the binaries into /usr/bin.
         "/usr/local/bin/" + binary: "/usr/bin/" + binary,
     },
+    tags = ["manual"],
+    tars = select(for_platforms(
+        for_server = [":%s-data-{ARCH}.tar" % binary],
+        only_os = "linux",
+    )),
+    visibility = ["//visibility:private"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
-[container_bundle(
-    name = binary,
-    images = {
-        "k8s.gcr.io/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal",
+# Also roll up all images into a single bundle to push with one target.
+multi_arch_container_push(
+    name = "server-images",
+    architectures = SERVER_PLATFORMS["linux"],
+    docker_tags_images = {
+        "{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary: "%s-internal" % binary
+        for binary in DOCKERIZED_BINARIES.keys()
     },
-) for binary in DOCKERIZED_BINARIES.keys()]
+    tags = ["manual"],
+)
 
 [genrule(
     name = binary + "_docker_tag",
@@ -141,8 +143,6 @@ release_filegroup(
     name = "server-targets",
     conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
-        "//cmd/cloud-controller-manager",
-        "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",
@@ -166,6 +166,7 @@ filegroup(
             "//cmd/linkcheck",
             "//test/e2e:e2e.test_binary",
             "//vendor/github.com/onsi/ginkgo/ginkgo",
+            "//cluster/images/conformance/go-runner",
         ],
     )),
 )
@@ -174,7 +175,6 @@ filegroup(
 filegroup(
     name = "test-portable-targets",
     srcs = [
-        "//hack:e2e.go",
         "//hack:get-build.sh",
         "//hack:ginkgo-e2e.sh",
         "//hack/e2e-internal:all-srcs",

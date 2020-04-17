@@ -29,8 +29,8 @@ import (
 //
 // ktop and kbot determine a block [ktop:kbot+1,ktop:kbot+1] along the diagonal
 // of H. It must hold that
-//  0 <= ilo <= ihi < n,     if n > 0,
-//  ilo == 0 and ihi == -1,  if n == 0,
+//  0 <= ilo <= ihi < n     if n > 0,
+//  ilo == 0 and ihi == -1  if n == 0,
 // and the block must be isolated, that is, it must hold that
 //  ktop == 0   or H[ktop,ktop-1] == 0,
 //  kbot == n-1 or H[kbot+1,kbot] == 0,
@@ -80,48 +80,38 @@ import (
 //
 func (impl Implementation) Dlaqr23(wantt, wantz bool, n, ktop, kbot, nw int, h []float64, ldh int, iloz, ihiz int, z []float64, ldz int, sr, si []float64, v []float64, ldv int, nh int, t []float64, ldt int, nv int, wv []float64, ldwv int, work []float64, lwork int, recur int) (ns, nd int) {
 	switch {
+	case n < 0:
+		panic(nLT0)
 	case ktop < 0 || max(0, n-1) < ktop:
-		panic("lapack: invalid value of ktop")
+		panic(badKtop)
 	case kbot < min(ktop, n-1) || n <= kbot:
-		panic("lapack: invalid value of kbot")
-	case (nw < 0 || kbot-ktop+1 < nw) && lwork != -1:
-		panic("lapack: invalid value of nw")
+		panic(badKbot)
+	case nw < 0 || kbot-ktop+1+1 < nw:
+		panic(badNw)
+	case ldh < max(1, n):
+		panic(badLdH)
+	case wantz && (iloz < 0 || ktop < iloz):
+		panic(badIloz)
+	case wantz && (ihiz < kbot || n <= ihiz):
+		panic(badIhiz)
+	case ldz < 1, wantz && ldz < n:
+		panic(badLdZ)
+	case ldv < max(1, nw):
+		panic(badLdV)
 	case nh < nw:
-		panic("lapack: invalid value of nh")
+		panic(badNh)
+	case ldt < max(1, nh):
+		panic(badLdT)
+	case nv < 0:
+		panic(nvLT0)
+	case ldwv < max(1, nw):
+		panic(badLdWV)
 	case lwork < max(1, 2*nw) && lwork != -1:
-		panic(badWork)
-	case len(work) < lwork:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
 		panic(shortWork)
 	case recur < 0:
-		panic("lapack: recur is negative")
-	}
-	if wantz {
-		switch {
-		case iloz < 0 || ktop < iloz:
-			panic("lapack: invalid value of iloz")
-		case ihiz < kbot || n <= ihiz:
-			panic("lapack: invalid value of ihiz")
-		}
-	}
-	if lwork != -1 {
-		// Check input slices only if not doing workspace query.
-		checkMatrix(n, n, h, ldh)
-		checkMatrix(nw, nw, v, ldv)
-		checkMatrix(nw, nh, t, ldt)
-		checkMatrix(nv, nw, wv, ldwv)
-		if wantz {
-			checkMatrix(n, n, z, ldz)
-		}
-		switch {
-		case ktop > 0 && h[ktop*ldh+ktop-1] != 0:
-			panic("lapack: block not isolated")
-		case kbot+1 < n && h[(kbot+1)*ldh+kbot] != 0:
-			panic("lapack: block not isolated")
-		case len(sr) != kbot+1:
-			panic("lapack: bad length of sr")
-		case len(si) != kbot+1:
-			panic("lapack: bad length of si")
-		}
+		panic(recurLT0)
 	}
 
 	// Quick return for zero window size.
@@ -137,14 +127,14 @@ func (impl Implementation) Dlaqr23(wantt, wantz bool, n, ktop, kbot, nw int, h [
 	lwkopt := max(1, 2*nw)
 	if jw > 2 {
 		// Workspace query call to Dgehrd.
-		impl.Dgehrd(jw, 0, jw-2, nil, 0, nil, work, -1)
+		impl.Dgehrd(jw, 0, jw-2, t, ldt, work, work, -1)
 		lwk1 := int(work[0])
 		// Workspace query call to Dormhr.
-		impl.Dormhr(blas.Right, blas.NoTrans, jw, jw, 0, jw-2, nil, 0, nil, nil, 0, work, -1)
+		impl.Dormhr(blas.Right, blas.NoTrans, jw, jw, 0, jw-2, t, ldt, work, v, ldv, work, -1)
 		lwk2 := int(work[0])
 		if recur > 0 {
 			// Workspace query call to Dlaqr04.
-			impl.Dlaqr04(true, true, jw, 0, jw-1, nil, 0, nil, nil, 0, jw-1, nil, 0, work, -1, recur-1)
+			impl.Dlaqr04(true, true, jw, 0, jw-1, t, ldt, sr, si, 0, jw-1, v, ldv, work, -1, recur-1)
 			lwk3 := int(work[0])
 			// Optimal workspace.
 			lwkopt = max(jw+max(lwk1, lwk2), lwk3)
@@ -157,6 +147,28 @@ func (impl Implementation) Dlaqr23(wantt, wantz bool, n, ktop, kbot, nw int, h [
 	if lwork == -1 {
 		work[0] = float64(lwkopt)
 		return 0, 0
+	}
+
+	// Check input slices only if not doing workspace query.
+	switch {
+	case len(h) < (n-1)*ldh+n:
+		panic(shortH)
+	case len(v) < (nw-1)*ldv+nw:
+		panic(shortV)
+	case len(t) < (nw-1)*ldt+nh:
+		panic(shortT)
+	case len(wv) < (nv-1)*ldwv+nw:
+		panic(shortWV)
+	case wantz && len(z) < (n-1)*ldz+n:
+		panic(shortZ)
+	case len(sr) != kbot+1:
+		panic(badLenSr)
+	case len(si) != kbot+1:
+		panic(badLenSi)
+	case ktop > 0 && h[ktop*ldh+ktop-1] != 0:
+		panic(notIsolated)
+	case kbot+1 < n && h[(kbot+1)*ldh+kbot] != 0:
+		panic(notIsolated)
 	}
 
 	// Machine constants.

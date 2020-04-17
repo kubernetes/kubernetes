@@ -31,8 +31,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
+	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 const (
@@ -154,18 +156,13 @@ func TestRunCreateToken(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tc.token)
+			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tc.token)
 			if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
 				t.Fatalf("token couldn't be parsed for testing: %v", err)
 			}
 
-			cfg := &kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					// KubernetesVersion is not used, but we set this explicitly to avoid
-					// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
-					KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
-				},
-				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
+			cfg := &kubeadmapiv1beta2.InitConfiguration{
+				BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 					{
 						Token:  bts,
 						TTL:    &metav1.Duration{Duration: 0},
@@ -175,9 +172,11 @@ func TestRunCreateToken(t *testing.T) {
 				},
 			}
 
-			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
-			if (err != nil) != tc.expectedError {
-				t.Errorf("Test case %s: RunCreateToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
+			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "", "")
+			if tc.expectedError && err == nil {
+				t.Error("unexpected success")
+			} else if !tc.expectedError && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}
@@ -300,7 +299,7 @@ func TestGetClientset(t *testing.T) {
 	}
 }
 
-func TestRunDeleteToken(t *testing.T) {
+func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
 
 	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
@@ -327,12 +326,129 @@ func TestRunDeleteToken(t *testing.T) {
 
 	// test valid; should not fail
 	// for some reason Secrets().Delete() does not fail even for this dummy config
-	if err = RunDeleteToken(&buf, client, "abcdef.1234567890123456"); err != nil {
+	if err = RunDeleteTokens(&buf, client, []string{"abcdef.1234567890123456", "abcdef.2345678901234567"}); err != nil {
 		t.Errorf("RunDeleteToken() failed for a valid token: %v", err)
 	}
 
 	// test invalid token; should fail
-	if err = RunDeleteToken(&buf, client, "invalid-token"); err == nil {
+	if err = RunDeleteTokens(&buf, client, []string{"invalid-token"}); err == nil {
 		t.Errorf("RunDeleteToken() succeeded for an invalid token: %v", err)
+	}
+}
+
+func TestTokenOutput(t *testing.T) {
+	testCases := []struct {
+		name         string
+		id           string
+		secret       string
+		description  string
+		usages       []string
+		extraGroups  []string
+		outputFormat string
+		expected     string
+	}{
+		{
+			name:         "JSON output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "json",
+			expected: `{
+    "kind": "BootstrapToken",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "token": "abcdef.1234567890123456",
+    "description": "valid bootstrap tooken",
+    "usages": [
+        "signing",
+        "authentication"
+    ],
+    "groups": [
+        "system:bootstrappers:kubeadm:default-node-token"
+    ]
+}
+`,
+		},
+		{
+			name:         "YAML output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "yaml",
+			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+description: valid bootstrap tooken
+groups:
+- system:bootstrappers:kubeadm:default-node-token
+kind: BootstrapToken
+token: abcdef.1234567890123456
+usages:
+- signing
+- authentication
+`,
+		},
+		{
+			name:         "Go template output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "go-template={{println .token .description .usages .groups}}",
+			expected: `abcdef.1234567890123456 valid bootstrap tooken [signing authentication] [system:bootstrappers:kubeadm:default-node-token]
+`,
+		},
+		{
+			name:         "text output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "text",
+			expected: `TOKEN                     TTL         EXPIRES   USAGES                   DESCRIPTION                                                EXTRA GROUPS
+abcdef.1234567890123456   <forever>   <never>   signing,authentication   valid bootstrap tooken                                     system:bootstrappers:kubeadm:default-node-token
+`,
+		},
+		{
+			name:         "jsonpath output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "jsonpath={.token} {.groups}",
+			expected:     "abcdef.1234567890123456 [system:bootstrappers:kubeadm:default-node-token]",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			token := outputapiv1alpha1.BootstrapToken{
+				BootstrapToken: kubeadmapiv1beta2.BootstrapToken{
+					Token:       &kubeadmapiv1beta2.BootstrapTokenString{ID: tc.id, Secret: tc.secret},
+					Description: tc.description,
+					Usages:      tc.usages,
+					Groups:      tc.extraGroups,
+				},
+			}
+			buf := bytes.Buffer{}
+			outputFlags := output.NewOutputFlags(&tokenTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(tc.outputFormat)
+			printer, err := outputFlags.ToPrinter()
+			if err != nil {
+				t.Errorf("can't create printer for output format %s: %+v", tc.outputFormat, err)
+			}
+
+			if err := printer.PrintObj(&token, &buf); err != nil {
+				t.Errorf("unable to print token %s: %+v", token.Token, err)
+			}
+
+			actual := buf.String()
+			if actual != tc.expected {
+				t.Errorf(
+					"failed TestTokenOutput:\n\nexpected:\n%s\n\nactual:\n%s", tc.expected, actual)
+			}
+		})
 	}
 }

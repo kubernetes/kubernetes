@@ -25,8 +25,9 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpath "k8s.io/utils/path"
@@ -36,12 +37,13 @@ import (
 // Set to true if the wrong build tags are set (see validate_disabled.go).
 var isDisabledBuild bool
 
-// Interface for validating that a pod with an AppArmor profile can be run by a Node.
+// Validator is a interface for validating that a pod with an AppArmor profile can be run by a Node.
 type Validator interface {
 	Validate(pod *v1.Pod) error
 	ValidateHost() error
 }
 
+// NewValidator is in order to find AppArmor FS
 func NewValidator(runtime string) Validator {
 	if err := validateHost(runtime); err != nil {
 		return &validator{validateHostErr: err}
@@ -76,18 +78,16 @@ func (v *validator) Validate(pod *v1.Pod) error {
 		return fmt.Errorf("could not read loaded profiles: %v", err)
 	}
 
-	for _, container := range pod.Spec.InitContainers {
-		if err := validateProfile(GetProfileName(pod, container.Name), loadedProfiles); err != nil {
-			return err
+	var retErr error
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+		retErr = validateProfile(GetProfileName(pod, container.Name), loadedProfiles)
+		if retErr != nil {
+			return false
 		}
-	}
-	for _, container := range pod.Spec.Containers {
-		if err := validateProfile(GetProfileName(pod, container.Name), loadedProfiles); err != nil {
-			return err
-		}
-	}
+		return true
+	})
 
-	return nil
+	return retErr
 }
 
 func (v *validator) ValidateHost() error {
@@ -103,7 +103,7 @@ func validateHost(runtime string) error {
 
 	// Check build support.
 	if isDisabledBuild {
-		return errors.New("Binary not compiled for linux")
+		return errors.New("binary not compiled for linux")
 	}
 
 	// Check kernel support.
@@ -113,7 +113,7 @@ func validateHost(runtime string) error {
 
 	// Check runtime support. Currently only Docker is supported.
 	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q.", runtime)
+		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q", runtime)
 	}
 
 	return nil
@@ -125,8 +125,8 @@ func validateProfile(profile string, loadedProfiles map[string]bool) error {
 		return err
 	}
 
-	if strings.HasPrefix(profile, ProfileNamePrefix) {
-		profileName := strings.TrimPrefix(profile, ProfileNamePrefix)
+	if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
+		profileName := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
 		if !loadedProfiles[profileName] {
 			return fmt.Errorf("profile %q is not loaded", profileName)
 		}
@@ -135,11 +135,12 @@ func validateProfile(profile string, loadedProfiles map[string]bool) error {
 	return nil
 }
 
+// ValidateProfileFormat checks the format of the profile.
 func ValidateProfileFormat(profile string) error {
-	if profile == "" || profile == ProfileRuntimeDefault || profile == ProfileNameUnconfined {
+	if profile == "" || profile == v1.AppArmorBetaProfileRuntimeDefault || profile == v1.AppArmorBetaProfileNameUnconfined {
 		return nil
 	}
-	if !strings.HasPrefix(profile, ProfileNamePrefix) {
+	if !strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
 	}
 	return nil
@@ -199,12 +200,10 @@ func getAppArmorFS() (string, error) {
 				msg := fmt.Sprintf("path %s does not exist", appArmorFS)
 				if err != nil {
 					return "", fmt.Errorf("%s: %v", msg, err)
-				} else {
-					return "", errors.New(msg)
 				}
-			} else {
-				return appArmorFS, nil
+				return "", errors.New(msg)
 			}
+			return appArmorFS, nil
 		}
 	}
 	if err := scanner.Err(); err != nil {

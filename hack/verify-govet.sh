@@ -14,18 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a vestigial redirection.  Please do not add "real" logic.
+# This script vets all *.go files by running `go vet`. It is equivalent to
+# `make vet`.
+# Usage: `hack/verify-govet.sh` or `make vet`.
+# Note: This script is a vestigial redirection. Please do not add "real" logic.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # For help output
 ARGHELP=""
 if [[ "$#" -gt 0 ]]; then
-    ARGHELP="WHAT='$@'"
+    ARGHELP="WHAT='$*'"
 fi
 
-make --no-print-directory -C "${KUBE_ROOT}" vet WHAT="$@"
+echo "NOTE: $0 has been replaced by 'make vet'"
+echo
+echo "The equivalent of this invocation is: "
+echo "    make vet ${ARGHELP}"
+echo
+echo
+
+make --no-print-directory -C "${KUBE_ROOT}" vet WHAT="$*"

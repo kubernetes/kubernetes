@@ -47,11 +47,18 @@ var (
 		- 'journalctl -xeu kubelet'
 
 	Additionally, a control plane component may have crashed or exited when started by the container runtime.
-	To troubleshoot, list all containers using your preferred container runtimes CLI, e.g. docker.
+	To troubleshoot, list all containers using your preferred container runtimes CLI.
+{{ if .IsDocker }}
 	Here is one example how you may list all Kubernetes containers running in docker:
 		- 'docker ps -a | grep kube | grep -v pause'
 		Once you have found the failing container, you can inspect its logs with:
 		- 'docker logs CONTAINERID'
+{{ else }}
+	Here is one example how you may list all Kubernetes containers running in cri-o/containerd using crictl:
+		- 'crictl --runtime-endpoint {{ .Socket }} ps -a | grep kube | grep -v pause'
+		Once you have found the failing container, you can inspect its logs with:
+		- 'crictl --runtime-endpoint {{ .Socket }} logs CONTAINERID'
+{{ end }}
 	`)))
 )
 
@@ -93,10 +100,17 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)
 
 	if err := waiter.WaitForKubeletAndFunc(waiter.WaitForAPI); err != nil {
-		ctx := map[string]string{
-			"Error": fmt.Sprintf("%v", err),
+		context := struct {
+			Error    string
+			Socket   string
+			IsDocker bool
+		}{
+			Error:    fmt.Sprintf("%v", err),
+			Socket:   data.Cfg().NodeRegistration.CRISocket,
+			IsDocker: data.Cfg().NodeRegistration.CRISocket == kubeadmconstants.DefaultDockerCRISocket,
 		}
-		kubeletFailTempl.Execute(data.OutputWriter(), ctx)
+
+		kubeletFailTempl.Execute(data.OutputWriter(), context)
 		return errors.New("couldn't initialize a Kubernetes cluster")
 	}
 
@@ -133,8 +147,7 @@ func printFilesIfDryRunning(data InitData) error {
 	return dryrunutil.PrintDryRunFiles(files, data.OutputWriter())
 }
 
-// NewControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.
-// TODO: make private (lowercase) after self-hosting phase is removed.
+// newControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.
 func newControlPlaneWaiter(dryRun bool, timeout time.Duration, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
 	if dryRun {
 		return dryrunutil.NewWaiter(), nil

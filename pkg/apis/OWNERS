@@ -45,7 +45,6 @@ filters:
     - madhusudancs
     - krousey
     - rootfs
-    - jszczepkowski
 
   # examples:
   #   pkg/apis/*/types.go

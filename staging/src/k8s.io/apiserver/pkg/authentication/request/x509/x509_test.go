@@ -657,6 +657,7 @@ func TestX509(t *testing.T) {
 			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
 		}
 
+		// this effectively tests the simple dynamic verify function.
 		a := New(testCase.Opts, testCase.User)
 
 		resp, ok, err := a.AuthenticateRequest(req)

@@ -29,11 +29,11 @@ import (
 type JSONPath struct {
 	name       string
 	parser     *Parser
-	stack      [][]reflect.Value // push and pop values in different scopes
-	cur        []reflect.Value   // current scope values
 	beginRange int
 	inRange    int
 	endRange   int
+
+	lastEndNode *Node
 
 	allowMissingKeys bool
 }
@@ -81,37 +81,44 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 		return nil, fmt.Errorf("%s is an incomplete jsonpath template", j.name)
 	}
 
-	j.cur = []reflect.Value{reflect.ValueOf(data)}
+	cur := []reflect.Value{reflect.ValueOf(data)}
 	nodes := j.parser.Root.Nodes
 	fullResult := [][]reflect.Value{}
 	for i := 0; i < len(nodes); i++ {
 		node := nodes[i]
-		results, err := j.walk(j.cur, node)
+		results, err := j.walk(cur, node)
 		if err != nil {
 			return nil, err
 		}
 
 		// encounter an end node, break the current block
 		if j.endRange > 0 && j.endRange <= j.inRange {
-			j.endRange -= 1
+			j.endRange--
+			j.lastEndNode = &nodes[i]
 			break
 		}
 		// encounter a range node, start a range loop
 		if j.beginRange > 0 {
-			j.beginRange -= 1
-			j.inRange += 1
-			for k, value := range results {
+			j.beginRange--
+			j.inRange++
+			for _, value := range results {
 				j.parser.Root.Nodes = nodes[i+1:]
-				if k == len(results)-1 {
-					j.inRange -= 1
-				}
 				nextResults, err := j.FindResults(value.Interface())
 				if err != nil {
 					return nil, err
 				}
 				fullResult = append(fullResult, nextResults...)
 			}
-			break
+			j.inRange--
+
+			// Fast forward to resume processing after the most recent end node that was encountered
+			for k := i + 1; k < len(nodes); k++ {
+				if &nodes[k] == j.lastEndNode {
+					i = k
+					break
+				}
+			}
+			continue
 		}
 		fullResult = append(fullResult, results)
 	}
@@ -212,17 +219,11 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 	results := []reflect.Value{}
 	switch node.Name {
 	case "range":
-		j.stack = append(j.stack, j.cur)
-		j.beginRange += 1
+		j.beginRange++
 		results = input
 	case "end":
-		if j.endRange < j.inRange { // inside a loop, break the current block
-			j.endRange += 1
-			break
-		}
-		// the loop is about to end, pop value and continue the following execution
-		if len(j.stack) > 0 {
-			j.cur, j.stack = j.stack[len(j.stack)-1], j.stack[:len(j.stack)-1]
+		if j.inRange > 0 {
+			j.endRange++
 		} else {
 			return results, fmt.Errorf("not in range, nothing to end")
 		}

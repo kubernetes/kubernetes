@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -113,9 +114,7 @@ func CreateTestClient() *fake.Clientset {
 			}
 			obj.Items = append(obj.Items, pod)
 		}
-		for _, pod := range extraPods.Items {
-			obj.Items = append(obj.Items, pod)
-		}
+		obj.Items = append(obj.Items, extraPods.Items...)
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -123,6 +122,26 @@ func CreateTestClient() *fake.Clientset {
 		pod := createAction.GetObject().(*v1.Pod)
 		extraPods.Items = append(extraPods.Items, *pod)
 		return true, createAction.GetObject(), nil
+	})
+	fakeClient.AddReactor("list", "csinodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &storagev1.CSINodeList{}
+		nodeNamePrefix := "mynode"
+		for i := 0; i < 5; i++ {
+			var nodeName string
+			if i != 0 {
+				nodeName = fmt.Sprintf("%s-%d", nodeNamePrefix, i)
+			} else {
+				// We want also the "mynode" node since all the testing pods live there
+				nodeName = nodeNamePrefix
+			}
+			csiNode := storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+				},
+			}
+			obj.Items = append(obj.Items, csiNode)
+		}
+		return true, obj, nil
 	})
 	fakeClient.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.NodeList{}
@@ -253,10 +272,6 @@ func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *TestPlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *TestPlugin) RequiresRemount() bool {
 	return false
 }
@@ -310,8 +325,12 @@ func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	return &detacher, nil
 }
 
-func (plugin *TestPlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *TestPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *TestPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *TestPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {

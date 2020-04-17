@@ -39,10 +39,13 @@ import (
 )
 
 func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
+	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
+	if !ctx.AvailableResources[gvr] {
+		klog.Warningf("Resource %s is not available now", gvr.String())
 		return nil, false, nil
 	}
 	if ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == "" {
+		klog.V(2).Info("skipping CSR signer controller because no csr cert/key was specified")
 		return nil, false, nil
 	}
 
@@ -77,6 +80,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		// setting up the signing controller. This isn't
 		// actually a problem since the signer is not a
 		// required controller.
+		klog.V(2).Info("skipping CSR signer controller because no csr cert/key was specified and the default files are missing")
 		return nil, false, nil
 	default:
 		// Note that '!filesExist && !usesDefaults' is obviously
@@ -102,7 +106,9 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 }
 
 func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
+	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}
+	if !ctx.AvailableResources[gvr] {
+		klog.Warningf("Resource %s is not available now", gvr.String())
 		return nil, false, nil
 	}
 

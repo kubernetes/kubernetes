@@ -19,12 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
 )
 
 // ReplicaSetControllerOptions holds the ReplicaSetController options.
 type ReplicaSetControllerOptions struct {
-	*kubectrlmgrconfig.ReplicaSetControllerConfiguration
+	*replicasetconfig.ReplicaSetControllerConfiguration
 }
 
 // AddFlags adds flags related to ReplicaSetController for controller manager to the specified FlagSet.
@@ -37,7 +37,7 @@ func (o *ReplicaSetControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up ReplicaSetController config with options.
-func (o *ReplicaSetControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.ReplicaSetControllerConfiguration) error {
+func (o *ReplicaSetControllerOptions) ApplyTo(cfg *replicasetconfig.ReplicaSetControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

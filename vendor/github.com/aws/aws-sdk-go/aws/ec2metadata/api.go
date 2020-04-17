@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,8 +13,41 @@ import (
 	"github.com/aws/aws-sdk-go/internal/sdkuri"
 )
 
+// getToken uses the duration to return a token for EC2 metadata service,
+// or an error if the request failed.
+func (c *EC2Metadata) getToken(duration time.Duration) (tokenOutput, error) {
+	op := &request.Operation{
+		Name:       "GetToken",
+		HTTPMethod: "PUT",
+		HTTPPath:   "/api/token",
+	}
+
+	var output tokenOutput
+	req := c.NewRequest(op, nil, &output)
+
+	// remove the fetch token handler from the request handlers to avoid infinite recursion
+	req.Handlers.Sign.RemoveByName(fetchTokenHandlerName)
+
+	// Swap the unmarshalMetadataHandler with unmarshalTokenHandler on this request.
+	req.Handlers.Unmarshal.Swap(unmarshalMetadataHandlerName, unmarshalTokenHandler)
+
+	ttl := strconv.FormatInt(int64(duration/time.Second), 10)
+	req.HTTPRequest.Header.Set(ttlHeader, ttl)
+
+	err := req.Send()
+
+	// Errors with bad request status should be returned.
+	if err != nil {
+		err = awserr.NewRequestFailure(
+			awserr.New(req.HTTPResponse.Status, http.StatusText(req.HTTPResponse.StatusCode), err),
+			req.HTTPResponse.StatusCode, req.RequestID)
+	}
+
+	return output, err
+}
+
 // GetMetadata uses the path provided to request information from the EC2
-// instance metdata service. The content will be returned as a string, or
+// instance metadata service. The content will be returned as a string, or
 // error if the request failed.
 func (c *EC2Metadata) GetMetadata(p string) (string, error) {
 	op := &request.Operation{
@@ -21,11 +55,12 @@ func (c *EC2Metadata) GetMetadata(p string) (string, error) {
 		HTTPMethod: "GET",
 		HTTPPath:   sdkuri.PathJoin("/meta-data", p),
 	}
-
 	output := &metadataOutput{}
+
 	req := c.NewRequest(op, nil, output)
 
-	return output.Content, req.Send()
+	err := req.Send()
+	return output.Content, err
 }
 
 // GetUserData returns the userdata that was configured for the service. If
@@ -40,13 +75,9 @@ func (c *EC2Metadata) GetUserData() (string, error) {
 
 	output := &metadataOutput{}
 	req := c.NewRequest(op, nil, output)
-	req.Handlers.UnmarshalError.PushBack(func(r *request.Request) {
-		if r.HTTPResponse.StatusCode == http.StatusNotFound {
-			r.Error = awserr.New("NotFoundError", "user-data not found", r.Error)
-		}
-	})
 
-	return output.Content, req.Send()
+	err := req.Send()
+	return output.Content, err
 }
 
 // GetDynamicData uses the path provided to request information from the EC2
@@ -62,7 +93,8 @@ func (c *EC2Metadata) GetDynamicData(p string) (string, error) {
 	output := &metadataOutput{}
 	req := c.NewRequest(op, nil, output)
 
-	return output.Content, req.Send()
+	err := req.Send()
+	return output.Content, err
 }
 
 // GetInstanceIdentityDocument retrieves an identity document describing an
@@ -79,7 +111,7 @@ func (c *EC2Metadata) GetInstanceIdentityDocument() (EC2InstanceIdentityDocument
 	doc := EC2InstanceIdentityDocument{}
 	if err := json.NewDecoder(strings.NewReader(resp)).Decode(&doc); err != nil {
 		return EC2InstanceIdentityDocument{},
-			awserr.New("SerializationError",
+			awserr.New(request.ErrCodeSerialization,
 				"failed to decode EC2 instance identity document", err)
 	}
 
@@ -98,7 +130,7 @@ func (c *EC2Metadata) IAMInfo() (EC2IAMInfo, error) {
 	info := EC2IAMInfo{}
 	if err := json.NewDecoder(strings.NewReader(resp)).Decode(&info); err != nil {
 		return EC2IAMInfo{},
-			awserr.New("SerializationError",
+			awserr.New(request.ErrCodeSerialization,
 				"failed to decode EC2 IAM info", err)
 	}
 
@@ -113,17 +145,17 @@ func (c *EC2Metadata) IAMInfo() (EC2IAMInfo, error) {
 
 // Region returns the region the instance is running in.
 func (c *EC2Metadata) Region() (string, error) {
-	resp, err := c.GetMetadata("placement/availability-zone")
+	ec2InstanceIdentityDocument, err := c.GetInstanceIdentityDocument()
 	if err != nil {
 		return "", err
 	}
-
-	if len(resp) == 0 {
-		return "", awserr.New("EC2MetadataError", "invalid Region response", nil)
+	// extract region from the ec2InstanceIdentityDocument
+	region := ec2InstanceIdentityDocument.Region
+	if len(region) == 0 {
+		return "", awserr.New("EC2MetadataError", "invalid region received for ec2metadata instance", nil)
 	}
-
-	// returns region without the suffix. Eg: us-west-2a becomes us-west-2
-	return resp[:len(resp)-1], nil
+	// returns region
+	return region, nil
 }
 
 // Available returns if the application has access to the EC2 Metadata service.
@@ -149,18 +181,19 @@ type EC2IAMInfo struct {
 // An EC2InstanceIdentityDocument provides the shape for unmarshaling
 // an instance identity document
 type EC2InstanceIdentityDocument struct {
-	DevpayProductCodes []string  `json:"devpayProductCodes"`
-	AvailabilityZone   string    `json:"availabilityZone"`
-	PrivateIP          string    `json:"privateIp"`
-	Version            string    `json:"version"`
-	Region             string    `json:"region"`
-	InstanceID         string    `json:"instanceId"`
-	BillingProducts    []string  `json:"billingProducts"`
-	InstanceType       string    `json:"instanceType"`
-	AccountID          string    `json:"accountId"`
-	PendingTime        time.Time `json:"pendingTime"`
-	ImageID            string    `json:"imageId"`
-	KernelID           string    `json:"kernelId"`
-	RamdiskID          string    `json:"ramdiskId"`
-	Architecture       string    `json:"architecture"`
+	DevpayProductCodes      []string  `json:"devpayProductCodes"`
+	MarketplaceProductCodes []string  `json:"marketplaceProductCodes"`
+	AvailabilityZone        string    `json:"availabilityZone"`
+	PrivateIP               string    `json:"privateIp"`
+	Version                 string    `json:"version"`
+	Region                  string    `json:"region"`
+	InstanceID              string    `json:"instanceId"`
+	BillingProducts         []string  `json:"billingProducts"`
+	InstanceType            string    `json:"instanceType"`
+	AccountID               string    `json:"accountId"`
+	PendingTime             time.Time `json:"pendingTime"`
+	ImageID                 string    `json:"imageId"`
+	KernelID                string    `json:"kernelId"`
+	RamdiskID               string    `json:"ramdiskId"`
+	Architecture            string    `json:"architecture"`
 }

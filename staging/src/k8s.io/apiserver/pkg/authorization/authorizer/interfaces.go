@@ -17,6 +17,7 @@ limitations under the License.
 package authorizer
 
 import (
+	"context"
 	"net/http"
 
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -67,12 +68,12 @@ type Attributes interface {
 // zero or more calls to methods of the Attributes interface.  It returns nil when an action is
 // authorized, otherwise it returns an error.
 type Authorizer interface {
-	Authorize(a Attributes) (authorized Decision, reason string, err error)
+	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
 }
 
 type AuthorizerFunc func(a Attributes) (Decision, string, error)
 
-func (f AuthorizerFunc) Authorize(a Attributes) (Decision, string, error) {
+func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, string, error) {
 	return f(a)
 }
 

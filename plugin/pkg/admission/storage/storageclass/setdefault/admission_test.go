@@ -17,6 +17,7 @@ limitations under the License.
 package setdefault
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/klog"
@@ -24,6 +25,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
@@ -208,10 +210,11 @@ func TestAdmission(t *testing.T) {
 			api.Resource("persistentvolumeclaims").WithVersion("version"),
 			"", // subresource
 			admission.Create,
+			&metav1.CreateOptions{},
 			false, // dryRun
 			nil,   // userInfo
 		)
-		err := ctrl.Admit(attrs, nil)
+		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(context.TODO(), attrs, nil)
 		klog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)

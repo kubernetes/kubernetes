@@ -134,9 +134,9 @@ func Get(c *gophercloud.ServiceClient, token string) (r GetResult) {
 		OkCodes:     []int{200, 203},
 	})
 	if resp != nil {
-		r.Err = err
 		r.Header = resp.Header
 	}
+	r.Err = err
 	return
 }
 

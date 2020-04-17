@@ -29,6 +29,7 @@ Just periodically list jobs and SJs, and then reconcile them.
 */
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -38,6 +39,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,9 +48,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/pager"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -56,7 +59,8 @@ import (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batchv1beta1.SchemeGroupVersion.WithKind("CronJob")
 
-type CronJobController struct {
+// Controller is a controller for CronJobs.
+type Controller struct {
 	kubeClient clientset.Interface
 	jobControl jobControlInterface
 	sjControl  sjControlInterface
@@ -64,18 +68,19 @@ type CronJobController struct {
 	recorder   record.EventRecorder
 }
 
-func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, error) {
+// NewController creates and initializes a new Controller.
+func NewController(kubeClient clientset.Interface) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
 
-	jm := &CronJobController{
+	jm := &Controller{
 		kubeClient: kubeClient,
 		jobControl: realJobControl{KubeClient: kubeClient},
 		sjControl:  &realSJControl{KubeClient: kubeClient},
@@ -86,8 +91,8 @@ func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, e
 	return jm, nil
 }
 
-// Run the main goroutine responsible for watching and syncing jobs.
-func (jm *CronJobController) Run(stopCh <-chan struct{}) {
+// Run starts the main goroutine responsible for watching and syncing jobs.
+func (jm *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	klog.Infof("Starting CronJob Manager")
 	// Check things every 10 second.
@@ -97,33 +102,50 @@ func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 }
 
 // syncAll lists all the CronJobs and Jobs and reconciles them.
-func (jm *CronJobController) syncAll() {
+func (jm *Controller) syncAll() {
 	// List children (Jobs) before parents (CronJob).
 	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
 	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
 	// Note that this only works because we are NOT using any caches here.
-	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't list Jobs: %v", err))
-		return
+	jobListFunc := func(opts metav1.ListOptions) (runtime.Object, error) {
+		return jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(context.TODO(), opts)
 	}
-	js := jl.Items
-	klog.V(4).Infof("Found %d jobs", len(js))
 
-	sjl, err := jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+	js := make([]batchv1.Job, 0)
+	err := pager.New(pager.SimplePageFunc(jobListFunc)).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
+		jobTmp, ok := object.(*batchv1.Job)
+		if !ok {
+			return fmt.Errorf("expected type *batchv1.Job, got type %T", jobTmp)
+		}
+		js = append(js, *jobTmp)
+		return nil
+	})
+
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't list CronJobs: %v", err))
+		utilruntime.HandleError(fmt.Errorf("Failed to extract job list: %v", err))
 		return
 	}
-	sjs := sjl.Items
-	klog.V(4).Infof("Found %d cronjobs", len(sjs))
+
+	klog.V(4).Infof("Found %d jobs", len(js))
+	cronJobListFunc := func(opts metav1.ListOptions) (runtime.Object, error) {
+		return jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(context.TODO(), opts)
+	}
 
 	jobsBySj := groupJobsByParent(js)
 	klog.V(4).Infof("Found %d groups", len(jobsBySj))
+	err = pager.New(pager.SimplePageFunc(cronJobListFunc)).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
+		sj, ok := object.(*batchv1beta1.CronJob)
+		if !ok {
+			return fmt.Errorf("expected type *batchv1beta1.CronJob, got type %T", sj)
+		}
+		syncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.recorder)
+		cleanupFinishedJobs(sj, jobsBySj[sj.UID], jm.jobControl, jm.sjControl, jm.recorder)
+		return nil
+	})
 
-	for _, sj := range sjs {
-		syncOne(&sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.recorder)
-		cleanupFinishedJobs(&sj, jobsBySj[sj.UID], jm.jobControl, jm.sjControl, jm.recorder)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Failed to extract cronJobs list: %v", err))
+		return
 	}
 }
 
@@ -136,12 +158,12 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 	}
 
 	failedJobs := []batchv1.Job{}
-	succesfulJobs := []batchv1.Job{}
+	successfulJobs := []batchv1.Job{}
 
 	for _, job := range js {
 		isFinished, finishedStatus := getFinishedStatus(&job)
 		if isFinished && finishedStatus == batchv1.JobComplete {
-			succesfulJobs = append(succesfulJobs, job)
+			successfulJobs = append(successfulJobs, job)
 		} else if isFinished && finishedStatus == batchv1.JobFailed {
 			failedJobs = append(failedJobs, job)
 		}
@@ -149,7 +171,7 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 
 	if sj.Spec.SuccessfulJobsHistoryLimit != nil {
 		removeOldestJobs(sj,
-			succesfulJobs,
+			successfulJobs,
 			jc,
 			*sj.Spec.SuccessfulJobsHistoryLimit,
 			recorder)
@@ -199,7 +221,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		childrenJobs[j.ObjectMeta.UID] = true
 		found := inActiveList(*sj, j.ObjectMeta.UID)
 		if !found && !IsJobFinished(&j) {
-			recorder.Eventf(sj, v1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %v", j.Name)
+			recorder.Eventf(sj, v1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %s", j.Name)
 			// We found an unfinished job that has us as the parent, but it is not in our Active list.
 			// This could happen if we crashed right after creating the Job and before updating the status,
 			// or if our jobs list is newer than our sj status after a relist, or if someone intentionally created
@@ -211,9 +233,9 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 			// in the same namespace "adopt" that job.  ReplicaSets and their Pods work the same way.
 			// TBS: how to update sj.Status.LastScheduleTime if the adopted job is newer than any we knew about?
 		} else if found && IsJobFinished(&j) {
+			_, status := getFinishedStatus(&j)
 			deleteFromActiveList(sj, j.ObjectMeta.UID)
-			// TODO: event to call out failure vs success.
-			recorder.Eventf(sj, v1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %v", j.Name)
+			recorder.Eventf(sj, v1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, status: %v", j.Name, status)
 		}
 	}
 
@@ -312,7 +334,11 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	}
 	jobResp, err := jc.CreateJob(sj.Namespace, jobReq)
 	if err != nil {
-		recorder.Eventf(sj, v1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
+		// If the namespace is being torn down, we can safely ignore
+		// this error since all subsequent creations will fail.
+		if !errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			recorder.Eventf(sj, v1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
+		}
 		return
 	}
 	klog.V(4).Infof("Created Job %s for %s", jobResp.Name, nameForLog)

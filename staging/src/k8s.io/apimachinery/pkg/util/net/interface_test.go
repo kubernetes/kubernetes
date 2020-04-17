@@ -535,17 +535,21 @@ func TestChooseHostInterfaceFromRoute(t *testing.T) {
 		tcase    string
 		routes   []Route
 		nw       networkInterfacer
+		order    AddressFamilyPreference
 		expected net.IP
 	}{
-		{"ipv4", routeV4, validNetworkInterface{}, net.ParseIP("10.254.71.145")},
-		{"ipv6", routeV6, ipv6NetworkInterface{}, net.ParseIP("2001::200")},
-		{"prefer ipv4", bothRoutes, v4v6NetworkInterface{}, net.ParseIP("10.254.71.145")},
-		{"all LLA", routeV4, networkInterfaceWithOnlyLinkLocals{}, nil},
-		{"no routes", noRoutes, validNetworkInterface{}, nil},
-		{"fail get IP", routeV4, networkInterfaceFailGetAddrs{}, nil},
+		{"single-stack ipv4", routeV4, validNetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145")},
+		{"single-stack ipv4, prefer v6", routeV4, validNetworkInterface{}, preferIPv6, net.ParseIP("10.254.71.145")},
+		{"single-stack ipv6", routeV6, ipv6NetworkInterface{}, preferIPv4, net.ParseIP("2001::200")},
+		{"single-stack ipv6, prefer v6", routeV6, ipv6NetworkInterface{}, preferIPv6, net.ParseIP("2001::200")},
+		{"dual stack", bothRoutes, v4v6NetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145")},
+		{"dual stack, prefer v6", bothRoutes, v4v6NetworkInterface{}, preferIPv6, net.ParseIP("2001::10")},
+		{"all LLA", routeV4, networkInterfaceWithOnlyLinkLocals{}, preferIPv4, nil},
+		{"no routes", noRoutes, validNetworkInterface{}, preferIPv4, nil},
+		{"fail get IP", routeV4, networkInterfaceFailGetAddrs{}, preferIPv4, nil},
 	}
 	for _, tc := range testCases {
-		ip, err := chooseHostInterfaceFromRoute(tc.routes, tc.nw)
+		ip, err := chooseHostInterfaceFromRoute(tc.routes, tc.nw, tc.order)
 		if !ip.Equal(tc.expected) {
 			t.Errorf("case[%v]: expected %v, got %+v .err : %v", tc.tcase, tc.expected, ip, err)
 		}
@@ -575,24 +579,29 @@ func TestGetIPFromHostInterfaces(t *testing.T) {
 	testCases := []struct {
 		tcase      string
 		nw         networkInterfacer
+		order      AddressFamilyPreference
 		expected   net.IP
 		errStrFrag string
 	}{
-		{"fail get I/Fs", failGettingNetworkInterface{}, nil, "failed getting all interfaces"},
-		{"no interfaces", noNetworkInterface{}, nil, "no interfaces"},
-		{"I/F not up", downNetworkInterface{}, nil, "no acceptable"},
-		{"loopback only", loopbackNetworkInterface{}, nil, "no acceptable"},
-		{"P2P I/F only", p2pNetworkInterface{}, nil, "no acceptable"},
-		{"fail get addrs", networkInterfaceFailGetAddrs{}, nil, "unable to get Addrs"},
-		{"no addresses", networkInterfaceWithNoAddrs{}, nil, "no acceptable"},
-		{"invalid addr", networkInterfaceWithInvalidAddr{}, nil, "invalid CIDR"},
-		{"no matches", networkInterfaceWithOnlyLinkLocals{}, nil, "no acceptable"},
-		{"ipv4", validNetworkInterface{}, net.ParseIP("10.254.71.145"), ""},
-		{"ipv6", ipv6NetworkInterface{}, net.ParseIP("2001::200"), ""},
+		{"fail get I/Fs", failGettingNetworkInterface{}, preferIPv4, nil, "failed getting all interfaces"},
+		{"no interfaces", noNetworkInterface{}, preferIPv4, nil, "no interfaces"},
+		{"I/F not up", downNetworkInterface{}, preferIPv4, nil, "no acceptable"},
+		{"loopback only", loopbackNetworkInterface{}, preferIPv4, nil, "no acceptable"},
+		{"P2P I/F only", p2pNetworkInterface{}, preferIPv4, nil, "no acceptable"},
+		{"fail get addrs", networkInterfaceFailGetAddrs{}, preferIPv4, nil, "unable to get Addrs"},
+		{"no addresses", networkInterfaceWithNoAddrs{}, preferIPv4, nil, "no acceptable"},
+		{"invalid addr", networkInterfaceWithInvalidAddr{}, preferIPv4, nil, "invalid CIDR"},
+		{"no matches", networkInterfaceWithOnlyLinkLocals{}, preferIPv4, nil, "no acceptable"},
+		{"single-stack ipv4", validNetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145"), ""},
+		{"single-stack ipv4, prefer ipv6", validNetworkInterface{}, preferIPv6, net.ParseIP("10.254.71.145"), ""},
+		{"single-stack ipv6", ipv6NetworkInterface{}, preferIPv4, net.ParseIP("2001::200"), ""},
+		{"single-stack ipv6, prefer ipv6", ipv6NetworkInterface{}, preferIPv6, net.ParseIP("2001::200"), ""},
+		{"dual stack", v4v6NetworkInterface{}, preferIPv4, net.ParseIP("10.254.71.145"), ""},
+		{"dual stack, prefer ipv6", v4v6NetworkInterface{}, preferIPv6, net.ParseIP("2001::10"), ""},
 	}
 
 	for _, tc := range testCases {
-		ip, err := chooseIPFromHostInterfaces(tc.nw)
+		ip, err := chooseIPFromHostInterfaces(tc.nw, tc.order)
 		if !ip.Equal(tc.expected) {
 			t.Errorf("case[%s]: expected %+v, got %+v with err : %v", tc.tcase, tc.expected, ip, err)
 		}

@@ -25,15 +25,10 @@ import (
 	tasksapi "github.com/containerd/containerd/api/services/tasks/v1"
 	versionapi "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/dialer"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/dialer"
 	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
-)
-
-const (
-	// k8sNamespace is the namespace we use to connect containerd.
-	k8sNamespace = "k8s.io"
 )
 
 type client struct {
@@ -52,13 +47,12 @@ var once sync.Once
 var ctrdClient containerdClient = nil
 
 const (
-	address           = "/run/containerd/containerd.sock"
 	maxBackoffDelay   = 3 * time.Second
 	connectionTimeout = 2 * time.Second
 )
 
 // Client creates a containerd client
-func Client() (containerdClient, error) {
+func Client(address, namespace string) (containerdClient, error) {
 	var retErr error
 	once.Do(func() {
 		tryConn, err := net.DialTimeout("unix", address, connectionTimeout)
@@ -75,7 +69,7 @@ func Client() (containerdClient, error) {
 			grpc.WithBackoffMaxDelay(maxBackoffDelay),
 			grpc.WithTimeout(connectionTimeout),
 		}
-		unary, stream := newNSInterceptors(k8sNamespace)
+		unary, stream := newNSInterceptors(namespace)
 		gopts = append(gopts,
 			grpc.WithUnaryInterceptor(unary),
 			grpc.WithStreamInterceptor(stream),

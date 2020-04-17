@@ -133,13 +133,6 @@ func TestGenerateContainerRef(t *testing.T) {
 			success: true,
 		},
 		{
-			name:      "no-selflink",
-			pod:       &noSelfLinkPod,
-			container: &v1.Container{},
-			expected:  nil,
-			success:   false,
-		},
-		{
 			name: "defaulted-selflink",
 			pod:  &defaultedSelfLinkPod,
 			container: &v1.Container{

@@ -20,7 +20,7 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -90,6 +90,47 @@ func TestRCNumber(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	go consume(t, w3, []string{}, wg)
+	source.Shutdown()
+	wg.Wait()
+}
+
+// TestResetWatch validates that the FakeController correctly mocks a watch
+// falling behind and ResourceVersions aging out.
+func TestResetWatch(t *testing.T) {
+	pod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		}
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	source := NewFakeControllerSource()
+	source.Add(pod("foo"))    // RV = 1
+	source.Modify(pod("foo")) // RV = 2
+	source.Modify(pod("foo")) // RV = 3
+
+	// Kill watch, delete change history
+	source.ResetWatch()
+
+	// This should fail, RV=1 was lost with ResetWatch
+	_, err := source.Watch(metav1.ListOptions{ResourceVersion: "1"})
+	if err == nil {
+		t.Fatalf("Unexpected non-error")
+	}
+
+	// This should succeed, RV=3 is current
+	w, err := source.Watch(metav1.ListOptions{ResourceVersion: "3"})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Modify again, ensure the watch is still working
+	source.Modify(pod("foo"))
+	go consume(t, w, []string{"4"}, wg)
 	source.Shutdown()
 	wg.Wait()
 }

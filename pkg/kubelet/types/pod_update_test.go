@@ -21,11 +21,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestGetValidatedSources(t *testing.T) {
@@ -45,7 +42,7 @@ func TestGetValidatedSources(t *testing.T) {
 	require.Len(t, sources, 3)
 
 	// Unknown source.
-	sources, err = GetValidatedSources([]string{"taco"})
+	_, err = GetValidatedSources([]string{"taco"})
 	require.Error(t, err)
 }
 
@@ -114,70 +111,6 @@ func TestString(t *testing.T) {
 		syncPodString := data.sp.String()
 		assert.Equal(t, data.expected, syncPodString, "test[%d]", i)
 		t.Logf("Test case [%d]", i)
-	}
-}
-
-func TestIsCriticalPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
-	cases := []struct {
-		pod      v1.Pod
-		expected bool
-	}{
-		{
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod1",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/critical-pod": "",
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod2",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/critical-pod": "abc",
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod3",
-					Namespace: "kube-system",
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/critical-pod": "abc",
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod4",
-					Namespace: "kube-system",
-					Annotations: map[string]string{
-						"scheduler.alpha.kubernetes.io/critical-pod": "",
-					},
-				},
-			},
-			expected: true,
-		},
-	}
-	for i, data := range cases {
-		actual := IsCriticalPod(&data.pod)
-		if actual != data.expected {
-			t.Errorf("IsCriticalPod result wrong:\nexpected: %v\nactual: %v for test[%d] with Annotations: %v",
-				data.expected, actual, i, data.pod.Annotations)
-		}
 	}
 }
 

@@ -17,15 +17,15 @@ package strfmt
 import (
 	"database/sql/driver"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"regexp"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
-	"github.com/globalsign/mgo/bson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const (
@@ -48,7 +48,15 @@ const (
 	//  <subdomain> ::= <label> | <subdomain> "." <label>
 	//  var subdomain = /^[a-zA-Z](([-0-9a-zA-Z]+)?[0-9a-zA-Z])?(\.[a-zA-Z](([-0-9a-zA-Z]+)?[0-9a-zA-Z])?)*$/;
 	//  <domain> ::= <subdomain> | " "
-	HostnamePattern = `^[a-zA-Z](([-0-9a-zA-Z]+)?[0-9a-zA-Z])?(\.[a-zA-Z](([-0-9a-zA-Z]+)?[0-9a-zA-Z])?)*$`
+	//
+	// Additional validations:
+	//   - for FDQNs, top-level domain (e.g. ".com"), is at least to letters long (no special characters here)
+	//   - hostnames may start with a digit [RFC1123]
+	//   - special registered names with an underscore ('_') are not allowed in this context
+	//   - dashes are permitted, but not at the start or the end of a segment
+	//   - long top-level domain names (e.g. example.london) are permitted
+	//   - symbol unicode points are permitted (e.g. emoji) (not for top-level domain)
+	HostnamePattern = `^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$`
 	// UUIDPattern Regex for UUID that allows uppercase
 	UUIDPattern = `(?i)^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$`
 	// UUID3Pattern Regex for UUID3 that allows uppercase
@@ -111,6 +119,12 @@ func IsUUID5(str string) bool {
 	return rxUUID5.MatchString(str)
 }
 
+// IsEmail validates an email address.
+func IsEmail(str string) bool {
+	addr, e := mail.ParseAddress(str)
+	return e == nil && addr.Address != ""
+}
+
 func init() {
 	// register formats in the default registry:
 	//   - byte
@@ -120,6 +134,7 @@ func init() {
 	//   - hostname
 	//   - ipv4
 	//   - ipv6
+	//   - cidr
 	//   - isbn
 	//   - isbn10
 	//   - isbn13
@@ -136,7 +151,7 @@ func init() {
 	Default.Add("uri", &u, govalidator.IsRequestURI)
 
 	eml := Email("")
-	Default.Add("email", &eml, govalidator.IsEmail)
+	Default.Add("email", &eml, IsEmail)
 
 	hn := Hostname("")
 	Default.Add("hostname", &hn, IsHostname)
@@ -146,6 +161,9 @@ func init() {
 
 	ip6 := IPv6("")
 	Default.Add("ipv6", &ip6, govalidator.IsIPv6)
+
+	cidr := CIDR("")
+	Default.Add("cidr", &cidr, govalidator.IsCIDR)
 
 	mac := MAC("")
 	Default.Add("mac", &mac, govalidator.IsMAC)
@@ -190,13 +208,7 @@ func init() {
 	Default.Add("password", &pw, func(_ string) bool { return true })
 }
 
-/* unused:
-var formatCheckers = map[string]Validator{
-	"byte": govalidator.IsBase64,
-}
-*/
-
-// Base64 represents a base64 encoded string
+// Base64 represents a base64 encoded string, using URLEncoding alphabet
 //
 // swagger:strfmt byte
 type Base64 []byte
@@ -228,9 +240,18 @@ func (b *Base64) UnmarshalText(data []byte) error { // validation is performed l
 func (b *Base64) Scan(raw interface{}) error {
 	switch v := raw.(type) {
 	case []byte:
-		*b = Base64(string(v))
+		dbuf := make([]byte, base64.StdEncoding.DecodedLen(len(v)))
+		n, err := base64.StdEncoding.Decode(dbuf, v)
+		if err != nil {
+			return err
+		}
+		*b = dbuf[:n]
 	case string:
-		*b = Base64(v)
+		vv, err := base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			return err
+		}
+		*b = Base64(vv)
 	default:
 		return fmt.Errorf("cannot sql.Scan() strfmt.Base64 from: %#v", v)
 	}
@@ -240,66 +261,68 @@ func (b *Base64) Scan(raw interface{}) error {
 
 // Value converts a value to a database driver value
 func (b Base64) Value() (driver.Value, error) {
-	return driver.Value(string(b)), nil
+	return driver.Value(b.String()), nil
 }
 
 func (b Base64) String() string {
-	return string(b)
+	return base64.StdEncoding.EncodeToString([]byte(b))
 }
 
 // MarshalJSON returns the Base64 as JSON
 func (b Base64) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	b.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the Base64 to a easyjson.Writer
-func (b Base64) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(base64.StdEncoding.EncodeToString([]byte(b)))
+	return json.Marshal(b.String())
 }
 
 // UnmarshalJSON sets the Base64 from JSON
 func (b *Base64) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	b.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the Base64 from a easyjson.Lexer
-func (b *Base64) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		enc := base64.StdEncoding
-		dbuf := make([]byte, enc.DecodedLen(len(data)))
-
-		n, err := enc.Decode(dbuf, []byte(data))
-		if err != nil {
-			in.AddError(err)
-			return
-		}
-
-		*b = dbuf[:n]
+	var b64str string
+	if err := json.Unmarshal(data, &b64str); err != nil {
+		return err
 	}
+	vb, err := base64.StdEncoding.DecodeString(b64str)
+	if err != nil {
+		return err
+	}
+	*b = Base64(vb)
+	return nil
 }
 
-// GetBSON returns the Base64 as a bson.M{} map.
-func (b *Base64) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*b)}, nil
+// MarshalBSON document from this value
+func (b Base64) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": b.String()})
 }
 
-// SetBSON sets the Base64 from raw bson data
-func (b *Base64) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (b *Base64) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*b = Base64(data)
+	if bd, ok := m["data"].(string); ok {
+		vb, err := base64.StdEncoding.DecodeString(bd)
+		if err != nil {
+			return err
+		}
+		*b = Base64(vb)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as base64")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as Base64")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (b *Base64) DeepCopyInto(out *Base64) {
+	*out = *b
+}
+
+// DeepCopy copies the receiver into a new Base64.
+func (b *Base64) DeepCopy() *Base64 {
+	if b == nil {
+		return nil
+	}
+	out := new(Base64)
+	b.DeepCopyInto(out)
+	return out
 }
 
 // URI represents the uri string format as specified by the json schema spec
@@ -343,48 +366,51 @@ func (u URI) String() string {
 
 // MarshalJSON returns the URI as JSON
 func (u URI) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the URI to a easyjson.Writer
-func (u URI) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the URI from JSON
 func (u *URI) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the URI from a easyjson.Lexer
-func (u *URI) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = URI(data)
+	var uristr string
+	if err := json.Unmarshal(data, &uristr); err != nil {
+		return err
 	}
+	*u = URI(uristr)
+	return nil
 }
 
-// GetBSON returns the URI as a bson.M{} map.
-func (u *URI) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u URI) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the URI from raw bson data
-func (u *URI) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *URI) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = URI(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = URI(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as uri")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as URI")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *URI) DeepCopyInto(out *URI) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new URI.
+func (u *URI) DeepCopy() *URI {
+	if u == nil {
+		return nil
+	}
+	out := new(URI)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // Email represents the email string format as specified by the json schema spec
@@ -428,48 +454,51 @@ func (e Email) String() string {
 
 // MarshalJSON returns the Email as JSON
 func (e Email) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	e.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the Email to a easyjson.Writer
-func (e Email) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(e))
+	return json.Marshal(string(e))
 }
 
 // UnmarshalJSON sets the Email from JSON
 func (e *Email) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	e.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the Email from a easyjson.Lexer
-func (e *Email) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*e = Email(data)
+	var estr string
+	if err := json.Unmarshal(data, &estr); err != nil {
+		return err
 	}
+	*e = Email(estr)
+	return nil
 }
 
-// GetBSON returns the Email as a bson.M{} map.
-func (e *Email) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*e)}, nil
+// MarshalBSON document from this value
+func (e Email) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": e.String()})
 }
 
-// SetBSON sets the Email from raw bson data
-func (e *Email) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (e *Email) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*e = Email(data)
+	if ud, ok := m["data"].(string); ok {
+		*e = Email(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as email")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as Email")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (e *Email) DeepCopyInto(out *Email) {
+	*out = *e
+}
+
+// DeepCopy copies the receiver into a new Email.
+func (e *Email) DeepCopy() *Email {
+	if e == nil {
+		return nil
+	}
+	out := new(Email)
+	e.DeepCopyInto(out)
+	return out
 }
 
 // Hostname represents the hostname string format as specified by the json schema spec
@@ -513,48 +542,51 @@ func (h Hostname) String() string {
 
 // MarshalJSON returns the Hostname as JSON
 func (h Hostname) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	h.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the Hostname to a easyjson.Writer
-func (h Hostname) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(h))
+	return json.Marshal(string(h))
 }
 
 // UnmarshalJSON sets the Hostname from JSON
 func (h *Hostname) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	h.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the Hostname from a easyjson.Lexer
-func (h *Hostname) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*h = Hostname(data)
+	var hstr string
+	if err := json.Unmarshal(data, &hstr); err != nil {
+		return err
 	}
+	*h = Hostname(hstr)
+	return nil
 }
 
-// GetBSON returns the Hostname as a bson.M{} map.
-func (h *Hostname) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*h)}, nil
+// MarshalBSON document from this value
+func (h Hostname) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": h.String()})
 }
 
-// SetBSON sets the Hostname from raw bson data
-func (h *Hostname) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (h *Hostname) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*h = Hostname(data)
+	if ud, ok := m["data"].(string); ok {
+		*h = Hostname(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as hostname")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as Hostname")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (h *Hostname) DeepCopyInto(out *Hostname) {
+	*out = *h
+}
+
+// DeepCopy copies the receiver into a new Hostname.
+func (h *Hostname) DeepCopy() *Hostname {
+	if h == nil {
+		return nil
+	}
+	out := new(Hostname)
+	h.DeepCopyInto(out)
+	return out
 }
 
 // IPv4 represents an IP v4 address
@@ -598,48 +630,51 @@ func (u IPv4) String() string {
 
 // MarshalJSON returns the IPv4 as JSON
 func (u IPv4) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the IPv4 to a easyjson.Writer
-func (u IPv4) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the IPv4 from JSON
 func (u *IPv4) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the IPv4 from a easyjson.Lexer
-func (u *IPv4) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = IPv4(data)
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
 	}
+	*u = IPv4(ustr)
+	return nil
 }
 
-// GetBSON returns the IPv4 as a bson.M{} map.
-func (u *IPv4) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u IPv4) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the IPv4 from raw bson data
-func (u *IPv4) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *IPv4) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = IPv4(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = IPv4(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as ipv4")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as IPv4")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *IPv4) DeepCopyInto(out *IPv4) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new IPv4.
+func (u *IPv4) DeepCopy() *IPv4 {
+	if u == nil {
+		return nil
+	}
+	out := new(IPv4)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // IPv6 represents an IP v6 address
@@ -683,48 +718,139 @@ func (u IPv6) String() string {
 
 // MarshalJSON returns the IPv6 as JSON
 func (u IPv6) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the IPv6 to a easyjson.Writer
-func (u IPv6) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the IPv6 from JSON
 func (u *IPv6) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the IPv6 from a easyjson.Lexer
-func (u *IPv6) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = IPv6(data)
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
 	}
+	*u = IPv6(ustr)
+	return nil
 }
 
-// GetBSON returns the IPv6 as a bson.M{} map.
-func (u *IPv6) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u IPv6) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the IPv6 from raw bson data
-func (u *IPv6) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *IPv6) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = IPv6(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = IPv6(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as ipv6")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as IPv6")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *IPv6) DeepCopyInto(out *IPv6) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new IPv6.
+func (u *IPv6) DeepCopy() *IPv6 {
+	if u == nil {
+		return nil
+	}
+	out := new(IPv6)
+	u.DeepCopyInto(out)
+	return out
+}
+
+// CIDR represents a Classless Inter-Domain Routing notation
+//
+// swagger:strfmt cidr
+type CIDR string
+
+// MarshalText turns this instance into text
+func (u CIDR) MarshalText() ([]byte, error) {
+	return []byte(string(u)), nil
+}
+
+// UnmarshalText hydrates this instance from text
+func (u *CIDR) UnmarshalText(data []byte) error { // validation is performed later on
+	*u = CIDR(string(data))
+	return nil
+}
+
+// Scan read a value from a database driver
+func (u *CIDR) Scan(raw interface{}) error {
+	switch v := raw.(type) {
+	case []byte:
+		*u = CIDR(string(v))
+	case string:
+		*u = CIDR(v)
+	default:
+		return fmt.Errorf("cannot sql.Scan() strfmt.CIDR from: %#v", v)
+	}
+
+	return nil
+}
+
+// Value converts a value to a database driver value
+func (u CIDR) Value() (driver.Value, error) {
+	return driver.Value(string(u)), nil
+}
+
+func (u CIDR) String() string {
+	return string(u)
+}
+
+// MarshalJSON returns the CIDR as JSON
+func (u CIDR) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(u))
+}
+
+// UnmarshalJSON sets the CIDR from JSON
+func (u *CIDR) UnmarshalJSON(data []byte) error {
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*u = CIDR(ustr)
+	return nil
+}
+
+// MarshalBSON document from this value
+func (u CIDR) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
+}
+
+// UnmarshalBSON document into this value
+func (u *CIDR) UnmarshalBSON(data []byte) error {
+	var m bson.M
+	if err := bson.Unmarshal(data, &m); err != nil {
+		return err
+	}
+
+	if ud, ok := m["data"].(string); ok {
+		*u = CIDR(ud)
+		return nil
+	}
+	return errors.New("couldn't unmarshal bson bytes as CIDR")
+}
+
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *CIDR) DeepCopyInto(out *CIDR) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new CIDR.
+func (u *CIDR) DeepCopy() *CIDR {
+	if u == nil {
+		return nil
+	}
+	out := new(CIDR)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // MAC represents a 48 bit MAC address
@@ -768,48 +894,51 @@ func (u MAC) String() string {
 
 // MarshalJSON returns the MAC as JSON
 func (u MAC) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the MAC to a easyjson.Writer
-func (u MAC) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the MAC from JSON
 func (u *MAC) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the MAC from a easyjson.Lexer
-func (u *MAC) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = MAC(data)
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
 	}
+	*u = MAC(ustr)
+	return nil
 }
 
-// GetBSON returns the MAC as a bson.M{} map.
-func (u *MAC) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u MAC) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the MAC from raw bson data
-func (u *MAC) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *MAC) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = MAC(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = MAC(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as MAC")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as MAC")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *MAC) DeepCopyInto(out *MAC) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new MAC.
+func (u *MAC) DeepCopy() *MAC {
+	if u == nil {
+		return nil
+	}
+	out := new(MAC)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // UUID represents a uuid string format
@@ -853,14 +982,7 @@ func (u UUID) String() string {
 
 // MarshalJSON returns the UUID as JSON
 func (u UUID) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the UUID to a easyjson.Writer
-func (u UUID) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the UUID from JSON
@@ -868,36 +990,46 @@ func (u *UUID) UnmarshalJSON(data []byte) error {
 	if string(data) == jsonNull {
 		return nil
 	}
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the UUID from a easyjson.Lexer
-func (u *UUID) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = UUID(data)
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
 	}
+	*u = UUID(ustr)
+	return nil
 }
 
-// GetBSON returns the UUID as a bson.M{} map.
-func (u *UUID) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u UUID) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the UUID from raw bson data
-func (u *UUID) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *UUID) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = UUID(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = UUID(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as UUID")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as UUID")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *UUID) DeepCopyInto(out *UUID) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new UUID.
+func (u *UUID) DeepCopy() *UUID {
+	if u == nil {
+		return nil
+	}
+	out := new(UUID)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // UUID3 represents a uuid3 string format
@@ -939,53 +1071,56 @@ func (u UUID3) String() string {
 	return string(u)
 }
 
-// MarshalJSON returns the UUID3 as JSON
+// MarshalJSON returns the UUID as JSON
 func (u UUID3) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
+	return json.Marshal(string(u))
 }
 
-// MarshalEasyJSON writes the UUID3 to a easyjson.Writer
-func (u UUID3) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
-}
-
-// UnmarshalJSON sets the UUID3 from JSON
+// UnmarshalJSON sets the UUID from JSON
 func (u *UUID3) UnmarshalJSON(data []byte) error {
 	if string(data) == jsonNull {
 		return nil
 	}
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the UUID3 from a easyjson.Lexer
-func (u *UUID3) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = UUID3(data)
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
 	}
+	*u = UUID3(ustr)
+	return nil
 }
 
-// GetBSON returns the UUID3 as a bson.M{} map.
-func (u *UUID3) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u UUID3) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the UUID3 from raw bson data
-func (u *UUID3) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *UUID3) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = UUID3(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = UUID3(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as UUID3")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as UUID3")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *UUID3) DeepCopyInto(out *UUID3) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new UUID3.
+func (u *UUID3) DeepCopy() *UUID3 {
+	if u == nil {
+		return nil
+	}
+	out := new(UUID3)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // UUID4 represents a uuid4 string format
@@ -1027,53 +1162,56 @@ func (u UUID4) String() string {
 	return string(u)
 }
 
-// MarshalJSON returns the UUID4 as JSON
+// MarshalJSON returns the UUID as JSON
 func (u UUID4) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
+	return json.Marshal(string(u))
 }
 
-// MarshalEasyJSON writes the UUID4 to a easyjson.Writer
-func (u UUID4) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
-}
-
-// UnmarshalJSON sets the UUID4 from JSON
+// UnmarshalJSON sets the UUID from JSON
 func (u *UUID4) UnmarshalJSON(data []byte) error {
 	if string(data) == jsonNull {
 		return nil
 	}
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the UUID4 from a easyjson.Lexer
-func (u *UUID4) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = UUID4(data)
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
 	}
+	*u = UUID4(ustr)
+	return nil
 }
 
-// GetBSON returns the UUID4 as a bson.M{} map.
-func (u *UUID4) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u UUID4) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the UUID4 from raw bson data
-func (u *UUID4) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *UUID4) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = UUID4(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = UUID4(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as UUID4")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as UUID4")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *UUID4) DeepCopyInto(out *UUID4) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new UUID4.
+func (u *UUID4) DeepCopy() *UUID4 {
+	if u == nil {
+		return nil
+	}
+	out := new(UUID4)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // UUID5 represents a uuid5 string format
@@ -1115,53 +1253,56 @@ func (u UUID5) String() string {
 	return string(u)
 }
 
-// MarshalJSON returns the UUID5 as JSON
+// MarshalJSON returns the UUID as JSON
 func (u UUID5) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
+	return json.Marshal(string(u))
 }
 
-// MarshalEasyJSON writes the UUID5 to a easyjson.Writer
-func (u UUID5) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
-}
-
-// UnmarshalJSON sets the UUID5 from JSON
+// UnmarshalJSON sets the UUID from JSON
 func (u *UUID5) UnmarshalJSON(data []byte) error {
 	if string(data) == jsonNull {
 		return nil
 	}
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the UUID5 from a easyjson.Lexer
-func (u *UUID5) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = UUID5(data)
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
 	}
+	*u = UUID5(ustr)
+	return nil
 }
 
-// GetBSON returns the UUID5 as a bson.M{} map.
-func (u *UUID5) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u UUID5) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the UUID5 from raw bson data
-func (u *UUID5) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *UUID5) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = UUID5(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = UUID5(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as UUID5")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as UUID5")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *UUID5) DeepCopyInto(out *UUID5) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new UUID5.
+func (u *UUID5) DeepCopy() *UUID5 {
+	if u == nil {
+		return nil
+	}
+	out := new(UUID5)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // ISBN represents an isbn string format
@@ -1205,48 +1346,54 @@ func (u ISBN) String() string {
 
 // MarshalJSON returns the ISBN as JSON
 func (u ISBN) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the ISBN to a easyjson.Writer
-func (u ISBN) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the ISBN from JSON
 func (u *ISBN) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the ISBN from a easyjson.Lexer
-func (u *ISBN) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = ISBN(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*u = ISBN(ustr)
+	return nil
 }
 
-// GetBSON returns the ISBN as a bson.M{} map.
-func (u *ISBN) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u ISBN) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the ISBN from raw bson data
-func (u *ISBN) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *ISBN) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = ISBN(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = ISBN(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as ISBN")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as ISBN")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *ISBN) DeepCopyInto(out *ISBN) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new ISBN.
+func (u *ISBN) DeepCopy() *ISBN {
+	if u == nil {
+		return nil
+	}
+	out := new(ISBN)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // ISBN10 represents an isbn 10 string format
@@ -1290,48 +1437,54 @@ func (u ISBN10) String() string {
 
 // MarshalJSON returns the ISBN10 as JSON
 func (u ISBN10) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the ISBN10 to a easyjson.Writer
-func (u ISBN10) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the ISBN10 from JSON
 func (u *ISBN10) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the ISBN10 from a easyjson.Lexer
-func (u *ISBN10) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = ISBN10(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*u = ISBN10(ustr)
+	return nil
 }
 
-// GetBSON returns the ISBN10 as a bson.M{} map.
-func (u *ISBN10) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u ISBN10) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the ISBN10 from raw bson data
-func (u *ISBN10) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *ISBN10) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = ISBN10(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = ISBN10(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as ISBN10")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as ISBN10")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *ISBN10) DeepCopyInto(out *ISBN10) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new ISBN10.
+func (u *ISBN10) DeepCopy() *ISBN10 {
+	if u == nil {
+		return nil
+	}
+	out := new(ISBN10)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // ISBN13 represents an isbn 13 string format
@@ -1375,48 +1528,54 @@ func (u ISBN13) String() string {
 
 // MarshalJSON returns the ISBN13 as JSON
 func (u ISBN13) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the ISBN13 to a easyjson.Writer
-func (u ISBN13) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the ISBN13 from JSON
 func (u *ISBN13) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the ISBN13 from a easyjson.Lexer
-func (u *ISBN13) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = ISBN13(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*u = ISBN13(ustr)
+	return nil
 }
 
-// GetBSON returns the ISBN13 as a bson.M{} map.
-func (u *ISBN13) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u ISBN13) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the ISBN13 from raw bson data
-func (u *ISBN13) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *ISBN13) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = ISBN13(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = ISBN13(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as ISBN13")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as ISBN13")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *ISBN13) DeepCopyInto(out *ISBN13) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new ISBN13.
+func (u *ISBN13) DeepCopy() *ISBN13 {
+	if u == nil {
+		return nil
+	}
+	out := new(ISBN13)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // CreditCard represents a credit card string format
@@ -1460,48 +1619,54 @@ func (u CreditCard) String() string {
 
 // MarshalJSON returns the CreditCard as JSON
 func (u CreditCard) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the CreditCard to a easyjson.Writer
-func (u CreditCard) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the CreditCard from JSON
 func (u *CreditCard) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the CreditCard from a easyjson.Lexer
-func (u *CreditCard) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = CreditCard(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*u = CreditCard(ustr)
+	return nil
 }
 
-// GetBSON returns the CreditCard as a bson.M{} map.
-func (u *CreditCard) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u CreditCard) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the CreditCard from raw bson data
-func (u *CreditCard) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *CreditCard) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = CreditCard(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = CreditCard(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as CreditCard")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as CreditCard")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *CreditCard) DeepCopyInto(out *CreditCard) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new CreditCard.
+func (u *CreditCard) DeepCopy() *CreditCard {
+	if u == nil {
+		return nil
+	}
+	out := new(CreditCard)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // SSN represents a social security string format
@@ -1545,48 +1710,54 @@ func (u SSN) String() string {
 
 // MarshalJSON returns the SSN as JSON
 func (u SSN) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	u.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the SSN to a easyjson.Writer
-func (u SSN) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(u))
+	return json.Marshal(string(u))
 }
 
 // UnmarshalJSON sets the SSN from JSON
 func (u *SSN) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	u.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the SSN from a easyjson.Lexer
-func (u *SSN) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*u = SSN(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*u = SSN(ustr)
+	return nil
 }
 
-// GetBSON returns the SSN as a bson.M{} map.
-func (u *SSN) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*u)}, nil
+// MarshalBSON document from this value
+func (u SSN) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": u.String()})
 }
 
-// SetBSON sets the SSN from raw bson data
-func (u *SSN) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (u *SSN) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*u = SSN(data)
+	if ud, ok := m["data"].(string); ok {
+		*u = SSN(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as SSN")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as SSN")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (u *SSN) DeepCopyInto(out *SSN) {
+	*out = *u
+}
+
+// DeepCopy copies the receiver into a new SSN.
+func (u *SSN) DeepCopy() *SSN {
+	if u == nil {
+		return nil
+	}
+	out := new(SSN)
+	u.DeepCopyInto(out)
+	return out
 }
 
 // HexColor represents a hex color string format
@@ -1630,48 +1801,54 @@ func (h HexColor) String() string {
 
 // MarshalJSON returns the HexColor as JSON
 func (h HexColor) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	h.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the HexColor to a easyjson.Writer
-func (h HexColor) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(h))
+	return json.Marshal(string(h))
 }
 
 // UnmarshalJSON sets the HexColor from JSON
 func (h *HexColor) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	h.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the HexColor from a easyjson.Lexer
-func (h *HexColor) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*h = HexColor(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*h = HexColor(ustr)
+	return nil
 }
 
-// GetBSON returns the HexColor as a bson.M{} map.
-func (h *HexColor) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*h)}, nil
+// MarshalBSON document from this value
+func (h HexColor) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": h.String()})
 }
 
-// SetBSON sets the HexColor from raw bson data
-func (h *HexColor) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (h *HexColor) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*h = HexColor(data)
+	if ud, ok := m["data"].(string); ok {
+		*h = HexColor(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as HexColor")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as HexColor")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (h *HexColor) DeepCopyInto(out *HexColor) {
+	*out = *h
+}
+
+// DeepCopy copies the receiver into a new HexColor.
+func (h *HexColor) DeepCopy() *HexColor {
+	if h == nil {
+		return nil
+	}
+	out := new(HexColor)
+	h.DeepCopyInto(out)
+	return out
 }
 
 // RGBColor represents a RGB color string format
@@ -1715,48 +1892,54 @@ func (r RGBColor) String() string {
 
 // MarshalJSON returns the RGBColor as JSON
 func (r RGBColor) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	r.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the RGBColor to a easyjson.Writer
-func (r RGBColor) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(r))
+	return json.Marshal(string(r))
 }
 
 // UnmarshalJSON sets the RGBColor from JSON
 func (r *RGBColor) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	r.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the RGBColor from a easyjson.Lexer
-func (r *RGBColor) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*r = RGBColor(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*r = RGBColor(ustr)
+	return nil
 }
 
-// GetBSON returns the RGBColor as a bson.M{} map.
-func (r *RGBColor) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*r)}, nil
+// MarshalBSON document from this value
+func (r RGBColor) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": r.String()})
 }
 
-// SetBSON sets the RGBColor from raw bson data
-func (r *RGBColor) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (r *RGBColor) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*r = RGBColor(data)
+	if ud, ok := m["data"].(string); ok {
+		*r = RGBColor(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as RGBColor")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as RGBColor")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (r *RGBColor) DeepCopyInto(out *RGBColor) {
+	*out = *r
+}
+
+// DeepCopy copies the receiver into a new RGBColor.
+func (r *RGBColor) DeepCopy() *RGBColor {
+	if r == nil {
+		return nil
+	}
+	out := new(RGBColor)
+	r.DeepCopyInto(out)
+	return out
 }
 
 // Password represents a password.
@@ -1801,46 +1984,52 @@ func (r Password) String() string {
 
 // MarshalJSON returns the Password as JSON
 func (r Password) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	r.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the Password to a easyjson.Writer
-func (r Password) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(string(r))
+	return json.Marshal(string(r))
 }
 
 // UnmarshalJSON sets the Password from JSON
 func (r *Password) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	r.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the Password from a easyjson.Lexer
-func (r *Password) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*r = Password(data)
+	if string(data) == jsonNull {
+		return nil
 	}
+	var ustr string
+	if err := json.Unmarshal(data, &ustr); err != nil {
+		return err
+	}
+	*r = Password(ustr)
+	return nil
 }
 
-// GetBSON returns the Password as a bson.M{} map.
-func (r *Password) GetBSON() (interface{}, error) {
-	return bson.M{"data": string(*r)}, nil
+// MarshalBSON document from this value
+func (r Password) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": r.String()})
 }
 
-// SetBSON sets the Password from raw bson data
-func (r *Password) SetBSON(raw bson.Raw) error {
+// UnmarshalBSON document into this value
+func (r *Password) UnmarshalBSON(data []byte) error {
 	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	if err := bson.Unmarshal(data, &m); err != nil {
 		return err
 	}
 
-	if data, ok := m["data"].(string); ok {
-		*r = Password(data)
+	if ud, ok := m["data"].(string); ok {
+		*r = Password(ud)
 		return nil
 	}
+	return errors.New("couldn't unmarshal bson bytes as Password")
+}
 
-	return errors.New("couldn't unmarshal bson raw value as Password")
+// DeepCopyInto copies the receiver and writes its value into out.
+func (r *Password) DeepCopyInto(out *Password) {
+	*out = *r
+}
+
+// DeepCopy copies the receiver into a new Password.
+func (r *Password) DeepCopy() *Password {
+	if r == nil {
+		return nil
+	}
+	out := new(Password)
+	r.DeepCopyInto(out)
+	return out
 }

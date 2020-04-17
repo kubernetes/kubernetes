@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -191,7 +191,14 @@ func setSelfHostedVolumesForScheduler(podSpec *v1.PodSpec) {
 	// This is not a problem with hostPath mounts as hostPath supports mounting one file only, instead of always a full directory. Secrets and Projected Volumes
 	// don't support that.
 	podSpec.Containers[0].Command = kubeadmutil.ReplaceArgument(podSpec.Containers[0].Command, func(argMap map[string]string) map[string]string {
-		argMap["kubeconfig"] = filepath.Join(selfHostedKubeConfigDir, kubeadmconstants.SchedulerKubeConfigFileName)
+		schedulerKubeConfigPath := filepath.Join(selfHostedKubeConfigDir, kubeadmconstants.SchedulerKubeConfigFileName)
+		argMap["kubeconfig"] = schedulerKubeConfigPath
+		if _, ok := argMap["authentication-kubeconfig"]; ok {
+			argMap["authentication-kubeconfig"] = schedulerKubeConfigPath
+		}
+		if _, ok := argMap["authorization-kubeconfig"]; ok {
+			argMap["authorization-kubeconfig"] = schedulerKubeConfigPath
+		}
 		return argMap
 	})
 }

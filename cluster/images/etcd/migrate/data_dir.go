@@ -30,7 +30,7 @@ import (
 
 // DataDirectory provides utilities for initializing and backing up an
 // etcd "data-dir" as well as managing a version.txt file to track the
-// etcd server version and storage verion of the etcd data in the
+// etcd server version and storage version of the etcd data in the
 // directory.
 type DataDirectory struct {
 	path        string
@@ -116,7 +116,7 @@ func (d *DataDirectory) String() string {
 }
 
 // VersionFile provides utilities for reading and writing version.txt files
-// to etcd "data-dir" for tracking the etcd server and storage verions
+// to etcd "data-dir" for tracking the etcd server and storage versions
 // of the data in the directory.
 type VersionFile struct {
 	path string

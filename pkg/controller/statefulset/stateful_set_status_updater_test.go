@@ -95,10 +95,10 @@ func TestStatefulSetStatusUpdaterUpdateReplicasConflict(t *testing.T) {
 		update := action.(core.UpdateAction)
 		if !conflict {
 			conflict = true
-			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
-		} else {
-			return true, update.GetObject(), nil
+			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("object already exists"))
 		}
+		return true, update.GetObject(), nil
+
 	})
 	if err := updater.UpdateStatefulSetStatus(set, &status); err != nil {
 		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
@@ -118,7 +118,7 @@ func TestStatefulSetStatusUpdaterUpdateReplicasConflictFailure(t *testing.T) {
 	updater := NewRealStatefulSetStatusUpdater(fakeClient, setLister)
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("Object already exists"))
+		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("object already exists"))
 	})
 	if err := updater.UpdateStatefulSetStatus(set, &status); err == nil {
 		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")

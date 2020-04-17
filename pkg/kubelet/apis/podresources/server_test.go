@@ -42,6 +42,10 @@ func (m *mockProvider) GetDevices(podUID, containerName string) []*v1alpha1.Cont
 	return args.Get(0).([]*v1alpha1.ContainerDevices)
 }
 
+func (m *mockProvider) UpdateAllocatedDevices() {
+	m.Called()
+}
+
 func TestListPodResources(t *testing.T) {
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
@@ -140,6 +144,7 @@ func TestListPodResources(t *testing.T) {
 			m := new(mockProvider)
 			m.On("GetPods").Return(tc.pods)
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
+			m.On("UpdateAllocatedDevices").Return()
 			server := NewPodResourcesServer(m, m)
 			resp, err := server.List(context.TODO(), &v1alpha1.ListPodResourcesRequest{})
 			if err != nil {

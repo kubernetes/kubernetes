@@ -20,14 +20,14 @@ limitations under the License.
 package drivers
 
 import (
-	"flag"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -35,28 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
-
-var (
-	csiImageVersion  = flag.String("storage.csi.image.version", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-	csiImageRegistry = flag.String("storage.csi.image.registry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-	csiImageVersions = map[string]string{
-		"hostpathplugin":   "v0.4.0",
-		"csi-attacher":     "v0.4.0",
-		"csi-provisioner":  "v0.4.0",
-		"driver-registrar": "v0.4.0",
-	}
-)
-
-func csiContainerImage(image string) string {
-	var fullName string
-	fullName += *csiImageRegistry + "/" + image + ":"
-	if *csiImageVersion != "" {
-		fullName += *csiImageVersion
-	} else {
-		fullName += csiImageVersions[image]
-	}
-	return fullName
-}
 
 func shredFile(filePath string) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -115,7 +93,7 @@ func createGCESecrets(client clientset.Interface, ns string) {
 		},
 	}
 
-	_, err = client.CoreV1().Secrets(ns).Create(s)
+	_, err = client.CoreV1().Secrets(ns).Create(context.TODO(), s, metav1.CreateOptions{})
 	if !apierrors.IsAlreadyExists(err) {
 		framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
 	}

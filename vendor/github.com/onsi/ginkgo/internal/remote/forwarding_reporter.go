@@ -3,8 +3,14 @@ package remote
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+
+	"github.com/onsi/ginkgo/internal/writer"
+	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/reporters/stenographer"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/types"
@@ -30,14 +36,41 @@ type ForwardingReporter struct {
 	serverHost        string
 	poster            Poster
 	outputInterceptor OutputInterceptor
+	debugMode         bool
+	debugFile         *os.File
+	nestedReporter    *reporters.DefaultReporter
 }
 
-func NewForwardingReporter(serverHost string, poster Poster, outputInterceptor OutputInterceptor) *ForwardingReporter {
-	return &ForwardingReporter{
+func NewForwardingReporter(config config.DefaultReporterConfigType, serverHost string, poster Poster, outputInterceptor OutputInterceptor, ginkgoWriter *writer.Writer, debugFile string) *ForwardingReporter {
+	reporter := &ForwardingReporter{
 		serverHost:        serverHost,
 		poster:            poster,
 		outputInterceptor: outputInterceptor,
 	}
+
+	if debugFile != "" {
+		var err error
+		reporter.debugMode = true
+		reporter.debugFile, err = os.Create(debugFile)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+
+		if !config.Verbose {
+			//if verbose is true then the GinkgoWriter emits to stdout.  Don't _also_ redirect GinkgoWriter output as that will result in duplication.
+			ginkgoWriter.AndRedirectTo(reporter.debugFile)
+		}
+		outputInterceptor.StreamTo(reporter.debugFile) //This is not working
+
+		stenographer := stenographer.New(false, true, reporter.debugFile)
+		config.Succinct = false
+		config.Verbose = true
+		config.FullTrace = true
+		reporter.nestedReporter = reporters.NewDefaultReporter(config, stenographer)
+	}
+
+	return reporter
 }
 
 func (reporter *ForwardingReporter) post(path string, data interface{}) {
@@ -56,6 +89,10 @@ func (reporter *ForwardingReporter) SpecSuiteWillBegin(conf config.GinkgoConfigT
 	}
 
 	reporter.outputInterceptor.StartInterceptingOutput()
+	if reporter.debugMode {
+		reporter.nestedReporter.SpecSuiteWillBegin(conf, summary)
+		reporter.debugFile.Sync()
+	}
 	reporter.post("/SpecSuiteWillBegin", data)
 }
 
@@ -63,10 +100,18 @@ func (reporter *ForwardingReporter) BeforeSuiteDidRun(setupSummary *types.SetupS
 	output, _ := reporter.outputInterceptor.StopInterceptingAndReturnOutput()
 	reporter.outputInterceptor.StartInterceptingOutput()
 	setupSummary.CapturedOutput = output
+	if reporter.debugMode {
+		reporter.nestedReporter.BeforeSuiteDidRun(setupSummary)
+		reporter.debugFile.Sync()
+	}
 	reporter.post("/BeforeSuiteDidRun", setupSummary)
 }
 
 func (reporter *ForwardingReporter) SpecWillRun(specSummary *types.SpecSummary) {
+	if reporter.debugMode {
+		reporter.nestedReporter.SpecWillRun(specSummary)
+		reporter.debugFile.Sync()
+	}
 	reporter.post("/SpecWillRun", specSummary)
 }
 
@@ -74,6 +119,10 @@ func (reporter *ForwardingReporter) SpecDidComplete(specSummary *types.SpecSumma
 	output, _ := reporter.outputInterceptor.StopInterceptingAndReturnOutput()
 	reporter.outputInterceptor.StartInterceptingOutput()
 	specSummary.CapturedOutput = output
+	if reporter.debugMode {
+		reporter.nestedReporter.SpecDidComplete(specSummary)
+		reporter.debugFile.Sync()
+	}
 	reporter.post("/SpecDidComplete", specSummary)
 }
 
@@ -81,10 +130,18 @@ func (reporter *ForwardingReporter) AfterSuiteDidRun(setupSummary *types.SetupSu
 	output, _ := reporter.outputInterceptor.StopInterceptingAndReturnOutput()
 	reporter.outputInterceptor.StartInterceptingOutput()
 	setupSummary.CapturedOutput = output
+	if reporter.debugMode {
+		reporter.nestedReporter.AfterSuiteDidRun(setupSummary)
+		reporter.debugFile.Sync()
+	}
 	reporter.post("/AfterSuiteDidRun", setupSummary)
 }
 
 func (reporter *ForwardingReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	reporter.outputInterceptor.StopInterceptingAndReturnOutput()
+	if reporter.debugMode {
+		reporter.nestedReporter.SpecSuiteDidEnd(summary)
+		reporter.debugFile.Sync()
+	}
 	reporter.post("/SpecSuiteDidEnd", summary)
 }

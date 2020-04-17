@@ -116,6 +116,10 @@ const (
 	// This is similar to ErrorTypeInvalid, but the error will not include the
 	// too-long value.  See TooLong().
 	ErrorTypeTooLong ErrorType = "FieldValueTooLong"
+	// ErrorTypeTooMany is used to report "too many". This is used to
+	// report that a given list has too many items. This is similar to FieldValueTooLong,
+	// but the error indicates quantity instead of length.
+	ErrorTypeTooMany ErrorType = "FieldValueTooMany"
 	// ErrorTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	ErrorTypeInternal ErrorType = "InternalError"
@@ -138,6 +142,8 @@ func (t ErrorType) String() string {
 		return "Forbidden"
 	case ErrorTypeTooLong:
 		return "Too long"
+	case ErrorTypeTooMany:
+		return "Too many"
 	case ErrorTypeInternal:
 		return "Internal error"
 	default:
@@ -198,7 +204,14 @@ func Forbidden(field *Path, detail string) *Error {
 // Invalid, but the returned error will not include the too-long
 // value.
 func TooLong(field *Path, value interface{}, maxLength int) *Error {
-	return &Error{ErrorTypeTooLong, field.String(), value, fmt.Sprintf("must have at most %d characters", maxLength)}
+	return &Error{ErrorTypeTooLong, field.String(), value, fmt.Sprintf("must have at most %d bytes", maxLength)}
+}
+
+// TooMany returns a *Error indicating "too many". This is used to
+// report that a given list has too many items. This is similar to TooLong,
+// but the returned error indicates quantity instead of length.
+func TooMany(field *Path, actualQuantity, maxQuantity int) *Error {
+	return &Error{ErrorTypeTooMany, field.String(), actualQuantity, fmt.Sprintf("must have at most %d items", maxQuantity)}
 }
 
 // InternalError returns a *Error indicating "internal error".  This is used

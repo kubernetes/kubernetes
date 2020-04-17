@@ -16,28 +16,27 @@ package libcontainer
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
+	"golang.org/x/sys/unix"
 
 	"bytes"
+
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"k8s.io/klog"
 )
-
-/*
-#include <unistd.h>
-*/
-import "C"
 
 type Handler struct {
 	cgroupManager   cgroups.Manager
@@ -46,6 +45,8 @@ type Handler struct {
 	includedMetrics container.MetricSet
 	pidMetricsCache map[int]*info.CpuSchedstat
 }
+
+var whitelistedUlimits = [...]string{"max_open_files"}
 
 func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedMetrics container.MetricSet) *Handler {
 	return &Handler{
@@ -106,6 +107,15 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 		} else {
 			stats.Network.Tcp6 = t6
 		}
+
+	}
+	if h.includedMetrics.Has(container.NetworkAdvancedTcpUsageMetrics) {
+		ta, err := advancedTcpStatsFromProc(h.rootFs, h.pid, "net/netstat", "net/snmp")
+		if err != nil {
+			klog.V(4).Infof("Unable to get advanced tcp stats from pid %d: %v", h.pid, err)
+		} else {
+			stats.Network.TcpAdvanced = ta
+		}
 	}
 	if h.includedMetrics.Has(container.NetworkUdpUsageMetrics) {
 		u, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp")
@@ -128,11 +138,14 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 		if !ok {
 			klog.V(4).Infof("Could not find cgroups CPU for container %d", h.pid)
 		} else {
-			stats.Processes, err = processStatsFromProcs(h.rootFs, path)
+			stats.Processes, err = processStatsFromProcs(h.rootFs, path, h.pid)
 			if err != nil {
 				klog.V(4).Infof("Unable to get Process Stats: %v", err)
 			}
 		}
+
+		// if include processes metrics, just set threads metrics if exist, and has no relationship with cpu path
+		setThreadsStats(cgroupStats, stats)
 	}
 
 	// For backwards compatibility.
@@ -143,8 +156,77 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	return stats, nil
 }
 
-func processStatsFromProcs(rootFs string, cgroupPath string) (info.ProcessStats, error) {
-	var fdCount uint64
+func parseUlimit(value string) (int64, error) {
+	num, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		if strings.EqualFold(value, "unlimited") {
+			// -1 implies unlimited except for priority and nice; man limits.conf
+			num = -1
+		} else {
+			// Value is not a number or "unlimited"; return an error
+			return 0, fmt.Errorf("unable to parse limit: %s", value)
+		}
+	}
+	return num, nil
+}
+
+func isUlimitWhitelisted(name string) bool {
+	for _, whitelist := range whitelistedUlimits {
+		if name == whitelist {
+			return true
+		}
+	}
+	return false
+}
+
+func processLimitsFile(fileData string) []info.UlimitSpec {
+	limits := strings.Split(fileData, "\n")
+	ulimits := make([]info.UlimitSpec, 0, len(limits))
+	for _, lim := range limits {
+		// Skip any headers/footers
+		if strings.HasPrefix(lim, "Max") {
+
+			// Line format: Max open files            16384                16384                files
+			fields := regexp.MustCompile("[\\s]{2,}").Split(lim, -1)
+			name := strings.Replace(strings.ToLower(strings.TrimSpace(fields[0])), " ", "_", -1)
+
+			found := isUlimitWhitelisted(name)
+			if !found {
+				continue
+			}
+
+			soft := strings.TrimSpace(fields[1])
+			soft_num, soft_err := parseUlimit(soft)
+
+			hard := strings.TrimSpace(fields[2])
+			hard_num, hard_err := parseUlimit(hard)
+
+			// Omit metric if there were any parsing errors
+			if soft_err == nil && hard_err == nil {
+				ulimitSpec := info.UlimitSpec{
+					Name:      name,
+					SoftLimit: int64(soft_num),
+					HardLimit: int64(hard_num),
+				}
+				ulimits = append(ulimits, ulimitSpec)
+			}
+		}
+	}
+	return ulimits
+}
+
+func processRootProcUlimits(rootFs string, rootPid int) []info.UlimitSpec {
+	filePath := path.Join(rootFs, "/proc", strconv.Itoa(rootPid), "limits")
+	out, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		klog.V(4).Infof("error while listing directory %q to read ulimits: %v", filePath, err)
+		return []info.UlimitSpec{}
+	}
+	return processLimitsFile(string(out))
+}
+
+func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.ProcessStats, error) {
+	var fdCount, socketCount uint64
 	filePath := path.Join(cgroupPath, "cgroup.procs")
 	out, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -168,11 +250,25 @@ func processStatsFromProcs(rootFs string, cgroupPath string) (info.ProcessStats,
 			continue
 		}
 		fdCount += uint64(len(fds))
+		for _, fd := range fds {
+			fdPath := path.Join(dirPath, fd.Name())
+			linkName, err := os.Readlink(fdPath)
+			if err != nil {
+				klog.V(4).Infof("error while reading %q link: %v", fdPath, err)
+				continue
+			}
+			if strings.HasPrefix(linkName, "socket") {
+				socketCount++
+			}
+		}
 	}
+	ulimits := processRootProcUlimits(rootFs, rootPid)
 
 	processStats := info.ProcessStats{
 		ProcessCount: uint64(len(pids)),
 		FdCount:      fdCount,
+		SocketCount:  socketCount,
+		Ulimits:      ulimits,
 	}
 
 	return processStats, nil
@@ -320,6 +416,80 @@ func tcpStatsFromProc(rootFs string, pid int, file string) (info.TcpStat, error)
 	}
 
 	return tcpStats, nil
+}
+
+func advancedTcpStatsFromProc(rootFs string, pid int, file1, file2 string) (info.TcpAdvancedStat, error) {
+	var advancedStats info.TcpAdvancedStat
+	var err error
+
+	netstatFile := path.Join(rootFs, "proc", strconv.Itoa(pid), file1)
+	err = scanAdvancedTcpStats(&advancedStats, netstatFile)
+	if err != nil {
+		return advancedStats, err
+	}
+
+	snmpFile := path.Join(rootFs, "proc", strconv.Itoa(pid), file2)
+	err = scanAdvancedTcpStats(&advancedStats, snmpFile)
+	if err != nil {
+		return advancedStats, err
+	}
+
+	return advancedStats, nil
+}
+
+func scanAdvancedTcpStats(advancedStats *info.TcpAdvancedStat, advancedTcpStatsFile string) error {
+	data, err := ioutil.ReadFile(advancedTcpStatsFile)
+	if err != nil {
+		return fmt.Errorf("failure opening %s: %v", advancedTcpStatsFile, err)
+	}
+
+	reader := strings.NewReader(string(data))
+	scanner := bufio.NewScanner(reader)
+	scanner.Split(bufio.ScanLines)
+
+	advancedTcpStats := make(map[string]interface{})
+	for scanner.Scan() {
+		nameParts := strings.Split(scanner.Text(), " ")
+		scanner.Scan()
+		valueParts := strings.Split(scanner.Text(), " ")
+		// Remove trailing :. and ignore non-tcp
+		protocol := nameParts[0][:len(nameParts[0])-1]
+		if protocol != "TcpExt" && protocol != "Tcp" {
+			continue
+		}
+		if len(nameParts) != len(valueParts) {
+			return fmt.Errorf("mismatch field count mismatch in %s: %s",
+				advancedTcpStatsFile, protocol)
+		}
+		for i := 1; i < len(nameParts); i++ {
+			if strings.Contains(valueParts[i], "-") {
+				vInt64, err := strconv.ParseInt(valueParts[i], 10, 64)
+				if err != nil {
+					return fmt.Errorf("decode value: %s to int64 error: %s", valueParts[i], err)
+				}
+				advancedTcpStats[nameParts[i]] = vInt64
+			} else {
+				vUint64, err := strconv.ParseUint(valueParts[i], 10, 64)
+				if err != nil {
+					return fmt.Errorf("decode value: %s to uint64 error: %s", valueParts[i], err)
+				}
+				advancedTcpStats[nameParts[i]] = vUint64
+			}
+		}
+	}
+
+	b, err := json.Marshal(advancedTcpStats)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(b, advancedStats)
+	if err != nil {
+		return err
+	}
+
+	return scanner.Err()
+
 }
 
 func scanTcpStats(tcpStatsFile string) (info.TcpStat, error) {
@@ -514,19 +684,12 @@ func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 
 }
 
-// Copied from
-// https://github.com/moby/moby/blob/8b1adf55c2af329a4334f21d9444d6a169000c81/daemon/stats/collector_unix.go#L73
-// Apache 2.0, Copyright Docker, Inc.
 func getNumberOnlineCPUs() (uint32, error) {
-	i, err := C.sysconf(C._SC_NPROCESSORS_ONLN)
-	// According to POSIX - errno is undefined after successful
-	// sysconf, and can be non-zero in several cases, so look for
-	// error in returned value not in errno.
-	// (https://sourceware.org/bugzilla/show_bug.cgi?id=21536)
-	if i == -1 {
+	var availableCPUs unix.CPUSet
+	if err := unix.SchedGetaffinity(0, &availableCPUs); err != nil {
 		return 0, err
 	}
-	return uint32(i), nil
+	return uint32(availableCPUs.Count()), nil
 }
 
 func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
@@ -576,6 +739,17 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.WorkingSet = workingSet
 }
 
+func setHugepageStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	ret.Hugetlb = make(map[string]info.HugetlbStats)
+	for k, v := range s.HugetlbStats {
+		ret.Hugetlb[k] = info.HugetlbStats{
+			Usage:    v.Usage,
+			MaxUsage: v.MaxUsage,
+			Failcnt:  v.Failcnt,
+		}
+	}
+}
+
 func setNetworkStats(libcontainerStats *libcontainer.Stats, ret *info.ContainerStats) {
 	ret.Network.Interfaces = make([]info.InterfaceStats, len(libcontainerStats.Interfaces))
 	for i := range libcontainerStats.Interfaces {
@@ -598,6 +772,15 @@ func setNetworkStats(libcontainerStats *libcontainer.Stats, ret *info.ContainerS
 	}
 }
 
+// read from pids path not cpu
+func setThreadsStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	if s != nil {
+		ret.Processes.ThreadsCurrent = s.PidsStats.Current
+		ret.Processes.ThreadsMax = s.PidsStats.Limit
+	}
+
+}
+
 func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics container.MetricSet) *info.ContainerStats {
 	ret := &info.ContainerStats{
 		Timestamp: time.Now(),
@@ -609,6 +792,9 @@ func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics co
 			setDiskIoStats(s, ret)
 		}
 		setMemoryStats(s, ret)
+		if includedMetrics.Has(container.HugetlbUsageMetrics) {
+			setHugepageStats(s, ret)
+		}
 	}
 	if len(libcontainerStats.Interfaces) > 0 {
 		setNetworkStats(libcontainerStats, ret)

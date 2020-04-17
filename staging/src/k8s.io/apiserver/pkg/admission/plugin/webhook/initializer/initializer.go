@@ -32,7 +32,7 @@ type WantsServiceResolver interface {
 // ServiceResolver knows how to convert a service reference into an actual
 // location.
 type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
+	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
 }
 
 // WantsAuthenticationInfoResolverWrapper defines a function that wraps the standard AuthenticationInfoResolver

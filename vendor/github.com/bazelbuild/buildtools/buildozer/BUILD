@@ -7,6 +7,7 @@ go_library(
     importpath = "github.com/bazelbuild/buildtools/buildozer",
     visibility = ["//visibility:private"],
     deps = [
+        "//vendor/github.com/bazelbuild/buildtools/build:go_default_library",
         "//vendor/github.com/bazelbuild/buildtools/edit:go_default_library",
         "//vendor/github.com/bazelbuild/buildtools/tables:go_default_library",
     ],

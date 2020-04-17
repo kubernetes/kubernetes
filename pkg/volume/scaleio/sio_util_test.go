@@ -19,7 +19,7 @@ package scaleio
 import (
 	"encoding/gob"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -93,7 +93,7 @@ func TestUtilValidateConfigs(t *testing.T) {
 		confKey.secretName: "sio-secret",
 		confKey.system:     "sio",
 	}
-	if err := validateConfigs(data); err != gatewayNotProvidedErr {
+	if err := validateConfigs(data); err != errGatewayNotProvided {
 		t.Error("Expecting error for missing gateway, but did not get it")
 	}
 }
@@ -152,7 +152,7 @@ func TestUtilSaveConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := path.Join(tmpDir, testConfigFile)
+	config := filepath.Join(tmpDir, testConfigFile)
 	data := map[string]string{
 		confKey.gateway:    "https://test-gateway/",
 		confKey.secretName: "sio-secret",
@@ -207,7 +207,7 @@ func TestUtilLoadConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	configFile := path.Join(tmpDir, sioConfigFileName)
+	configFile := filepath.Join(tmpDir, sioConfigFileName)
 
 	if err := saveConfig(configFile, config); err != nil {
 		t.Fatalf("failed to save configFile %s error:%v", configFile, err)

@@ -16,7 +16,9 @@
 // when the code is not running on Google App Engine, compiled by GopherJS, and
 // "-tags safe" is not added to the go build command line.  The "disableunsafe"
 // tag is deprecated and thus should not be used.
-// +build !js,!appengine,!safe,!disableunsafe
+// Go versions prior to 1.4 are disabled because they use a different layout
+// for interfaces which make the implementation of unsafeReflectValue more complex.
+// +build !js,!appengine,!safe,!disableunsafe,go1.4
 
 package spew
 
@@ -34,80 +36,49 @@ const (
 	ptrSize = unsafe.Sizeof((*byte)(nil))
 )
 
-var (
-	// offsetPtr, offsetScalar, and offsetFlag are the offsets for the
-	// internal reflect.Value fields.  These values are valid before golang
-	// commit ecccf07e7f9d which changed the format.  The are also valid
-	// after commit 82f48826c6c7 which changed the format again to mirror
-	// the original format.  Code in the init function updates these offsets
-	// as necessary.
-	offsetPtr    = uintptr(ptrSize)
-	offsetScalar = uintptr(0)
-	offsetFlag   = uintptr(ptrSize * 2)
+type flag uintptr
 
-	// flagKindWidth and flagKindShift indicate various bits that the
-	// reflect package uses internally to track kind information.
-	//
-	// flagRO indicates whether or not the value field of a reflect.Value is
-	// read-only.
-	//
-	// flagIndir indicates whether the value field of a reflect.Value is
-	// the actual data or a pointer to the data.
-	//
-	// These values are valid before golang commit 90a7c3c86944 which
-	// changed their positions.  Code in the init function updates these
-	// flags as necessary.
-	flagKindWidth = uintptr(5)
-	flagKindShift = uintptr(flagKindWidth - 1)
-	flagRO        = uintptr(1 << 0)
-	flagIndir     = uintptr(1 << 1)
+var (
+	// flagRO indicates whether the value field of a reflect.Value
+	// is read-only.
+	flagRO flag
+
+	// flagAddr indicates whether the address of the reflect.Value's
+	// value may be taken.
+	flagAddr flag
 )
 
-func init() {
-	// Older versions of reflect.Value stored small integers directly in the
-	// ptr field (which is named val in the older versions).  Versions
-	// between commits ecccf07e7f9d and 82f48826c6c7 added a new field named
-	// scalar for this purpose which unfortunately came before the flag
-	// field, so the offset of the flag field is different for those
-	// versions.
-	//
-	// This code constructs a new reflect.Value from a known small integer
-	// and checks if the size of the reflect.Value struct indicates it has
-	// the scalar field. When it does, the offsets are updated accordingly.
-	vv := reflect.ValueOf(0xf00)
-	if unsafe.Sizeof(vv) == (ptrSize * 4) {
-		offsetScalar = ptrSize * 2
-		offsetFlag = ptrSize * 3
-	}
+// flagKindMask holds the bits that make up the kind
+// part of the flags field. In all the supported versions,
+// it is in the lower 5 bits.
+const flagKindMask = flag(0x1f)
 
-	// Commit 90a7c3c86944 changed the flag positions such that the low
-	// order bits are the kind.  This code extracts the kind from the flags
-	// field and ensures it's the correct type.  When it's not, the flag
-	// order has been changed to the newer format, so the flags are updated
-	// accordingly.
-	upf := unsafe.Pointer(uintptr(unsafe.Pointer(&vv)) + offsetFlag)
-	upfv := *(*uintptr)(upf)
-	flagKindMask := uintptr((1<<flagKindWidth - 1) << flagKindShift)
-	if (upfv&flagKindMask)>>flagKindShift != uintptr(reflect.Int) {
-		flagKindShift = 0
-		flagRO = 1 << 5
-		flagIndir = 1 << 6
+// Different versions of Go have used different
+// bit layouts for the flags type. This table
+// records the known combinations.
+var okFlags = []struct {
+	ro, addr flag
+}{{
+	// From Go 1.4 to 1.5
+	ro:   1 << 5,
+	addr: 1 << 7,
+}, {
+	// Up to Go tip.
+	ro:   1<<5 | 1<<6,
+	addr: 1 << 8,
+}}
 
-		// Commit adf9b30e5594 modified the flags to separate the
-		// flagRO flag into two bits which specifies whether or not the
-		// field is embedded.  This causes flagIndir to move over a bit
-		// and means that flagRO is the combination of either of the
-		// original flagRO bit and the new bit.
-		//
-		// This code detects the change by extracting what used to be
-		// the indirect bit to ensure it's set.  When it's not, the flag
-		// order has been changed to the newer format, so the flags are
-		// updated accordingly.
-		if upfv&flagIndir == 0 {
-			flagRO = 3 << 5
-			flagIndir = 1 << 7
-		}
+var flagValOffset = func() uintptr {
+	field, ok := reflect.TypeOf(reflect.Value{}).FieldByName("flag")
+	if !ok {
+		panic("reflect.Value has no flag field")
 	}
+	return field.Offset
+}()
+
+// flagField returns a pointer to the flag field of a reflect.Value.
+func flagField(v *reflect.Value) *flag {
+	return (*flag)(unsafe.Pointer(uintptr(unsafe.Pointer(v)) + flagValOffset))
 }
 
 // unsafeReflectValue converts the passed reflect.Value into a one that bypasses
@@ -119,34 +90,56 @@ func init() {
 // This allows us to check for implementations of the Stringer and error
 // interfaces to be used for pretty printing ordinarily unaddressable and
 // inaccessible values such as unexported struct fields.
-func unsafeReflectValue(v reflect.Value) (rv reflect.Value) {
-	indirects := 1
-	vt := v.Type()
-	upv := unsafe.Pointer(uintptr(unsafe.Pointer(&v)) + offsetPtr)
-	rvf := *(*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(&v)) + offsetFlag))
-	if rvf&flagIndir != 0 {
-		vt = reflect.PtrTo(v.Type())
-		indirects++
-	} else if offsetScalar != 0 {
-		// The value is in the scalar field when it's not one of the
-		// reference types.
-		switch vt.Kind() {
-		case reflect.Uintptr:
-		case reflect.Chan:
-		case reflect.Func:
-		case reflect.Map:
-		case reflect.Ptr:
-		case reflect.UnsafePointer:
-		default:
-			upv = unsafe.Pointer(uintptr(unsafe.Pointer(&v)) +
-				offsetScalar)
+func unsafeReflectValue(v reflect.Value) reflect.Value {
+	if !v.IsValid() || (v.CanInterface() && v.CanAddr()) {
+		return v
+	}
+	flagFieldPtr := flagField(&v)
+	*flagFieldPtr &^= flagRO
+	*flagFieldPtr |= flagAddr
+	return v
+}
+
+// Sanity checks against future reflect package changes
+// to the type or semantics of the Value.flag field.
+func init() {
+	field, ok := reflect.TypeOf(reflect.Value{}).FieldByName("flag")
+	if !ok {
+		panic("reflect.Value has no flag field")
+	}
+	if field.Type.Kind() != reflect.TypeOf(flag(0)).Kind() {
+		panic("reflect.Value flag field has changed kind")
+	}
+	type t0 int
+	var t struct {
+		A t0
+		// t0 will have flagEmbedRO set.
+		t0
+		// a will have flagStickyRO set
+		a t0
+	}
+	vA := reflect.ValueOf(t).FieldByName("A")
+	va := reflect.ValueOf(t).FieldByName("a")
+	vt0 := reflect.ValueOf(t).FieldByName("t0")
+
+	// Infer flagRO from the difference between the flags
+	// for the (otherwise identical) fields in t.
+	flagPublic := *flagField(&vA)
+	flagWithRO := *flagField(&va) | *flagField(&vt0)
+	flagRO = flagPublic ^ flagWithRO
+
+	// Infer flagAddr from the difference between a value
+	// taken from a pointer and not.
+	vPtrA := reflect.ValueOf(&t).Elem().FieldByName("A")
+	flagNoPtr := *flagField(&vA)
+	flagPtr := *flagField(&vPtrA)
+	flagAddr = flagNoPtr ^ flagPtr
+
+	// Check that the inferred flags tally with one of the known versions.
+	for _, f := range okFlags {
+		if flagRO == f.ro && flagAddr == f.addr {
+			return
 		}
 	}
-
-	pv := reflect.NewAt(vt, upv)
-	rv = pv
-	for i := 0; i < indirects; i++ {
-		rv = rv.Elem()
-	}
-	return rv
+	panic("reflect.Value read-only flag has changed semantics")
 }

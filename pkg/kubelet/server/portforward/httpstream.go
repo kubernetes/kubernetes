@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"k8s.io/klog"
 )
@@ -46,7 +46,7 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 	upgrader := spdy.NewResponseUpgrader()
 	conn := upgrader.UpgradeResponse(w, req, httpStreamReceived(streamChan))
 	if conn == nil {
-		return errors.New("Unable to upgrade httpstream connection")
+		return errors.New("unable to upgrade httpstream connection")
 	}
 	defer conn.Close()
 

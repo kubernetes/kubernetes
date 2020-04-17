@@ -17,12 +17,22 @@ package edit
 import (
 	buildpb "github.com/bazelbuild/buildtools/build_proto"
 	"github.com/bazelbuild/buildtools/lang"
+	"github.com/bazelbuild/buildtools/tables"
 )
 
 var typeOf = lang.TypeOf
 
 // IsList returns true for all attributes whose type is a list.
 func IsList(attr string) bool {
+	overrideValue, isOverridden := tables.IsListArg[attr]
+	if isOverridden {
+		return overrideValue
+	}
+	// It stands to reason that a sortable list must be a list.
+	isSortableList := tables.IsSortableListArg[attr]
+	if isSortableList {
+		return true
+	}
 	ty := typeOf[attr]
 	return ty == buildpb.Attribute_STRING_LIST ||
 		ty == buildpb.Attribute_LABEL_LIST ||

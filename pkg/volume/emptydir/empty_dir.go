@@ -19,18 +19,20 @@ package emptydir
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
 // TODO: in the near future, this will be changed to be more restrictive
@@ -86,10 +88,6 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
 		return true
 	}
-	return false
-}
-
-func (plugin *emptyDirPlugin) IsMigratedToCSI() bool {
 	return false
 }
 
@@ -162,7 +160,7 @@ type mountDetector interface {
 	// returns (v1.StorageMediumMemory, false, nil), the caller knows that the path is
 	// on a memory FS (tmpfs on Linux) but is not the root mountpoint of
 	// that tmpfs.
-	GetMountMedium(path string) (v1.StorageMedium, bool, error)
+	GetMountMedium(path string, requestedMedium v1.StorageMedium) (v1.StorageMedium, bool, *resource.Quantity, error)
 }
 
 // EmptyDir volumes are temporary directories exposed to the pod.
@@ -193,12 +191,12 @@ func (ed *emptyDir) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(fsGroup *int64) error {
-	return ed.SetUpAt(ed.GetPath(), fsGroup)
+func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
+	return ed.SetUpAt(ed.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
+func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -218,23 +216,39 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		}
 	}
 
-	switch ed.medium {
-	case v1.StorageMediumDefault:
+	switch {
+	case ed.medium == v1.StorageMediumDefault:
 		err = ed.setupDir(dir)
-	case v1.StorageMediumMemory:
+	case ed.medium == v1.StorageMediumMemory:
 		err = ed.setupTmpfs(dir)
-	case v1.StorageMediumHugePages:
+	case v1helper.IsHugePageMedium(ed.medium):
 		err = ed.setupHugepages(dir)
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, fsGroup)
+	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
 
+	// If setting up the quota fails, just log a message but don't actually error out.
+	// We'll use the old du mechanism in this case, at least until we support
+	// enforcement.
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())
+		if mounterArgs.DesiredSize != nil {
+			// Deliberately shadow the outer use of err as noted
+			// above.
+			hasQuotas, err := fsquota.SupportsQuotas(ed.mounter, dir)
+			if err != nil {
+				klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
+			} else if hasQuotas {
+				klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterArgs.DesiredSize, dir)
+				err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterArgs.DesiredSize)
+				if err != nil {
+					klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
+				}
+			}
+		}
 	}
-
 	return err
 }
 
@@ -247,7 +261,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return err
 	}
 	// Make SetUp idempotent.
-	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	medium, isMnt, _, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
 	if err != nil {
 		return err
 	}
@@ -270,17 +284,34 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 		return err
 	}
 	// Make SetUp idempotent.
-	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	medium, isMnt, mountPageSize, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
+	klog.V(3).Infof("pod %v: setupHugepages: medium: %s, isMnt: %v, dir: %s, err: %v", ed.pod.UID, medium, isMnt, dir, err)
 	if err != nil {
 		return err
 	}
-	// If the directory is a mountpoint with medium hugepages, there is no
-	// work to do since we are already in the desired state.
-	if isMnt && medium == v1.StorageMediumHugePages {
+	// If the directory is a mountpoint with medium hugepages of the same page size,
+	// there is no work to do since we are already in the desired state.
+	if isMnt && v1helper.IsHugePageMedium(medium) {
+		// Medium is: Hugepages
+		if ed.medium == v1.StorageMediumHugePages {
+			return nil
+		}
+		if mountPageSize == nil {
+			return fmt.Errorf("pod %v: mounted dir %s pagesize is not determined", ed.pod.UID, dir)
+		}
+		// Medium is: Hugepages-<size>
+		// Mounted page size and medium size must be equal
+		mediumSize, err := v1helper.HugePageSizeFromMedium(ed.medium)
+		if err != nil {
+			return err
+		}
+		if mountPageSize == nil || mediumSize.Cmp(*mountPageSize) != 0 {
+			return fmt.Errorf("pod %v: mounted dir %s pagesize '%s' and requested medium size '%s' differ", ed.pod.UID, dir, mountPageSize.String(), mediumSize.String())
+		}
 		return nil
 	}
 
-	pageSizeMountOption, err := getPageSizeMountOptionFromPod(ed.pod)
+	pageSizeMountOption, err := getPageSizeMountOption(ed.medium, ed.pod)
 	if err != nil {
 		return err
 	}
@@ -289,33 +320,52 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 	return ed.mounter.Mount("nodev", dir, "hugetlbfs", []string{pageSizeMountOption})
 }
 
-// getPageSizeMountOptionFromPod retrieves pageSize mount option from Pod's resources
-// and validates pageSize options in all containers of given Pod.
-func getPageSizeMountOptionFromPod(pod *v1.Pod) (string, error) {
+// getPageSizeMountOption retrieves pageSize mount option from Pod's resources
+// and medium and validates pageSize options in all containers of given Pod.
+func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error) {
 	pageSizeFound := false
 	pageSize := resource.Quantity{}
-	// In some rare cases init containers can also consume Huge pages.
-	containers := append(pod.Spec.Containers, pod.Spec.InitContainers...)
-	for _, container := range containers {
+
+	var mediumPageSize resource.Quantity
+	if medium != v1.StorageMediumHugePages {
+		// medium is: Hugepages-<size>
+		var err error
+		mediumPageSize, err = v1helper.HugePageSizeFromMedium(medium)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// In some rare cases init containers can also consume Huge pages
+	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
 		// We can take request because limit and requests must match.
 		for requestName := range container.Resources.Requests {
-			if v1helper.IsHugePageResourceName(requestName) {
-				currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)
-				if err != nil {
-					return "", err
-				}
-				// PageSize for all volumes in a POD are equal, except for the first one discovered.
+			if !v1helper.IsHugePageResourceName(requestName) {
+				continue
+			}
+			currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)
+			if err != nil {
+				return "", err
+			}
+			if medium == v1.StorageMediumHugePages { // medium is: Hugepages, size is not specified
+				// PageSize for all volumes in a POD must be equal if medium is "Hugepages"
 				if pageSizeFound && pageSize.Cmp(currentPageSize) != 0 {
-					return "", fmt.Errorf("multiple pageSizes for huge pages in a single PodSpec")
+					return "", fmt.Errorf("medium: %s can't be used if container requests multiple huge page sizes", medium)
 				}
-				pageSize = currentPageSize
+
 				pageSizeFound = true
+				pageSize = currentPageSize
+			} else { // medium is: Hugepages-<size>
+				if currentPageSize.Cmp(mediumPageSize) == 0 {
+					pageSizeFound = true
+					pageSize = currentPageSize
+				}
 			}
 		}
 	}
 
 	if !pageSizeFound {
-		return "", fmt.Errorf("hugePages storage requested, but there is no resource request for huge pages")
+		return "", fmt.Errorf("medium %s: hugePages storage requested, but there is no resource request for huge pages", medium)
 	}
 
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil
@@ -379,7 +429,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 	}
 
 	// Figure out the medium.
-	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	medium, isMnt, _, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
 	if err != nil {
 		return err
 	}
@@ -397,9 +447,14 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
+	// Remove any quota
+	err := fsquota.ClearQuota(ed.mounter, dir)
+	if err != nil {
+		klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
+	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	err := os.RemoveAll(dir)
+	err = os.RemoveAll(dir)
 	if err != nil {
 		return err
 	}
@@ -420,7 +475,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
+	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {

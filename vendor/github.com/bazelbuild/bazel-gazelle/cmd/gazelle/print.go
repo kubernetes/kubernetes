@@ -18,8 +18,8 @@ package main
 import (
 	"os"
 
-	"github.com/bazelbuild/bazel-gazelle/internal/config"
-	"github.com/bazelbuild/bazel-gazelle/internal/rule"
+	"github.com/bazelbuild/bazel-gazelle/config"
+	"github.com/bazelbuild/bazel-gazelle/rule"
 )
 
 func printFile(c *config.Config, f *rule.File) error {

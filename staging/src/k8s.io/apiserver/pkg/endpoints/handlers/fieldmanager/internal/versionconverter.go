@@ -17,13 +17,11 @@ limitations under the License.
 package internal
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/structured-merge-diff/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/merge"
-	"sigs.k8s.io/structured-merge-diff/typed"
+	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v3/merge"
+	"sigs.k8s.io/structured-merge-diff/v3/typed"
 )
 
 // versionConverter is an implementation of
@@ -31,7 +29,7 @@ import (
 type versionConverter struct {
 	typeConverter   TypeConverter
 	objectConvertor runtime.ObjectConvertor
-	hubVersion      schema.GroupVersion
+	hubGetter       func(from schema.GroupVersion) schema.GroupVersion
 }
 
 var _ merge.Converter = &versionConverter{}
@@ -41,12 +39,28 @@ func NewVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.Gr
 	return &versionConverter{
 		typeConverter:   t,
 		objectConvertor: o,
-		hubVersion:      h,
+		hubGetter: func(from schema.GroupVersion) schema.GroupVersion {
+			return schema.GroupVersion{
+				Group:   from.Group,
+				Version: h.Version,
+			}
+		},
+	}
+}
+
+// NewCRDVersionConverter builds a VersionConverter for CRDs from a TypeConverter and an ObjectConvertor.
+func NewCRDVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.GroupVersion) merge.Converter {
+	return &versionConverter{
+		typeConverter:   t,
+		objectConvertor: o,
+		hubGetter: func(from schema.GroupVersion) schema.GroupVersion {
+			return h
+		},
 	}
 }
 
 // Convert implements sigs.k8s.io/structured-merge-diff/merge.Converter
-func (v *versionConverter) Convert(object typed.TypedValue, version fieldpath.APIVersion) (typed.TypedValue, error) {
+func (v *versionConverter) Convert(object *typed.TypedValue, version fieldpath.APIVersion) (*typed.TypedValue, error) {
 	// Convert the smd typed value to a kubernetes object.
 	objectToConvert, err := v.typeConverter.TypedToObject(object)
 	if err != nil {
@@ -60,24 +74,28 @@ func (v *versionConverter) Convert(object typed.TypedValue, version fieldpath.AP
 	}
 
 	// If attempting to convert to the same version as we already have, just return it.
-	if objectToConvert.GetObjectKind().GroupVersionKind().GroupVersion() == groupVersion {
+	fromVersion := objectToConvert.GetObjectKind().GroupVersionKind().GroupVersion()
+	if fromVersion == groupVersion {
 		return object, nil
 	}
 
 	// Convert to internal
-	internalObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, v.hubVersion)
+	internalObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, v.hubGetter(fromVersion))
 	if err != nil {
-		return object, fmt.Errorf("failed to convert object (%v to %v): %v",
-			objectToConvert.GetObjectKind().GroupVersionKind(), v.hubVersion, err)
+		return object, err
 	}
 
 	// Convert the object into the target version
 	convertedObject, err := v.objectConvertor.ConvertToVersion(internalObject, groupVersion)
 	if err != nil {
-		return object, fmt.Errorf("failed to convert object (%v to %v): %v",
-			internalObject.GetObjectKind().GroupVersionKind(), groupVersion, err)
+		return object, err
 	}
 
 	// Convert the object back to a smd typed value and return it.
 	return v.typeConverter.ObjectToTyped(convertedObject)
+}
+
+// IsMissingVersionError
+func (v *versionConverter) IsMissingVersionError(err error) bool {
+	return runtime.IsNotRegisteredError(err) || isNoCorrespondingTypeError(err)
 }

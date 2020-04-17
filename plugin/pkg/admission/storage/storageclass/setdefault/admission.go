@@ -17,6 +17,7 @@ limitations under the License.
 package setdefault
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -85,7 +86,7 @@ func (a *claimDefaulterPlugin) ValidateInitialization() error {
 // 1.  Find available StorageClasses.
 // 2.  Figure which is the default
 // 3.  Write to the PVClaim
-func (a *claimDefaulterPlugin) Admit(attr admission.Attributes, o admission.ObjectInterfaces) error {
+func (a *claimDefaulterPlugin) Admit(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if attr.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}

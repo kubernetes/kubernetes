@@ -57,14 +57,24 @@ type RegisterObject interface {
 
 // Registry manages a map of mo.Reference objects
 type Registry struct {
+	counter  int64 // Keep first to ensure 64-bit alignment
 	m        sync.Mutex
 	objects  map[types.ManagedObjectReference]mo.Reference
 	handlers map[types.ManagedObjectReference]RegisterObject
 	locks    map[types.ManagedObjectReference]sync.Locker
-	counter  int64
 
 	Namespace string
 	Path      string
+
+	tagManager tagManager
+}
+
+// tagManager is an interface to simplify internal interaction with the vapi tag manager simulator.
+type tagManager interface {
+	AttachedObjects(types.VslmTagEntry) ([]types.ManagedObjectReference, types.BaseMethodFault)
+	AttachedTags(id types.ManagedObjectReference) ([]types.VslmTagEntry, types.BaseMethodFault)
+	AttachTag(types.ManagedObjectReference, types.VslmTagEntry) types.BaseMethodFault
+	DetachTag(types.ManagedObjectReference, types.VslmTagEntry) types.BaseMethodFault
 }
 
 // NewRegistry creates a new instances of Registry
@@ -175,6 +185,24 @@ func (r *Registry) Any(kind string) mo.Entity {
 	}
 
 	return nil
+}
+
+// All returns all entities of type specified by kind.
+// If kind is empty - all entities will be returned.
+func (r *Registry) All(kind string) []mo.Entity {
+	r.m.Lock()
+	defer r.m.Unlock()
+
+	var entities []mo.Entity
+	for ref, val := range r.objects {
+		if kind == "" || ref.Type == kind {
+			if e, ok := val.(mo.Entity); ok {
+				entities = append(entities, e)
+			}
+		}
+	}
+
+	return entities
 }
 
 // applyHandlers calls the given func for each r.handlers
@@ -441,6 +469,11 @@ func (r *Registry) SessionManager() *SessionManager {
 // OptionManager returns the OptionManager singleton
 func (r *Registry) OptionManager() *OptionManager {
 	return r.Get(r.content().Setting.Reference()).(*OptionManager)
+}
+
+// CustomFieldsManager returns CustomFieldsManager singleton
+func (r *Registry) CustomFieldsManager() *CustomFieldsManager {
+	return r.Get(r.content().CustomFieldsManager.Reference()).(*CustomFieldsManager)
 }
 
 func (r *Registry) MarshalJSON() ([]byte, error) {

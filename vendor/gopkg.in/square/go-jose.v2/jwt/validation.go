@@ -35,7 +35,7 @@ type Expected struct {
 	Audience Audience
 	// ID matches the "jti" claim exactly.
 	ID string
-	// Time matches the "exp" and "ebf" claims with leeway.
+	// Time matches the "exp" and "nbf" claims with leeway.
 	Time time.Time
 }
 
@@ -47,6 +47,14 @@ func (e Expected) WithTime(t time.Time) Expected {
 
 // Validate checks claims in a token against expected values.
 // A default leeway value of one minute is used to compare time values.
+//
+// The default leeway will cause the token to be deemed valid until one
+// minute after the expiration time. If you're a server application that
+// wants to give an extra minute to client tokens, use this
+// function. If you're a client application wondering if the server
+// will accept your token, use ValidateWithLeeway with a leeway <=0,
+// otherwise this function might make you think a token is valid when
+// it is not.
 func (c Claims) Validate(e Expected) error {
 	return c.ValidateWithLeeway(e, DefaultLeeway)
 }
@@ -56,6 +64,15 @@ func (c Claims) Validate(e Expected) error {
 // zero value to check time values with no leeway, but you should not that
 // numeric date values are rounded to the nearest second and sub-second
 // precision is not supported.
+//
+// The leeway gives some extra time to the token from the server's
+// point of view. That is, if the token is expired, ValidateWithLeeway
+// will still accept the token for 'leeway' amount of time. This fails
+// if you're using this function to check if a server will accept your
+// token, because it will think the token is valid even after it
+// expires. So if you're a client validating if the token is valid to
+// be submitted to a server, use leeway <=0, if you're a server
+// validation a token, use leeway >=0.
 func (c Claims) ValidateWithLeeway(e Expected, leeway time.Duration) error {
 	if e.Issuer != "" && e.Issuer != c.Issuer {
 		return ErrInvalidIssuer

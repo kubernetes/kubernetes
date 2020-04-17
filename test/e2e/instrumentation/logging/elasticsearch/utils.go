@@ -17,6 +17,7 @@ limitations under the License.
 package elasticsearch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -26,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 )
 
@@ -60,7 +63,7 @@ func (p *esLogProvider) Init() error {
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
-		if _, err = s.Get("elasticsearch-logging", meta_v1.GetOptions{}); err == nil {
+		if _, err = s.Get(context.TODO(), "elasticsearch-logging", meta_v1.GetOptions{}); err == nil {
 			break
 		}
 		framework.Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
@@ -73,12 +76,12 @@ func (p *esLogProvider) Init() error {
 	framework.Logf("Checking to make sure the Elasticsearch pods are running")
 	labelSelector := fields.SelectorFromSet(fields.Set(map[string]string{"k8s-app": "elasticsearch-logging"})).String()
 	options := meta_v1.ListOptions{LabelSelector: labelSelector}
-	pods, err := f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(options)
+	pods, err := f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(context.TODO(), options)
 	if err != nil {
 		return err
 	}
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
+		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, &pod)
 		if err != nil {
 			return err
 		}
@@ -90,7 +93,7 @@ func (p *esLogProvider) Init() error {
 	err = nil
 	var body []byte
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
@@ -98,7 +101,7 @@ func (p *esLogProvider) Init() error {
 		// Query against the root URL for Elasticsearch.
 		response := proxyRequest.Namespace(api.NamespaceSystem).
 			Name("elasticsearch-logging").
-			Do()
+			Do(context.TODO())
 		err = response.Error()
 		response.StatusCode(&statusCode)
 
@@ -124,7 +127,7 @@ func (p *esLogProvider) Init() error {
 	framework.Logf("Checking health of Elasticsearch service.")
 	healthy := false
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
@@ -133,7 +136,7 @@ func (p *esLogProvider) Init() error {
 			Name("elasticsearch-logging").
 			Suffix("_cluster/health").
 			Param("level", "indices").
-			DoRaw()
+			DoRaw(context.TODO())
 		if err != nil {
 			continue
 		}
@@ -172,7 +175,7 @@ func (p *esLogProvider) Cleanup() {
 func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 	f := p.Framework
 
-	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+	proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 	if errProxy != nil {
 		framework.Logf("Failed to get services proxy request: %v", errProxy)
 		return nil
@@ -187,9 +190,8 @@ func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 		Name("elasticsearch-logging").
 		Suffix("_search").
 		Param("q", query).
-		// Ask for more in case we included some unrelated records in our query
 		Param("size", strconv.Itoa(searchPageSize)).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err != nil {
 		framework.Logf("Failed to make proxy call to elasticsearch-logging: %v", err)
 		return nil

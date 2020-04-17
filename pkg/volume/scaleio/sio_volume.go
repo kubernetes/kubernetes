@@ -19,9 +19,13 @@ package scaleio
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,11 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 type sioVolume struct {
@@ -77,12 +78,12 @@ func (v *sioVolume) CanMount() error {
 	return nil
 }
 
-func (v *sioVolume) SetUp(fsGroup *int64) error {
-	return v.SetUpAt(v.GetPath(), fsGroup)
+func (v *sioVolume) SetUp(mounterArgs volume.MounterArgs) error {
+	return v.SetUpAt(v.GetPath(), mounterArgs)
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (v *sioVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
@@ -154,9 +155,9 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	if !v.readOnly && fsGroup != nil {
+	if !v.readOnly && mounterArgs.FsGroup != nil {
 		klog.V(4).Info(log("applying  value FSGroup ownership"))
-		volume.SetVolumeOwnership(v, fsGroup)
+		volume.SetVolumeOwnership(v, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	}
 
 	klog.V(4).Info(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))
@@ -201,7 +202,12 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	klog.V(4).Info(log("dir %s unmounted successfully", dir))
 
 	// detach/unmap
-	deviceBusy, err := mounter.DeviceOpened(dev)
+	kvh, ok := v.plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
+	deviceBusy, err := hu.DeviceOpened(dev)
 	if err != nil {
 		klog.Error(log("teardown unable to get status for device %s: %v", dev, err))
 		return err
@@ -359,7 +365,7 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 func (v *sioVolume) setSioMgr() error {
 	klog.V(4).Info(log("setting up sio mgr for spec  %s", v.volSpecName))
 	podDir := v.plugin.host.GetPodPluginDir(v.podUID, sioPluginName)
-	configName := path.Join(podDir, sioConfigFileName)
+	configName := filepath.Join(podDir, sioConfigFileName)
 	if v.sioMgr == nil {
 		configData, err := loadConfig(configName) // try to load config if exist
 		if err != nil {
@@ -414,7 +420,7 @@ func (v *sioVolume) setSioMgr() error {
 // resetSioMgr creates scaleio manager from existing (cached) config data
 func (v *sioVolume) resetSioMgr() error {
 	podDir := v.plugin.host.GetPodPluginDir(v.podUID, sioPluginName)
-	configName := path.Join(podDir, sioConfigFileName)
+	configName := filepath.Join(podDir, sioConfigFileName)
 	if v.sioMgr == nil {
 		// load config data from disk
 		configData, err := loadConfig(configName)

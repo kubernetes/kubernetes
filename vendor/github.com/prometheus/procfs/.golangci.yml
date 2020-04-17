@@ -1,0 +1,6 @@
+# Run only staticcheck for now. Additional linters will be enabled one-by-one.
+linters:
+  enable:
+  - staticcheck
+  - govet
+  disable-all: true

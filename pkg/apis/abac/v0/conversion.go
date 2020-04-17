@@ -18,51 +18,45 @@ package v0
 
 import (
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/abac"
 )
 
 // allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,
-// but we don't want an client library (which must include types), depending on a server library
+// but we don't want a client library (which must include types), depending on a server library
 const allAuthenticated = "system:authenticated"
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddConversionFuncs(
-		func(in *Policy, out *api.Policy, s conversion.Scope) error {
-			// Begin by copying all fields
-			out.Spec.User = in.User
-			out.Spec.Group = in.Group
-			out.Spec.Namespace = in.Namespace
-			out.Spec.Resource = in.Resource
-			out.Spec.Readonly = in.Readonly
+func Convert_v0_Policy_To_abac_Policy(in *Policy, out *abac.Policy, s conversion.Scope) error {
+	out.Spec.User = in.User
+	out.Spec.Group = in.Group
+	out.Spec.Namespace = in.Namespace
+	out.Spec.Resource = in.Resource
+	out.Spec.Readonly = in.Readonly
 
-			// In v0, unspecified user and group matches all authenticated subjects
-			if len(in.User) == 0 && len(in.Group) == 0 {
-				out.Spec.Group = allAuthenticated
-			}
-			// In v0, user or group of * matches all authenticated subjects
-			if in.User == "*" || in.Group == "*" {
-				out.Spec.Group = allAuthenticated
-				out.Spec.User = ""
-			}
+	// In v0, unspecified user and group matches all authenticated subjects
+	if len(in.User) == 0 && len(in.Group) == 0 {
+		out.Spec.Group = allAuthenticated
+	}
+	// In v0, user or group of * matches all authenticated subjects
+	if in.User == "*" || in.Group == "*" {
+		out.Spec.Group = allAuthenticated
+		out.Spec.User = ""
+	}
 
-			// In v0, leaving namespace empty matches all namespaces
-			if len(in.Namespace) == 0 {
-				out.Spec.Namespace = "*"
-			}
-			// In v0, leaving resource empty matches all resources
-			if len(in.Resource) == 0 {
-				out.Spec.Resource = "*"
-			}
-			// Any rule in v0 should match all API groups
-			out.Spec.APIGroup = "*"
+	// In v0, leaving namespace empty matches all namespaces
+	if len(in.Namespace) == 0 {
+		out.Spec.Namespace = "*"
+	}
+	// In v0, leaving resource empty matches all resources
+	if len(in.Resource) == 0 {
+		out.Spec.Resource = "*"
+	}
+	// Any rule in v0 should match all API groups
+	out.Spec.APIGroup = "*"
 
-			// In v0, leaving namespace and resource blank allows non-resource paths
-			if len(in.Namespace) == 0 && len(in.Resource) == 0 {
-				out.Spec.NonResourcePath = "*"
-			}
+	// In v0, leaving namespace and resource blank allows non-resource paths
+	if len(in.Namespace) == 0 && len(in.Resource) == 0 {
+		out.Spec.NonResourcePath = "*"
+	}
 
-			return nil
-		},
-	)
+	return nil
 }

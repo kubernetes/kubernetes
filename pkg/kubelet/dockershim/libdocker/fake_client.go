@@ -23,7 +23,6 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -71,12 +70,13 @@ type FakeDockerClient struct {
 	// Images pulled by ref (name or ID).
 	ImagesPulled []string
 
-	VersionInfo     dockertypes.Version
-	Information     dockertypes.Info
-	ExecInspect     *dockertypes.ContainerExecInspect
-	execCmd         []string
-	EnableSleep     bool
-	ImageHistoryMap map[string][]dockerimagetypes.HistoryResponseItem
+	VersionInfo       dockertypes.Version
+	Information       dockertypes.Info
+	ExecInspect       *dockertypes.ContainerExecInspect
+	execCmd           []string
+	EnableSleep       bool
+	ImageHistoryMap   map[string][]dockerimagetypes.HistoryResponseItem
+	ContainerStatsMap map[string]*dockertypes.StatsJSON
 }
 
 const (
@@ -98,6 +98,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 		Clock:        clock.RealClock{},
 		// default this to true, so that we trace calls, image pulls and container lifecycle
 		EnableTrace:         true,
+		ExecInspect:         &dockertypes.ContainerExecInspect{},
 		ImageInspects:       make(map[string]*dockertypes.ImageInspect),
 		ImageIDsNeedingAuth: make(map[string]dockertypes.AuthConfig),
 		RandGenerator:       rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -268,13 +269,6 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*FakeContainer) {
 	}
 }
 
-func (f *FakeDockerClient) SetFakeRunningContainers(containers []*FakeContainer) {
-	for _, c := range containers {
-		c.Running = true
-	}
-	f.SetFakeContainers(containers)
-}
-
 func (f *FakeDockerClient) AssertCalls(calls []string) (err error) {
 	f.Lock()
 	defer f.Unlock()
@@ -295,82 +289,6 @@ func (f *FakeDockerClient) AssertCallDetails(calls ...CalledDetail) (err error) 
 	}
 
 	return
-}
-
-// idsToNames converts container ids into names. The caller must hold the lock.
-func (f *FakeDockerClient) idsToNames(ids []string) ([]string, error) {
-	names := []string{}
-	for _, id := range ids {
-		names = append(names, strings.TrimPrefix(f.ContainerMap[id].Name, dockerNamePrefix))
-	}
-	return names, nil
-}
-
-func (f *FakeDockerClient) AssertCreatedByNameWithOrder(created []string) error {
-	f.Lock()
-	defer f.Unlock()
-	actualCreated, err := f.idsToNames(f.Created)
-	if err != nil {
-		return err
-	}
-	if !reflect.DeepEqual(created, actualCreated) {
-		return fmt.Errorf("expected %#v, got %#v", created, actualCreated)
-	}
-	return nil
-}
-
-func (f *FakeDockerClient) AssertCreatedByName(created []string) error {
-	f.Lock()
-	defer f.Unlock()
-
-	actualCreated, err := f.idsToNames(f.Created)
-	if err != nil {
-		return err
-	}
-	return sortedStringSlicesEqual(created, actualCreated)
-}
-
-func (f *FakeDockerClient) AssertStoppedByName(stopped []string) error {
-	f.Lock()
-	defer f.Unlock()
-	actualStopped, err := f.idsToNames(f.Stopped)
-	if err != nil {
-		return err
-	}
-	return sortedStringSlicesEqual(stopped, actualStopped)
-}
-
-func (f *FakeDockerClient) AssertStopped(stopped []string) error {
-	f.Lock()
-	defer f.Unlock()
-	// Copy stopped to avoid modifying it.
-	actualStopped := append([]string{}, f.Stopped...)
-	return sortedStringSlicesEqual(stopped, actualStopped)
-}
-
-func (f *FakeDockerClient) AssertImagesPulled(pulled []string) error {
-	f.Lock()
-	defer f.Unlock()
-	// Copy pulled to avoid modifying it.
-	actualPulled := append([]string{}, f.ImagesPulled...)
-	return sortedStringSlicesEqual(pulled, actualPulled)
-}
-
-func (f *FakeDockerClient) AssertImagesPulledMsgs(expected []string) error {
-	f.Lock()
-	defer f.Unlock()
-	// Copy pulled to avoid modifying it.
-	actual := append([]string{}, f.pulled...)
-	return sortedStringSlicesEqual(expected, actual)
-}
-
-func sortedStringSlicesEqual(expected, actual []string) error {
-	sort.StringSlice(expected).Sort()
-	sort.StringSlice(actual).Sort()
-	if !reflect.DeepEqual(expected, actual) {
-		return fmt.Errorf("expected %#v, got %#v", expected, actual)
-	}
-	return nil
 }
 
 func (f *FakeDockerClient) popError(op string) error {
@@ -396,7 +314,6 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 	if options.All {
 		// Although the container is not sorted, but the container with the same name should be in order,
 		// that is enough for us now.
-		// TODO(random-liu): Is a fully sorted array needed?
 		containerList = append(containerList, f.ExitedContainerList...)
 	}
 	// Filters containers with id, only support 1 id.
@@ -536,7 +453,7 @@ func (f *FakeDockerClient) normalSleep(mean, stdDev, cutOffMillis int) {
 		return
 	}
 	cutoff := (time.Duration)(cutOffMillis) * time.Millisecond
-	delay := (time.Duration)(rand.NormFloat64()*float64(stdDev)+float64(mean)) * time.Millisecond
+	delay := (time.Duration)(f.RandGenerator.NormFloat64()*float64(stdDev)+float64(mean)) * time.Millisecond
 	if delay < cutoff {
 		delay = cutoff
 	}
@@ -913,9 +830,19 @@ func (f *FakeDockerPuller) GetImageRef(image string) (string, error) {
 	return image, err
 }
 
+func (f *FakeDockerClient) InjectContainerStats(data map[string]*dockertypes.StatsJSON) {
+	f.Lock()
+	defer f.Unlock()
+	f.ContainerStatsMap = data
+}
+
 func (f *FakeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.appendCalled(CalledDetail{name: "getContainerStats"})
-	return nil, fmt.Errorf("not implemented")
+	f.appendCalled(CalledDetail{name: "get_container_stats"})
+	stats, ok := f.ContainerStatsMap[id]
+	if !ok {
+		return nil, fmt.Errorf("container %q not found", id)
+	}
+	return stats, nil
 }

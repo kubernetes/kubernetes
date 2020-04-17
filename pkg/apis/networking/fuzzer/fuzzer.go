@@ -44,5 +44,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				np.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeIngress}
 			}
 		},
+		func(path *networking.HTTPIngressPath, c fuzz.Continue) {
+			c.FuzzNoCustom(path) // fuzz self without calling this function again
+			pathTypes := []networking.PathType{networking.PathTypeExact, networking.PathTypePrefix, networking.PathTypeImplementationSpecific}
+			path.PathType = &pathTypes[c.Rand.Intn(len(pathTypes))]
+		},
 	}
 }

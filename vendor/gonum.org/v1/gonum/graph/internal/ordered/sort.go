@@ -74,3 +74,20 @@ func Reverse(nodes []graph.Node) {
 		nodes[i], nodes[j] = nodes[j], nodes[i]
 	}
 }
+
+// LinesByIDs implements the sort.Interface sorting a slice of graph.LinesByIDs
+// lexically by the From IDs, then by the To IDs, finally by the Line IDs.
+type LinesByIDs []graph.Line
+
+func (n LinesByIDs) Len() int { return len(n) }
+func (n LinesByIDs) Less(i, j int) bool {
+	a, b := n[i], n[j]
+	if a.From().ID() != b.From().ID() {
+		return a.From().ID() < b.From().ID()
+	}
+	if a.To().ID() != b.To().ID() {
+		return a.To().ID() < b.To().ID()
+	}
+	return n[i].ID() < n[j].ID()
+}
+func (n LinesByIDs) Swap(i, j int) { n[i], n[j] = n[j], n[i] }

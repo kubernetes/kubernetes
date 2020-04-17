@@ -50,7 +50,7 @@ func (p PathItem) JSONLookup(token string) (interface{}, error) {
 	if ex, ok := p.Extensions[token]; ok {
 		return &ex, nil
 	}
-	if token == "$ref" {
+	if token == jsonRef {
 		return &p.Ref, nil
 	}
 	r, _, err := jsonpointer.GetForToken(p.PathItemProps, token)
@@ -65,10 +65,7 @@ func (p *PathItem) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &p.VendorExtensible); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &p.PathItemProps); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, &p.PathItemProps)
 }
 
 // MarshalJSON converts this items object to JSON

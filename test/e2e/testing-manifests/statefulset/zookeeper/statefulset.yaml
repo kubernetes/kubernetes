@@ -15,7 +15,7 @@ spec:
     spec:
       initContainers:
       - name: install
-        image: gcr.io/kubernetes-e2e-test-images/pets/zookeeper-installer:1.2
+        image: gcr.io/kubernetes-e2e-test-images/pets/zookeeper-installer:1.3
         imagePullPolicy: Always
         args:
         - "--install-into=/opt"

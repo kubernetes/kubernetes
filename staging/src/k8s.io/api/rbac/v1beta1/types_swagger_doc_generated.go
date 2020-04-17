@@ -37,7 +37,7 @@ func (AggregationRule) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRole = map[string]string{
-	"":                "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.",
+	"":                "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding. Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRole, and will no longer be served in v1.20.",
 	"metadata":        "Standard object's metadata.",
 	"rules":           "Rules holds all the PolicyRules for this ClusterRole",
 	"aggregationRule": "AggregationRule is an optional field that describes how to build the Rules for this ClusterRole. If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be stomped by the controller.",
@@ -48,7 +48,7 @@ func (ClusterRole) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRoleBinding = map[string]string{
-	"":         "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
+	"":         "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject. Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoleBinding, and will no longer be served in v1.20.",
 	"metadata": "Standard object's metadata.",
 	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
@@ -59,7 +59,7 @@ func (ClusterRoleBinding) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRoleBindingList = map[string]string{
-	"":         "ClusterRoleBindingList is a collection of ClusterRoleBindings",
+	"":         "ClusterRoleBindingList is a collection of ClusterRoleBindings. Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoleBindingList, and will no longer be served in v1.20.",
 	"metadata": "Standard object's metadata.",
 	"items":    "Items is a list of ClusterRoleBindings",
 }
@@ -69,7 +69,7 @@ func (ClusterRoleBindingList) SwaggerDoc() map[string]string {
 }
 
 var map_ClusterRoleList = map[string]string{
-	"":         "ClusterRoleList is a collection of ClusterRoles",
+	"":         "ClusterRoleList is a collection of ClusterRoles. Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoles, and will no longer be served in v1.20.",
 	"metadata": "Standard object's metadata.",
 	"items":    "Items is a list of ClusterRoles",
 }
@@ -92,7 +92,7 @@ func (PolicyRule) SwaggerDoc() map[string]string {
 }
 
 var map_Role = map[string]string{
-	"":         "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.",
+	"":         "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding. Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 Role, and will no longer be served in v1.20.",
 	"metadata": "Standard object's metadata.",
 	"rules":    "Rules holds all the PolicyRules for this Role",
 }
@@ -102,7 +102,7 @@ func (Role) SwaggerDoc() map[string]string {
 }
 
 var map_RoleBinding = map[string]string{
-	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
+	"":         "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace. Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 RoleBinding, and will no longer be served in v1.20.",
 	"metadata": "Standard object's metadata.",
 	"subjects": "Subjects holds references to the objects the role applies to.",
 	"roleRef":  "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
@@ -113,7 +113,7 @@ func (RoleBinding) SwaggerDoc() map[string]string {
 }
 
 var map_RoleBindingList = map[string]string{
-	"":         "RoleBindingList is a collection of RoleBindings",
+	"":         "RoleBindingList is a collection of RoleBindings Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 RoleBindingList, and will no longer be served in v1.20.",
 	"metadata": "Standard object's metadata.",
 	"items":    "Items is a list of RoleBindings",
 }
@@ -123,7 +123,7 @@ func (RoleBindingList) SwaggerDoc() map[string]string {
 }
 
 var map_RoleList = map[string]string{
-	"":         "RoleList is a collection of Roles",
+	"":         "RoleList is a collection of Roles Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 RoleList, and will no longer be served in v1.20.",
 	"metadata": "Standard object's metadata.",
 	"items":    "Items is a list of Roles",
 }

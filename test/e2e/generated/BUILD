@@ -23,7 +23,9 @@ go_library(
 go_bindata(
     name = "bindata",
     srcs = [
+        "//test/conformance/testdata:all-srcs",
         "//test/e2e/testing-manifests:all-srcs",
+        "//test/e2e_node/testing-manifests:all-srcs",
         "//test/fixtures:all-srcs",
         "//test/images:all-srcs",
     ],

@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	cliflag "k8s.io/component-base/cli/flag"
-	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
@@ -39,9 +38,7 @@ type GenericControllerManagerConfigurationOptions struct {
 func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
 		GenericControllerManagerConfiguration: cfg,
-		Debugging: &DebuggingOptions{
-			DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{},
-		},
+		Debugging:                             RecommendedDebuggingOptions(),
 	}
 
 	return o
@@ -103,9 +100,7 @@ func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers [
 		if controller == "*" {
 			continue
 		}
-		if strings.HasPrefix(controller, "-") {
-			controller = controller[1:]
-		}
+		controller = strings.TrimPrefix(controller, "-")
 		if !allControllersSet.Has(controller) {
 			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
 		}

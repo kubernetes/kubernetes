@@ -5,7 +5,12 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"regexp"
+	"strings"
 	"time"
+
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/ginkgo/interrupthandler"
@@ -71,7 +76,7 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 
 	runners := []*testrunner.TestRunner{}
 	for _, suite := range suites {
-		runners = append(runners, testrunner.New(suite, r.commandFlags.NumCPU, r.commandFlags.ParallelStream, r.commandFlags.GoOpts, additionalArgs))
+		runners = append(runners, testrunner.New(suite, r.commandFlags.NumCPU, r.commandFlags.ParallelStream, r.commandFlags.Timeout, r.commandFlags.GoOpts, additionalArgs))
 	}
 
 	numSuites := 0
@@ -104,10 +109,25 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 		runner.CleanUp()
 	}
 
+	if r.isInCoverageMode() {
+		if r.getOutputDir() != "" {
+			// If coverprofile is set, combine coverages
+			if r.getCoverprofile() != "" {
+				if err := r.combineCoverprofiles(runners); err != nil {
+					fmt.Println(err.Error())
+					os.Exit(1)
+				}
+			} else {
+				// Just move them
+				r.moveCoverprofiles(runners)
+			}
+		}
+	}
+
 	fmt.Printf("\nGinkgo ran %d %s in %s\n", numSuites, pluralizedWord("suite", "suites", numSuites), time.Since(t))
 
 	if runResult.Passed {
-		if runResult.HasProgrammaticFocus {
+		if runResult.HasProgrammaticFocus && strings.TrimSpace(os.Getenv("GINKGO_EDITOR_INTEGRATION")) == "" {
 			fmt.Printf("Test Suite Passed\n")
 			fmt.Printf("Detected Programmatic Focus - setting exit status to %d\n", types.GINKGO_FOCUS_EXIT_CODE)
 			os.Exit(types.GINKGO_FOCUS_EXIT_CODE)
@@ -119,6 +139,80 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 		fmt.Printf("Test Suite Failed\n")
 		os.Exit(1)
 	}
+}
+
+// Moves all generated profiles to specified directory
+func (r *SpecRunner) moveCoverprofiles(runners []*testrunner.TestRunner) {
+	for _, runner := range runners {
+		_, filename := filepath.Split(runner.CoverageFile)
+		err := os.Rename(runner.CoverageFile, filepath.Join(r.getOutputDir(), filename))
+
+		if err != nil {
+			fmt.Printf("Unable to move coverprofile %s, %v\n", runner.CoverageFile, err)
+			return
+		}
+	}
+}
+
+// Combines all generated profiles in the specified directory
+func (r *SpecRunner) combineCoverprofiles(runners []*testrunner.TestRunner) error {
+
+	path, _ := filepath.Abs(r.getOutputDir())
+	if !fileExists(path) {
+		return fmt.Errorf("Unable to create combined profile, outputdir does not exist: %s", r.getOutputDir())
+	}
+
+	fmt.Println("path is " + path)
+
+	combined, err := os.OpenFile(
+		filepath.Join(path, r.getCoverprofile()),
+		os.O_WRONLY|os.O_CREATE,
+		0666,
+	)
+
+	if err != nil {
+		fmt.Printf("Unable to create combined profile, %v\n", err)
+		return nil // non-fatal error
+	}
+
+	modeRegex := regexp.MustCompile(`^mode: .*\n`)
+	for index, runner := range runners {
+		contents, err := ioutil.ReadFile(runner.CoverageFile)
+
+		// remove the cover mode line from every file
+		// except the first one
+		if index > 0 {
+			contents = modeRegex.ReplaceAll(contents, []byte{})
+		}
+
+		if err != nil {
+			fmt.Printf("Unable to read coverage file %s to combine, %v\n", runner.CoverageFile, err)
+			return nil // non-fatal error
+		}
+
+		_, err = combined.Write(contents)
+
+		if err != nil {
+			fmt.Printf("Unable to append to coverprofile, %v\n", err)
+			return nil // non-fatal error
+		}
+	}
+
+	fmt.Println("All profiles combined")
+	return nil
+}
+
+func (r *SpecRunner) isInCoverageMode() bool {
+	opts := r.commandFlags.GoOpts
+	return *opts["cover"].(*bool) || *opts["coverpkg"].(*string) != "" || *opts["covermode"].(*string) != ""
+}
+
+func (r *SpecRunner) getCoverprofile() string {
+	return *r.commandFlags.GoOpts["coverprofile"].(*string)
+}
+
+func (r *SpecRunner) getOutputDir() string {
+	return *r.commandFlags.GoOpts["outputdir"].(*string)
 }
 
 func (r *SpecRunner) ComputeSuccinctMode(numSuites int) {
@@ -171,7 +265,7 @@ func orcMessage(iteration int) string {
 			"Still good...",
 			"I think your tests are fine....",
 			"Yep, still passing",
-			"Here we go again...",
+			"Oh boy, here I go testin' again!",
 			"Even the gophers are getting bored",
 			"Did you try -race?",
 			"Maybe you should stop now?",

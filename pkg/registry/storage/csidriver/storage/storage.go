@@ -21,6 +21,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/storage/csidriver"
 )
 
@@ -35,7 +38,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against CSIDrivers
-func NewStorage(optsGetter generic.RESTOptionsGetter) *CSIDriverStorage {
+func NewStorage(optsGetter generic.RESTOptionsGetter) (*CSIDriverStorage, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &storageapi.CSIDriver{} },
 		NewListFunc:              func() runtime.Object { return &storageapi.CSIDriverList{} },
@@ -45,13 +48,15 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) *CSIDriverStorage {
 		UpdateStrategy:      csidriver.Strategy,
 		DeleteStrategy:      csidriver.Strategy,
 		ReturnDeletedObject: true,
+
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
 	return &CSIDriverStorage{
 		CSIDriver: &REST{store},
-	}
+	}, nil
 }

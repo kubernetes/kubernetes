@@ -26,11 +26,11 @@ import (
 )
 
 type readerReport struct {
-	t time.Time
+	pos  int64   // Keep first to ensure 64-bit alignment
+	size int64   // Keep first to ensure 64-bit alignment
+	bps  *uint64 // Keep first to ensure 64-bit alignment
 
-	pos  int64
-	size int64
-	bps  *uint64
+	t time.Time
 
 	err error
 }

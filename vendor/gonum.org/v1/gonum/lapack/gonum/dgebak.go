@@ -10,8 +10,8 @@ import (
 )
 
 // Dgebak updates an n×m matrix V as
-//  V = P D V,        if side == lapack.RightEV,
-//  V = P D^{-1} V,   if side == lapack.LeftEV,
+//  V = P D V       if side == lapack.EVRight,
+//  V = P D^{-1} V  if side == lapack.EVLeft,
 // where P and D are n×n permutation and scaling matrices, respectively,
 // implicitly represented by job, scale, ilo and ihi as returned by Dgebal.
 //
@@ -20,34 +20,45 @@ import (
 // the eigenvectors of the original matrix.
 //
 // Dgebak is an internal routine. It is exported for testing purposes.
-func (impl Implementation) Dgebak(job lapack.Job, side lapack.EVSide, n, ilo, ihi int, scale []float64, m int, v []float64, ldv int) {
-	switch job {
-	default:
-		panic(badJob)
-	case lapack.None, lapack.Permute, lapack.Scale, lapack.PermuteScale:
-	}
-	switch side {
-	default:
-		panic(badEVSide)
-	case lapack.LeftEV, lapack.RightEV:
-	}
-	checkMatrix(n, m, v, ldv)
+func (impl Implementation) Dgebak(job lapack.BalanceJob, side lapack.EVSide, n, ilo, ihi int, scale []float64, m int, v []float64, ldv int) {
 	switch {
+	case job != lapack.BalanceNone && job != lapack.Permute && job != lapack.Scale && job != lapack.PermuteScale:
+		panic(badBalanceJob)
+	case side != lapack.EVLeft && side != lapack.EVRight:
+		panic(badEVSide)
+	case n < 0:
+		panic(nLT0)
 	case ilo < 0 || max(0, n-1) < ilo:
 		panic(badIlo)
 	case ihi < min(ilo, n-1) || n <= ihi:
 		panic(badIhi)
+	case m < 0:
+		panic(mLT0)
+	case ldv < max(1, m):
+		panic(badLdV)
 	}
 
 	// Quick return if possible.
-	if n == 0 || m == 0 || job == lapack.None {
+	if n == 0 || m == 0 {
+		return
+	}
+
+	if len(scale) < n {
+		panic(shortScale)
+	}
+	if len(v) < (n-1)*ldv+m {
+		panic(shortV)
+	}
+
+	// Quick return if possible.
+	if job == lapack.BalanceNone {
 		return
 	}
 
 	bi := blas64.Implementation()
 	if ilo != ihi && job != lapack.Permute {
 		// Backward balance.
-		if side == lapack.RightEV {
+		if side == lapack.EVRight {
 			for i := ilo; i <= ihi; i++ {
 				bi.Dscal(m, scale[i], v[i*ldv:], 1)
 			}

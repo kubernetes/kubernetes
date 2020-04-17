@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -40,11 +40,9 @@ import (
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	switch internalcfg := obj.(type) {
 	case *kubeadmapi.InitConfiguration:
-		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1beta1.SchemeGroupVersion)
-	case *kubeadmapi.ClusterConfiguration:
-		return MarshalClusterConfigurationToBytes(internalcfg, kubeadmapiv1beta1.SchemeGroupVersion)
+		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1beta2.SchemeGroupVersion)
 	default:
-		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1beta1.SchemeGroupVersion, kubeadmscheme.Codecs)
+		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1beta2.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
 }
 
@@ -57,14 +55,16 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Errors if the user tries to use v1alpha1
 	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
 	// v1.14: v1alpha3 convert only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
+	// v1.15: v1beta1 read-only, writes only v1beta2 config. Errors if the user tries to use v1alpha1, v1alpha2 or v1alpha3
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
+		"kubeadm.k8s.io/v1alpha3": "v1.14",
 	}
 
 	// Deprecated API versions are supported by us, but can only be used for migration.
 	deprecatedAPIVersions := map[string]struct{}{
-		"kubeadm.k8s.io/v1alpha3": {}, // Can be migrated with kubeadm 1.13+
+		"kubeadm.k8s.io/v1beta1": {},
 	}
 
 	gvString := gv.String()
@@ -74,7 +74,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		return errors.Errorf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
+		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv)
 	}
 
 	return nil
@@ -125,16 +125,24 @@ func VerifyAPIServerBindAddress(address string) error {
 	if ip == nil {
 		return errors.Errorf("cannot parse IP address: %s", address)
 	}
+	// There are users with network setups where default routes are present, but network interfaces
+	// use only link-local addresses (e.g. as described in RFC5549).
+	// In many cases that matching global unicast IP address can be found on loopback interface,
+	// so kubeadm allows users to specify address=Loopback for handling supporting the scenario above.
+	// Nb. SetAPIEndpointDynamicDefaults will try to translate loopback to a valid address afterwards
+	if ip.IsLoopback() {
+		return nil
+	}
 	if !ip.IsGlobalUnicast() {
 		return errors.Errorf("cannot use %q as the bind address for the API Server", address)
 	}
 	return nil
 }
 
-// ChooseAPIServerBindAddress is a wrapper for netutil.ChooseBindAddress that also handles
-// the case where no default routes were found and an IP for the API server could not be obatained.
+// ChooseAPIServerBindAddress is a wrapper for netutil.ResolveBindAddress that also handles
+// the case where no default routes were found and an IP for the API server could not be obtained.
 func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
-	ip, err := netutil.ChooseBindAddress(bindAddress)
+	ip, err := netutil.ResolveBindAddress(bindAddress)
 	if err != nil {
 		if netutil.IsNoRoutesError(err) {
 			klog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)

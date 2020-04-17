@@ -24,7 +24,7 @@ import (
 
 // +genclient
 // +genclient:nonNamespaced
-// +genclient:noVerbs
+// +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TokenReview attempts to authenticate a token to a known user.

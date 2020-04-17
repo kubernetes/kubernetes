@@ -34,6 +34,7 @@ import (
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
+// InitNodeE2ERemote initializes the node e2e test suite.
 func InitNodeE2ERemote() TestSuite {
 	// TODO: Register flags.
 	return &NodeE2ERemote{}
@@ -82,23 +83,6 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		}
 	}
 
-	return nil
-}
-
-// dest is relative to the root of the tar
-func tarAddFile(tar, source, dest string) error {
-	dir := filepath.Dir(dest)
-	tardir := filepath.Join(tar, dir)
-	tardest := filepath.Join(tar, dest)
-
-	out, err := exec.Command("mkdir", "-p", tardir).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create archive bin subdir %q, was dest for file %q. Err: %v. Output:\n%s", tardir, source, err, out)
-	}
-	out, err = exec.Command("cp", source, tardest).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to copy file %q to the archive bin subdir %q. Err: %v. Output:\n%s", source, tardir, err, out)
-	}
 	return nil
 }
 

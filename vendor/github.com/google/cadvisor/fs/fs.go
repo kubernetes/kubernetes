@@ -30,19 +30,20 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/docker/docker/pkg/mount"
 	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/utils"
-	dockerutil "github.com/google/cadvisor/utils/docker"
 	zfs "github.com/mistifyio/go-zfs"
+
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
 )
 
 const (
-	LabelSystemRoot   = "root"
-	LabelDockerImages = "docker-images"
-	LabelRktImages    = "rkt-images"
-	LabelCrioImages   = "crio-images"
+	LabelSystemRoot          = "root"
+	LabelDockerImages        = "docker-images"
+	LabelCrioImages          = "crio-images"
+	DriverStatusPoolName     = "Pool Name"
+	DriverStatusDataLoopFile = "Data loop file"
 )
 
 const (
@@ -84,32 +85,15 @@ type RealFsInfo struct {
 	// Labels are intent-specific tags that are auto-detected.
 	labels map[string]string
 	// Map from mountpoint to mount information.
-	mounts map[string]*mount.Info
+	mounts map[string]mount.MountInfo
 	// devicemapper client
 	dmsetup devicemapper.DmsetupClient
 	// fsUUIDToDeviceName is a map from the filesystem UUID to its device name.
 	fsUUIDToDeviceName map[string]string
 }
 
-type Context struct {
-	// docker root directory.
-	Docker  DockerContext
-	RktPath string
-	Crio    CrioContext
-}
-
-type DockerContext struct {
-	Root         string
-	Driver       string
-	DriverStatus map[string]string
-}
-
-type CrioContext struct {
-	Root string
-}
-
 func NewFsInfo(context Context) (FsInfo, error) {
-	mounts, err := mount.GetMounts(nil)
+	mounts, err := mount.ParseMountInfo("/proc/self/mountinfo")
 	if err != nil {
 		return nil, err
 	}
@@ -126,16 +110,15 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	fsInfo := &RealFsInfo{
 		partitions:         processMounts(mounts, excluded),
 		labels:             make(map[string]string, 0),
-		mounts:             make(map[string]*mount.Info, 0),
+		mounts:             make(map[string]mount.MountInfo, 0),
 		dmsetup:            devicemapper.NewDmsetupClient(),
 		fsUUIDToDeviceName: fsUUIDToDeviceName,
 	}
 
 	for _, mount := range mounts {
-		fsInfo.mounts[mount.Mountpoint] = mount
+		fsInfo.mounts[mount.MountPoint] = mount
 	}
 
-	fsInfo.addRktImagesLabel(context, mounts)
 	// need to call this before the log line below printing out the partitions, as this function may
 	// add a "partition" for devicemapper to fsInfo.partitions
 	fsInfo.addDockerImagesLabel(context, mounts)
@@ -179,29 +162,32 @@ func getFsUUIDToDeviceNameMap() (map[string]string, error) {
 	return fsUUIDToDeviceName, nil
 }
 
-func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) map[string]partition {
+func processMounts(mounts []mount.MountInfo, excludedMountpointPrefixes []string) map[string]partition {
 	partitions := make(map[string]partition, 0)
 
 	supportedFsType := map[string]bool{
 		// all ext systems are checked through prefix.
-		"btrfs": true,
-		"tmpfs": true,
-		"xfs":   true,
-		"zfs":   true,
+		"btrfs":   true,
+		"overlay": true,
+		"tmpfs":   true,
+		"xfs":     true,
+		"zfs":     true,
 	}
 
 	for _, mount := range mounts {
-		if !strings.HasPrefix(mount.Fstype, "ext") && !supportedFsType[mount.Fstype] {
+		if !strings.HasPrefix(mount.FsType, "ext") && !supportedFsType[mount.FsType] {
 			continue
 		}
-		// Avoid bind mounts.
+		// Avoid bind mounts, exclude tmpfs.
 		if _, ok := partitions[mount.Source]; ok {
-			continue
+			if mount.FsType != "tmpfs" {
+				continue
+			}
 		}
 
 		hasPrefix := false
 		for _, prefix := range excludedMountpointPrefixes {
-			if strings.HasPrefix(mount.Mountpoint, prefix) {
+			if strings.HasPrefix(mount.MountPoint, prefix) {
 				hasPrefix = true
 				break
 			}
@@ -210,10 +196,14 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 			continue
 		}
 
+		// using mountpoint to replace device once fstype it tmpfs
+		if mount.FsType == "tmpfs" {
+			mount.Source = mount.MountPoint
+		}
 		// btrfs fix: following workaround fixes wrong btrfs Major and Minor Ids reported in /proc/self/mountinfo.
 		// instead of using values from /proc/self/mountinfo we use stat to get Ids from btrfs mount point
-		if mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
-			major, minor, err := getBtrfsMajorMinorIds(mount)
+		if mount.FsType == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
+			major, minor, err := getBtrfsMajorMinorIds(&mount)
 			if err != nil {
 				klog.Warningf("%s", err)
 			} else {
@@ -222,9 +212,14 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 			}
 		}
 
+		// overlay fix: Making mount source unique for all overlay mounts, using the mount's major and minor ids.
+		if mount.FsType == "overlay" {
+			mount.Source = fmt.Sprintf("%s_%d-%d", mount.Source, mount.Major, mount.Minor)
+		}
+
 		partitions[mount.Source] = partition{
-			fsType:     mount.Fstype,
-			mountpoint: mount.Mountpoint,
+			fsType:     mount.FsType,
+			mountpoint: mount.MountPoint,
 			major:      uint(mount.Major),
 			minor:      uint(mount.Minor),
 		}
@@ -242,7 +237,7 @@ func (self *RealFsInfo) getDockerDeviceMapperInfo(context DockerContext) (string
 		return "", nil, nil
 	}
 
-	dataLoopFile := context.DriverStatus[dockerutil.DriverStatusDataLoopFile]
+	dataLoopFile := context.DriverStatus[DriverStatusDataLoopFile]
 	if len(dataLoopFile) > 0 {
 		return "", nil, nil
 	}
@@ -261,12 +256,12 @@ func (self *RealFsInfo) getDockerDeviceMapperInfo(context DockerContext) (string
 }
 
 // addSystemRootLabel attempts to determine which device contains the mount for /.
-func (self *RealFsInfo) addSystemRootLabel(mounts []*mount.Info) {
+func (self *RealFsInfo) addSystemRootLabel(mounts []mount.MountInfo) {
 	for _, m := range mounts {
-		if m.Mountpoint == "/" {
+		if m.MountPoint == "/" {
 			self.partitions[m.Source] = partition{
-				fsType:     m.Fstype,
-				mountpoint: m.Mountpoint,
+				fsType:     m.FsType,
+				mountpoint: m.MountPoint,
 				major:      uint(m.Major),
 				minor:      uint(m.Minor),
 			}
@@ -277,7 +272,7 @@ func (self *RealFsInfo) addSystemRootLabel(mounts []*mount.Info) {
 }
 
 // addDockerImagesLabel attempts to determine which device contains the mount for docker images.
-func (self *RealFsInfo) addDockerImagesLabel(context Context, mounts []*mount.Info) {
+func (self *RealFsInfo) addDockerImagesLabel(context Context, mounts []mount.MountInfo) {
 	dockerDev, dockerPartition, err := self.getDockerDeviceMapperInfo(context.Docker)
 	if err != nil {
 		klog.Warningf("Could not get Docker devicemapper device: %v", err)
@@ -290,7 +285,7 @@ func (self *RealFsInfo) addDockerImagesLabel(context Context, mounts []*mount.In
 	}
 }
 
-func (self *RealFsInfo) addCrioImagesLabel(context Context, mounts []*mount.Info) {
+func (self *RealFsInfo) addCrioImagesLabel(context Context, mounts []mount.MountInfo) {
 	if context.Crio.Root != "" {
 		crioPath := context.Crio.Root
 		crioImagePaths := map[string]struct{}{
@@ -304,20 +299,6 @@ func (self *RealFsInfo) addCrioImagesLabel(context Context, mounts []*mount.Info
 			crioPath = filepath.Dir(crioPath)
 		}
 		self.updateContainerImagesPath(LabelCrioImages, mounts, crioImagePaths)
-	}
-}
-
-func (self *RealFsInfo) addRktImagesLabel(context Context, mounts []*mount.Info) {
-	if context.RktPath != "" {
-		rktPath := context.RktPath
-		rktImagesPaths := map[string]struct{}{
-			"/": {},
-		}
-		for rktPath != "/" && rktPath != "." {
-			rktImagesPaths[rktPath] = struct{}{}
-			rktPath = filepath.Dir(rktPath)
-		}
-		self.updateContainerImagesPath(LabelRktImages, mounts, rktImagesPaths)
 	}
 }
 
@@ -343,19 +324,19 @@ func getDockerImagePaths(context Context) map[string]struct{} {
 
 // This method compares the mountpoints with possible container image mount points. If a match is found,
 // the label is added to the partition.
-func (self *RealFsInfo) updateContainerImagesPath(label string, mounts []*mount.Info, containerImagePaths map[string]struct{}) {
-	var useMount *mount.Info
+func (self *RealFsInfo) updateContainerImagesPath(label string, mounts []mount.MountInfo, containerImagePaths map[string]struct{}) {
+	var useMount *mount.MountInfo
 	for _, m := range mounts {
-		if _, ok := containerImagePaths[m.Mountpoint]; ok {
-			if useMount == nil || (len(useMount.Mountpoint) < len(m.Mountpoint)) {
-				useMount = m
+		if _, ok := containerImagePaths[m.MountPoint]; ok {
+			if useMount == nil || (len(useMount.MountPoint) < len(m.MountPoint)) {
+				useMount = &m
 			}
 		}
 	}
 	if useMount != nil {
 		self.partitions[useMount.Source] = partition{
-			fsType:     useMount.Fstype,
-			mountpoint: useMount.Mountpoint,
+			fsType:     useMount.FsType,
+			mountpoint: useMount.MountPoint,
 			major:      uint(useMount.Major),
 			minor:      uint(useMount.Minor),
 		}
@@ -410,8 +391,13 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 				klog.V(5).Infof("got devicemapper fs capacity stats: capacity: %v free: %v available: %v:", fs.Capacity, fs.Free, fs.Available)
 				fs.Type = DeviceMapper
 			case ZFS.String():
-				fs.Capacity, fs.Free, fs.Available, err = getZfstats(device)
-				fs.Type = ZFS
+				if _, devzfs := os.Stat("/dev/zfs"); os.IsExist(devzfs) {
+					fs.Capacity, fs.Free, fs.Available, err = getZfstats(device)
+					fs.Type = ZFS
+					break
+				}
+				// if /dev/zfs is not present default to VFS
+				fallthrough
 			default:
 				var inodes, inodesFree uint64
 				if utils.FileExists(partition.mountpoint) {
@@ -526,8 +512,9 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 		return nil, fmt.Errorf("stat failed on %s with error: %s", dir, err)
 	}
 
-	major := major(buf.Dev)
-	minor := minor(buf.Dev)
+	// The type Dev in Stat_t is 32bit on mips.
+	major := major(uint64(buf.Dev)) // nolint: unconvert
+	minor := minor(uint64(buf.Dev)) // nolint: unconvert
 	for device, partition := range self.partitions {
 		if partition.major == major && partition.minor == minor {
 			return &DeviceInfo{device, major, minor}, nil
@@ -550,8 +537,8 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 		mount, found = self.mounts[dir]
 	}
 
-	if found && mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
-		major, minor, err := getBtrfsMajorMinorIds(mount)
+	if found && mount.FsType == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
+		major, minor, err := getBtrfsMajorMinorIds(&mount)
 		if err != nil {
 			klog.Warningf("%s", err)
 		} else {
@@ -621,7 +608,7 @@ func GetDirUsage(dir string) (UsageInfo, error) {
 		return nil
 	})
 
-	return usage, nil
+	return usage, err
 }
 
 func (self *RealFsInfo) GetDirUsage(dir string) (UsageInfo, error) {
@@ -646,7 +633,7 @@ func getVfsStats(path string) (total uint64, free uint64, avail uint64, inodes u
 // Devicemapper thin provisioning is detailed at
 // https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
 func dockerDMDevice(driverStatus map[string]string, dmsetup devicemapper.DmsetupClient) (string, uint, uint, uint, error) {
-	poolName, ok := driverStatus[dockerutil.DriverStatusPoolName]
+	poolName, ok := driverStatus[DriverStatusPoolName]
 	if !ok || len(poolName) == 0 {
 		return "", 0, 0, 0, fmt.Errorf("Could not get dm pool name")
 	}
@@ -749,7 +736,7 @@ func (b *byteCounter) Write(p []byte) (int, error) {
 }
 
 // Get major and minor Ids for a mount point using btrfs as filesystem.
-func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
+func getBtrfsMajorMinorIds(mount *mount.MountInfo) (int, int, error) {
 	// btrfs fix: following workaround fixes wrong btrfs Major and Minor Ids reported in /proc/self/mountinfo.
 	// instead of using values from /proc/self/mountinfo we use stat to get Ids from btrfs mount point
 
@@ -762,16 +749,17 @@ func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
 
 	klog.V(4).Infof("btrfs mount %#v", mount)
 	if buf.Mode&syscall.S_IFMT == syscall.S_IFBLK {
-		err := syscall.Stat(mount.Mountpoint, buf)
+		err := syscall.Stat(mount.MountPoint, buf)
 		if err != nil {
-			err = fmt.Errorf("stat failed on %s with error: %s", mount.Mountpoint, err)
+			err = fmt.Errorf("stat failed on %s with error: %s", mount.MountPoint, err)
 			return 0, 0, err
 		}
 
-		klog.V(4).Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
-		klog.V(4).Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
+		// The type Dev and Rdev in Stat_t are 32bit on mips.
+		klog.V(4).Infof("btrfs dev major:minor %d:%d\n", int(major(uint64(buf.Dev))), int(minor(uint64(buf.Dev))))    // nolint: unconvert
+		klog.V(4).Infof("btrfs rdev major:minor %d:%d\n", int(major(uint64(buf.Rdev))), int(minor(uint64(buf.Rdev)))) // nolint: unconvert
 
-		return int(major(buf.Dev)), int(minor(buf.Dev)), nil
+		return int(major(uint64(buf.Dev))), int(minor(uint64(buf.Dev))), nil // nolint: unconvert
 	} else {
 		return 0, 0, fmt.Errorf("%s is not a block device", mount.Source)
 	}

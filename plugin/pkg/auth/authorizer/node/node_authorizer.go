@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
@@ -53,7 +55,7 @@ type NodeAuthorizer struct {
 	nodeRules  []rbacv1.PolicyRule
 
 	// allows overriding for testing
-	features utilfeature.FeatureGate
+	features featuregate.FeatureGate
 }
 
 // NewAuthorizer returns a new node authorizer
@@ -77,7 +79,7 @@ var (
 	csiNodeResource   = storageapi.Resource("csinodes")
 )
 
-func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
 		// reject requests from non-nodes
@@ -107,25 +109,19 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
 		case vaResource:
-			if r.features.Enabled(features.CSIPersistentVolume) {
-				return r.authorizeGet(nodeName, vaVertexType, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.CSIPersistentVolume), nil
+			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
 			if r.features.Enabled(features.TokenRequest) {
 				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
 			}
 			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
 		case leaseResource:
-			if r.features.Enabled(features.NodeLease) {
-				return r.authorizeLease(nodeName, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.NodeLease), nil
+			return r.authorizeLease(nodeName, attrs)
 		case csiNodeResource:
-			if r.features.Enabled(features.KubeletPluginsWatcher) && r.features.Enabled(features.CSINodeInfo) {
+			if r.features.Enabled(features.CSINodeInfo) {
 				return r.authorizeCSINode(nodeName, attrs)
 			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo), nil
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s", features.CSINodeInfo), nil
 		}
 
 	}
@@ -171,10 +167,14 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 // authorizeReadNamespacedObject authorizes "get", "list" and "watch" requests to single objects of a
 // specified types if they are related to the specified node.
 func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-	if attrs.GetVerb() != "get" && attrs.GetVerb() != "list" && attrs.GetVerb() != "watch" {
+	switch attrs.GetVerb() {
+	case "get", "list", "watch":
+		//ok
+	default:
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only read resources of this type", nil
 	}
+
 	if len(attrs.GetSubresource()) > 0 {
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot read subresource", nil
@@ -233,11 +233,10 @@ func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vert
 func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	// allowed verbs: get, create, update, patch, delete
 	verb := attrs.GetVerb()
-	if verb != "get" &&
-		verb != "create" &&
-		verb != "update" &&
-		verb != "patch" &&
-		verb != "delete" {
+	switch verb {
+	case "get", "create", "update", "patch", "delete":
+		//ok
+	default:
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a node lease", nil
 	}
@@ -263,11 +262,10 @@ func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attrib
 func (r *NodeAuthorizer) authorizeCSINode(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	// allowed verbs: get, create, update, patch, delete
 	verb := attrs.GetVerb()
-	if verb != "get" &&
-		verb != "create" &&
-		verb != "update" &&
-		verb != "patch" &&
-		verb != "delete" {
+	switch verb {
+	case "get", "create", "update", "patch", "delete":
+		//ok
+	default:
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINode", nil
 	}

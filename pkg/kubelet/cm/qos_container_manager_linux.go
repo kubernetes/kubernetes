@@ -49,7 +49,6 @@ type QOSContainerManager interface {
 
 type qosContainerManagerImpl struct {
 	sync.Mutex
-	nodeInfo           *v1.Node
 	qosContainersInfo  QOSContainersInfo
 	subsystems         *CgroupSubsystems
 	cgroupManager      CgroupManager

@@ -104,10 +104,6 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	// Initializers are a deprecated alpha field and should not be saved
-	oldMeta.SetInitializers(nil)
-	objectMeta.SetInitializers(nil)
-
 	// Ensure managedFields state is removed unless ServerSideApply is enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		oldMeta.SetManagedFields(nil)
@@ -259,9 +255,9 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj run
 func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
-		return func(obj, old runtime.Object) error { return nil }
+		return func(ctx context.Context, obj, old runtime.Object) error { return nil }
 	}
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
 		finalAttributes := admission.NewAttributesRecord(
 			obj,
 			old,
@@ -271,12 +267,13 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes, o)
+		return validatingAdmission.Validate(ctx, finalAttributes, o)
 	}
 }

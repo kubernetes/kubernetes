@@ -59,7 +59,7 @@ func (in *Fischer) DeepCopyObject() runtime.Object {
 func (in *FischerList) DeepCopyInto(out *FischerList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Fischer, len(*in))
@@ -120,7 +120,7 @@ func (in *Flunder) DeepCopyObject() runtime.Object {
 func (in *FlunderList) DeepCopyInto(out *FlunderList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Flunder, len(*in))

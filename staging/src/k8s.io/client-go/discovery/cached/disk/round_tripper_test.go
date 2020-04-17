@@ -22,7 +22,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // copied from k8s.io/client-go/transport/round_trippers_test.go
@@ -92,4 +95,53 @@ func TestCacheRoundTripper(t *testing.T) {
 	if string(content) != "Content" {
 		t.Errorf("Invalid content read from cache %q", string(content))
 	}
+}
+
+func TestCacheRoundTripperPathPerm(t *testing.T) {
+	assert := assert.New(t)
+
+	rt := &testRoundTripper{}
+	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	os.RemoveAll(cacheDir)
+	defer os.RemoveAll(cacheDir)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := newCacheRoundTripper(cacheDir, rt)
+
+	// First call, caches the response
+	req := &http.Request{
+		Method: http.MethodGet,
+		URL:    &url.URL{Host: "localhost"},
+	}
+	rt.Response = &http.Response{
+		Header:     http.Header{"ETag": []string{`"123456"`}},
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Content"))),
+		StatusCode: http.StatusOK,
+	}
+	resp, err := cache.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "Content" {
+		t.Errorf(`Expected Body to be "Content", got %q`, string(content))
+	}
+
+	err = filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			assert.Equal(os.FileMode(0750), info.Mode().Perm())
+		} else {
+			assert.Equal(os.FileMode(0660), info.Mode().Perm())
+		}
+		return nil
+	})
+	assert.NoError(err)
 }

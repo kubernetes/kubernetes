@@ -14,6 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
         "//vendor/github.com/gogo/protobuf/types:go_default_library",
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
     ],

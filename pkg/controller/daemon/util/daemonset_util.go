@@ -21,12 +21,12 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 // GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
@@ -45,14 +45,14 @@ func GetTemplateGeneration(ds *apps.DaemonSet) (*int64, error) {
 	return &generation, nil
 }
 
-// AddOrUpdateDaemonPodTolerations apply necessary tolerations to DeamonSet Pods, e.g. node.kubernetes.io/not-ready:NoExecute.
+// AddOrUpdateDaemonPodTolerations apply necessary tolerations to DaemonSet Pods, e.g. node.kubernetes.io/not-ready:NoExecute.
 func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      schedulerapi.TaintNodeNotReady,
+		Key:      v1.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -62,7 +62,7 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      schedulerapi.TaintNodeUnreachable,
+		Key:      v1.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -70,32 +70,32 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	// According to TaintNodesByCondition feature, all DaemonSet pods should tolerate
 	// MemoryPressure, DiskPressure, PIDPressure, Unschedulable and NetworkUnavailable taints.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      schedulerapi.TaintNodeDiskPressure,
+		Key:      v1.TaintNodeDiskPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      schedulerapi.TaintNodeMemoryPressure,
+		Key:      v1.TaintNodeMemoryPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      schedulerapi.TaintNodePIDPressure,
+		Key:      v1.TaintNodePIDPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      schedulerapi.TaintNodeUnschedulable,
+		Key:      v1.TaintNodeUnschedulable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
 	if spec.HostNetwork {
 		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-			Key:      schedulerapi.TaintNodeNetworkUnavailable,
+			Key:      v1.TaintNodeNetworkUnavailable,
 			Operator: v1.TolerationOpExists,
 			Effect:   v1.TaintEffectNoSchedule,
 		})
@@ -151,7 +151,7 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 // Note that this function assumes that no NodeAffinity conflicts with the selected nodeName.
 func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
 	nodeSelReq := v1.NodeSelectorRequirement{
-		Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+		Key:      api.ObjectNameField,
 		Operator: v1.NodeSelectorOpIn,
 		Values:   []string{nodename},
 	}
@@ -204,7 +204,7 @@ func GetTargetNodeName(pod *v1.Pod) (string, error) {
 		return pod.Spec.NodeName, nil
 	}
 
-	// If ScheduleDaemonSetPods was enabled before, retrieve node name of unscheduled pods from NodeAffinity
+	// Retrieve node name of unscheduled pods from NodeAffinity
 	if pod.Spec.Affinity == nil ||
 		pod.Spec.Affinity.NodeAffinity == nil ||
 		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
@@ -220,11 +220,11 @@ func GetTargetNodeName(pod *v1.Pod) (string, error) {
 
 	for _, term := range terms {
 		for _, exp := range term.MatchFields {
-			if exp.Key == schedulerapi.NodeFieldSelectorKeyNodeName &&
+			if exp.Key == api.ObjectNameField &&
 				exp.Operator == v1.NodeSelectorOpIn {
 				if len(exp.Values) != 1 {
 					return "", fmt.Errorf("the matchFields value of '%s' is not unique for pod %s/%s",
-						schedulerapi.NodeFieldSelectorKeyNodeName, pod.Namespace, pod.Name)
+						api.ObjectNameField, pod.Namespace, pod.Name)
 				}
 
 				return exp.Values[0], nil

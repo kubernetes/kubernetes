@@ -24,12 +24,13 @@ import (
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	watch "github.com/google/cadvisor/manager/watcher"
+	watch "github.com/google/cadvisor/watcher"
 
 	"k8s.io/klog"
 )
 
 var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")
+var disableRootCgroupStats = flag.Bool("disable_root_cgroup_stats", false, "Disable collecting root Cgroup stats")
 
 type rawFactory struct {
 	// Factory for machine information.

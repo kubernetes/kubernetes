@@ -7,18 +7,19 @@
 // capacity in the AWS cloud. Using Amazon EC2 eliminates the need to invest
 // in hardware up front, so you can develop and deploy applications faster.
 //
-// To learn more about Amazon EC2, Amazon EBS, and Amazon VPC, see the following
-// resources:
+// To learn more, see the following resources:
 //
-//    * Amazon EC2 product page (http://aws.amazon.com/ec2)
+//    * Amazon EC2: AmazonEC2 product page (http://aws.amazon.com/ec2), Amazon
+//    EC2 documentation (http://aws.amazon.com/documentation/ec2)
 //
-//    * Amazon EC2 documentation (http://aws.amazon.com/documentation/ec2)
+//    * Amazon EBS: Amazon EBS product page (http://aws.amazon.com/ebs), Amazon
+//    EBS documentation (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html)
 //
-//    * Amazon EBS product page (http://aws.amazon.com/ebs)
+//    * Amazon VPC: Amazon VPC product page (http://aws.amazon.com/vpc), Amazon
+//    VPC documentation (http://aws.amazon.com/documentation/vpc)
 //
-//    * Amazon VPC product page (http://aws.amazon.com/vpc)
-//
-//    * Amazon VPC documentation (http://aws.amazon.com/documentation/vpc)
+//    * AWS VPN: AWS VPN product page (http://aws.amazon.com/vpn), AWS VPN documentation
+//    (http://aws.amazon.com/documentation/vpn)
 //
 // See https://docs.aws.amazon.com/goto/WebAPI/ec2-2016-11-15 for more information on this service.
 //

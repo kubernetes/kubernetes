@@ -17,15 +17,17 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"path"
-	"time"
 
-	. "github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -38,31 +40,37 @@ var (
 	testImageNonRootUid = imageutils.GetE2EImage(imageutils.MounttestUser)
 )
 
-var _ = Describe("[sig-storage] EmptyDir volumes", func() {
+var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	Context("when FSGroup is specified [NodeFeature:FSGroup]", func() {
-		It("new files should be created with FSGroup ownership when container is root", func() {
+	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
+
+		ginkgo.BeforeEach(func() {
+			// Windows does not support the FSGroup SecurityContext option.
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
+		})
+
+		ginkgo.It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 
-		It("new files should be created with FSGroup ownership when container is non-root", func() {
+		ginkgo.It("new files should be created with FSGroup ownership when container is non-root", func() {
 			doTestSetgidFSGroup(f, testImageNonRootUid, v1.StorageMediumMemory)
 		})
 
-		It("nonexistent volume subPath should have the correct mode and owner using FSGroup", func() {
+		ginkgo.It("nonexistent volume subPath should have the correct mode and owner using FSGroup", func() {
 			doTestSubPathFSGroup(f, testImageNonRootUid, v1.StorageMediumMemory)
 		})
 
-		It("files with FSGroup ownership should support (root,0644,tmpfs)", func() {
+		ginkgo.It("files with FSGroup ownership should support (root,0644,tmpfs)", func() {
 			doTest0644FSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 
-		It("volume on default medium should have the correct mode using FSGroup", func() {
+		ginkgo.It("volume on default medium should have the correct mode using FSGroup", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, v1.StorageMediumDefault)
 		})
 
-		It("volume on tmpfs should have the correct mode using FSGroup", func() {
+		ginkgo.It("volume on tmpfs should have the correct mode using FSGroup", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 	})
@@ -207,7 +215,13 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
-	It("pod should support shared volumes between containers", func() {
+	/*
+		Release : v1.15
+		Testname: EmptyDir, Shared volumes between containers
+		Description: A Pod created with an 'emptyDir' Volume, should share volumes between the containeres in the pod. The two busybox image containers shoud share the volumes mounted to the pod.
+		The main container shoud wait until the sub container drops a file, and main container acess the shared data.
+	*/
+	framework.ConformanceIt("pod should support shared volumes between containers", func() {
 		var (
 			volumeName                 = "shared-data"
 			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"
@@ -218,6 +232,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			busyBoxMainContainerName   = "busybox-main-container"
 			busyBoxSubContainerName    = "busybox-sub-container"
 			resultString               = ""
+			deletionGracePeriod        = int64(0)
 		)
 
 		pod := &v1.Pod{
@@ -238,7 +253,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 						Name:    busyBoxMainContainerName,
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh"},
-						Args:    []string{"-c", "sleep 10"},
+						Args:    []string{"-c", "sleep 100000"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -259,25 +274,26 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 						},
 					},
 				},
-				RestartPolicy: v1.RestartPolicyNever,
+				TerminationGracePeriodSeconds: &deletionGracePeriod,
+				RestartPolicy:                 v1.RestartPolicyNever,
 			},
 		}
 
 		var err error
-		By("Creating Pod")
+		ginkgo.By("Creating Pod")
 		pod = f.PodClient().CreateSync(pod)
 
-		By("Waiting for the pod running")
-		err = f.WaitForPodRunning(pod.Name)
+		ginkgo.By("Waiting for the pod running")
+		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
 
-		By("Geting the pod")
-		pod, err = f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		ginkgo.By("Geting the pod")
+		pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
 
-		By("Reading file content from the nginx-container")
-		resultString, err = framework.LookForStringInFile(f.Namespace.Name, pod.Name, busyBoxMainContainerName, busyBoxMainVolumeFilePath, message, 30*time.Second)
-		framework.ExpectNoError(err, "failed to match expected string %s with %s", message, resultString)
+		ginkgo.By("Reading file content from the nginx-container")
+		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
+		framework.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
 	})
 })
 

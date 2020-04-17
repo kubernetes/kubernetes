@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "clone.go",
         "decode.go",
+        "deprecated.go",
         "discard.go",
         "encode.go",
         "equal.go",

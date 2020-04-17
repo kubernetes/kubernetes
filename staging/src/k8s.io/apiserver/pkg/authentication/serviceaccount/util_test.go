@@ -62,7 +62,9 @@ func TestMakeUsername(t *testing.T) {
 
 	for k, tc := range testCases {
 		username := MakeUsername(tc.Namespace, tc.Name)
-
+		if !MatchesUsername(tc.Namespace, tc.Name, username) {
+			t.Errorf("%s: Expected to match username", k)
+		}
 		namespace, name, err := SplitUsername(username)
 		if (err != nil) != tc.ExpectedErr {
 			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
@@ -78,5 +80,41 @@ func TestMakeUsername(t *testing.T) {
 		if name != tc.Name {
 			t.Errorf("%s: Expected name %q, got %q", k, tc.Name, name)
 		}
+	}
+}
+
+func TestMatchUsername(t *testing.T) {
+
+	testCases := []struct {
+		TestName  string
+		Namespace string
+		Name      string
+		Username  string
+		Expect    bool
+	}{
+		{Namespace: "foo", Name: "bar", Username: "foo", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: "system:serviceaccount:", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: "system:serviceaccount:foo", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: "system:serviceaccount:foo:", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: "system:serviceaccount:foo:bar", Expect: true},
+		{Namespace: "foo", Name: "bar", Username: "system:serviceaccount::bar", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: "system:serviceaccount:bar", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: ":bar", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: "foo:bar", Expect: false},
+		{Namespace: "foo", Name: "bar", Username: "", Expect: false},
+
+		{Namespace: "foo2", Name: "bar", Username: "system:serviceaccount:foo:bar", Expect: false},
+		{Namespace: "foo", Name: "bar2", Username: "system:serviceaccount:foo:bar", Expect: false},
+		{Namespace: "foo:", Name: "bar", Username: "system:serviceaccount:foo:bar", Expect: false},
+		{Namespace: "foo", Name: ":bar", Username: "system:serviceaccount:foo:bar", Expect: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.TestName, func(t *testing.T) {
+			actual := MatchesUsername(tc.Namespace, tc.Name, tc.Username)
+			if actual != tc.Expect {
+				t.Fatalf("unexpected match")
+			}
+		})
 	}
 }

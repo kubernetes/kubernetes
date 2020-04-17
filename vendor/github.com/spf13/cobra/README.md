@@ -2,25 +2,29 @@
 
 Cobra is both a library for creating powerful modern CLI applications as well as a program to generate applications and command files.
 
-Many of the most widely used Go projects are built using Cobra including:
-
-* [Kubernetes](http://kubernetes.io/)
-* [Hugo](http://gohugo.io)
-* [rkt](https://github.com/coreos/rkt)
-* [etcd](https://github.com/coreos/etcd)
-* [Moby (former Docker)](https://github.com/moby/moby)
-* [Docker (distribution)](https://github.com/docker/distribution)
-* [OpenShift](https://www.openshift.com/)
-* [Delve](https://github.com/derekparker/delve)
-* [GopherJS](http://www.gopherjs.org/)
-* [CockroachDB](http://www.cockroachlabs.com/)
-* [Bleve](http://www.blevesearch.com/)
-* [ProjectAtomic (enterprise)](http://www.projectatomic.io/)
-* [GiantSwarm's swarm](https://github.com/giantswarm/cli)
-* [Nanobox](https://github.com/nanobox-io/nanobox)/[Nanopack](https://github.com/nanopack)
-* [rclone](http://rclone.org/)
-* [nehm](https://github.com/bogem/nehm)
-* [Pouch](https://github.com/alibaba/pouch)
+Many of the most widely used Go projects are built using Cobra, such as:
+[Kubernetes](http://kubernetes.io/),
+[Hugo](http://gohugo.io),
+[rkt](https://github.com/coreos/rkt),
+[etcd](https://github.com/coreos/etcd),
+[Moby (former Docker)](https://github.com/moby/moby),
+[Docker (distribution)](https://github.com/docker/distribution),
+[OpenShift](https://www.openshift.com/),
+[Delve](https://github.com/derekparker/delve),
+[GopherJS](http://www.gopherjs.org/),
+[CockroachDB](http://www.cockroachlabs.com/),
+[Bleve](http://www.blevesearch.com/),
+[ProjectAtomic (enterprise)](http://www.projectatomic.io/),
+[Giant Swarm's gsctl](https://github.com/giantswarm/gsctl),
+[Nanobox](https://github.com/nanobox-io/nanobox)/[Nanopack](https://github.com/nanopack),
+[rclone](http://rclone.org/),
+[nehm](https://github.com/bogem/nehm),
+[Pouch](https://github.com/alibaba/pouch),
+[Istio](https://istio.io),
+[Prototool](https://github.com/uber/prototool),
+[mattermost-server](https://github.com/mattermost/mattermost-server),
+[Gardener](https://github.com/gardener/gardenctl),
+etc.
 
 [![Build Status](https://travis-ci.org/spf13/cobra.svg "Travis CI status")](https://travis-ci.org/spf13/cobra)
 [![CircleCI status](https://circleci.com/gh/spf13/cobra.png?circle-token=:circle-token "CircleCI status")](https://circleci.com/gh/spf13/cobra)
@@ -45,6 +49,7 @@ Many of the most widely used Go projects are built using Cobra including:
   * [Suggestions when "unknown command" happens](#suggestions-when-unknown-command-happens)
   * [Generating documentation for your command](#generating-documentation-for-your-command)
   * [Generating bash completions](#generating-bash-completions)
+  * [Generating zsh completions](#generating-zsh-completions)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -152,9 +157,6 @@ In a Cobra app, typically the main.go file is very bare. It serves one purpose: 
 package main
 
 import (
-  "fmt"
-  "os"
-
   "{pathToYourApp}/cmd"
 )
 
@@ -265,9 +267,6 @@ In a Cobra app, typically the main.go file is very bare. It serves, one purpose,
 package main
 
 import (
-  "fmt"
-  "os"
-
   "{pathToYourApp}/cmd"
 )
 
@@ -339,7 +338,7 @@ rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose out
 A flag can also be assigned locally which will only apply to that specific command.
 
 ```go
-rootCmd.Flags().StringVarP(&Source, "source", "s", "", "Source directory to read from")
+localCmd.Flags().StringVarP(&Source, "source", "s", "", "Source directory to read from")
 ```
 
 ### Local Flag on Parent Commands
@@ -395,6 +394,7 @@ The following validators are built in:
 - `MinimumNArgs(int)` - the command will report an error if there are not at least N positional args.
 - `MaximumNArgs(int)` - the command will report an error if there are more than N positional args.
 - `ExactArgs(int)` - the command will report an error if there are not exactly N positional args.
+- `ExactValidArgs(int)` - the command will report an error if there are not exactly N positional args OR if there are any positional args that are not in the `ValidArgs` field of `Command`
 - `RangeArgs(min, max)` - the command will report an error if the number of args is not between the minimum and maximum number of expected args.
 
 An example of setting the custom validator:
@@ -404,7 +404,7 @@ var cmd = &cobra.Command{
   Short: "hello",
   Args: func(cmd *cobra.Command, args []string) error {
     if len(args) < 1 {
-      return errors.New("requires at least one arg")
+      return errors.New("requires a color argument")
     }
     if myapp.IsValidColor(args[0]) {
       return nil
@@ -464,7 +464,7 @@ Echo works a lot like print, except it has a child command.`,
   }
 
   var cmdTimes = &cobra.Command{
-    Use:   "times [# times] [string to echo]",
+    Use:   "times [string to echo]",
     Short: "Echo anything to the screen more times",
     Long: `echo things multiple times back to the user by providing
 a count and a string.`,
@@ -720,6 +720,11 @@ Cobra can generate documentation based on subcommands, flags, etc. in the follow
 ## Generating bash completions
 
 Cobra can generate a bash-completion file. If you add more information to your command, these completions can be amazingly powerful and flexible.  Read more about it in [Bash Completions](bash_completions.md).
+
+## Generating zsh completions
+
+Cobra can generate zsh-completion file. Read more about it in
+[Zsh Completions](zsh_completions.md).
 
 # Contributing
 

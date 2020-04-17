@@ -23,16 +23,27 @@ import (
 	"strings"
 )
 
-// Format returns the formatted form of the given BUILD file.
+const (
+	nestedIndentation = 4 // Indentation of nested blocks
+	listIndentation   = 4 // Indentation of multiline expressions
+	defIndentation    = 8 // Indentation of multiline function definitions
+)
+
+// Format returns the formatted form of the given BUILD or bzl file.
 func Format(f *File) []byte {
-	pr := &printer{}
+	pr := &printer{fileType: f.Type}
 	pr.file(f)
 	return pr.Bytes()
 }
 
 // FormatString returns the string form of the given expression.
 func FormatString(x Expr) string {
-	pr := &printer{}
+	fileType := TypeBuild // for compatibility
+	if file, ok := x.(*File); ok {
+		fileType = file.Type
+	}
+
+	pr := &printer{fileType: fileType}
 	switch x := x.(type) {
 	case *File:
 		pr.file(x)
@@ -44,10 +55,13 @@ func FormatString(x Expr) string {
 
 // A printer collects the state during printing of a file or expression.
 type printer struct {
+	fileType     FileType  // different rules can be applied to different file types.
 	bytes.Buffer           // output buffer
 	comment      []Comment // pending end-of-line comments
 	margin       int       // left margin (indent), a number of spaces
 	depth        int       // nesting depth inside ( ) [ ] { }
+	level        int       // nesting level of def-, if-else- and for-blocks
+	needsNewLine bool      // true if the next statement needs a new line before it
 }
 
 // printf prints to the buffer.
@@ -71,6 +85,7 @@ func (p *printer) indent() int {
 // To break a line inside an expression that might not be enclosed
 // in brackets of some kind, use breakline instead.
 func (p *printer) newline() {
+	p.needsNewLine = false
 	if len(p.comment) > 0 {
 		p.printf("  ")
 		for i, com := range p.comment {
@@ -85,6 +100,28 @@ func (p *printer) newline() {
 
 	p.trim()
 	p.printf("\n%*s", p.margin, "")
+}
+
+// softNewline postpones a call to newline to the next call of p.newlineIfNeeded()
+// If softNewline is called several times, just one newline is printed.
+// Usecase: if there are several nested blocks ending at the same time, for instance
+//
+//     if True:
+//         for a in b:
+//             pass
+//     foo()
+//
+// the last statement (`pass`) doesn't end with a newline, each block ends with a lazy newline
+// which actually gets printed only once when right before the next statement (`foo()`) is printed.
+func (p *printer) softNewline() {
+	p.needsNewLine = true
+}
+
+// newlineIfNeeded calls newline if softNewline() has previously been called
+func (p *printer) newlineIfNeeded() {
+	if p.needsNewLine == true {
+		p.newline()
+	}
 }
 
 // breakline breaks the current line, inserting a continuation \ if needed.
@@ -118,36 +155,68 @@ func (p *printer) file(f *File) {
 		p.newline()
 	}
 
-	for i, stmt := range f.Stmt {
-		switch stmt := stmt.(type) {
-		case *CommentBlock:
-			// comments already handled
-
-		case *PythonBlock:
-			for _, com := range stmt.Before {
-				p.printf("%s", strings.TrimSpace(com.Token))
-				p.newline()
-			}
-			p.printf("%s", stmt.Token) // includes trailing newline
-
-		default:
-			p.expr(stmt, precLow)
-			p.newline()
-		}
-
-		for _, com := range stmt.Comment().After {
-			p.printf("%s", strings.TrimSpace(com.Token))
-			p.newline()
-		}
-
-		if i+1 < len(f.Stmt) && !compactStmt(stmt, f.Stmt[i+1]) {
-			p.newline()
-		}
-	}
+	p.statements(f.Stmt)
 
 	for _, com := range f.After {
 		p.printf("%s", strings.TrimSpace(com.Token))
 		p.newline()
+	}
+
+	p.newlineIfNeeded()
+}
+
+func (p *printer) nestedStatements(stmts []Expr) {
+	p.margin += nestedIndentation
+	p.level++
+	p.newline()
+
+	p.statements(stmts)
+
+	p.margin -= nestedIndentation
+	p.level--
+}
+
+func (p *printer) statements(rawStmts []Expr) {
+	// rawStmts may contain nils if a refactoring tool replaces an actual statement with nil.
+	// It means the statements don't exist anymore, just ignore them.
+
+	stmts := []Expr{}
+	for _, stmt := range rawStmts {
+		if stmt != nil {
+			stmts = append(stmts, stmt)
+		}
+	}
+
+	for i, stmt := range stmts {
+		switch stmt := stmt.(type) {
+		case *CommentBlock:
+			// comments already handled
+
+		default:
+			p.expr(stmt, precLow)
+		}
+
+		// A CommentBlock is an empty statement without a body,
+		// it doesn't need an line break after the body
+		if _, ok := stmt.(*CommentBlock); !ok {
+			p.softNewline()
+		}
+
+		for _, com := range stmt.Comment().After {
+			p.newlineIfNeeded()
+			p.printf("%s", strings.TrimSpace(com.Token))
+			p.softNewline()
+		}
+
+		// Print an empty line break after the statement unless it's the last statement in the sequence.
+		// In that case a line break should be printed when the block or the file ends.
+		if i < len(stmts)-1 {
+			p.newline()
+		}
+
+		if i+1 < len(stmts) && !p.compactStmt(stmt, stmts[i+1]) {
+			p.newline()
+		}
 	}
 }
 
@@ -155,26 +224,58 @@ func (p *printer) file(f *File) {
 // should be printed without an intervening blank line.
 // We omit the blank line when both are subinclude statements
 // and the second one has no leading comments.
-func compactStmt(s1, s2 Expr) bool {
+func (p *printer) compactStmt(s1, s2 Expr) bool {
 	if len(s2.Comment().Before) > 0 {
 		return false
+	} else if isLoad(s1) && isLoad(s2) {
+		// Load statements should be compact
+		return true
+	} else if isLoad(s1) || isLoad(s2) {
+		// Load statements should be separated from anything else
+		return false
+	} else if isCommentBlock(s1) || isCommentBlock(s2) {
+		// Standalone comment blocks shouldn't be attached to other statements
+		return false
+	} else if (p.fileType == TypeBuild || p.fileType == TypeWorkspace) && p.level == 0 {
+		// Top-level statements in a BUILD or WORKSPACE file
+		return false
+	} else if isFunctionDefinition(s1) || isFunctionDefinition(s2) {
+		// On of the statements is a function definition
+		return false
+	} else {
+		// Depend on how the statements have been printed in the original file
+		_, end := s1.Span()
+		start, _ := s2.Span()
+		return start.Line-end.Line <= 1
 	}
-
-	return (isCall(s1, "subinclude") || isCall(s1, "load")) &&
-		(isCall(s2, "subinclude") || isCall(s2, "load"))
 }
 
-// isCall reports whether x is a call to a function with the given name.
-func isCall(x Expr, name string) bool {
-	c, ok := x.(*CallExpr)
-	if !ok {
+// isLoad reports whether x is a load statement.
+func isLoad(x Expr) bool {
+	_, ok := x.(*LoadStmt)
+	return ok
+}
+
+// isCommentBlock reports whether x is a comment block node.
+func isCommentBlock(x Expr) bool {
+	_, ok := x.(*CommentBlock)
+	return ok
+}
+
+// isFunctionDefinition checks if the statement is a def code block
+func isFunctionDefinition(x Expr) bool {
+	_, ok := x.(*DefStmt)
+	return ok
+}
+
+// isDifferentLines reports whether two positions belong to different lines.
+// If one of the positions is null (Line == 0), it's not a real position but probably an indicator
+// of manually inserted node. Return false in this case
+func isDifferentLines(p1, p2 *Position) bool {
+	if p1.Line == 0 || p2.Line == 0 {
 		return false
 	}
-	nam, ok := c.X.(*LiteralExpr)
-	if !ok {
-		return false
-	}
-	return nam.Token == name
+	return p1.Line != p2.Line
 }
 
 // Expression formatting.
@@ -203,36 +304,44 @@ func isCall(x Expr, name string) bool {
 const (
 	precLow = iota
 	precAssign
-	precComma
 	precColon
-	precIn
+	precIfElse
 	precOr
 	precAnd
 	precCmp
+	precBitwiseOr
+	precBitwiseXor
+	precBitwiseAnd
+	precBitwiseShift
 	precAdd
 	precMultiply
-	precSuffix
 	precUnary
-	precConcat
+	precSuffix
 )
 
 // opPrec gives the precedence for operators found in a BinaryExpr.
 var opPrec = map[string]int{
-	"=":   precAssign,
-	"+=":  precAssign,
-	"or":  precOr,
-	"and": precAnd,
-	"<":   precCmp,
-	">":   precCmp,
-	"==":  precCmp,
-	"!=":  precCmp,
-	"<=":  precCmp,
-	">=":  precCmp,
-	"+":   precAdd,
-	"-":   precAdd,
-	"*":   precMultiply,
-	"/":   precMultiply,
-	"%":   precMultiply,
+	"or":     precOr,
+	"and":    precAnd,
+	"in":     precCmp,
+	"not in": precCmp,
+	"<":      precCmp,
+	">":      precCmp,
+	"==":     precCmp,
+	"!=":     precCmp,
+	"<=":     precCmp,
+	">=":     precCmp,
+	"+":      precAdd,
+	"-":      precAdd,
+	"*":      precMultiply,
+	"/":      precMultiply,
+	"//":     precMultiply,
+	"%":      precMultiply,
+	"|":      precBitwiseOr,
+	"&":      precBitwiseAnd,
+	"^":      precBitwiseXor,
+	"<<":     precBitwiseShift,
+	">>":     precBitwiseShift,
 }
 
 // expr prints the expression v to the print buffer.
@@ -252,6 +361,8 @@ func (p *printer) expr(v Expr, outerPrec int) {
 	// TODO(bazel-team): Check whether it is valid to emit comments right now,
 	// and if not, insert them earlier in the output instead, at the most
 	// recent \n not following a \ line.
+	p.newlineIfNeeded()
+
 	if before := v.Comment().Before; len(before) > 0 {
 		// Want to print a line comment.
 		// Line comments must be at the current margin.
@@ -291,14 +402,19 @@ func (p *printer) expr(v Expr, outerPrec int) {
 	case *LiteralExpr:
 		p.printf("%s", v.Token)
 
+	case *Ident:
+		p.printf("%s", v.Name)
+
+	case *BranchStmt:
+		p.printf("%s", v.Token)
+
 	case *StringExpr:
-		// If the Token is a correct quoting of Value, use it.
-		// This preserves the specific escaping choices that
-		// BUILD authors have made, and it also works around
-		// b/7272572.
-		if strings.HasPrefix(v.Token, `"`) {
-			s, triple, err := unquote(v.Token)
-			if s == v.Value && triple == v.TripleQuote && err == nil {
+		// If the Token is a correct quoting of Value and has double quotes, use it,
+		// also use it if it has single quotes and the value itself contains a double quote symbol.
+		// This preserves the specific escaping choices that BUILD authors have made.
+		s, triple, err := Unquote(v.Token)
+		if s == v.Value && triple == v.TripleQuote && err == nil {
+			if strings.HasPrefix(v.Token, `"`) || strings.ContainsRune(v.Value, '"') {
 				p.printf("%s", v.Token)
 				break
 			}
@@ -309,7 +425,16 @@ func (p *printer) expr(v Expr, outerPrec int) {
 	case *DotExpr:
 		addParen(precSuffix)
 		p.expr(v.X, precSuffix)
+		_, xEnd := v.X.Span()
+		isMultiline := isDifferentLines(&v.NamePos, &xEnd)
+		if isMultiline {
+			p.margin += listIndentation
+			p.breakline()
+		}
 		p.printf(".%s", v.Name)
+		if isMultiline {
+			p.margin -= listIndentation
+		}
 
 	case *IndexExpr:
 		addParen(precSuffix)
@@ -327,12 +452,18 @@ func (p *printer) expr(v Expr, outerPrec int) {
 		addParen(precSuffix)
 		p.expr(v.X, precSuffix)
 		p.printf("[")
-		if v.Y != nil {
-			p.expr(v.Y, precLow)
+		if v.From != nil {
+			p.expr(v.From, precLow)
 		}
 		p.printf(":")
-		if v.Z != nil {
-			p.expr(v.Z, precLow)
+		if v.To != nil {
+			p.expr(v.To, precLow)
+		}
+		if v.SecondColon.Byte != 0 {
+			p.printf(":")
+			if v.Step != nil {
+				p.expr(v.Step, precLow)
+			}
 		}
 		p.printf("]")
 
@@ -343,19 +474,23 @@ func (p *printer) expr(v Expr, outerPrec int) {
 		} else {
 			p.printf("%s", v.Op)
 		}
-		p.expr(v.X, precUnary)
+		// Use the next precedence level (precSuffix), so that nested unary expressions are parenthesized,
+		// for example: `not (-(+(~foo)))` instead of `not -+~foo`
+		if v.X != nil {
+			p.expr(v.X, precSuffix)
+		}
 
 	case *LambdaExpr:
 		addParen(precColon)
 		p.printf("lambda ")
-		for i, name := range v.Var {
+		for i, param := range v.Params {
 			if i > 0 {
 				p.printf(", ")
 			}
-			p.expr(name, precLow)
+			p.expr(param, precLow)
 		}
 		p.printf(": ")
-		p.expr(v.Expr, precColon)
+		p.expr(v.Body[0], precLow) // lambdas should have exactly one statement
 
 	case *BinaryExpr:
 		// Precedence: use the precedence of the operator.
@@ -378,9 +513,6 @@ func (p *printer) expr(v Expr, outerPrec int) {
 		m := p.margin
 		if v.LineBreak {
 			p.margin = p.indent()
-			if v.Op == "=" {
-				p.margin += 4
-			}
 		}
 
 		p.expr(v.X, prec)
@@ -393,40 +525,165 @@ func (p *printer) expr(v Expr, outerPrec int) {
 		p.expr(v.Y, prec+1)
 		p.margin = m
 
+	case *AssignExpr:
+		addParen(precAssign)
+		m := p.margin
+		if v.LineBreak {
+			p.margin = p.indent() + listIndentation
+		}
+
+		p.expr(v.LHS, precAssign)
+		p.printf(" %s", v.Op)
+		if v.LineBreak {
+			p.breakline()
+		} else {
+			p.printf(" ")
+		}
+		p.expr(v.RHS, precAssign+1)
+		p.margin = m
+
 	case *ParenExpr:
-		p.seq("()", []Expr{v.X}, &v.End, modeParen, false, v.ForceMultiLine)
+		p.seq("()", &v.Start, &[]Expr{v.X}, &v.End, modeParen, false, v.ForceMultiLine)
 
 	case *CallExpr:
 		addParen(precSuffix)
 		p.expr(v.X, precSuffix)
-		p.seq("()", v.List, &v.End, modeCall, v.ForceCompact, v.ForceMultiLine)
+		p.seq("()", &v.ListStart, &v.List, &v.End, modeCall, v.ForceCompact, v.ForceMultiLine)
+
+	case *LoadStmt:
+		addParen(precSuffix)
+		p.printf("load")
+		args := []Expr{v.Module}
+		for i := range v.From {
+			from := v.From[i]
+			to := v.To[i]
+			var arg Expr
+			if from.Name == to.Name {
+				// Suffix comments are attached to the `to` token,
+				// Before comments are attached to the `from` token,
+				// they need to be combined.
+				arg = from.asString()
+				arg.Comment().Before = to.Comment().Before
+			} else {
+				arg = &AssignExpr{
+					LHS: to,
+					Op:  "=",
+					RHS: from.asString(),
+				}
+			}
+			args = append(args, arg)
+		}
+		p.seq("()", &v.Load, &args, &v.Rparen, modeLoad, v.ForceCompact, false)
 
 	case *ListExpr:
-		p.seq("[]", v.List, &v.End, modeList, false, v.ForceMultiLine)
+		p.seq("[]", &v.Start, &v.List, &v.End, modeList, false, v.ForceMultiLine)
 
 	case *SetExpr:
-		p.seq("{}", v.List, &v.End, modeList, false, v.ForceMultiLine)
+		p.seq("{}", &v.Start, &v.List, &v.End, modeList, false, v.ForceMultiLine)
 
 	case *TupleExpr:
-		p.seq("()", v.List, &v.End, modeTuple, v.ForceCompact, v.ForceMultiLine)
+		mode := modeTuple
+		if v.NoBrackets {
+			mode = modeSeq
+		}
+		p.seq("()", &v.Start, &v.List, &v.End, mode, v.ForceCompact, v.ForceMultiLine)
 
 	case *DictExpr:
 		var list []Expr
 		for _, x := range v.List {
 			list = append(list, x)
 		}
-		p.seq("{}", list, &v.End, modeDict, false, v.ForceMultiLine)
+		p.seq("{}", &v.Start, &list, &v.End, modeDict, false, v.ForceMultiLine)
 
-	case *ListForExpr:
+	case *Comprehension:
 		p.listFor(v)
 
 	case *ConditionalExpr:
 		addParen(precSuffix)
-		p.expr(v.Then, precSuffix)
+		p.expr(v.Then, precIfElse)
 		p.printf(" if ")
-		p.expr(v.Test, precSuffix)
+		p.expr(v.Test, precIfElse)
 		p.printf(" else ")
-		p.expr(v.Else, precSuffix)
+		p.expr(v.Else, precIfElse)
+
+	case *ReturnStmt:
+		p.printf("return")
+		if v.Result != nil {
+			p.printf(" ")
+			p.expr(v.Result, precLow)
+		}
+
+	case *DefStmt:
+		p.printf("def ")
+		p.printf(v.Name)
+		p.seq("()", &v.StartPos, &v.Params, nil, modeDef, v.ForceCompact, v.ForceMultiLine)
+		p.printf(":")
+		p.nestedStatements(v.Body)
+
+	case *ForStmt:
+		p.printf("for ")
+		p.expr(v.Vars, precLow)
+		p.printf(" in ")
+		p.expr(v.X, precLow)
+		p.printf(":")
+		p.nestedStatements(v.Body)
+
+	case *IfStmt:
+		block := v
+		isFirst := true
+		needsEmptyLine := false
+		for {
+			p.newlineIfNeeded()
+			if !isFirst {
+				if needsEmptyLine {
+					p.newline()
+				}
+				p.printf("el")
+			}
+			p.printf("if ")
+			p.expr(block.Cond, precLow)
+			p.printf(":")
+			p.nestedStatements(block.True)
+
+			isFirst = false
+			_, end := block.True[len(block.True)-1].Span()
+			needsEmptyLine = block.ElsePos.Pos.Line-end.Line > 1
+
+			// If the else-block contains just one statement which is an IfStmt, flatten it as a part
+			// of if-elif chain.
+			// Don't do it if the "else" statement has a suffix comment or if the next "if" statement
+			// has a before-comment.
+			if len(block.False) != 1 {
+				break
+			}
+			next, ok := block.False[0].(*IfStmt)
+			if !ok {
+				break
+			}
+			if len(block.ElsePos.Comment().Suffix) == 0 && len(next.Comment().Before) == 0 {
+				block = next
+				continue
+			}
+			break
+		}
+
+		if len(block.False) > 0 {
+			p.newlineIfNeeded()
+			if needsEmptyLine {
+				p.newline()
+			}
+			p.printf("else:")
+			p.comment = append(p.comment, block.ElsePos.Comment().Suffix...)
+			p.nestedStatements(block.False)
+		}
+	case *ForClause:
+		p.printf("for ")
+		p.expr(v.Vars, precLow)
+		p.printf(" in ")
+		p.expr(v.X, precLow)
+	case *IfClause:
+		p.printf("if ")
+		p.expr(v.Cond, precLow)
 	}
 
 	// Add closing parenthesis if needed.
@@ -452,7 +709,72 @@ const (
 	modeTuple // (x,)
 	modeParen // (x)
 	modeDict  // {x:y}
+	modeSeq   // x, y
+	modeDef   // def f(x, y)
+	modeLoad  // load(a, b, c)
 )
+
+// useCompactMode reports whether a sequence should be formatted in a compact mode
+func (p *printer) useCompactMode(start *Position, list *[]Expr, end *End, mode seqMode, forceCompact, forceMultiLine bool) bool {
+	// If there are line comments, use multiline
+	// so we can print the comments before the closing bracket.
+	for _, x := range *list {
+		if len(x.Comment().Before) > 0 || (len(x.Comment().Suffix) > 0 && mode != modeDef) {
+			return false
+		}
+	}
+	if end != nil && len(end.Before) > 0 {
+		return false
+	}
+
+	// Implicit tuples are always compact
+	if mode == modeSeq {
+		return true
+	}
+
+	// In the Default and .bzl printing modes try to keep the original printing style.
+	// Non-top-level statements and lists of arguments of a function definition
+	// should also keep the original style regardless of the mode.
+	if (p.level != 0 || p.fileType == TypeDefault || p.fileType == TypeBzl || mode == modeDef) && mode != modeLoad {
+		// If every element (including the brackets) ends on the same line where the next element starts,
+		// use the compact mode, otherwise use multiline mode.
+		// If an node's line number is 0, it means it doesn't appear in the original file,
+		// its position shouldn't be taken into account. Unless a sequence is new,
+		// then use multiline mode if ForceMultiLine mode was set.
+		previousEnd := start
+		isNewSeq := start.Line == 0
+		for _, x := range *list {
+			start, end := x.Span()
+			isNewSeq = isNewSeq && start.Line == 0
+			if isDifferentLines(&start, previousEnd) {
+				return false
+			}
+			if end.Line != 0 {
+				previousEnd = &end
+			}
+		}
+		if end != nil {
+			isNewSeq = isNewSeq && end.Pos.Line == 0
+			if isDifferentLines(previousEnd, &end.Pos) {
+				return false
+			}
+		}
+		if !isNewSeq {
+			return true
+		}
+		// Use the forceMultiline value for new sequences.
+		return !forceMultiLine
+	}
+	// In Build mode, use the forceMultiline and forceCompact values
+	if forceMultiLine {
+		return false
+	}
+	if forceCompact {
+		return true
+	}
+	// If neither of the flags are set, use compact mode only for empty or 1-element sequences
+	return len(*list) <= 1
+}
 
 // seq formats a list of values inside a given bracket pair (brack = "()", "[]", "{}").
 // The end node holds any trailing comments to be printed just before the
@@ -460,79 +782,87 @@ const (
 // The mode parameter specifies the sequence mode (see above).
 // If multiLine is true, seq avoids the compact form even
 // for 0- and 1-element sequences.
-func (p *printer) seq(brack string, list []Expr, end *End, mode seqMode, forceCompact, forceMultiLine bool) {
-	p.printf("%s", brack[:1])
+func (p *printer) seq(brack string, start *Position, list *[]Expr, end *End, mode seqMode, forceCompact, forceMultiLine bool) {
+	if mode != modeSeq {
+		p.printf("%s", brack[:1])
+	}
 	p.depth++
-
-	// If there are line comments, force multiline
-	// so we can print the comments before the closing bracket.
-	for _, x := range list {
-		if len(x.Comment().Before) > 0 {
-			forceMultiLine = true
+	defer func() {
+		p.depth--
+		if mode != modeSeq {
+			p.printf("%s", brack[1:])
 		}
-	}
-	if len(end.Before) > 0 {
-		forceMultiLine = true
-	}
+	}()
 
-	// Resolve possibly ambiguous call arguments explicitly
-	// instead of depending on implicit resolution in logic below.
-	if forceMultiLine {
-		forceCompact = false
-	}
-
-	switch {
-	case len(list) == 0 && !forceMultiLine:
-		// Compact form: print nothing.
-
-	case len(list) == 1 && !forceMultiLine:
-		// Compact form.
-		p.expr(list[0], precLow)
-		// Tuple must end with comma, to mark it as a tuple.
-		if mode == modeTuple {
-			p.printf(",")
-		}
-
-	case forceCompact:
-		// Compact form but multiple elements.
-		for i, x := range list {
+	if p.useCompactMode(start, list, end, mode, forceCompact, forceMultiLine) {
+		for i, x := range *list {
 			if i > 0 {
 				p.printf(", ")
 			}
 			p.expr(x, precLow)
 		}
-
-	default:
-		// Multi-line form.
-		p.margin += 4
-		for i, x := range list {
-			// If we are about to break the line before the first
-			// element and there are trailing end-of-line comments
-			// waiting to be printed, delay them and print them as
-			// whole-line comments preceding that element.
-			// Do this by printing a newline ourselves and positioning
-			// so that the end-of-line comment, with the two spaces added,
-			// will line up with the current margin.
-			if i == 0 && len(p.comment) > 0 {
-				p.printf("\n%*s", p.margin-2, "")
-			}
-
-			p.newline()
-			p.expr(x, precLow)
-			if mode != modeParen || i+1 < len(list) {
-				p.printf(",")
-			}
+		// Single-element tuple must end with comma, to mark it as a tuple.
+		if len(*list) == 1 && mode == modeTuple {
+			p.printf(",")
 		}
-		// Final comments.
+		return
+	}
+	// Multi-line form.
+	indentation := listIndentation
+	if mode == modeDef {
+		indentation = defIndentation
+	}
+	p.margin += indentation
+
+	for i, x := range *list {
+		// If we are about to break the line before the first
+		// element and there are trailing end-of-line comments
+		// waiting to be printed, delay them and print them as
+		// whole-line comments preceding that element.
+		// Do this by printing a newline ourselves and positioning
+		// so that the end-of-line comment, with the two spaces added,
+		// will line up with the current margin.
+		if i == 0 && len(p.comment) > 0 {
+			p.printf("\n%*s", p.margin-2, "")
+		}
+
+		p.newline()
+		p.expr(x, precLow)
+
+		if i+1 < len(*list) || needsTrailingComma(mode, x) {
+			p.printf(",")
+		}
+	}
+	// Final comments.
+	if end != nil {
 		for _, com := range end.Before {
 			p.newline()
 			p.printf("%s", strings.TrimSpace(com.Token))
 		}
-		p.margin -= 4
+	}
+	p.margin -= indentation
+	// in modeDef print the closing bracket on the same line
+	if mode != modeDef {
 		p.newline()
 	}
-	p.depth--
-	p.printf("%s", brack[1:])
+}
+
+func needsTrailingComma(mode seqMode, v Expr) bool {
+	switch mode {
+	case modeDef:
+		return false
+	case modeParen:
+		return false
+	case modeCall:
+		// *args and **kwargs in fn calls
+		switch v := v.(type) {
+		case *UnaryExpr:
+			if v.Op == "*" || v.Op == "**" {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // listFor formats a ListForExpr (list comprehension).
@@ -546,7 +876,7 @@ func (p *printer) seq(brack string, list []Expr, end *End, mode seqMode, forceCo
 //	    if c
 //	]
 //
-func (p *printer) listFor(v *ListForExpr) {
+func (p *printer) listFor(v *Comprehension) {
 	multiLine := v.ForceMultiLine || len(v.End.Before) > 0
 
 	// space breaks the line in multiline mode
@@ -559,41 +889,23 @@ func (p *printer) listFor(v *ListForExpr) {
 		}
 	}
 
-	if v.Brack != "" {
-		p.depth++
-		p.printf("%s", v.Brack[:1])
+	open, close := "[", "]"
+	if v.Curly {
+		open, close = "{", "}"
 	}
+	p.depth++
+	p.printf("%s", open)
 
 	if multiLine {
-		if v.Brack != "" {
-			p.margin += 4
-		}
+		p.margin += listIndentation
 		p.newline()
 	}
 
-	p.expr(v.X, precLow)
+	p.expr(v.Body, precLow)
 
-	for _, c := range v.For {
+	for _, c := range v.Clauses {
 		space()
-		p.printf("for ")
-		for i, name := range c.For.Var {
-			if i > 0 {
-				p.printf(", ")
-			}
-			p.expr(name, precLow)
-		}
-		p.printf(" in ")
-		p.expr(c.For.Expr, precLow)
-		p.comment = append(p.comment, c.For.Comment().Suffix...)
-
-		for _, i := range c.Ifs {
-			space()
-			p.printf("if ")
-			p.expr(i.Cond, precLow)
-			p.comment = append(p.comment, i.Comment().Suffix...)
-		}
-		p.comment = append(p.comment, c.Comment().Suffix...)
-
+		p.expr(c, precLow)
 	}
 
 	if multiLine {
@@ -601,14 +913,14 @@ func (p *printer) listFor(v *ListForExpr) {
 			p.newline()
 			p.printf("%s", strings.TrimSpace(com.Token))
 		}
-		if v.Brack != "" {
-			p.margin -= 4
-		}
+		p.margin -= listIndentation
 		p.newline()
 	}
 
-	if v.Brack != "" {
-		p.printf("%s", v.Brack[1:])
-		p.depth--
-	}
+	p.printf("%s", close)
+	p.depth--
+}
+
+func (p *printer) isTopLevel() bool {
+	return p.margin == 0
 }

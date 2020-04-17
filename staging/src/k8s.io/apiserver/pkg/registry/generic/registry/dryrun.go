@@ -38,20 +38,22 @@ func (s *DryRunnableStorage) Create(ctx context.Context, key string, obj, out ru
 		if err := s.Storage.Get(ctx, key, "", out, false); err == nil {
 			return storage.NewKeyExistsError(key, 0)
 		}
-		s.copyInto(obj, out)
-		return nil
+		return s.copyInto(obj, out)
 	}
 	return s.Storage.Create(ctx, key, obj, out, ttl)
 }
 
-func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, dryRun bool) error {
+func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, deleteValidation storage.ValidateObjectFunc, dryRun bool) error {
 	if dryRun {
 		if err := s.Storage.Get(ctx, key, "", out, false); err != nil {
 			return err
 		}
-		return preconditions.Check(key, out)
+		if err := preconditions.Check(key, out); err != nil {
+			return err
+		}
+		return deleteValidation(ctx, out)
 	}
-	return s.Storage.Delete(ctx, key, out, preconditions)
+	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation)
 }
 
 func (s *DryRunnableStorage) Watch(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
@@ -87,12 +89,14 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 			return err
 		}
 		rev, err := s.Versioner().ObjectResourceVersion(ptrToType)
+		if err != nil {
+			return err
+		}
 		out, _, err := tryUpdate(ptrToType, storage.ResponseMeta{ResourceVersion: rev})
 		if err != nil {
 			return err
 		}
-		s.copyInto(out, ptrToType)
-		return nil
+		return s.copyInto(out, ptrToType)
 	}
 	return s.Storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, suggestion...)
 }

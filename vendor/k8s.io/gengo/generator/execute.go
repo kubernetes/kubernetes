@@ -233,11 +233,13 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 		if f == nil {
 			// This is the first generator to reference this file, so start it.
 			f = &File{
-				Name:        g.Filename(),
-				FileType:    fileType,
-				PackageName: p.Name(),
-				Header:      p.Header(g.Filename()),
-				Imports:     map[string]struct{}{},
+				Name:              g.Filename(),
+				FileType:          fileType,
+				PackageName:       p.Name(),
+				PackagePath:       p.Path(),
+				PackageSourcePath: p.SourcePath(),
+				Header:            p.Header(g.Filename()),
+				Imports:           map[string]struct{}{},
 			}
 			files[f.Name] = f
 		} else {

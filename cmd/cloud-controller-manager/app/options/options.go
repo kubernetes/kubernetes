@@ -107,6 +107,9 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 	s.SecureServing.ServerCert.PairName = "cloud-controller-manager"
 	s.SecureServing.BindPort = ports.CloudControllerManagerPort
 
+	s.Generic.LeaderElection.ResourceName = "cloud-controller-manager"
+	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
+
 	return &s, nil
 }
 
@@ -176,6 +179,8 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	if err != nil {
 		return err
 	}
+	c.Kubeconfig.DisableCompression = true
+	c.Kubeconfig.ContentConfig.AcceptContentTypes = o.Generic.ClientConnection.AcceptContentTypes
 	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
 	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
 	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)

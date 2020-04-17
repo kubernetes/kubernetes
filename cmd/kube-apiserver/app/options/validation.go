@@ -19,24 +19,69 @@ package options
 import (
 	"errors"
 	"fmt"
+	"net"
+	"strings"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/metrics"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
+// validateClusterIPFlags is expected to be called after Complete()
 func validateClusterIPFlags(options *ServerRunOptions) []error {
 	var errs []error
 
-	if options.ServiceClusterIPRange.IP == nil {
-		errs = append(errs, errors.New("no --service-cluster-ip-range specified"))
+	// validate that primary has been processed by user provided values or it has been defaulted
+	if options.PrimaryServiceClusterIPRange.IP == nil {
+		errs = append(errs, errors.New("--service-cluster-ip-range must contain at least one valid cidr"))
 	}
-	var ones, bits = options.ServiceClusterIPRange.Mask.Size()
+
+	serviceClusterIPRangeList := strings.Split(options.ServiceClusterIPRanges, ",")
+	if len(serviceClusterIPRangeList) > 2 {
+		errs = append(errs, errors.New("--service-cluster-ip-range must not contain more than two entries"))
+	}
+
+	// Complete() expected to have set Primary* and Secondary*
+	// primary CIDR validation
+	var ones, bits = options.PrimaryServiceClusterIPRange.Mask.Size()
 	if bits-ones > 20 {
 		errs = append(errs, errors.New("specified --service-cluster-ip-range is too large"))
+	}
+
+	// Secondary IP validation
+	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
+	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		errs = append(errs, fmt.Errorf("--secondary-service-cluster-ip-range can only be used if %v feature is enabled", string(features.IPv6DualStack)))
+	}
+
+	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
+	// to only ingress traffic within and into the cluster on one IP family only. this family is decided
+	// by the range set on --service-cluster-ip-range. If/when the user decides to use dual stack services
+	// the Secondary* must be of different IPFamily than --service-cluster-ip-range
+	if secondaryServiceClusterIPRangeUsed {
+		// Should be dualstack IPFamily(PrimaryServiceClusterIPRange) != IPFamily(SecondaryServiceClusterIPRange)
+		dualstack, err := netutils.IsDualStackCIDRs([]*net.IPNet{&options.PrimaryServiceClusterIPRange, &options.SecondaryServiceClusterIPRange})
+		if err != nil {
+			errs = append(errs, errors.New("error attempting to validate dualstack for --service-cluster-ip-range and --secondary-service-cluster-ip-range"))
+		}
+
+		if !dualstack {
+			errs = append(errs, errors.New("--service-cluster-ip-range and --secondary-service-cluster-ip-range must be of different IP family"))
+		}
+
+		// Should be smallish sized cidr, this thing is kept in etcd
+		// bigger cidr (specially those offered by IPv6) will add no value
+		// significantly increase snapshotting time.
+		var ones, bits = options.SecondaryServiceClusterIPRange.Mask.Size()
+		if bits-ones > 20 {
+			errs = append(errs, errors.New("specified --secondary-service-cluster-ip-range is too large"))
+		}
 	}
 
 	return errs
@@ -83,6 +128,25 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 	return errs
 }
 
+func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
+		// We need the alpha API enabled.  There are only a few ways to turn it on
+		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
+		switch {
+		case strings.Contains(enabledAPIString, "api/all=true"):
+			return nil
+		case strings.Contains(enabledAPIString, "api/alpha=true"):
+			return nil
+		case strings.Contains(enabledAPIString, "flowcontrol.apiserver.k8s.io/v1alpha1=true"):
+			return nil
+		default:
+			return []error{fmt.Errorf("enabling APIPriorityAndFairness requires --runtime-confg=flowcontrol.apiserver.k8s.io/v1alpha1=true to enable the required API")}
+		}
+	}
+
+	return nil
+}
+
 // Validate checks ServerRunOptions and return a slice of found errs.
 func (s *ServerRunOptions) Validate() []error {
 	var errs []error
@@ -92,6 +156,7 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, s.Etcd.Validate()...)
 	errs = append(errs, validateClusterIPFlags(s)...)
 	errs = append(errs, validateServiceNodePort(s)...)
+	errs = append(errs, validateAPIPriorityAndFairness(s)...)
 	errs = append(errs, s.SecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
@@ -100,6 +165,7 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, s.InsecureServing.Validate()...)
 	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
 	errs = append(errs, validateTokenRequest(s)...)
+	errs = append(errs, metrics.ValidateShowHiddenMetricsVersion(s.ShowHiddenMetricsForVersion)...)
 
 	return errs
 }

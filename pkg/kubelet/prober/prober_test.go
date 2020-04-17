@@ -17,10 +17,12 @@ limitations under the License.
 package prober
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -29,6 +31,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 )
@@ -233,6 +236,11 @@ func TestProbe(t *testing.T) {
 			execResult:     probe.Success,
 			expectedResult: results.Success,
 		},
+		{ // Probe result is warning
+			probe:          execProbe,
+			execResult:     probe.Warning,
+			expectedResult: results.Success,
+		},
 		{ // Probe result is unknown
 			probe:          execProbe,
 			execResult:     probe.Unknown,
@@ -275,7 +283,7 @@ func TestProbe(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		for _, probeType := range [...]probeType{liveness, readiness} {
+		for _, probeType := range [...]probeType{liveness, readiness, startup} {
 			prober := &prober{
 				refManager: kubecontainer.NewRefManager(),
 				recorder:   &record.FakeRecorder{},
@@ -287,6 +295,8 @@ func TestProbe(t *testing.T) {
 				testContainer.LivenessProbe = test.probe
 			case readiness:
 				testContainer.ReadinessProbe = test.probe
+			case startup:
+				testContainer.StartupProbe = test.probe
 			}
 			if test.execError {
 				prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}
@@ -322,23 +332,38 @@ func TestProbe(t *testing.T) {
 }
 
 func TestNewExecInContainer(t *testing.T) {
+	limit := 1024
+	tenKilobyte := strings.Repeat("logs-123", 128*10)
+
 	tests := []struct {
-		name string
-		err  error
+		name     string
+		stdout   string
+		expected string
+		err      error
 	}{
 		{
-			name: "no error",
-			err:  nil,
+			name:     "no error",
+			stdout:   "foo",
+			expected: "foo",
+			err:      nil,
 		},
 		{
-			name: "error - make sure we get output",
-			err:  errors.New("bad"),
+			name:     "no error",
+			stdout:   tenKilobyte,
+			expected: tenKilobyte[0:limit],
+			err:      nil,
+		},
+		{
+			name:     "error - make sure we get output",
+			stdout:   "foo",
+			expected: "foo",
+			err:      errors.New("bad"),
 		},
 	}
 
 	for _, test := range tests {
 		runner := &containertest.FakeContainerCommandRunner{
-			Stdout: "foo",
+			Stdout: test.stdout,
 			Err:    test.err,
 		}
 		prober := &prober{
@@ -350,7 +375,16 @@ func TestNewExecInContainer(t *testing.T) {
 		cmd := []string{"/foo", "bar"}
 		exec := prober.newExecInContainer(container, containerID, cmd, 0)
 
-		actualOutput, err := exec.CombinedOutput()
+		var dataBuffer bytes.Buffer
+		writer := ioutils.LimitWriter(&dataBuffer, int64(limit))
+		exec.SetStderr(writer)
+		exec.SetStdout(writer)
+		err := exec.Start()
+		if err == nil {
+			err = exec.Wait()
+		}
+		actualOutput := dataBuffer.Bytes()
+
 		if e, a := containerID, runner.ContainerID; e != a {
 			t.Errorf("%s: container id: expected %v, got %v", test.name, e, a)
 		}
@@ -358,7 +392,7 @@ func TestNewExecInContainer(t *testing.T) {
 			t.Errorf("%s: cmd: expected %v, got %v", test.name, e, a)
 		}
 		// this isn't 100% foolproof as a bug in a real ContainerCommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
-		if e, a := "foo", string(actualOutput); e != a {
+		if e, a := test.expected, string(actualOutput); e != a {
 			t.Errorf("%s: output: expected %q, got %q", test.name, e, a)
 		}
 		if e, a := fmt.Sprintf("%v", test.err), fmt.Sprintf("%v", err); e != a {

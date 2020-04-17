@@ -51,6 +51,16 @@ func (r *Storage) NamespaceScoped() bool {
 	return false
 }
 
+func (r *Storage) StorageVersion() runtime.GroupVersioner {
+	svp, ok := r.StandardStorage.(rest.StorageVersionProvider)
+	if !ok {
+		return nil
+	}
+	return svp.StorageVersion()
+}
+
+var _ rest.StorageVersionProvider = &Storage{}
+
 func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Create(ctx, obj, createValidation, options)

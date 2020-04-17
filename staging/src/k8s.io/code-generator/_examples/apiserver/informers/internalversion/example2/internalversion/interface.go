@@ -41,5 +41,5 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 
 // TestTypes returns a TestTypeInformer.
 func (v *version) TestTypes() TestTypeInformer {
-	return &testTypeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &testTypeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

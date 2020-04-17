@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["spec.go"],
+    srcs = [
+        "doc.go",
+        "spec.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/github.com/go-openapi/loads",
     importpath = "github.com/go-openapi/loads",
     visibility = ["//visibility:public"],

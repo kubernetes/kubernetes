@@ -23,22 +23,18 @@ reviewers:
 - zmerlynn
 - luxas
 - justinsb
-- roberthbailey
 - eparis
-- jlowdermilk
 - piosz
 - jsafrane
 - dims
 - krousey
 - rootfs
-- jszczepkowski
-- markturansky
-- girishkalele
-- jdef
 - freehan
 - jingxu97
 - wlan0
 - cheftako
 - andrewsykim
+- mcrute
 labels:
 - sig/cloud-provider
+- area/cloudprovider

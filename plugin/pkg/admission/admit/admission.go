@@ -17,6 +17,7 @@ limitations under the License.
 package admit
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
@@ -40,12 +41,12 @@ var _ admission.MutationInterface = alwaysAdmit{}
 var _ admission.ValidationInterface = alwaysAdmit{}
 
 // Admit makes an admission decision based on the request attributes
-func (alwaysAdmit) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (alwaysAdmit) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return nil
 }
 
 // Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
-func (alwaysAdmit) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (alwaysAdmit) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return nil
 }
 

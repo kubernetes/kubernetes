@@ -26,7 +26,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/pkg/constants"
-	"sigs.k8s.io/kustomize/pkg/fs"
 	"sigs.k8s.io/kustomize/pkg/ifc"
 	"sigs.k8s.io/kustomize/pkg/ifc/transformer"
 	interror "sigs.k8s.io/kustomize/pkg/internal/error"
@@ -42,7 +41,6 @@ import (
 type KustTarget struct {
 	kustomization *types.Kustomization
 	ldr           ifc.Loader
-	fSys          fs.FileSystem
 	rFactory      *resmap.Factory
 	tFactory      transformer.Factory
 }
@@ -50,7 +48,6 @@ type KustTarget struct {
 // NewKustTarget returns a new instance of KustTarget primed with a Loader.
 func NewKustTarget(
 	ldr ifc.Loader,
-	fSys fs.FileSystem,
 	rFactory *resmap.Factory,
 	tFactory transformer.Factory) (*KustTarget, error) {
 	content, err := loadKustFile(ldr)
@@ -70,10 +67,21 @@ func NewKustTarget(
 	return &KustTarget{
 		kustomization: &k,
 		ldr:           ldr,
-		fSys:          fSys,
 		rFactory:      rFactory,
 		tFactory:      tFactory,
 	}, nil
+}
+
+func quoted(l []string) []string {
+	r := make([]string, len(l))
+	for i, v := range l {
+		r[i] = "'" + v + "'"
+	}
+	return r
+}
+
+func commaOr(q []string) string {
+	return strings.Join(q[:len(q)-1], ", ") + " or " + q[len(q)-1]
 }
 
 func loadKustFile(ldr ifc.Loader) ([]byte, error) {
@@ -88,8 +96,9 @@ func loadKustFile(ldr ifc.Loader) ([]byte, error) {
 	}
 	switch match {
 	case 0:
-		return nil, fmt.Errorf("No kustomization file found in %s. Kustomize supports the following kustomization files: %s",
-			ldr.Root(), strings.Join(constants.KustomizationFileNames, ", "))
+		return nil, fmt.Errorf(
+			"unable to find one of %v in directory '%s'",
+			commaOr(quoted(constants.KustomizationFileNames)), ldr.Root())
 	case 1:
 		return content, nil
 	default:
@@ -110,7 +119,7 @@ func unmarshal(y []byte, o interface{}) error {
 // MakeCustomizedResMap creates a ResMap per kustomization instructions.
 // The Resources in the returned ResMap are fully customized.
 func (kt *KustTarget) MakeCustomizedResMap() (resmap.ResMap, error) {
-	ra, err := kt.accumulateTarget()
+	ra, err := kt.AccumulateTarget()
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +143,11 @@ func (kt *KustTarget) shouldAddHashSuffixesToGeneratedResources() bool {
 		!kt.kustomization.GeneratorOptions.DisableNameSuffixHash
 }
 
-// accumulateTarget returns a new ResAccumulator,
+// AccumulateTarget returns a new ResAccumulator,
 // holding customized resources and the data/rules used
 // to do so.  The name back references and vars are
 // not yet fixed.
-func (kt *KustTarget) accumulateTarget() (
+func (kt *KustTarget) AccumulateTarget() (
 	ra *ResAccumulator, err error) {
 	// TODO(monopole): Get rid of the KustomizationErrors accumulator.
 	// It's not consistently used, and complicates tests.
@@ -236,15 +245,15 @@ func (kt *KustTarget) accumulateBases() (
 			continue
 		}
 		subKt, err := NewKustTarget(
-			ldr, kt.fSys, kt.rFactory, kt.tFactory)
+			ldr, kt.rFactory, kt.tFactory)
 		if err != nil {
 			errs.Append(errors.Wrap(err, "couldn't make target for "+path))
 			ldr.Cleanup()
 			continue
 		}
-		subRa, err := subKt.accumulateTarget()
+		subRa, err := subKt.AccumulateTarget()
 		if err != nil {
-			errs.Append(errors.Wrap(err, "accumulateTarget"))
+			errs.Append(errors.Wrap(err, "AccumulateTarget"))
 			ldr.Cleanup()
 			continue
 		}

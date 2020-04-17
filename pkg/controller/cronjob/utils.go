@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -94,7 +93,7 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
-		return starts, fmt.Errorf("Unparseable schedule: %s : %s", sj.Spec.Schedule, err)
+		return starts, fmt.Errorf("unparseable schedule: %s : %s", sj.Spec.Schedule, err)
 	}
 
 	var earliestTime time.Time
@@ -142,7 +141,7 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 		// but less than "lots".
 		if len(starts) > 100 {
 			// We can't get the most recent times so just return an empty slice
-			return []time.Time{}, fmt.Errorf("Too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew.")
+			return []time.Time{}, fmt.Errorf("too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew")
 		}
 	}
 	return starts, nil
@@ -163,9 +162,7 @@ func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*bat
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(sj, controllerKind)},
 		},
 	}
-	if err := legacyscheme.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {
-		return nil, fmt.Errorf("unable to convert job template: %v", err)
-	}
+	sj.Spec.JobTemplate.Spec.DeepCopyInto(&job.Spec)
 	return job, nil
 }
 
@@ -183,6 +180,7 @@ func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {
 	return false, ""
 }
 
+// IsJobFinished returns whether or not a job has completed successfully or failed.
 func IsJobFinished(j *batchv1.Job) bool {
 	isFinished, _ := getFinishedStatus(j)
 	return isFinished
@@ -195,13 +193,14 @@ func (o byJobStartTime) Len() int      { return len(o) }
 func (o byJobStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byJobStartTime) Less(i, j int) bool {
-	if o[j].Status.StartTime == nil {
-		return o[i].Status.StartTime != nil
+	if o[i].Status.StartTime == nil && o[j].Status.StartTime != nil {
+		return false
 	}
-
+	if o[i].Status.StartTime != nil && o[j].Status.StartTime == nil {
+		return true
+	}
 	if o[i].Status.StartTime.Equal(o[j].Status.StartTime) {
 		return o[i].Name < o[j].Name
 	}
-
 	return o[i].Status.StartTime.Before(o[j].Status.StartTime)
 }

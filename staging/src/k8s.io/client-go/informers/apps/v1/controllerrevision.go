@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -61,13 +62,13 @@ func NewFilteredControllerRevisionInformer(client kubernetes.Interface, namespac
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().ControllerRevisions(namespace).List(options)
+				return client.AppsV1().ControllerRevisions(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1().ControllerRevisions(namespace).Watch(options)
+				return client.AppsV1().ControllerRevisions(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&appsv1.ControllerRevision{},

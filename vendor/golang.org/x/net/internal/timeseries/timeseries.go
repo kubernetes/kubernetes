@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package timeseries implements a time series structure for stats collection.
-package timeseries
+package timeseries // import "golang.org/x/net/internal/timeseries"
 
 import (
 	"fmt"
@@ -403,9 +403,9 @@ func (ts *timeSeries) extract(l *tsLevel, start, finish time.Time, num int, resu
 
 	// Where should scanning start?
 	if dstStart.After(srcStart) {
-		advance := dstStart.Sub(srcStart) / srcInterval
-		srcIndex += int(advance)
-		srcStart = srcStart.Add(advance * srcInterval)
+		advance := int(dstStart.Sub(srcStart) / srcInterval)
+		srcIndex += advance
+		srcStart = srcStart.Add(time.Duration(advance) * srcInterval)
 	}
 
 	// The i'th value is computed as show below.

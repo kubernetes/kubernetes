@@ -49,28 +49,55 @@ import (
 //
 // Dlaqps is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jpvt []int, tau, vn1, vn2, auxv, f []float64, ldf int) (kb int) {
-	checkMatrix(m, n, a, lda)
-	checkMatrix(n, nb, f, ldf)
-	if offset > m {
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case offset < 0:
+		panic(offsetLT0)
+	case offset > m:
 		panic(offsetGTM)
+	case nb < 0:
+		panic(nbLT0)
+	case nb > n:
+		panic(nbGTN)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldf < max(1, nb):
+		panic(badLdF)
 	}
-	if n < 0 || nb > n {
-		panic(badNb)
+
+	if m == 0 || n == 0 {
+		return 0
 	}
-	if len(jpvt) != n {
-		panic(badIpiv)
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(jpvt) != n:
+		panic(badLenJpvt)
+	case len(vn1) < n:
+		panic(shortVn1)
+	case len(vn2) < n:
+		panic(shortVn2)
 	}
-	if len(tau) < nb {
-		panic(badTau)
+
+	if nb == 0 {
+		return 0
 	}
-	if len(vn1) < n {
-		panic(badVn1)
+
+	switch {
+	case len(tau) < nb:
+		panic(shortTau)
+	case len(auxv) < nb:
+		panic(shortAuxv)
+	case len(f) < (n-1)*ldf+nb:
+		panic(shortF)
 	}
-	if len(vn2) < n {
-		panic(badVn2)
-	}
-	if len(auxv) < nb {
-		panic(badAuxv)
+
+	if offset == m {
+		return 0
 	}
 
 	lastrk := min(m, n+offset)
@@ -95,7 +122,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Apply previous Householder reflectors to column K:
 		//
-		// A[rk:m, k] = A[rk:m, k] - A[rk:m, 0:k-1]*F[k, 0:k-1]^T.
+		// A[rk:m, k] = A[rk:m, k] - A[rk:m, 0:k-1]*F[k, 0:k-1]ᵀ.
 		if k > 0 {
 			bi.Dgemv(blas.NoTrans, m-rk, k, -1,
 				a[rk*lda:], lda,
@@ -116,7 +143,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Compute kth column of F:
 		//
-		// Compute F[k+1:n, k] = tau[k]*A[rk:m, k+1:n]^T*A[rk:m, k].
+		// Compute F[k+1:n, k] = tau[k]*A[rk:m, k+1:n]ᵀ*A[rk:m, k].
 		if k < n-1 {
 			bi.Dgemv(blas.Trans, m-rk, n-k-1, tau[k],
 				a[rk*lda+k+1:], lda,
@@ -132,7 +159,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Incremental updating of F:
 		//
-		// F[0:n, k] := F[0:n, k] - tau[k]*F[0:n, 0:k-1]*A[rk:m, 0:k-1]^T*A[rk:m,k].
+		// F[0:n, k] := F[0:n, k] - tau[k]*F[0:n, 0:k-1]*A[rk:m, 0:k-1]ᵀ*A[rk:m,k].
 		if k > 0 {
 			bi.Dgemv(blas.Trans, m-rk, k, -tau[k],
 				a[rk*lda:], lda,
@@ -148,7 +175,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 		// Update the current row of A:
 		//
-		// A[rk, k+1:n] = A[rk, k+1:n] - A[rk, 0:k]*F[k+1:n, 0:k]^T.
+		// A[rk, k+1:n] = A[rk, k+1:n] - A[rk, 0:k]*F[k+1:n, 0:k]ᵀ.
 		if k < n-1 {
 			bi.Dgemv(blas.NoTrans, n-k-1, k+1, -1,
 				f[(k+1)*ldf:], ldf,
@@ -189,7 +216,7 @@ func (impl Implementation) Dlaqps(m, n, offset, nb int, a []float64, lda int, jp
 
 	// Apply the block reflector to the rest of the matrix:
 	//
-	// A[offset+kb+1:m, kb+1:n] := A[offset+kb+1:m, kb+1:n] - A[offset+kb+1:m, 1:kb]*F[kb+1:n, 1:kb]^T.
+	// A[offset+kb+1:m, kb+1:n] := A[offset+kb+1:m, kb+1:n] - A[offset+kb+1:m, 1:kb]*F[kb+1:n, 1:kb]ᵀ.
 	if kb < min(n, m-offset) {
 		bi.Dgemm(blas.NoTrans, blas.Trans,
 			m-rk, n-kb, kb, -1,

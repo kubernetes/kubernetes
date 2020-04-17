@@ -6,7 +6,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/internal/backoff",
     importpath = "google.golang.org/grpc/internal/backoff",
     visibility = ["//vendor/google.golang.org/grpc:__subpackages__"],
-    deps = ["//vendor/google.golang.org/grpc/internal/grpcrand:go_default_library"],
+    deps = [
+        "//vendor/google.golang.org/grpc/backoff:go_default_library",
+        "//vendor/google.golang.org/grpc/internal/grpcrand:go_default_library",
+    ],
 )
 
 filegroup(

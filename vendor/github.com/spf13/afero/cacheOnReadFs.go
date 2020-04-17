@@ -32,9 +32,8 @@ func NewCacheOnReadFs(base Fs, layer Fs, cacheTime time.Duration) Fs {
 type cacheState int
 
 const (
-	cacheUnknown cacheState = iota
 	// not present in the overlay, unknown if it exists in the base:
-	cacheMiss
+	cacheMiss cacheState = iota
 	// present in the overlay and in base, base file is newer:
 	cacheStale
 	// present in the overlay - with cache time == 0 it may exist in the base,
@@ -65,15 +64,10 @@ func (u *CacheOnReadFs) cacheStatus(name string) (state cacheState, fi os.FileIn
 		return cacheHit, lfi, nil
 	}
 
-	if err == syscall.ENOENT {
+	if err == syscall.ENOENT || os.IsNotExist(err) {
 		return cacheMiss, nil, nil
 	}
-	var ok bool
-	if err, ok = err.(*os.PathError); ok {
-		if err == os.ErrNotExist {
-			return cacheMiss, nil, nil
-		}
-	}
+
 	return cacheMiss, nil, err
 }
 
@@ -211,7 +205,7 @@ func (u *CacheOnReadFs) OpenFile(name string, flag int, perm os.FileMode) (File,
 			bfi.Close() // oops, what if O_TRUNC was set and file opening in the layer failed...?
 			return nil, err
 		}
-		return &UnionFile{base: bfi, layer: lfi}, nil
+		return &UnionFile{Base: bfi, Layer: lfi}, nil
 	}
 	return u.layer.OpenFile(name, flag, perm)
 }
@@ -257,7 +251,7 @@ func (u *CacheOnReadFs) Open(name string) (File, error) {
 	if err != nil && bfile == nil {
 		return nil, err
 	}
-	return &UnionFile{base: bfile, layer: lfile}, nil
+	return &UnionFile{Base: bfile, Layer: lfile}, nil
 }
 
 func (u *CacheOnReadFs) Mkdir(name string, perm os.FileMode) error {
@@ -292,5 +286,5 @@ func (u *CacheOnReadFs) Create(name string) (File, error) {
 		bfh.Close()
 		return nil, err
 	}
-	return &UnionFile{base: bfh, layer: lfh}, nil
+	return &UnionFile{Base: bfh, Layer: lfh}, nil
 }

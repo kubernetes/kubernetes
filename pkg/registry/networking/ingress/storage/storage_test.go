@@ -26,22 +26,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, networking.Resource("ingresses"))
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "ingresses",
 	}
-	ingressStorage, statusStorage := NewREST(restOptions)
+	ingressStorage, statusStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return ingressStorage, statusStorage, server
 }
 
@@ -53,6 +57,7 @@ var (
 	defaultBackendPort  = intstr.FromInt(80)
 	defaultLoadBalancer = "127.0.0.1"
 	defaultPath         = "/foo"
+	defaultPathType     = networking.PathTypeImplementationSpecific
 	defaultPathMap      = map[string]string{defaultPath: defaultBackendName}
 	defaultTLS          = []networking.IngressTLS{
 		{Hosts: []string{"foo.bar.com", "*.bar.com"}, SecretName: "fooSecret"},
@@ -65,7 +70,8 @@ func toHTTPIngressPaths(pathMap map[string]string) []networking.HTTPIngressPath 
 	httpPaths := []networking.HTTPIngressPath{}
 	for path, backend := range pathMap {
 		httpPaths = append(httpPaths, networking.HTTPIngressPath{
-			Path: path,
+			Path:     path,
+			PathType: &defaultPathType,
 			Backend: networking.IngressBackend{
 				ServiceName: backend,
 				ServicePort: defaultBackendPort,
@@ -126,16 +132,16 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
 	ingress := validIngress()
-	noDefaultBackendAndRules := validIngress()
-	noDefaultBackendAndRules.Spec.Backend = &networking.IngressBackend{}
-	noDefaultBackendAndRules.Spec.Rules = []networking.IngressRule{}
+	noBackendAndRules := validIngress()
+	noBackendAndRules.Spec.Backend = &networking.IngressBackend{}
+	noBackendAndRules.Spec.Rules = []networking.IngressRule{}
 	badPath := validIngress()
 	badPath.Spec.Rules = toIngressRules(map[string]IngressRuleValues{
 		"foo.bar.com": {"/invalid[": "svc"}})
 	test.TestCreate(
 		// valid
 		ingress,
-		noDefaultBackendAndRules,
+		noBackendAndRules,
 		badPath,
 	)
 }
@@ -160,7 +166,7 @@ func TestUpdate(t *testing.T) {
 			})
 			return object
 		},
-		// invalid updateFunc: ObjeceMeta is not to be tampered with.
+		// invalid updateFunc: ObjectMeta is not to be tampered with.
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*networking.Ingress)
 			object.Name = ""

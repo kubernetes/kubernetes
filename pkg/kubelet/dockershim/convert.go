@@ -23,7 +23,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -69,7 +69,7 @@ func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
 	// Default to the image ID, but if RepoDigests is not empty, use
 	// the first digest instead.
 	imageID := DockerImageIDPrefix + id
-	if len(image.RepoDigests) > 0 {
+	if image != nil && len(image.RepoDigests) > 0 {
 		imageID = DockerPullableImageIDPrefix + image.RepoDigests[0]
 	}
 	return imageID

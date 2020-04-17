@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "event.go",
+        "event_expansion.go",
         "events_client.go",
         "generated_expansion.go",
     ],
@@ -14,7 +15,6 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/events/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",

@@ -18,12 +18,18 @@ const (
 	ElementNode
 	CommentNode
 	DoctypeNode
+	// RawNode nodes are not returned by the parser, but can be part of the
+	// Node tree passed to func Render to insert raw HTML (without escaping).
+	// If so, this package makes no guarantee that the rendered HTML is secure
+	// (from e.g. Cross Site Scripting attacks) or well-formed.
+	RawNode
 	scopeMarkerNode
 )
 
-// Section 12.2.3.3 says "scope markers are inserted when entering applet
-// elements, buttons, object elements, marquees, table cells, and table
-// captions, and are used to prevent formatting from 'leaking'".
+// Section 12.2.4.3 says "The markers are inserted when entering applet,
+// object, marquee, template, td, th, and caption elements, and are used
+// to prevent formatting from "leaking" into applet, object, marquee,
+// template, td, th, and caption elements".
 var scopeMarker = Node{Type: scopeMarkerNode}
 
 // A Node consists of a NodeType and some Data (tag name for element nodes,
@@ -173,6 +179,16 @@ func (s *nodeStack) index(n *Node) int {
 	return -1
 }
 
+// contains returns whether a is within s.
+func (s *nodeStack) contains(a atom.Atom) bool {
+	for _, n := range *s {
+		if n.DataAtom == a && n.Namespace == "" {
+			return true
+		}
+	}
+	return false
+}
+
 // insert inserts a node at the given index.
 func (s *nodeStack) insert(i int, n *Node) {
 	(*s) = append(*s, nil)
@@ -190,4 +206,20 @@ func (s *nodeStack) remove(n *Node) {
 	j := len(*s) - 1
 	(*s)[j] = nil
 	*s = (*s)[:j]
+}
+
+type insertionModeStack []insertionMode
+
+func (s *insertionModeStack) pop() (im insertionMode) {
+	i := len(*s)
+	im = (*s)[i-1]
+	*s = (*s)[:i-1]
+	return im
+}
+
+func (s *insertionModeStack) top() insertionMode {
+	if i := len(*s); i > 0 {
+		return (*s)[i-1]
+	}
+	return nil
 }

@@ -165,11 +165,9 @@ func compare(got, want []*dto.MetricFamily) error {
 metric output does not match expectation; want:
 
 %s
-
 got:
 
-%s
-`, wantBuf.String(), gotBuf.String())
+%s`, wantBuf.String(), gotBuf.String())
 
 	}
 	return nil

@@ -1,11 +1,10 @@
 /*Package filters provides tools for encoding a mapping of keys to a set of
 multiple values.
 */
-package filters
+package filters // import "github.com/docker/docker/api/types/filters"
 
 import (
 	"encoding/json"
-	"errors"
 	"regexp"
 	"strings"
 
@@ -37,39 +36,13 @@ func NewArgs(initialArgs ...KeyValuePair) Args {
 	return args
 }
 
-// ParseFlag parses a key=value string and adds it to an Args.
-//
-// Deprecated: Use Args.Add()
-func ParseFlag(arg string, prev Args) (Args, error) {
-	filters := prev
-	if len(arg) == 0 {
-		return filters, nil
+// Keys returns all the keys in list of Args
+func (args Args) Keys() []string {
+	keys := make([]string, 0, len(args.fields))
+	for k := range args.fields {
+		keys = append(keys, k)
 	}
-
-	if !strings.Contains(arg, "=") {
-		return filters, ErrBadFormat
-	}
-
-	f := strings.SplitN(arg, "=", 2)
-
-	name := strings.ToLower(strings.TrimSpace(f[0]))
-	value := strings.TrimSpace(f[1])
-
-	filters.Add(name, value)
-
-	return filters, nil
-}
-
-// ErrBadFormat is an error returned when a filter is not in the form key=value
-//
-// Deprecated: this error will be removed in a future version
-var ErrBadFormat = errors.New("bad format of filter (expected name=value)")
-
-// ToParam encodes the Args as args JSON encoded string
-//
-// Deprecated: use ToJSON
-func ToParam(a Args) (string, error) {
-	return ToJSON(a)
+	return keys
 }
 
 // MarshalJSON returns a JSON byte representation of the Args
@@ -105,13 +78,6 @@ func ToParamWithVersion(version string, a Args) (string, error) {
 	}
 
 	return ToJSON(a)
-}
-
-// FromParam decodes a JSON encoded string into Args
-//
-// Deprecated: use FromJSON
-func FromParam(p string) (Args, error) {
-	return FromJSON(p)
 }
 
 // FromJSON decodes a JSON encoded string into Args
@@ -275,14 +241,6 @@ func (args Args) FuzzyMatch(key, source string) bool {
 	return false
 }
 
-// Include returns true if the key exists in the mapping
-//
-// Deprecated: use Contains
-func (args Args) Include(field string) bool {
-	_, ok := args.fields[field]
-	return ok
-}
-
 // Contains returns true if the key exists in the mapping
 func (args Args) Contains(field string) bool {
 	_, ok := args.fields[field]
@@ -321,6 +279,22 @@ func (args Args) WalkValues(field string, op func(value string) error) error {
 		}
 	}
 	return nil
+}
+
+// Clone returns a copy of args.
+func (args Args) Clone() (newArgs Args) {
+	newArgs.fields = make(map[string]map[string]bool, len(args.fields))
+	for k, m := range args.fields {
+		var mm map[string]bool
+		if m != nil {
+			mm = make(map[string]bool, len(m))
+			for kk, v := range m {
+				mm[kk] = v
+			}
+		}
+		newArgs.fields[k] = mm
+	}
+	return newArgs
 }
 
 func deprecatedArgs(d map[string][]string) map[string]map[string]bool {

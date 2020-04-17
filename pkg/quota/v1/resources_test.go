@@ -17,6 +17,7 @@ limitations under the License.
 package quota
 
 import (
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -316,6 +317,96 @@ func TestIsNegative(t *testing.T) {
 		expectedSet := ToSet(testCase.expected)
 		if !actualSet.Equal(expectedSet) {
 			t.Errorf("%s expected: %v, actual: %v", testName, expectedSet, actualSet)
+		}
+	}
+}
+
+func TestIntersection(t *testing.T) {
+	testCases := map[string]struct {
+		a        []corev1.ResourceName
+		b        []corev1.ResourceName
+		expected []corev1.ResourceName
+	}{
+		"empty": {
+			a:        []corev1.ResourceName{},
+			b:        []corev1.ResourceName{},
+			expected: []corev1.ResourceName{},
+		},
+		"equal": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			b:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			expected: []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+		},
+		"a has extra": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			b:        []corev1.ResourceName{corev1.ResourceCPU},
+			expected: []corev1.ResourceName{corev1.ResourceCPU},
+		},
+		"b has extra": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU},
+			b:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			expected: []corev1.ResourceName{corev1.ResourceCPU},
+		},
+		"dedupes": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceMemory},
+			b:        []corev1.ResourceName{corev1.ResourceCPU},
+			expected: []corev1.ResourceName{corev1.ResourceCPU},
+		},
+		"sorts": {
+			a:        []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceMemory, corev1.ResourceCPU, corev1.ResourceCPU},
+			b:        []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceMemory, corev1.ResourceCPU, corev1.ResourceCPU},
+			expected: []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+		},
+	}
+	for testName, testCase := range testCases {
+		actual := Intersection(testCase.a, testCase.b)
+		if !reflect.DeepEqual(actual, testCase.expected) {
+			t.Errorf("%s expected: %#v, actual: %#v", testName, testCase.expected, actual)
+		}
+	}
+}
+
+func TestDifference(t *testing.T) {
+	testCases := map[string]struct {
+		a        []corev1.ResourceName
+		b        []corev1.ResourceName
+		expected []corev1.ResourceName
+	}{
+		"empty": {
+			a:        []corev1.ResourceName{},
+			b:        []corev1.ResourceName{},
+			expected: []corev1.ResourceName{},
+		},
+		"equal": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			b:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			expected: []corev1.ResourceName{},
+		},
+		"a has extra": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			b:        []corev1.ResourceName{corev1.ResourceCPU},
+			expected: []corev1.ResourceName{corev1.ResourceMemory},
+		},
+		"b has extra": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU},
+			b:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+			expected: []corev1.ResourceName{},
+		},
+		"dedupes": {
+			a:        []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceMemory},
+			b:        []corev1.ResourceName{corev1.ResourceCPU},
+			expected: []corev1.ResourceName{corev1.ResourceMemory},
+		},
+		"sorts": {
+			a:        []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceMemory, corev1.ResourceCPU, corev1.ResourceCPU},
+			b:        []corev1.ResourceName{},
+			expected: []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory},
+		},
+	}
+	for testName, testCase := range testCases {
+		actual := Difference(testCase.a, testCase.b)
+		if !reflect.DeepEqual(actual, testCase.expected) {
+			t.Errorf("%s expected: %#v, actual: %#v", testName, testCase.expected, actual)
 		}
 	}
 }

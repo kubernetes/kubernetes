@@ -243,7 +243,7 @@ func Example_minifyAndShorten() {
 	//     LocationOfOrigin: ""
 	//     client-certificate-data: REDACTED
 	//     client-key-data: REDACTED
-	//     token: red-token
+	//     token: REDACTED
 }
 
 func TestShortenSuccess(t *testing.T) {
@@ -298,5 +298,8 @@ func TestShortenSuccess(t *testing.T) {
 	}
 	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData) != redacted {
 		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
+	}
+	if mutatingConfig.AuthInfos[changingAuthInfo].Token != "REDACTED" {
+		t.Errorf("expected REDACTED, got %v", mutatingConfig.AuthInfos[changingAuthInfo].Token)
 	}
 }

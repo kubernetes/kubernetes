@@ -16,6 +16,8 @@ limitations under the License.
 
 package cm
 
+// ContainerManager is an interface that abstracts the basic operations of a
+// container manager.
 type ContainerManager interface {
 	Start() error
 }

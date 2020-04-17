@@ -20,16 +20,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
+
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -136,18 +133,18 @@ func scsiHostRescan(io ioHandler) {
 func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
 		w := strings.Join(wwns, "-")
-		return path.Join(host.GetPluginDir(fcPluginName), w+"-lun-"+lun)
+		return filepath.Join(host.GetPluginDir(fcPluginName), w+"-lun-"+lun)
 	}
-	return path.Join(host.GetPluginDir(fcPluginName), strings.Join(wwids, "-"))
+	return filepath.Join(host.GetPluginDir(fcPluginName), strings.Join(wwids, "-"))
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/volumeDevices/target-lun-0
 func makeVDPDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
 		w := strings.Join(wwns, "-")
-		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), w+"-lun-"+lun)
+		return filepath.Join(host.GetVolumeDevicePluginDir(fcPluginName), w+"-lun-"+lun)
 	}
-	return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), strings.Join(wwids, "-"))
+	return filepath.Join(host.GetVolumeDevicePluginDir(fcPluginName), strings.Join(wwids, "-"))
 }
 
 func parsePDName(path string) (wwns []string, lun int32, wwids []string, err error) {
@@ -243,37 +240,8 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		// If the volumeMode is 'Block', plugin don't have to format the volume.
-		// The globalPDPath will be created by operationexecutor. Just return devicePath here.
-		klog.V(5).Infof("fc: AttachDisk volumeMode: %s, devicePath: %s", b.volumeMode, devicePath)
-		if b.volumeMode == v1.PersistentVolumeBlock {
-			return devicePath, nil
-		}
-	}
 
-	// mount it
-	globalPDPath := util.MakeGlobalPDName(*b.fcDisk)
-	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		return devicePath, fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
-	}
-
-	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
-	if err != nil {
-		return devicePath, fmt.Errorf("Heuristic determination of mount point failed:%v", err)
-	}
-	if !noMnt {
-		klog.Infof("fc: %s already mounted", globalPDPath)
-		return devicePath, nil
-	}
-
-	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
-	if err != nil {
-		return devicePath, fmt.Errorf("fc: failed to mount fc volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
-	}
-
-	return devicePath, err
+	return devicePath, nil
 }
 
 // DetachDisk removes scsi device file such as /dev/sdX from the node.
@@ -360,7 +328,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	for _, fi := range fis {
 		if strings.Contains(fi.Name(), volumeInfo) {
-			devicePath = path.Join(searchPath, fi.Name())
+			devicePath = filepath.Join(searchPath, fi.Name())
 			klog.V(5).Infof("fc: updated devicePath: %s", devicePath)
 			break
 		}

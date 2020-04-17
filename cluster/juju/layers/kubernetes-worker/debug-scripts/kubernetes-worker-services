@@ -1,9 +1,0 @@
-#!/bin/sh
-set -ux
-
-for service in kubelet kube-proxy; do
-  systemctl status snap.$service.daemon > $DEBUG_SCRIPT_DIR/$service-systemctl-status
-  journalctl -u snap.$service.daemon > $DEBUG_SCRIPT_DIR/$service-journal
-done
-
-# FIXME: get the snap config or something

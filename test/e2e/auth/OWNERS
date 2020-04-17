@@ -12,3 +12,5 @@ approvers:
   - smarterclayton
   - sttts
   - tallclair
+labels:
+- sig/auth

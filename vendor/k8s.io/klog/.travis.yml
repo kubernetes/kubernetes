@@ -1,14 +1,16 @@
 language: go
+go_import_path: k8s.io/klog
 dist: xenial
 go:
   - 1.9.x
   - 1.10.x
   - 1.11.x
+  - 1.12.x
 script:
   - go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d .)
   - diff -u <(echo -n) <(golint $(go list -e ./...))
-  - go tool vet .
+  - go tool vet . || go vet .
   - go test -v -race ./...
 install:
   - go get golang.org/x/lint/golint

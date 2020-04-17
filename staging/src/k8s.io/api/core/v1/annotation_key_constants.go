@@ -48,6 +48,22 @@ const (
 	// SeccompProfileRuntimeDefault represents the default seccomp profile used by container runtime.
 	SeccompProfileRuntimeDefault string = "runtime/default"
 
+	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	AppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
+	// AppArmorBetaDefaultProfileAnnotatoinKey is the annotation key specifying the default AppArmor profile.
+	AppArmorBetaDefaultProfileAnnotationKey = "apparmor.security.beta.kubernetes.io/defaultProfileName"
+	// AppArmorBetaAllowedProfileAnnotationKey is the annotation key specifying the allowed AppArmor profiles.
+	AppArmorBetaAllowedProfilesAnnotationKey = "apparmor.security.beta.kubernetes.io/allowedProfileNames"
+
+	// AppArmorBetaProfileRuntimeDefault is the profile specifying the runtime default.
+	AppArmorBetaProfileRuntimeDefault = "runtime/default"
+
+	// AppArmorBetaProfileNamePrefix is the prefix for specifying profiles loaded on the node.
+	AppArmorBetaProfileNamePrefix = "localhost/"
+
+	// AppArmorBetaProfileNameUnconfined is the Unconfined AppArmor profile
+	AppArmorBetaProfileNameUnconfined = "unconfined"
+
 	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
 	// This is now deprecated and should be replaced by SeccompProfileRuntimeDefault.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
@@ -97,4 +113,10 @@ const (
 	// This annotation will be used to compute the in-cluster network programming latency SLI, see
 	// https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
 	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
+
+	// MigratedPluginsAnnotationKey is the annotation key, set for CSINode objects, that is a comma-separated
+	// list of in-tree plugins that will be serviced by the CSI backend on the Node represented by CSINode.
+	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or
+	// CSI Backend for a volume plugin on a specific node.
+	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
 )

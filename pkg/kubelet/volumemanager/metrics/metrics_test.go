@@ -27,6 +27,7 @@ import (
 
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
 func TestMetricCollection(t *testing.T) {
@@ -77,13 +78,22 @@ func TestMetricCollection(t *testing.T) {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	err = asw.AddPodToVolume(
-		podName, pod.UID, generatedVolumeName, mounter, mapper, volumeSpec.Name(), "", volumeSpec)
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          generatedVolumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+		VolumeMountState:    operationexecutor.VolumeMounted,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	metricCollector := &totalVolumesCollector{asw, dsw, volumePluginMgr}
+	metricCollector := &totalVolumesCollector{asw: asw, dsw: dsw, pluginMgr: volumePluginMgr}
 
 	// Check if getVolumeCount returns correct data
 	count := metricCollector.getVolumeCount()

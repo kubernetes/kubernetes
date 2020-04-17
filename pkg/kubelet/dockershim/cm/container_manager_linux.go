@@ -31,26 +31,30 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 const (
-	// The percent of the machine memory capacity.
-	dockerMemoryLimitThresholdPercent = kubecm.DockerMemoryLimitThresholdPercent
+	// The percent of the machine memory capacity. The value is used to calculate
+	// docker memory resource container's hardlimit to workaround docker memory
+	// leakage issue. Please see kubernetes/issues/9881 for more detail.
+	dockerMemoryLimitThresholdPercent = 70
 
-	// The minimum memory limit allocated to docker container.
-	minDockerMemoryLimit = kubecm.MinDockerMemoryLimit
+	// The minimum memory limit allocated to docker container: 150Mi
+	minDockerMemoryLimit = 150 * 1024 * 1024
 
-	// The Docker OOM score adjustment.
-	dockerOOMScoreAdj = qos.DockerOOMScoreAdj
+	// The OOM score adjustment for the docker process (i.e. the docker
+	// daemon). Essentially, makes docker very unlikely to experience an oom
+	// kill.
+	dockerOOMScoreAdj = -999
 )
 
 var (
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 )
 
+// NewContainerManager creates a new instance of ContainerManager
 func NewContainerManager(cgroupsName string, client libdocker.Interface) ContainerManager {
 	return &containerManager{
 		cgroupsName: cgroupsName,

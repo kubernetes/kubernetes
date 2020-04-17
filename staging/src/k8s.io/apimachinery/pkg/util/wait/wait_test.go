@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -531,7 +532,7 @@ func TestWaitForWithEarlyClosingWaitFunc(t *testing.T) {
 	}, func() (bool, error) {
 		return false, nil
 	}, stopCh)
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 
 	// The WaitFor should return immediately, so the duration is close to 0s.
 	if duration >= ForeverTestTimeout/2 {
@@ -555,7 +556,7 @@ func TestWaitForWithClosedChannel(t *testing.T) {
 	}, func() (bool, error) {
 		return false, nil
 	}, stopCh)
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	// The WaitFor should return immediately, so the duration is close to 0s.
 	if duration >= ForeverTestTimeout/2 {
 		t.Errorf("expected short timeout duration")
@@ -662,5 +663,71 @@ func TestBackoff_Step(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestContextForChannel(t *testing.T) {
+	var wg sync.WaitGroup
+	parentCh := make(chan struct{})
+	done := make(chan struct{})
+
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := contextForChannel(parentCh)
+			defer cancel()
+			<-ctx.Done()
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// Closing parent channel should cancel all children contexts
+	close(parentCh)
+
+	select {
+	case <-done:
+	case <-time.After(ForeverTestTimeout):
+		t.Errorf("unexepcted timeout waiting for parent to cancel child contexts")
+	}
+}
+
+func TestExponentialBackoffManagerGetNextBackoff(t *testing.T) {
+	fc := clock.NewFakeClock(time.Now())
+	backoff := NewExponentialBackoffManager(1, 10, 10, 2.0, 0.0, fc)
+	durations := []time.Duration{1, 2, 4, 8, 10, 10, 10}
+	for i := 0; i < len(durations); i++ {
+		generatedBackoff := backoff.(*exponentialBackoffManagerImpl).getNextBackoff()
+		if generatedBackoff != durations[i] {
+			t.Errorf("unexpected %d-th backoff: %d, expecting %d", i, generatedBackoff, durations[i])
+		}
+	}
+
+	fc.Step(11)
+	resetDuration := backoff.(*exponentialBackoffManagerImpl).getNextBackoff()
+	if resetDuration != 1 {
+		t.Errorf("after reset, backoff should be 1, but got %d", resetDuration)
+	}
+}
+
+func TestJitteredBackoffManagerGetNextBackoff(t *testing.T) {
+	// positive jitter
+	backoffMgr := NewJitteredBackoffManager(1, 1, clock.NewFakeClock(time.Now()))
+	for i := 0; i < 5; i++ {
+		backoff := backoffMgr.(*jitteredBackoffManagerImpl).getNextBackoff()
+		if backoff < 1 || backoff > 2 {
+			t.Errorf("backoff out of range: %d", backoff)
+		}
+	}
+
+	// negative jitter, shall be a fixed backoff
+	backoffMgr = NewJitteredBackoffManager(1, -1, clock.NewFakeClock(time.Now()))
+	backoff := backoffMgr.(*jitteredBackoffManagerImpl).getNextBackoff()
+	if backoff != 1 {
+		t.Errorf("backoff should be 1, but got %d", backoff)
 	}
 }

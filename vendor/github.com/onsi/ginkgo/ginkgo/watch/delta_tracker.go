@@ -3,6 +3,8 @@ package watch
 import (
 	"fmt"
 
+	"regexp"
+
 	"github.com/onsi/ginkgo/ginkgo/testsuite"
 )
 
@@ -10,14 +12,16 @@ type SuiteErrors map[testsuite.TestSuite]error
 
 type DeltaTracker struct {
 	maxDepth      int
+	watchRegExp   *regexp.Regexp
 	suites        map[string]*Suite
 	packageHashes *PackageHashes
 }
 
-func NewDeltaTracker(maxDepth int) *DeltaTracker {
+func NewDeltaTracker(maxDepth int, watchRegExp *regexp.Regexp) *DeltaTracker {
 	return &DeltaTracker{
 		maxDepth:      maxDepth,
-		packageHashes: NewPackageHashes(),
+		watchRegExp:   watchRegExp,
+		packageHashes: NewPackageHashes(watchRegExp),
 		suites:        map[string]*Suite{},
 	}
 }

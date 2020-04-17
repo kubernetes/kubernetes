@@ -35,6 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/sample-apiserver/hack:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle:all-srcs",
@@ -44,6 +45,7 @@ filegroup(
         "//staging/src/k8s.io/sample-apiserver/pkg/generated/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/generated/listers/wardle/v1alpha1:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/generated/listers/wardle/v1beta1:all-srcs",
+        "//staging/src/k8s.io/sample-apiserver/pkg/generated/openapi:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/registry:all-srcs",
     ],
     tags = ["automanaged"],

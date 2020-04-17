@@ -18,23 +18,20 @@ package upgrade
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
-	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-)
-
-const (
-	validConfig = `apiVersion: kubeadm.k8s.io/v1beta1
-kind: ClusterConfiguration
-kubernetesVersion: 1.13.0
-`
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestGetK8sVersionFromUserInput(t *testing.T) {
+	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
+	validConfig := "apiVersion: kubeadm.k8s.io/v1beta2\n" +
+		"kind: ClusterConfiguration\n" +
+		"kubernetesVersion: " + currentVersion
+
 	var tcases = []struct {
 		name               string
 		isVersionMandatory bool
@@ -64,7 +61,7 @@ func TestGetK8sVersionFromUserInput(t *testing.T) {
 			name:               "Valid config, but no version specified",
 			isVersionMandatory: true,
 			clusterConfig:      validConfig,
-			expectedVersion:    "v1.13.0",
+			expectedVersion:    currentVersion,
 		},
 		{
 			name:               "Valid config and different version specified",
@@ -77,17 +74,25 @@ func TestGetK8sVersionFromUserInput(t *testing.T) {
 			name: "Version is optional",
 		},
 	}
-	for tnum, tt := range tcases {
+	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
 			flags := &applyPlanFlags{}
 			if len(tt.clusterConfig) > 0 {
-				tmpfile := fmt.Sprintf("/tmp/kubeadm-upgrade-common-test-%d-%d.yaml", tnum, time.Now().Unix())
-				if err := ioutil.WriteFile(tmpfile, []byte(tt.clusterConfig), 0666); err != nil {
+				file, err := ioutil.TempFile("", "kubeadm-upgrade-common-test-*.yaml")
+				if err != nil {
 					t.Fatalf("Failed to create test config file: %+v", err)
 				}
-				defer os.Remove(tmpfile)
 
-				flags.cfgPath = tmpfile
+				tmpFileName := file.Name()
+				defer os.Remove(tmpFileName)
+
+				_, err = file.WriteString(tt.clusterConfig)
+				file.Close()
+				if err != nil {
+					t.Fatalf("Failed to write test config file contents: %+v", err)
+				}
+
+				flags.cfgPath = tmpFileName
 			}
 
 			userVersion, err := getK8sVersionFromUserInput(flags, tt.args, tt.isVersionMandatory)
@@ -99,7 +104,7 @@ func TestGetK8sVersionFromUserInput(t *testing.T) {
 				t.Errorf("Unexpected error: %+v", err)
 			}
 			if userVersion != tt.expectedVersion {
-				t.Errorf("Expected '%s', but got '%s'", tt.expectedVersion, userVersion)
+				t.Errorf("Expected %q, but got %q", tt.expectedVersion, userVersion)
 			}
 		})
 	}
@@ -173,22 +178,16 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
-	certificatesDir: ""
-	controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1beta2
 	controllerManager: {}
 	dns:
 	  type: CoreDNS
 	etcd:
 	  local:
 	    dataDir: /some/path
-	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
-	networking:
-	  dnsDomain: ""
-	  podSubnet: ""
-	  serviceSubnet: ""
+	networking: {}
 	scheduler: {}
 `),
 		},
@@ -210,9 +209,7 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
-	certificatesDir: ""
-	controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1beta2
 	controllerManager: {}
 	dns:
 	  type: CoreDNS
@@ -223,12 +220,9 @@ func TestPrintConfiguration(t *testing.T) {
 	    endpoints:
 	    - https://one-etcd-instance:2379
 	    keyFile: ""
-	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
 	networking:
-	  dnsDomain: ""
-	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
 	scheduler: {}
 `),

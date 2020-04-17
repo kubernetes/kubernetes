@@ -15,7 +15,7 @@ import (
 // The matrix Q is represented as a product of elementary reflectors
 //  Q = H_0 H_1 . . . H_{k-1}, where k = min(m,n).
 // Each H_i has the form
-//  H_i = I - tau * v * v^T
+//  H_i = I - tau * v * vᵀ
 // where tau and v are real vectors with v[0:i-1] = 0 and v[i] = 1;
 // v[i:m] is stored on exit in A[i:m, i], and tau in tau[i].
 //
@@ -45,38 +45,50 @@ func (impl Implementation) Dgeqp3(m, n int, a []float64, lda int, jpvt []int, ta
 		inbmin = 2
 		ixover = 3
 	)
-	checkMatrix(m, n, a, lda)
 
-	if len(jpvt) != n {
-		panic(badIpiv)
-	}
-	for _, v := range jpvt {
-		if v < -1 || n <= v {
-			panic("lapack: jpvt element out of range")
-		}
-	}
 	minmn := min(m, n)
-	if len(work) < max(1, lwork) {
-		panic(badWork)
-	}
-
-	var iws, lwkopt, nb int
+	iws := 3*n + 1
 	if minmn == 0 {
 		iws = 1
-		lwkopt = 1
-	} else {
-		iws = 3*n + 1
-		nb = impl.Ilaenv(inb, "DGEQRF", " ", m, n, -1, -1)
-		lwkopt = 2*n + (n+1)*nb
 	}
-	work[0] = float64(lwkopt)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case lwork < iws && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
+	}
 
-	if lwork == -1 {
+	// Quick return if possible.
+	if minmn == 0 {
+		work[0] = 1
 		return
 	}
 
-	if len(tau) < minmn {
-		panic(badTau)
+	nb := impl.Ilaenv(inb, "DGEQRF", " ", m, n, -1, -1)
+	if lwork == -1 {
+		work[0] = float64(2*n + (n+1)*nb)
+		return
+	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(jpvt) != n:
+		panic(badLenJpvt)
+	case len(tau) < minmn:
+		panic(shortTau)
+	}
+
+	for _, v := range jpvt {
+		if v < -1 || n <= v {
+			panic(badJpvt)
+		}
 	}
 
 	bi := blas64.Implementation()

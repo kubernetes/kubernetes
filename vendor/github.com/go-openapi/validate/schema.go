@@ -27,8 +27,8 @@ import (
 var (
 	specSchemaType    = reflect.TypeOf(&spec.Schema{})
 	specParameterType = reflect.TypeOf(&spec.Parameter{})
-	specItemsType     = reflect.TypeOf(&spec.Items{})
 	specHeaderType    = reflect.TypeOf(&spec.Header{})
+	//specItemsType     = reflect.TypeOf(&spec.Items{})
 )
 
 // SchemaValidator validates data against a JSON schema
@@ -39,13 +39,14 @@ type SchemaValidator struct {
 	validators   []valueValidator
 	Root         interface{}
 	KnownFormats strfmt.Registry
+	Options      SchemaValidatorOptions
 }
 
 // AgainstSchema validates the specified data against the provided schema, using a registry of supported formats.
 //
 // When no pre-parsed *spec.Schema structure is provided, it uses a JSON schema as default. See example.
-func AgainstSchema(schema *spec.Schema, data interface{}, formats strfmt.Registry) error {
-	res := NewSchemaValidator(schema, nil, "", formats).Validate(data)
+func AgainstSchema(schema *spec.Schema, data interface{}, formats strfmt.Registry, options ...Option) error {
+	res := NewSchemaValidator(schema, nil, "", formats, options...).Validate(data)
 	if res.HasErrors() {
 		return errors.CompositeValidationError(res.Errors...)
 	}
@@ -55,7 +56,7 @@ func AgainstSchema(schema *spec.Schema, data interface{}, formats strfmt.Registr
 // NewSchemaValidator creates a new schema validator.
 //
 // Panics if the provided schema is invalid.
-func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry) *SchemaValidator {
+func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry, options ...Option) *SchemaValidator {
 	if schema == nil {
 		return nil
 	}
@@ -71,7 +72,16 @@ func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string
 			panic(msg)
 		}
 	}
-	s := SchemaValidator{Path: root, in: "body", Schema: schema, Root: rootSchema, KnownFormats: formats}
+	s := SchemaValidator{
+		Path:         root,
+		in:           "body",
+		Schema:       schema,
+		Root:         rootSchema,
+		KnownFormats: formats,
+		Options:      SchemaValidatorOptions{}}
+	for _, o := range options {
+		o(&s.Options)
+	}
 	s.validators = []valueValidator{
 		s.typeValidator(),
 		s.schemaPropsValidator(),
@@ -130,9 +140,9 @@ func (s *SchemaValidator) Validate(data interface{}) *Result {
 
 	// TODO: this part should be handed over to type validator
 	// Handle special case of json.Number data (number marshalled as string)
-	isnumber := s.Schema.Type.Contains("number") || s.Schema.Type.Contains("integer")
+	isnumber := s.Schema.Type.Contains(numberType) || s.Schema.Type.Contains(integerType)
 	if num, ok := data.(json.Number); ok && isnumber {
-		if s.Schema.Type.Contains("integer") { // avoid lossy conversion
+		if s.Schema.Type.Contains(integerType) { // avoid lossy conversion
 			in, erri := num.Int64()
 			if erri != nil {
 				result.AddErrors(invalidTypeConversionMsg(s.Path, erri))
@@ -170,7 +180,7 @@ func (s *SchemaValidator) Validate(data interface{}) *Result {
 }
 
 func (s *SchemaValidator) typeValidator() valueValidator {
-	return &typeValidator{Type: s.Schema.Type, Format: s.Schema.Format, In: s.in, Path: s.Path}
+	return &typeValidator{Type: s.Schema.Type, Nullable: s.Schema.Nullable, Format: s.Schema.Format, In: s.in, Path: s.Path}
 }
 
 func (s *SchemaValidator) commonValidator() valueValidator {
@@ -192,6 +202,7 @@ func (s *SchemaValidator) sliceValidator() valueValidator {
 		Items:           s.Schema.Items,
 		Root:            s.Root,
 		KnownFormats:    s.KnownFormats,
+		Options:         s.Options,
 	}
 }
 
@@ -229,7 +240,7 @@ func (s *SchemaValidator) formatValidator() valueValidator {
 
 func (s *SchemaValidator) schemaPropsValidator() valueValidator {
 	sch := s.Schema
-	return newSchemaPropsValidator(s.Path, s.in, sch.AllOf, sch.OneOf, sch.AnyOf, sch.Not, sch.Dependencies, s.Root, s.KnownFormats)
+	return newSchemaPropsValidator(s.Path, s.in, sch.AllOf, sch.OneOf, sch.AnyOf, sch.Not, sch.Dependencies, s.Root, s.KnownFormats, s.Options.Options()...)
 }
 
 func (s *SchemaValidator) objectValidator() valueValidator {
@@ -244,5 +255,6 @@ func (s *SchemaValidator) objectValidator() valueValidator {
 		PatternProperties:    s.Schema.PatternProperties,
 		Root:                 s.Root,
 		KnownFormats:         s.KnownFormats,
+		Options:              s.Options,
 	}
 }

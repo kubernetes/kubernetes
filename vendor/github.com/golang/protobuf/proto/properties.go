@@ -38,7 +38,6 @@ package proto
 import (
 	"fmt"
 	"log"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -139,7 +138,7 @@ type Properties struct {
 	Repeated bool
 	Packed   bool   // relevant for repeated primitives only
 	Enum     string // set for enum types only
-	proto3   bool   // whether this is known to be a proto3 field; set for []byte only
+	proto3   bool   // whether this is known to be a proto3 field
 	oneof    bool   // whether this is a oneof field
 
 	Default    string // default value
@@ -148,9 +147,9 @@ type Properties struct {
 	stype reflect.Type      // set for struct types only
 	sprop *StructProperties // set for struct types only
 
-	mtype    reflect.Type // set for map types only
-	mkeyprop *Properties  // set for map types only
-	mvalprop *Properties  // set for map types only
+	mtype      reflect.Type // set for map types only
+	MapKeyProp *Properties  // set for map types only
+	MapValProp *Properties  // set for map types only
 }
 
 // String formats the properties in the protobuf struct field tag style.
@@ -194,7 +193,7 @@ func (p *Properties) Parse(s string) {
 	// "bytes,49,opt,name=foo,def=hello!"
 	fields := strings.Split(s, ",") // breaks def=, but handled below.
 	if len(fields) < 2 {
-		fmt.Fprintf(os.Stderr, "proto: tag has too few fields: %q\n", s)
+		log.Printf("proto: tag has too few fields: %q", s)
 		return
 	}
 
@@ -214,7 +213,7 @@ func (p *Properties) Parse(s string) {
 		p.WireType = WireBytes
 		// no numeric converter for non-numeric types
 	default:
-		fmt.Fprintf(os.Stderr, "proto: tag has unknown wire type: %q\n", s)
+		log.Printf("proto: tag has unknown wire type: %q", s)
 		return
 	}
 
@@ -275,16 +274,16 @@ func (p *Properties) setFieldProps(typ reflect.Type, f *reflect.StructField, loc
 
 	case reflect.Map:
 		p.mtype = t1
-		p.mkeyprop = &Properties{}
-		p.mkeyprop.init(reflect.PtrTo(p.mtype.Key()), "Key", f.Tag.Get("protobuf_key"), nil, lockGetProp)
-		p.mvalprop = &Properties{}
+		p.MapKeyProp = &Properties{}
+		p.MapKeyProp.init(reflect.PtrTo(p.mtype.Key()), "Key", f.Tag.Get("protobuf_key"), nil, lockGetProp)
+		p.MapValProp = &Properties{}
 		vtype := p.mtype.Elem()
 		if vtype.Kind() != reflect.Ptr && vtype.Kind() != reflect.Slice {
 			// The value type is not a message (*T) or bytes ([]byte),
 			// so we need encoders for the pointer to this type.
 			vtype = reflect.PtrTo(vtype)
 		}
-		p.mvalprop.init(vtype, "Value", f.Tag.Get("protobuf_val"), nil, lockGetProp)
+		p.MapValProp.init(vtype, "Value", f.Tag.Get("protobuf_val"), nil, lockGetProp)
 	}
 
 	if p.stype != nil {
@@ -334,9 +333,6 @@ func GetProperties(t reflect.Type) *StructProperties {
 	sprop, ok := propertiesMap[t]
 	propertiesMu.RUnlock()
 	if ok {
-		if collectStats {
-			stats.Chit++
-		}
 		return sprop
 	}
 
@@ -346,16 +342,19 @@ func GetProperties(t reflect.Type) *StructProperties {
 	return sprop
 }
 
+type (
+	oneofFuncsIface interface {
+		XXX_OneofFuncs() (func(Message, *Buffer) error, func(Message, int, int, *Buffer) (bool, error), func(Message) int, []interface{})
+	}
+	oneofWrappersIface interface {
+		XXX_OneofWrappers() []interface{}
+	}
+)
+
 // getPropertiesLocked requires that propertiesMu is held.
 func getPropertiesLocked(t reflect.Type) *StructProperties {
 	if prop, ok := propertiesMap[t]; ok {
-		if collectStats {
-			stats.Chit++
-		}
 		return prop
-	}
-	if collectStats {
-		stats.Cmiss++
 	}
 
 	prop := new(StructProperties)
@@ -391,13 +390,14 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 	// Re-order prop.order.
 	sort.Sort(prop)
 
-	type oneofMessage interface {
-		XXX_OneofFuncs() (func(Message, *Buffer) error, func(Message, int, int, *Buffer) (bool, error), func(Message) int, []interface{})
+	var oots []interface{}
+	switch m := reflect.Zero(reflect.PtrTo(t)).Interface().(type) {
+	case oneofFuncsIface:
+		_, _, _, oots = m.XXX_OneofFuncs()
+	case oneofWrappersIface:
+		oots = m.XXX_OneofWrappers()
 	}
-	if om, ok := reflect.Zero(reflect.PtrTo(t)).Interface().(oneofMessage); ok {
-		var oots []interface{}
-		_, _, _, oots = om.XXX_OneofFuncs()
-
+	if len(oots) > 0 {
 		// Interpret oneof metadata.
 		prop.OneofTypes = make(map[string]*OneofProperties)
 		for _, oot := range oots {

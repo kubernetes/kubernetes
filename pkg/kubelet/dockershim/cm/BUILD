@@ -16,7 +16,13 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/cm",
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/kubelet/cm:go_default_library",
             "//pkg/kubelet/dockershim/libdocker:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "//pkg/kubelet/dockershim/libdocker:go_default_library",
@@ -27,10 +33,12 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//pkg/kubelet/dockershim/libdocker:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm:go_default_library",
             "//pkg/kubelet/dockershim/libdocker:go_default_library",
-            "//pkg/kubelet/qos:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",

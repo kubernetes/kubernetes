@@ -315,17 +315,17 @@ func usePlusEqual(f *build.File) bool {
 		if !ok || len(call.List) != 1 {
 			continue
 		}
-		obj, ok := dot.X.(*build.LiteralExpr)
+		obj, ok := dot.X.(*build.Ident)
 		if !ok {
 			continue
 		}
 
-		var fix *build.BinaryExpr
+		var fix *build.AssignExpr
 		if dot.Name == "extend" {
-			fix = &build.BinaryExpr{X: obj, Op: "+=", Y: call.List[0]}
+			fix = &build.AssignExpr{LHS: obj, Op: "+=", RHS: call.List[0]}
 		} else if dot.Name == "append" {
 			list := &build.ListExpr{List: []build.Expr{call.List[0]}}
-			fix = &build.BinaryExpr{X: obj, Op: "+=", Y: list}
+			fix = &build.AssignExpr{LHS: obj, Op: "+=", RHS: list}
 		} else {
 			continue
 		}
@@ -340,13 +340,17 @@ func isNonemptyComment(comment *build.Comments) bool {
 	return len(comment.Before)+len(comment.Suffix)+len(comment.After) > 0
 }
 
-// Checks whether a call or any of its arguments have a comment
-func hasComment(call *build.CallExpr) bool {
-	if isNonemptyComment(call.Comment()) {
+// Checks whether a load statement or any of its arguments have a comment
+func hasComment(load *build.LoadStmt) bool {
+	if isNonemptyComment(load.Comment()) {
 		return true
 	}
-	for _, arg := range call.List {
-		if isNonemptyComment(arg.Comment()) {
+	if isNonemptyComment(load.Module.Comment()) {
+		return true
+	}
+
+	for i := range load.From {
+		if isNonemptyComment(load.From[i].Comment()) || isNonemptyComment(load.To[i].Comment()) {
 			return true
 		}
 	}
@@ -357,62 +361,41 @@ func hasComment(call *build.CallExpr) bool {
 // It also cleans symbols loaded multiple times, sorts symbol list, and removes load
 // statements when the list is empty.
 func cleanUnusedLoads(f *build.File) bool {
-	// If the file needs preprocessing, leave it alone.
-	for _, stmt := range f.Stmt {
-		if _, ok := stmt.(*build.PythonBlock); ok {
-			return false
-		}
-	}
 	symbols := UsedSymbols(f)
 	fixed := false
 
 	var all []build.Expr
 	for _, stmt := range f.Stmt {
-		rule, ok := ExprToRule(stmt, "load")
-		if !ok || len(rule.Call.List) == 0 || hasComment(rule.Call) {
+		load, ok := stmt.(*build.LoadStmt)
+		if !ok || hasComment(load) {
 			all = append(all, stmt)
 			continue
 		}
-		var args []build.Expr
-		for _, arg := range rule.Call.List[1:] { // first argument is the path, we keep it
-			symbol, ok := loadedSymbol(arg)
-			if !ok || symbols[symbol] {
-				args = append(args, arg)
-				if ok {
-					// If the same symbol is loaded twice, we'll remove it.
-					delete(symbols, symbol)
-				}
+		var fromSymbols, toSymbols []*build.Ident
+		for i := range load.From {
+			fromSymbol := load.From[i]
+			toSymbol := load.To[i]
+			if symbols[toSymbol.Name] {
+				// The symbol is actually used
+				fromSymbols = append(fromSymbols, fromSymbol)
+				toSymbols = append(toSymbols, toSymbol)
+				// If the same symbol is loaded twice, we'll remove it.
+				delete(symbols, toSymbol.Name)
 			} else {
 				fixed = true
 			}
 		}
-		if len(args) > 0 { // Keep the load statement if it loads at least one symbol.
-			li := &build.ListExpr{List: args}
-			build.SortStringList(li)
-			rule.Call.List = append(rule.Call.List[:1], li.List...)
-			all = append(all, rule.Call)
+		if len(toSymbols) > 0 { // Keep the load statement if it loads at least one symbol.
+			sort.Sort(loadArgs{fromSymbols, toSymbols})
+			load.From = fromSymbols
+			load.To = toSymbols
+			all = append(all, load)
 		} else {
 			fixed = true
 		}
 	}
 	f.Stmt = all
 	return fixed
-}
-
-// loadedSymbol parses the symbol token from a load statement argument,
-// supporting aliases.
-func loadedSymbol(arg build.Expr) (string, bool) {
-	symbol, ok := arg.(*build.StringExpr)
-	if ok {
-		return symbol.Value, ok
-	}
-	// try an aliased symbol
-	if binExpr, ok := arg.(*build.BinaryExpr); ok && binExpr.Op == "=" {
-		if keyExpr, ok := binExpr.X.(*build.LiteralExpr); ok {
-			return keyExpr.Token, ok
-		}
-	}
-	return "", false
 }
 
 // movePackageDeclarationToTheTop ensures that the call to package() is done
@@ -426,9 +409,10 @@ func movePackageDeclarationToTheTop(f *build.File) bool {
 	inserted := false // true when the package declaration has been inserted
 	for _, stmt := range f.Stmt {
 		_, isComment := stmt.(*build.CommentBlock)
-		_, isBinaryExpr := stmt.(*build.BinaryExpr) // e.g. variable declaration
-		_, isLoad := ExprToRule(stmt, "load")
-		if isComment || isBinaryExpr || isLoad {
+		_, isString := stmt.(*build.StringExpr)     // typically a docstring
+		_, isAssignExpr := stmt.(*build.AssignExpr) // e.g. variable declaration
+		_, isLoad := stmt.(*build.LoadStmt)
+		if isComment || isString || isAssignExpr || isLoad {
 			all = append(all, stmt)
 			continue
 		}
@@ -566,4 +550,25 @@ func FixFile(f *build.File, pkg string, fixes []string) *build.File {
 		return nil
 	}
 	return f
+}
+
+// A wrapper for a LoadStmt's From and To slices for consistent sorting of their contents.
+// It's assumed that the following slices have the same length, the contents are sorted by
+// the `To` attribute, the items of `From` are swapped exactly the same way as the items of `To`.
+type loadArgs struct {
+	From []*build.Ident
+	To   []*build.Ident
+}
+
+func (args loadArgs) Len() int {
+	return len(args.From)
+}
+
+func (args loadArgs) Swap(i, j int) {
+	args.From[i], args.From[j] = args.From[j], args.From[i]
+	args.To[i], args.To[j] = args.To[j], args.To[i]
+}
+
+func (args loadArgs) Less(i, j int) bool {
+	return args.To[i].Name < args.To[j].Name
 }

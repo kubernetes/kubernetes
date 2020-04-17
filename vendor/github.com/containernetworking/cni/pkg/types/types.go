@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 )
@@ -63,25 +64,31 @@ type NetConf struct {
 	Name         string          `json:"name,omitempty"`
 	Type         string          `json:"type,omitempty"`
 	Capabilities map[string]bool `json:"capabilities,omitempty"`
-	IPAM         struct {
-		Type string `json:"type,omitempty"`
-	} `json:"ipam,omitempty"`
-	DNS DNS `json:"dns"`
+	IPAM         IPAM            `json:"ipam,omitempty"`
+	DNS          DNS             `json:"dns"`
+
+	RawPrevResult map[string]interface{} `json:"prevResult,omitempty"`
+	PrevResult    Result                 `json:"-"`
+}
+
+type IPAM struct {
+	Type string `json:"type,omitempty"`
 }
 
 // NetConfList describes an ordered list of networks.
 type NetConfList struct {
 	CNIVersion string `json:"cniVersion,omitempty"`
 
-	Name    string     `json:"name,omitempty"`
-	Plugins []*NetConf `json:"plugins,omitempty"`
+	Name         string     `json:"name,omitempty"`
+	DisableCheck bool       `json:"disableCheck,omitempty"`
+	Plugins      []*NetConf `json:"plugins,omitempty"`
 }
 
 type ResultFactoryFunc func([]byte) (Result, error)
 
 // Result is an interface that provides the result of plugin execution
 type Result interface {
-	// The highest CNI specification result verison the result supports
+	// The highest CNI specification result version the result supports
 	// without having to convert
 	Version() string
 
@@ -91,6 +98,9 @@ type Result interface {
 
 	// Prints the result in JSON format to stdout
 	Print() error
+
+	// Prints the result in JSON format to provided writer
+	PrintTo(writer io.Writer) error
 
 	// Returns a JSON string representation of the result
 	String() string
@@ -167,7 +177,7 @@ func (r *Route) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Route) MarshalJSON() ([]byte, error) {
+func (r Route) MarshalJSON() ([]byte, error) {
 	rt := route{
 		Dst: IPNet(r.Dst),
 		GW:  r.GW,

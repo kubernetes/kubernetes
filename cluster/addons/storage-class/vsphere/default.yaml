@@ -5,7 +5,6 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
   labels:
-    kubernetes.io/cluster-service: "true"
 provisioner: kubernetes.io/vsphere-volume
 parameters:
     diskformat: thin

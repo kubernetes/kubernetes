@@ -18,15 +18,17 @@ import "math"
 //
 // Dlaqr1 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlaqr1(n int, h []float64, ldh int, sr1, si1, sr2, si2 float64, v []float64) {
-	if n != 2 && n != 3 {
-		panic(badDims)
-	}
-	checkMatrix(n, n, h, ldh)
-	if len(v) != n {
-		panic(badSlice)
-	}
-	if !((sr1 == sr2 && si1 == -si2) || (si1 == 0 && si2 == 0)) {
+	switch {
+	case n != 2 && n != 3:
+		panic("lapack: n must be 2 or 3")
+	case ldh < n:
+		panic(badLdH)
+	case len(h) < (n-1)*ldh+n:
+		panic(shortH)
+	case !((sr1 == sr2 && si1 == -si2) || (si1 == 0 && si2 == 0)):
 		panic(badShifts)
+	case len(v) != n:
+		panic(shortV)
 	}
 
 	if n == 2 {

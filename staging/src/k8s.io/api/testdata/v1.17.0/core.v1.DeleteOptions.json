@@ -1,0 +1,14 @@
+{
+  "kind": "DeleteOptions",
+  "apiVersion": "v1",
+  "gracePeriodSeconds": 4518808233936994290,
+  "preconditions": {
+    "uid": "ȕHH壬%龺ǟ橸章蒪ʤǎ\u003e渽蝧抰",
+    "resourceVersion": "2"
+  },
+  "orphanDependents": false,
+  "propagationPolicy": "ZȢXQ",
+  "dryRun": [
+    "3"
+  ]
+}

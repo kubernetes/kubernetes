@@ -2,8 +2,9 @@ package matchers
 
 import (
 	"fmt"
-	"github.com/onsi/gomega/format"
 	"regexp"
+
+	"github.com/onsi/gomega/format"
 )
 
 type MatchRegexpMatcher struct {

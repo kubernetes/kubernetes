@@ -13,22 +13,32 @@ import (
 
 // Dpotf2 computes the Cholesky decomposition of the symmetric positive definite
 // matrix a. If ul == blas.Upper, then a is stored as an upper-triangular matrix,
-// and a = U^T U is stored in place into a. If ul == blas.Lower, then a = L L^T
+// and a = Uᵀ U is stored in place into a. If ul == blas.Lower, then a = L Lᵀ
 // is computed and stored in-place into a. If a is not positive definite, false
 // is returned. This is the unblocked version of the algorithm.
 //
 // Dpotf2 is an internal routine. It is exported for testing purposes.
 func (Implementation) Dpotf2(ul blas.Uplo, n int, a []float64, lda int) (ok bool) {
-	if ul != blas.Upper && ul != blas.Lower {
+	switch {
+	case ul != blas.Upper && ul != blas.Lower:
 		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	checkMatrix(n, n, a, lda)
 
+	// Quick return if possible.
 	if n == 0 {
 		return true
 	}
 
+	if len(a) < (n-1)*lda+n {
+		panic(shortA)
+	}
+
 	bi := blas64.Implementation()
+
 	if ul == blas.Upper {
 		for j := 0; j < n; j++ {
 			ajj := a[j*lda+j]

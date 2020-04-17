@@ -53,6 +53,9 @@ func (s PodsByCreationTime) Less(i, j int) bool {
 type ByImageSize []kubecontainer.Image
 
 func (a ByImageSize) Less(i, j int) bool {
+	if a[i].Size == a[j].Size {
+		return a[i].ID > a[j].ID
+	}
 	return a[i].Size > a[j].Size
 }
 func (a ByImageSize) Len() int      { return len(a) }

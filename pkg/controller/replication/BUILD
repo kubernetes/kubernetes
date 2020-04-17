@@ -59,6 +59,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/replication/config:all-srcs",
+    ],
     tags = ["automanaged"],
 )

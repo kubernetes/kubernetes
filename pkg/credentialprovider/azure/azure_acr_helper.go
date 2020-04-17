@@ -47,15 +47,15 @@ package azure
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"unicode"
-
-	jwt "github.com/dgrijalva/jwt-go"
 )
 
 type authDirective struct {
@@ -63,22 +63,11 @@ type authDirective struct {
 	realm   string
 }
 
-type accessTokenPayload struct {
-	TenantID string `json:"tid"`
-}
-
-type acrTokenPayload struct {
-	Expiration int64  `json:"exp"`
-	TenantID   string `json:"tenant"`
-	Credential string `json:"credential"`
-}
-
 type acrAuthResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
 // 5 minutes buffer time to allow timeshift between local machine and AAD
-const timeShiftBuffer = 300
 const userAgentHeader = "User-Agent"
 const userAgent = "kubernetes-credentialprovider-acr"
 
@@ -94,27 +83,30 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 	}
 	var err error
 	var r *http.Request
-	r, _ = http.NewRequest("GET", challengeURL.String(), nil)
+	r, err = http.NewRequest("GET", challengeURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct request, got %v", err)
+	}
 	r.Header.Add(userAgentHeader, userAgent)
 
 	var challenge *http.Response
 	if challenge, err = client.Do(r); err != nil {
-		return nil, fmt.Errorf("Error reaching registry endpoint %s, error: %s", challengeURL.String(), err)
+		return nil, fmt.Errorf("error reaching registry endpoint %s, error: %s", challengeURL.String(), err)
 	}
 	defer challenge.Body.Close()
 
 	if challenge.StatusCode != 401 {
-		return nil, fmt.Errorf("Registry did not issue a valid AAD challenge, status: %d", challenge.StatusCode)
+		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, status: %d", challenge.StatusCode)
 	}
 
 	var authHeader []string
 	var ok bool
 	if authHeader, ok = challenge.Header["Www-Authenticate"]; !ok {
-		return nil, fmt.Errorf("Challenge response does not contain header 'Www-Authenticate'")
+		return nil, fmt.Errorf("challenge response does not contain header 'Www-Authenticate'")
 	}
 
 	if len(authHeader) != 1 {
-		return nil, fmt.Errorf("Registry did not issue a valid AAD challenge, authenticate header [%s]",
+		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, authenticate header [%s]",
 			strings.Join(authHeader, ", "))
 	}
 
@@ -122,7 +114,7 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 	authType := strings.ToLower(authSections[0])
 	var authParams *map[string]string
 	if authParams, err = parseAssignments(authSections[1]); err != nil {
-		return nil, fmt.Errorf("Unable to understand the contents of Www-Authenticate header %s", authSections[1])
+		return nil, fmt.Errorf("unable to understand the contents of Www-Authenticate header %s", authSections[1])
 	}
 
 	// verify headers
@@ -140,23 +132,6 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 		service: (*authParams)["service"],
 		realm:   (*authParams)["realm"],
 	}, nil
-}
-
-func parseAcrToken(identityToken string) (token *acrTokenPayload, err error) {
-	tokenSegments := strings.Split(identityToken, ".")
-	if len(tokenSegments) < 2 {
-		return nil, fmt.Errorf("Invalid existing refresh token length: %d", len(tokenSegments))
-	}
-	payloadSegmentEncoded := tokenSegments[1]
-	var payloadBytes []byte
-	if payloadBytes, err = jwt.DecodeSegment(payloadSegmentEncoded); err != nil {
-		return nil, fmt.Errorf("Error decoding payload segment from refresh token, error: %s", err)
-	}
-	var payload acrTokenPayload
-	if err = json.Unmarshal(payloadBytes, &payload); err != nil {
-		return nil, fmt.Errorf("Error unmarshalling acr payload, error: %s", err)
-	}
-	return &payload, nil
 }
 
 func performTokenExchange(
@@ -181,7 +156,10 @@ func performTokenExchange(
 
 	datac := data.Encode()
 	var r *http.Request
-	r, _ = http.NewRequest("POST", authEndpoint, bytes.NewBufferString(datac))
+	r, err = http.NewRequest("POST", authEndpoint, bytes.NewBufferString(datac))
+	if err != nil {
+		return "", fmt.Errorf("failed to construct request, got %v", err)
+	}
 	r.Header.Add(userAgentHeader, userAgent)
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Content-Length", strconv.Itoa(len(datac)))
@@ -197,8 +175,13 @@ func performTokenExchange(
 	}
 
 	var content []byte
-	if content, err = ioutil.ReadAll(exchange.Body); err != nil {
+	limitedReader := &io.LimitedReader{R: exchange.Body, N: maxReadLength}
+	if content, err = ioutil.ReadAll(limitedReader); err != nil {
 		return "", fmt.Errorf("Www-Authenticate: error reading response from %s", authEndpoint)
+	}
+
+	if limitedReader.N <= 0 {
+		return "", errors.New("the read limit is reached")
 	}
 
 	var authResp acrAuthResponse

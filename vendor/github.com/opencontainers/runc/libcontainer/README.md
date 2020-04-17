@@ -148,6 +148,7 @@ config := &configs.Config{
 		{Type: configs.NEWPID},
 		{Type: configs.NEWUSER},
 		{Type: configs.NEWNET},
+		{Type: configs.NEWCGROUP},
 	}),
 	Cgroups: &configs.Cgroup{
 		Name:   "test-container",
@@ -260,6 +261,7 @@ process := &libcontainer.Process{
 	Stdin:  os.Stdin,
 	Stdout: os.Stdout,
 	Stderr: os.Stderr,
+	Init:   true,
 }
 
 err := container.Run(process)

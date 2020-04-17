@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows/registry"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 type dummyRegistryKey struct {
@@ -73,7 +73,11 @@ func TestApplyGMSAConfig(t *testing.T) {
 	expectedValueName := "k8s-cred-spec-" + expectedHex
 
 	containerConfigWithGMSAAnnotation := &runtimeapi.ContainerConfig{
-		Annotations: map[string]string{"container.alpha.windows.kubernetes.io/gmsa-credential-spec": dummyCredSpec},
+		Windows: &runtimeapi.WindowsContainerConfig{
+			SecurityContext: &runtimeapi.WindowsContainerSecurityContext{
+				CredentialSpec: dummyCredSpec,
+			},
+		},
 	}
 
 	t.Run("happy path", func(t *testing.T) {
@@ -82,7 +86,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 		defer setRandomReader(randomBytes)()
 
 		createConfig := &dockertypes.ContainerCreateConfig{}
-		cleanupInfo := &containerCreationCleanupInfo{}
+		cleanupInfo := &containerCleanupInfo{}
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, createConfig, cleanupInfo)
 
 		assert.Nil(t, err)
@@ -105,7 +109,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 		defer setRegistryCreateKeyFunc(t, &dummyRegistryKey{})()
 
 		createConfig := &dockertypes.ContainerCreateConfig{}
-		cleanupInfo := &containerCreationCleanupInfo{}
+		cleanupInfo := &containerCleanupInfo{}
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, createConfig, cleanupInfo)
 
 		assert.Nil(t, err)
@@ -127,7 +131,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 	t.Run("when there's an error generating the random value name", func(t *testing.T) {
 		defer setRandomReader([]byte{})()
 
-		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCreationCleanupInfo{})
+		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCleanupInfo{})
 
 		require.NotNil(t, err)
 		assert.Contains(t, err.Error(), "error when generating gMSA registry value name: unable to generate random string")
@@ -135,7 +139,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 	t.Run("if there's an error opening the registry key", func(t *testing.T) {
 		defer setRegistryCreateKeyFunc(t, &dummyRegistryKey{}, fmt.Errorf("dummy error"))()
 
-		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCreationCleanupInfo{})
+		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCleanupInfo{})
 
 		require.NotNil(t, err)
 		assert.Contains(t, err.Error(), "unable to open registry key")
@@ -145,7 +149,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 		key.setStringValueError = fmt.Errorf("dummy error")
 		defer setRegistryCreateKeyFunc(t, key)()
 
-		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCreationCleanupInfo{})
+		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCleanupInfo{})
 
 		if assert.NotNil(t, err) {
 			assert.Contains(t, err.Error(), "unable to write into registry value")
@@ -155,7 +159,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 	t.Run("if there is no GMSA annotation", func(t *testing.T) {
 		createConfig := &dockertypes.ContainerCreateConfig{}
 
-		err := applyGMSAConfig(&runtimeapi.ContainerConfig{}, createConfig, &containerCreationCleanupInfo{})
+		err := applyGMSAConfig(&runtimeapi.ContainerConfig{}, createConfig, &containerCleanupInfo{})
 
 		assert.Nil(t, err)
 		assert.Nil(t, createConfig.HostConfig)
@@ -164,7 +168,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 
 func TestRemoveGMSARegistryValue(t *testing.T) {
 	valueName := "k8s-cred-spec-1900254518529e2a3dedb85cdec03ce270559647459ab531f07af5eb1c5495fda709435ce82ab89c"
-	cleanupInfoWithValue := &containerCreationCleanupInfo{gMSARegistryValueName: valueName}
+	cleanupInfoWithValue := &containerCleanupInfo{gMSARegistryValueName: valueName}
 
 	t.Run("it does remove the registry value", func(t *testing.T) {
 		key := &dummyRegistryKey{}
@@ -204,7 +208,7 @@ func TestRemoveGMSARegistryValue(t *testing.T) {
 		key := &dummyRegistryKey{}
 		defer setRegistryCreateKeyFunc(t, key)()
 
-		err := removeGMSARegistryValue(&containerCreationCleanupInfo{})
+		err := removeGMSARegistryValue(&containerCleanupInfo{})
 
 		assert.Nil(t, err)
 		assert.Equal(t, 0, len(key.deleteValueArgs))

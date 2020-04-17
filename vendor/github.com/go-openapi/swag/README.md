@@ -19,5 +19,4 @@ You may also use it standalone for your projects.
 
 This repo has only few dependencies outside of the standard library:
 
-* JSON utilities depend on github.com/mailru/easyjson
 * YAML utilities depend on gopkg.in/yaml.v2
