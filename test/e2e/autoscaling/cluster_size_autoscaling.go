@@ -45,6 +45,7 @@ import (
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -222,7 +223,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addGpuNodePool(gpuPoolName, gpuType, 1, 0)
 		defer deleteNodePool(gpuPoolName)
 
-		installNvidiaDriversDaemonSet(f.Namespace.Name)
+		installNvidiaDriversDaemonSet(f)
 
 		ginkgo.By("Enable autoscaler")
 		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
@@ -249,7 +250,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addGpuNodePool(gpuPoolName, gpuType, 1, 1)
 		defer deleteNodePool(gpuPoolName)
 
-		installNvidiaDriversDaemonSet(f.Namespace.Name)
+		installNvidiaDriversDaemonSet(f)
 
 		ginkgo.By("Schedule a single pod which requires GPU")
 		framework.ExpectNoError(ScheduleAnySingleGpuPod(f, "gpu-pod-rc"))
@@ -279,7 +280,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addGpuNodePool(gpuPoolName, gpuType, 1, 0)
 		defer deleteNodePool(gpuPoolName)
 
-		installNvidiaDriversDaemonSet(f.Namespace.Name)
+		installNvidiaDriversDaemonSet(f)
 
 		ginkgo.By("Enable autoscaler")
 		framework.ExpectNoError(enableAutoscaler(gpuPoolName, 0, 1))
@@ -308,7 +309,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addGpuNodePool(gpuPoolName, gpuType, 1, 1)
 		defer deleteNodePool(gpuPoolName)
 
-		installNvidiaDriversDaemonSet(f.Namespace.Name)
+		installNvidiaDriversDaemonSet(f)
 
 		ginkgo.By("Schedule a single pod which requires GPU")
 		framework.ExpectNoError(ScheduleAnySingleGpuPod(f, "gpu-pod-rc"))
@@ -999,10 +1000,18 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 })
 
-func installNvidiaDriversDaemonSet(namespace string) {
+func installNvidiaDriversDaemonSet(f *framework.Framework) {
 	ginkgo.By("Add daemonset which installs nvidia drivers")
-	// the link differs from one in GKE documentation; discussed with @mindprince this one should be used
-	framework.RunKubectlOrDie(namespace, "apply", "-f", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml")
+
+	dsYamlURL := "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+	framework.Logf("Using %v", dsYamlURL)
+	// Creates the DaemonSet that installs Nvidia Drivers.
+	ds, err := e2emanifest.DaemonSetFromURL(dsYamlURL)
+	framework.ExpectNoError(err)
+	ds.Namespace = f.Namespace.Name
+
+	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(context.TODO(), ds, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 }
 
 func execCmd(args ...string) *exec.Cmd {
