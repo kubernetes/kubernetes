@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -254,6 +254,26 @@ func TestPullWithSecrets(t *testing.T) {
 
 		_, err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
 		require.NoError(t, err)
-		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName}, test.expectedAuth, description)
+		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
 	}
+}
+
+func TestPullThenListWithAnnotations(t *testing.T) {
+	_, _, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	imageSpec := kubecontainer.ImageSpec{
+		Image: "12345",
+		Annotations: []kubecontainer.Annotation{
+			{Name: "kubernetes.io/runtimehandler", Value: "handler_name"},
+		},
+	}
+
+	_, err = fakeManager.PullImage(imageSpec, nil, nil)
+	assert.NoError(t, err)
+
+	images, err := fakeManager.ListImages()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(images))
+	assert.Equal(t, images[0].Spec, imageSpec)
 }

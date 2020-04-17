@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
@@ -201,4 +201,49 @@ func TestApplyDefaultImageTag(t *testing.T) {
 			t.Errorf("Expected image reference: %q, got %q", testCase.Output, image)
 		}
 	}
+}
+
+func TestPullAndListImageWithPodAnnotations(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+			SelfLink:        "/api/v1/pods/foo",
+			Annotations: map[string]string{
+				"kubernetes.io/runtimehandler": "handler_name",
+			},
+		}}
+	c := pullerTestCase{ // pull missing image
+		containerImage: "missing_image",
+		policy:         v1.PullIfNotPresent,
+		inspectErr:     nil,
+		pullerErr:      nil,
+		expected: []pullerExpects{
+			{[]string{"GetImageRef", "PullImage"}, nil},
+		}}
+
+	useSerializedEnv := true
+	puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv)
+	fakeRuntime.CalledFunctions = nil
+	fakeRuntime.ImageList = []Image{}
+	fakeClock.Step(time.Second)
+
+	_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
+	assert.NoError(t, fakeRuntime.AssertCalls(c.expected[0].calls), "tick=%d", 0)
+	assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
+
+	images, _ := fakeRuntime.ListImages()
+	assert.Equal(t, 1, len(images), "ListImages() count")
+
+	image := images[0]
+	assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
+
+	expectedAnnotations := []Annotation{
+		{
+			Name:  "kubernetes.io/runtimehandler",
+			Value: "handler_name",
+		}}
+	assert.Equal(t, expectedAnnotations, image.Spec.Annotations, "image spec annotations")
 }
