@@ -44,7 +44,7 @@ func PeriodicallyInvalidate(cache AvailableAPIsGetter, interval time.Duration, s
 	for {
 		select {
 		case <-ticker.C:
-			cache.Invalidate()
+			go cache.Invalidate()
 		case <-stopCh:
 			return
 		}
