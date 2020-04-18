@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -174,12 +174,20 @@ func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
 	case Int:
 		return intOrStr.IntValue(), false, nil
 	case String:
-		s := strings.Replace(intOrStr.StrVal, "%", "", -1)
-		v, err := strconv.Atoi(s)
-		if err != nil {
-			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
+		if strings.HasSuffix(intOrStr.StrVal, "%") {
+			s := strings.Replace(intOrStr.StrVal, "%", "", -1)
+			v, err := strconv.Atoi(s)
+			if err != nil || v >100 {
+				return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
+			}
+			return int(v), true, nil
+		} else {
+			v, err := strconv.Atoi(intOrStr.StrVal)
+			if err != nil {
+				return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
+			}
+			return int(v), false, nil
 		}
-		return int(v), true, nil
 	}
 	return 0, false, fmt.Errorf("invalid type: neither int nor percentage")
 }

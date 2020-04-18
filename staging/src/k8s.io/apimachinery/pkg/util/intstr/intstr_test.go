@@ -145,6 +145,11 @@ func TestGetValueFromIntOrPercent(t *testing.T) {
 			expectVal: 85,
 		},
 		{
+			input:     FromString("129"),
+			expectErr: false,
+			expectVal: 129,
+		},
+		{
 			input:     FromString("%"),
 			expectErr: true,
 		},
@@ -154,6 +159,10 @@ func TestGetValueFromIntOrPercent(t *testing.T) {
 		},
 		{
 			input:     FromString("#%"),
+			expectErr: true,
+		},
+		{
+			input:     FromString("102%"),
 			expectErr: true,
 		},
 	}
