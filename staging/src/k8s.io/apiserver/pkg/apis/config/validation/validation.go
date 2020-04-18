@@ -31,6 +31,7 @@ const (
 	keyLenErrFmt             = "secret is not of the expected length, got %d, expected one of %v"
 	unsupportedSchemeErrFmt  = "unsupported scheme %q for KMS provider, only unix is supported"
 	atLeastOneRequiredErrFmt = "at least one %s is required"
+	invalidURLErrFmt         = "invalid endpoint for kms provider, error: parse %s: net/url: invalid control character in URL"
 	mandatoryFieldErrFmt     = "%s is a mandatory field for a %s"
 	base64EncodingErr        = "secrets must be base64 encoded"
 	zeroOrNegativeErrFmt     = "%s should be a positive value"
