@@ -962,6 +962,8 @@ func containerPrometheusLabelsFunc(s stats.Provider) metrics.ContainerLabelsFunc
 		}
 		if v, ok := c.Spec.Labels[kubelettypes.KubernetesContainerNameLabel]; ok {
 			containerName = v
+		} else if v, ok := c.Spec.Labels[kubelettypes.ContainerdKindLabel]; ok {
+			containerName = v
 		}
 		// Associate pod cgroup with pod so we have an accurate accounting of sandbox
 		if podName == "" && namespace == "" {
