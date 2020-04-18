@@ -2810,22 +2810,22 @@ func TestAllocGetters(t *testing.T) {
 			}
 
 			alloc := storage.getAllocatorByClusterIP(tc.svc)
-			if tc.clusterIPExpectPrimary && !bytes.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
+			if tc.clusterIPExpectPrimary && !net.IP.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
 				t.Errorf("expected primary allocator, but primary allocator was not selected")
 				return
 			}
 
-			if tc.enableDualStack && !tc.clusterIPExpectPrimary && !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+			if tc.enableDualStack && !tc.clusterIPExpectPrimary && !net.IP.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
 				t.Errorf("expected secondary allocator, but secondary allocator was not selected")
 			}
 
 			alloc = storage.getAllocatorBySpec(tc.svc)
-			if tc.specExpctPrimary && !bytes.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
+			if tc.specExpctPrimary && !net.IP.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
 				t.Errorf("expected primary allocator, but primary allocator was not selected")
 				return
 			}
 
-			if tc.enableDualStack && !tc.specExpctPrimary && !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+			if tc.enableDualStack && !tc.specExpctPrimary && !net.IP.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
 				t.Errorf("expected secondary allocator, but secondary allocator was not selected")
 			}
 
