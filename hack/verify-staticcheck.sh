@@ -51,9 +51,10 @@ export IFS='|'; ignore_pattern="^(${IGNORE[*]})\$"; unset IFS
 export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
-# Install staticcheck from vendor
-echo 'installing staticcheck from vendor'
-go install k8s.io/kubernetes/vendor/honnef.co/go/tools/cmd/staticcheck
+# Install staticcheck
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install honnef.co/go/tools/cmd/staticcheck
+popd >/dev/null
 
 cd "${KUBE_ROOT}"
 

@@ -19,6 +19,15 @@ limitations under the License.
 package tools
 
 import (
+	// linting tools
+	_ "github.com/client9/misspell/cmd/misspell"
+	_ "golang.org/x/lint/golint"
+	_ "honnef.co/go/tools/cmd/staticcheck"
+
+	// benchmarking tools
+	_ "github.com/cespare/prettybench"
+	_ "gotest.tools/gotestsum"
+
 	// bazel-related tools
 	_ "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
 	_ "github.com/bazelbuild/buildtools/buildozer"
