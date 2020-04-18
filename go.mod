@@ -318,7 +318,7 @@ replace (
 	github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.0
 	github.com/marten-seemann/qtls => github.com/marten-seemann/qtls v0.2.3
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
-	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.9
+	github.com/mattn/go-isatty => github.com/mattn/go-isatty v0.0.4
 	github.com/mattn/go-runewidth => github.com/mattn/go-runewidth v0.0.2
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 	github.com/mholt/certmagic => github.com/mholt/certmagic v0.6.2-0.20190624175158-6a42ef9fe8c2
