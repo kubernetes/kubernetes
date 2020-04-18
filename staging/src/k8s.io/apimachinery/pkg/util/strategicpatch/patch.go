@@ -440,7 +440,7 @@ func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, k
 	// left and right should be non-overlapping.
 	size := len(left) + len(right)
 	i, j := 0, 0
-	s := make([]interface{}, size, size)
+	s := make([]interface{}, size)
 
 	for k := 0; k < size; k++ {
 		if i >= len(left) && j < len(right) {
