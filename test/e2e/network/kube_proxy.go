@@ -81,8 +81,6 @@ var _ = SIGDescribe("Network", func() {
 			nodeIP: ips[1],
 		}
 
-		zero := int64(0)
-
 		// Create a pod to check the conntrack entries on the host node
 		// It mounts the host /proc/net folder to be able to access
 		// the nf_conntrack file with the host conntrack entries
@@ -125,7 +123,6 @@ var _ = SIGDescribe("Network", func() {
 						},
 					},
 				},
-				TerminationGracePeriodSeconds: &zero,
 			},
 		}
 		fr.PodClient().CreateSync(hostExecPod)
@@ -164,7 +161,6 @@ var _ = SIGDescribe("Network", func() {
 						},
 					},
 				},
-				TerminationGracePeriodSeconds: &zero,
 			},
 		}
 
@@ -198,7 +194,6 @@ var _ = SIGDescribe("Network", func() {
 						},
 					},
 				},
-				TerminationGracePeriodSeconds: &zero,
 			},
 		}
 
