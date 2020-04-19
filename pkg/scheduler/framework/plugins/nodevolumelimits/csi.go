@@ -110,10 +110,8 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	attachedVolumeCount := map[string]int{}
 	for volumeUniqueName, volumeLimitKey := range attachedVolumes {
-		if _, ok := newVolumes[volumeUniqueName]; ok {
-			// Don't count single volume used in multiple pods more than once
-			delete(newVolumes, volumeUniqueName)
-		}
+		// Don't count single volume used in multiple pods more than once
+		delete(newVolumes, volumeUniqueName)
 		attachedVolumeCount[volumeLimitKey]++
 	}
 
