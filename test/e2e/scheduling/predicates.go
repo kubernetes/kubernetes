@@ -1052,15 +1052,19 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 			if pod.Spec.NodeName != "" {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 				framework.ExpectEqual(scheduledCondition != nil, true)
-				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
-				scheduledPods = append(scheduledPods, pod)
+				if scheduledCondition != nil {
+					framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
+					scheduledPods = append(scheduledPods, pod)
+				}
 			} else {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 				framework.ExpectEqual(scheduledCondition != nil, true)
-				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionFalse)
-				if scheduledCondition.Reason == "Unschedulable" {
+				if scheduledCondition != nil {
+					framework.ExpectEqual(scheduledCondition.Status, v1.ConditionFalse)
+					if scheduledCondition.Reason == "Unschedulable" {
 
-					notScheduledPods = append(notScheduledPods, pod)
+						notScheduledPods = append(notScheduledPods, pod)
+					}
 				}
 			}
 		}
