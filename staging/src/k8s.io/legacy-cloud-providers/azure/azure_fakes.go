@@ -61,6 +61,7 @@ func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
 			SecurityGroupName:            "nsg",
 			RouteTableName:               "rt",
 			PrimaryAvailabilitySetName:   "as",
+			PrimaryScaleSetName:          "vmss",
 			MaximumLoadBalancerRuleCount: 250,
 			VMType:                       vmTypeStandard,
 		},
