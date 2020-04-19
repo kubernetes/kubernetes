@@ -700,6 +700,7 @@ func (p *criStatsProvider) cleanupOutdatedCaches() {
 	for k, v := range p.cpuUsageCache {
 		if v == nil {
 			delete(p.cpuUsageCache, k)
+			continue
 		}
 
 		if time.Since(time.Unix(0, v.stats.Timestamp)) > defaultCachePeriod {
