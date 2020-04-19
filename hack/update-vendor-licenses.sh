@@ -153,21 +153,23 @@ fi
 LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
 
-VENDOR_LICENSE_FILE="Godeps/LICENSES"
+VENDOR_LICENSE_FILE="${VENDOR_LICENSE_FILE:-"Godeps/LICENSES"}"
 TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
 DEPS_DIR="vendor"
 declare -Ag CONTENT
 
-# Put the K8S LICENSE on top
-(
-echo "================================================================================"
-echo "= Kubernetes licensed under: ="
-echo
-cat "${LICENSE_ROOT}/LICENSE"
-echo
-echo "= LICENSE $(kube::util::md5 "${LICENSE_ROOT}/LICENSE")"
-echo "================================================================================"
-) > ${TMP_LICENSE_FILE}
+if [[ -f "${LICENSE_ROOT}/LICENSE" ]]; then
+  # Put the K8S LICENSE on top
+  (
+  echo "================================================================================"
+  echo "= Kubernetes licensed under: ="
+  echo
+  cat "${LICENSE_ROOT}/LICENSE"
+  echo
+  echo "= LICENSE $(kube::util::md5 "${LICENSE_ROOT}/LICENSE")"
+  echo "================================================================================"
+  ) > ${TMP_LICENSE_FILE}
+fi
 
 # Loop through every vendored package
 for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
@@ -219,4 +221,4 @@ __EOF__
   echo
 done >> ${TMP_LICENSE_FILE}
 
-cat ${TMP_LICENSE_FILE} > ${VENDOR_LICENSE_FILE}
+cat ${TMP_LICENSE_FILE} > "${VENDOR_LICENSE_FILE}"

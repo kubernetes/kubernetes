@@ -26,6 +26,7 @@ import (
 
 	// benchmarking tools
 	_ "github.com/cespare/prettybench"
+	_ "gotest.tools"
 	_ "gotest.tools/gotestsum"
 
 	// bazel-related tools
