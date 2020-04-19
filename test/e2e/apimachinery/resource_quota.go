@@ -1491,6 +1491,11 @@ func newTestPodForQuota(f *framework.Framework, name string, requests v1.Resourc
 			Name: name,
 		},
 		Spec: v1.PodSpec{
+			// prevent disruption to other test workloads in parallel test runs by ensuring the quota
+			// test pods don't get scheduled onto a node
+			NodeSelector: map[string]string{
+				"x-test.k8s.io/unsatisfiable": "not-schedulable",
+			},
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
@@ -1512,6 +1517,11 @@ func newTestPodForQuotaWithPriority(f *framework.Framework, name string, request
 			Name: name,
 		},
 		Spec: v1.PodSpec{
+			// prevent disruption to other test workloads in parallel test runs by ensuring the quota
+			// test pods don't get scheduled onto a node
+			NodeSelector: map[string]string{
+				"x-test.k8s.io/unsatisfiable": "not-schedulable",
+			},
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
