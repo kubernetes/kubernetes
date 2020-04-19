@@ -101,7 +101,7 @@ var _ = SIGDescribe("Network", func() {
 					{
 						Name:            "e2e-net-exec",
 						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: "Always",
+						ImagePullPolicy: v1.PullIfNotPresent,
 						Args:            []string{"pause"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -152,7 +152,7 @@ var _ = SIGDescribe("Network", func() {
 					{
 						Name:            "e2e-net-client",
 						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: "Always",
+						ImagePullPolicy: v1.PullIfNotPresent,
 						Args: []string{
 							"net",
 							"--runner", "nat-closewait-client",
@@ -180,7 +180,7 @@ var _ = SIGDescribe("Network", func() {
 					{
 						Name:            "e2e-net-server",
 						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: "Always",
+						ImagePullPolicy: v1.PullIfNotPresent,
 						Args: []string{
 							"net",
 							"--runner", "nat-closewait-server",
