@@ -1287,7 +1287,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture load-balancer ingress.
 		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
-			if ingress != "" {
+			if ingress != "" && !svcInfo.DisableLoadBalancerLocalTrafficRedirect() {
 				// ipset call
 				entry = &utilipset.Entry{
 					IP:       ingress,

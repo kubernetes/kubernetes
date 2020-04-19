@@ -119,4 +119,8 @@ const (
 	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or
 	// CSI Backend for a volume plugin on a specific node.
 	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
+
+	// AnnotationDisableLoadBalancerLocalTrafficRedirect is a servie annotation either set by the user or by the cloud provider
+	// in order to tell kube-proxy to disable the local traffic redirect to the LoadBalancer IP
+	AnnotationDisableLoadBalancerLocalTrafficRedirect = "service.kubernetes.io/disable-lb-local-traffic-redirect"
 )

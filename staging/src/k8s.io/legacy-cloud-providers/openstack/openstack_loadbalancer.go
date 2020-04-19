@@ -1575,3 +1575,7 @@ func (lbaas *LbaasV2) EnsureSecurityGroupDeleted(clusterName string, service *v1
 
 	return nil
 }
+
+func (lbaas *LbaasV2) DisableLoadBalancerLocalTrafficRedirect(ctx context.Context) bool {
+	return false
+}

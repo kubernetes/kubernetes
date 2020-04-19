@@ -26,7 +26,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
@@ -213,6 +213,10 @@ func (g *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 	}
 	klog.V(4).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v): done deleting loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
 	return err
+}
+
+func (g *Cloud) DisableLoadBalancerLocalTrafficRedirect(ctx context.Context) bool {
+	return false
 }
 
 func getSvcScheme(svc *v1.Service) cloud.LbScheme {

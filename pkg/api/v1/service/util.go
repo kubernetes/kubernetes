@@ -18,9 +18,10 @@ package service
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -94,4 +95,18 @@ func GetServiceHealthCheckPathPort(service *v1.Service) (string, int32) {
 		return "", 0
 	}
 	return "/healthz", port
+}
+
+// DisableLoadBalancerLocalTrafficRedirect checks if the service have the annotation
+// to disabe the load balancer local redirection the the Cluster IP
+func DisableLoadBalancerLocalTrafficRedirect(service *v1.Service) bool {
+	value, ok := service.Annotations[v1.AnnotationDisableLoadBalancerLocalTrafficRedirect]
+	if !ok {
+		return false
+	}
+	boolValue, err := strconv.ParseBool(strings.TrimSpace(value))
+	if err != nil {
+		return false
+	}
+	return boolValue
 }

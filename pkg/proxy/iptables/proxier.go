@@ -1126,15 +1126,18 @@ func (proxier *Proxier) syncProxyRules() {
 					// This currently works for loadbalancers that preserves source ips.
 					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
 
-					args = append(args[:0],
-						"-A", string(kubeServicesChain),
-						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
-						"-m", protocol, "-p", protocol,
-						"-d", utilproxy.ToCIDR(net.ParseIP(ingress)),
-						"--dport", strconv.Itoa(svcInfo.Port()),
-					)
-					// jump to service firewall chain
-					writeLine(proxier.natRules, append(args, "-j", string(fwChain))...)
+					if !svcInfo.DisableLoadBalancerLocalTrafficRedirect() {
+						args = append(args[:0],
+							"-A", string(kubeServicesChain),
+							"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
+							"-m", protocol, "-p", protocol,
+							"-d", utilproxy.ToCIDR(net.ParseIP(ingress)),
+							"--dport", strconv.Itoa(svcInfo.Port()),
+						)
+						// jump to service firewall chain
+
+						writeLine(proxier.natRules, append(args, "-j", string(fwChain))...)
+					}
 
 					args = append(args[:0],
 						"-A", string(fwChain),
@@ -1380,7 +1383,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// First rule in the chain redirects all pod -> external VIP traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if localDetector is implemented
-		if proxier.localDetector.IsImplemented() {
+		if proxier.localDetector.IsImplemented() || !svcInfo.DisableLoadBalancerLocalTrafficRedirect() {
 			args = append(args[:0],
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",

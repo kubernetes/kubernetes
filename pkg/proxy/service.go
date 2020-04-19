@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -40,18 +40,19 @@ import (
 // or can be used for constructing a more specific ServiceInfo struct
 // defined by the proxier if needed.
 type BaseServiceInfo struct {
-	clusterIP                net.IP
-	port                     int
-	protocol                 v1.Protocol
-	nodePort                 int
-	loadBalancerStatus       v1.LoadBalancerStatus
-	sessionAffinityType      v1.ServiceAffinity
-	stickyMaxAgeSeconds      int
-	externalIPs              []string
-	loadBalancerSourceRanges []string
-	healthCheckNodePort      int
-	onlyNodeLocalEndpoints   bool
-	topologyKeys             []string
+	clusterIP                               net.IP
+	port                                    int
+	protocol                                v1.Protocol
+	nodePort                                int
+	loadBalancerStatus                      v1.LoadBalancerStatus
+	sessionAffinityType                     v1.ServiceAffinity
+	stickyMaxAgeSeconds                     int
+	externalIPs                             []string
+	loadBalancerSourceRanges                []string
+	healthCheckNodePort                     int
+	onlyNodeLocalEndpoints                  bool
+	topologyKeys                            []string
+	disableLoadBalancerLocalTrafficRedirect bool
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -125,25 +126,38 @@ func (info *BaseServiceInfo) TopologyKeys() []string {
 	return info.topologyKeys
 }
 
+// DisableLoadBalancerLocalTrafficRedirect returns wether or not the service needs to disable the traffic redirect
+// from the pods to the external VIP to the Service's ClusterIP.
+func (info *BaseServiceInfo) DisableLoadBalancerLocalTrafficRedirect() bool {
+	return info.disableLoadBalancerLocalTrafficRedirect
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
+
+	disableLoadBalancerLocalTrafficRedirect := false
+	if apiservice.DisableLoadBalancerLocalTrafficRedirect(service) {
+		disableLoadBalancerLocalTrafficRedirect = true
+	}
+
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 	info := &BaseServiceInfo{
-		clusterIP:              net.ParseIP(service.Spec.ClusterIP),
-		port:                   int(port.Port),
-		protocol:               port.Protocol,
-		nodePort:               int(port.NodePort),
-		sessionAffinityType:    service.Spec.SessionAffinity,
-		stickyMaxAgeSeconds:    stickyMaxAgeSeconds,
-		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
-		topologyKeys:           service.Spec.TopologyKeys,
+		clusterIP:                               net.ParseIP(service.Spec.ClusterIP),
+		port:                                    int(port.Port),
+		protocol:                                port.Protocol,
+		nodePort:                                int(port.NodePort),
+		sessionAffinityType:                     service.Spec.SessionAffinity,
+		stickyMaxAgeSeconds:                     stickyMaxAgeSeconds,
+		onlyNodeLocalEndpoints:                  onlyNodeLocalEndpoints,
+		topologyKeys:                            service.Spec.TopologyKeys,
+		disableLoadBalancerLocalTrafficRedirect: disableLoadBalancerLocalTrafficRedirect,
 	}
 
 	if sct.isIPv6Mode == nil {

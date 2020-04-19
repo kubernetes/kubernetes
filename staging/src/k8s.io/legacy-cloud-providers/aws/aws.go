@@ -4026,6 +4026,10 @@ func (c *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, ser
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 
+func (c *Cloud) DisableLoadBalancerLocalTrafficRedirect(ctx context.Context) bool {
+	return false
+}
+
 func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
 	status := &v1.LoadBalancerStatus{}
 

@@ -87,6 +87,9 @@ type ServicePort interface {
 	OnlyNodeLocalEndpoints() bool
 	// TopologyKeys returns service TopologyKeys as a string array.
 	TopologyKeys() []string
+	// DisableLoadBalancerLocalTrafficRedirect returns wether or not the service needs to disable the traffic redirect
+	// from the pods to the external VIP to the Service's ClusterIP.
+	DisableLoadBalancerLocalTrafficRedirect() bool
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.

@@ -240,6 +240,10 @@ func (az *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, se
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 
+func (az *Cloud) DisableLoadBalancerLocalTrafficRedirect(ctx context.Context) bool {
+	return false
+}
+
 func (az *Cloud) getLoadBalancerResourceGroup() string {
 	if az.LoadBalancerResourceGroup != "" {
 		return az.LoadBalancerResourceGroup

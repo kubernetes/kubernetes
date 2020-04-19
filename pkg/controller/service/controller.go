@@ -369,6 +369,16 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
+	if s.balancer.DisableLoadBalancerLocalTrafficRedirect(context.TODO()) {
+		if _, ok := service.Annotations[v1.AnnotationDisableLoadBalancerLocalTrafficRedirect]; !ok {
+			if err := s.addAnnotationToService(service, v1.AnnotationDisableLoadBalancerLocalTrafficRedirect, "true"); err != nil {
+				if !errors.IsNotFound(err) {
+					return op, fmt.Errorf("failed to add annotation to service: %v", err)
+				}
+			}
+		}
+	}
+
 	if err := s.patchStatus(service, previousStatus, newStatus); err != nil {
 		// Only retry error that isn't not found:
 		// - Not found error mostly happens when service disappears right after
@@ -853,6 +863,16 @@ func (s *Controller) patchStatus(service *v1.Service, previousStatus, newStatus 
 	updated.Status.LoadBalancer = *newStatus
 
 	klog.V(2).Infof("Patching status for service %s/%s", updated.Namespace, updated.Name)
+	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)
+	return err
+}
+
+func (s *Controller) addAnnotationToService(service *v1.Service, key string, value string) error {
+	// Make a copy so we don't mutate the shared informer cache.
+	updated := service.DeepCopy()
+	updated.Annotations[key] = value
+
+	klog.V(2).Infof("Adding annotation %s with value %s for service %s/%s", key, value, updated.Namespace, updated.Name)
 	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)
 	return err
 }

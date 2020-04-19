@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -152,6 +152,9 @@ type LoadBalancer interface {
 	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 	EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error
+	// DisableLoadBalancerLocalTrafficRedirect get the value from the cloud provider on wether or not
+	// the local redirect from LoadBalancer IP to Service IP should be disabled.
+	DisableLoadBalancerLocalTrafficRedirect(ctx context.Context) bool
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
