@@ -1727,11 +1727,11 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 
 	// For external service
 	if publicIP == nil {
-		t.Errorf("Expected publicIP resource exists, when it is not an internal service")
+		t.Fatalf("Expected publicIP resource exists, when it is not an internal service")
 	}
 
 	if publicIP.Tags == nil || publicIP.Tags[serviceTagKey] == nil {
-		t.Errorf("Expected publicIP resource has tags[%s]", serviceTagKey)
+		t.Fatalf("Expected publicIP resource has tags[%s]", serviceTagKey)
 	}
 
 	serviceName := getServiceName(service)
