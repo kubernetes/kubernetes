@@ -244,9 +244,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 
 	// filter out already-mounted volumes
 	for k := range existingVolumes {
-		if _, ok := newVolumes[k]; ok {
-			delete(newVolumes, k)
-		}
+		delete(newVolumes, k)
 	}
 
 	numNewVolumes := len(newVolumes)
