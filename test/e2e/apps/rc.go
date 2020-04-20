@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -163,8 +162,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "failed to marshal json of replicationcontroller label patch")
 		// Patch the ReplicationController
 		ginkgo.By("patching ReplicationController")
-		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
+		testRcPatched, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "Failed to patch ReplicationController")
+		framework.ExpectEqual(testRcPatched.ObjectMeta.Labels["test-rc"], "patched", "failed to patch RC")
 		ginkgo.By("waiting for RC to be modified")
 		for watchEvent := range rcWatchChan {
 			if watchEvent.Type == watch.Modified {
@@ -192,6 +192,15 @@ var _ = SIGDescribe("ReplicationController", func() {
 			}
 		}
 
+		for watchEvent := range rcWatchChan {
+			rc, ok := watchEvent.Object.(*v1.ReplicationController)
+			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch watchEvent")
+
+			if rc.Status.Replicas == testRcInitialReplicaCount {
+				break
+			}
+		}
+
 		ginkgo.By("fetching ReplicationController status")
 		rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{}, "status")
 		framework.ExpectNoError(err, "Failed to fetch ReplicationControllerStatus")
@@ -201,9 +210,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		json.Unmarshal(rcStatusUjson, &rcStatus)
 		framework.ExpectEqual(rcStatus.Status.Replicas, testRcInitialReplicaCount, "ReplicationController ReplicaSet cound does not match initial Replica count")
 
-		rcScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
-			Spec: autoscalingv1.ScaleSpec{
-				Replicas: testRcMaxReplicaCount,
+		rcScalePatchPayload, err := json.Marshal(v1.ReplicationController{
+			Spec: v1.ReplicationControllerSpec{
+				Replicas: &testRcMaxReplicaCount,
 			},
 		})
 		framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
