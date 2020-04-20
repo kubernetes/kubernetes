@@ -1,5 +1,3 @@
-// +build tools
-
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -16,17 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package imports things required by build scripts, to force `go mod` to see them as dependencies
+// Package tools is used to track binary dependencies with go modules
+// https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
 package tools
 
 import (
-	_ "github.com/go-bindata/go-bindata/go-bindata"
-	_ "github.com/onsi/ginkgo/ginkgo"
-	_ "k8s.io/code-generator/cmd/go-to-protobuf"
-	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
-	_ "k8s.io/gengo/examples/deepcopy-gen/generators"
-	_ "k8s.io/gengo/examples/defaulter-gen/generators"
-	_ "k8s.io/gengo/examples/import-boss/generators"
-	_ "k8s.io/gengo/examples/set-gen/generators"
-	_ "k8s.io/kube-openapi/cmd/openapi-gen"
+	// linting tools
+	_ "github.com/client9/misspell/cmd/misspell"
+	_ "golang.org/x/lint/golint"
+	_ "honnef.co/go/tools/cmd/staticcheck"
+
+	// benchmarking tools
+	_ "github.com/cespare/prettybench"
+	_ "gotest.tools"
+	_ "gotest.tools/gotestsum"
+
+	// bazel-related tools
+	_ "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
+	_ "github.com/bazelbuild/buildtools/buildozer"
+	_ "k8s.io/repo-infra/cmd/kazel"
 )

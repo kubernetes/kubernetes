@@ -82,6 +82,9 @@ var (
 		// edit/record.go doesn't compile without gopkg.in/yaml.v2
 		// in $GOSRC/$GOROOT (both typecheck and the shell script).
 		"pkg/kubectl/cmd/testdata/edit",
+		// Tools we use for maintaining the code base but not necessarily
+		// ship as part of the release
+		"hack/tools",
 	}
 )
 
