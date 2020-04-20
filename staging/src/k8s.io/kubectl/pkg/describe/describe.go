@@ -3642,6 +3642,9 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp), e.Count, translateTimestampSince(e.FirstTimestamp))
 		} else {
 			interval = translateTimestampSince(e.FirstTimestamp)
+			if e.FirstTimestamp.IsZero() {
+				interval = translateMicroTimestampSince(e.EventTime)
+			}
 		}
 		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
@@ -4743,6 +4746,16 @@ func shorten(s string, maxLength int) string {
 		return s[:maxLength] + "..."
 	}
 	return s
+}
+
+// translateMicroTimestampSince returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateMicroTimestampSince(timestamp metav1.MicroTime) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }
 
 // translateTimestampSince returns the elapsed time since timestamp in
