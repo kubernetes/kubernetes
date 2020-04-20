@@ -68,7 +68,8 @@ func (d *DaemonSetPrepuller) CreateFunc(component string) error {
 	} else {
 		image = images.GetKubernetesImage(component, d.cfg)
 	}
-	ds := buildPrePullDaemonSet(component, image)
+	pauseImage := images.GetPauseImage(d.cfg)
+	ds := buildPrePullDaemonSet(component, image, pauseImage)
 
 	// Create the DaemonSet in the API Server
 	if err := apiclient.CreateOrUpdateDaemonSet(d.client, ds); err != nil {
@@ -155,8 +156,7 @@ func addPrepullPrefix(component string) string {
 }
 
 // buildPrePullDaemonSet builds the DaemonSet that ensures the control plane image is available
-func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
-	var gracePeriodSecs int64
+func buildPrePullDaemonSet(component, image, pauseImage string) *apps.DaemonSet {
 	return &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      addPrepullPrefix(component),
@@ -175,18 +175,32 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 					},
 				},
 				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+					// Use an init container to prepull the target component image.
+					// Once the prepull completes, the "component --version" command is executed
+					// to get an exit code of 0.
+					// After the init container completes a regular container with "pause"
+					// will start to get this Pod in Running state with a blocking container process.
+					// Note that DaemonSet Pods can only use RestartPolicy of Always, so there has
+					// to be a blocking process to achieve the Running state.
+					InitContainers: []v1.Container{
 						{
 							Name:    component,
 							Image:   image,
-							Command: []string{"/bin/sleep", "3600"},
+							Command: []string{component, "--version"},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "pause",
+							Image:   pauseImage,
+							Command: []string{"/pause"},
 						},
 					},
 					NodeSelector: map[string]string{
 						constants.LabelNodeRoleMaster: "",
 					},
 					Tolerations:                   []v1.Toleration{constants.ControlPlaneToleration},
-					TerminationGracePeriodSeconds: &gracePeriodSecs,
+					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(0),
 					// Explicitly add a PodSecurityContext to allow these Pods to run as non-root.
 					// This prevents restrictive PSPs from blocking the Pod creation.
 					SecurityContext: &v1.PodSecurityContext{
