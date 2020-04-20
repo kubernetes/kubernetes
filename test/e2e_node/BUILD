@@ -21,6 +21,8 @@ go_library(
         "util_sriov.go",
         "util_xfs_linux.go",
         "util_xfs_unsupported.go",
+        "utils_linux.go",
+        "utils_unsupported.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e_node",
     visibility = ["//visibility:public"],

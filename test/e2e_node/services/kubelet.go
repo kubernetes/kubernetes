@@ -194,6 +194,10 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		unitName := fmt.Sprintf("kubelet-%s.service", unitTimestamp)
 		cmdArgs = append(cmdArgs,
 			systemdRun,
+			"-p", "Delegate=true",
+			"-p", "CPUAccounting=true",
+			"-p", "MemoryAccounting=true",
+			"-p", "TasksAccounting=true",
 			"--unit="+unitName,
 			"--slice=runtime.slice",
 			"--remain-after-exit",

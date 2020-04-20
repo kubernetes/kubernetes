@@ -18,15 +18,18 @@ package cm
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog"
@@ -36,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -228,6 +232,12 @@ func (m *cgroupManagerImpl) buildCgroupPaths(name CgroupName) map[string]string 
 	return cgroupPaths
 }
 
+// buildCgroupUnifiedPath builds a path to the specified name.
+func (m *cgroupManagerImpl) buildCgroupUnifiedPath(name CgroupName) string {
+	cgroupFsAdaptedName := m.Name(name)
+	return path.Join(cmutil.CgroupRoot, cgroupFsAdaptedName)
+}
+
 // TODO(filbranden): This logic belongs in libcontainer/cgroup/systemd instead.
 // It should take a libcontainerconfigs.Cgroup.Path field (rather than Name and Parent)
 // and split it appropriately, using essentially the logic below.
@@ -246,6 +256,21 @@ func updateSystemdCgroupInfo(cgroupConfig *libcontainerconfigs.Cgroup, cgroupNam
 
 // Exists checks if all subsystem cgroups already exist
 func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		cgroupPath := m.buildCgroupUnifiedPath(name)
+		neededControllers := getSupportedUnifiedControllers()
+		enabledControllers, err := readUnifiedControllers(cgroupPath)
+		if err != nil {
+			return false
+		}
+		difference := neededControllers.Difference(enabledControllers)
+		if difference.Len() > 0 {
+			klog.V(4).Infof("The Cgroup %v has some missing controllers: %v", name, difference)
+			return false
+		}
+		return true
+	}
+
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := m.buildCgroupPaths(name)
 
@@ -338,7 +363,7 @@ func getSupportedSubsystems() map[subsystem]bool {
 	return supportedSubsystems
 }
 
-// setSupportedSubsystems sets cgroup resource limits only on the supported
+// setSupportedSubsystemsV1 sets cgroup resource limits on cgroup v1 only on the supported
 // subsystems. ie. cpu and memory. We don't use libcontainer's cgroup/fs/Set()
 // method as it doesn't allow us to skip updates on the devices cgroup
 // Allowing or denying all devices by writing 'a' to devices.allow or devices.deny is
@@ -347,7 +372,7 @@ func getSupportedSubsystems() map[subsystem]bool {
 // We would like to skip setting any values on the device cgroup in this case
 // but this is not possible with libcontainers Set() method
 // See https://github.com/opencontainers/runc/issues/932
-func setSupportedSubsystems(cgroupConfig *libcontainerconfigs.Cgroup) error {
+func setSupportedSubsystemsV1(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	for sys, required := range getSupportedSubsystems() {
 		if _, ok := cgroupConfig.Paths[sys.Name()]; !ok {
 			if required {
@@ -386,6 +411,106 @@ func getCpuMax(cpuQuota *int64, cpuPeriod *uint64) string {
 		periodStr = strconv.FormatUint(*cpuPeriod, 10)
 	}
 	return fmt.Sprintf("%s %s", quotaStr, periodStr)
+}
+
+// readUnifiedControllers reads the controllers available at the specified cgroup
+func readUnifiedControllers(path string) (sets.String, error) {
+	controllersFileContent, err := ioutil.ReadFile(filepath.Join(path, "cgroup.controllers"))
+	if err != nil {
+		return nil, err
+	}
+	controllers := strings.Fields(string(controllersFileContent))
+	return sets.NewString(controllers...), nil
+}
+
+var (
+	availableRootControllersOnce sync.Once
+	availableRootControllers     sets.String
+)
+
+// getSupportedUnifiedControllers returns a set of supported controllers when running on cgroup v2
+func getSupportedUnifiedControllers() sets.String {
+	// This is the set of controllers used by the Kubelet
+	supportedControllers := sets.NewString("cpu", "cpuset", "memory", "hugetlb")
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
+		supportedControllers.Insert("pids")
+	}
+	// Memoize the set of controllers that are present in the root cgroup
+	availableRootControllersOnce.Do(func() {
+		var err error
+		availableRootControllers, err = readUnifiedControllers(cmutil.CgroupRoot)
+		if err != nil {
+			panic(fmt.Errorf("cannot read cgroup controllers at %s", cmutil.CgroupRoot))
+		}
+	})
+	// Return the set of controllers that are supported both by the Kubelet and by the kernel
+	return supportedControllers.Intersection(availableRootControllers)
+}
+
+// propagateControllers on an unified hierarchy enables all the supported controllers for the specified cgroup
+func propagateControllers(path string) error {
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("failed to create cgroup %q : %v", path, err)
+	}
+
+	// Retrieve all the supported controllers from the cgroup root
+	controllersFileContent, err := ioutil.ReadFile(filepath.Join(cmutil.CgroupRoot, "cgroup.controllers"))
+	if err != nil {
+		return fmt.Errorf("failed to read controllers from %q : %v", cmutil.CgroupRoot, err)
+	}
+
+	supportedControllers := getSupportedUnifiedControllers()
+
+	// The retrieved content looks like: "cpuset cpu io memory hugetlb pids".  Prepend each of the controllers
+	// with '+', so we have something like "+cpuset +cpu +io +memory +hugetlb +pids"
+	controllers := ""
+	for _, controller := range strings.Fields(string(controllersFileContent)) {
+		// ignore controllers we don't care about
+		if !supportedControllers.Has(controller) {
+			continue
+		}
+
+		sep := " +"
+		if controllers == "" {
+			sep = "+"
+		}
+		controllers = controllers + sep + controller
+	}
+
+	current := cmutil.CgroupRoot
+	relPath, err := filepath.Rel(cmutil.CgroupRoot, path)
+	if err != nil {
+		return fmt.Errorf("failed to get relative path to cgroup root from %q: %v", path, err)
+	}
+	// Write the controllers list to each "cgroup.subtree_control" file until it reaches the parent cgroup.
+	// For the /foo/bar/baz cgroup, controllers must be enabled sequentially in the files:
+	// - /sys/fs/cgroup/foo/cgroup.subtree_control
+	// - /sys/fs/cgroup/foo/bar/cgroup.subtree_control
+	for _, p := range strings.Split(filepath.Dir(relPath), "/") {
+		current = filepath.Join(current, p)
+		if err := ioutil.WriteFile(filepath.Join(current, "cgroup.subtree_control"), []byte(controllers), 0755); err != nil {
+			return fmt.Errorf("failed to enable controllers on %q: %v", cmutil.CgroupRoot, err)
+		}
+	}
+	return nil
+}
+
+// setResourcesV2 sets cgroup resource limits on cgroup v2
+func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
+	if err := propagateControllers(cgroupConfig.Path); err != nil {
+		return err
+	}
+	allowAll := true
+	cgroupConfig.Resources.AllowAllDevices = &allowAll
+
+	manager, err := cgroupfs2.NewManager(cgroupConfig, cgroupConfig.Path, false)
+	if err != nil {
+		return fmt.Errorf("failed to create cgroup v2 manager: %v", err)
+	}
+	config := &libcontainerconfigs.Config{
+		Cgroups: cgroupConfig,
+	}
+	return manager.Set(config)
 }
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
@@ -454,12 +579,17 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	resourceConfig := cgroupConfig.ResourceParameters
 	resources := m.toResources(resourceConfig)
 
-	cgroupPaths := m.buildCgroupPaths(cgroupConfig.Name)
-
 	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
 		Resources: resources,
-		Paths:     cgroupPaths,
 	}
+
+	unified := libcontainercgroups.IsCgroup2UnifiedMode()
+	if unified {
+		libcontainerCgroupConfig.Path = m.buildCgroupUnifiedPath(cgroupConfig.Name)
+	} else {
+		libcontainerCgroupConfig.Paths = m.buildCgroupPaths(cgroupConfig.Name)
+	}
+
 	// libcontainer consumes a different field and expects a different syntax
 	// depending on the cgroup driver in use, so we need this conditional here.
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
@@ -472,8 +602,14 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 
-	if err := setSupportedSubsystems(libcontainerCgroupConfig); err != nil {
-		return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
+	if unified {
+		if err := setResourcesV2(libcontainerCgroupConfig); err != nil {
+			return fmt.Errorf("failed to set resources for cgroup %v: %v", cgroupConfig.Name, err)
+		}
+	} else {
+		if err := setSupportedSubsystemsV1(libcontainerCgroupConfig); err != nil {
+			return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
+		}
 	}
 	return nil
 }
@@ -619,10 +755,25 @@ func toResourceStats(stats *libcontainercgroups.Stats) *ResourceStats {
 
 // Get sets the ResourceParameters of the specified cgroup as read from the cgroup fs
 func (m *cgroupManagerImpl) GetResourceStats(name CgroupName) (*ResourceStats, error) {
-	cgroupPaths := m.buildCgroupPaths(name)
-	stats, err := getStatsSupportedSubsystems(cgroupPaths)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get stats supported cgroup subsystems for cgroup %v: %v", name, err)
+	var err error
+	var stats *libcontainercgroups.Stats
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		cgroupPath := m.buildCgroupUnifiedPath(name)
+		manager, err := cgroupfs2.NewManager(nil, cgroupPath, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cgroup v2 manager: %v", err)
+		}
+
+		stats, err = manager.GetStats()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get stats for cgroup %v: %v", name, err)
+		}
+	} else {
+		cgroupPaths := m.buildCgroupPaths(name)
+		stats, err = getStatsSupportedSubsystems(cgroupPaths)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get stats supported cgroup subsystems for cgroup %v: %v", name, err)
+		}
 	}
 	return toResourceStats(stats), nil
 }
