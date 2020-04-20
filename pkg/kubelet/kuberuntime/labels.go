@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -39,6 +40,8 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+
+	podAnnotationSuffixForContainerLabel = "containers-label.alpha.kubernetes.io"
 )
 
 type labeledPodSandboxInfo struct {
@@ -101,7 +104,59 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
 
+	commonLabels := map[string]string{}
+	for k, v := range pod.Annotations {
+		isContainerLabel, containerName, labelKey := parseContainerLabelFromAnnotationKey(k)
+		if !isContainerLabel {
+			continue
+		}
+
+		if containerName == "" {
+			commonLabels[labelKey] = v
+		}
+		if containerName == container.Name {
+			labels[labelKey] = v
+		}
+	}
+
+	for k, v := range commonLabels {
+		if _, found := labels[k]; !found {
+			labels[k] = v
+		}
+	}
+
 	return labels
+}
+
+// parseContainerLabelFromAnnotationKey checks if v1.Pod's annotations key is used for setting container label
+// and parses the container name and label key from the annotations key.
+// if the annotation is meant for setting labels for all containers in the pod, the function returns empty string
+// as `containerName`
+// "containers-label.alpha.kubernetes.io/XXX" -> (true, "", "XXX")
+// "container_name.containers-label.alpha.kubernetes.io/YYY" -> (true, "container_name", "YYY")
+// "normal-annotation" -> (false, "", "")
+// ".containers-label.alpha.kubernetes.io/XXX" -> (false, "", "")
+func parseContainerLabelFromAnnotationKey(key string) (isContainerLabel bool, containerName string, labelKey string) {
+	sp := strings.Split(key, "/")
+	if len(sp) != 2 {
+		return false, "", ""
+	}
+
+	if !strings.HasSuffix(sp[0], podAnnotationSuffixForContainerLabel) {
+		return false, "", ""
+	}
+
+	if sp[0] == podAnnotationSuffixForContainerLabel {
+		return true, "", sp[1]
+	}
+
+	containerName = sp[0][:len(sp[0])-len(podAnnotationSuffixForContainerLabel)-1]
+
+	if len(containerName) == 0 {
+		return false, "", ""
+	}
+
+	return true, containerName, sp[1]
 }
 
 // newContainerAnnotations creates container annotations from v1.Container and v1.Pod.
