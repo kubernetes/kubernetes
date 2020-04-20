@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"bytes"
 	"context"
 	"net"
 	"reflect"
