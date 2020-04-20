@@ -1727,11 +1727,11 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 
 	// For external service
 	if publicIP == nil {
-		t.Errorf("Expected publicIP resource exists, when it is not an internal service")
+		t.Fatal("Expected publicIP resource exists, when it is not an internal service")
 	}
 
 	if publicIP.Tags == nil || publicIP.Tags[serviceTagKey] == nil {
-		t.Errorf("Expected publicIP resource has tags[%s]", serviceTagKey)
+		t.Fatalf("Expected publicIP resource does not have tags[%s]", serviceTagKey)
 	}
 
 	serviceName := getServiceName(service)
@@ -1740,7 +1740,7 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 	}
 
 	if publicIP.Tags[clusterNameKey] == nil {
-		t.Errorf("Expected publicIP resource has tags[%s]", clusterNameKey)
+		t.Fatalf("Expected publicIP resource does not have tags[%s]", clusterNameKey)
 	}
 
 	if *(publicIP.Tags[clusterNameKey]) != testClusterName {
