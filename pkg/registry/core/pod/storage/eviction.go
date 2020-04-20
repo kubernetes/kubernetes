@@ -303,11 +303,11 @@ func resourceVersionIsUnset(options *metav1.DeleteOptions) bool {
 }
 
 func createTooManyRequestsError(name string) error {
-	// TODO(mml): Add a Retry-After header.  Once there are time-based
+	// TODO: Once there are time-based
 	// budgets, we can sometimes compute a sensible suggested value.  But
-	// even without that, we can give a suggestion (10 minutes?) that
+	// even without that, we can give a suggestion (even if small) that
 	// prevents well-behaved clients from hammering us.
-	err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 0)
+	err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 10)
 	err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: fmt.Sprintf("The disruption budget %s is still being processed by the server.", name)})
 	return err
 }
