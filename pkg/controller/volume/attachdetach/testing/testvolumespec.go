@@ -23,8 +23,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
@@ -182,6 +184,60 @@ func CreateTestClient() *fake.Clientset {
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	return fakeClient
+}
+
+func CreateTestClientWithVolumeAttachment() *fake.Clientset {
+	fakeClient := &fake.Clientset{}
+	vaList := newVAlist()
+	fakeClient.AddReactor("list", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object,
+		err error) {
+		return true, vaList, nil
+	})
+
+	fakeClient.AddReactor("delete", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object,
+		err error) {
+		vaList.Items = []storagev1.VolumeAttachment{}
+		return true, nil, nil
+	})
+	fakeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (handled bool, ret runtime.Object,
+		err error) {
+		return true, nil, errors.NewNotFound(schema.GroupResource{"v1", "PersistentVolumes"}, "")
+	})
+	fakeWatch := watch.NewFake()
+	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+
+	return fakeClient
+}
+
+func newVAlist() *storagev1.VolumeAttachmentList {
+	obj := &storagev1.VolumeAttachmentList{}
+	vaNamePrefix := "testva"
+	pvNamePrefix := "testpv"
+	for i := 0; i < 2; i++ {
+		var vaName string
+		var pvName string
+		if i != 0 {
+			vaName = fmt.Sprintf("%s-%d", vaNamePrefix, i)
+			pvName = fmt.Sprintf("%s-%d", pvNamePrefix, i)
+		} else {
+			vaName = vaNamePrefix
+			pvName = pvNamePrefix
+		}
+		va := storagev1.VolumeAttachment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: vaName,
+			},
+			Spec: storagev1.VolumeAttachmentSpec{
+				Attacher: "testAttacher",
+				Source: storagev1.VolumeAttachmentSource{
+					PersistentVolumeName: &pvName,
+				},
+				NodeName: "testnode",
+			},
+		}
+		obj.Items = append(obj.Items, va)
+	}
+	return obj
 }
 
 // NewPod returns a test pod object

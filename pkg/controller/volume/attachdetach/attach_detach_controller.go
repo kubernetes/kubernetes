@@ -100,6 +100,8 @@ var DefaultTimerConfig TimerConfig = TimerConfig{
 	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Minute,
 }
 
+const volNameSep = "^"
+
 // AttachDetachController defines the operations supported by this controller.
 type AttachDetachController interface {
 	Run(stopCh <-chan struct{})
@@ -413,13 +415,15 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 		if va.Spec.Source.PersistentVolumeName == nil {
 			continue
 		}
-		var volumeName string
 		driverName := va.Spec.Attacher
 		pluginName := csi.CSIPluginName
 		pvName := *va.Spec.Source.PersistentVolumeName
 		pv, err := adc.pvLister.Get(pvName)
-		var uniqueVolumeName v1.UniqueVolumeName
-		if err != nil && apierrors.IsNotFound(err) {
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				klog.Error(err)
+				continue
+			}
 			if _, err = adc.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvName,
 				metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
 				deleteError := adc.kubeClient.StorageV1().VolumeAttachments().Delete(context.TODO(), va.Name, metav1.DeleteOptions{})
@@ -428,8 +432,11 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 				}
 			}
 		}
-		volumeName = fmt.Sprintf("%s%s%s", driverName, "^", pv.Spec.CSI.VolumeHandle)
-		uniqueVolumeName = volumeutil.GetUniqueVolumeName(pluginName, volumeName)
+		if pv == nil {
+			continue
+		}
+		volumeName := fmt.Sprintf("%s%s%s", driverName, volNameSep, pv.Spec.CSI.VolumeHandle)
+		uniqueVolumeName := volumeutil.GetUniqueVolumeName(pluginName, volumeName)
 		found := false
 		for _, volumeToAttach := range volumesToAttach {
 			if volumeToAttach.NodeName == nodeName && volumeToAttach.VolumeName == v1.UniqueVolumeName(volumeName) {
@@ -655,13 +662,13 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 }
 
 func (adc *attachDetachController) vaAdd(obj interface{}) {
-	klog.Infof("Processing va %+v", obj)
+	klog.V(5).Infof("Processing va %+v", obj)
 	va, ok := obj.(*storage.VolumeAttachment)
 	if va == nil || !ok {
 		return
 	}
 	adc.enqueueVA(&va)
-	klog.Infof("Processing va %+v success", obj)
+	klog.V(5).Infof("Enqueue va %+v success", obj)
 
 }
 
@@ -800,7 +807,7 @@ func (adc *attachDetachController) syncVAByKey(key string) error {
 
 	volumesToAttach := adc.desiredStateOfWorld.GetVolumesToAttach()
 	if len(volumesToAttach) == 0 {
-		klog.Info("can not get volumes to attach")
+		klog.V(4).Info("Can not get volumes to attach")
 		//return fmt.Errorf("can not get volumes to attach")
 	}
 
@@ -808,7 +815,10 @@ func (adc *attachDetachController) syncVAByKey(key string) error {
 	pv, err := adc.pvLister.Get(pvName)
 	// If the pv also has been deleted, we can not find volumeHandler,
 	// we need delete the volumeAttachment directly.
-	if err != nil && apierrors.IsNotFound(err) {
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
 		if _, err = adc.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvName,
 			metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
 			deleteError := adc.kubeClient.StorageV1().VolumeAttachments().Delete(context.TODO(), va.Name, metav1.DeleteOptions{})
@@ -819,12 +829,10 @@ func (adc *attachDetachController) syncVAByKey(key string) error {
 		}
 	}
 
-	var volumeName string
 	driverName := va.Spec.Attacher
 	pluginName := csi.CSIPluginName
-	var uniqueVolumeName v1.UniqueVolumeName
-	volumeName = fmt.Sprintf("%s%s%s", driverName, "^", pv.Spec.CSI.VolumeHandle)
-	uniqueVolumeName = volumeutil.GetUniqueVolumeName(pluginName, volumeName)
+	volumeName := fmt.Sprintf("%s%s%s", driverName, volNameSep, pv.Spec.CSI.VolumeHandle)
+	uniqueVolumeName := volumeutil.GetUniqueVolumeName(pluginName, volumeName)
 	found := false
 	for _, volumeToAttach := range volumesToAttach {
 		if volumeToAttach.NodeName == nodeName && volumeToAttach.VolumeName == v1.UniqueVolumeName(volumeName) {

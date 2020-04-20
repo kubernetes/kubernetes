@@ -95,7 +95,6 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
 		t.Fatalf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
-
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 
@@ -139,6 +138,126 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 				pod.Spec.NodeName)
 		}
 	}
+}
+
+func Test_AttachDetachControllerVolumeAttachment_GC(t *testing.T) {
+	// Arrange
+	fakeKubeClient := controllervolumetesting.CreateTestClientWithVolumeAttachment()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informerFactory.Core().V1().Pods()
+	nodeInformer := informerFactory.Core().V1().Nodes()
+	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+	pvInformer := informerFactory.Core().V1().PersistentVolumes()
+	vaInformer := informerFactory.Storage().V1().VolumeAttachments()
+
+	adc := &attachDetachController{
+		kubeClient:  fakeKubeClient,
+		pvcLister:   pvcInformer.Lister(),
+		pvcsSynced:  pvcInformer.Informer().HasSynced,
+		pvLister:    pvInformer.Lister(),
+		pvsSynced:   pvInformer.Informer().HasSynced,
+		podLister:   podInformer.Lister(),
+		podsSynced:  podInformer.Informer().HasSynced,
+		nodeLister:  nodeInformer.Lister(),
+		nodesSynced: nodeInformer.Informer().HasSynced,
+		vaLister:    vaInformer.Lister(),
+		vaSynced:    vaInformer.Informer().HasSynced,
+		cloud:       nil,
+	}
+
+	ctx := context.TODO()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	// Act
+	plugins := controllervolumetesting.CreateTestPlugin()
+	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+
+	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
+		t.Fatalf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
+	}
+
+	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
+	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
+
+	err := adc.populateActualStateOfWorld()
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
+	}
+
+	err = adc.populateDesiredStateOfWorld()
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
+	}
+
+	vas, err := adc.kubeClient.StorageV1().VolumeAttachments().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
+	}
+	if len(vas.Items) != 0 {
+		t.Fatal("Remove volume attachment failed")
+	}
+
+}
+
+func Test_AttachDetachControllerVolumeAttachment_MarkUncertain(t *testing.T) {
+	// Arrange
+	fakeKubeClient := controllervolumetesting.CreateTestClientWithVolumeAttachment()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informerFactory.Core().V1().Pods()
+	nodeInformer := informerFactory.Core().V1().Nodes()
+	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+	pvInformer := informerFactory.Core().V1().PersistentVolumes()
+	vaInformer := informerFactory.Storage().V1().VolumeAttachments()
+
+	adc := &attachDetachController{
+		kubeClient:  fakeKubeClient,
+		pvcLister:   pvcInformer.Lister(),
+		pvcsSynced:  pvcInformer.Informer().HasSynced,
+		pvLister:    pvInformer.Lister(),
+		pvsSynced:   pvInformer.Informer().HasSynced,
+		podLister:   podInformer.Lister(),
+		podsSynced:  podInformer.Informer().HasSynced,
+		nodeLister:  nodeInformer.Lister(),
+		nodesSynced: nodeInformer.Informer().HasSynced,
+		vaLister:    vaInformer.Lister(),
+		vaSynced:    vaInformer.Informer().HasSynced,
+		cloud:       nil,
+	}
+
+	ctx := context.TODO()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	// Act
+	plugins := controllervolumetesting.CreateTestPlugin()
+	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+
+	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
+		t.Fatalf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
+	}
+
+	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
+	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
+
+	err := adc.populateActualStateOfWorld()
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
+	}
+
+	err = adc.populateDesiredStateOfWorld()
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
+	}
+
+	vas, err := adc.kubeClient.StorageV1().VolumeAttachments().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
+	}
+	if len(vas.Items) != 0 {
+		t.Fatal("Remove volume attachment failed")
+	}
+
 }
 
 func Test_AttachDetachControllerRecovery(t *testing.T) {
