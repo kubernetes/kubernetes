@@ -17,8 +17,11 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubelet/types"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -235,5 +238,110 @@ func TestPodAnnotations(t *testing.T) {
 	podSandboxInfo := getPodSandboxInfoFromAnnotations(annotations)
 	if !reflect.DeepEqual(podSandboxInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, podSandboxInfo)
+	}
+}
+
+func TestNewContainerLabels(t *testing.T) {
+	container1Name := "container1"
+	container1 := &v1.Container{
+		Name: container1Name,
+	}
+
+	container2Name := "container2"
+	container2 := &v1.Container{
+		Name: container2Name,
+	}
+
+	cLabelKey1 := "label_1"
+	cLabelVal1 := "label_1_val"
+	c1LabelOverwrite := "container_1_label_1"
+	c2LabelKey := "container_2_label"
+	c2LabelVal := "container_2_label_val"
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod_all_labels_name",
+			Namespace: "pod_all_labels_namespace",
+			UID:       "pod_all_labels_uid",
+			Annotations: map[string]string{
+				fmt.Sprintf("%s/%s", podAnnotationSuffixForContainerLabel, cLabelKey1):                    cLabelVal1,
+				fmt.Sprintf("%s.%s/%s", container1Name, podAnnotationSuffixForContainerLabel, cLabelKey1): c1LabelOverwrite,
+				fmt.Sprintf("%s.%s/%s", container2Name, podAnnotationSuffixForContainerLabel, c2LabelKey): c2LabelVal,
+				fmt.Sprintf(".%s/%s", podAnnotationSuffixForContainerLabel, cLabelKey1):                   "shouldn't overwrite",
+				"other-annotation": "val",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{*container1, *container2},
+		},
+	}
+
+	var tests = []struct {
+		description string
+		container   *v1.Container
+		pod         *v1.Pod
+		expected    map[string]string
+	}{
+		{
+			"container 1",
+			container1,
+			pod,
+			map[string]string{
+				types.KubernetesPodNameLabel:       pod.Name,
+				types.KubernetesPodNamespaceLabel:  pod.Namespace,
+				types.KubernetesPodUIDLabel:        string(pod.UID),
+				types.KubernetesContainerNameLabel: container1.Name,
+				cLabelKey1:                         c1LabelOverwrite,
+			},
+		},
+		{
+			"container 2",
+			container2,
+			pod,
+			map[string]string{
+				types.KubernetesPodNameLabel:       pod.Name,
+				types.KubernetesPodNamespaceLabel:  pod.Namespace,
+				types.KubernetesPodUIDLabel:        string(pod.UID),
+				types.KubernetesContainerNameLabel: container2.Name,
+				cLabelKey1:                         cLabelVal1,
+				c2LabelKey:                         c2LabelVal,
+			},
+		},
+	}
+
+	// Test whether we can get right information from label
+	for _, test := range tests {
+		labels := newContainerLabels(test.container, test.pod)
+		if !reflect.DeepEqual(labels, test.expected) {
+			t.Errorf("%v: expected %v, got %v", test.description, test.expected, labels)
+		}
+	}
+}
+
+func TestParseContainerLabelFromAnnotationKey(t *testing.T) {
+	var tests = []struct {
+		description      string
+		annotation       string
+		isContainerLabel bool
+		containerName    string
+		labelKey         string
+	}{
+		{"test set all containers' label", "containers-label.alpha.kubernetes.io/XXX", true, "", "XXX"},
+		{"test set specific container label", "container_name.containers-label.alpha.kubernetes.io/YYY", true, "container_name", "YYY"},
+		{"test normal annotation", "normal-annotation", false, "", ""},
+		{"test empty container name", ".containers-label.alpha.kubernetes.io/XXX", false, "", ""},
+	}
+
+	for _, test := range tests {
+		isContainerLabel, containerName, labelKey := parseContainerLabelFromAnnotationKey(test.annotation)
+		if test.isContainerLabel != isContainerLabel {
+			t.Errorf("%v: expected %v, got %v", test.description, test.isContainerLabel, isContainerLabel)
+		}
+		if test.containerName != containerName {
+			t.Errorf("%v: expected %v, got %v", test.description, test.containerName, containerName)
+		}
+		if test.labelKey != labelKey {
+			t.Errorf("%v: expected %v, got %v", test.description, test.labelKey, labelKey)
+		}
 	}
 }
