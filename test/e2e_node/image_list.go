@@ -98,7 +98,11 @@ func (dp *dockerPuller) Name() string {
 }
 
 func (dp *dockerPuller) Pull(image string) ([]byte, error) {
-	return exec.Command("docker", "pull", image).CombinedOutput()
+	// TODO(random-liu): Use docker client to get rid of docker binary dependency.
+	if exec.Command("docker", "inspect", "--type=image", image).Run() != nil {
+		return exec.Command("docker", "pull", image).CombinedOutput()
+	}
+	return nil, nil
 }
 
 type remotePuller struct {
