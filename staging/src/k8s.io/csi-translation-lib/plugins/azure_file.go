@@ -18,11 +18,13 @@ package plugins
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 )
 
 const (
@@ -32,13 +34,18 @@ const (
 	AzureFileInTreePluginName = "kubernetes.io/azure-file"
 
 	separator        = "#"
-	volumeIDTemplate = "%s#%s#%s"
+	volumeIDTemplate = "%s#%s#%s#%s"
 	// Parameter names defined in azure file CSI driver, refer to
 	// https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
 	azureFileShareName = "shareName"
+
+	secretNameTemplate     = "azure-storage-account-%s-secret"
+	defaultSecretNamespace = "default"
 )
 
 var _ InTreePlugin = &azureFileCSITranslator{}
+
+var secretNameFormatRE = regexp.MustCompile(`azure-storage-account-(.+)-secret`)
 
 // azureFileCSITranslator handles translation of PV spec from In-tree
 // Azure File to CSI Azure File and vice versa
@@ -61,9 +68,14 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 		return nil, fmt.Errorf("volume is nil or Azure File not defined on volume")
 	}
 
-	var (
-		azureSource = volume.AzureFile
+	azureSource := volume.AzureFile
+	accountName, err := getStorageAccountName(azureSource.SecretName)
+	if err != nil {
+		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
+		accountName = azureSource.SecretName
+	}
 
+	var (
 		pv = &v1.PersistentVolume{
 			ObjectMeta: metav1.ObjectMeta{
 				// Must be unique per disk as it is used as the unique part of the
@@ -74,12 +86,12 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					CSI: &v1.CSIPersistentVolumeSource{
 						Driver:           AzureFileDriverName,
-						VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", azureSource.SecretName, azureSource.ShareName),
+						VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, ""),
 						ReadOnly:         azureSource.ReadOnly,
 						VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
-						NodePublishSecretRef: &v1.SecretReference{
-							Name:      azureSource.ShareName,
-							Namespace: "default",
+						NodeStageSecretRef: &v1.SecretReference{
+							Name:      azureSource.SecretName,
+							Namespace: defaultSecretNamespace,
 						},
 					},
 				},
@@ -98,15 +110,21 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		return nil, fmt.Errorf("pv is nil or Azure File source not defined on pv")
 	}
 
-	var (
-		azureSource = pv.Spec.PersistentVolumeSource.AzureFile
-		volumeID    = fmt.Sprintf(volumeIDTemplate, "", azureSource.SecretName, azureSource.ShareName)
+	azureSource := pv.Spec.PersistentVolumeSource.AzureFile
+	accountName, err := getStorageAccountName(azureSource.SecretName)
+	if err != nil {
+		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
+		accountName = azureSource.SecretName
+	}
+	volumeID := fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, "")
 
+	var (
 		// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
 		csiSource = &v1.CSIPersistentVolumeSource{
 			Driver: AzureFileDriverName,
-			NodePublishSecretRef: &v1.SecretReference{
-				Name: azureSource.ShareName,
+			NodeStageSecretRef: &v1.SecretReference{
+				Name:      azureSource.SecretName,
+				Namespace: defaultSecretNamespace,
 			},
 			ReadOnly:         azureSource.ReadOnly,
 			VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
@@ -115,7 +133,7 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 	)
 
 	if azureSource.SecretNamespace != nil {
-		csiSource.NodePublishSecretRef.Namespace = *azureSource.SecretNamespace
+		csiSource.NodeStageSecretRef.Namespace = *azureSource.SecretNamespace
 	}
 
 	pv.Spec.PersistentVolumeSource.AzureFile = nil
@@ -137,22 +155,21 @@ func (t *azureFileCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 		ReadOnly: csiSource.ReadOnly,
 	}
 
-	if csiSource.NodePublishSecretRef != nil && csiSource.NodePublishSecretRef.Name != "" {
-		azureSource.SecretName = csiSource.NodePublishSecretRef.Name
-		azureSource.SecretNamespace = &csiSource.NodePublishSecretRef.Namespace
+	if csiSource.NodeStageSecretRef != nil && csiSource.NodeStageSecretRef.Name != "" {
+		azureSource.SecretName = csiSource.NodeStageSecretRef.Name
+		azureSource.SecretNamespace = &csiSource.NodeStageSecretRef.Namespace
 		if csiSource.VolumeAttributes != nil {
 			if shareName, ok := csiSource.VolumeAttributes[azureFileShareName]; ok {
 				azureSource.ShareName = shareName
 			}
 		}
 	} else {
-		_, _, fileShareName, err := getFileShareInfo(csiSource.VolumeHandle)
+		_, storageAccount, fileShareName, _, err := getFileShareInfo(csiSource.VolumeHandle)
 		if err != nil {
 			return nil, err
 		}
 		azureSource.ShareName = fileShareName
-		// to-do: for dynamic provision scenario in CSI, it uses cluster's identity to get storage account key
-		// secret for the file share is not created, we may create a serect here
+		azureSource.SecretName = fmt.Sprintf(secretNameTemplate, storageAccount)
 	}
 
 	pv.Spec.CSI = nil
@@ -190,12 +207,25 @@ func (t *azureFileCSITranslator) RepairVolumeHandle(volumeHandle, nodeID string)
 }
 
 // get file share info according to volume id, e.g.
-// input: "rg#f5713de20cde511e8ba4900#pvc-file-dynamic-17e43f84-f474-11e8-acd0-000d3a00df41"
-// output: rg, f5713de20cde511e8ba4900, pvc-file-dynamic-17e43f84-f474-11e8-acd0-000d3a00df41
-func getFileShareInfo(id string) (string, string, string, error) {
+// input: "rg#f5713de20cde511e8ba4900#pvc-file-dynamic-17e43f84-f474-11e8-acd0-000d3a00df41#diskname.vhd"
+// output: rg, f5713de20cde511e8ba4900, pvc-file-dynamic-17e43f84-f474-11e8-acd0-000d3a00df41, diskname.vhd
+func getFileShareInfo(id string) (string, string, string, string, error) {
 	segments := strings.Split(id, separator)
 	if len(segments) < 3 {
-		return "", "", "", fmt.Errorf("error parsing volume id: %q, should at least contain two #", id)
+		return "", "", "", "", fmt.Errorf("error parsing volume id: %q, should at least contain two #", id)
 	}
-	return segments[0], segments[1], segments[2], nil
+	var diskName string
+	if len(segments) > 3 {
+		diskName = segments[3]
+	}
+	return segments[0], segments[1], segments[2], diskName, nil
+}
+
+// get storage account name from secret name
+func getStorageAccountName(secretName string) (string, error) {
+	matches := secretNameFormatRE.FindStringSubmatch(secretName)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("could not get account name from %s, correct format: %s", secretName, secretNameFormatRE)
+	}
+	return matches[1], nil
 }
