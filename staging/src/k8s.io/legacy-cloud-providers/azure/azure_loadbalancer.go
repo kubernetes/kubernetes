@@ -1731,7 +1731,7 @@ func subnet(service *v1.Service) *string {
 
 // getServiceLoadBalancerMode parses the mode value.
 // if the value is __auto__ it returns isAuto = TRUE.
-// if anything else it returns the unique VM set names after triming spaces.
+// if anything else it returns the unique VM set names after trimming spaces.
 func getServiceLoadBalancerMode(service *v1.Service) (hasMode bool, isAuto bool, vmSetNames []string) {
 	mode, hasMode := service.Annotations[ServiceAnnotationLoadBalancerMode]
 	mode = strings.TrimSpace(mode)
