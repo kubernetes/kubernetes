@@ -2840,8 +2840,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 })
 
-// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
+var _ = SIGDescribe("ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	var loadBalancerCreateTimeout time.Duration
 
@@ -3069,7 +3068,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}
 	})
 
-	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #90047 is fixed.
+	ginkgo.It("should handle updates to ExternalTrafficPolicy field [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
