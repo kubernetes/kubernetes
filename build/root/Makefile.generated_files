@@ -119,7 +119,7 @@ ALL_K8S_TAG_FILES := $(shell                             \
 #     // +k8s:prerelease-lifecycle-gen=true
 #
 
-# The result file, in each pkg, of deep-copy generation.
+# The result file, in each pkg, of prerelease-lifecycle generation.
 PRERELEASE_LIFECYCLE_BASENAME := $(GENERATED_FILE_PREFIX)prerelease-lifecycle
 PRERELEASE_LIFECYCLE_FILENAME := $(PRERELEASE_LIFECYCLE_BASENAME).go
 
@@ -131,7 +131,7 @@ ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:prerelease-lifecycle-gen tags)
 endif
 PRERELEASE_LIFECYCLE_DIRS := $(shell                                             \
-    grep --color=never -l '+k8s:prerelease-lifecycle-gen=' $(ALL_K8S_TAG_FILES)  \
+    grep --color=never -l '+k8s:prerelease-lifecycle-gen=true' $(ALL_K8S_TAG_FILES)  \
         | xargs -n1 dirname                                          \
         | LC_ALL=C sort -u                                           \
 )
