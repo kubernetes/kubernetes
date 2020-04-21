@@ -910,13 +910,16 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		podWatchChan := podWatch.ResultChan()
 		ginkgo.By("watching for Pod to be ready")
+		eventFound := false
 		for watchEvent := range podWatchChan {
 			podWatchEvent, ok := watchEvent.Object.(*v1.Pod)
 			framework.ExpectEqual(ok, true, "unable to assert runtime object type to v1.Pod")
 			if podWatchEvent.Status.Phase == v1.PodRunning {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find running Pod")
 
 		ginkgo.By("patching the Pod with a new Label and updated data")
 		podPatch, err := json.Marshal(v1.Pod{
@@ -978,11 +981,14 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to delete Pod by collection")
 
 		ginkgo.By("watching for the Pod to be deleted")
+		eventFound = false
 		for watchEvent := range podWatchChan {
 			if watchEvent.Type == watch.Deleted {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find Pod %v event", watch.Deleted)
 	})
 })
 
