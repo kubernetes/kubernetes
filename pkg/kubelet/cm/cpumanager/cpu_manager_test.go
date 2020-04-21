@@ -269,12 +269,14 @@ func TestCPUManagerAdd(t *testing.T) {
 				err: testCase.updateErr,
 			},
 			containerMap:      containermap.NewContainerMap(),
-			activePods:        func() []*v1.Pod { return nil },
 			podStatusProvider: mockPodStatusProvider{},
+			sourcesReady:      &sourcesReadyStub{},
 		}
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
+		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
+
 		err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
@@ -487,8 +489,11 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			state:             state,
 			containerRuntime:  mockRuntimeService{},
 			containerMap:      containermap.NewContainerMap(),
-			activePods:        func() []*v1.Pod { return nil },
 			podStatusProvider: mockPodStatusProvider{},
+			sourcesReady:      &sourcesReadyStub{},
+			activePods: func() []*v1.Pod {
+				return []*v1.Pod{testCase.pod}
+			},
 		}
 
 		containers := append(
@@ -1021,12 +1026,14 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 				err: testCase.updateErr,
 			},
 			containerMap:      containermap.NewContainerMap(),
-			activePods:        func() []*v1.Pod { return nil },
 			podStatusProvider: mockPodStatusProvider{},
+			sourcesReady:      &sourcesReadyStub{},
 		}
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
+		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
+
 		err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
 			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
