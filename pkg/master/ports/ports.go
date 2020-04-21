@@ -21,6 +21,9 @@ import (
 )
 
 const (
+	// KubeletHealthzPort is the default port for the kubelet healthz port.
+	// May be overridden by a flag at startup.
+	KubeletHealthzPort = 10248
 	// ProxyStatusPort is the default port for the proxy metrics server.
 	// May be overridden by a flag at startup.
 	ProxyStatusPort = 10249

@@ -254,13 +254,15 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 		if s.KubeletConfig.Port == 0 {
 			return nil, nil, fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
-		healthzPort := 10248
+		if s.KubeletConfig.HealthzPort == 0 {
+			return nil, nil, fmt.Errorf("must enable kubelet healthz port if proxy ssh-tunneling is specified")
+		}
 		// Set up the nodeTunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
 		// kubelet listen-addresses, we need to plumb through options.
 		healthCheckPath := &url.URL{
 			Scheme: "http",
-			Host:   net.JoinHostPort("127.0.0.1", strconv.Itoa(healthzPort)),
+			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.HealthzPort), 10)),
 			Path:   "healthz",
 		}
 		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
