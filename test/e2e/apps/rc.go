@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -210,9 +211,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 		json.Unmarshal(rcStatusUjson, &rcStatus)
 		framework.ExpectEqual(rcStatus.Status.Replicas, testRcInitialReplicaCount, "ReplicationController ReplicaSet cound does not match initial Replica count")
 
-		rcScalePatchPayload, err := json.Marshal(v1.ReplicationController{
-			Spec: v1.ReplicationControllerSpec{
-				Replicas: &testRcMaxReplicaCount,
+		rcScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: testRcMaxReplicaCount,
 			},
 		})
 		framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
