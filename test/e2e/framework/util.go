@@ -134,6 +134,9 @@ const (
 	// SnapshotCreateTimeout is how long for snapshot to create snapshotContent.
 	SnapshotCreateTimeout = 5 * time.Minute
 
+	// SnapshotDeleteTimeout is how long for snapshot to delete snapshotContent.
+	SnapshotDeleteTimeout = 5 * time.Minute
+
 	// Minimal number of nodes for the cluster to be considered large.
 	largeClusterThreshold = 100
 
