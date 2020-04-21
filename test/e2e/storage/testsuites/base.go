@@ -308,15 +308,37 @@ func (r *VolumeResource) CleanupResource() error {
 					r.Pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
 			if r.Pvc != nil {
+				cs := f.ClientSet
+				pv := r.Pv
+				if pv == nil && r.Pvc.Name != "" {
+					// This happens for late binding. Check whether we have a volume now that we need to wait for.
+					pvc, err := cs.CoreV1().PersistentVolumeClaims(r.Pvc.Namespace).Get(context.TODO(), r.Pvc.Name, metav1.GetOptions{})
+					switch {
+					case err == nil:
+						if pvc.Spec.VolumeName != "" {
+							pv, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+							if err != nil {
+								cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PV %v", pvc.Spec.VolumeName))
+							}
+						}
+					case apierrors.IsNotFound(err):
+						// Without the PVC, we cannot locate the corresponding PV. Let's
+						// hope that it is gone.
+					default:
+						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PVC %v", r.Pvc.Name))
+					}
+				}
+
 				err := e2epv.DeletePersistentVolumeClaim(f.ClientSet, r.Pvc.Name, f.Namespace.Name)
 				if err != nil {
 					cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete PVC %v", r.Pvc.Name))
 				}
-				if r.Pv != nil {
-					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, r.Pv.Name, 5*time.Second, 5*time.Minute)
+
+				if pv != nil {
+					err = e2epv.WaitForPersistentVolumeDeleted(f.ClientSet, pv.Name, 5*time.Second, 5*time.Minute)
 					if err != nil {
 						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err,
-							"Persistent Volume %v not deleted by dynamic provisioner", r.Pv.Name))
+							"Persistent Volume %v not deleted by dynamic provisioner", pv.Name))
 					}
 				}
 			}
