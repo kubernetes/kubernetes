@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -228,11 +229,11 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 }
 
 // getWaiter gets the right waiter implementation
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
+func getWaiter(dryRun bool, client clientset.Interface, timeout time.Duration) apiclient.Waiter {
 	if dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	return apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
+	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
 // InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.

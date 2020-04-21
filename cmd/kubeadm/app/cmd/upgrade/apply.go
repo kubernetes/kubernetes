@@ -145,7 +145,8 @@ func runApply(flags *applyFlags, userVersion string) error {
 		}
 	}
 
-	waiter := getWaiter(flags.dryRun, client)
+	// Set the timeout as flags.imagePullTimeout to ensure that Prepuller truly respects 'image-pull-timeout' flag
+	waiter := getWaiter(flags.dryRun, client, flags.imagePullTimeout)
 
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
@@ -158,6 +159,8 @@ func runApply(flags *applyFlags, userVersion string) error {
 	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
 		return errors.Wrap(err, "[upgrade/prepull] Failed prepulled the images for the control plane components error")
 	}
+
+	waiter = getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
 
 	// Now; perform the upgrade procedure
 	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
