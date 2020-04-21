@@ -69,6 +69,7 @@ var kubeletMarshalCases = []struct {
 			nodeStatusReportFrequency: 0s
 			nodeStatusUpdateFrequency: 0s
 			runtimeRequestTimeout: 0s
+			runtimeSandBoxTimeout: 0s
 			streamingConnectionIdleTimeout: 0s
 			syncFrequency: 0s
 			volumeStatsAggPeriod: 0s
@@ -106,6 +107,7 @@ var kubeletMarshalCases = []struct {
 			port: 12345
 			rotateCertificates: true
 			runtimeRequestTimeout: 0s
+			runtimeSandBoxTimeout: 0s
 			streamingConnectionIdleTimeout: 0s
 			syncFrequency: 0s
 			volumeStatsAggPeriod: 0s

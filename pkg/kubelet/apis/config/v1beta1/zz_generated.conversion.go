@@ -333,6 +333,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.VolumePluginDir = in.VolumePluginDir
+	out.RuntimeSandBoxTimeout = in.RuntimeSandBoxTimeout
 	return nil
 }
 
@@ -409,6 +410,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.TopologyManagerPolicy = in.TopologyManagerPolicy
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.RuntimeSandBoxTimeout = in.RuntimeSandBoxTimeout
 	out.HairpinMode = in.HairpinMode
 	out.MaxPods = in.MaxPods
 	out.PodCIDR = in.PodCIDR

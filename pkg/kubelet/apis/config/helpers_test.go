@@ -225,5 +225,6 @@ var (
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
 		"VolumePluginDir",
+		"RuntimeSandBoxTimeout.Duration",
 	)
 )

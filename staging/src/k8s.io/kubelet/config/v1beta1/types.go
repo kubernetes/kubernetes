@@ -762,6 +762,10 @@ type KubeletConfiguration struct {
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 	// +optional
 	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+	// runtimeSandBoxTimeout is the timeout for sandbox operations.
+	// Default: "4m"
+	// +optional
+	RuntimeSandBoxTimeout metav1.Duration `json:"runtimeSandBoxTimeout,omitempty"`
 }
 
 type KubeletAuthorizationMode string
