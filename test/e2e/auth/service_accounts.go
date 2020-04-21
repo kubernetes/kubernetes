@@ -628,7 +628,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	ginkgo.It("should run through the lifecycle of a ServiceAccount", func() {
 		testNamespaceName := f.Namespace.Name
 		testServiceAccountName := "testserviceaccount"
-		testSecretName := "testsecret"
 		testServiceAccountStaticLabels := map[string]string{"test-serviceaccount-static": "true"}
 		testServiceAccountStaticLabelsFlat := "test-serviceaccount-static=true"
 
@@ -641,20 +640,8 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 		_, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(context.TODO(), &testServiceAccount, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create a ServiceAccount")
-		ginkgo.By("creating a Secret")
-		testSecret := v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: testSecretName,
-			},
-			Data: map[string][]byte{
-				"test-field": []byte("test-value"),
-			},
-			Type: "Opaque",
-		}
-		_, err = f.ClientSet.CoreV1().Secrets(testNamespaceName).Create(context.TODO(), &testSecret, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create a Secret")
 
-		fmt.Println("watching for the ServiceAccount to be added")
+		ginkgo.By("watching for the ServiceAccount to be added")
 		resourceWatchTimeoutSeconds := int64(180)
 		resourceWatch, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat, TimeoutSeconds: &resourceWatchTimeoutSeconds})
 		if err != nil {
@@ -663,52 +650,54 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 
 		resourceWatchChan := resourceWatch.ResultChan()
+		eventFound := false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Added {
+				eventFound = true
 				break
 			}
 		}
-
-		defer func() {
-			ginkgo.By("deleting the ServiceAccount")
-			err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-			framework.ExpectNoError(err, "failed to delete the ServiceAccount by Collection")
-			for watchEvent := range resourceWatchChan {
-				if watchEvent.Type == watch.Deleted {
-					break
-				}
-			}
-
-			ginkgo.By("deleting the Secret")
-			err = f.ClientSet.CoreV1().Secrets(testNamespaceName).Delete(context.TODO(), testSecretName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete the Secret")
-		}()
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Added)
 
 		ginkgo.By("patching the ServiceAccount")
-		testServiceAccountPatchData, err := json.Marshal(map[string]interface{}{
-			"secrets": []map[string]interface{}{{
-				"name": testSecretName,
-			}},
+		boolFalse := false
+		testServiceAccountPatchData, err := json.Marshal(v1.ServiceAccount{
+			AutomountServiceAccountToken: &boolFalse,
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch for the ServiceAccount")
 		_, err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(context.TODO(), testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch the ServiceAccount")
+		eventFound = false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Modified {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Modified)
 
 		ginkgo.By("finding ServiceAccount in list of all ServiceAccounts (by LabelSelector)")
 		serviceAccountList, err := f.ClientSet.CoreV1().ServiceAccounts("").List(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat})
 		foundServiceAccount := false
 		for _, serviceAccountItem := range serviceAccountList.Items {
-			if serviceAccountItem.ObjectMeta.Name == testServiceAccountName && serviceAccountItem.ObjectMeta.Namespace == testNamespaceName && serviceAccountItem.Secrets[0].Name == testSecretName {
+			if serviceAccountItem.ObjectMeta.Name == testServiceAccountName && serviceAccountItem.ObjectMeta.Namespace == testNamespaceName && *serviceAccountItem.AutomountServiceAccountToken == boolFalse {
 				foundServiceAccount = true
 				break
 			}
 		}
 		framework.ExpectEqual(foundServiceAccount, true, "failed to find the created ServiceAccount")
+
+		ginkgo.By("deleting the ServiceAccount")
+		err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		framework.ExpectNoError(err, "failed to delete the ServiceAccount by Collection")
+		eventFound = false
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Deleted {
+				eventFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
 	})
 })
 
