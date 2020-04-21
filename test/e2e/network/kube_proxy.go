@@ -44,10 +44,9 @@ var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 var _ = SIGDescribe("Network", func() {
 	const (
-		testDaemonHTTPPort     = 11301
-		testDaemonTCPPort      = 11302
-		deadlineTimeoutSeconds = 5
-		postFinTimeoutSeconds  = 15
+		testDaemonHTTPPort    = 11301
+		testDaemonTCPPort     = 11302
+		postFinTimeoutSeconds = 30
 	)
 
 	fr := framework.NewDefaultFramework("network")
@@ -81,8 +80,6 @@ var _ = SIGDescribe("Network", func() {
 			nodeIP: ips[1],
 		}
 
-		zero := int64(0)
-
 		// Create a pod to check the conntrack entries on the host node
 		// It mounts the host /proc/net folder to be able to access
 		// the nf_conntrack file with the host conntrack entries
@@ -101,7 +98,7 @@ var _ = SIGDescribe("Network", func() {
 					{
 						Name:            "e2e-net-exec",
 						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: "Always",
+						ImagePullPolicy: v1.PullIfNotPresent,
 						Args:            []string{"pause"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -125,7 +122,6 @@ var _ = SIGDescribe("Network", func() {
 						},
 					},
 				},
-				TerminationGracePeriodSeconds: &zero,
 			},
 		}
 		fr.PodClient().CreateSync(hostExecPod)
@@ -152,7 +148,7 @@ var _ = SIGDescribe("Network", func() {
 					{
 						Name:            "e2e-net-client",
 						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: "Always",
+						ImagePullPolicy: v1.PullIfNotPresent,
 						Args: []string{
 							"net",
 							"--runner", "nat-closewait-client",
@@ -160,11 +156,10 @@ var _ = SIGDescribe("Network", func() {
 							fmt.Sprintf(`{"RemoteAddr":"%v", "PostFinTimeoutSeconds":%v, "TimeoutSeconds":%v, "LeakConnection":true}`,
 								net.JoinHostPort(serverNodeInfo.nodeIP, strconv.Itoa(testDaemonTCPPort)),
 								postFinTimeoutSeconds,
-								deadlineTimeoutSeconds),
+								0),
 						},
 					},
 				},
-				TerminationGracePeriodSeconds: &zero,
 			},
 		}
 
@@ -180,7 +175,7 @@ var _ = SIGDescribe("Network", func() {
 					{
 						Name:            "e2e-net-server",
 						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: "Always",
+						ImagePullPolicy: v1.PullIfNotPresent,
 						Args: []string{
 							"net",
 							"--runner", "nat-closewait-server",
@@ -198,7 +193,6 @@ var _ = SIGDescribe("Network", func() {
 						},
 					},
 				},
-				TerminationGracePeriodSeconds: &zero,
 			},
 		}
 
@@ -237,7 +231,7 @@ var _ = SIGDescribe("Network", func() {
 		cmd := fmt.Sprintf("cat /rootfs/proc/net/nf_conntrack "+
 			"| grep -m 1 'CLOSE_WAIT.*dst=%v.*dport=%v' ",
 			ip, testDaemonTCPPort)
-		if err := wait.PollImmediate(deadlineTimeoutSeconds, postFinTimeoutSeconds, func() (bool, error) {
+		if err := wait.PollImmediate(1*time.Second, postFinTimeoutSeconds, func() (bool, error) {
 			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {
