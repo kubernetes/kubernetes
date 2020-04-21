@@ -511,3 +511,8 @@ aliases:
     - bgrant0607
     - smarterclayton
     - johnbelamaric
+
+  prod-readiness-approvers:
+    - johnbelamaric
+    - wojtek-t
+    - deads2k
