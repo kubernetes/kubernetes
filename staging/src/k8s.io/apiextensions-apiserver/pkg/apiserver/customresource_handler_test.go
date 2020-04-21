@@ -151,7 +151,7 @@ func TestRouting(t *testing.T) {
 	delegateCalled := false
 	delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		delegateCalled = true
-		http.Error(w, "", 418)
+		http.Error(w, "", http.StatusTeapot)
 	})
 	customV1 := schema.GroupVersion{Group: "custom", Version: "v1"}
 	handler := &crdHandler{
