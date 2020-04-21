@@ -375,7 +375,7 @@ HTTP server:
 
 ### netexec
 
-Starts a HTTP server on given port with the following endpoints:
+Starts a HTTP(S) server on given port with the following endpoints:
 
 - `/`: Returns the request's timestamp.
 - `/clientip`: Returns the request's IP address.
@@ -407,6 +407,10 @@ Starts a HTTP server on given port with the following endpoints:
   Returns a JSON with the fields `output` (containing the file's name on the server) and
   `error` containing any potential server side errors.
 
+If `--tls-cert-file` is added (ideally in conjunction with `--tls-private-key-file`, the HTTP server
+will be upgraded to HTTPS. The image has default, `localhost`-based cert/privkey files at
+`/localhost.crt` and `/localhost.key` (see: [`porter` subcommand](#porter))
+
 It will also start a UDP server on the indicated UDP port that responds to the following commands:
 
 - `hostname`: Returns the server's hostname
@@ -419,7 +423,7 @@ responding to the same commands as the UDP server.
 Usage:
 
 ```console
-    kubectl exec test-agnhost -- /agnhost netexec [--http-port <http-port>] [--udp-port <udp-port>] [--sctp-port <sctp-port>]
+    kubectl exec test-agnhost -- /agnhost netexec [--http-port <http-port>] [--udp-port <udp-port>] [--sctp-port <sctp-port>] [--tls-cert-file <cert-file>] [--tls-private-key-file <privkey-file>]
 ```
 
 ### nettest
