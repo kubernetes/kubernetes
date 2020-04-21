@@ -165,7 +165,7 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, fmt.Errorf("invalid PV spec")
 	}
 	shareName := spec.PersistentVolume.Spec.AzureFile.ShareName
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		return oldSize, err
 	}
@@ -175,12 +175,12 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	accountName, accountKey, err := (&azureSvc{}).GetAzureCredentials(plugin.host, secretNamespace, secretName)
+	accountName, _, err := (&azureSvc{}).GetAzureCredentials(plugin.host, secretNamespace, secretName)
 	if err != nil {
 		return oldSize, err
 	}
 
-	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volumehelpers.RoundUpToGiB(newSize))); err != nil {
+	if err := azure.ResizeFileShare(resourceGroup, accountName, shareName, int(volumehelpers.RoundUpToGiB(newSize))); err != nil {
 		return oldSize, err
 	}
 
