@@ -177,7 +177,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 	if len(podConfig.Command) == 0 {
 		podConfig.Command = "trap exit TERM; while true; do sleep 1; done"
 	}
-	podName := "security-context-" + string(uuid.NewUUID())
+	podName := "pod-" + string(uuid.NewUUID())
 	if podConfig.FsGroup == nil {
 		podConfig.FsGroup = func(i int64) *int64 {
 			return &i
