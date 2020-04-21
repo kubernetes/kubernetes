@@ -203,15 +203,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// create target_dir before call to NodePublish
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		if isCorruptedDir(dir) {
-			// leave to CSI driver to handle corrupted mount
-			klog.Warning(log("mounter.SetUpAt detected corrupted mount for dir [%s]", dir))
-		} else {
-			return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
-		}
+	parentDir := filepath.Dir(dir)
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
+		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", parentDir, err))
 	}
-	klog.V(4).Info(log("created target path successfully [%s]", dir))
+	klog.V(4).Info(log("created target path successfully [%s]", parentDir))
 
 	nodePublishSecrets = map[string]string{}
 	if secretRef != nil {
