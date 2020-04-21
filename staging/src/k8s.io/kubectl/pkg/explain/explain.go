@@ -20,9 +20,10 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/kube-openapi/pkg/util/proto"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 type fieldsPrinter interface {
@@ -43,10 +44,13 @@ func splitDotNotation(model string) (string, []string) {
 }
 
 // SplitAndParseResourceRequest separates the users input into a model and fields
-func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, []string, error) {
+func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (schema.GroupVersionResource, []string, error) {
 	inResource, fieldsPath := splitDotNotation(inResource)
-	inResource, _ = mapper.ResourceSingularizer(inResource)
-	return inResource, fieldsPath, nil
+	gvr, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: inResource})
+	if err != nil {
+		return schema.GroupVersionResource{}, nil, err
+	}
+	return gvr, fieldsPath, nil
 }
 
 // PrintModelDescription prints the description of a specific model or dot path.
