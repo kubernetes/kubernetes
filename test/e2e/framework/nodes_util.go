@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -52,8 +51,6 @@ func MasterUpgrade(f *Framework, v string) error {
 		return masterUpgradeGCE(v, false)
 	case "gke":
 		return MasterUpgradeGKE(f.Namespace.Name, v)
-	case "kubernetes-anywhere":
-		return masterUpgradeKubernetesAnywhere(v)
 	default:
 		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
@@ -134,43 +131,6 @@ func MasterUpgradeGKE(namespace string, v string) error {
 	}
 
 	WaitForSSHTunnels(namespace)
-
-	return nil
-}
-
-func masterUpgradeKubernetesAnywhere(v string) error {
-	Logf("Upgrading master to %q", v)
-
-	kaPath := TestContext.KubernetesAnywherePath
-	originalConfigPath := filepath.Join(kaPath, ".config")
-	backupConfigPath := filepath.Join(kaPath, ".config.bak")
-	updatedConfigPath := filepath.Join(kaPath, fmt.Sprintf(".config-%s", v))
-
-	// modify config with specified k8s version
-	if _, _, err := RunCmd("sed",
-		"-i.bak", // writes original to .config.bak
-		fmt.Sprintf(`s/kubernetes_version=.*$/kubernetes_version=%q/`, v),
-		originalConfigPath); err != nil {
-		return err
-	}
-
-	defer func() {
-		// revert .config.bak to .config
-		if err := os.Rename(backupConfigPath, originalConfigPath); err != nil {
-			Logf("Could not rename %s back to %s", backupConfigPath, originalConfigPath)
-		}
-	}()
-
-	// invoke ka upgrade
-	if _, _, err := RunCmd("make", "-C", TestContext.KubernetesAnywherePath,
-		"WAIT_FOR_KUBECONFIG=y", "upgrade-master"); err != nil {
-		return err
-	}
-
-	// move .config to .config.<version>
-	if err := os.Rename(originalConfigPath, updatedConfigPath); err != nil {
-		return err
-	}
 
 	return nil
 }
