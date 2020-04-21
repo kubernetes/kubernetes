@@ -328,7 +328,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
-	testPodInfo := &framework.PodInfo{Pod: testPod}
+	testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{*nodeBar}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)

@@ -69,14 +69,14 @@ type SchedulingQueue interface {
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
 	// returned by calling SchedulingCycle().
-	AddUnschedulableIfNotPresent(pod *framework.PodInfo, podSchedulingCycle int64) error
+	AddUnschedulableIfNotPresent(pod *framework.QueuedPodInfo, podSchedulingCycle int64) error
 	// SchedulingCycle returns the current number of scheduling cycle which is
 	// cached by scheduling queue. Normally, incrementing this number whenever
 	// a pod is popped (e.g. called Pop()) is enough.
 	SchedulingCycle() int64
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
-	Pop() (*framework.PodInfo, error)
+	Pop() (*framework.QueuedPodInfo, error)
 	Update(oldPod, newPod *v1.Pod) error
 	Delete(pod *v1.Pod) error
 	MoveAllToActiveOrBackoffQueue(event string)
@@ -191,9 +191,9 @@ var defaultPriorityQueueOptions = priorityQueueOptions{
 // Making sure that PriorityQueue implements SchedulingQueue.
 var _ SchedulingQueue = &PriorityQueue{}
 
-// newPodInfoNoTimestamp builds a PodInfo object without timestamp.
-func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
-	return &framework.PodInfo{
+// newQueuedPodInfoNoTimestamp builds a QueuedPodInfo object without timestamp.
+func newQueuedPodInfoNoTimestamp(pod *v1.Pod) *framework.QueuedPodInfo {
+	return &framework.QueuedPodInfo{
 		Pod: pod,
 	}
 }
@@ -209,8 +209,8 @@ func NewPriorityQueue(
 	}
 
 	comp := func(podInfo1, podInfo2 interface{}) bool {
-		pInfo1 := podInfo1.(*framework.PodInfo)
-		pInfo2 := podInfo2.(*framework.PodInfo)
+		pInfo1 := podInfo1.(*framework.QueuedPodInfo)
+		pInfo2 := podInfo2.(*framework.QueuedPodInfo)
 		return lessFn(pInfo1, pInfo2)
 	}
 
@@ -241,7 +241,7 @@ func (p *PriorityQueue) Run() {
 func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	pInfo := p.newPodInfo(pod)
+	pInfo := p.newQueuedPodInfo(pod)
 	if err := p.activeQ.Add(pInfo); err != nil {
 		klog.Errorf("Error adding pod %v to the scheduling queue: %v", nsNameForPod(pod), err)
 		return err
@@ -271,7 +271,7 @@ func nsNameForPod(pod *v1.Pod) ktypes.NamespacedName {
 
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 // If this returns true, the pod should not be re-tried.
-func (p *PriorityQueue) isPodBackingoff(podInfo *framework.PodInfo) bool {
+func (p *PriorityQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 	boTime := p.getBackoffTime(podInfo)
 	return boTime.After(p.clock.Now())
 }
@@ -287,7 +287,7 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 // the queue, unless it is already in the queue. Normally, PriorityQueue puts
 // unschedulable pods in `unschedulableQ`. But if there has been a recent move
 // request, then the pod is put in `podBackoffQ`.
-func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.PodInfo, podSchedulingCycle int64) error {
+func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	pod := pInfo.Pod
@@ -330,8 +330,8 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		if rawPodInfo == nil {
 			return
 		}
-		pod := rawPodInfo.(*framework.PodInfo).Pod
-		boTime := p.getBackoffTime(rawPodInfo.(*framework.PodInfo))
+		pod := rawPodInfo.(*framework.QueuedPodInfo).Pod
+		boTime := p.getBackoffTime(rawPodInfo.(*framework.QueuedPodInfo))
 		if boTime.After(p.clock.Now()) {
 			return
 		}
@@ -352,7 +352,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	var podsToMove []*framework.PodInfo
+	var podsToMove []*framework.QueuedPodInfo
 	currentTime := p.clock.Now()
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
@@ -369,7 +369,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 // Pop removes the head of the active queue and returns it. It blocks if the
 // activeQ is empty and waits until a new item is added to the queue. It
 // increments scheduling cycle when a pod is popped.
-func (p *PriorityQueue) Pop() (*framework.PodInfo, error) {
+func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	for p.activeQ.Len() == 0 {
@@ -385,7 +385,7 @@ func (p *PriorityQueue) Pop() (*framework.PodInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	pInfo := obj.(*framework.PodInfo)
+	pInfo := obj.(*framework.QueuedPodInfo)
 	pInfo.Attempts++
 	p.schedulingCycle++
 	return pInfo, err
@@ -413,7 +413,7 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 	defer p.lock.Unlock()
 
 	if oldPod != nil {
-		oldPodInfo := newPodInfoNoTimestamp(oldPod)
+		oldPodInfo := newQueuedPodInfoNoTimestamp(oldPod)
 		// If the pod is already in the active queue, just update it there.
 		if oldPodInfo, exists, _ := p.activeQ.Get(oldPodInfo); exists {
 			p.nominatedPods.update(oldPod, newPod)
@@ -449,7 +449,7 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 		return nil
 	}
 	// If pod is not in any of the queues, we put it in the active queue.
-	err := p.activeQ.Add(p.newPodInfo(newPod))
+	err := p.activeQ.Add(p.newQueuedPodInfo(newPod))
 	if err == nil {
 		p.nominatedPods.add(newPod, "")
 		p.cond.Broadcast()
@@ -463,9 +463,9 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.nominatedPods.delete(pod)
-	err := p.activeQ.Delete(newPodInfoNoTimestamp(pod))
+	err := p.activeQ.Delete(newQueuedPodInfoNoTimestamp(pod))
 	if err != nil { // The item was probably not found in the activeQ.
-		p.podBackoffQ.Delete(newPodInfoNoTimestamp(pod))
+		p.podBackoffQ.Delete(newQueuedPodInfoNoTimestamp(pod))
 		p.unschedulableQ.delete(pod)
 	}
 	return nil
@@ -494,7 +494,7 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	unschedulablePods := make([]*framework.PodInfo, 0, len(p.unschedulableQ.podInfoMap))
+	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulableQ.podInfoMap))
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		unschedulablePods = append(unschedulablePods, pInfo)
 	}
@@ -504,7 +504,7 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 }
 
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.PodInfo, event string) {
+func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event string) {
 	for _, pInfo := range podInfoList {
 		pod := pInfo.Pod
 		if p.isPodBackingoff(pInfo) {
@@ -530,8 +530,8 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 // getUnschedulablePodsWithMatchingAffinityTerm returns unschedulable pods which have
 // any affinity term that matches "pod".
 // NOTE: this function assumes lock has been acquired in caller.
-func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) []*framework.PodInfo {
-	var podsToMove []*framework.PodInfo
+func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod) []*framework.QueuedPodInfo {
+	var podsToMove []*framework.QueuedPodInfo
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		up := pInfo.Pod
 		affinity := up.Spec.Affinity
@@ -569,10 +569,10 @@ func (p *PriorityQueue) PendingPods() []*v1.Pod {
 	defer p.lock.RUnlock()
 	result := []*v1.Pod{}
 	for _, pInfo := range p.activeQ.List() {
-		result = append(result, pInfo.(*framework.PodInfo).Pod)
+		result = append(result, pInfo.(*framework.QueuedPodInfo).Pod)
 	}
 	for _, pInfo := range p.podBackoffQ.List() {
-		result = append(result, pInfo.(*framework.PodInfo).Pod)
+		result = append(result, pInfo.(*framework.QueuedPodInfo).Pod)
 	}
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		result = append(result, pInfo.Pod)
@@ -607,8 +607,8 @@ func (p *PriorityQueue) UpdateNominatedPodForNode(pod *v1.Pod, nodeName string) 
 }
 
 func (p *PriorityQueue) podsCompareBackoffCompleted(podInfo1, podInfo2 interface{}) bool {
-	pInfo1 := podInfo1.(*framework.PodInfo)
-	pInfo2 := podInfo2.(*framework.PodInfo)
+	pInfo1 := podInfo1.(*framework.QueuedPodInfo)
+	pInfo2 := podInfo2.(*framework.QueuedPodInfo)
 	bo1 := p.getBackoffTime(pInfo1)
 	bo2 := p.getBackoffTime(pInfo2)
 	return bo1.Before(bo2)
@@ -621,10 +621,10 @@ func (p *PriorityQueue) NumUnschedulablePods() int {
 	return len(p.unschedulableQ.podInfoMap)
 }
 
-// newPodInfo builds a PodInfo object.
-func (p *PriorityQueue) newPodInfo(pod *v1.Pod) *framework.PodInfo {
+// newQueuedPodInfo builds a QueuedPodInfo object.
+func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod) *framework.QueuedPodInfo {
 	now := p.clock.Now()
-	return &framework.PodInfo{
+	return &framework.QueuedPodInfo{
 		Pod:                     pod,
 		Timestamp:               now,
 		InitialAttemptTimestamp: now,
@@ -632,7 +632,7 @@ func (p *PriorityQueue) newPodInfo(pod *v1.Pod) *framework.PodInfo {
 }
 
 // getBackoffTime returns the time that podInfo completes backoff
-func (p *PriorityQueue) getBackoffTime(podInfo *framework.PodInfo) time.Time {
+func (p *PriorityQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time {
 	duration := p.calculateBackoffDuration(podInfo)
 	backoffTime := podInfo.Timestamp.Add(duration)
 	return backoffTime
@@ -640,7 +640,7 @@ func (p *PriorityQueue) getBackoffTime(podInfo *framework.PodInfo) time.Time {
 
 // calculateBackoffDuration is a helper function for calculating the backoffDuration
 // based on the number of attempts the pod has made.
-func (p *PriorityQueue) calculateBackoffDuration(podInfo *framework.PodInfo) time.Duration {
+func (p *PriorityQueue) calculateBackoffDuration(podInfo *framework.QueuedPodInfo) time.Duration {
 	duration := p.podInitialBackoffDuration
 	for i := 1; i < podInfo.Attempts; i++ {
 		duration = duration * 2
@@ -651,8 +651,8 @@ func (p *PriorityQueue) calculateBackoffDuration(podInfo *framework.PodInfo) tim
 	return duration
 }
 
-func updatePod(oldPodInfo interface{}, newPod *v1.Pod) *framework.PodInfo {
-	pInfo := oldPodInfo.(*framework.PodInfo)
+func updatePod(oldPodInfo interface{}, newPod *v1.Pod) *framework.QueuedPodInfo {
+	pInfo := oldPodInfo.(*framework.QueuedPodInfo)
 	pInfo.Pod = newPod
 	return pInfo
 }
@@ -660,8 +660,8 @@ func updatePod(oldPodInfo interface{}, newPod *v1.Pod) *framework.PodInfo {
 // UnschedulablePodsMap holds pods that cannot be scheduled. This data structure
 // is used to implement unschedulableQ.
 type UnschedulablePodsMap struct {
-	// podInfoMap is a map key by a pod's full-name and the value is a pointer to the PodInfo.
-	podInfoMap map[string]*framework.PodInfo
+	// podInfoMap is a map key by a pod's full-name and the value is a pointer to the QueuedPodInfo.
+	podInfoMap map[string]*framework.QueuedPodInfo
 	keyFunc    func(*v1.Pod) string
 	// metricRecorder updates the counter when elements of an unschedulablePodsMap
 	// get added or removed, and it does nothing if it's nil
@@ -669,7 +669,7 @@ type UnschedulablePodsMap struct {
 }
 
 // Add adds a pod to the unschedulable podInfoMap.
-func (u *UnschedulablePodsMap) addOrUpdate(pInfo *framework.PodInfo) {
+func (u *UnschedulablePodsMap) addOrUpdate(pInfo *framework.QueuedPodInfo) {
 	podID := u.keyFunc(pInfo.Pod)
 	if _, exists := u.podInfoMap[podID]; !exists && u.metricRecorder != nil {
 		u.metricRecorder.Inc()
@@ -686,9 +686,9 @@ func (u *UnschedulablePodsMap) delete(pod *v1.Pod) {
 	delete(u.podInfoMap, podID)
 }
 
-// Get returns the PodInfo if a pod with the same key as the key of the given "pod"
+// Get returns the QueuedPodInfo if a pod with the same key as the key of the given "pod"
 // is found in the map. It returns nil otherwise.
-func (u *UnschedulablePodsMap) get(pod *v1.Pod) *framework.PodInfo {
+func (u *UnschedulablePodsMap) get(pod *v1.Pod) *framework.QueuedPodInfo {
 	podKey := u.keyFunc(pod)
 	if pInfo, exists := u.podInfoMap[podKey]; exists {
 		return pInfo
@@ -698,7 +698,7 @@ func (u *UnschedulablePodsMap) get(pod *v1.Pod) *framework.PodInfo {
 
 // Clear removes all the entries from the unschedulable podInfoMap.
 func (u *UnschedulablePodsMap) clear() {
-	u.podInfoMap = make(map[string]*framework.PodInfo)
+	u.podInfoMap = make(map[string]*framework.QueuedPodInfo)
 	if u.metricRecorder != nil {
 		u.metricRecorder.Clear()
 	}
@@ -707,7 +707,7 @@ func (u *UnschedulablePodsMap) clear() {
 // newUnschedulablePodsMap initializes a new object of UnschedulablePodsMap.
 func newUnschedulablePodsMap(metricRecorder metrics.MetricRecorder) *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
-		podInfoMap:     make(map[string]*framework.PodInfo),
+		podInfoMap:     make(map[string]*framework.QueuedPodInfo),
 		keyFunc:        util.GetPodFullName,
 		metricRecorder: metricRecorder,
 	}
@@ -803,8 +803,8 @@ func newNominatedPodMap() *nominatedPodMap {
 
 // MakeNextPodFunc returns a function to retrieve the next pod from a given
 // scheduling queue
-func MakeNextPodFunc(queue SchedulingQueue) func() *framework.PodInfo {
-	return func() *framework.PodInfo {
+func MakeNextPodFunc(queue SchedulingQueue) func() *framework.QueuedPodInfo {
+	return func() *framework.QueuedPodInfo {
 		podInfo, err := queue.Pop()
 		if err == nil {
 			klog.V(4).Infof("About to try and schedule pod %v/%v", podInfo.Pod.Namespace, podInfo.Pod.Name)
@@ -816,5 +816,5 @@ func MakeNextPodFunc(queue SchedulingQueue) func() *framework.PodInfo {
 }
 
 func podInfoKeyFunc(obj interface{}) (string, error) {
-	return cache.MetaNamespaceKeyFunc(obj.(*framework.PodInfo).Pod)
+	return cache.MetaNamespaceKeyFunc(obj.(*framework.QueuedPodInfo).Pod)
 }

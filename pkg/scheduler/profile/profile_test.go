@@ -296,7 +296,7 @@ func (p *fakePlugin) Name() string {
 	return ""
 }
 
-func (p *fakePlugin) Less(*framework.PodInfo, *framework.PodInfo) bool {
+func (p *fakePlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) bool {
 	return false
 }
 

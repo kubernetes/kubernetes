@@ -177,8 +177,8 @@ func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
 func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	q := createAndRunPriorityQueue(newDefaultQueueSort())
 	q.Add(&highPriNominatedPod)
-	q.AddUnschedulableIfNotPresent(newPodInfoNoTimestamp(&highPriNominatedPod), q.SchedulingCycle()) // Must not add anything.
-	q.AddUnschedulableIfNotPresent(newPodInfoNoTimestamp(&unschedulablePod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(newQueuedPodInfoNoTimestamp(&highPriNominatedPod), q.SchedulingCycle()) // Must not add anything.
+	q.AddUnschedulableIfNotPresent(newQueuedPodInfoNoTimestamp(&unschedulablePod), q.SchedulingCycle())
 	expectedNominatedPods := &nominatedPodMap{
 		nominatedPodToNode: map[types.UID]string{
 			unschedulablePod.UID:    "node1",
@@ -257,7 +257,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 			},
 		}
 
-		if err := q.AddUnschedulableIfNotPresent(newPodInfoNoTimestamp(unschedulablePod), oldCycle); err != nil {
+		if err := q.AddUnschedulableIfNotPresent(newQueuedPodInfoNoTimestamp(unschedulablePod), oldCycle); err != nil {
 			t.Errorf("Failed to call AddUnschedulableIfNotPresent(%v): %v", unschedulablePod.Name, err)
 		}
 	}
@@ -266,7 +266,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	// Since there was a move request at the same cycle as "oldCycle", these pods
 	// should be in the backoff queue.
 	for i := 1; i < totalNum; i++ {
-		if _, exists, _ := q.podBackoffQ.Get(newPodInfoNoTimestamp(&expectedPods[i])); !exists {
+		if _, exists, _ := q.podBackoffQ.Get(newQueuedPodInfoNoTimestamp(&expectedPods[i])); !exists {
 			t.Errorf("Expected %v to be added to podBackoffQ.", expectedPods[i].Name)
 		}
 	}
@@ -294,7 +294,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	q := createAndRunPriorityQueue(newDefaultQueueSort())
 	q.Update(nil, &highPriorityPod)
 	q.lock.RLock()
-	if _, exists, _ := q.activeQ.Get(newPodInfoNoTimestamp(&highPriorityPod)); !exists {
+	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoNoTimestamp(&highPriorityPod)); !exists {
 		t.Errorf("Expected %v to be added to activeQ.", highPriorityPod.Name)
 	}
 	q.lock.RUnlock()
@@ -315,7 +315,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	// add the pod to activeQ.
 	q.Update(&unschedulablePod, &unschedulablePod)
 	q.lock.RLock()
-	if _, exists, _ := q.activeQ.Get(newPodInfoNoTimestamp(&unschedulablePod)); !exists {
+	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoNoTimestamp(&unschedulablePod)); !exists {
 		t.Errorf("Expected %v to be added to activeQ.", unschedulablePod.Name)
 	}
 	q.lock.RUnlock()
@@ -325,7 +325,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 		t.Error("Expected unschedulableQ to be empty.")
 	}
 	q.lock.RLock()
-	if _, exists, _ := q.activeQ.Get(newPodInfoNoTimestamp(&unschedulablePod)); !exists {
+	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoNoTimestamp(&unschedulablePod)); !exists {
 		t.Errorf("Expected: %v to be added to activeQ.", unschedulablePod.Name)
 	}
 	q.lock.RUnlock()
@@ -334,7 +334,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 	}
 	// Updating a pod that is in unschedulableQ in a way that it may
 	// become schedulable should add the pod to the activeQ.
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&medPriorityPod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&medPriorityPod), q.SchedulingCycle())
 	if len(q.unschedulableQ.podInfoMap) != 1 {
 		t.Error("Expected unschedulableQ to be 1.")
 	}
@@ -354,10 +354,10 @@ func TestPriorityQueue_Delete(t *testing.T) {
 		t.Errorf("delete failed: %v", err)
 	}
 	q.lock.RLock()
-	if _, exists, _ := q.activeQ.Get(newPodInfoNoTimestamp(&unschedulablePod)); !exists {
+	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoNoTimestamp(&unschedulablePod)); !exists {
 		t.Errorf("Expected %v to be in activeQ.", unschedulablePod.Name)
 	}
-	if _, exists, _ := q.activeQ.Get(newPodInfoNoTimestamp(&highPriNominatedPod)); exists {
+	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoNoTimestamp(&highPriNominatedPod)); exists {
 		t.Errorf("Didn't expect %v to be in activeQ.", highPriorityPod.Name)
 	}
 	q.lock.RUnlock()
@@ -375,8 +375,8 @@ func TestPriorityQueue_Delete(t *testing.T) {
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	q := createAndRunPriorityQueue(newDefaultQueueSort())
 	q.Add(&medPriorityPod)
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&unschedulablePod), q.SchedulingCycle())
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&highPriorityPod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&unschedulablePod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPriorityPod), q.SchedulingCycle())
 	q.MoveAllToActiveOrBackoffQueue("test")
 	q.lock.RLock()
 	defer q.lock.RUnlock()
@@ -428,8 +428,8 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	q := createAndRunPriorityQueue(newDefaultQueueSort(), WithClock(c))
 	q.Add(&medPriorityPod)
 	// Add a couple of pods to the unschedulableQ.
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&unschedulablePod), q.SchedulingCycle())
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(affinityPod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&unschedulablePod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(affinityPod), q.SchedulingCycle())
 
 	// Move clock to make the unschedulable pods complete backoff.
 	c.Step(DefaultPodInitialBackoffDuration + time.Second)
@@ -440,7 +440,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 		t.Error("affinityPod is still in the unschedulableQ.")
 	}
 	q.lock.RLock()
-	if _, exists, _ := q.activeQ.Get(newPodInfoNoTimestamp(affinityPod)); !exists {
+	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoNoTimestamp(affinityPod)); !exists {
 		t.Error("affinityPod is not moved to activeQ.")
 	}
 	q.lock.RUnlock()
@@ -478,8 +478,8 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 
 	q := createAndRunPriorityQueue(newDefaultQueueSort())
 	q.Add(&medPriorityPod)
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&unschedulablePod), q.SchedulingCycle())
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&highPriorityPod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&unschedulablePod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPriorityPod), q.SchedulingCycle())
 
 	expectedSet := makeSet([]*v1.Pod{&medPriorityPod, &unschedulablePod, &highPriorityPod})
 	if !reflect.DeepEqual(expectedSet, makeSet(q.PendingPods())) {
@@ -630,30 +630,30 @@ func TestUnschedulablePodsMap(t *testing.T) {
 	tests := []struct {
 		name                   string
 		podsToAdd              []*v1.Pod
-		expectedMapAfterAdd    map[string]*framework.PodInfo
+		expectedMapAfterAdd    map[string]*framework.QueuedPodInfo
 		podsToUpdate           []*v1.Pod
-		expectedMapAfterUpdate map[string]*framework.PodInfo
+		expectedMapAfterUpdate map[string]*framework.QueuedPodInfo
 		podsToDelete           []*v1.Pod
-		expectedMapAfterDelete map[string]*framework.PodInfo
+		expectedMapAfterDelete map[string]*framework.QueuedPodInfo
 	}{
 		{
 			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.PodInfo{
+			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[0]): {Pod: pods[0]},
 				util.GetPodFullName(pods[1]): {Pod: pods[1]},
 				util.GetPodFullName(pods[2]): {Pod: pods[2]},
 				util.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[0]},
-			expectedMapAfterUpdate: map[string]*framework.PodInfo{
+			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[0]): {Pod: updatedPods[0]},
 				util.GetPodFullName(pods[1]): {Pod: pods[1]},
 				util.GetPodFullName(pods[2]): {Pod: pods[2]},
 				util.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToDelete: []*v1.Pod{pods[0], pods[1]},
-			expectedMapAfterDelete: map[string]*framework.PodInfo{
+			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[2]): {Pod: pods[2]},
 				util.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
@@ -661,32 +661,32 @@ func TestUnschedulablePodsMap(t *testing.T) {
 		{
 			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.PodInfo{
+			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[0]): {Pod: pods[0]},
 				util.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[3]},
-			expectedMapAfterUpdate: map[string]*framework.PodInfo{
+			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[0]): {Pod: pods[0]},
 				util.GetPodFullName(pods[3]): {Pod: updatedPods[3]},
 			},
 			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.PodInfo{},
+			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{},
 		},
 		{
 			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
-			expectedMapAfterAdd: map[string]*framework.PodInfo{
+			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[1]): {Pod: pods[1]},
 				util.GetPodFullName(pods[2]): {Pod: pods[2]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[1]},
-			expectedMapAfterUpdate: map[string]*framework.PodInfo{
+			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
 				util.GetPodFullName(pods[2]): {Pod: pods[2]},
 			},
 			podsToDelete: []*v1.Pod{pods[2], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.PodInfo{
+			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
 				util.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
 			},
 		},
@@ -696,7 +696,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			upm := newUnschedulablePodsMap(nil)
 			for _, p := range test.podsToAdd {
-				upm.addOrUpdate(newPodInfoNoTimestamp(p))
+				upm.addOrUpdate(newQueuedPodInfoNoTimestamp(p))
 			}
 			if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterAdd) {
 				t.Errorf("Unexpected map after adding pods. Expected: %v, got: %v",
@@ -705,7 +705,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 
 			if len(test.podsToUpdate) > 0 {
 				for _, p := range test.podsToUpdate {
-					upm.addOrUpdate(newPodInfoNoTimestamp(p))
+					upm.addOrUpdate(newQueuedPodInfoNoTimestamp(p))
 				}
 				if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterUpdate) {
 					t.Errorf("Unexpected map after updating pods. Expected: %v, got: %v",
@@ -847,7 +847,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	})
 
 	// Put in the unschedulable queue
-	q.AddUnschedulableIfNotPresent(newPodInfoNoTimestamp(&unschedulablePod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(newQueuedPodInfoNoTimestamp(&unschedulablePod), q.SchedulingCycle())
 	// Move clock to make the unschedulable pods complete backoff.
 	c.Step(DefaultPodInitialBackoffDuration + time.Second)
 	// Move all unschedulable pods to the active queue.
@@ -890,7 +890,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	})
 
 	// And then, put unschedulable pod to the unschedulable queue
-	q.AddUnschedulableIfNotPresent(newPodInfoNoTimestamp(&unschedulablePod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(newQueuedPodInfoNoTimestamp(&unschedulablePod), q.SchedulingCycle())
 	// Move clock to make the unschedulable pods complete backoff.
 	c.Step(DefaultPodInitialBackoffDuration + time.Second)
 	// Move all unschedulable pods to the active queue.
@@ -1018,8 +1018,8 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 		Message: "fake scheduling failure",
 	})
 
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&highPod), q.SchedulingCycle())
-	q.AddUnschedulableIfNotPresent(q.newPodInfo(&midPod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&midPod), q.SchedulingCycle())
 	c.Step(unschedulableQTimeInterval + time.Second)
 
 	if p, err := q.Pop(); err != nil || p.Pod != &highPod {
@@ -1030,29 +1030,29 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	}
 }
 
-type operation func(queue *PriorityQueue, pInfo *framework.PodInfo)
+type operation func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo)
 
 var (
-	add = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
+	add = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.Add(pInfo.Pod)
 	}
-	addUnschedulablePodBackToUnschedulableQ = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
+	addUnschedulablePodBackToUnschedulableQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.AddUnschedulableIfNotPresent(pInfo, 0)
 	}
-	addUnschedulablePodBackToBackoffQ = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
+	addUnschedulablePodBackToBackoffQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.AddUnschedulableIfNotPresent(pInfo, -1)
 	}
-	addPodActiveQ = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
+	addPodActiveQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.lock.Lock()
 		queue.activeQ.Add(pInfo)
 		queue.lock.Unlock()
 	}
-	updatePodActiveQ = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
+	updatePodActiveQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.lock.Lock()
 		queue.activeQ.Update(pInfo)
 		queue.lock.Unlock()
 	}
-	addPodUnschedulableQ = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
+	addPodUnschedulableQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.lock.Lock()
 		// Update pod condition to unschedulable.
 		podutil.UpdatePodCondition(&pInfo.Pod.Status, &v1.PodCondition{
@@ -1064,24 +1064,24 @@ var (
 		queue.unschedulableQ.addOrUpdate(pInfo)
 		queue.lock.Unlock()
 	}
-	addPodBackoffQ = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
+	addPodBackoffQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.lock.Lock()
 		queue.podBackoffQ.Add(pInfo)
 		queue.lock.Unlock()
 	}
-	moveAllToActiveOrBackoffQ = func(queue *PriorityQueue, _ *framework.PodInfo) {
+	moveAllToActiveOrBackoffQ = func(queue *PriorityQueue, _ *framework.QueuedPodInfo) {
 		queue.MoveAllToActiveOrBackoffQueue("test")
 	}
-	flushBackoffQ = func(queue *PriorityQueue, _ *framework.PodInfo) {
+	flushBackoffQ = func(queue *PriorityQueue, _ *framework.QueuedPodInfo) {
 		queue.clock.(*clock.FakeClock).Step(2 * time.Second)
 		queue.flushBackoffQCompleted()
 	}
-	moveClockForward = func(queue *PriorityQueue, _ *framework.PodInfo) {
+	moveClockForward = func(queue *PriorityQueue, _ *framework.QueuedPodInfo) {
 		queue.clock.(*clock.FakeClock).Step(2 * time.Second)
 	}
 )
 
-// TestPodTimestamp tests the operations related to PodInfo.
+// TestPodTimestamp tests the operations related to QueuedPodInfo.
 func TestPodTimestamp(t *testing.T) {
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1106,11 +1106,11 @@ func TestPodTimestamp(t *testing.T) {
 	}
 
 	var timestamp = time.Now()
-	pInfo1 := &framework.PodInfo{
+	pInfo1 := &framework.QueuedPodInfo{
 		Pod:       pod1,
 		Timestamp: timestamp,
 	}
-	pInfo2 := &framework.PodInfo{
+	pInfo2 := &framework.QueuedPodInfo{
 		Pod:       pod2,
 		Timestamp: timestamp.Add(time.Second),
 	}
@@ -1118,8 +1118,8 @@ func TestPodTimestamp(t *testing.T) {
 	tests := []struct {
 		name       string
 		operations []operation
-		operands   []*framework.PodInfo
-		expected   []*framework.PodInfo
+		operands   []*framework.QueuedPodInfo
+		expected   []*framework.QueuedPodInfo
 	}{
 		{
 			name: "add two pod to activeQ and sort them by the timestamp",
@@ -1127,8 +1127,8 @@ func TestPodTimestamp(t *testing.T) {
 				addPodActiveQ,
 				addPodActiveQ,
 			},
-			operands: []*framework.PodInfo{pInfo2, pInfo1},
-			expected: []*framework.PodInfo{pInfo1, pInfo2},
+			operands: []*framework.QueuedPodInfo{pInfo2, pInfo1},
+			expected: []*framework.QueuedPodInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "update two pod to activeQ and sort them by the timestamp",
@@ -1136,8 +1136,8 @@ func TestPodTimestamp(t *testing.T) {
 				updatePodActiveQ,
 				updatePodActiveQ,
 			},
-			operands: []*framework.PodInfo{pInfo2, pInfo1},
-			expected: []*framework.PodInfo{pInfo1, pInfo2},
+			operands: []*framework.QueuedPodInfo{pInfo2, pInfo1},
+			expected: []*framework.QueuedPodInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "add two pod to unschedulableQ then move them to activeQ and sort them by the timestamp",
@@ -1147,8 +1147,8 @@ func TestPodTimestamp(t *testing.T) {
 				moveClockForward,
 				moveAllToActiveOrBackoffQ,
 			},
-			operands: []*framework.PodInfo{pInfo2, pInfo1, nil, nil},
-			expected: []*framework.PodInfo{pInfo1, pInfo2},
+			operands: []*framework.QueuedPodInfo{pInfo2, pInfo1, nil, nil},
+			expected: []*framework.QueuedPodInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "add one pod to BackoffQ and move it to activeQ",
@@ -1158,15 +1158,15 @@ func TestPodTimestamp(t *testing.T) {
 				flushBackoffQ,
 				moveAllToActiveOrBackoffQ,
 			},
-			operands: []*framework.PodInfo{pInfo2, pInfo1, nil, nil},
-			expected: []*framework.PodInfo{pInfo1, pInfo2},
+			operands: []*framework.QueuedPodInfo{pInfo2, pInfo1, nil, nil},
+			expected: []*framework.QueuedPodInfo{pInfo1, pInfo2},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			queue := createAndRunPriorityQueue(newDefaultQueueSort(), WithClock(clock.NewFakeClock(timestamp)))
-			var podInfoList []*framework.PodInfo
+			var podInfoList []*framework.QueuedPodInfo
 
 			for i, op := range test.operations {
 				op(queue, test.operands[i])
@@ -1177,13 +1177,13 @@ func TestPodTimestamp(t *testing.T) {
 				if pInfo, err := queue.activeQ.Pop(); err != nil {
 					t.Errorf("Error while popping the head of the queue: %v", err)
 				} else {
-					podInfoList = append(podInfoList, pInfo.(*framework.PodInfo))
+					podInfoList = append(podInfoList, pInfo.(*framework.QueuedPodInfo))
 				}
 			}
 			queue.lock.Unlock()
 
 			if !reflect.DeepEqual(test.expected, podInfoList) {
-				t.Errorf("Unexpected PodInfo list. Expected: %v, got: %v",
+				t.Errorf("Unexpected QueuedPodInfo list. Expected: %v, got: %v",
 					test.expected, podInfoList)
 			}
 		})
@@ -1195,14 +1195,14 @@ func TestPendingPodsMetric(t *testing.T) {
 	timestamp := time.Now()
 	metrics.Register()
 	total := 50
-	pInfos := makePodInfos(total, timestamp)
+	pInfos := makeQueuedPodInfos(total, timestamp)
 	totalWithDelay := 20
-	pInfosWithDelay := makePodInfos(totalWithDelay, timestamp.Add(2*time.Second))
+	pInfosWithDelay := makeQueuedPodInfos(totalWithDelay, timestamp.Add(2*time.Second))
 
 	tests := []struct {
 		name        string
 		operations  []operation
-		operands    [][]*framework.PodInfo
+		operands    [][]*framework.QueuedPodInfo
 		metricsName string
 		wants       string
 	}{
@@ -1212,7 +1212,7 @@ func TestPendingPodsMetric(t *testing.T) {
 				addPodActiveQ,
 				addPodUnschedulableQ,
 			},
-			operands: [][]*framework.PodInfo{
+			operands: [][]*framework.QueuedPodInfo{
 				pInfos[:30],
 				pInfos[30:],
 			},
@@ -1232,7 +1232,7 @@ scheduler_pending_pods{queue="unschedulable"} 20
 				addPodBackoffQ,
 				addPodUnschedulableQ,
 			},
-			operands: [][]*framework.PodInfo{
+			operands: [][]*framework.QueuedPodInfo{
 				pInfos[:15],
 				pInfos[15:40],
 				pInfos[40:],
@@ -1253,7 +1253,7 @@ scheduler_pending_pods{queue="unschedulable"} 10
 				moveClockForward,
 				moveAllToActiveOrBackoffQ,
 			},
-			operands: [][]*framework.PodInfo{
+			operands: [][]*framework.QueuedPodInfo{
 				pInfos[:total],
 				{nil},
 				{nil},
@@ -1275,7 +1275,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 				addPodUnschedulableQ,
 				moveAllToActiveOrBackoffQ,
 			},
-			operands: [][]*framework.PodInfo{
+			operands: [][]*framework.QueuedPodInfo{
 				pInfos[20:total],
 				{nil},
 				pInfosWithDelay[:20],
@@ -1298,7 +1298,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 				moveAllToActiveOrBackoffQ,
 				flushBackoffQ,
 			},
-			operands: [][]*framework.PodInfo{
+			operands: [][]*framework.QueuedPodInfo{
 				pInfos[:40],
 				pInfos[40:],
 				{nil},
@@ -1408,9 +1408,9 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 func TestIncomingPodsMetrics(t *testing.T) {
 	timestamp := time.Now()
 	metrics.Register()
-	var pInfos = make([]*framework.PodInfo, 0, 3)
+	var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
 	for i := 1; i <= 3; i++ {
-		p := &framework.PodInfo{
+		p := &framework.QueuedPodInfo{
 			Pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("test-pod-%d", i),
@@ -1499,7 +1499,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 	}
 }
 
-func checkPerPodSchedulingMetrics(name string, t *testing.T, pInfo *framework.PodInfo, wantAttemtps int, wantInitialAttemptTs time.Time) {
+func checkPerPodSchedulingMetrics(name string, t *testing.T, pInfo *framework.QueuedPodInfo, wantAttemtps int, wantInitialAttemptTs time.Time) {
 	if pInfo.Attempts != wantAttemtps {
 		t.Errorf("[%s] Pod schedule attempt unexpected, got %v, want %v", name, pInfo.Attempts, wantAttemtps)
 	}
@@ -1592,10 +1592,10 @@ func TestBackOffFlow(t *testing.T) {
 	}
 }
 
-func makePodInfos(num int, timestamp time.Time) []*framework.PodInfo {
-	var pInfos = make([]*framework.PodInfo, 0, num)
+func makeQueuedPodInfos(num int, timestamp time.Time) []*framework.QueuedPodInfo {
+	var pInfos = make([]*framework.QueuedPodInfo, 0, num)
 	for i := 1; i <= num; i++ {
-		p := &framework.PodInfo{
+		p := &framework.QueuedPodInfo{
 			Pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("test-pod-%d", i),

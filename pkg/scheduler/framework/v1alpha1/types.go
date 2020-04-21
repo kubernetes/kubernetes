@@ -34,9 +34,10 @@ import (
 
 var generation int64
 
-// PodInfo is a wrapper to a Pod with additional information for purposes such as tracking
-// the timestamp when it's added to the queue or recording per-pod metrics.
-type PodInfo struct {
+// QueuedPodInfo is a Pod wrapper with additional information related to
+// the pod's status in the scheduling queue, such as the timestamp when
+// it's added to the queue.
+type QueuedPodInfo struct {
 	Pod *v1.Pod
 	// The time pod added to the scheduling queue.
 	Timestamp time.Time
@@ -50,14 +51,21 @@ type PodInfo struct {
 	InitialAttemptTimestamp time.Time
 }
 
-// DeepCopy returns a deep copy of the PodInfo object.
-func (podInfo *PodInfo) DeepCopy() *PodInfo {
-	return &PodInfo{
-		Pod:                     podInfo.Pod.DeepCopy(),
-		Timestamp:               podInfo.Timestamp,
-		Attempts:                podInfo.Attempts,
-		InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
+// DeepCopy returns a deep copy of the QueuedPodInfo object.
+func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
+	return &QueuedPodInfo{
+		Pod:                     pqi.Pod.DeepCopy(),
+		Timestamp:               pqi.Timestamp,
+		Attempts:                pqi.Attempts,
+		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
 	}
+}
+
+// PodInfo is a wrapper to a Pod with additional pre-computed information to
+// accelerate processing. This information is typically immutable (e.g., pre-processed
+// inter-pod affinity selectors).
+type PodInfo struct {
+	Pod *v1.Pod
 }
 
 // NewPodInfo return a new PodInfo
@@ -359,7 +367,6 @@ func (n *NodeInfo) String() string {
 
 // AddPod adds pod information to this NodeInfo.
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	// TODO(#89528): AddPod should accept a PodInfo as an input argument.
 	podInfo := NewPodInfo(pod)
 	res, non0CPU, non0Mem := calculateResource(pod)
 	n.Requested.MilliCPU += res.MilliCPU
