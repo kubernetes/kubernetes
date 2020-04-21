@@ -17,7 +17,7 @@ rules:
   - update
   - patch
 - apiGroups:
-  - "autoscaling.k8s.io"
+  - "autoscaling"
   resources:
   - horizontalpodautoscalers
   verbs:
@@ -35,7 +35,11 @@ rules:
   - get
   - list
   - watch
-  - create
+- apiGroups:
+  - "autoscaling.gke.io"
+  resources:
+  - multidimpodautoscalers/status
+  verbs:
   - update
   - patch
 ---

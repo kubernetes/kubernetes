@@ -130,4 +130,9 @@ spec:
                 properties:
                   updateMode:
                     type: string
-                    enum: ["Off", "Auto"]
+                    enum: ["Auto"]
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
