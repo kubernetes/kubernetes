@@ -68,7 +68,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// Good Path
 	spec, err := plug.(*awsElasticBlockStorePlugin).getVolumeSpecFromGlobalMapPath("myVolume", expectedGlobalPath)
 	if spec == nil || err != nil {
-		t.Fatalf("Failed to get spec from GlobalMapPath: %v", err)
+		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v - %v", &specMode, block)
 	}
 	if spec.PersistentVolume.Name != "myVolume" {
 		t.Errorf("Invalid PV name from GlobalMapPath spec: %s", spec.PersistentVolume.Name)
