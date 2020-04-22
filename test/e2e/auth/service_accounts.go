@@ -41,8 +41,6 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
-
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 
@@ -389,7 +387,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: tc.PodName},
 				Spec: v1.PodSpec{
-					Containers:                   []v1.Container{{Name: "token-test", Image: mountImage}},
+					Containers:                   []v1.Container{{Name: "token-test", Image: imageutils.GetE2EImage(imageutils.Agnhost)}},
 					RestartPolicy:                v1.RestartPolicyNever,
 					ServiceAccountName:           tc.ServiceAccountName,
 					AutomountServiceAccountToken: tc.AutomountPodSpec,

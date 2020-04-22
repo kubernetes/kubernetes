@@ -167,9 +167,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 				},
 				Containers: []v1.Container{
 					{
-						Name:    containerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
+						Name:  containerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -322,9 +322,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 				},
 				Containers: []v1.Container{
 					{
-						Name:    deleteContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
+						Name:  deleteContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -334,9 +334,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 						},
 					},
 					{
-						Name:    updateContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
+						Name:  updateContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -346,9 +346,9 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 						},
 					},
 					{
-						Name:    createContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
+						Name:  createContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -466,8 +466,8 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "projected-configmap-volume-test",
-						Image: imageutils.GetE2EImage(imageutils.Mounttest),
-						Args:  []string{"--file_content=/etc/projected-configmap-volume/data-1"},
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--file_content=/etc/projected-configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -556,8 +556,9 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool,
 			Containers: []v1.Container{
 				{
 					Name:  "projected-configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						"--file_content=/etc/projected-configmap-volume/data-1",
 						"--file_mode=/etc/projected-configmap-volume/data-1"},
 					VolumeMounts: []v1.VolumeMount{
@@ -643,8 +644,10 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 			Containers: []v1.Container{
 				{
 					Name:  "projected-configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
-					Args: []string{"--file_content=/etc/projected-configmap-volume/path/to/data-2",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args: []string{
+						"mounttest",
+						"--file_content=/etc/projected-configmap-volume/path/to/data-2",
 						"--file_mode=/etc/projected-configmap-volume/path/to/data-2"},
 					VolumeMounts: []v1.VolumeMount{
 						{

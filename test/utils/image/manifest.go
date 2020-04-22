@@ -159,10 +159,6 @@ const (
 	JessieDnsutils
 	// Kitten image
 	Kitten
-	// Mounttest image
-	Mounttest
-	// MounttestUser image
-	MounttestUser
 	// Nautilus image
 	Nautilus
 	// NFSProvisioner image
@@ -223,8 +219,6 @@ func initImageConfigs() map[int]Config {
 	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
 	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
 	configs[Kitten] = Config{e2eRegistry, "kitten", "1.0"}
-	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
-	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
 	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
