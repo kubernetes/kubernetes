@@ -27,6 +27,7 @@ readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  illumos/amd64
 )
 
 # The node platforms we build for
@@ -37,6 +38,7 @@ readonly KUBE_SUPPORTED_NODE_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   windows/amd64
+  illumos/amd64
 )
 
 # If we update this we should also update the set of platforms whose standard
@@ -51,6 +53,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   darwin/amd64
   windows/amd64
   windows/386
+  illumos/amd64
 )
 
 # Which platforms we should compile test targets for.
@@ -63,6 +66,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   linux/ppc64le
   darwin/amd64
   windows/amd64
+  illumos/amd64
 )
 
 # The set of server targets that we are only building for Linux
