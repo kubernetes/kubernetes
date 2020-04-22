@@ -678,6 +678,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		ginkgo.By("finding ServiceAccount in list of all ServiceAccounts (by LabelSelector)")
 		serviceAccountList, err := f.ClientSet.CoreV1().ServiceAccounts("").List(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat})
+		framework.ExpectNoError(err, "failed to list ServiceAccounts by LabelSelector")
 		foundServiceAccount := false
 		for _, serviceAccountItem := range serviceAccountList.Items {
 			if serviceAccountItem.ObjectMeta.Name == testServiceAccountName && serviceAccountItem.ObjectMeta.Namespace == testNamespaceName && *serviceAccountItem.AutomountServiceAccountToken == boolFalse {
