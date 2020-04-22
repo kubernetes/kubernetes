@@ -41,8 +41,9 @@ func (Endpoint) SwaggerDoc() map[string]string {
 }
 
 var map_EndpointConditions = map[string]string{
-	"":      "EndpointConditions represents the current condition of an endpoint.",
-	"ready": "ready indicates that this endpoint is prepared to receive traffic, according to whatever system is managing the endpoint. A nil value indicates an unknown state. In most cases consumers should interpret this unknown state as ready.",
+	"":            "EndpointConditions represents the current condition of an endpoint.",
+	"ready":       "ready indicates that this endpoint is prepared to receive traffic, according to whatever system is managing the endpoint. A nil value indicates an unknown state. In most cases consumers should interpret this unknown state as ready.",
+	"terminating": "terminating indicates if this endpoint is terminating. Consumers should assume a nil value indicates the endpoint is not terminating.",
 }
 
 func (EndpointConditions) SwaggerDoc() map[string]string {

@@ -116,6 +116,11 @@ type EndpointConditions struct {
 	// indicates an unknown state. In most cases consumers should interpret this
 	// unknown state as ready.
 	Ready *bool
+
+	// terminating indicates if this endpoint is terminating. Consumers should assume a
+	// nil value indicates the endpoint is not terminating.
+	// +optional
+	Terminating *bool
 }
 
 // EndpointPort represents a Port used by an EndpointSlice.

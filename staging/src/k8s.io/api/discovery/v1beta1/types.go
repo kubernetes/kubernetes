@@ -118,6 +118,11 @@ type EndpointConditions struct {
 	// unknown state as ready.
 	// +optional
 	Ready *bool `json:"ready,omitempty" protobuf:"bytes,1,name=ready"`
+
+	// terminating indicates if this endpoint is terminating. Consumers should assume a
+	// nil value indicates the endpoint is not terminating.
+	// +optional
+	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,2,name=terminating"`
 }
 
 // EndpointPort represents a Port used by an EndpointSlice

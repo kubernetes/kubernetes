@@ -79,6 +79,11 @@ message EndpointConditions {
   // unknown state as ready.
   // +optional
   optional bool ready = 1;
+
+  // terminating indicates if this endpoint is terminating. Consumers should assume a
+  // nil value indicates the endpoint is not terminating.
+  // +optional
+  optional bool terminating = 2;
 }
 
 // EndpointPort represents a Port used by an EndpointSlice
