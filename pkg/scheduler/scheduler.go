@@ -94,11 +94,11 @@ type Scheduler struct {
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func() *framework.PodInfo
+	NextPod func() *framework.QueuedPodInfo
 
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
-	Error func(*framework.PodInfo, error)
+	Error func(*framework.QueuedPodInfo, error)
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
@@ -384,7 +384,7 @@ func (sched *Scheduler) Run(ctx context.Context) {
 // recordFailedSchedulingEvent records an event for the pod that indicates the
 // pod has failed to schedule.
 // NOTE: This function modifies "pod". "pod" should be copied before being passed.
-func (sched *Scheduler) recordSchedulingFailure(prof *profile.Profile, podInfo *framework.PodInfo, err error, reason string, message string) {
+func (sched *Scheduler) recordSchedulingFailure(prof *profile.Profile, podInfo *framework.QueuedPodInfo, err error, reason string, message string) {
 	sched.Error(podInfo, err)
 	pod := podInfo.Pod
 	prof.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", message)

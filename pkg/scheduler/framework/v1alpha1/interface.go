@@ -211,7 +211,7 @@ type Plugin interface {
 }
 
 // LessFunc is the function to sort pod info
-type LessFunc func(podInfo1, podInfo2 *PodInfo) bool
+type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
 
 // QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
 // These plugins are used to sort pods in the scheduling queue. Only one queue sort
@@ -219,7 +219,7 @@ type LessFunc func(podInfo1, podInfo2 *PodInfo) bool
 type QueueSortPlugin interface {
 	Plugin
 	// Less are used to sort pods in the scheduling queue.
-	Less(*PodInfo, *PodInfo) bool
+	Less(*QueuedPodInfo, *QueuedPodInfo) bool
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying

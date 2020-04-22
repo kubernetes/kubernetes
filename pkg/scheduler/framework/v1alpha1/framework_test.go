@@ -288,7 +288,7 @@ func (pl *TestQueueSortPlugin) Name() string {
 	return queueSortPlugin
 }
 
-func (pl *TestQueueSortPlugin) Less(_, _ *PodInfo) bool {
+func (pl *TestQueueSortPlugin) Less(_, _ *QueuedPodInfo) bool {
 	return false
 }
 
