@@ -21,18 +21,10 @@ import (
 	"net"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsnet "k8s.io/utils/net"
 )
-
-// PrintFlags logs the flags in the flagset
-func PrintFlags(flags *pflag.FlagSet) {
-	flags.VisitAll(func(flag *pflag.Flag) {
-		klog.V(1).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
-	})
-}
 
 // TODO(mikedanese): remove these flag wrapper types when we remove command line flags
 

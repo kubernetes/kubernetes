@@ -20,7 +20,6 @@ go_library(
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/profile:go_default_library",
         "//pkg/util/configz:go_default_library",
-        "//pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/events/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
