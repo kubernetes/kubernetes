@@ -1,11 +1,5 @@
-{
-	"Rules": [
-		{
-			"SelectorRegexp": "k8s[.]io/kubernetes",
-			"AllowedPrefixes": [
-				"k8s.io/kubernetes/pkg/cloudprovider/providers"
-			],
-			"ForbiddenPrefixes": []
-		}
-	]
-}
+rules:
+  # prevent any k8s.io/kubernetes imports outside of this package
+  - selectorRegexp: k8s[.]io/kubernetes
+    allowedPrefixes:
+      - k8s.io/kubernetes/pkg/cloudprovider/providers

@@ -1,8 +1,5 @@
-{
-	"Rules": [
-		{
-			"SelectorRegexp": "k8s[.]io/kubernetes/test/e2e",
-			"AllowedPrefixes": []
-		}
-	]
-}
+rules:
+  # Prevent import of k8s.io/kubernetes/test/e2e
+  - selectorRegexp: k8s[.]io/kubernetes/test/e2e
+    allowedPrefixes:
+      - ''

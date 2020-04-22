@@ -1,11 +1,6 @@
-{
-	"Rules": [
-	  {
-		"SelectorRegexp": "k8s[.]io/kubernetes",
-		"AllowedPrefixes": [
-		    "k8s.io/kubernetes/pkg/kubelet/server/portforward",
-		    "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
-		]
-	  }
-	]
-}
+rules:
+  # prevent exposing internal api in streaming packages
+  - selectorRegexp: k8s[.]io/kubernetes
+    allowedPrefixes:
+      - k8s.io/kubernetes/pkg/kubelet/server/portforward
+      - k8s.io/kubernetes/pkg/kubelet/server/remotecommand
