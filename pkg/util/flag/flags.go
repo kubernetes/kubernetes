@@ -19,12 +19,12 @@ package flag
 import (
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilsnet "k8s.io/utils/net"
 )
 
 // PrintFlags logs the flags in the flagset
@@ -109,7 +109,7 @@ func (v IPPortVar) Set(s string) error {
 	if net.ParseIP(host) == nil {
 		return fmt.Errorf("%q is not a valid IP address", host)
 	}
-	if _, err := strconv.Atoi(port); err != nil {
+	if _, err := utilsnet.ParsePort(port, true); err != nil {
 		return fmt.Errorf("%q is not a valid number", port)
 	}
 	*v.Val = s
