@@ -576,19 +576,28 @@ func TestCopyToPod(t *testing.T) {
 	defer os.RemoveAll(srcFile)
 
 	tests := map[string]struct {
+		src         string
 		dest        string
 		expectedErr bool
 	}{
 		"copy to directory": {
+			src:         srcFile,
 			dest:        "/tmp/",
 			expectedErr: false,
 		},
 		"copy to root": {
+			src:         srcFile,
 			dest:        "/",
 			expectedErr: false,
 		},
 		"copy to empty file name": {
+			src:         srcFile,
 			dest:        "",
+			expectedErr: true,
+		},
+		"copy unexisting file": {
+			src:         path.Join(srcFile, "nope"),
+			dest:        "/tmp",
 			expectedErr: true,
 		},
 	}
@@ -596,7 +605,7 @@ func TestCopyToPod(t *testing.T) {
 	for name, test := range tests {
 		opts := NewCopyOptions(ioStreams)
 		src := fileSpec{
-			File: srcFile,
+			File: test.src,
 		}
 		dest := fileSpec{
 			PodNamespace: "pod-ns",
