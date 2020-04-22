@@ -72,10 +72,13 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) 
 	}
 
 	ready := service.Spec.PublishNotReadyAddresses || podutil.IsPodReady(pod)
+	terminating := pod.DeletionTimestamp != nil
+
 	ep := discovery.Endpoint{
 		Addresses: getEndpointAddresses(pod.Status, service),
 		Conditions: discovery.EndpointConditions{
-			Ready: &ready,
+			Ready:       &ready,
+			Terminating: &terminating,
 		},
 		Topology: topology,
 		TargetRef: &corev1.ObjectReference{

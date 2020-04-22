@@ -86,7 +86,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
-		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
+		if !endpointutil.ShouldPodBeInEndpoints(pod) {
 			continue
 		}
 

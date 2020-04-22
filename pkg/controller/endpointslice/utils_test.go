@@ -81,13 +81,14 @@ func TestPodToEndpoint(t *testing.T) {
 	svcPublishNotReady, _ := newServiceAndEndpointMeta("publishnotready", ns)
 	svcPublishNotReady.Spec.PublishNotReadyAddresses = true
 
-	readyPod := newPod(1, ns, true, 1)
-	readyPodHostname := newPod(1, ns, true, 1)
+	readyPod := newPod(1, ns, true, 1, false)
+	readyTerminatingPod := newPod(1, ns, true, 1, true)
+	readyPodHostname := newPod(1, ns, true, 1, false)
 	readyPodHostname.Spec.Subdomain = svc.Name
 	readyPodHostname.Spec.Hostname = "example-hostname"
 
-	unreadyPod := newPod(1, ns, false, 1)
-	multiIPPod := newPod(1, ns, true, 1)
+	unreadyPod := newPod(1, ns, false, 1, false)
+	multiIPPod := newPod(1, ns, true, 1, false)
 	multiIPPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 
 	node1 := &v1.Node{
@@ -113,9 +114,12 @@ func TestPodToEndpoint(t *testing.T) {
 			pod:  readyPod,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       ns,
@@ -130,9 +134,32 @@ func TestPodToEndpoint(t *testing.T) {
 			pod:  readyPod,
 			svc:  &svcPublishNotReady,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+		},
+		{
+			name: "Ready terminating pod",
+			pod:  readyTerminatingPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       ns,
@@ -147,9 +174,12 @@ func TestPodToEndpoint(t *testing.T) {
 			pod:  unreadyPod,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       ns,
@@ -164,9 +194,12 @@ func TestPodToEndpoint(t *testing.T) {
 			pod:  unreadyPod,
 			svc:  &svcPublishNotReady,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       ns,
@@ -182,8 +215,11 @@ func TestPodToEndpoint(t *testing.T) {
 			node: node1,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
 				Topology: map[string]string{
 					"kubernetes.io/hostname":        "node-1",
 					"topology.kubernetes.io/zone":   "us-central1-a",
@@ -204,8 +240,11 @@ func TestPodToEndpoint(t *testing.T) {
 			node: node1,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Addresses: []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
 				Topology: map[string]string{
 					"kubernetes.io/hostname":        "node-1",
 					"topology.kubernetes.io/zone":   "us-central1-a",
@@ -226,9 +265,12 @@ func TestPodToEndpoint(t *testing.T) {
 			node: node1,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Hostname:   &readyPodHostname.Spec.Hostname,
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Hostname: &readyPodHostname.Spec.Hostname,
 				Topology: map[string]string{
 					"kubernetes.io/hostname":        "node-1",
 					"topology.kubernetes.io/zone":   "us-central1-a",
@@ -258,7 +300,7 @@ func TestPodToEndpoint(t *testing.T) {
 func TestPodChangedWithPodEndpointChanged(t *testing.T) {
 	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	ns := "test"
-	podStore.Add(newPod(1, ns, true, 1))
+	podStore.Add(newPod(1, ns, true, 1, false))
 	pods := podStore.List()
 	if len(pods) != 1 {
 		t.Errorf("podStore size: expected: %d, got: %d", 1, len(pods))
@@ -446,18 +488,26 @@ func TestGetEndpointPorts(t *testing.T) {
 
 // Test helpers
 
-func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {
+func newPod(n int, namespace string, ready bool, nPorts int, terminating bool) *v1.Pod {
 	status := v1.ConditionTrue
 	if !ready {
 		status = v1.ConditionFalse
 	}
 
+	var deletionTimestamp *metav1.Time
+	if terminating {
+		deletionTimestamp = &metav1.Time{
+			Time: time.Now(),
+		}
+	}
+
 	p := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      fmt.Sprintf("pod%d", n),
-			Labels:    map[string]string{"foo": "bar"},
+			Namespace:         namespace,
+			Name:              fmt.Sprintf("pod%d", n),
+			Labels:            map[string]string{"foo": "bar"},
+			DeletionTimestamp: deletionTimestamp,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{

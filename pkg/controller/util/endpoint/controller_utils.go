@@ -127,12 +127,8 @@ func DeepHashObjectToString(objectToWrite interface{}) string {
 
 // ShouldPodBeInEndpoints returns true if a specified pod should be in an
 // endpoints object. Terminating pods are only included if publishNotReady is true.
-func ShouldPodBeInEndpoints(pod *v1.Pod, publishNotReady bool) bool {
+func ShouldPodBeInEndpoints(pod *v1.Pod) bool {
 	if len(pod.Status.PodIP) == 0 && len(pod.Status.PodIPs) == 0 {
-		return false
-	}
-
-	if !publishNotReady && pod.DeletionTimestamp != nil {
 		return false
 	}
 
