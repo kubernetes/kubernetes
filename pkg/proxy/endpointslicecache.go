@@ -75,9 +75,10 @@ type endpointSliceInfo struct {
 // Used for caching. Intentionally small to limit memory util.
 // Addresses and Topology are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
-	Addresses []string
-	NotReady  bool
-	Topology  map[string]string
+	Addresses   []string
+	NotReady    bool
+	Terminating bool
+	Topology    map[string]string
 }
 
 // spToEndpointMap stores groups Endpoint objects by ServicePortName and
@@ -120,19 +121,24 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 
 	if !remove {
 		for _, endpoint := range endpointSlice.Endpoints {
-			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
-				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
-					Addresses: endpoint.Addresses,
-					Topology:  endpoint.Topology,
-					NotReady:  false,
-				})
-			} else {
-				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
-					Addresses: endpoint.Addresses,
-					Topology:  endpoint.Topology,
-					NotReady:  true,
-				})
+			endpointInfo := &endpointInfo{
+				Addresses: endpoint.Addresses,
+				Topology:  endpoint.Topology,
 			}
+
+			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
+				endpointInfo.NotReady = false
+			} else {
+				endpointInfo.NotReady = true
+			}
+
+			if endpoint.Conditions.Terminating == nil || !*endpoint.Conditions.Terminating {
+				endpointInfo.Terminating = false
+			} else {
+				endpointInfo.Terminating = true
+			}
+
+			esInfo.Endpoints = append(esInfo.Endpoints, endpointInfo)
 		}
 
 		sort.Sort(byAddress(esInfo.Endpoints))
@@ -265,7 +271,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 
 		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
 
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology, endpoint.NotReady)
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology, endpoint.NotReady, endpoint.Terminating)
 
 		// This logic ensures we're deduping potential overlapping endpoints
 		// isLocal should not vary between matching IPs, but if it does, we

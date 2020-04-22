@@ -51,7 +51,10 @@ type BaseEndpointInfo struct {
 	IsLocal bool
 	// NotReady indicates whether an endpoint is not ready to serve traffic
 	NotReady bool
-	Topology map[string]string
+	// Terminating is true if the endpoint is terminating.
+	// NOTE: only supported with EndpointSlice
+	Terminating bool
+	Topology    map[string]string
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
@@ -64,6 +67,11 @@ func (info *BaseEndpointInfo) String() string {
 // IsNotReady returns true if the endpoint is not ready to serve traffic
 func (info *BaseEndpointInfo) IsNotReady() bool {
 	return info.NotReady
+}
+
+// IsTerminating returns true if the endpoint is terminating
+func (info *BaseEndpointInfo) IsTerminating() bool {
+	return info.Terminating
 }
 
 // GetIsLocal is part of proxy.Endpoint interface.
@@ -91,12 +99,13 @@ func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string, notReady bool) *BaseEndpointInfo {
+func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string, notReady bool, terminating bool) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
-		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
-		NotReady: notReady,
-		IsLocal:  isLocal,
-		Topology: topology,
+		Endpoint:    net.JoinHostPort(IP, strconv.Itoa(port)),
+		NotReady:    notReady,
+		Terminating: terminating,
+		IsLocal:     isLocal,
+		Topology:    topology,
 	}
 }
 
@@ -377,7 +386,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, false)
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, false, false)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {
@@ -401,7 +410,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 				}
 
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, true)
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, true, false)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {
