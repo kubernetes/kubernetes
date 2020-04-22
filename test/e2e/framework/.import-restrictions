@@ -236,6 +236,11 @@ rules:
       - k8s.io/kubernetes/pkg/volume/util/subpath
       - k8s.io/kubernetes/pkg/volume/util/types
       - k8s.io/kubernetes/pkg/volume/util/volumepathhandler
+      # TODO: I have no idea why import-boss --include-test-files is yelling about these for k8s.io/kubernetes/test/e2e/framework/providers/kubemark
+      - k8s.io/kubernetes/pkg/apis/authentication
+      - k8s.io/kubernetes/pkg/apis/authentication/v1
+      - k8s.io/kubernetes/pkg/apis/certificates/v1beta1
+      - k8s.io/kubernetes/pkg/scheduler/internal/cache
   - selectorRegexp: k8s[.]io/kubernetes/test/
     allowedPrefixes:
       - k8s.io/kubernetes/test/e2e/framework

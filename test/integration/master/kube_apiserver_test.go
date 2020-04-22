@@ -31,7 +31,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,7 +156,7 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 	}
 
 	matchedExtension := false
-	extensionsPrefix := "/apis/" + apiextensions.GroupName
+	extensionsPrefix := "/apis/" + apiextensionsv1beta1.GroupName
 
 	matchedRegistration := false
 	registrationPrefix := "/apis/" + apiregistration.GroupName
