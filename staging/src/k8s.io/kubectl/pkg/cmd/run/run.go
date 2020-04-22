@@ -384,7 +384,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		leaveStdinOpen := o.LeaveStdinOpen
 		waitForExitCode := !leaveStdinOpen && restartPolicy == corev1.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, podCompleted)
+			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, opts.GetPodTimeout, podCompleted)
 			if err != nil {
 				return err
 			}
@@ -453,9 +453,8 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 }
 
 // waitForPod watches the given pod until the exitCondition is true
-func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitCondition watchtools.ConditionFunc) (*corev1.Pod, error) {
-	// TODO: expose the timeout
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), 0*time.Second)
+func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time.Duration, exitCondition watchtools.ConditionFunc) (*corev1.Pod, error) {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
 
 	preconditionFunc := func(store cache.Store) (bool, error) {
@@ -501,7 +500,7 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitConditio
 }
 
 func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *attach.AttachOptions) error {
-	pod, err := waitForPod(podClient, ns, name, podRunningAndReady)
+	pod, err := waitForPod(podClient, ns, name, opts.GetPodTimeout, podRunningAndReady)
 	if err != nil && err != ErrPodCompleted {
 		return err
 	}
