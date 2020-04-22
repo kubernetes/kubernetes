@@ -360,3 +360,25 @@ func GetHistogramMetricValue(m metrics.ObserverMetric) (float64, error) {
 	}
 	return metricProto.Histogram.GetSampleSum(), nil
 }
+
+// LabelsMatch returns true if metric has all expected labels otherwise false
+func LabelsMatch(metric *dto.Metric, labelFilter map[string]string) bool {
+	metricLabels := map[string]string{}
+
+	for _, labelPair := range metric.Label {
+		metricLabels[labelPair.GetName()] = labelPair.GetValue()
+	}
+
+	// length comparison then match key to values in the maps
+	if len(labelFilter) > len(metricLabels) {
+		return false
+	}
+
+	for labelName, labelValue := range labelFilter {
+		if value, ok := metricLabels[labelName]; !ok || value != labelValue {
+			return false
+		}
+	}
+
+	return true
+}
