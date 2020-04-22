@@ -61,3 +61,60 @@ func TestValueOfAllocatableResources(t *testing.T) {
 		}
 	}
 }
+
+func TestValueOfReservedMemoryConfig(t *testing.T) {
+	testCases := []struct {
+		config        []map[string]string
+		errorExpected bool
+		name          string
+	}{
+		{
+			config:        []map[string]string{{"numa-node": "0", "type": "memory", "limit": "2Gi"}},
+			errorExpected: false,
+			name:          "Valid resource quantity",
+		},
+		{
+			config:        []map[string]string{{"numa-node": "0", "type": "memory", "limit": "2000m"}, {"numa-node": "1", "type": "memory", "limit": "1Gi"}},
+			errorExpected: false,
+			name:          "Valid resource quantity",
+		},
+		{
+			config:        []map[string]string{{"type": "memory", "limit": "2Gi"}},
+			errorExpected: true,
+			name:          "Missing key",
+		},
+		{
+			config:        []map[string]string{{"numa-node": "one", "type": "memory", "limit": "2Gi"}},
+			errorExpected: true,
+			name:          "Wrong 'numa-node' value",
+		},
+		{
+			config:        []map[string]string{{"numa-node": "0", "type": "not-memory", "limit": "2Gi"}},
+			errorExpected: true,
+			name:          "Wrong 'memory' value",
+		},
+		{
+			config:        []map[string]string{{"numa-node": "0", "type": "memory", "limit": "2Gigs"}},
+			errorExpected: true,
+			name:          "Wrong 'limit' value",
+		},
+		{
+			config:        []map[string]string{{"numa-node": "-1", "type": "memory", "limit": "2Gigs"}},
+			errorExpected: true,
+			name:          "Invalid 'numa-node' number",
+		},
+	}
+
+	for _, test := range testCases {
+		_, err := parseReservedMemoryConfig(test.config)
+		if test.errorExpected {
+			if err == nil {
+				t.Errorf("%s: error expected", test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", test.name, err)
+			}
+		}
+	}
+}
