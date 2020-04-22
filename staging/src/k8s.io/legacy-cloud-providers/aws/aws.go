@@ -216,6 +216,11 @@ const ServiceAnnotationLoadBalancerEIPAllocations = "service.beta.kubernetes.io/
 // For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
 const ServiceAnnotationLoadBalancerTargetNodeLabels = "service.beta.kubernetes.io/aws-load-balancer-target-node-labels"
 
+// ServiceAnnotationLoadBalancerPrivateIPs is the annotation used on the
+// service to specify static, private IPs to be used by an NLB.
+// Only supported on elbv2 (NLB).
+const ServiceAnnotationLoadBalancerPrivateIPs = "service.beta.kubernetes.io/aws-load-balancer-private-ips"
+
 // Event key when a volume is stuck on attaching state when being attached to a volume
 const volumeAttachmentStuck = "VolumeAttachmentStuck"
 
