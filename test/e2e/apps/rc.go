@@ -141,19 +141,26 @@ var _ = SIGDescribe("ReplicationController", func() {
 		rcWatchChan := rcWatch.ResultChan()
 
 		ginkgo.By("waiting for RC to be added")
+		eventFound := false
 		for watchEvent := range rcWatchChan {
 			if watchEvent.Type == watch.Added {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+
 		ginkgo.By("waiting for available Replicas")
+		eventFound = false
 		for watchEvent := range rcWatchChan {
 			rc, ok := watchEvent.Object.(*v1.ReplicationController)
 			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch watchEvent")
 			if rc.Status.Replicas == testRcInitialReplicaCount && rc.Status.ReadyReplicas == testRcInitialReplicaCount {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find event with initial replica count")
 
 		rcLabelPatchPayload, err := json.Marshal(v1.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{
@@ -167,11 +174,14 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to patch ReplicationController")
 		framework.ExpectEqual(testRcPatched.ObjectMeta.Labels["test-rc"], "patched", "failed to patch RC")
 		ginkgo.By("waiting for RC to be modified")
+		eventFound = false
 		for watchEvent := range rcWatchChan {
 			if watchEvent.Type == watch.Modified {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Modified)
 
 		rcStatusPatchPayload, err := json.Marshal(map[string]interface{}{
 			"status": map[string]interface{}{
@@ -187,20 +197,26 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to patch ReplicationControllerStatus")
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(0), "ReplicationControllerStatus's readyReplicas does not equal 0")
 		ginkgo.By("waiting for RC to be modified")
+		eventFound = false
 		for watchEvent := range rcWatchChan {
 			if watchEvent.Type == watch.Modified {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Modified)
 
+		eventFound = false
 		for watchEvent := range rcWatchChan {
 			rc, ok := watchEvent.Object.(*v1.ReplicationController)
 			framework.ExpectEqual(ok, true, "Unable to convert type of ReplicationController watch watchEvent")
 
 			if rc.Status.Replicas == testRcInitialReplicaCount {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "RC does not have initial replica count")
 
 		ginkgo.By("fetching ReplicationController status")
 		rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{}, "status")
@@ -223,11 +239,15 @@ var _ = SIGDescribe("ReplicationController", func() {
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(context.TODO(), testRcName, types.StrategicMergePatchType, []byte(rcScalePatchPayload), metav1.PatchOptions{}, "scale")
 		framework.ExpectNoError(err, "Failed to patch ReplicationControllerScale")
 		ginkgo.By("waiting for RC to be modified")
+
+		eventFound = false
 		for watchEvent := range rcWatchChan {
 			if watchEvent.Type == watch.Modified {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Modified)
 
 		var rcFromWatch *v1.ReplicationController
 		ginkgo.By("waiting for ReplicationController's scale to be the max amount")
@@ -260,11 +280,15 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "failed to update ReplicationControllerStatus")
 		framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(1), "ReplicationControllerStatus readyReplicas does not equal 1")
 		ginkgo.By("waiting for RC to be modified")
+
+		eventFound = false
 		for watchEvent := range rcWatchChan {
 			if watchEvent.Type == watch.Modified {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Modified)
 
 		ginkgo.By("listing all ReplicationControllers")
 		rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true"})
@@ -289,11 +313,14 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to delete ReplicationControllers")
 
 		ginkgo.By("waiting for ReplicationController to have a DELETED watchEvent")
+		eventFound = false
 		for watchEvent := range rcWatchChan {
 			if watchEvent.Type == watch.Deleted {
+				eventFound = true
 				break
 			}
 		}
+		framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Deleted)
 	})
 })
 
