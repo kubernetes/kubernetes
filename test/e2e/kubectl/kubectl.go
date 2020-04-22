@@ -857,11 +857,11 @@ metadata:
 
 	ginkgo.Describe("Kubectl diff", func() {
 		/*
-			Release : v1.18
+			Release : v1.19
 			Testname: Kubectl, diff Deployment
 			Description: Create a Deployment with httpd image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
 		*/
-		ginkgo.It("should find diff in Deployment", func() {
+		framework.ConformanceIt("should check if kubectl diff finds a difference for Deployments", func() {
 			ginkgo.By("create deployment with httpd image")
 			deployment := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
 			framework.RunKubectlOrDieInput(ns, deployment, "create", "-f", "-")
@@ -888,11 +888,11 @@ metadata:
 
 	ginkgo.Describe("Kubectl server-side dry-run", func() {
 		/*
-			Release : v1.18
+			Release : v1.19
 			Testname: Kubectl, server-side dry-run Pod
 			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl replace --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
 		*/
-		ginkgo.It("should dry-run update the Pod", func() {
+		framework.ConformanceIt("should check if kubectl can dry-run update Pods", func() {
 			ginkgo.By("running the image " + httpdImage)
 			podName := "e2e-test-httpd-pod"
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
