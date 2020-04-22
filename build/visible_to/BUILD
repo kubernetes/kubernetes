@@ -432,7 +432,6 @@ package_group(
         "//pkg/scheduler/framework/v1alpha1",
         "//pkg/volume/util/operationexecutor",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics",
-        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics",
         "//staging/src/k8s.io/component-base/metrics/...",
         "//test/e2e_node",
         "//test/integration/apiserver/flowcontrol",
