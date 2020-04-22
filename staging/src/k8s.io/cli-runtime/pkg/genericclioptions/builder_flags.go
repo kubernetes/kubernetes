@@ -42,12 +42,14 @@ type ResourceBuilderFlags struct {
 // NewResourceBuilderFlags returns a default ResourceBuilderFlags
 func NewResourceBuilderFlags() *ResourceBuilderFlags {
 	filenames := []string{}
+	kustomize := ""
 
 	return &ResourceBuilderFlags{
 		FileNameFlags: &FileNameFlags{
 			Usage:     "identifying the resource.",
 			Filenames: &filenames,
-			Recursive: boolPtr(true),
+			Kustomize: &kustomize,
+			Recursive: boolPtr(false),
 		},
 	}
 }

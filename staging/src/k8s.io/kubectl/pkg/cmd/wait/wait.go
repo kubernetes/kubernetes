@@ -107,7 +107,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
+		Use:     "wait ([-f FILENAME] | [-k DIRECTORY] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
 		Short:   "Experimental: Wait for a specific condition on one or many resources.",
 		Long:    waitLong,
 		Example: waitExample,
