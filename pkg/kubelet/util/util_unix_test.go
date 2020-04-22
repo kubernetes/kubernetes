@@ -1,4 +1,4 @@
-// +build freebsd linux darwin
+// +build freebsd linux darwin solaris illumos
 
 /*
 Copyright 2018 The Kubernetes Authors.
