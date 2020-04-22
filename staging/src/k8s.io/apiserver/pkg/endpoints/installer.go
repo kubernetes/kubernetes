@@ -39,8 +39,10 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 )
 
 const (
@@ -247,6 +249,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	exporter, isExporter := storage.(rest.Exporter)
 	if !isExporter {
 		exporter = nil
+	}
+
+	var preparator *rest.GenericPreparator
+	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		var (
+			createStrategy rest.RESTCreateStrategy
+			updateStrategy rest.RESTUpdateStrategy
+		)
+
+		if getter, isCreateStrategyGetter := storage.(registry.CreateStrategyGetter); isCreateStrategyGetter {
+			createStrategy = getter.GetCreateStrategy()
+		}
+		if getter, isUpdateStrategyGetter := storage.(registry.UpdateStrategyGetter); isUpdateStrategyGetter {
+			updateStrategy = getter.GetUpdateStrategy()
+		}
+
+		if createStrategy != nil || updateStrategy != nil {
+			preparator = rest.NewGenericPreparator(
+				createStrategy,
+				updateStrategy,
+			)
+		} else {
+			// TODO: temporary debug logging
+			klog.Infof("---- !StrategyGetter: %v %v %v", a.group.GroupVersion.Group, a.group.GroupVersion.Version, path)
+		}
 	}
 
 	versionedExportOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ExportOptions"))
@@ -566,6 +593,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			a.group.Creater,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
+			preparator,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)

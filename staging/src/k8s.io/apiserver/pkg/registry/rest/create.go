@@ -42,18 +42,10 @@ type RESTCreateStrategy interface {
 	// The NameGenerator will be invoked prior to validation.
 	names.NameGenerator
 
+	CreationPreparator
+
 	// NamespaceScoped returns true if the object must be within a namespace.
 	NamespaceScoped() bool
-	// PrepareForCreate is invoked on create before validation to normalize
-	// the object.  For example: remove fields that are not to be persisted,
-	// sort order-insensitive list fields, etc.  This should not remove fields
-	// whose presence would be considered a validation error.
-	//
-	// Often implemented as a type check and an initailization or clearing of
-	// status. Clear the status because status changes are internal. External
-	// callers of an api (users) should not be setting an initial status on
-	// newly created objects.
-	PrepareForCreate(ctx context.Context, obj runtime.Object)
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in
 	// before the object is persisted.  This method should not mutate the

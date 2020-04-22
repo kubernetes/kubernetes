@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/klog"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
@@ -38,6 +40,7 @@ type structuredMergeManager struct {
 	groupVersion    schema.GroupVersion
 	hubVersion      schema.GroupVersion
 	updater         merge.Updater
+	preparator      *rest.GenericPreparator
 }
 
 var _ Manager = &structuredMergeManager{}
@@ -45,7 +48,7 @@ var atMostEverySecond = internal.NewAtMostEvery(time.Second)
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
+func NewStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preparator *rest.GenericPreparator) (Manager, error) {
 	typeConverter, err := internal.NewTypeConverter(models, false)
 	if err != nil {
 		return nil, err
@@ -60,13 +63,14 @@ func NewStructuredMergeManager(models openapiproto.Models, objectConverter runti
 		updater: merge.Updater{
 			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub),
 		},
+		preparator: preparator,
 	}, nil
 }
 
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ Manager, err error) {
+func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preparator *rest.GenericPreparator, preserveUnknownFields bool) (_ Manager, err error) {
 	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
 	if models != nil {
 		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
@@ -83,16 +87,31 @@ func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter ru
 		updater: merge.Updater{
 			Converter: internal.NewCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
+		preparator: preparator,
 	}, nil
 }
 
 // Update implements Manager.
 func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
-	newObjVersioned, err := f.toVersioned(newObj)
+	newObjUnversioned, err := f.toUnversioned(newObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert new object to unversioned: %v", err)
+	}
+	liveObjUnversioned, err := f.toUnversioned(liveObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert live object to unversioned: %v", err)
+	}
+
+	if f.preparator != nil {
+		// TODO: should we have ctx here?
+		f.preparator.Prepare(context.TODO(), newObjUnversioned, liveObjUnversioned)
+	}
+
+	newObjVersioned, err := f.toVersioned(newObjUnversioned)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
 	}
-	liveObjVersioned, err := f.toVersioned(liveObj)
+	liveObjVersioned, err := f.toVersioned(liveObjUnversioned)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
 	}
@@ -143,7 +162,21 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("metadata.managedFields must be nil"))
 	}
 
-	liveObjVersioned, err := f.toVersioned(liveObj)
+	liveObjUnversioned, err := f.toUnversioned(liveObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert live object to unversioned: %v", err)
+	}
+	patchObjUnversioned, err := f.toUnversioned(patchObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert patch object to unversioned: %v", err)
+	}
+
+	if f.preparator != nil {
+		// TODO: should we have ctx here?
+		f.preparator.Prepare(context.TODO(), patchObjUnversioned, liveObjUnversioned)
+	}
+
+	liveObjVersioned, err := f.toVersioned(liveObjUnversioned)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
 	}

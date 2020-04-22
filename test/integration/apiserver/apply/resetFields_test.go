@@ -19,6 +19,7 @@ package apiserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -41,64 +41,10 @@ import (
 )
 
 // namespace used for all tests, do not change this
-const testNamespace = "statusnamespace"
+const resetFieldsNamespace = "reset-fields-namespace"
 
-var statusData = map[schema.GroupVersionResource]string{
-	gvr("", "v1", "persistentvolumes"):                                  `{"status": {"message": "hello"}}`,
-	gvr("", "v1", "resourcequotas"):                                     `{"status": {"used": {"cpu": "5M"}}}`,
-	gvr("", "v1", "services"):                                           `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
-	gvr("", "v1", "replicationcontrollers"):                             `{"status": {"replicas": 2, "readyReplicas": 2, "availableReplicas": 2}}`,
-	gvr("extensions", "v1beta1", "ingresses"):                           `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
-	gvr("networking.k8s.io", "v1beta1", "ingresses"):                    `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
-	gvr("autoscaling", "v1", "horizontalpodautoscalers"):                `{"status": {"currentReplicas": 5}}`,
-	gvr("batch", "v1beta1", "cronjobs"):                                 `{"status": {"lastScheduleTime": null}}`,
-	gvr("batch", "v2alpha1", "cronjobs"):                                `{"status": {"lastScheduleTime": null}}`,
-	gvr("storage.k8s.io", "v1", "volumeattachments"):                    `{"status": {"attached": true}}`,
-	gvr("policy", "v1beta1", "poddisruptionbudgets"):                    `{"status": {"currentHealthy": 5}}`,
-	gvr("certificates.k8s.io", "v1beta1", "certificatesigningrequests"): `{"status": {"conditions": [{"type": "MyStatus"}]}}`,
-	gvr("apiextensions.k8s.io", "v1", "customresourcedefinitions"):      `{"status": {"acceptedNames":{"kind":"", "plural":"", "listKind": "", "singular": ""},"conditions": null, "storedVersions": ["v1alpha1"]}}`,
-}
-
-const statusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"true"}]}}`
-
-// DO NOT ADD TO THIS LIST.
-// This list is used to ignore known bugs. We shouldn't introduce new bugs.
-var ignoreList = map[schema.GroupVersionResource]struct{}{
-	// TODO(#89264): apiservices doesn't work because the openapi is not routed properly.
-	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {},
-	gvr("apiregistration.k8s.io", "v1", "apiservices"):      {},
-}
-
-func gvr(g, v, r string) schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: g, Version: v, Resource: r}
-}
-
-func createMapping(groupVersion string, resource metav1.APIResource) (*meta.RESTMapping, error) {
-	gv, err := schema.ParseGroupVersion(groupVersion)
-	if err != nil {
-		return nil, err
-	}
-	if len(resource.Group) > 0 || len(resource.Version) > 0 {
-		gv = schema.GroupVersion{
-			Group:   resource.Group,
-			Version: resource.Version,
-		}
-	}
-	gvk := gv.WithKind(resource.Kind)
-	gvr := gv.WithResource(strings.TrimSuffix(resource.Name, "/status"))
-	scope := meta.RESTScopeRoot
-	if resource.Namespaced {
-		scope = meta.RESTScopeNamespace
-	}
-	return &meta.RESTMapping{
-		Resource:         gvr,
-		GroupVersionKind: gvk,
-		Scope:            scope,
-	}, nil
-}
-
-// TestApplyStatus makes sure that applying the status works for all known types.
-func TestApplyStatus(t *testing.T) {
+// TestResetFields makes sure that fieldManager does not own fields reset by the storage strategy.
+func TestApplyResetFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	if err != nil {
@@ -117,11 +63,12 @@ func TestApplyStatus(t *testing.T) {
 
 	// create CRDs so we can make sure that custom resources do not get lost
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resetFieldsNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	createData := etcd.GetEtcdStorageData()
+	createData := etcd.GetEtcdStorageDataForNamespace(resetFieldsNamespace)
 
 	// gather resources to test
 	_, resourceLists, err := client.Discovery().ServerGroupsAndResources()
@@ -142,6 +89,7 @@ func TestApplyStatus(t *testing.T) {
 				if _, ok := ignoreList[mapping.Resource]; ok {
 					t.Skip()
 				}
+
 				status, ok := statusData[mapping.Resource]
 				if !ok {
 					status = statusDefault
@@ -150,12 +98,16 @@ func TestApplyStatus(t *testing.T) {
 				if !ok {
 					t.Fatalf("no test data for %s.  Please add a test for your new type to etcd.GetEtcdStorageData().", mapping.Resource)
 				}
+
 				newObj := unstructured.Unstructured{}
 				if err := json.Unmarshal([]byte(newResource.Stub), &newObj.Object); err != nil {
 					t.Fatal(err)
 				}
+				if err := json.Unmarshal([]byte(status), &newObj.Object); err != nil {
+					t.Fatal(err)
+				}
 
-				namespace := testNamespace
+				namespace := resetFieldsNamespace
 				if mapping.Scope == meta.RESTScopeRoot {
 					namespace = ""
 				}
@@ -196,11 +148,21 @@ func TestApplyStatus(t *testing.T) {
 				if managedFields == nil {
 					t.Fatal("Empty managed fields")
 				}
-				if !findManager(managedFields, "apply_status_test") {
-					t.Fatalf("Couldn't find apply_status_test: %v", managedFields)
+
+				createFields, err := getManagedFieldsFor(managedFields, "create_test")
+				if err != nil {
+					t.Fatal(err)
 				}
-				if !findManager(managedFields, "create_test") {
-					t.Fatalf("Couldn't find create_test: %v", managedFields)
+				statusFields, err := getManagedFieldsFor(managedFields, "apply_status_test")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// TODO: test for full object applies to status (~~status~~/spec wiping on status strategies)
+				for field := range createFields {
+					if _, exists := statusFields[field]; exists {
+						t.Errorf("found overlapping field ownership: %v", field)
+					}
 				}
 
 				if err := rsc.Delete(context.TODO(), name, *metav1.NewDeleteOptions(0)); err != nil {
@@ -211,11 +173,16 @@ func TestApplyStatus(t *testing.T) {
 	}
 }
 
-func findManager(managedFields []metav1.ManagedFieldsEntry, manager string) bool {
+func getManagedFieldsFor(managedFields []metav1.ManagedFieldsEntry, manager string) (map[string]interface{}, error) {
 	for _, entry := range managedFields {
 		if entry.Manager == manager {
-			return true
+
+			fields := make(map[string]interface{})
+			if err := json.Unmarshal(entry.FieldsV1.Raw, &fields); err != nil {
+				return nil, err
+			}
+			return fields, nil
 		}
 	}
-	return false
+	return nil, fmt.Errorf("manager not found: %s", manager)
 }

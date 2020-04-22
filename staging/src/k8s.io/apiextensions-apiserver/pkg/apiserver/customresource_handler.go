@@ -72,7 +72,9 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -825,13 +827,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
-			reqScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
+			reqScope.FieldManager, err = buildFieldManager(
+				storages[v.Name].CustomResource,
 				openAPIModels,
-				reqScope.Convertor,
-				reqScope.Defaulter,
-				reqScope.Creater,
-				reqScope.Kind,
-				reqScope.HubGroupVersion,
+				reqScope,
 				crd.Spec.PreserveUnknownFields,
 			)
 			if err != nil {
@@ -867,6 +866,18 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/status",
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			statusScope.FieldManager, err = buildFieldManager(
+				storages[v.Name].Status,
+				openAPIModels,
+				statusScope,
+				crd.Spec.PreserveUnknownFields,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		statusScopes[v.Name] = &statusScope
 	}
 
@@ -1264,4 +1275,38 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensi
 		return nil, err
 	}
 	return models, nil
+}
+
+func buildFieldManager(storage rest.Storage, openAPIModels proto.Models, reqScope handlers.RequestScope, preserveUnknownFields bool) (*fieldmanager.FieldManager, error) {
+	var (
+		preparator     *rest.GenericPreparator
+		createStrategy rest.RESTCreateStrategy
+		updateStrategy rest.RESTUpdateStrategy
+	)
+
+	if getter, isCreateStrategyGetter := storage.(registry.CreateStrategyGetter); isCreateStrategyGetter {
+		createStrategy = getter.GetCreateStrategy()
+	}
+
+	if getter, isUpdateStrategyGetter := storage.(registry.UpdateStrategyGetter); isUpdateStrategyGetter {
+		updateStrategy = getter.GetUpdateStrategy()
+	}
+
+	if createStrategy != nil || updateStrategy != nil {
+		preparator = rest.NewGenericPreparator(
+			createStrategy,
+			updateStrategy,
+		)
+	}
+
+	return fieldmanager.NewDefaultCRDFieldManager(
+		openAPIModels,
+		reqScope.Convertor,
+		reqScope.Defaulter,
+		reqScope.Creater,
+		reqScope.Kind,
+		reqScope.HubGroupVersion,
+		preparator,
+		preserveUnknownFields,
+	)
 }

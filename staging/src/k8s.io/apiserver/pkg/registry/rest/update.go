@@ -38,15 +38,11 @@ import (
 // the call pattern in use.
 type RESTUpdateStrategy interface {
 	runtime.ObjectTyper
+	UpdatePreparator
 	// NamespaceScoped returns true if the object must be within a namespace.
 	NamespaceScoped() bool
 	// AllowCreateOnUpdate returns true if the object can be created by a PUT.
 	AllowCreateOnUpdate() bool
-	// PrepareForUpdate is invoked on update before validation to normalize
-	// the object.  For example: remove fields that are not to be persisted,
-	// sort order-insensitive list fields, etc.  This should not remove fields
-	// whose presence would be considered a validation error.
-	PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.

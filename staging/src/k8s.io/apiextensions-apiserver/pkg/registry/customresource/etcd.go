@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -175,6 +176,7 @@ type StatusREST struct {
 }
 
 var _ = rest.Patcher(&StatusREST{})
+var _ = registry.UpdateStrategyGetter(&StatusREST{})
 
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
@@ -197,6 +199,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetUpdateStrategy implements registry.UpdateStrategyGetter
+func (r *StatusREST) GetUpdateStrategy() rest.RESTUpdateStrategy {
+	return r.store.GetUpdateStrategy()
 }
 
 type ScaleREST struct {

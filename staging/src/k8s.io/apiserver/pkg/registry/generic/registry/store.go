@@ -57,10 +57,20 @@ type ObjectFunc func(obj runtime.Object) error
 
 // GenericStore interface can be used for type assertions when we need to access the underlying strategies.
 type GenericStore interface {
-	GetCreateStrategy() rest.RESTCreateStrategy
-	GetUpdateStrategy() rest.RESTUpdateStrategy
+	CreateStrategyGetter
+	UpdateStrategyGetter
 	GetDeleteStrategy() rest.RESTDeleteStrategy
 	GetExportStrategy() rest.RESTExportStrategy
+}
+
+// CreateStrategyGetter can be used for type assertions when we need to access the underlying create strategy.
+type CreateStrategyGetter interface {
+	GetCreateStrategy() rest.RESTCreateStrategy
+}
+
+// UpdateStrategyGetter can be used for type assertions when we need to access the underlying update strategy.
+type UpdateStrategyGetter interface {
+	GetUpdateStrategy() rest.RESTUpdateStrategy
 }
 
 // Store implements pkg/api/rest.StandardStorage. It's intended to be

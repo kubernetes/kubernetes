@@ -97,6 +97,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 		&fakeObjectDefaulter{},
 		gvk.GroupVersion(),
 		gvk.GroupVersion(),
+		nil,
 	)
 	if err != nil {
 		panic(err)
