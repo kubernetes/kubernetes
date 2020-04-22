@@ -847,7 +847,7 @@ func (nc *Controller) monitorNodeHealth() error {
 				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				fallthrough
 			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
-				if err = nodeutil.MarkPodsNotReady(nc.kubeClient, pods, node.Name); err != nil {
+				if err = nodeutil.MarkPodsNotReady(nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to mark all pods NotReady on node %v: %v; queuing for retry", node.Name, err))
 					nc.nodesToRetry.Store(node.Name, struct{}{})
 					continue
@@ -1330,7 +1330,7 @@ func (nc *Controller) processPod(podItem podUpdateItem) {
 	}
 
 	if currentReadyCondition.Status != v1.ConditionTrue {
-		if err := nodeutil.MarkPodsNotReady(nc.kubeClient, pods, nodeName); err != nil {
+		if err := nodeutil.MarkPodsNotReady(nc.kubeClient, nc.recorder, pods, nodeName); err != nil {
 			klog.Warningf("Unable to mark pod %+v NotReady on node %v: %v.", podItem, nodeName, err)
 			nc.podUpdateQueue.AddRateLimited(podItem)
 		}
