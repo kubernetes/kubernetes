@@ -1,9 +1,0 @@
-rules:
-  # prevent use of pkg/client/unversioned (#34759)
-  - selectorRegexp: k8s[.]io/kubernetes/pkg/client/unversioned$
-    forbiddenPrefixes:
-      - k8s.io/kubernetes/pkg/client/unversioned
-  # prevent use of pkg/client/unversioned (#34759)
-  - selectorRegexp: k8s[.]io/kubernetes/pkg/client/unversioned/testclient$
-    forbiddenPrefixes:
-      - k8s.io/kubernetes/pkg/client/unversioned/testclient
