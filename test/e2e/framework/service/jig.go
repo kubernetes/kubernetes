@@ -962,3 +962,18 @@ func (j *TestJig) CreateTCPUDPServicePods(replica int) error {
 	}
 	return e2erc.RunRC(config)
 }
+
+// CreateSCTPServiceWithPort creates a new SCTP Service with given port based on the
+// j's defaults. Callers can provide a function to tweak the Service object before
+// it is created.
+func (j *TestJig) CreateSCTPServiceWithPort(tweak func(svc *v1.Service), port int32) (*v1.Service, error) {
+	svc := j.newServiceTemplate(v1.ProtocolSCTP, port)
+	if tweak != nil {
+		tweak(svc)
+	}
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SCTP Service %q: %v", svc.Name, err)
+	}
+	return j.sanityCheckService(result, svc.Spec.Type)
+}
