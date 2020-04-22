@@ -608,6 +608,46 @@ func TestNodeInfoAddPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "node_info_cache_test",
+				Name:      "test-3",
+				UID:       types.UID("test-3"),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("200m"),
+							},
+						},
+						Ports: []v1.ContainerPort{
+							{
+								HostIP:   "127.0.0.1",
+								HostPort: 8080,
+								Protocol: "TCP",
+							},
+						},
+					},
+				},
+				InitContainers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: resource.MustParse("200Mi"),
+							},
+						},
+					},
+				},
+				NodeName: nodeName,
+				Overhead: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("500m"),
+					v1.ResourceMemory: resource.MustParse("500"),
+				},
+			},
+		},
 	}
 	expected := &NodeInfo{
 		node: &v1.Node{
@@ -616,15 +656,15 @@ func TestNodeInfoAddPod(t *testing.T) {
 			},
 		},
 		requestedResource: &Resource{
-			MilliCPU:         1300,
-			Memory:           1000,
+			MilliCPU:         2300,
+			Memory:           209716700, //1500 + 200MB in initContainers
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
 		nonzeroRequest: &Resource{
-			MilliCPU:         1300,
-			Memory:           209716200, //200MB + 1000 specified in requests/overhead
+			MilliCPU:         2300,
+			Memory:           419431900, //200MB(initContainers) + 200MB(default memory value) + 1500 specified in requests/overhead
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
@@ -689,6 +729,46 @@ func TestNodeInfoAddPod(t *testing.T) {
 									HostIP:   "127.0.0.1",
 									HostPort: 8080,
 									Protocol: "TCP",
+								},
+							},
+						},
+					},
+					NodeName: nodeName,
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("500m"),
+						v1.ResourceMemory: resource.MustParse("500"),
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "node_info_cache_test",
+					Name:      "test-3",
+					UID:       types.UID("test-3"),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("200m"),
+								},
+							},
+							Ports: []v1.ContainerPort{
+								{
+									HostIP:   "127.0.0.1",
+									HostPort: 8080,
+									Protocol: "TCP",
+								},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("500m"),
+									v1.ResourceMemory: resource.MustParse("200Mi"),
 								},
 							},
 						},
