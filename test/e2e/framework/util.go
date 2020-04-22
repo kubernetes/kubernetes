@@ -133,9 +133,6 @@ const (
 
 	// Minimal number of nodes for the cluster to be considered large.
 	largeClusterThreshold = 100
-
-	// TODO(justinsb): Avoid hardcoding this.
-	awsMasterIP = "172.20.0.9"
 )
 
 var (
@@ -1174,15 +1171,13 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 
 	ips := sets.NewString()
 	switch TestContext.Provider {
-	case "gce", "gke":
+	case "gce", "gke", "aws":
 		if externalIP != "" {
 			ips.Insert(externalIP)
 		}
 		if internalIP != "" {
 			ips.Insert(internalIP)
 		}
-	case "aws":
-		ips.Insert(awsMasterIP)
 	default:
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
