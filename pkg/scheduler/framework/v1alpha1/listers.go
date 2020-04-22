@@ -16,23 +16,6 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-)
-
-// PodFilter is a function to filter a pod. If pod passed return true else return false.
-type PodFilter func(*v1.Pod) bool
-
-// PodLister interface represents anything that can list pods for a scheduler.
-type PodLister interface {
-	// Returns the list of pods.
-	List(labels.Selector) ([]*v1.Pod, error)
-	// This is similar to "List()", but the returned slice does not
-	// contain pods that don't pass `podFilter`.
-	FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
-}
-
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// Returns the list of NodeInfos.
@@ -45,6 +28,5 @@ type NodeInfoLister interface {
 
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
-	Pods() PodLister
 	NodeInfos() NodeInfoLister
 }
