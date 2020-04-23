@@ -31,6 +31,7 @@ go_test(
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
