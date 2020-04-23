@@ -30,31 +30,6 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-var _ framework.PodLister = &PodLister{}
-
-// PodLister implements PodLister on an []v1.Pods for test purposes.
-type PodLister []*v1.Pod
-
-// List returns []*v1.Pod matching a query.
-func (f PodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
-	for _, pod := range f {
-		if s.Matches(labels.Set(pod.Labels)) {
-			selected = append(selected, pod)
-		}
-	}
-	return selected, nil
-}
-
-// FilteredList returns pods matching a pod filter and a label selector.
-func (f PodLister) FilteredList(podFilter framework.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
-	for _, pod := range f {
-		if podFilter(pod) && s.Matches(labels.Set(pod.Labels)) {
-			selected = append(selected, pod)
-		}
-	}
-	return selected, nil
-}
-
 var _ corelisters.ServiceLister = &ServiceLister{}
 
 // ServiceLister implements ServiceLister on []v1.Service for test purposes.

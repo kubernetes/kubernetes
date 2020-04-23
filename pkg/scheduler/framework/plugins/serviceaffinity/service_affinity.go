@@ -104,13 +104,13 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 		return nil, fmt.Errorf("listing pod services: %v", err.Error())
 	}
 	selector := createSelectorFromLabels(pod.Labels)
-	allMatches, err := pl.sharedLister.Pods().List(selector)
-	if err != nil {
-		return nil, fmt.Errorf("listing pods: %v", err.Error())
-	}
 
 	// consider only the pods that belong to the same namespace
-	matchingPodList := filterPodsByNamespace(allMatches, pod.Namespace)
+	nodeInfos, err := pl.sharedLister.NodeInfos().List()
+	if err != nil {
+		return nil, fmt.Errorf("listing nodeInfos: %v", err.Error())
+	}
+	matchingPodList := filterPods(nodeInfos, selector, pod.Namespace)
 
 	return &preFilterState{
 		matchingPodList:     matchingPodList,
@@ -392,15 +392,21 @@ func createSelectorFromLabels(aL map[string]string) labels.Selector {
 	return labels.Set(aL).AsSelector()
 }
 
-// filterPodsByNamespace filters pods outside a namespace from the given list.
-func filterPodsByNamespace(pods []*v1.Pod, ns string) []*v1.Pod {
-	filtered := []*v1.Pod{}
-	for _, nsPod := range pods {
-		if nsPod.Namespace == ns {
-			filtered = append(filtered, nsPod)
+// filterPods filters pods outside a namespace from the given list.
+func filterPods(nodeInfos []*framework.NodeInfo, selector labels.Selector, ns string) []*v1.Pod {
+	maxSize := 0
+	for _, n := range nodeInfos {
+		maxSize += len(n.Pods)
+	}
+	pods := make([]*v1.Pod, 0, maxSize)
+	for _, n := range nodeInfos {
+		for _, p := range n.Pods {
+			if p.Pod.Namespace == ns && selector.Matches(labels.Set(p.Pod.Labels)) {
+				pods = append(pods, p.Pod)
+			}
 		}
 	}
-	return filtered
+	return pods
 }
 
 // findLabelsInSet gets as many key/value pairs as possible out of a label set.

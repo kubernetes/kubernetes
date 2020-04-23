@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -123,11 +122,6 @@ func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
 	return imageExistenceMap
 }
 
-// Pods returns a PodLister
-func (s *Snapshot) Pods() framework.PodLister {
-	return podLister(s.nodeInfoList)
-}
-
 // NodeInfos returns a NodeInfoLister.
 func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
 	return s
@@ -136,34 +130,6 @@ func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
 // NumNodes returns the number of nodes in the snapshot.
 func (s *Snapshot) NumNodes() int {
 	return len(s.nodeInfoList)
-}
-
-type podLister []*framework.NodeInfo
-
-// List returns the list of pods in the snapshot.
-func (p podLister) List(selector labels.Selector) ([]*v1.Pod, error) {
-	alwaysTrue := func(*v1.Pod) bool { return true }
-	return p.FilteredList(alwaysTrue, selector)
-}
-
-// FilteredList returns a filtered list of pods in the snapshot.
-func (p podLister) FilteredList(filter framework.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
-	// podFilter is expected to return true for most or all of the pods. We
-	// can avoid expensive array growth without wasting too much memory by
-	// pre-allocating capacity.
-	maxSize := 0
-	for _, n := range p {
-		maxSize += len(n.Pods)
-	}
-	pods := make([]*v1.Pod, 0, maxSize)
-	for _, n := range p {
-		for _, p := range n.Pods {
-			if filter(p.Pod) && selector.Matches(labels.Set(p.Pod.Labels)) {
-				pods = append(pods, p.Pod)
-			}
-		}
-	}
-	return pods, nil
 }
 
 // List returns the list of nodes in the snapshot.
