@@ -290,7 +290,6 @@ aliases:
     - MaciekPytel
     - mwielgus
   sig-instrumentation-approvers:
-    - piosz
     - brancz
     - serathius
   sig-instrumentation-reviewers:
