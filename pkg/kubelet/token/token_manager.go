@@ -168,7 +168,9 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 // ttl, or if the token is older than 24 hours.
 func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
-		klog.Errorf("expiration seconds was nil for tr: %#v", tr)
+		cpy := tr.DeepCopy()
+		cpy.Status.Token = ""
+		klog.Errorf("expiration seconds was nil for tr: %#v", cpy)
 		return false
 	}
 	now := m.clock.Now()
