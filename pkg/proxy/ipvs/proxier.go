@@ -1976,7 +1976,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 
 	for _, epInfo := range endpoints {
 		if epInfo.GetIsLocal() && epInfo.IsTerminating() {
-			if epInfo.IsNotReady() {
+			if !epInfo.IsReady() {
 				localNotReadyTerminatingEndpoints.Insert(epInfo.String())
 			} else {
 				localReadyTerminatingEndpoints.Insert(epInfo.String())
@@ -1985,7 +1985,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		}
 
 		// skip adding endpoint to "all ready endpoints" if not ready or terminating
-		if epInfo.IsNotReady() || epInfo.IsTerminating() {
+		if !epInfo.IsReady() || epInfo.IsTerminating() {
 			continue
 		}
 

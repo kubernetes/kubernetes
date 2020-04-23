@@ -169,7 +169,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true},
 				},
 			},
 		},
@@ -191,7 +191,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "port", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true},
 				},
 			},
 		},
@@ -212,7 +212,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true},
 				},
 			},
 		},
@@ -245,12 +245,12 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false},
-					{Endpoint: "2.2.2.2:11", IsLocal: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true},
+					{Endpoint: "2.2.2.2:11", IsLocal: false, Ready: true},
 				},
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:22", IsLocal: false},
-					{Endpoint: "2.2.2.2:22", IsLocal: false},
+					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true},
+					{Endpoint: "2.2.2.2:22", IsLocal: false, Ready: true},
 				},
 			},
 		},
@@ -272,7 +272,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true},
 				},
 			},
 		},
@@ -294,7 +294,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true},
 				},
 			},
 		},
@@ -316,7 +316,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:22", IsLocal: false},
+					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true},
 				},
 			},
 		},
@@ -344,10 +344,10 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:11", IsLocal: false},
+					{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true},
 				},
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "1.1.1.1:22", IsLocal: false},
+					{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true},
 				},
 			},
 			isIPv6Mode: &falseVal,
@@ -376,10 +376,10 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1", v1.ProtocolTCP): {
-					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:11", IsLocal: false},
+					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:11", IsLocal: false, Ready: true},
 				},
 				makeServicePortName("ns1", "ep1", "p2", v1.ProtocolTCP): {
-					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:22", IsLocal: false},
+					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:22", IsLocal: false, Ready: true},
 				},
 			},
 			isIPv6Mode: &trueVal,
@@ -1597,14 +1597,14 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			expectedReturnVal:     true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true, NotReady: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, NotReady: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: true, NotReady: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true, Ready: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Ready: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: true, Ready: false},
 				},
 				makeServicePortName("ns1", "svc1", "port-1", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true, NotReady: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true, NotReady: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: true, NotReady: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true, Ready: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true, Ready: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: true, Ready: false},
 				},
 			},
 		},
@@ -1620,12 +1620,12 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			expectedReturnVal:     true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Ready: true},
 				},
 				makeServicePortName("ns1", "svc1", "port-1", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true, Ready: true},
 				},
 			},
 		},
@@ -1642,18 +1642,18 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			expectedReturnVal:     true,
 			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: true, NotReady: true},
-					&BaseEndpointInfo{Endpoint: "10.0.2.1:80", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.2.2:80", IsLocal: true, NotReady: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: true, Ready: false},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:80", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:80", IsLocal: true, Ready: false},
 				},
 				makeServicePortName("ns1", "svc1", "port-1", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: true, NotReady: true},
-					&BaseEndpointInfo{Endpoint: "10.0.2.1:443", IsLocal: true},
-					&BaseEndpointInfo{Endpoint: "10.0.2.2:443", IsLocal: true, NotReady: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: true, Ready: false},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:443", IsLocal: true, Ready: true},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:443", IsLocal: true, Ready: false},
 				},
 			},
 		},
@@ -1714,21 +1714,21 @@ func TestCheckoutChanges(t *testing.T) {
 			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", false), newTestEp("10.0.1.2:80", "", false)},
-					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "", false), newTestEp("10.0.1.2:443", "", false)},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", true), newTestEp("10.0.1.2:80", "", true)},
+					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "", true), newTestEp("10.0.1.2:443", "", true)},
 				},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", false), newTestEp("10.0.1.2:80", "", false)},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", true), newTestEp("10.0.1.2:80", "", true)},
 				},
 			}},
 			items: map[types.NamespacedName]*endpointsChange{
 				{Namespace: "ns1", Name: "svc1"}: {
 					previous: EndpointsMap{
-						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", false), newTestEp("10.0.1.2:80", "", false)},
-						svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "", false), newTestEp("10.0.1.2:443", "", false)},
+						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", true), newTestEp("10.0.1.2:80", "", true)},
+						svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "", true), newTestEp("10.0.1.2:443", "", true)},
 					},
 					current: EndpointsMap{
-						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", false), newTestEp("10.0.1.2:80", "", false)},
+						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "", true), newTestEp("10.0.1.2:80", "", true)},
 					},
 				},
 			},
@@ -1739,7 +1739,7 @@ func TestCheckoutChanges(t *testing.T) {
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", false), newTestEp("10.0.1.2:80", "host1", false), newTestEp("10.0.1.3:80", "host1", true)},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", true), newTestEp("10.0.1.2:80", "host1", true), newTestEp("10.0.1.3:80", "host1", false)},
 				},
 			}},
 			useEndpointSlices: true,
@@ -1752,11 +1752,11 @@ func TestCheckoutChanges(t *testing.T) {
 			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", false), newTestEp("10.0.1.2:80", "host1", false), newTestEp("10.0.1.3:80", "host1", true)},
-					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "host1", false), newTestEp("10.0.1.2:443", "host1", false), newTestEp("10.0.1.3:443", "host1", true)},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", true), newTestEp("10.0.1.2:80", "host1", true), newTestEp("10.0.1.3:80", "host1", false)},
+					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "host1", true), newTestEp("10.0.1.2:443", "host1", true), newTestEp("10.0.1.3:443", "host1", false)},
 				},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", false), newTestEp("10.0.1.2:80", "host1", false), newTestEp("10.0.1.3:80", "host1", true)},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1", true), newTestEp("10.0.1.2:80", "host1", true), newTestEp("10.0.1.3:80", "host1", false)},
 				},
 			}},
 			useEndpointSlices: true,
@@ -1865,8 +1865,8 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 	}
 }
 
-func newTestEp(ep, host string, notReady bool) *BaseEndpointInfo {
-	endpointInfo := &BaseEndpointInfo{Endpoint: ep, NotReady: notReady}
+func newTestEp(ep, host string, ready bool) *BaseEndpointInfo {
+	endpointInfo := &BaseEndpointInfo{Endpoint: ep, Ready: ready}
 	if host != "" {
 		endpointInfo.Topology = map[string]string{
 			"kubernetes.io/hostname": host,

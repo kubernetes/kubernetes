@@ -76,7 +76,7 @@ type endpointSliceInfo struct {
 // Addresses and Topology are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
 	Addresses   []string
-	NotReady    bool
+	Ready       bool
 	Terminating bool
 	Topology    map[string]string
 }
@@ -127,9 +127,9 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 			}
 
 			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
-				endpointInfo.NotReady = false
+				endpointInfo.Ready = true
 			} else {
-				endpointInfo.NotReady = true
+				endpointInfo.Ready = false
 			}
 
 			if endpoint.Conditions.Terminating == nil || !*endpoint.Conditions.Terminating {
@@ -271,7 +271,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 
 		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
 
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology, endpoint.NotReady, endpoint.Terminating)
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology, endpoint.Ready, endpoint.Terminating)
 
 		// This logic ensures we're deduping potential overlapping endpoints
 		// isLocal should not vary between matching IPs, but if it does, we
