@@ -59,7 +59,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/scheduling:go_default_library",

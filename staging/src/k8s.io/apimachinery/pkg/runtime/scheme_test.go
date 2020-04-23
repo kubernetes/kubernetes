@@ -986,7 +986,7 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 
 	// Register functions to verify that scope.Meta() gets set correctly.
 	convertSimple := func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
-		scope.Convert(&in.TestString, &out.TestString, 0)
+		out.TestString = in.TestString
 		internalToExternalCalls++
 		return nil
 	}

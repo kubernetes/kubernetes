@@ -442,20 +442,20 @@ func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags
 	if fn, ok := c.generatedConversionFuncs.untyped[pair]; ok {
 		return fn(src, dest, scope)
 	}
-	// TODO: consider everything past this point deprecated - we want to support only point to point top level
-	// conversions
 
 	dv, err := EnforcePtr(dest)
 	if err != nil {
 		return err
 	}
-	if !dv.CanAddr() && !dv.CanSet() {
-		return fmt.Errorf("can't write to dest")
-	}
 	sv, err := EnforcePtr(src)
 	if err != nil {
 		return err
 	}
+	return fmt.Errorf("converting (%s) to (%s): unknown conversion", sv.Type(), dv.Type())
+
+	// TODO: Everything past this point is deprecated.
+	//  Remove in 1.20 once we're sure it didn't break anything.
+
 	// Leave something on the stack, so that calls to struct tag getters never fail.
 	scope.srcStack.push(scopeStackElem{})
 	scope.destStack.push(scopeStackElem{})
