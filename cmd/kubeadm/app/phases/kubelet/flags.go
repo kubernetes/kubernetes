@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilsexec "k8s.io/utils/exec"
 	"os"
 	"path/filepath"
@@ -39,7 +38,6 @@ type kubeletFlagsOpts struct {
 	pauseImage               string
 	registerTaintsUsingFlags bool
 	execer                   utilsexec.Interface
-	isServiceActiveFunc      func(string) (bool, error)
 }
 
 // GetNodeNameAndHostname obtains the name for this Node using the following precedence
@@ -69,13 +67,6 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 		execer:                   utilsexec.New(),
-		isServiceActiveFunc: func(name string) (bool, error) {
-			initSystem, err := initsystem.GetInitSystem()
-			if err != nil {
-				return false, err
-			}
-			return initSystem.ServiceIsActive(name), nil
-		},
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)

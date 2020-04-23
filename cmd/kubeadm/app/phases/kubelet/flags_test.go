@@ -89,14 +89,6 @@ var (
 	}
 )
 
-func serviceIsActiveFunc(_ string) (bool, error) {
-	return true, nil
-}
-
-func serviceIsNotActiveFunc(_ string) (bool, error) {
-	return false, nil
-}
-
 func TestBuildKubeletArgMap(t *testing.T) {
 
 	tests := []struct {
@@ -117,8 +109,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 						},
 					},
 				},
-				execer:              errCgroupExecer,
-				isServiceActiveFunc: serviceIsNotActiveFunc,
+				execer: errCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
@@ -131,8 +122,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					CRISocket: "/var/run/dockershim.sock",
 					Name:      "override-name",
 				},
-				execer:              errCgroupExecer,
-				isServiceActiveFunc: serviceIsNotActiveFunc,
+				execer: errCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
@@ -146,8 +136,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					CRISocket:        "/var/run/dockershim.sock",
 					KubeletExtraArgs: map[string]string{"hostname-override": "override-name"},
 				},
-				execer:              errCgroupExecer,
-				isServiceActiveFunc: serviceIsNotActiveFunc,
+				execer: errCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
@@ -160,8 +149,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
 				},
-				execer:              systemdCgroupExecer,
-				isServiceActiveFunc: serviceIsNotActiveFunc,
+				execer: systemdCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
@@ -174,8 +162,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
 				},
-				execer:              cgroupfsCgroupExecer,
-				isServiceActiveFunc: serviceIsNotActiveFunc,
+				execer: cgroupfsCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
@@ -188,8 +175,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/containerd.sock",
 				},
-				execer:              cgroupfsCgroupExecer,
-				isServiceActiveFunc: serviceIsNotActiveFunc,
+				execer: cgroupfsCgroupExecer,
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -216,7 +202,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				},
 				registerTaintsUsingFlags: true,
 				execer:                   cgroupfsCgroupExecer,
-				isServiceActiveFunc:      serviceIsNotActiveFunc,
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -225,29 +210,13 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 		},
 		{
-			name: "systemd-resolved running",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
-				},
-				execer:              cgroupfsCgroupExecer,
-				isServiceActiveFunc: serviceIsActiveFunc,
-			},
-			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"resolv-conf":                "/run/systemd/resolve/resolv.conf",
-			},
-		},
-		{
 			name: "pause image is set",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
 				},
-				pauseImage:          "gcr.io/pause:3.2",
-				execer:              cgroupfsCgroupExecer,
-				isServiceActiveFunc: serviceIsNotActiveFunc,
+				pauseImage: "gcr.io/pause:3.2",
+				execer:     cgroupfsCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
