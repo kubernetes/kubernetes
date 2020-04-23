@@ -21,13 +21,12 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/metrics/testutil"
 	kubeletresourcemetricsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-
-	"github.com/prometheus/common/model"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -119,8 +118,7 @@ func nodeID(element interface{}) string {
 }
 
 func containerID(element interface{}) string {
-	el := element.(*model.Sample)
-	return fmt.Sprintf("%s::%s::%s", el.Metric["namespace"], el.Metric["pod"], el.Metric["container"])
+	return testutil.GetMetricLabelValue(element, "namespace", "pod", "container")
 }
 
 func boundedSample(lower, upper interface{}) types.GomegaMatcher {
@@ -128,10 +126,7 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 		// We already check Metric when matching the Id
 		"Metric": gstruct.Ignore(),
 		"Value":  gomega.And(gomega.BeNumerically(">=", lower), gomega.BeNumerically("<=", upper)),
-		"Timestamp": gomega.WithTransform(func(t model.Time) time.Time {
-			// model.Time is in Milliseconds since epoch
-			return time.Unix(0, int64(t)*int64(time.Millisecond))
-		},
+		"Timestamp": gomega.WithTransform(testutil.GetModelTimeFun(0),
 			gomega.And(
 				gomega.BeTemporally(">=", time.Now().Add(-maxStatsAge)),
 				// Now() is the test start time, not the match time, so permit a few extra minutes.

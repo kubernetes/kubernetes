@@ -19,8 +19,10 @@ package testutil
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/prometheus/common/model"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
@@ -67,4 +69,26 @@ func NewFakeKubeRegistry(ver string) metrics.KubeRegistry {
 	}
 
 	return metrics.NewKubeRegistry()
+}
+
+// GetMetricLabelValue returns string that consists of the value of labelName in Metric
+func GetMetricLabelValue(element interface{}, labelName ...string) string {
+	el := element.(*model.Sample)
+	var value string
+	var i int
+	if len(labelName) > 1 {
+		for i = 0; i < len(labelName)-1; i++ {
+			value += fmt.Sprintf("%s::", el.Metric[model.LabelName(labelName[i])])
+		}
+	}
+	value += fmt.Sprintf("%s", el.Metric[model.LabelName(labelName[i])])
+	return value
+}
+
+// GetModelTimeFun returns fun of model.Time
+func GetModelTimeFun(sec int64) interface{} {
+	return func(t model.Time) time.Time {
+		// model.Time is in Milliseconds since epoch
+		return time.Unix(sec, int64(t)*int64(time.Millisecond))
+	}
 }
