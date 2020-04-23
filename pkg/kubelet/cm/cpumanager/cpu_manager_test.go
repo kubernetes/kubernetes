@@ -503,6 +503,8 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 			testCase.expInitCSets,
 			testCase.expCSets...)
 
+		cumCSet := cpuset.NewCPUSet()
+
 		for i := range containers {
 			err := mgr.Allocate(testCase.pod, &containers[i])
 			if err != nil {
@@ -525,6 +527,13 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v for container %v but got %v",
 					testCase.description, expCSets[i], containers[i].Name, cset)
 			}
+
+			cumCSet = cumCSet.Union(cset)
+		}
+
+		if !testCase.stDefaultCPUSet.Difference(cumCSet).Equals(state.defaultCPUSet) {
+			t.Errorf("StaticPolicy error (%v). expected final state for defaultCPUSet %v but got %v",
+				testCase.description, testCase.stDefaultCPUSet.Difference(cumCSet), state.defaultCPUSet)
 		}
 	}
 }
