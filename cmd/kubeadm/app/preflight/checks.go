@@ -125,7 +125,7 @@ func (sc ServiceCheck) Name() string {
 
 // Check validates if the service is enabled and active.
 func (sc ServiceCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating if the service is enabled and active")
+	klog.V(1).Infof("validating if the %q service is enabled and active", sc.Service)
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		return []error{err}, nil
