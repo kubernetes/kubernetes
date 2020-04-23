@@ -39,7 +39,14 @@ type Action func() error
 var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 	f := framework.NewDefaultFramework("events")
 
-	ginkgo.It("should ensure that an event can be fetched, patched, deleted, and listed", func() {
+	/*
+			   Release : v1.19
+			   Testname: Event resource lifecycle
+			   Description: Create an event, the event MUST exist.
+		           The event is patched with a new message, the check MUST have the update message.
+		           The event is deleted and MUST NOT show up when listing all events.
+	*/
+	framework.ConformanceIt("should ensure that an event can be fetched, patched, deleted, and listed", func() {
 		eventTestName := "event-test"
 
 		ginkgo.By("creating a test event")

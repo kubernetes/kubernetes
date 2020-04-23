@@ -804,6 +804,14 @@
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
+- testname: Event resource lifecycle
+  codename: '[sig-api-machinery] Events should ensure that an event can be fetched,
+    patched, deleted, and listed [Conformance]'
+  description: Create an event, the event MUST exist. The event is patched with a
+    new message, the check MUST have the update message. The event is deleted and
+    MUST NOT show up when listing all events.
+  release: v1.19
+  file: test/e2e/framework/events/events.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
     when not orphaning [Conformance]'
