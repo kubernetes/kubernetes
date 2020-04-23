@@ -886,11 +886,11 @@ func (m *LinuxPodSandboxConfig) GetSysctls() map[string]string {
 // PodSandbox in its user interface for better user experience. For example,
 // the runtime can construct a unique PodSandboxName based on the metadata.
 type PodSandboxMetadata struct {
-	// Pod name of the sandbox. Same as the pod name in the PodSpec.
+	// Pod name of the sandbox. Same as the pod name in the Pod ObjectMeta.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Pod UID of the sandbox. Same as the pod UID in the PodSpec.
+	// Pod UID of the sandbox. Same as the pod UID in the Pod ObjectMeta.
 	Uid string `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
-	// Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+	// Pod namespace of the sandbox. Same as the pod namespace in the Pod ObjectMeta.
 	Namespace string `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	// Attempt number of creating the sandbox. Default: 0.
 	Attempt              uint32   `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
