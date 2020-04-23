@@ -457,21 +457,6 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
 
-	preconditionFunc := func(store cache.Store) (bool, error) {
-		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: ns, Name: name})
-		if err != nil {
-			return true, err
-		}
-		if !exists {
-			// We need to make sure we see the object in the cache before we start waiting for events
-			// or we would be waiting for the timeout if such object didn't exist.
-			// (e.g. it was deleted before we started informers so they wouldn't even see the delete event)
-			return true, errors.NewNotFound(corev1.Resource("pods"), name)
-		}
-
-		return false, nil
-	}
-
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -487,9 +472,7 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time
 	intr := interrupt.New(nil, cancel)
 	var result *corev1.Pod
 	err := intr.Run(func() error {
-		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, preconditionFunc, func(ev watch.Event) (bool, error) {
-			return exitCondition(ev)
-		})
+		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, nil, exitCondition)
 		if ev != nil {
 			result = ev.Object.(*corev1.Pod)
 		}
