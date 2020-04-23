@@ -32,6 +32,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
     ],
 )
