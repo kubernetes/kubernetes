@@ -18,6 +18,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"regexp"
@@ -29,9 +30,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -618,6 +621,82 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		framework.ExpectNoError(podErr)
 		framework.Logf("completed pod")
+	})
+
+	ginkgo.It("should run through the lifecycle of a ServiceAccount", func() {
+		testNamespaceName := f.Namespace.Name
+		testServiceAccountName := "testserviceaccount"
+		testServiceAccountStaticLabels := map[string]string{"test-serviceaccount-static": "true"}
+		testServiceAccountStaticLabelsFlat := "test-serviceaccount-static=true"
+
+		ginkgo.By("creating a ServiceAccount")
+		testServiceAccount := v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   testServiceAccountName,
+				Labels: testServiceAccountStaticLabels,
+			},
+		}
+		_, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Create(context.TODO(), &testServiceAccount, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create a ServiceAccount")
+
+		ginkgo.By("watching for the ServiceAccount to be added")
+		resourceWatchTimeoutSeconds := int64(180)
+		resourceWatch, err := f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat, TimeoutSeconds: &resourceWatchTimeoutSeconds})
+		if err != nil {
+			fmt.Println(err, "failed to setup watch on newly created ServiceAccount")
+			return
+		}
+
+		resourceWatchChan := resourceWatch.ResultChan()
+		eventFound := false
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Added {
+				eventFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Added)
+
+		ginkgo.By("patching the ServiceAccount")
+		boolFalse := false
+		testServiceAccountPatchData, err := json.Marshal(v1.ServiceAccount{
+			AutomountServiceAccountToken: &boolFalse,
+		})
+		framework.ExpectNoError(err, "failed to marshal JSON patch for the ServiceAccount")
+		_, err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).Patch(context.TODO(), testServiceAccountName, types.StrategicMergePatchType, []byte(testServiceAccountPatchData), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch the ServiceAccount")
+		eventFound = false
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Modified {
+				eventFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Modified)
+
+		ginkgo.By("finding ServiceAccount in list of all ServiceAccounts (by LabelSelector)")
+		serviceAccountList, err := f.ClientSet.CoreV1().ServiceAccounts("").List(context.TODO(), metav1.ListOptions{LabelSelector: testServiceAccountStaticLabelsFlat})
+		framework.ExpectNoError(err, "failed to list ServiceAccounts by LabelSelector")
+		foundServiceAccount := false
+		for _, serviceAccountItem := range serviceAccountList.Items {
+			if serviceAccountItem.ObjectMeta.Name == testServiceAccountName && serviceAccountItem.ObjectMeta.Namespace == testNamespaceName && *serviceAccountItem.AutomountServiceAccountToken == boolFalse {
+				foundServiceAccount = true
+				break
+			}
+		}
+		framework.ExpectEqual(foundServiceAccount, true, "failed to find the created ServiceAccount")
+
+		ginkgo.By("deleting the ServiceAccount")
+		err = f.ClientSet.CoreV1().ServiceAccounts(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		framework.ExpectNoError(err, "failed to delete the ServiceAccount by Collection")
+		eventFound = false
+		for watchEvent := range resourceWatchChan {
+			if watchEvent.Type == watch.Deleted {
+				eventFound = true
+				break
+			}
+		}
+		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
 	})
 })
 
