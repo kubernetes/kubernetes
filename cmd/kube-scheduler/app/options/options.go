@@ -61,6 +61,7 @@ type Options struct {
 	CombinedInsecureServing *CombinedInsecureServingOptions
 	Authentication          *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization           *apiserveroptions.DelegatingAuthorizationOptions
+	Metrics                 *metrics.Options
 	Deprecated              *DeprecatedOptions
 
 	// ConfigFile is the location of the scheduler server's configuration file.
@@ -70,8 +71,6 @@ type Options struct {
 	WriteConfigTo string
 
 	Master string
-
-	ShowHiddenMetricsForVersion string
 }
 
 // NewOptions returns default scheduler app options.
@@ -107,6 +106,7 @@ func NewOptions() (*Options, error) {
 			SchedulerName:                  corev1.DefaultSchedulerName,
 			HardPodAffinitySymmetricWeight: interpodaffinity.DefaultHardPodAffinityWeight,
 		},
+		Metrics: metrics.NewOptions(),
 	}
 
 	o.Authentication.TolerateInClusterLookupFailure = true
@@ -161,15 +161,7 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 
 	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, nfs.FlagSet("leader election"))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
-
-	// TODO(RainbowMango): move it to genericoptions before next flag comes.
-	mfs := nfs.FlagSet("metrics")
-	mfs.StringVar(&o.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.ShowHiddenMetricsForVersion,
-		"The previous version for which you want to show hidden metrics. "+
-			"Only the previous minor version is meaningful, other values will not be allowed. "+
-			"Accepted format of version is <major>.<minor>, e.g.: '1.16'. "+
-			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
-			"rather than being surprised when they are permanently removed in the release after that.")
+	o.Metrics.AddFlags(nfs.FlagSet("metrics"))
 
 	return nfs
 }
@@ -216,10 +208,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 			return err
 		}
 	}
-	if len(o.ShowHiddenMetricsForVersion) > 0 {
-		metrics.SetShowHidden()
-	}
-
+	o.Metrics.Apply()
 	return nil
 }
 
@@ -235,7 +224,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authentication.Validate()...)
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Deprecated.Validate()...)
-	errs = append(errs, metrics.ValidateShowHiddenMetricsVersion(o.ShowHiddenMetricsForVersion)...)
+	errs = append(errs, o.Metrics.Validate()...)
 
 	return errs
 }
