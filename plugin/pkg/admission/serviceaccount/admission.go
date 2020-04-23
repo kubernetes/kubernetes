@@ -530,7 +530,7 @@ func (s *Plugin) createVolume(tokenVolumeName, secretName string) api.Volume {
 						{
 							ServiceAccountToken: &api.ServiceAccountTokenProjection{
 								Path:              "token",
-								ExpirationSeconds: 60 * 60,
+								ExpirationSeconds: serviceaccount.WarnOnlyBoundTokenExpirationSeconds,
 							},
 						},
 						{
