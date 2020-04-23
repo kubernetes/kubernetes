@@ -153,8 +153,8 @@ func TestRequiresRefresh(t *testing.T) {
 			expectRefresh: true,
 		},
 		{
-			now:           start.Add(0 * time.Minute),
 			// expiry will be overwritten by the tweak below.
+			now:           start.Add(0 * time.Minute),
 			exp:           start.Add(60 * time.Minute),
 			expectRefresh: false,
 			requestTweaks: func(tr *authenticationv1.TokenRequest) {
