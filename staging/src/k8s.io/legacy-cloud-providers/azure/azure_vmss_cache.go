@@ -173,9 +173,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*azcache.TimedCache, error) {
 					}
 					localCache.Store(computerName, vmssVMCacheEntry)
 
-					if _, exists := oldCache[computerName]; exists {
-						delete(oldCache, computerName)
-					}
+					delete(oldCache, computerName)
 				}
 			}
 
