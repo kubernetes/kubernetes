@@ -23,10 +23,10 @@ import (
 )
 
 // BracketSeparatedSliceMapStringString can be set from the command line with the format `--flag {key=value, ...}, {...}`.
-// Multiple comma-separated key-value pairs in a braket(`{}`) in a single invocation are supported. For example: `--flag {key=value, key=value, ...}`.
-// Multiple braket-separated list of key-value pairs in a single invocation are supported. For example: `--flag {key=value, key=value}, {key=value, key=value}`.
+// Multiple comma-separated key-value pairs in brackets (`{}`) in a single invocation are supported. For example: `--flag {key=value, key=value, ...}`.
+// Multiple bracket-separated list of key-value pairs in a single invocation are supported. For example: `--flag {key=value, key=value}, {key=value, key=value}`.
 type BracketSeparatedSliceMapStringString struct {
-	Value    *[]map[string]string
+	Value       *[]map[string]string
 	initialized bool // set to true after the first Set call
 }
 
@@ -35,7 +35,6 @@ type BracketSeparatedSliceMapStringString struct {
 func NewBracketSeparatedSliceMapStringString(m *[]map[string]string) *BracketSeparatedSliceMapStringString {
 	return &BracketSeparatedSliceMapStringString{Value: m}
 }
-
 
 // Set implements github.com/spf13/pflag.Value
 func (m *BracketSeparatedSliceMapStringString) Set(value string) error {
@@ -49,13 +48,7 @@ func (m *BracketSeparatedSliceMapStringString) Set(value string) error {
 
 	value = strings.TrimSpace(value)
 
-	// split here
-	//{numa-node=0,memory-type=memory,limit=1Gi},{numa-node=1,memory-type=memory,limit=1Gi},{numa-node=1,memory-type=memory,limit=1Gi}
-//	for _, split := range strings.Split(value, "{") {
-//		split = strings.TrimRight(split, ",")
-//		split = strings.TrimRight(split, "}")
 	for _, split := range strings.Split(value, ",{") {
-		//split = strings.TrimRight(split, ",")
 		split = strings.TrimLeft(split, "{")
 		split = strings.TrimRight(split, "}")
 
@@ -66,7 +59,7 @@ func (m *BracketSeparatedSliceMapStringString) Set(value string) error {
 		// now we have "numa-node=1,memory-type=memory,limit=1Gi"
 		tmpRawMap := make(map[string]string)
 
-		tmpMap:= NewMapStringString(&tmpRawMap)
+		tmpMap := NewMapStringString(&tmpRawMap)
 
 		if err := tmpMap.Set(split); err != nil {
 			return fmt.Errorf("could not parse String: (%s): %v", value, err)
@@ -100,7 +93,7 @@ func (m *BracketSeparatedSliceMapStringString) String() string {
 		}
 
 		if len(tmpPairs) != 0 {
-			slices = append(slices, "{" + strings.Join(tmpPairs, ",") + "}")
+			slices = append(slices, "{"+strings.Join(tmpPairs, ",")+"}")
 		}
 	}
 	sort.Strings(slices)

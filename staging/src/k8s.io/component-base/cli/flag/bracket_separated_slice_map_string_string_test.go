@@ -28,7 +28,7 @@ func TestStringBracketSeparatedSliceMapStringString(t *testing.T) {
 		m      *BracketSeparatedSliceMapStringString
 		expect string
 	}{
-		{"nill", NewBracketSeparatedSliceMapStringString(&nilSliceMap), ""},
+		{"nil", NewBracketSeparatedSliceMapStringString(&nilSliceMap), ""},
 		{"empty", NewBracketSeparatedSliceMapStringString(&[]map[string]string{}), ""},
 		{"one key", NewBracketSeparatedSliceMapStringString(&[]map[string]string{{"a": "string"}}), "{a=string}"},
 		{"two keys", NewBracketSeparatedSliceMapStringString(&[]map[string]string{{"a": "string", "b": "string"}}), "{a=string,b=string}"},
@@ -73,13 +73,13 @@ func TestSetBracketSeparatedSliceMapStringString(t *testing.T) {
 				initialized: true,
 				Value:       &[]map[string]string{},
 			}, ""},
-		{"empty braket", []string{"{}"},
+		{"empty bracket", []string{"{}"},
 			NewBracketSeparatedSliceMapStringString(&nilMap),
 			&BracketSeparatedSliceMapStringString{
 				initialized: true,
 				Value:       &[]map[string]string{},
 			}, ""},
-		{"missing braket", []string{"a=string, b=string"},
+		{"missing bracket", []string{"a=string, b=string"},
 			NewBracketSeparatedSliceMapStringString(&nilMap),
 			&BracketSeparatedSliceMapStringString{
 				initialized: true,
@@ -103,13 +103,13 @@ func TestSetBracketSeparatedSliceMapStringString(t *testing.T) {
 				initialized: true,
 				Value:       &[]map[string]string{{"a": "string", "b": "string"}},
 			}, ""},
-		{"two duplecated keys", []string{"{a=string,a=string}"},
+		{"two duplicated keys", []string{"{a=string,a=string}"},
 			NewBracketSeparatedSliceMapStringString(&nilMap),
 			&BracketSeparatedSliceMapStringString{
 				initialized: true,
 				Value:       &[]map[string]string{{"a": "string"}},
 			}, ""},
-		{"two keys with space", []string{"{a = string, b = string}"},
+		{"two keys with spaces", []string{"{a = string, b = string}"},
 			NewBracketSeparatedSliceMapStringString(&nilMap),
 			&BracketSeparatedSliceMapStringString{
 				initialized: true,

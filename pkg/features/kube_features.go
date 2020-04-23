@@ -703,6 +703,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:                               {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                                     {Default: true, PreRelease: featuregate.Beta},
+	MemoryManager:                                  {Default: false, PreRelease: featuregate.Alpha},
 	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
 	ServiceNodeExclusion:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
