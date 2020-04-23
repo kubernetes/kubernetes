@@ -36,6 +36,8 @@ import (
 // validateClusterIPFlags is expected to be called after Complete()
 func validateClusterIPFlags(options *ServerRunOptions) []error {
 	var errs []error
+	// maxCIDRbits is used to define the maximum CIDR size for the cluster ip(s)
+	const maxCIDRbits = 20
 
 	// validate that primary has been processed by user provided values or it has been defaulted
 	if options.PrimaryServiceClusterIPRange.IP == nil {
@@ -50,8 +52,8 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 	// Complete() expected to have set Primary* and Secondary*
 	// primary CIDR validation
 	var ones, bits = options.PrimaryServiceClusterIPRange.Mask.Size()
-	if bits-ones > 20 {
-		errs = append(errs, errors.New("specified --service-cluster-ip-range is too large"))
+	if bits-ones > maxCIDRbits {
+		errs = append(errs, fmt.Errorf("specified --service-cluster-ip-range is too large. Network CIDR should not be bigger than /%d", bits-maxCIDRbits))
 	}
 
 	// Secondary IP validation
@@ -79,8 +81,8 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		// bigger cidr (specially those offered by IPv6) will add no value
 		// significantly increase snapshotting time.
 		var ones, bits = options.SecondaryServiceClusterIPRange.Mask.Size()
-		if bits-ones > 20 {
-			errs = append(errs, errors.New("specified --secondary-service-cluster-ip-range is too large"))
+		if bits-ones > maxCIDRbits {
+			errs = append(errs, fmt.Errorf("specified --service-cluster-ip-range is too large. Network CIDR should not be bigger than /%d", bits-maxCIDRbits))
 		}
 	}
 

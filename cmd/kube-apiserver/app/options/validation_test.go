@@ -95,6 +95,18 @@ func TestClusterSerivceIPRange(t *testing.T) {
 			options:         makeOptionsWithCIDRs("10.0.0.0/16", "3000::/108"),
 			enableDualStack: false,
 		},
+		{
+			name:            "service cidr to big",
+			expectErrors:    true,
+			options:         makeOptionsWithCIDRs("10.0.0.0/8", ""),
+			enableDualStack: true,
+		},
+		{
+			name:            "dual-stack secondary cidr to big",
+			expectErrors:    true,
+			options:         makeOptionsWithCIDRs("10.0.0.0/16", "3000::/64"),
+			enableDualStack: true,
+		},
 		/* success cases */
 		{
 			name:            "valid primary",
