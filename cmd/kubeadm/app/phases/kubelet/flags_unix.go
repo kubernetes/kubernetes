@@ -39,13 +39,5 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		}
 	}
 
-	ok, err := opts.isServiceActiveFunc("systemd-resolved")
-	if err != nil {
-		klog.Warningf("cannot determine if systemd-resolved is active: %v\n", err)
-	}
-	if ok {
-		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
-	}
-
 	return kubeletFlags
 }

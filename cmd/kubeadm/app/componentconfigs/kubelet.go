@@ -21,7 +21,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilpointer "k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -49,6 +51,9 @@ const (
 
 	// kubeletHealthzBindAddress specifies the default healthz bind address
 	kubeletHealthzBindAddress = "127.0.0.1"
+
+	// kubeletSystemdResolverConfig specifies the default resolver config when systemd service is active
+	kubeletSystemdResolverConfig = "/run/systemd/resolve/resolv.conf"
 )
 
 // kubeletHandler is the handler instance for the kubelet component config
@@ -173,4 +178,27 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	// We cannot show a warning for RotateCertificates==false and we must hardcode it to true.
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
 	kc.config.RotateCertificates = kubeletRotateCertificates
+
+	ok, err := isServiceActive("systemd-resolved")
+	if err != nil {
+		klog.Warningf("cannot determine if systemd-resolved is active: %v", err)
+	}
+	if ok {
+		if kc.config.ResolverConfig == "" {
+			kc.config.ResolverConfig = kubeletSystemdResolverConfig
+		} else {
+			if kc.config.ResolverConfig != kubeletSystemdResolverConfig {
+				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, kc.config.ResolverConfig)
+			}
+		}
+	}
+}
+
+// isServiceActive checks whether the given service exists and is running
+func isServiceActive(name string) (bool, error) {
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		return false, err
+	}
+	return initSystem.ServiceIsActive(name), nil
 }
