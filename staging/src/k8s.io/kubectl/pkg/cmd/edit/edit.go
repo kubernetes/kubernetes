@@ -17,8 +17,6 @@ limitations under the License.
 package edit
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -77,7 +75,7 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Edit a resource on the server"),
 		Long:                  editLong,
-		Example:               fmt.Sprintf(editExample),
+		Example:               editExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)

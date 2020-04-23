@@ -175,6 +175,9 @@ func (o *SetSelectorOptions) RunSelector() error {
 	r := o.ResourceFinder.Do()
 
 	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
 		patch := &Patch{Info: info}
 
 		if len(o.resourceVersion) != 0 {
