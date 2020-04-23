@@ -97,7 +97,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		testRCReleaseControlledNotMatching(f)
 	})
 
-	ginkgo.It("should test the lifecycle of a ReplicationController", func() {
+	ginkgo.It("[Flaky] should test the lifecycle of a ReplicationController", func() {
 		testRcName := "rc-test"
 		testRcNamespace := ns
 		testRcInitialReplicaCount := int32(1)
