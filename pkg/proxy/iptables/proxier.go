@@ -504,6 +504,7 @@ func (proxier *Proxier) probability(n int) string {
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.QueuedUpdate()
+		metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	}
 	proxier.syncRunner.Run()
 }

@@ -125,6 +125,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// SyncProxyRulesLastQueuedTimestamp is the last time a proxy sync was
+	// requested. If this is much larger than
+	// kubeproxy_sync_proxy_rules_last_timestamp_seconds, then something is hung.
+	SyncProxyRulesLastQueuedTimestamp = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_last_queued_timestamp_seconds",
+			Help:           "The last time a sync of proxy rules was queued",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -140,6 +152,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesPending)
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 	})
 }
 

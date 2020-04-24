@@ -736,6 +736,7 @@ func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.QueuedUpdate()
+		metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	}
 	proxier.syncRunner.Run()
 }

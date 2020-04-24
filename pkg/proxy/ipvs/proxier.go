@@ -810,6 +810,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.QueuedUpdate()
+		metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	}
 	proxier.syncRunner.Run()
 }
