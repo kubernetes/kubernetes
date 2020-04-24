@@ -171,10 +171,7 @@ func newTimeBucketWatchers(clock clock.Clock) *watcherBookmarkTimeBuckets {
 // adds a watcher to the bucket, if the deadline is before the start, it will be
 // added to the first one.
 func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
-	nextTime, ok := w.nextBookmarkTime(t.clock.Now())
-	if !ok {
-		return false
-	}
+	nextTime := w.nextBookmarkTime(t.clock.Now())
 	bucketID := nextTime.Unix()
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -1219,13 +1216,26 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	}
 }
 
-func (c *cacheWatcher) nextBookmarkTime(now time.Time) (time.Time, bool) {
-	// For now we return 2s before deadline (and maybe +infinity is now already passed this time)
-	// but it gives us extensibility for the future(false when deadline is not set).
+// bookmarkHeartbeatFrequency defines how frequently bookmarks should be
+// under regular conditions.
+const bookmarkHeartbeatFrequency = time.Minute
+
+func (c *cacheWatcher) nextBookmarkTime(now time.Time) time.Time {
+	// We try to send bookmarks:
+	// (a) roughly every minute
+	// (b) right before the watcher timeout - for now we simply set it 2s before
+	//     the deadline
+	// The former gives us periodicity if the watch breaks due to unexpected
+	// conditions, the later ensures that on timeout the watcher is as close to
+	// now as possible - this covers 99% of cases.
+	heartbeatTime := now.Add(bookmarkHeartbeatFrequency)
 	if c.deadline.IsZero() {
-		return c.deadline, false
+		return heartbeatTime
 	}
-	return c.deadline.Add(-2 * time.Second), true
+	if pretimeoutTime := c.deadline.Add(-2 * time.Second); pretimeoutTime.Before(heartbeatTime) {
+		return pretimeoutTime
+	}
+	return heartbeatTime
 }
 
 func getEventObject(object runtime.Object) runtime.Object {
