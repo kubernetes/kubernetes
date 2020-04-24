@@ -4,3 +4,6 @@ reviewers:
   - sig-scalability-reviewers
 approvers:
   - sig-scalability-approvers
+labels:
+- sig/scalability
+- sig/testing

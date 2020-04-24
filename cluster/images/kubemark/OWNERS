@@ -8,3 +8,5 @@ approvers:
   - gmarek
   - shyamjvs
   - wojtek-t
+labels:
+- sig/scalability

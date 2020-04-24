@@ -24,3 +24,6 @@ approvers:
   - sig-scalability-approvers
 emeritus_approvers:
   - jszczepkowski
+labels:
+- sig/cloud-provider
+- area/provider/gcp
