@@ -184,6 +184,7 @@ func TestAddFlags(t *testing.T) {
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         10250,
 			ReadOnlyPort: 10255,
+			HealthzPort:  10248,
 			PreferredAddressTypes: []string{
 				string(kapi.NodeHostName),
 				string(kapi.NodeInternalDNS),
