@@ -397,7 +397,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 	for _, s := range subnets {
 		numAddresses := utilnet.RangeSize(s)
 		if numAddresses < minAddrs {
-			allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
+			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), "subnet is too small"))
 		}
 	}
 	return allErrs
