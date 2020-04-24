@@ -1059,6 +1059,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	if err != nil {
 		return err
 	}
+	hostnameOverridden := len(kubeServer.HostnameOverride) > 0
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
@@ -1077,7 +1078,9 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
 		kubeServer.ContainerRuntime,
-		kubeServer.HostnameOverride,
+		hostname,
+		hostnameOverridden,
+		nodeName,
 		kubeServer.NodeIP,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
@@ -1149,7 +1152,9 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
 	containerRuntime string,
-	hostnameOverride string,
+	hostname string,
+	hostnameOverridden bool,
+	nodeName types.NodeName,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
@@ -1179,7 +1184,9 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps,
 		crOptions,
 		containerRuntime,
-		hostnameOverride,
+		hostname,
+		hostnameOverridden,
+		nodeName,
 		nodeIP,
 		providerID,
 		cloudProvider,
