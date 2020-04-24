@@ -399,7 +399,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 				}
 				extras = append(extras, fmt.Sprintf("%s = %s", k, v))
 			}
-			sort.Strings(extras))
+			sort.Strings(extras)
 			if len(extras) > 0 {
 				fmt.Fprintf(out, " [")
 				fmt.Fprint(out, strings.Join(extras, ", "))
