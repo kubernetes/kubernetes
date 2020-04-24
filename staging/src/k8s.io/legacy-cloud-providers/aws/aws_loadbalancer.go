@@ -609,7 +609,9 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 		}
 		actualIDs := []string{}
 		for _, healthDescription := range healthResponse.TargetHealthDescriptions {
-			if healthDescription.TargetHealth.Reason != nil {
+			if aws.StringValue(healthDescription.TargetHealth.State) == elbv2.TargetHealthStateEnumHealthy {
+				actualIDs = append(actualIDs, *healthDescription.Target.Id)
+			} else if healthDescription.TargetHealth.Reason != nil {
 				switch aws.StringValue(healthDescription.TargetHealth.Reason) {
 				case elbv2.TargetHealthReasonEnumTargetDeregistrationInProgress:
 					// We don't need to count this instance in service if it is
