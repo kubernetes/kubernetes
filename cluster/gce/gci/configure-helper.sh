@@ -253,9 +253,7 @@ function get-or-generate-uuid(){
   else
     # generate new uuid and add it to the map
     local myuuid
-    myuuid=$(uuidgen)
-    # shellcheck disable=SC2181
-    if [[ $? -ne 0 ]]; then
+    if ! myuuid=$(uuidgen); then
       echo "Failed to generate valid UUID with uuidgen" >&2
       exit 2
     fi
