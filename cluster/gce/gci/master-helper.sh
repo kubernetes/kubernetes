@@ -157,6 +157,7 @@ function create-master-instance-internal() {
   metadata="${metadata},gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
   metadata="${metadata},kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml"
   metadata="${metadata},cluster-location=${KUBE_TEMP}/cluster-location.txt"
+  metadata="${metadata},kube-master-internal-route=${KUBE_ROOT}/cluster/gce/gci/kube-master-internal-route.sh"
   metadata="${metadata},${MASTER_EXTRA_METADATA}"
 
   local disk="name=${master_name}-pd"
