@@ -9,6 +9,7 @@ go_library(
         "types.go",
         "types_swagger_doc_generated.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.prerelease-lifecycle.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/api/autoscaling/v2beta2",
     importpath = "k8s.io/api/autoscaling/v2beta2",
