@@ -305,7 +305,7 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 		if err != nil {
 			return err
 		}
-		if mountPageSize == nil || mediumSize.Cmp(*mountPageSize) != 0 {
+		if mediumSize.Cmp(*mountPageSize) != 0 {
 			return fmt.Errorf("pod %v: mounted dir %s pagesize '%s' and requested medium size '%s' differ", ed.pod.UID, dir, mountPageSize.String(), mediumSize.String())
 		}
 		return nil
