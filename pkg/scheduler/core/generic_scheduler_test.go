@@ -1632,7 +1632,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			nodeToPods, err := g.selectNodesForPreemption(context.Background(), prof, state, test.pod, nodeInfos, test.pdbs)
+			nodeToPods, err := selectNodesForPreemption(context.Background(), prof, g.podNominator, state, test.pod, nodeInfos, test.pdbs)
 			if err != nil {
 				t.Error(err)
 			}
@@ -1912,7 +1912,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("Unexpected preFilterStatus: %v", preFilterStatus)
 			}
-			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), prof, state, test.pod, nodeInfos, nil)
+			candidateNodes, _ := selectNodesForPreemption(context.Background(), prof, g.podNominator, state, test.pod, nodeInfos, nil)
 			node := pickOneNodeForPreemption(candidateNodes)
 			found := false
 			for _, nodeName := range test.expected {
