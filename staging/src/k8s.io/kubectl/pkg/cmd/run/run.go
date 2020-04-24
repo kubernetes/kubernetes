@@ -381,17 +381,21 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 
 		var pod *corev1.Pod
-		leaveStdinOpen := o.LeaveStdinOpen
-		waitForExitCode := !leaveStdinOpen && restartPolicy == corev1.RestartPolicyNever
+		waitForExitCode := !o.LeaveStdinOpen && (restartPolicy == corev1.RestartPolicyNever || restartPolicy == corev1.RestartPolicyOnFailure)
 		if waitForExitCode {
-			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, opts.GetPodTimeout, podCompleted)
+			// we need different exit condition depending on restart policy
+			// for Never it can either fail or succeed, for OnFailure only
+			// success matters
+			exitCondition := podCompleted
+			if restartPolicy == corev1.RestartPolicyOnFailure {
+				exitCondition = podSucceeded
+			}
+			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, opts.GetPodTimeout, exitCondition)
 			if err != nil {
 				return err
 			}
-		}
-
-		// after removal is done, return successfully if we are not interested in the exit code
-		if !waitForExitCode {
+		} else {
+			// after removal is done, return successfully if we are not interested in the exit code
 			return nil
 		}
 
@@ -457,21 +461,6 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
 
-	preconditionFunc := func(store cache.Store) (bool, error) {
-		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: ns, Name: name})
-		if err != nil {
-			return true, err
-		}
-		if !exists {
-			// We need to make sure we see the object in the cache before we start waiting for events
-			// or we would be waiting for the timeout if such object didn't exist.
-			// (e.g. it was deleted before we started informers so they wouldn't even see the delete event)
-			return true, errors.NewNotFound(corev1.Resource("pods"), name)
-		}
-
-		return false, nil
-	}
-
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -487,9 +476,7 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time
 	intr := interrupt.New(nil, cancel)
 	var result *corev1.Pod
 	err := intr.Run(func() error {
-		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, preconditionFunc, func(ev watch.Event) (bool, error) {
-			return exitCondition(ev)
-		})
+		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, nil, exitCondition)
 		if ev != nil {
 			result = ev.Object.(*corev1.Pod)
 		}
@@ -704,6 +691,20 @@ func podCompleted(event watch.Event) (bool, error) {
 		case corev1.PodFailed, corev1.PodSucceeded:
 			return true, nil
 		}
+	}
+	return false, nil
+}
+
+// podSucceeded returns true if the pod has run to completion, false if the pod has not yet
+// reached running state, or an error in any other case.
+func podSucceeded(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *corev1.Pod:
+		return t.Status.Phase == corev1.PodSucceeded, nil
 	}
 	return false, nil
 }
