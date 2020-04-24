@@ -1455,10 +1455,6 @@ message EventSeries {
 
   // Time of the last occurrence observed
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
-
-  // State of this Series: Ongoing or Finished
-  // Deprecated. Planned removal for 1.18
-  optional string state = 3;
 }
 
 // EventSource contains information for an event.

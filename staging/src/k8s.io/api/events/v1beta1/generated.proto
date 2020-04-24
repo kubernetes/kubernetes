@@ -114,9 +114,5 @@ message EventSeries {
 
   // Time when last Event from the series was seen before last heartbeat.
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
-
-  // Information whether this series is ongoing or finished.
-  // Deprecated. Planned removal for 1.18
-  optional string state = 3;
 }
 
