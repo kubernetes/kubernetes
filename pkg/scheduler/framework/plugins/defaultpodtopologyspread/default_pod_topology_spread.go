@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	scheutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // DefaultPodTopologySpread is a plugin that calculates selector spread priority.
@@ -118,7 +118,7 @@ func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *f
 		if err != nil {
 			return framework.NewStatus(framework.Error, err.Error())
 		}
-		zoneID := utilnode.GetZoneKey(nodeInfo.Node())
+		zoneID := scheutil.GetZoneKey(nodeInfo.Node())
 		if zoneID == "" {
 			continue
 		}
@@ -150,7 +150,7 @@ func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *f
 				return framework.NewStatus(framework.Error, err.Error())
 			}
 
-			zoneID := utilnode.GetZoneKey(nodeInfo.Node())
+			zoneID := scheutil.GetZoneKey(nodeInfo.Node())
 			if zoneID != "" {
 				zoneScore := MaxNodeScoreFloat64
 				if maxCountByZone > 0 {

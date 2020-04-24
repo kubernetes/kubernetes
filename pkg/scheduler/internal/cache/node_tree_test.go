@@ -36,7 +36,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-1",
 			Labels: map[string]string{
-				v1.LabelZoneRegion: "region-1",
+				v1.LabelZoneRegionStable: "region-1",
 			},
 		},
 	},
@@ -45,7 +45,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-2",
 			Labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneFailureDomainStable: "zone-2",
 			},
 		},
 	},
@@ -54,8 +54,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-3",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegionStable:        "region-1",
+				v1.LabelZoneFailureDomainStable: "zone-2",
 			},
 		},
 	},
@@ -64,8 +64,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-4",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegionStable:        "region-1",
+				v1.LabelZoneFailureDomainStable: "zone-2",
 			},
 		},
 	},
@@ -74,60 +74,38 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-5",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-3",
+				v1.LabelZoneRegionStable:        "region-1",
+				v1.LabelZoneFailureDomainStable: "zone-3",
 			},
 		},
 	},
-	// Node 6: a node with proper region and zone labels in a new region and zone
+	// Node 6: a node with proper region and zone labels in a new region and zone as node-6
 	{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-6",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegionStable:        "region-2",
+				v1.LabelZoneFailureDomainStable: "zone-2",
 			},
 		},
 	},
-	// Node 7: a node with proper region and zone labels in a region and zone as node-6
+	// Node 7: a node with proper region and zone labels in a region and zone as node-7
 	{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-7",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegionStable:        "region-2",
+				v1.LabelZoneFailureDomainStable: "zone-2",
 			},
 		},
 	},
-	// Node 8: a node with proper region and zone labels in a region and zone as node-6
+	// Node 8: a node with proper region and zone labels in a region and zone as node-8
 	{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-8",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
-			},
-		},
-	},
-	// Node 9: a node with zone + region label and the deprecated zone + region label
-	{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-9",
-			Labels: map[string]string{
 				v1.LabelZoneRegionStable:        "region-2",
 				v1.LabelZoneFailureDomainStable: "zone-2",
-				v1.LabelZoneRegion:              "region-2",
-				v1.LabelZoneFailureDomain:       "zone-2",
-			},
-		},
-	},
-	// Node 10: a node with only the deprecated zone + region labels
-	{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-10",
-			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-3",
 			},
 		},
 	},
@@ -185,14 +163,6 @@ func TestNodeTree_AddNode(t *testing.T) {
 				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
 				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
 				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
-			},
-		},
-		{
-			name:       "nodes also using deprecated zone/region label",
-			nodesToAdd: allNodes[9:],
-			expectedTree: map[string]*nodeArray{
-				"region-2:\x00:zone-2": {[]string{"node-9"}, 0},
-				"region-2:\x00:zone-3": {[]string{"node-10"}, 0},
 			},
 		},
 	}
@@ -282,8 +252,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegionStable:        "region-1",
+						v1.LabelZoneFailureDomainStable: "zone-2",
 					},
 				},
 			},
@@ -302,8 +272,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegionStable:        "region-1",
+						v1.LabelZoneFailureDomainStable: "zone-2",
 					},
 				},
 			},
@@ -318,8 +288,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-new",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegionStable:        "region-1",
+						v1.LabelZoneFailureDomainStable: "zone-2",
 					},
 				},
 			},
@@ -407,22 +377,22 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 	}{
 		{
 			name:           "add and remove all nodes between two Next operations",
-			nodesToAdd:     allNodes[2:9],
-			nodesToRemove:  allNodes[2:9],
+			nodesToAdd:     allNodes[2:8],
+			nodesToRemove:  allNodes[2:8],
 			operations:     []string{"add", "add", "next", "add", "remove", "remove", "remove", "next"},
 			expectedOutput: []string{"node-2", ""},
 		},
 		{
 			name:           "add and remove some nodes between two Next operations",
-			nodesToAdd:     allNodes[2:9],
-			nodesToRemove:  allNodes[2:9],
+			nodesToAdd:     allNodes[2:8],
+			nodesToRemove:  allNodes[2:8],
 			operations:     []string{"add", "add", "next", "add", "remove", "remove", "next"},
 			expectedOutput: []string{"node-2", "node-4"},
 		},
 		{
 			name:           "remove nodes already iterated on and add new nodes",
-			nodesToAdd:     allNodes[2:9],
-			nodesToRemove:  allNodes[2:9],
+			nodesToAdd:     allNodes[2:8],
+			nodesToRemove:  allNodes[2:8],
 			operations:     []string{"add", "add", "next", "next", "add", "remove", "remove", "next"},
 			expectedOutput: []string{"node-2", "node-3", "node-4"},
 		},
@@ -431,7 +401,7 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 			nodesToAdd:     append(allNodes[4:9], allNodes[3]),
 			nodesToRemove:  nil,
 			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "add", "next", "next", "next"},
-			expectedOutput: []string{"node-4", "node-6", "node-7", "node-8", "node-3", "node-4", "node-6"},
+			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-3", "node-8", "node-4"},
 		},
 		{
 			name:           "remove zone and add new to ensure exhausted is reset correctly",

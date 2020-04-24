@@ -109,3 +109,26 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 	}
 	return terms
 }
+
+// GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
+// it returns empty-string for no zone.
+// NOTE: This function copied from pkg/util/node package to avoid external scheduler dependency
+// TODO defaultpodtopologyspread will be deprecated soon, move this function to pkg/scheduler/internal/cache/node_tree.go once this happens.
+func GetZoneKey(node *v1.Node) string {
+	labels := node.Labels
+	if labels == nil {
+		return ""
+	}
+
+	zone := labels[v1.LabelZoneFailureDomainStable]
+	region := labels[v1.LabelZoneRegionStable]
+
+	if region == "" && zone == "" {
+		return ""
+	}
+
+	// We include the null character just in case region or failureDomain has a colon
+	// (We do assume there's no null characters in a region or failureDomain)
+	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
+	return region + ":\x00:" + zone
+}

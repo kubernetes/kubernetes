@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	scheutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // nodeTree is a tree-like data structure that holds node names in each zone. Zone names are
@@ -70,7 +70,7 @@ func newNodeTree(nodes []*v1.Node) *nodeTree {
 // addNode adds a node and its corresponding zone to the tree. If the zone already exists, the node
 // is added to the array of nodes in that zone.
 func (nt *nodeTree) addNode(n *v1.Node) {
-	zone := utilnode.GetZoneKey(n)
+	zone := scheutil.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na.nodes {
 			if nodeName == n.Name {
@@ -89,7 +89,7 @@ func (nt *nodeTree) addNode(n *v1.Node) {
 
 // removeNode removes a node from the NodeTree.
 func (nt *nodeTree) removeNode(n *v1.Node) error {
-	zone := utilnode.GetZoneKey(n)
+	zone := scheutil.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for i, nodeName := range na.nodes {
 			if nodeName == n.Name {
@@ -123,9 +123,9 @@ func (nt *nodeTree) removeZone(zone string) {
 func (nt *nodeTree) updateNode(old, new *v1.Node) {
 	var oldZone string
 	if old != nil {
-		oldZone = utilnode.GetZoneKey(old)
+		oldZone = scheutil.GetZoneKey(old)
 	}
-	newZone := utilnode.GetZoneKey(new)
+	newZone := scheutil.GetZoneKey(new)
 	// If the zone ID of the node has not changed, we don't need to do anything. Name of the node
 	// cannot be changed in an update.
 	if oldZone == newZone {
