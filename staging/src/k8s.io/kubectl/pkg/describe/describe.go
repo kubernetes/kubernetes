@@ -3038,15 +3038,6 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		return "", err
 	}
 
-	lease, err := d.CoordinationV1().Leases(corev1.NamespaceNodeLease).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return "", err
-		}
-		// Corresponding Lease object doesn't exist - print it accordingly.
-		lease = nil
-	}
-
 	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(corev1.PodSucceeded) + ",status.phase!=" + string(corev1.PodFailed))
 	if err != nil {
 		return "", err
@@ -3073,10 +3064,15 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		}
 	}
 
-	return describeNode(node, lease, nodeNonTerminatedPodsList, events, canViewPods)
+	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d})
 }
 
-func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList, canViewPods bool) (string, error) {
+type LeaseDescriber struct {
+	client clientset.Interface
+}
+
+func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList,
+	canViewPods bool, ld *LeaseDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
@@ -3091,22 +3087,13 @@ func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTermina
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "Unschedulable:\t%v\n", node.Spec.Unschedulable)
 
-		w.Write(LEVEL_0, "Lease:\n")
-		holderIdentity := "<unset>"
-		if lease != nil && lease.Spec.HolderIdentity != nil {
-			holderIdentity = *lease.Spec.HolderIdentity
+		if ld != nil {
+			if lease, err := ld.client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Get(context.TODO(), node.Name, metav1.GetOptions{}); err == nil {
+				describeNodeLease(lease, w)
+			} else {
+				w.Write(LEVEL_0, "Lease:\tFailed to get lease: %s\n", err)
+			}
 		}
-		w.Write(LEVEL_1, "HolderIdentity:\t%s\n", holderIdentity)
-		acquireTime := "<unset>"
-		if lease != nil && lease.Spec.AcquireTime != nil {
-			acquireTime = lease.Spec.AcquireTime.Time.Format(time.RFC1123Z)
-		}
-		w.Write(LEVEL_1, "AcquireTime:\t%s\n", acquireTime)
-		renewTime := "<unset>"
-		if lease != nil && lease.Spec.RenewTime != nil {
-			renewTime = lease.Spec.RenewTime.Time.Format(time.RFC1123Z)
-		}
-		w.Write(LEVEL_1, "RenewTime:\t%s\n", renewTime)
 
 		if len(node.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
@@ -3181,6 +3168,25 @@ func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTermina
 		}
 		return nil
 	})
+}
+
+func describeNodeLease(lease *coordinationv1.Lease, w PrefixWriter) {
+	w.Write(LEVEL_0, "Lease:\n")
+	holderIdentity := "<unset>"
+	if lease != nil && lease.Spec.HolderIdentity != nil {
+		holderIdentity = *lease.Spec.HolderIdentity
+	}
+	w.Write(LEVEL_1, "HolderIdentity:\t%s\n", holderIdentity)
+	acquireTime := "<unset>"
+	if lease != nil && lease.Spec.AcquireTime != nil {
+		acquireTime = lease.Spec.AcquireTime.Time.Format(time.RFC1123Z)
+	}
+	w.Write(LEVEL_1, "AcquireTime:\t%s\n", acquireTime)
+	renewTime := "<unset>"
+	if lease != nil && lease.Spec.RenewTime != nil {
+		renewTime = lease.Spec.RenewTime.Time.Format(time.RFC1123Z)
+	}
+	w.Write(LEVEL_1, "RenewTime:\t%s\n", renewTime)
 }
 
 type StatefulSetDescriber struct {
