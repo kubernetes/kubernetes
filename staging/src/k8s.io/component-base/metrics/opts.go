@@ -125,7 +125,7 @@ func (o *GaugeOpts) annotateStabilityLevel() {
 
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
-func (o GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
+func (o *GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
 	return prometheus.GaugeOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
@@ -169,7 +169,7 @@ func (o *HistogramOpts) annotateStabilityLevel() {
 
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
-func (o HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
+func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 	return prometheus.HistogramOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
@@ -224,7 +224,7 @@ var (
 
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
-func (o SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
+func (o *SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
 	// we need to retain existing quantile behavior for backwards compatibility,
 	// so let's do what prometheus used to do prior to v1.
 	objectives := o.Objectives
