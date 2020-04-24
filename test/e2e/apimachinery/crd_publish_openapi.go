@@ -22,25 +22,33 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-openapi/spec"
 	"github.com/onsi/ginkgo"
 	"k8s.io/utils/pointer"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	k8sclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/crd"
 	"sigs.k8s.io/yaml"
 )
@@ -63,13 +71,15 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		explain the nested custom resource properties.
 	*/
 	framework.ConformanceIt("works for CRD with validation schema", func() {
-		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
+		crd, localProxyPorts, cleanupFn, err := setupCRDProxyAndVerifySchema(f, schemaFoo, "foo", "v1")
+		defer cleanupFn()
 		if err != nil {
 			framework.Failf("%v", err)
 		}
 
 		customServiceShortName := "ksvc"
-		crdSvc, err := setupCRDWithShortName(f, schemaCustomService, "service", customServiceShortName, "v1alpha1")
+		crdSvc, localProxyPortShortName, cleanupFnShortName, err := setupCRDWithShortNameProxyAndVerifySchema(f, schemaCustomService, "service", customServiceShortName, "v1alpha1")
+		defer cleanupFnShortName()
 		if err != nil {
 			framework.Failf("%v", err)
 		}
@@ -136,10 +146,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crd); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdSvc); err != nil {
+		if err := cleanupCRD(f, localProxyPortShortName, crdSvc); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -152,7 +162,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		properties. Attempt kubectl explain; the output MUST contain a valid DESCRIPTION stanza.
 	*/
 	framework.ConformanceIt("works for CRD without validation schema", func() {
-		crd, err := setupCRD(f, nil, "empty", "v1")
+		crd, localProxyPorts, cleanupFn, err := setupCRDProxyAndVerifySchema(f, nil, "empty", "v1")
+		defer cleanupFn()
 		if err != nil {
 			framework.Failf("%v", err)
 		}
@@ -180,7 +191,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -193,8 +204,16 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		properties. Attempt kubectl explain; the output MUST show the custom resource KIND.
 	*/
 	framework.ConformanceIt("works for CRD preserving unknown fields at the schema root", func() {
-		crd, err := setupCRDAndVerifySchema(f, schemaPreserveRoot, nil, "unknown-at-root", "v1")
+		crd, err := setupCRD(f, schemaPreserveRoot, "unknown-at-root", "v1")
 		if err != nil {
+			framework.Failf("%v", err)
+		}
+		localProxyPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+		defer cleanupFn()
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crd, "v1"), nil); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -221,7 +240,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -235,8 +254,16 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		nested field.
 	*/
 	framework.ConformanceIt("works for CRD preserving unknown fields in an embedded object", func() {
-		crd, err := setupCRDAndVerifySchema(f, schemaPreserveNested, nil, "unknown-in-nested", "v1")
+		crd, err := setupCRD(f, schemaPreserveNested, "unknown-in-nested", "v1")
 		if err != nil {
+			framework.Failf("%v", err)
+		}
+		localProxyPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+		defer cleanupFn()
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crd, "v1"), nil); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -263,7 +290,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -287,16 +314,21 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if crdFoo.Crd.Spec.Group == crdWaldo.Crd.Spec.Group {
 			framework.Failf("unexpected: CRDs should be of different group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v1beta1"), schemaWaldo); err != nil {
+		localProxyPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+		defer cleanupFn()
+		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v1"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdWaldo, "v1beta1"), schemaWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdFoo, "v1"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crdFoo); err != nil {
+			framework.Failf("%v", err)
+		}
+		if err := cleanupCRD(f, localProxyPorts, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -313,13 +345,18 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
+		localProxyPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+		defer cleanupFn()
+		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdMultiVer); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
+			framework.Failf("%v", err)
+		}
+		if err := cleanupCRD(f, localProxyPorts, crdMultiVer); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -335,16 +372,16 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
 			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v5"), schemaWaldo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdWaldo, "v5"), schemaWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v4"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdFoo, "v4"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crdFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -368,16 +405,21 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
 			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v6"), schemaWaldo); err != nil {
+		localProxyPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+		defer cleanupFn()
+		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v6"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdWaldo, "v6"), schemaWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdFoo, "v6"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crdFoo); err != nil {
+			framework.Failf("%v", err)
+		}
+		if err := cleanupCRD(f, localProxyPorts, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -395,10 +437,15 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
+		localProxyPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+		defer cleanupFn()
+		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
+			framework.Failf("%v", err)
+		}
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -413,22 +460,22 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		ginkgo.By("check the new version name is served")
-		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v4"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdMultiVer, "v4"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
 		ginkgo.By("check the old version name is removed")
-		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crdMultiVer, "v3")); err != nil {
+		if err := waitForDefinitionCleanup(f, localProxyPorts, definitionName(crdMultiVer, "v3")); err != nil {
 			framework.Failf("%v", err)
 		}
 		ginkgo.By("check the other version is not changed")
-		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
 
 		// TestCrd.Versions is different from TestCrd.Crd.Versions, we have to manually
 		// update the name there. Used by cleanupCRD
 		crdMultiVer.Crd.Spec.Versions[1].Name = "v4"
-		if err := cleanupCRD(f, crdMultiVer); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crdMultiVer); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -446,11 +493,16 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err != nil {
 			framework.Failf("%v", err)
 		}
-		// just double check. setupCRD() checked this for us already
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v6alpha1"), schemaFoo); err != nil {
+		localProxyPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+		defer cleanupFn()
+		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v5"), schemaFoo); err != nil {
+		// just double check. setupCRD() checked this for us already
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crd, "v6alpha1"), schemaFoo); err != nil {
+			framework.Failf("%v", err)
+		}
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crd, "v5"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -466,48 +518,25 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		ginkgo.By("check the unserved version gets removed")
-		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crd, "v6alpha1")); err != nil {
+		if err := waitForDefinitionCleanup(f, localProxyPorts, definitionName(crd, "v6alpha1")); err != nil {
 			framework.Failf("%v", err)
 		}
 		ginkgo.By("check the other version is not changed")
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v5"), schemaFoo); err != nil {
+		if err := waitForDefinition(f, localProxyPorts, definitionName(crd, "v5"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(f, localProxyPorts, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
 })
 
 func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
-	expect := schema
-	if schema == nil {
-		// to be backwards compatible, we expect CRD controller to treat
-		// CRD with nil schema specially and publish an empty schema
-		expect = []byte(`type: object`)
-	}
-	return setupCRDAndVerifySchema(f, schema, expect, groupSuffix, versions...)
+	return setupCRDWithOptions(f, schema, groupSuffix, versions)
 }
 
-func setupCRDWithShortName(f *framework.Framework, schema []byte, groupSuffix, shortName string, versions ...string) (*crd.TestCrd, error) {
-	expect := schema
-	if schema == nil {
-		// to be backwards compatible, we expect CRD controller to treat
-		// CRD with nil schema specially and publish an empty schema
-		expect = []byte(`type: object`)
-	}
-	setShortName := func(crd *apiextensionsv1.CustomResourceDefinition) {
-		crd.Spec.Names.ShortNames = []string{shortName}
-	}
-	return setupCRDAndVerifySchemaWithOptions(f, schema, expect, groupSuffix, versions, setShortName)
-}
-
-func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
-	return setupCRDAndVerifySchemaWithOptions(f, schema, expect, groupSuffix, versions)
-}
-
-func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect []byte, groupSuffix string, versions []string, options ...crd.Option) (*crd.TestCrd, error) {
+func setupCRDWithOptions(f *framework.Framework, schema []byte, groupSuffix string, versions []string, options ...crd.Option) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s-test-%s.example.com", f.BaseName, groupSuffix)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("require at least one version for CRD")
@@ -549,35 +578,64 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRD: %v", err)
 	}
-
-	for _, v := range crd.Crd.Spec.Versions {
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), expect); err != nil {
-			return nil, fmt.Errorf("%v", err)
-		}
-	}
-	return crd, nil
+	return crd, err
 }
 
-func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
+func setupCRDWithShortNameProxyAndVerifySchema(f *framework.Framework, schema []byte, groupSuffix, shortName string, versions ...string) (*crd.TestCrd, []int, func(), error) {
+	setShortName := func(crd *apiextensionsv1.CustomResourceDefinition) {
+		crd.Spec.Names.ShortNames = []string{shortName}
+	}
+	return setupCRDProxyAndVerifySchemaWithOptions(f, schema, groupSuffix, versions, setShortName)
+}
+
+func setupCRDProxyAndVerifySchema(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, []int, func(), error) {
+	return setupCRDProxyAndVerifySchemaWithOptions(f, schema, groupSuffix, versions)
+}
+
+func setupCRDProxyAndVerifySchemaWithOptions(f *framework.Framework, schema []byte, groupSuffix string, versions []string, options ...crd.Option) (*crd.TestCrd, []int, func(), error) {
+	noopfn := func() {}
+	expect := schema
+	if schema == nil {
+		// to be backwards compatible, we expect CRD controller to treat
+		// CRD with nil schema specially and publish an empty schema
+		expect = []byte(`type: object`)
+	}
+	crd, err := setupCRDWithOptions(f, schema, groupSuffix, versions, options...)
+	if err != nil {
+		return nil, nil, noopfn, err
+	}
+
+	localPorts, cleanupFn, err := setupAPIServersProxyPodAndPortForward(f)
+	if err != nil {
+		return nil, nil, noopfn, err
+	}
+
+	for _, v := range crd.Crd.Spec.Versions {
+		if err := waitForDefinition(f, localPorts, definitionName(crd, v.Name), expect); err != nil {
+			return nil, localPorts, cleanupFn, fmt.Errorf("%v", err)
+		}
+	}
+	return crd, localPorts, cleanupFn, nil
+}
+
+func cleanupCRD(f *framework.Framework, localProxyPorts []int, crd *crd.TestCrd) error {
 	crd.CleanUp()
 	for _, v := range crd.Crd.Spec.Versions {
 		name := definitionName(crd, v.Name)
-		if err := waitForDefinitionCleanup(f.ClientSet, name); err != nil {
+		if err := waitForDefinitionCleanup(f, localProxyPorts, name); err != nil {
 			return fmt.Errorf("%v", err)
 		}
 	}
 	return nil
 }
 
-const waitSuccessThreshold = 10
-
-// mustSucceedMultipleTimes calls f multiple times on success and only returns true if all calls are successful.
+// mustSucceedForAllAPIServers calls f multiple times on success and only returns true if all calls are successful.
 // This is necessary to avoid flaking tests where one call might hit a good apiserver while in HA other apiservers
-// might be lagging behind. Calling f multiple times reduces the chance exponentially.
-func mustSucceedMultipleTimes(n int, f func() (bool, error)) func() (bool, error) {
+// might be lagging behind.
+func mustSucceedForAllAPIServers(localProxyPorts []int, f func(int) (bool, error)) func() (bool, error) {
 	return func() (bool, error) {
-		for i := 0; i < n; i++ {
-			ok, err := f()
+		for i := 0; i < len(localProxyPorts); i++ {
+			ok, err := f(localProxyPorts[i])
 			if err != nil || !ok {
 				return ok, err
 			}
@@ -588,13 +646,13 @@ func mustSucceedMultipleTimes(n int, f func() (bool, error)) func() (bool, error
 
 // waitForDefinition waits for given definition showing up in swagger with given schema.
 // If schema is nil, only the existence of the given name is checked.
-func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) error {
+func waitForDefinition(f *framework.Framework, localProxyPorts []int, name string, schema []byte) error {
 	expect := spec.Schema{}
 	if err := convertJSONSchemaProps(schema, &expect); err != nil {
 		return err
 	}
 
-	err := waitForOpenAPISchema(c, func(spec *spec.Swagger) (bool, string) {
+	err := waitForOpenAPISchema(f, localProxyPorts, func(spec *spec.Swagger) (bool, string) {
 		d, ok := spec.SwaggerProps.Definitions[name]
 		if !ok {
 			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not found", name)
@@ -615,8 +673,8 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 }
 
 // waitForDefinitionCleanup waits for given definition to be removed from swagger
-func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
-	err := waitForOpenAPISchema(c, func(spec *spec.Swagger) (bool, string) {
+func waitForDefinitionCleanup(f *framework.Framework, localProxyPorts []int, name string) error {
+	err := waitForOpenAPISchema(f, localProxyPorts, func(spec *spec.Swagger) (bool, string) {
 		if _, ok := spec.SwaggerProps.Definitions[name]; ok {
 			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] still exists", name)
 		}
@@ -628,20 +686,32 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 	return nil
 }
 
-func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bool, string)) error {
-	client := c.Discovery().RESTClient().(*rest.RESTClient).Client
-	url := c.Discovery().RESTClient().Get().AbsPath("openapi", "v2").URL()
+func waitForOpenAPISchema(f *framework.Framework, localProxyPorts []int, pred func(*spec.Swagger) (bool, string)) error {
+	clientCfg := f.ClientConfig()
+	transport, err := rest.TransportFor(clientCfg)
+	if err != nil {
+		return err
+	}
+	if transport == nil {
+		return fmt.Errorf("transport was not specified - unable to authenticate to the server")
+	}
+	client := &http.Client{Transport: transport}
+
 	lastMsg := ""
 	etag := ""
 	var etagSpec *spec.Swagger
-	if err := wait.Poll(500*time.Millisecond, 60*time.Second, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
+	if err := wait.Poll(500*time.Millisecond, 60*time.Second, mustSucceedForAllAPIServers(localProxyPorts, func(localProxyPort int) (bool, error) {
 		// download spec with etag support
 		spec := &spec.Swagger{}
+		url, err := url.Parse(fmt.Sprintf("https://localhost:%d/openapi/v2", localProxyPort))
+		if err != nil {
+			return false, err
+		}
 		req, err := http.NewRequest("GET", url.String(), nil)
 		if err != nil {
 			return false, err
 		}
-		req.Close = true // enforce a new connection to hit different HA API servers
+
 		if len(etag) > 0 {
 			req.Header.Set("If-None-Match", fmt.Sprintf(`"%s"`, etag))
 		}
@@ -833,3 +903,220 @@ properties:
         type: array
         items:
           type: object`)
+
+// setupAPIServersProxyPodAndPortForward a convenience method that creates and runs a pod that proxies connections to the API servers.
+// It also uses kubectl port-forward to route local connections to that pod.
+func setupAPIServersProxyPodAndPortForward(f *framework.Framework) ([]int, func(), error) {
+	noopfn := func() {}
+	apis, err := getAllAPIServersEndpoint(f.ClientSet)
+	if err != nil {
+		return nil, noopfn, err
+	}
+	proxyPod, remotePorts, err := apiServersProxyPod(apis)
+	if err != nil {
+		return nil, noopfn, err
+	}
+	if err := createAndWaitForPodRunning(f, proxyPod); err != nil {
+		return nil, noopfn, err
+	}
+	cmd := RunKubectlPortForward(f.Namespace.Name, proxyPod.Name, remotePorts)
+	return cmd.localPorts, cmd.Stop, nil
+}
+
+// PortForwardCommand captures running cmd for clean up purposes and a list of local listening ports
+type PortForwardCommand struct {
+	cmd        *exec.Cmd
+	localPorts []int
+}
+
+// Stop attempts to gracefully stop `kubectl port-forward`, only killing it if necessary.
+// This helps avoid spdy goroutine leaks in the Kubelet.
+func (c *PortForwardCommand) Stop() {
+	// SIGINT signals that kubectl port-forward should gracefully terminate
+	if err := c.cmd.Process.Signal(syscall.SIGINT); err != nil {
+		framework.Logf("error sending SIGINT to kubectl port-forward: %v", err)
+	}
+
+	// try to wait for a clean exit
+	done := make(chan error)
+	go func() {
+		done <- c.cmd.Wait()
+	}()
+
+	expired := time.NewTimer(wait.ForeverTestTimeout)
+	defer expired.Stop()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			// success
+			return
+		}
+		framework.Logf("error waiting for kubectl port-forward to exit: %v", err)
+	case <-expired.C:
+		framework.Logf("timed out waiting for kubectl port-forward to exit")
+	}
+
+	framework.Logf("trying to forcibly kill kubectl port-forward")
+	framework.TryKill(c.cmd)
+}
+
+// RunKubectlPortForward runs port-forward via kubectl on multiple ports - warning, this may need root functionality on some systems.
+// TODO: move it to kubectl_utils.go
+// TODO: refactor portforward.go
+func RunKubectlPortForward(namespace, podName string, remotePorts []int) *PortForwardCommand {
+	remotePortsToStrArr := func(remotePorts []int) []string {
+		ret := []string{}
+		for _, port := range remotePorts {
+			ret = append(ret, fmt.Sprintf(":%d", port))
+		}
+		return ret
+	}
+
+	args := []string{"port-forward", fmt.Sprintf("--namespace=%v", namespace), podName}
+	args = append(args, remotePortsToStrArr(remotePorts)...)
+
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	cmd := tk.KubectlCmd(args...)
+
+	// This is somewhat ugly but is the only way to retrieve the port that was picked
+	// by the port-forward command. We don't want to hard code the port as we have no
+	// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
+	framework.Logf("starting kubectl port-forward command and streaming output")
+	cmdstdout, _, err := framework.StartCmdAndStreamOutput(cmd)
+	if err != nil {
+		framework.Failf("Failed to start port-forward command: %v", err)
+	}
+
+	var localPorts []int
+	err = wait.Poll(500*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		buf := make([]byte, 128*len(remotePorts))
+		var n int
+		framework.Logf("reading from `kubectl port-forward` command's stdout")
+		if n, err = cmdstdout.Read(buf); err != nil {
+			return false, fmt.Errorf("failed to read from kubectl port-forward stdout: %v", err)
+		}
+		portForwardOutput := string(buf[:n])
+
+		localPorts = make([]int, len(remotePorts))
+		for index, remotePort := range remotePorts {
+			portForwardExpr := fmt.Sprintf("Forwarding from (127.0.0.1|\\[::1\\]):([0-9]+) -> %d", remotePort)
+			portForwardRegexp, err := regexp.Compile(portForwardExpr)
+			if err != nil {
+				return false, fmt.Errorf("failed to compile a regexp for finding a local listening port, err: %v, expression: %s", err, portForwardExpr)
+			}
+			match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
+			if len(match) != 3 {
+				framework.Logf("failed to parse kubectl port-forward output: %q, with %q reg exp, expected to find exactly 3 matches, found: %v", portForwardOutput, portForwardExpr, match)
+				return false, nil
+			}
+
+			localListenPort, err := strconv.Atoi(match[2])
+			if err != nil {
+				return false, fmt.Errorf("error converting %s to an int: %v", match[2], err)
+			}
+			localPorts[index] = localListenPort
+		}
+		if len(localPorts) != len(remotePorts) {
+			framework.Logf("not all ports have been forwarded, found %d forwarded ports but want %d", len(localPorts), len(remotePorts))
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		framework.Failf("Timeout waiting/parsing kubectl port-forward command's output: %v", err)
+	}
+
+	return &PortForwardCommand{
+		cmd:        cmd,
+		localPorts: localPorts,
+	}
+}
+
+// apiServersProxyPod creates a pod that once run proxies connections to the given apiServers.
+// It also returns a remote ports list for convenience that will be used by kubectl port-forward
+func apiServersProxyPod(apiServers []string) (*v1.Pod, []int, error) {
+	script := `
+       apk add socat
+       socat TCP-LISTEN:${LOCAL_LISTEN_PORT},fork TCP:${SERVER_IP}:${SERVER_PORT}
+`
+
+	proxyListenPorts := []int{}
+	proxyListenPort := 8443
+	containers := []v1.Container{}
+	for index, apiServer := range apiServers {
+		ipPort := strings.Split(apiServer, ":")
+		if len(ipPort) != 2 {
+			return nil, nil, fmt.Errorf("incorrect apiServer =%s, expected to find an IP address and port in the form of IP:PORT", apiServer)
+		}
+
+		r := strings.NewReplacer(
+			"${LOCAL_LISTEN_PORT}", fmt.Sprintf("%d", proxyListenPort),
+			"${SERVER_IP}", ipPort[0],
+			"${SERVER_PORT}", ipPort[1],
+		)
+		modifiedScript := r.Replace(script)
+
+		containers = append(containers, v1.Container{
+			Name: fmt.Sprintf("server-%d", index),
+			Ports: []v1.ContainerPort{
+				{ContainerPort: int32(proxyListenPort)},
+			},
+			Image:   "alpine", // TODO: build an image with socat and then use  imageutils.GetE2EImage(imageutils.BusyBox),
+			Command: []string{"/bin/sh", "-c"},
+			Args:    []string{modifiedScript},
+		})
+		proxyListenPorts = append(proxyListenPorts, proxyListenPort)
+		proxyListenPort++
+	}
+
+	name := "api-servers-proxy"
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name + "-" + string(uuid.NewUUID()),
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
+	}, proxyListenPorts, nil
+}
+
+func getAllAPIServersEndpoint(c k8sclientset.Interface) ([]string, error) {
+	eps, err := c.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	apiServers := []string{}
+	for _, s := range eps.Subsets {
+		var port int32
+		for _, p := range s.Ports {
+			if p.Name == "https" {
+				port = p.Port
+				break
+			}
+		}
+		if port == 0 {
+			continue
+		}
+		for _, ep := range s.Addresses {
+			apiServers = append(apiServers, fmt.Sprintf("%s:%d", ep.IP, port))
+		}
+		break
+	}
+	if len(apiServers) == 0 {
+		return nil, fmt.Errorf("didn't create api servers list from the default (\"kubernetes\") endpoint")
+	}
+	return apiServers, nil
+}
+
+func createAndWaitForPodRunning(f *framework.Framework, pod *v1.Pod) error {
+	createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	if err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, createdPod); err != nil {
+		framework.Failf("Pod %v did not start running: %v", pod.Name, err)
+	}
+	return nil
+}
