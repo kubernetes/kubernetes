@@ -57,12 +57,12 @@ type SimpleControllerClientBuilder struct {
 	ClientConfig *restclient.Config
 }
 
-func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
+func (b *SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	clientConfig := *b.ClientConfig
 	return restclient.AddUserAgent(&clientConfig, name), nil
 }
 
-func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
+func (b *SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		klog.Fatal(err)
@@ -70,7 +70,7 @@ func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Conf
 	return clientConfig
 }
 
-func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface, error) {
+func (b *SimpleControllerClientBuilder) Client(name string) (clientset.Interface, error) {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 	return clientset.NewForConfig(clientConfig)
 }
 
-func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
+func (b *SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
 	if err != nil {
 		klog.Fatal(err)
@@ -107,7 +107,7 @@ type SAControllerClientBuilder struct {
 
 // config returns a complete clientConfig for constructing clients.  This is separate in anticipation of composition
 // which means that not all clientsets are known here
-func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, error) {
+func (b *SAControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	sa, err := getOrCreateServiceAccount(b.CoreClient, b.Namespace, name)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	return clientConfig, nil
 }
 
-func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount, token string) (*restclient.Config, bool, error) {
+func (b *SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount, token string) (*restclient.Config, bool, error) {
 	username := apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name)
 
 	clientConfig := restclient.AnonymousClientConfig(b.ClientConfig)
@@ -216,7 +216,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	return clientConfig, true, nil
 }
 
-func (b SAControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
+func (b *SAControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		klog.Fatal(err)
@@ -224,7 +224,7 @@ func (b SAControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	return clientConfig
 }
 
-func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, error) {
+func (b *SAControllerClientBuilder) Client(name string) (clientset.Interface, error) {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		return nil, err
@@ -232,7 +232,7 @@ func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, err
 	return clientset.NewForConfig(clientConfig)
 }
 
-func (b SAControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
+func (b *SAControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
 	if err != nil {
 		klog.Fatal(err)
