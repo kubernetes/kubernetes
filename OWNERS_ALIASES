@@ -168,7 +168,6 @@ aliases:
     - damemi
 
   sig-cli-maintainers:
-    - adohe
     - brendandburns
     - deads2k
     - janetkuo
@@ -181,14 +180,14 @@ aliases:
     - smarterclayton
     - soltysh
     - pwittrock
+  # emeritus:
+  # - adohe
   sig-cli:
-    - adohe
+    - brianpursley
     - deads2k
     - derekwaynecarr
     - dixudx
     - dims
-    - eparis
-    - juanvallejo
     - mengqiy
     - rootfs
     - seans3
@@ -196,6 +195,8 @@ aliases:
     - smarterclayton
     - soltysh
     - pwittrock
+    - zhouya0
+
   sig-testing-reviewers:
     - bentheelder
     - cblecker
