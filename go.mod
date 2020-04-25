@@ -26,16 +26,14 @@ require (
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/codegangsta/negroni v1.0.0 // indirect
 	github.com/container-storage-interface/spec v1.2.0
-	github.com/containerd/console v1.0.0 // indirect
 	github.com/containerd/ttrpc v1.0.0 // indirect
 	github.com/containerd/typeurl v1.0.0 // indirect
 	github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration v1.0.6
 	github.com/coreos/go-oidc v2.1.0+incompatible
-	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
+	github.com/coreos/go-systemd/v22 v22.0.0
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/cpuguy83/go-md2man v1.0.10
-	github.com/cyphar/filepath-securejoin v0.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
@@ -73,14 +71,13 @@ require (
 	github.com/miekg/dns v1.1.4
 	github.com/moby/ipvs v1.0.0
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
-	github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest v1.0.0-rc1
-	github.com/opencontainers/runc v1.0.0-rc10
-	github.com/opencontainers/selinux v1.3.3
+	github.com/opencontainers/runc v1.0.0-rc9.0.20200425063419-b19f9cecfe78
+	github.com/opencontainers/selinux v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.0.0
@@ -88,7 +85,6 @@ require (
 	github.com/prometheus/common v0.4.1
 	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v1.1.0
-	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -104,7 +100,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+	golang.org/x/sys v0.0.0-20200327173247-9dae0f8f5775
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
 	gonum.org/v1/gonum v0.6.2
@@ -205,6 +201,7 @@ replace (
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
+	github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.0.0
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea // 97fdf19511ea is the SHA for git tag v4
 	github.com/cpuguy83/go-md2man => github.com/cpuguy83/go-md2man v1.0.10
 	github.com/creack/pty => github.com/creack/pty v1.1.7
@@ -252,6 +249,7 @@ replace (
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 	github.com/godbus/dbus => github.com/godbus/dbus v0.0.0-20190422162347-ade71ed3457e
+	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -329,6 +327,7 @@ replace (
 	github.com/mitchellh/go-wordwrap => github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.1.2
 	github.com/moby/ipvs => github.com/moby/ipvs v1.0.0
+	github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.1.3
 	github.com/moby/term => github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
@@ -346,7 +345,7 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc10
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc9.0.20200425063419-b19f9cecfe78
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.1
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.3.3
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0

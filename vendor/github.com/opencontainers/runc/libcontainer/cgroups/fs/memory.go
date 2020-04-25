@@ -5,7 +5,9 @@ package fs
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,8 +18,16 @@ import (
 )
 
 const (
-	cgroupMemorySwapLimit = "memory.memsw.limit_in_bytes"
-	cgroupMemoryLimit     = "memory.limit_in_bytes"
+	numaNodeSymbol            = "N"
+	numaStatColumnSeparator   = " "
+	numaStatKeyValueSeparator = "="
+	numaStatMaxColumns        = math.MaxUint8 + 1
+	numaStatValueIndex        = 1
+	numaStatTypeIndex         = 0
+	numaStatColumnSliceLength = 2
+	cgroupMemorySwapLimit     = "memory.memsw.limit_in_bytes"
+	cgroupMemoryLimit         = "memory.limit_in_bytes"
+	cgroupMemoryPagesByNuma   = "memory.numa_stat"
 )
 
 type MemoryGroup struct {
@@ -209,6 +219,13 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	if value == 1 {
 		stats.MemoryStats.UseHierarchy = true
 	}
+
+	pagesByNUMA, err := getPageUsageByNUMA(path)
+	if err != nil {
+		return err
+	}
+	stats.MemoryStats.PageUsageByNUMA = pagesByNUMA
+
 	return nil
 }
 
@@ -268,4 +285,78 @@ func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 	memoryData.Limit = value
 
 	return memoryData, nil
+}
+
+func getPageUsageByNUMA(cgroupPath string) (cgroups.PageUsageByNUMA, error) {
+	stats := cgroups.PageUsageByNUMA{}
+
+	file, err := os.Open(path.Join(cgroupPath, cgroupMemoryPagesByNuma))
+	if err != nil {
+		return stats, err
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var statsType string
+		statsByType := cgroups.PageStats{Nodes: map[uint8]uint64{}}
+		columns := strings.SplitN(scanner.Text(), numaStatColumnSeparator, numaStatMaxColumns)
+
+		for _, column := range columns {
+			pagesByNode := strings.SplitN(column, numaStatKeyValueSeparator, numaStatColumnSliceLength)
+
+			if strings.HasPrefix(pagesByNode[numaStatTypeIndex], numaNodeSymbol) {
+				nodeID, err := strconv.ParseUint(pagesByNode[numaStatTypeIndex][1:], 10, 8)
+				if err != nil {
+					return cgroups.PageUsageByNUMA{}, err
+				}
+
+				statsByType.Nodes[uint8(nodeID)], err = strconv.ParseUint(pagesByNode[numaStatValueIndex], 0, 64)
+				if err != nil {
+					return cgroups.PageUsageByNUMA{}, err
+				}
+			} else {
+				statsByType.Total, err = strconv.ParseUint(pagesByNode[numaStatValueIndex], 0, 64)
+				if err != nil {
+					return cgroups.PageUsageByNUMA{}, err
+				}
+
+				statsType = pagesByNode[numaStatTypeIndex]
+			}
+
+			err := addNUMAStatsByType(&stats, statsByType, statsType)
+			if err != nil {
+				return cgroups.PageUsageByNUMA{}, err
+			}
+		}
+	}
+	err = scanner.Err()
+	if err != nil {
+		return cgroups.PageUsageByNUMA{}, err
+	}
+
+	return stats, nil
+}
+
+func addNUMAStatsByType(stats *cgroups.PageUsageByNUMA, byTypeStats cgroups.PageStats, statsType string) error {
+	switch statsType {
+	case "total":
+		stats.Total = byTypeStats
+	case "file":
+		stats.File = byTypeStats
+	case "anon":
+		stats.Anon = byTypeStats
+	case "unevictable":
+		stats.Unevictable = byTypeStats
+	case "hierarchical_total":
+		stats.Hierarchical.Total = byTypeStats
+	case "hierarchical_file":
+		stats.Hierarchical.File = byTypeStats
+	case "hierarchical_anon":
+		stats.Hierarchical.Anon = byTypeStats
+	case "hierarchical_unevictable":
+		stats.Hierarchical.Unevictable = byTypeStats
+	default:
+		return fmt.Errorf("unsupported NUMA page type found: %s", statsType)
+	}
+	return nil
 }

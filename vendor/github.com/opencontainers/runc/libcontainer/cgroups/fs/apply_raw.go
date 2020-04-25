@@ -110,22 +110,18 @@ func isIgnorableError(rootless bool, err error) bool {
 	if !rootless {
 		return false
 	}
+	// TODO: rm errors.Cause once we switch to %w everywhere
+	err = errors.Cause(err)
 	// Is it an ordinary EPERM?
-	if os.IsPermission(errors.Cause(err)) {
+	if errors.Is(err, os.ErrPermission) {
 		return true
 	}
-
-	// Try to handle other errnos.
-	var errno error
-	switch err := errors.Cause(err).(type) {
-	case *os.PathError:
-		errno = err.Err
-	case *os.LinkError:
-		errno = err.Err
-	case *os.SyscallError:
-		errno = err.Err
+	// Handle some specific syscall errors.
+	var errno unix.Errno
+	if errors.As(err, &errno) {
+		return errno == unix.EROFS || errno == unix.EPERM || errno == unix.EACCES
 	}
-	return errno == unix.EROFS || errno == unix.EPERM || errno == unix.EACCES
+	return false
 }
 
 func (m *Manager) getSubsystems() subsystemSet {

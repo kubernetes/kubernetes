@@ -19,11 +19,6 @@ type syncType string
 // procHooks   --> [run hooks]
 //             <-- procResume
 //
-// procConsole -->
-//             <-- procConsoleReq
-//  [send(fd)] --> [recv(fd)]
-//             <-- procConsoleAck
-//
 // procReady   --> [final setup]
 //             <-- procRun
 const (
@@ -52,20 +47,21 @@ func readSync(pipe io.Reader, expected syncType) error {
 		if err == io.EOF {
 			return fmt.Errorf("parent closed synchronisation channel")
 		}
+		return fmt.Errorf("failed reading error from parent: %v", err)
+	}
 
-		if procSync.Type == procError {
-			var ierr genericError
+	if procSync.Type == procError {
+		var ierr genericError
 
-			if err := json.NewDecoder(pipe).Decode(&ierr); err != nil {
-				return fmt.Errorf("failed reading error from parent: %v", err)
-			}
-
-			return &ierr
+		if err := json.NewDecoder(pipe).Decode(&ierr); err != nil {
+			return fmt.Errorf("failed reading error from parent: %v", err)
 		}
 
-		if procSync.Type != expected {
-			return fmt.Errorf("invalid synchronisation flag from parent")
-		}
+		return &ierr
+	}
+
+	if procSync.Type != expected {
+		return fmt.Errorf("invalid synchronisation flag from parent")
 	}
 	return nil
 }

@@ -16,7 +16,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"syscall" // only for SysProcAttr and Signal
 	"time"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
@@ -309,7 +308,7 @@ func awaitFifoOpen(path string) <-chan openResult {
 func fifoOpen(path string, block bool) openResult {
 	flags := os.O_RDONLY
 	if !block {
-		flags |= syscall.O_NONBLOCK
+		flags |= unix.O_NONBLOCK
 	}
 	f, err := os.OpenFile(path, flags, 0)
 	if err != nil {
@@ -379,6 +378,8 @@ func (c *linuxContainer) start(process *Process) error {
 }
 
 func (c *linuxContainer) Signal(s os.Signal, all bool) error {
+	c.m.Lock()
+	defer c.m.Unlock()
 	if all {
 		return signalAllProcesses(c.cgroupManager, s)
 	}
@@ -454,10 +455,7 @@ func (c *linuxContainer) newParentProcess(p *Process) (parentProcess, error) {
 	}
 	logFilePair := filePair{parentLogPipe, childLogPipe}
 
-	cmd, err := c.commandTemplate(p, childInitPipe, childLogPipe)
-	if err != nil {
-		return nil, newSystemErrorWithCause(err, "creating new command template")
-	}
+	cmd := c.commandTemplate(p, childInitPipe, childLogPipe)
 	if !p.Init {
 		return c.newSetnsProcess(p, cmd, messageSockPair, logFilePair)
 	}
@@ -473,7 +471,7 @@ func (c *linuxContainer) newParentProcess(p *Process) (parentProcess, error) {
 	return c.newInitProcess(p, cmd, messageSockPair, logFilePair)
 }
 
-func (c *linuxContainer) commandTemplate(p *Process, childInitPipe *os.File, childLogPipe *os.File) (*exec.Cmd, error) {
+func (c *linuxContainer) commandTemplate(p *Process, childInitPipe *os.File, childLogPipe *os.File) *exec.Cmd {
 	cmd := exec.Command(c.initPath, c.initArgs[1:]...)
 	cmd.Args[0] = c.initArgs[0]
 	cmd.Stdin = p.Stdin
@@ -481,7 +479,7 @@ func (c *linuxContainer) commandTemplate(p *Process, childInitPipe *os.File, chi
 	cmd.Stderr = p.Stderr
 	cmd.Dir = c.config.Rootfs
 	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		cmd.SysProcAttr = &unix.SysProcAttr{}
 	}
 	cmd.Env = append(cmd.Env, fmt.Sprintf("GOMAXPROCS=%s", os.Getenv("GOMAXPROCS")))
 	cmd.ExtraFiles = append(cmd.ExtraFiles, p.ExtraFiles...)
@@ -507,9 +505,9 @@ func (c *linuxContainer) commandTemplate(p *Process, childInitPipe *os.File, chi
 	// PID1 the pdeathsig is being delivered to the container's init process by the kernel for some reason
 	// even with the parent still running.
 	if c.config.ParentDeathSignal > 0 {
-		cmd.SysProcAttr.Pdeathsig = syscall.Signal(c.config.ParentDeathSignal)
+		cmd.SysProcAttr.Pdeathsig = unix.Signal(c.config.ParentDeathSignal)
 	}
-	return cmd, nil
+	return cmd
 }
 
 func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, messageSockPair, logFilePair filePair) (*initProcess, error) {
@@ -1006,8 +1004,8 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 			// CRIU expects the information about an external namespace
 			// like this: --external net[<inode>]:<key>
 			// This <key> is always 'extRootNetNS'.
-			var netns syscall.Stat_t
-			err = syscall.Stat(nsPath, &netns)
+			var netns unix.Stat_t
+			err = unix.Stat(nsPath, &netns)
 			if err != nil {
 				return err
 			}
@@ -1016,7 +1014,22 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 		}
 	}
 
-	fcg := c.cgroupManager.GetPaths()["freezer"]
+	// CRIU can use cgroup freezer; when rpcOpts.FreezeCgroup
+	// is not set, CRIU uses ptrace() to pause the processes.
+	var fcg string
+	switch cgroups.IsCgroup2UnifiedMode() {
+	case false:
+		fcg = c.cgroupManager.GetPaths()["freezer"]
+	case true:
+		// cgroup v2 freezer is only supported since CRIU release 3.14
+		if c.checkCriuVersion(31400) == nil {
+			fcg, err = c.cgroupManager.GetUnifiedPath()
+			if err != nil {
+				// should not happen
+				return err
+			}
+		}
+	}
 	if fcg != "" {
 		rpcOpts.FreezeCgroup = proto.String(fcg)
 	}
@@ -1082,13 +1095,19 @@ func (c *linuxContainer) Checkpoint(criuOpts *CriuOpts) error {
 		go waitForCriuLazyServer(statusRead, criuOpts.StatusFd)
 	}
 
-	//no need to dump these information in pre-dump
+	// no need to dump all this in pre-dump
 	if !criuOpts.PreDump {
+		hasCgroupns := c.config.Namespaces.Contains(configs.NEWCGROUP)
 		for _, m := range c.config.Mounts {
 			switch m.Device {
 			case "bind":
 				c.addCriuDumpMount(req, m)
 			case "cgroup":
+				if cgroups.IsCgroup2UnifiedMode() || hasCgroupns {
+					// real mount(s)
+					continue
+				}
+				// a set of "external" bind mounts
 				binds, err := getCgroupMounts(m)
 				if err != nil {
 					return err
@@ -1166,7 +1185,14 @@ func (c *linuxContainer) restoreNetwork(req *criurpc.CriuReq, criuOpts *CriuOpts
 func (c *linuxContainer) makeCriuRestoreMountpoints(m *configs.Mount) error {
 	switch m.Device {
 	case "cgroup":
-		// Do nothing for cgroup, CRIU should handle it
+		// No mount point(s) need to be created:
+		//
+		// * for v1, mount points are saved by CRIU because
+		//   /sys/fs/cgroup is a tmpfs mount
+		//
+		// * for v2, /sys/fs/cgroup is a real mount, but
+		//   the mountpoint appears as soon as /sys is mounted
+		return nil
 	case "bind":
 		// The prepareBindMount() function checks if source
 		// exists. So it cannot be used for other filesystem types.
@@ -1174,7 +1200,7 @@ func (c *linuxContainer) makeCriuRestoreMountpoints(m *configs.Mount) error {
 			return err
 		}
 	default:
-		// for all other file-systems just create the mountpoints
+		// for all other filesystems just create the mountpoints
 		dest, err := securejoin.SecureJoin(c.config.Rootfs, m.Destination)
 		if err != nil {
 			return err
@@ -1195,10 +1221,10 @@ func (c *linuxContainer) makeCriuRestoreMountpoints(m *configs.Mount) error {
 func isPathInPrefixList(path string, prefix []string) bool {
 	for _, p := range prefix {
 		if strings.HasPrefix(path, p+"/") {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 // prepareCriuRestoreMounts tries to set up the rootfs of the
@@ -1220,7 +1246,7 @@ func (c *linuxContainer) prepareCriuRestoreMounts(mounts []*configs.Mount) error
 	// if the mountpoints are not on a tmpfs, as CRIU will
 	// restore the complete tmpfs content from its checkpoint.
 	for _, m := range mounts {
-		if isPathInPrefixList(m.Destination, tmpfs) {
+		if !isPathInPrefixList(m.Destination, tmpfs) {
 			if err := c.makeCriuRestoreMountpoints(m); err != nil {
 				return err
 			}
@@ -1326,11 +1352,11 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 			// The <key> needs to be the same as during checkpointing.
 			// We are always using 'extRootNetNS' as the key in this.
 			netns, err := os.Open(nsPath)
-			defer netns.Close()
 			if err != nil {
 				logrus.Errorf("If a specific network namespace is defined it must exist: %s", err)
 				return fmt.Errorf("Requested network namespace %v does not exist", nsPath)
 			}
+			defer netns.Close()
 			inheritFd := new(criurpc.InheritFd)
 			inheritFd.Key = proto.String("extRootNetNS")
 			// The offset of four is necessary because 0, 1, 2 and 3 is already
@@ -1348,11 +1374,16 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 		return err
 	}
 
+	hasCgroupns := c.config.Namespaces.Contains(configs.NEWCGROUP)
 	for _, m := range c.config.Mounts {
 		switch m.Device {
 		case "bind":
 			c.addCriuRestoreMount(req, m)
 		case "cgroup":
+			if cgroups.IsCgroup2UnifiedMode() || hasCgroupns {
+				continue
+			}
+			// cgroup v1 is a set of bind mounts, unless cgroupns is used
 			binds, err := getCgroupMounts(m)
 			if err != nil {
 				return err
@@ -1484,18 +1515,21 @@ func (c *linuxContainer) criuSwrk(process *Process, req *criurpc.CriuReq, opts *
 	if err := cmd.Start(); err != nil {
 		return err
 	}
+	// we close criuServer so that even if CRIU crashes or unexpectedly exits, runc will not hang.
 	criuServer.Close()
+	// cmd.Process will be replaced by a restored init.
+	criuProcess := cmd.Process
 
 	defer func() {
 		criuClientCon.Close()
-		_, err := cmd.Process.Wait()
+		_, err := criuProcess.Wait()
 		if err != nil {
 			return
 		}
 	}()
 
 	if applyCgroups {
-		err := c.criuApplyCgroups(cmd.Process.Pid, req)
+		err := c.criuApplyCgroups(criuProcess.Pid, req)
 		if err != nil {
 			return err
 		}
@@ -1503,7 +1537,7 @@ func (c *linuxContainer) criuSwrk(process *Process, req *criurpc.CriuReq, opts *
 
 	var extFds []string
 	if process != nil {
-		extFds, err = getPipeFds(cmd.Process.Pid)
+		extFds, err = getPipeFds(criuProcess.Pid)
 		if err != nil {
 			return err
 		}
@@ -1577,7 +1611,7 @@ func (c *linuxContainer) criuSwrk(process *Process, req *criurpc.CriuReq, opts *
 			logrus.Debugf("Feature check says: %s", resp)
 			criuFeatures = resp.GetFeatures()
 		case t == criurpc.CriuReqType_NOTIFY:
-			if err := c.criuNotifications(resp, process, opts, extFds, oob[:oobn]); err != nil {
+			if err := c.criuNotifications(resp, process, cmd, opts, extFds, oob[:oobn]); err != nil {
 				return err
 			}
 			t = criurpc.CriuReqType_NOTIFY
@@ -1607,7 +1641,7 @@ func (c *linuxContainer) criuSwrk(process *Process, req *criurpc.CriuReq, opts *
 	criuClientCon.CloseWrite()
 	// cmd.Wait() waits cmd.goroutines which are used for proxying file descriptors.
 	// Here we want to wait only the CRIU process.
-	st, err := cmd.Process.Wait()
+	st, err := criuProcess.Wait()
 	if err != nil {
 		return err
 	}
@@ -1653,7 +1687,7 @@ func unlockNetwork(config *configs.Config) error {
 	return nil
 }
 
-func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Process, opts *CriuOpts, fds []string, oob []byte) error {
+func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Process, cmd *exec.Cmd, opts *CriuOpts, fds []string, oob []byte) error {
 	notify := resp.GetNotify()
 	if notify == nil {
 		return fmt.Errorf("invalid response: %s", resp.String())
@@ -1689,7 +1723,14 @@ func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Proc
 		}
 	case notify.GetScript() == "post-restore":
 		pid := notify.GetPid()
-		r, err := newRestoredProcess(int(pid), fds)
+
+		p, err := os.FindProcess(int(pid))
+		if err != nil {
+			return err
+		}
+		cmd.Process = p
+
+		r, err := newRestoredProcess(cmd, fds)
 		if err != nil {
 			return err
 		}
@@ -1778,10 +1819,7 @@ func (c *linuxContainer) refreshState() error {
 	if paused {
 		return c.state.transition(&pausedState{c: c})
 	}
-	t, err := c.runType()
-	if err != nil {
-		return err
-	}
+	t := c.runType()
 	switch t {
 	case Created:
 		return c.state.transition(&createdState{c: c})
@@ -1791,35 +1829,44 @@ func (c *linuxContainer) refreshState() error {
 	return c.state.transition(&stoppedState{c: c})
 }
 
-func (c *linuxContainer) runType() (Status, error) {
+func (c *linuxContainer) runType() Status {
 	if c.initProcess == nil {
-		return Stopped, nil
+		return Stopped
 	}
 	pid := c.initProcess.pid()
 	stat, err := system.Stat(pid)
 	if err != nil {
-		return Stopped, nil
+		return Stopped
 	}
 	if stat.StartTime != c.initProcessStartTime || stat.State == system.Zombie || stat.State == system.Dead {
-		return Stopped, nil
+		return Stopped
 	}
 	// We'll create exec fifo and blocking on it after container is created,
 	// and delete it after start container.
 	if _, err := os.Stat(filepath.Join(c.root, execFifoFilename)); err == nil {
-		return Created, nil
+		return Created
 	}
-	return Running, nil
+	return Running
 }
 
 func (c *linuxContainer) isPaused() (bool, error) {
-	fcg := c.cgroupManager.GetPaths()["freezer"]
-	if fcg == "" {
-		// A container doesn't have a freezer cgroup
-		return false, nil
-	}
-	pausedState := "FROZEN"
-	filename := "freezer.state"
-	if cgroups.IsCgroup2UnifiedMode() {
+	var fcg, filename, pausedState string
+
+	if !cgroups.IsCgroup2UnifiedMode() {
+		fcg = c.cgroupManager.GetPaths()["freezer"]
+		if fcg == "" {
+			// A container doesn't have a freezer cgroup
+			return false, nil
+		}
+		filename = "freezer.state"
+		pausedState = "FROZEN"
+	} else {
+		var err error
+		fcg, err = c.cgroupManager.GetUnifiedPath()
+		if err != nil {
+			// should not happen
+			return false, err
+		}
 		filename = "cgroup.freeze"
 		pausedState = "1"
 	}
@@ -1827,7 +1874,7 @@ func (c *linuxContainer) isPaused() (bool, error) {
 	data, err := ioutil.ReadFile(filepath.Join(fcg, filename))
 	if err != nil {
 		// If freezer cgroup is not mounted, the container would just be not paused.
-		if os.IsNotExist(err) || err == syscall.ENODEV {
+		if os.IsNotExist(err) || errors.Is(err, unix.ENODEV) {
 			return false, nil
 		}
 		return false, newSystemErrorWithCause(err, "checking if container is paused")

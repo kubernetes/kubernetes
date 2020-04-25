@@ -1,5 +1,9 @@
 package configs
 
+import (
+	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
+)
+
 type FreezerState string
 
 const (
@@ -29,6 +33,11 @@ type Cgroup struct {
 
 	// Resources contains various cgroups settings to apply
 	*Resources
+
+	// SystemdProps are any additional properties for systemd,
+	// derived from org.systemd.property.xxx annotations.
+	// Ignored unless systemd is used for managing cgroups.
+	SystemdProps []systemdDbus.Property `json:"-"`
 }
 
 type Resources struct {

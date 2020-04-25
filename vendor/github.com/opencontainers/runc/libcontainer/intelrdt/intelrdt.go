@@ -310,14 +310,10 @@ func parseCpuInfoFile(path string) (bool, bool, error) {
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
-		if err := s.Err(); err != nil {
-			return false, false, err
-		}
-
 		line := s.Text()
 
 		// Search "cat_l3" and "mba" flags in first "flags" line
-		if strings.Contains(line, "flags") {
+		if strings.HasPrefix(line, "flags") {
 			flags := strings.Split(line, " ")
 			// "cat_l3" flag for CAT and "mba" flag for MBA
 			for _, flag := range flags {
@@ -331,6 +327,10 @@ func parseCpuInfoFile(path string) (bool, bool, error) {
 			return isCatFlagSet, isMbaFlagSet, nil
 		}
 	}
+	if err := s.Err(); err != nil {
+		return false, false, err
+	}
+
 	return isCatFlagSet, isMbaFlagSet, nil
 }
 
@@ -758,7 +758,7 @@ type LastCmdError struct {
 }
 
 func (e *LastCmdError) Error() string {
-	return fmt.Sprintf(e.Err.Error() + ", last_cmd_status: " + e.LastCmdStatus)
+	return e.Err.Error() + ", last_cmd_status: " + e.LastCmdStatus
 }
 
 func NewLastCmdError(err error) error {

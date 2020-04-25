@@ -14,6 +14,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.4.1
 	github.com/prometheus/procfs v0.0.5
+	github.com/sirupsen/logrus v1.5.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	k8s.io/apimachinery v0.0.0
@@ -23,6 +24,8 @@ require (
 )
 
 replace (
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
+	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.4.2
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	k8s.io/api => ../api

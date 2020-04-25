@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	systemd "github.com/coreos/go-systemd/daemon"
+	systemd "github.com/coreos/go-systemd/v22/daemon"
 	"github.com/go-openapi/spec"
 
 	"k8s.io/apimachinery/pkg/api/meta"

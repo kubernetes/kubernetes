@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall" // only for Errno
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -455,7 +454,7 @@ func isWaitable(pid int) (bool, error) {
 // isNoChildren returns true if err represents a unix.ECHILD (formerly syscall.ECHILD) false otherwise
 func isNoChildren(err error) bool {
 	switch err := err.(type) {
-	case syscall.Errno:
+	case unix.Errno:
 		if err == unix.ECHILD {
 			return true
 		}

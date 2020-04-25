@@ -31,7 +31,7 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 
-	systemdutil "github.com/coreos/go-systemd/util"
+	systemdutil "github.com/coreos/go-systemd/v22/util"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"

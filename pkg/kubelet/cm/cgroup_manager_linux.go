@@ -155,7 +155,7 @@ func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup, pa
 		}, nil
 	case libcontainerSystemd:
 		// this means you asked systemd to manage cgroups, but systemd was not on the host, so all you can do is panic...
-		if !cgroupsystemd.UseSystemd() {
+		if !cgroupsystemd.IsRunningSystemd() {
 			panic("systemd cgroup manager not available")
 		}
 		f, err := cgroupsystemd.NewSystemdCgroupsManager()
