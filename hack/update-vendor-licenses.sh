@@ -177,7 +177,7 @@ for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
     echo "$PACKAGE is a staging package, skipping" > /dev/stderr
     continue
   fi
-  if [[ ! -e "${DEPS_DIR}/${PACKAGE}" ]]; then
+  if ! grep "# $PACKAGE " "vendor/modules.txt" >/dev/null; then
     echo "$PACKAGE doesn't exist in vendor, skipping" > /dev/stderr
     continue
   fi
