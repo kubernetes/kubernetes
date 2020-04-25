@@ -70,10 +70,10 @@ func networkingIPerfTest(isIPv6 bool) {
 			func(n v1.Node) v1.PodSpec {
 				return v1.PodSpec{
 					Containers: []v1.Container{{
-						Name:  "iperf-server",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:    "iperf-server",
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+						Command: []string{"/bin/sh"},
 						Args: []string{
-							"/bin/sh",
 							"-c",
 							"/usr/local/bin/iperf " + familyStr + "-s -p 8001 ",
 						},
@@ -100,10 +100,10 @@ func networkingIPerfTest(isIPv6 bool) {
 				return v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "iperf-client",
-							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Name:    "iperf-client",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"/bin/sh"},
 							Args: []string{
-								"/bin/sh",
 								"-c",
 								"/usr/local/bin/iperf " + familyStr + "-c service-for-" + appName + " -p 8002 --reportstyle C && sleep 5",
 							},
