@@ -86,6 +86,11 @@ func (in *KubeletAuthorization) DeepCopy() *KubeletAuthorization {
 func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.EnableServer != nil {
+		in, out := &in.EnableServer, &out.EnableServer
+		*out = new(bool)
+		**out = **in
+	}
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency

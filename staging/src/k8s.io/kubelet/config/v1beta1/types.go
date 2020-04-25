@@ -74,6 +74,12 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// enableServer enables Kubelet's secured server.
+	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt components that interact with the Kubelet server.
+	// Default: true
+	EnableServer *bool `json:"enableServer,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -767,6 +773,13 @@ type KubeletConfiguration struct {
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 	// +optional
 	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+	// providerID, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
+	// can use to identify a specific node.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the ability of the Kubelet to interact with cloud providers.
+	// Default: ""
+	// +optional
+	ProviderID string `json:"providerID,omitempty"`
 }
 
 type KubeletAuthorizationMode string

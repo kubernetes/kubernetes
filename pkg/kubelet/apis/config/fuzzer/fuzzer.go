@@ -37,6 +37,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		// provide non-empty values for fields with defaults, so the defaulter doesn't change values during round-trip
 		func(obj *kubeletconfig.KubeletConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
+			obj.EnableServer = true
 			obj.Authentication.Anonymous.Enabled = true
 			obj.Authentication.Webhook.Enabled = false
 			obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
