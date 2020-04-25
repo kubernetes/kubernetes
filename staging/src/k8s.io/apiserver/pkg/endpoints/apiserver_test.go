@@ -2104,7 +2104,7 @@ func TestWatchTable(t *testing.T) {
 
 	s := metainternalversionscheme.Codecs.SupportedMediaTypes()[0].Serializer
 
-	type _test_ struct {
+	type apiTest struct {
 		accept string
 		params url.Values
 		send   func(w *watch.FakeWatcher)
@@ -2115,7 +2115,7 @@ func TestWatchTable(t *testing.T) {
 		item        bool
 	}
 
-	tests := []_test_ {
+	tests := []apiTest {
 		{
 			accept:     "application/json;as=Table;v=v1alpha1;g=meta.k8s.io",
 			statusCode: http.StatusNotAcceptable,
@@ -2284,7 +2284,7 @@ func TestWatchTable(t *testing.T) {
 				t.Fatalf("%d: unexpected response: %#v", i, resp)
 			}
 
-			go func(test _test_) {
+			go func(test apiTest) {
 				defer simpleStorage.fakeWatch.Stop()
 				test.send(simpleStorage.fakeWatch)
 			}(test)
