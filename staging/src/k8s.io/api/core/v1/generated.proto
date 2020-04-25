@@ -459,7 +459,7 @@ message ConfigMap {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 4;
 
@@ -4310,7 +4310,7 @@ message Secret {
   // be updated (only object metadata can be modified).
   // If not set to true, the field can be modified at any time.
   // Defaulted to nil.
-  // This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+  // This is a beta field enabled by ImmutableEphemeralVolumes feature gate.
   // +optional
   optional bool immutable = 5;
 

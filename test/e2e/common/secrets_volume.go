@@ -373,7 +373,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 
 	// It should be forbidden to change data for secrets marked as immutable, but
 	// allowed to modify its metadata independently of its state.
-	ginkgo.It("should be immutable if `immutable` field is set [Feature:ImmutableEphemeralVolume]", func() {
+	ginkgo.It("should be immutable if `immutable` field is set", func() {
 		name := "immutable"
 		secret := secretForTest(f.Namespace.Name, name)
 
