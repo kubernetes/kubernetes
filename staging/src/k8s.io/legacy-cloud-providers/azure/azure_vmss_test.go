@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cloudprovider "k8s.io/cloud-provider"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
@@ -43,11 +44,13 @@ import (
 )
 
 const (
-	fakePrivateIP       = "10.240.0.10"
-	fakePublicIP        = "10.10.10.10"
-	testVMSSName        = "vmss"
-	testVMPowerState    = "PowerState/Running"
-	testLBBackendpoolID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-0"
+	fakePrivateIP        = "10.240.0.10"
+	fakePublicIP         = "10.10.10.10"
+	testVMSSName         = "vmss"
+	testVMPowerState     = "PowerState/Running"
+	testLBBackendpoolID0 = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-0"
+	testLBBackendpoolID1 = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1"
+	testLBBackendpoolID2 = "/subscriptions/sub/resourceGroups/rg1/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-2"
 )
 
 func newTestScaleSet(ctrl *gomock.Controller) (*scaleSet, error) {
@@ -62,6 +65,40 @@ func newTestScaleSetWithState(ctrl *gomock.Controller) (*scaleSet, error) {
 	}
 
 	return ss.(*scaleSet), nil
+}
+
+func buildTestVMSS(lbBackendpoolIDs []string) compute.VirtualMachineScaleSet {
+	lbBackendpools := make([]compute.SubResource, 0)
+	for _, id := range lbBackendpoolIDs {
+		lbBackendpools = append(lbBackendpools, compute.SubResource{ID: to.StringPtr(id)})
+	}
+
+	expectedVMSS := compute.VirtualMachineScaleSet{
+		Name: to.StringPtr(testVMSSName),
+		VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+			ProvisioningState: to.StringPtr("Running"),
+			VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
+				NetworkProfile: &compute.VirtualMachineScaleSetNetworkProfile{
+					NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
+						{
+							VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
+								Primary: to.BoolPtr(true),
+								IPConfigurations: &[]compute.VirtualMachineScaleSetIPConfiguration{
+									{
+										VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
+											LoadBalancerBackendAddressPools: &lbBackendpools,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return expectedVMSS
 }
 
 func buildTestVirtualMachineEnv(ss *Cloud, scaleSetName, zone string, faultDomain int32, vmList []string, state string) ([]compute.VirtualMachineScaleSetVM, network.Interface, network.PublicIPAddress) {
@@ -91,7 +128,7 @@ func buildTestVirtualMachineEnv(ss *Cloud, scaleSetName, zone string, faultDomai
 				Name: to.StringPtr("ipconfig1"),
 				VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
 					Primary:                         to.BoolPtr(true),
-					LoadBalancerBackendAddressPools: &[]compute.SubResource{{ID: to.StringPtr(testLBBackendpoolID)}},
+					LoadBalancerBackendAddressPools: &[]compute.SubResource{{ID: to.StringPtr(testLBBackendpoolID0)}},
 				},
 			},
 		}
@@ -1496,7 +1533,7 @@ func TestEnsureHostInPool(t *testing.T) {
 			service:       &v1.Service{Spec: v1.ServiceSpec{ClusterIP: "clusterIP"}},
 			nodeName:      "vmss-vm-000000",
 			vmSetName:     "vmss",
-			backendPoolID: testLBBackendpoolID,
+			backendPoolID: testLBBackendpoolID0,
 		},
 		{
 			description:   "EnsureHostInPool should skip the current node if it has already been added to another LB",
@@ -1533,7 +1570,7 @@ func TestEnsureHostInPool(t *testing.T) {
 												Primary: to.BoolPtr(true),
 												LoadBalancerBackendAddressPools: &[]compute.SubResource{
 													{
-														ID: to.StringPtr(testLBBackendpoolID),
+														ID: to.StringPtr(testLBBackendpoolID0),
 													},
 													{
 														ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb-internal/backendAddressPools/backendpool-1"),
@@ -1656,7 +1693,7 @@ func TestEnsureVMSSInPool(t *testing.T) {
 				},
 			},
 			isBasicLB:       false,
-			backendPoolID:   testLBBackendpoolID,
+			backendPoolID:   testLBBackendpoolID0,
 			expectedPutVMSS: false,
 		},
 		{
@@ -1682,7 +1719,7 @@ func TestEnsureVMSSInPool(t *testing.T) {
 				},
 			},
 			isBasicLB:       false,
-			backendPoolID:   "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1",
+			backendPoolID:   testLBBackendpoolID1,
 			expectedPutVMSS: true,
 		},
 	}
@@ -1695,34 +1732,7 @@ func TestEnsureVMSSInPool(t *testing.T) {
 			ss.LoadBalancerSku = loadBalancerSkuStandard
 		}
 
-		expectedVMSS := compute.VirtualMachineScaleSet{
-			Name: to.StringPtr(testVMSSName),
-			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
-				ProvisioningState: to.StringPtr("Running"),
-				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
-					NetworkProfile: &compute.VirtualMachineScaleSetNetworkProfile{
-						NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
-							{
-								VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
-									Primary: to.BoolPtr(true),
-									IPConfigurations: &[]compute.VirtualMachineScaleSetIPConfiguration{
-										{
-											VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
-												LoadBalancerBackendAddressPools: &[]compute.SubResource{
-													{
-														ID: to.StringPtr(testLBBackendpoolID),
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
+		expectedVMSS := buildTestVMSS([]string{testLBBackendpoolID0})
 		if test.isVMSSDeallocating {
 			expectedVMSS.ProvisioningState = &virtualMachineScaleSetsDeallocating
 		}
@@ -1789,7 +1799,7 @@ func TestEnsureHostsInPool(t *testing.T) {
 					},
 				},
 			},
-			backendpoolID:          "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1",
+			backendpoolID:          testLBBackendpoolID1,
 			vmSetName:              testVMSSName,
 			expectedVMSSVMPutTimes: 1,
 		},
@@ -1805,7 +1815,7 @@ func TestEnsureHostsInPool(t *testing.T) {
 					},
 				},
 			},
-			backendpoolID:          "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1",
+			backendpoolID:          testLBBackendpoolID1,
 			vmSetName:              testVMSSName,
 			expectedVMSSVMPutTimes: 0,
 			expectedErr:            true,
@@ -1819,34 +1829,7 @@ func TestEnsureHostsInPool(t *testing.T) {
 		ss.LoadBalancerSku = loadBalancerSkuStandard
 		ss.ExcludeMasterFromStandardLB = to.BoolPtr(true)
 
-		expectedVMSS := compute.VirtualMachineScaleSet{
-			Name: to.StringPtr(testVMSSName),
-			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
-				ProvisioningState: to.StringPtr("Running"),
-				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
-					NetworkProfile: &compute.VirtualMachineScaleSetNetworkProfile{
-						NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
-							{
-								VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
-									Primary: to.BoolPtr(true),
-									IPConfigurations: &[]compute.VirtualMachineScaleSetIPConfiguration{
-										{
-											VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
-												LoadBalancerBackendAddressPools: &[]compute.SubResource{
-													{
-														ID: to.StringPtr(testLBBackendpoolID),
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
+		expectedVMSS := buildTestVMSS([]string{testLBBackendpoolID0})
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), ss.ResourceGroup, testVMSSName).Return(expectedVMSS, nil).MaxTimes(1)
@@ -1893,12 +1876,12 @@ func TestEnsureBackendPoolDeletedFromNode(t *testing.T) {
 		{
 			description:   "ensureBackendPoolDeletedFromNode should skip the node if there's no wanted lb backendpool ID on that VM",
 			nodeName:      "vmss-vm-000000",
-			backendpoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1",
+			backendpoolID: testLBBackendpoolID1,
 		},
 		{
 			description:               "ensureBackendPoolDeletedFromNode should delete the given backendpool ID",
 			nodeName:                  "vmss-vm-000000",
-			backendpoolID:             testLBBackendpoolID,
+			backendpoolID:             testLBBackendpoolID0,
 			expectedNodeResourceGroup: "rg",
 			expectedVMSSName:          testVMSSName,
 			expectedInstanceID:        "0",
@@ -1999,18 +1982,18 @@ func TestEnsureBackendPoolDeletedFromVMSS(t *testing.T) {
 		{
 			description:        "ensureBackendPoolDeletedFromVMSS should delete the corresponding LB backendpool ID",
 			ipConfigurationIDs: []string{"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/vmss-vm-000000/networkInterfaces/nic"},
-			backendPoolID:      testLBBackendpoolID,
+			backendPoolID:      testLBBackendpoolID0,
 			expectedPutVMSS:    true,
 		},
 		{
 			description:        "ensureBackendPoolDeletedFromVMSS should skip the VMSS if there's no wanted LB backendpool ID",
 			ipConfigurationIDs: []string{"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/vmss-vm-000000/networkInterfaces/nic"},
-			backendPoolID:      "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1",
+			backendPoolID:      testLBBackendpoolID1,
 		},
 		{
 			description:        "ensureBackendPoolDeletedFromVMSS should report the error that occurs during VMSS client's call",
 			ipConfigurationIDs: []string{"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/vmss-vm-000000/networkInterfaces/nic"},
-			backendPoolID:      testLBBackendpoolID,
+			backendPoolID:      testLBBackendpoolID0,
 			expectedPutVMSS:    true,
 			vmssClientErr:      &retry.Error{RawError: fmt.Errorf("error")},
 			expectedErr:        fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: error"),
@@ -2023,34 +2006,7 @@ func TestEnsureBackendPoolDeletedFromVMSS(t *testing.T) {
 
 		ss.LoadBalancerSku = loadBalancerSkuStandard
 
-		expectedVMSS := compute.VirtualMachineScaleSet{
-			Name: to.StringPtr(testVMSSName),
-			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
-				ProvisioningState: to.StringPtr("Running"),
-				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
-					NetworkProfile: &compute.VirtualMachineScaleSetNetworkProfile{
-						NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
-							{
-								VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
-									Primary: to.BoolPtr(true),
-									IPConfigurations: &[]compute.VirtualMachineScaleSetIPConfiguration{
-										{
-											VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
-												LoadBalancerBackendAddressPools: &[]compute.SubResource{
-													{
-														ID: to.StringPtr(testLBBackendpoolID),
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
+		expectedVMSS := buildTestVMSS([]string{testLBBackendpoolID0})
 		if test.isVMSSDeallocating {
 			expectedVMSS.ProvisioningState = &virtualMachineScaleSetsDeallocating
 		}
@@ -2089,10 +2045,10 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 	}{
 		{
 			description:   "EnsureBackendPoolDeleted should skip the unwanted backend address pools and update the VMSS VM correctly",
-			backendpoolID: testLBBackendpoolID,
+			backendpoolID: testLBBackendpoolID0,
 			backendAddressPools: &[]network.BackendAddressPool{
 				{
-					ID: to.StringPtr(testLBBackendpoolID),
+					ID: to.StringPtr(testLBBackendpoolID0),
 					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
 						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
 							{
@@ -2110,17 +2066,17 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 					},
 				},
 				{
-					ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1"),
+					ID: to.StringPtr(testLBBackendpoolID1),
 				},
 			},
 			expectedVMSSVMPutTimes: 1,
 		},
 		{
 			description:   "EnsureBackendPoolDeleted should report the error that occurs during the call of VMSS VM client",
-			backendpoolID: testLBBackendpoolID,
+			backendpoolID: testLBBackendpoolID0,
 			backendAddressPools: &[]network.BackendAddressPool{
 				{
-					ID: to.StringPtr(testLBBackendpoolID),
+					ID: to.StringPtr(testLBBackendpoolID0),
 					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
 						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
 							{
@@ -2131,7 +2087,7 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 					},
 				},
 				{
-					ID: to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb/backendAddressPools/backendpool-1"),
+					ID: to.StringPtr(testLBBackendpoolID1),
 				},
 			},
 			expectedVMSSVMPutTimes: 1,
@@ -2144,34 +2100,7 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, test.description)
 
-		expectedVMSS := compute.VirtualMachineScaleSet{
-			Name: to.StringPtr(testVMSSName),
-			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
-				ProvisioningState: to.StringPtr("Running"),
-				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{
-					NetworkProfile: &compute.VirtualMachineScaleSetNetworkProfile{
-						NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
-							{
-								VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
-									Primary: to.BoolPtr(true),
-									IPConfigurations: &[]compute.VirtualMachineScaleSetIPConfiguration{
-										{
-											VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
-												LoadBalancerBackendAddressPools: &[]compute.SubResource{
-													{
-														ID: to.StringPtr(testLBBackendpoolID),
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
+		expectedVMSS := buildTestVMSS([]string{testLBBackendpoolID0})
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), ss.ResourceGroup, testVMSSName).Return(expectedVMSS, nil).MaxTimes(1)
@@ -2185,4 +2114,77 @@ func TestEnsureBackendPoolDeleted(t *testing.T) {
 		err = ss.EnsureBackendPoolDeleted(&v1.Service{}, test.backendpoolID, testVMSSName, test.backendAddressPools)
 		assert.Equal(t, test.expectedErr, err != nil, test.description+", but an error occurs")
 	}
+}
+
+func TestEnsureBackendPoolDeletedConcurrently(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ss, err := newTestScaleSet(ctrl)
+	assert.NoError(t, err)
+
+	backendAddressPools := &[]network.BackendAddressPool{
+		{
+			ID: to.StringPtr(testLBBackendpoolID0),
+			BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+				BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+					{
+						Name: to.StringPtr("ip-1"),
+						ID:   to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0/networkInterfaces/nic"),
+					},
+				},
+			},
+		},
+		{
+			ID: to.StringPtr(testLBBackendpoolID1),
+			BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+				BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+					{
+						Name: to.StringPtr("ip-1"),
+						ID:   to.StringPtr("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0/networkInterfaces/nic"),
+					},
+				},
+			},
+		},
+		{
+			// this would fail
+			ID: to.StringPtr(testLBBackendpoolID2),
+			BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+				BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+					{
+						Name: to.StringPtr("ip-1"),
+						ID:   to.StringPtr("/subscriptions/sub/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0/networkInterfaces/nic"),
+					},
+				},
+			},
+		},
+	}
+	expectedVMSS := buildTestVMSS([]string{testLBBackendpoolID0, testLBBackendpoolID1})
+
+	expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, testVMSSName, "", 0, []string{"vmss-vm-000000"}, "succeeded")
+	vmssVMNetworkConfigs := expectedVMSSVMs[0].NetworkProfileConfiguration
+	vmssVMIPConfigs := (*vmssVMNetworkConfigs.NetworkInterfaceConfigurations)[0].VirtualMachineScaleSetNetworkConfigurationProperties.IPConfigurations
+	lbBackendpools := (*vmssVMIPConfigs)[0].LoadBalancerBackendAddressPools
+	*lbBackendpools = append(*lbBackendpools, compute.SubResource{ID: to.StringPtr(testLBBackendpoolID1)})
+
+	mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
+	mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
+	mockVMSSClient.EXPECT().Get(gomock.Any(), ss.ResourceGroup, testVMSSName).Return(expectedVMSS, nil).MaxTimes(2)
+	mockVMSSClient.EXPECT().CreateOrUpdate(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(nil).Times(2)
+
+	mockVMSSVMClient := ss.cloud.VirtualMachineScaleSetVMsClient.(*mockvmssvmclient.MockInterface)
+	mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
+	mockVMSSVMClient.EXPECT().UpdateVMs(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	backendpoolAddressIDs := []string{testLBBackendpoolID0, testLBBackendpoolID1, testLBBackendpoolID2}
+	testFunc := make([]func() error, 0)
+	for _, id := range backendpoolAddressIDs {
+		id := id
+		testFunc = append(testFunc, func() error {
+			return ss.EnsureBackendPoolDeleted(&v1.Service{}, id, testVMSSName, backendAddressPools)
+		})
+	}
+	errs := utilerrors.AggregateGoroutines(testFunc...)
+	assert.Equal(t, 1, len(errs.Errors()))
+	assert.Equal(t, "instance not found", errs.Error())
 }

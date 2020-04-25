@@ -40,8 +40,8 @@ const (
 	// not active means the instance is under deleting from Azure VMSS.
 	vmssVMNotActiveErrorMessage = "not an active Virtual Machine Scale Set VM instanceId"
 
-	// operationCancledErrorMessage means the operation is canceled by another new operation.
-	operationCancledErrorMessage = "canceledandsupersededduetoanotheroperation"
+	// operationCanceledErrorMessage means the operation is canceled by another new operation.
+	operationCanceledErrorMessage = "canceledandsupersededduetoanotheroperation"
 )
 
 // RequestBackoff if backoff is disabled in cloud provider it
@@ -166,8 +166,8 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 	}
 
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-		klog.V(3).Infof("SecurityGroup cache for %s is cleanup because CreateOrUpdateSecurityGroup is canceld by another operation", *sg.Name)
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
+		klog.V(3).Infof("SecurityGroup cache for %s is cleanup because CreateOrUpdateSecurityGroup is canceled by another operation", *sg.Name)
 		az.nsgCache.Delete(*sg.Name)
 	}
 
@@ -194,7 +194,7 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		az.lbCache.Delete(*lb.Name)
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
 		klog.V(3).Infof("LoadBalancer cache for %s is cleanup because CreateOrUpdate is canceled by another operation", *lb.Name)
 		az.lbCache.Delete(*lb.Name)
 	}
@@ -317,7 +317,7 @@ func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
 		az.rtCache.Delete(*routeTable.Name)
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
 		klog.V(3).Infof("Route table cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *routeTable.Name)
 		az.rtCache.Delete(*routeTable.Name)
 	}
@@ -342,7 +342,7 @@ func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
 		az.rtCache.Delete(az.RouteTableName)
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
 		klog.V(3).Infof("Route cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *route.Name)
 		az.rtCache.Delete(az.RouteTableName)
 	}
