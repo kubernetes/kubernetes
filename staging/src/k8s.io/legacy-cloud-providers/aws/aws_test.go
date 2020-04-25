@@ -111,10 +111,77 @@ func (m *MockedFakeELB) DescribeLoadBalancers(input *elb.DescribeLoadBalancersIn
 	return args.Get(0).(*elb.DescribeLoadBalancersOutput), nil
 }
 
+func (m *MockedFakeELB) DeleteLoadBalancer(input *elb.DeleteLoadBalancerInput) (*elb.DeleteLoadBalancerOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elb.DeleteLoadBalancerOutput), nil
+}
+
+func (m *MockedFakeEC2) DeleteSecurityGroup(input *ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*ec2.DeleteSecurityGroupOutput), nil
+}
+
 func (m *MockedFakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
 	m.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String(loadBalancerName)}}).Return(&elb.DescribeLoadBalancersOutput{
 		LoadBalancerDescriptions: []*elb.LoadBalancerDescription{{}},
 	})
+}
+
+func (m *MockedFakeELB) expectDescribeLoadBalancersWithSg(loadBalancerName string, securityGroups []*string) {
+	m.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String(loadBalancerName)}}).Return(&elb.DescribeLoadBalancersOutput{
+		LoadBalancerDescriptions: []*elb.LoadBalancerDescription{
+			{
+				SecurityGroups: securityGroups,
+			},
+		},
+	})
+}
+
+func (m *MockedFakeELB) expectLoadBalancerDelete() {
+	m.On("DeleteLoadBalancer", &elb.DeleteLoadBalancerInput{}).Return(&elb.DeleteLoadBalancerOutput{})
+}
+
+func (m *MockedFakeEC2) expectDescribeSecurityGroupsForEnsureLoadBalancer(securityGroups []*string) {
+	var securityGroupsDtos []*ec2.SecurityGroup
+	var describeGroupIdFilters []*string
+
+	tags := []*ec2.Tag{
+		{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(TestClusterID)},
+		{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterID)), Value: aws.String(ResourceLifecycleOwned)},
+	}
+
+	for _, sg := range securityGroups {
+		sgDto := &ec2.SecurityGroup{GroupId: sg, Tags: tags}
+		securityGroupsDtos = append(securityGroupsDtos, sgDto)
+
+		m.On("DescribeSecurityGroups", &ec2.DescribeSecurityGroupsInput{Filters: []*ec2.Filter{
+			newEc2Filter("ip-permission.group-id", *sg),
+		}}).Return(securityGroupsDtos)
+
+		describeGroupIdFilters = append(describeGroupIdFilters, sg)
+
+		m.On("DescribeSecurityGroups", &ec2.DescribeSecurityGroupsInput{
+			GroupIds: []*string{sg},
+		}).Return([]*ec2.SecurityGroup{
+			sgDto,
+		})
+	}
+
+	m.On("DescribeSecurityGroups", &ec2.DescribeSecurityGroupsInput{}).Return(securityGroupsDtos)
+	m.On("DescribeSecurityGroups", &ec2.DescribeSecurityGroupsInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("group-id"),
+				Values: describeGroupIdFilters,
+			},
+		},
+	}).Return(securityGroupsDtos)
+}
+
+func (m *MockedFakeEC2) expectDeleteSecurityGroup(securityGroup *string) {
+	m.On("DeleteSecurityGroup", &ec2.DeleteSecurityGroupInput{
+		GroupId: securityGroup,
+	}).Return(&ec2.DeleteSecurityGroupOutput{})
 }
 
 func (m *MockedFakeELB) AddTags(input *elb.AddTagsInput) (*elb.AddTagsOutput, error) {
@@ -1369,6 +1436,37 @@ func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancers("aid")
 
 	c.EnsureLoadBalancerDeleted(context.TODO(), TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
+}
+
+func TestDescribeLoadBalancerOnDeleteWithExtraSecurityGroup(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, _ := newAWSCloud(CloudConfig{}, awsServices)
+
+	sg1 := aws.String("sg-000001")
+	sg2 := aws.String("sg-000002")
+
+	securityGroups := []*string{
+		sg1,
+		sg2,
+	}
+
+	awsServices.elb.(*MockedFakeELB).expectDescribeLoadBalancersWithSg("aid", securityGroups)
+	awsServices.elb.(*MockedFakeELB).expectLoadBalancerDelete()
+	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroupsForEnsureLoadBalancer(securityGroups)
+
+	// only expect deletion of sg1 which is not the one we passed as extra security group
+	// in the service annotation
+	awsServices.ec2.(*MockedFakeEC2).expectDeleteSecurityGroup(sg1)
+
+	c.EnsureLoadBalancerDeleted(context.TODO(), TestClusterName, &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "myservice",
+			UID:  "id",
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerExtraSecurityGroups: *sg2,
+			},
+		},
+	})
 }
 
 func TestDescribeLoadBalancerOnUpdate(t *testing.T) {

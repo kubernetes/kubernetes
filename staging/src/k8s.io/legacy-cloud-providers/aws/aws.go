@@ -4267,7 +4267,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 }
 
 // Returns a list of all the extra security groups as annotated in the service definition
-func (c* Cloud) collectExtraSecurityGroupsForService(service *v1.Service) []string {
+func (c *Cloud) collectExtraSecurityGroupsForService(service *v1.Service) []string {
 	extraSgList := []string{}
 
 	for _, extraSG := range strings.Split(service.ObjectMeta.Annotations[ServiceAnnotationLoadBalancerExtraSecurityGroups], ",") {
@@ -4281,7 +4281,7 @@ func (c* Cloud) collectExtraSecurityGroupsForService(service *v1.Service) []stri
 }
 
 // Checks whether a given security group is inside the extra security group annotation of a service definition
-func (c* Cloud) checkSecurityGroupMatchesServiceExtraSg(service *v1.Service, securityGroup *string) bool {
+func (c *Cloud) checkSecurityGroupMatchesServiceExtraSg(service *v1.Service, securityGroup *string) bool {
 	for _, extraSg := range c.collectExtraSecurityGroupsForService(service) {
 		if extraSg == *securityGroup {
 			return true
