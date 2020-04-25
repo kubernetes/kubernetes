@@ -515,7 +515,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
-	if len(s.KubeConfig) > 0 {
+	if len(s.Kubeconfig) > 0 {
 		standaloneMode = false
 	}
 
@@ -834,7 +834,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 		// bootstrap the cert manager with the contents of the initial client config.
 
 		klog.Infof("Client rotation is on, will bootstrap in background")
-		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
+		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.Kubeconfig, s.BootstrapKubeconfig, s.CertDirectory)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -867,13 +867,13 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 	}
 
 	if len(s.BootstrapKubeconfig) > 0 {
-		if err := bootstrap.LoadClientCert(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+		if err := bootstrap.LoadClientCert(s.Kubeconfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 			return nil, nil, err
 		}
 	}
 
 	clientConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {

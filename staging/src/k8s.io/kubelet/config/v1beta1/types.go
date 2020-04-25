@@ -74,6 +74,24 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// bootstrapKubeconfig is the path to a kubeconfig file that will be used to get client
+	// certificate for kubelet. If the file specified by --kubeconfig does not exist,
+	// the bootstrap kubeconfig is used to request a client certificate from the API server.
+	// On success, a kubeconfig file referencing the generated client certificate and key is
+	// written to the path specified by --kubeconfig. The client certificate and key file will
+	// be stored in the directory pointed by --cert-dir.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// the path of bootstrapKubeconfig file is different with before, and this may disrupt your node.
+	// Default: ""
+	// +optional
+	BootstrapKubeconfig string `json:"bootstrapKubeconfig,omitempty"`
+	// kubeConfig is the path to a kubeconfig file, specifying how to connect to the API server.
+	// Providing kubeconfig enables API server mode, omitting kubeconfig enables standalone mode.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// the path of kubeconfig file is different with before, and this may disrupt your node.
+	// Default: ""
+	// +optional
+	Kubeconfig string `json:"kubeconfig,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that

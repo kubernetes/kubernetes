@@ -207,6 +207,8 @@ func Convert_config_KubeletAuthorization_To_v1beta1_KubeletAuthorization(in *con
 }
 
 func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in *v1beta1.KubeletConfiguration, out *config.KubeletConfiguration, s conversion.Scope) error {
+	out.BootstrapKubeconfig = in.BootstrapKubeconfig
+	out.Kubeconfig = in.Kubeconfig
 	out.StaticPodPath = in.StaticPodPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
@@ -343,6 +345,8 @@ func Convert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in *v1b
 }
 
 func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in *config.KubeletConfiguration, out *v1beta1.KubeletConfiguration, s conversion.Scope) error {
+	out.BootstrapKubeconfig = in.BootstrapKubeconfig
+	out.Kubeconfig = in.Kubeconfig
 	out.StaticPodPath = in.StaticPodPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency

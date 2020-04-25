@@ -74,6 +74,10 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// bootstrap-kubeconfig
+	BootstrapKubeconfig string
+	// kubeconfig is the path to a kubeconfig file
+	Kubeconfig string
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	StaticPodPath string

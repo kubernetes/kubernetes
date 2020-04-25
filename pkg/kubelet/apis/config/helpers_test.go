@@ -130,6 +130,8 @@ func TestAllPrimitiveFieldPaths(t *testing.T) {
 var (
 	// KubeletConfiguration fields that contain file paths. If you update this, also update KubeletConfigurationPathRefs!
 	kubeletConfigurationPathFieldPaths = sets.NewString(
+		"Kubeconfig",
+		"BootstrapKubeconfig",
 		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
 		"TLSCertFile",
