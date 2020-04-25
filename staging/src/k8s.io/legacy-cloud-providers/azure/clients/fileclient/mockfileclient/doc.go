@@ -17,4 +17,4 @@ limitations under the License.
 */
 
 // Package mockfileclient implements the mock client for azure file.
-package mockfileclient // import "k8s.io/legacy-cloud-providers/azure/clients/filelient/mockfileclient"
+package mockfileclient // import "k8s.io/legacy-cloud-providers/azure/clients/fileclient/mockfileclient"
