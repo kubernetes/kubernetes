@@ -48,7 +48,7 @@ func TestDecoder(t *testing.T) {
 		out, in := io.Pipe()
 
 		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, getDecoder()), getDecoder())
-
+		eventType := eventType
 		expect := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		go func() {
