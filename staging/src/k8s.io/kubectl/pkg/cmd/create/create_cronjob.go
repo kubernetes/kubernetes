@@ -58,12 +58,13 @@ type CreateCronJobOptions struct {
 	Command  []string
 	Restart  string
 
-	Namespace      string
-	Client         batchv1beta1client.BatchV1beta1Interface
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
-	Builder        *resource.Builder
-	FieldManager   string
+	Namespace        string
+	EnforceNamespace bool
+	Client           batchv1beta1client.BatchV1beta1Interface
+	DryRunStrategy   cmdutil.DryRunStrategy
+	DryRunVerifier   *resource.DryRunVerifier
+	Builder          *resource.Builder
+	FieldManager     string
 
 	genericclioptions.IOStreams
 }
@@ -126,7 +127,7 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 		return err
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -193,7 +194,7 @@ func (o *CreateCronJobOptions) Run() error {
 }
 
 func (o *CreateCronJobOptions) createCronJob() *batchv1beta1.CronJob {
-	return &batchv1beta1.CronJob{
+	cronjob := &batchv1beta1.CronJob{
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1beta1.SchemeGroupVersion.String(), Kind: "CronJob"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.Name,
@@ -221,4 +222,8 @@ func (o *CreateCronJobOptions) createCronJob() *batchv1beta1.CronJob {
 			},
 		},
 	}
+	if o.EnforceNamespace {
+		cronjob.Namespace = o.Namespace
+	}
+	return cronjob
 }
