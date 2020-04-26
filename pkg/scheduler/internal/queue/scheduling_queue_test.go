@@ -740,6 +740,7 @@ func TestSchedulingQueue_Close(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			wg := sync.WaitGroup{}
 			wg.Add(1)
