@@ -72,6 +72,9 @@ type Config struct {
 
 	// Called whenever the ListAndWatch drops the connection with an error.
 	WatchErrorHandler WatchErrorHandler
+
+	// Backoff manages backoff for reflector on retry.
+	Backoff wait.BackoffManager
 }
 
 // ShouldResyncFunc is a type of function that indicates if a reflector should perform a
@@ -132,6 +135,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		c.config.ObjectType,
 		c.config.Queue,
 		c.config.FullResyncPeriod,
+		c.config.Backoff,
 	)
 	r.ShouldResync = c.config.ShouldResync
 	r.clock = c.clock
@@ -314,11 +318,12 @@ func NewInformer(
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
+	backoff wait.BackoffManager,
 ) (Store, Controller) {
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
-	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
+	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, backoff)
 }
 
 // NewIndexerInformer returns a Indexer and a controller for populating the index
@@ -343,11 +348,12 @@ func NewIndexerInformer(
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
 	indexers Indexers,
+	backoff wait.BackoffManager,
 ) (Indexer, Controller) {
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
-	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
+	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, backoff)
 }
 
 // newInformer returns a controller for populating the store while also
@@ -370,6 +376,7 @@ func newInformer(
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
 	clientState Store,
+	backoff wait.BackoffManager,
 ) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
@@ -385,6 +392,7 @@ func newInformer(
 		ObjectType:       objType,
 		FullResyncPeriod: resyncPeriod,
 		RetryOnError:     false,
+		Backoff:          backoff,
 
 		Process: func(obj interface{}) error {
 			// from oldest to newest

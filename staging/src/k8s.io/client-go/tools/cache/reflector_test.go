@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -50,7 +50,7 @@ func (t *testLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 }
 
 func TestCloseWatchChannelOnError(t *testing.T) {
-	r := NewReflector(&testLW{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
+	r := NewReflector(&testLW{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0, nil)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	fw := watch.NewFake()
 	r.listerWatcher = &testLW{
@@ -77,7 +77,7 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 func TestRunUntil(t *testing.T) {
 	stopCh := make(chan struct{})
 	store := NewStore(MetaNamespaceKeyFunc)
-	r := NewReflector(&testLW{}, &v1.Pod{}, store, 0)
+	r := NewReflector(&testLW{}, &v1.Pod{}, store, 0, nil)
 	fw := watch.NewFake()
 	r.listerWatcher = &testLW{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -105,7 +105,7 @@ func TestRunUntil(t *testing.T) {
 
 func TestReflectorResyncChan(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&testLW{}, &v1.Pod{}, s, time.Millisecond)
+	g := NewReflector(&testLW{}, &v1.Pod{}, s, time.Millisecond, nil)
 	a, _ := g.resyncChan()
 	b := time.After(wait.ForeverTestTimeout)
 	select {
@@ -118,7 +118,7 @@ func TestReflectorResyncChan(t *testing.T) {
 
 func BenchmarkReflectorResyncChanMany(b *testing.B) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&testLW{}, &v1.Pod{}, s, 25*time.Millisecond)
+	g := NewReflector(&testLW{}, &v1.Pod{}, s, 25*time.Millisecond, nil)
 	// The improvement to this (calling the timer's Stop() method) makes
 	// this benchmark about 40% faster.
 	for i := 0; i < b.N; i++ {
@@ -130,7 +130,7 @@ func BenchmarkReflectorResyncChanMany(b *testing.B) {
 
 func TestReflectorWatchHandlerError(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0, nil)
 	fw := watch.NewFake()
 	go func() {
 		fw.Stop()
@@ -144,7 +144,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 
 func TestReflectorWatchHandler(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0, nil)
 	fw := watch.NewFake()
 	s.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	s.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})
@@ -200,7 +200,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 
 func TestReflectorStopWatch(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0, nil)
 	fw := watch.NewFake()
 	var resumeRV string
 	stopWatch := make(chan struct{}, 1)
@@ -236,7 +236,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 		},
 	}
 	s := NewFIFO(MetaNamespaceKeyFunc)
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 	go r.ListAndWatch(wait.NeverStop)
 
 	ids := []string{"foo", "bar", "baz", "qux", "zoo"}
@@ -353,7 +353,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 				return item.list, item.listErr
 			},
 		}
-		r := NewReflector(lw, &v1.Pod{}, s, 0)
+		r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 		r.ListAndWatch(wait.NeverStop)
 	}
 }
@@ -382,7 +382,7 @@ func TestReflectorResync(t *testing.T) {
 		},
 	}
 	resyncPeriod := 1 * time.Millisecond
-	r := NewReflector(lw, &v1.Pod{}, s, resyncPeriod)
+	r := NewReflector(lw, &v1.Pod{}, s, resyncPeriod, nil)
 	if err := r.ListAndWatch(stopCh); err != nil {
 		// error from Resync is not propaged up to here.
 		t.Errorf("expected error %v", err)
@@ -424,7 +424,7 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 			return nil, nil
 		},
 	}
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 	// Set resource version to test pagination also for not consistent reads.
 	r.setLastSyncResourceVersion("10")
 	// Set the reflector to paginate the list request in 4 item chunks.
@@ -462,7 +462,7 @@ func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods}, nil
 		},
 	}
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 	r.setLastSyncResourceVersion("10")
 	r.ListAndWatch(stopCh)
 
@@ -505,7 +505,7 @@ func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T)
 			return nil, nil
 		},
 	}
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 
 	// Initial list should initialize paginatedResult in the reflector.
 	stopCh = make(chan struct{})
@@ -555,7 +555,7 @@ func TestReflectorResyncWithResourceVersion(t *testing.T) {
 			return nil, nil
 		},
 	}
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 
 	// Initial list should use RV=0
 	r.ListAndWatch(stopCh)
@@ -617,7 +617,7 @@ func TestReflectorExpiredExactResourceVersion(t *testing.T) {
 			return nil, nil
 		},
 	}
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 
 	// Initial list should use RV=0
 	r.ListAndWatch(stopCh)
@@ -684,7 +684,7 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 			return nil, nil
 		},
 	}
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0, nil)
 	r.WatchListPageSize = 4
 
 	// Initial list should use RV=0

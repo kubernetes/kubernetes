@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 )
 
 func Example() {
@@ -147,6 +147,7 @@ func ExampleNewInformer() {
 				deletionCounter <- key
 			},
 		},
+		nil,
 	)
 
 	// Run the controller and run it until we close stop.
@@ -214,6 +215,7 @@ func TestHammerController(t *testing.T) {
 			UpdateFunc: func(oldObj, newObj interface{}) { recordFunc("update", newObj) },
 			DeleteFunc: func(obj interface{}) { recordFunc("delete", obj) },
 		},
+		nil,
 	)
 
 	if controller.HasSynced() {
@@ -376,6 +378,7 @@ func TestUpdate(t *testing.T) {
 				testDoneWG.Done()
 			},
 		},
+		nil,
 	)
 
 	// Run the controller and run it until we close stop.

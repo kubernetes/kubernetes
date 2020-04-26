@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -103,7 +103,7 @@ func TestListenerResyncPeriods(t *testing.T) {
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
 
 	// create the shared informer and resync every 1s
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second, nil).(*sharedIndexInformer)
 
 	clock := clock.NewFakeClock(time.Now())
 	informer.clock = clock
@@ -188,7 +188,7 @@ func TestResyncCheckPeriod(t *testing.T) {
 	source := fcache.NewFakeControllerSource()
 
 	// create the shared informer and resync every 12 hours
-	informer := NewSharedInformer(source, &v1.Pod{}, 12*time.Hour).(*sharedIndexInformer)
+	informer := NewSharedInformer(source, &v1.Pod{}, 12*time.Hour, nil).(*sharedIndexInformer)
 
 	clock := clock.NewFakeClock(time.Now())
 	informer.clock = clock
@@ -256,7 +256,7 @@ func TestResyncCheckPeriod(t *testing.T) {
 // verify that https://github.com/kubernetes/kubernetes/issues/59822 is fixed
 func TestSharedInformerInitializationRace(t *testing.T) {
 	source := fcache.NewFakeControllerSource()
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second, nil).(*sharedIndexInformer)
 	listener := newTestListener("raceListener", 0)
 
 	stop := make(chan struct{})
@@ -276,7 +276,7 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2", ResourceVersion: "2"}})
 
 	// create the shared informer and resync every 1s
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second, nil).(*sharedIndexInformer)
 
 	clock := clock.NewFakeClock(time.Now())
 	informer.clock = clock
@@ -337,7 +337,7 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 	source.ListError = fmt.Errorf("Access Denied")
 
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second, nil).(*sharedIndexInformer)
 
 	errCh := make(chan error)
 	_ = informer.SetWatchErrorHandler(func(_ *Reflector, err error) {

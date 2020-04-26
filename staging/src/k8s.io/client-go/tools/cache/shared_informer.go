@@ -191,8 +191,8 @@ type SharedIndexInformer interface {
 }
 
 // NewSharedInformer creates a new instance for the listwatcher.
-func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})
+func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, backoff wait.BackoffManager) SharedInformer {
+	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{}, backoff)
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
@@ -207,7 +207,7 @@ func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEv
 // requested before the informer starts and the
 // defaultEventHandlerResyncPeriod given here and (b) the constant
 // `minimumResyncPeriod` defined in this file.
-func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers, backoff wait.BackoffManager) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{
 		processor:                       &sharedProcessor{clock: realClock},
@@ -218,6 +218,7 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 		clock:                           realClock,
+		backoff:                         backoff,
 	}
 	return sharedIndexInformer
 }
@@ -318,6 +319,9 @@ type sharedIndexInformer struct {
 
 	// Called whenever the ListAndWatch drops the connection with an error.
 	watchErrorHandler WatchErrorHandler
+
+	// backoff manages backoff for reflector on retry.
+	backoff wait.BackoffManager
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -380,6 +384,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		FullResyncPeriod: s.resyncCheckPeriod,
 		RetryOnError:     false,
 		ShouldResync:     s.processor.shouldResync,
+		Backoff:          s.backoff,
 
 		Process:           s.HandleDeltas,
 		WatchErrorHandler: s.watchErrorHandler,

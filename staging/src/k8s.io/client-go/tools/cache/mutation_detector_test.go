@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -49,7 +49,7 @@ func TestMutationDetector(t *testing.T) {
 	addReceived := make(chan bool)
 	mutationFound := make(chan bool)
 
-	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second, nil).(*sharedIndexInformer)
 	informer.cacheMutationDetector = &defaultCacheMutationDetector{
 		name:   "name",
 		period: 1 * time.Second,
