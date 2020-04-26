@@ -21,6 +21,7 @@ import (
 	"os"
 	"regexp"
 
+	"k8s.io/klog"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
@@ -363,6 +364,9 @@ type fileTypeChecker struct {
 
 func (ftc *fileTypeChecker) Exists() bool {
 	exists, err := ftc.hu.PathExists(ftc.path)
+	if err != nil {
+		klog.Errorf("Error checking if path %q exists: %v", ftc.path, err)
+	}
 	return exists && err == nil
 }
 
