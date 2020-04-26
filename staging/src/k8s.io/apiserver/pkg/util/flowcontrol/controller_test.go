@@ -26,6 +26,7 @@ import (
 	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
@@ -231,6 +232,11 @@ func TestConfigConsumer(t *testing.T) {
 				queues:          map[string]*ctlrTestQueueSet{},
 			}
 			ctlr := newTestableController(
+				"Controller",
+				clock.RealClock{},
+				FinishHandlingNotification,
+				ConfigConsumerAsFieldManager,
+				func(found bool) bool { return !found },
 				informerFactory,
 				flowcontrolClient,
 				100,         // server concurrency limit
@@ -295,7 +301,7 @@ func TestConfigConsumer(t *testing.T) {
 				for _, newFS := range newFSs {
 					t.Logf("For %s, digesting newFS=%s", trialStep, fcfmt.Fmt(newFS))
 				}
-				_ = ctlr.lockAndDigestConfigObjects(newPLs, newFSs)
+				_, _ = ctlr.lockAndDigestConfigObjects(newPLs, newFSs)
 			}
 			for plName, hr, nCount := cts.popHeldRequest(); hr != nil; plName, hr, nCount = cts.popHeldRequest() {
 				desired := desiredPLNames.Has(plName) || mandPLs[plName] != nil

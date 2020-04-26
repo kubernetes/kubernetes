@@ -28,6 +28,7 @@ import (
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
@@ -64,7 +65,24 @@ type Interface interface {
 	Install(c *mux.PathRecorderMux)
 }
 
+// TestableInterface declares the methods used in integration tests
+type TestableInterface interface {
+	Interface
+
+	// WaitForCacheSync waits for the caches of the informers of the
+	// implementation to sync.
+	WaitForCacheSync(stopCh <-chan struct{}) bool
+
+	// SyncOne attempts to sync all the API Priority and Fairness
+	// config objects.
+	SyncOne() SyncReport
+}
+
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
+
+// ConfigConsumerAsFieldManager is how the config consuminng
+// controller appears in an ObjectMeta ManagedFieldsEntry.Manager
+const ConfigConsumerAsFieldManager = "api-priority-and-fairness-config-consumer-v1"
 
 // New creates a new instance to implement API priority and fairness
 func New(
@@ -74,26 +92,37 @@ func New(
 	requestWaitLimit time.Duration,
 ) Interface {
 	grc := counter.NoOp{}
+	clk := clock.RealClock{}
 	return NewTestable(
+		"Controller",
+		clk,
+		FinishHandlingNotification,
+		ConfigConsumerAsFieldManager,
+		func(found bool) bool { return !found },
 		informerFactory,
 		flowcontrolClient,
 		serverConcurrencyLimit,
 		requestWaitLimit,
 		metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
+		fqs.NewQueueSetFactory(clk, grc),
 	)
 }
 
 // NewTestable is extra flexible to facilitate testing
 func NewTestable(
+	name string,
+	clock clock.PassiveClock,
+	finishHandlingNotification func(workqueue.RateLimitingInterface),
+	asFieldManager string,
+	foundToDangling func(bool) bool,
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 	obsPairGenerator metrics.TimedObserverPairGenerator,
 	queueSetFactory fq.QueueSetFactory,
-) Interface {
-	return newTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, obsPairGenerator, queueSetFactory)
+) TestableInterface {
+	return newTestableController(name, clock, finishHandlingNotification, asFieldManager, foundToDangling, informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, obsPairGenerator, queueSetFactory)
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
