@@ -58,6 +58,7 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 		var wg sync.WaitGroup
 		wg.Add(loggingSoak.Scale)
 		for i := 0; i < loggingSoak.Scale; i++ {
+			i := i
 			go func() {
 				defer wg.Done()
 				defer ginkgo.GinkgoRecover()
