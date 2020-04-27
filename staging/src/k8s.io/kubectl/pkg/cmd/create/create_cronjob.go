@@ -66,7 +66,6 @@ type CreateCronJobOptions struct {
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
 	Builder        *resource.Builder
-	Cmd            *cobra.Command
 
 	genericclioptions.IOStreams
 }
@@ -133,7 +132,6 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 		return err
 	}
 	o.Builder = f.NewBuilder()
-	o.Cmd = cmd
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {

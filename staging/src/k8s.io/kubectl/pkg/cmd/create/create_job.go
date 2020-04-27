@@ -67,7 +67,6 @@ type CreateJobOptions struct {
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
 	Builder        *resource.Builder
-	Cmd            *cobra.Command
 
 	genericclioptions.IOStreams
 }
@@ -131,7 +130,6 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return err
 	}
 	o.Builder = f.NewBuilder()
-	o.Cmd = cmd
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
