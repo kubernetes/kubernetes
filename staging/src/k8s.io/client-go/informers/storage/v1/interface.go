@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 )
 
@@ -38,29 +39,30 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // CSIDrivers returns a CSIDriverInformer.
 func (v *version) CSIDrivers() CSIDriverInformer {
-	return &cSIDriverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &cSIDriverInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // CSINodes returns a CSINodeInformer.
 func (v *version) CSINodes() CSINodeInformer {
-	return &cSINodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &cSINodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // StorageClasses returns a StorageClassInformer.
 func (v *version) StorageClasses() StorageClassInformer {
-	return &storageClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &storageClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // VolumeAttachments returns a VolumeAttachmentInformer.
 func (v *version) VolumeAttachments() VolumeAttachmentInformer {
-	return &volumeAttachmentInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &volumeAttachmentInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

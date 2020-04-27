@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -42,20 +43,21 @@ type SecretInformer interface {
 type secretInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 	namespace        string
 }
 
 // NewSecretInformer constructs a new informer for Secret type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredSecretInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, backoff wait.BackoffManager) cache.SharedIndexInformer {
+	return NewFilteredSecretInformer(client, namespace, resyncPeriod, indexers, nil, backoff)
 }
 
 // NewFilteredSecretInformer constructs a new informer for Secret type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -74,11 +76,12 @@ func NewFilteredSecretInformer(client kubernetes.Interface, namespace string, re
 		&corev1.Secret{},
 		resyncPeriod,
 		indexers,
+		backoff,
 	)
 }
 
-func (f *secretInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredSecretInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *secretInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration, backoff wait.BackoffManager) cache.SharedIndexInformer {
+	return NewFilteredSecretInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions, f.backoff)
 }
 
 func (f *secretInformer) Informer() cache.SharedIndexInformer {

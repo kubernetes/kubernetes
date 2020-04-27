@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 	examplev1 "k8s.io/code-generator/_examples/MixedCase/apis/example/v1"
@@ -42,19 +43,20 @@ type ClusterTestTypeInformer interface {
 type clusterTestTypeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // NewClusterTestTypeInformer constructs a new informer for ClusterTestType type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterTestTypeInformer(client, resyncPeriod, indexers, nil)
+func NewClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, backoff wait.BackoffManager) cache.SharedIndexInformer {
+	return NewFilteredClusterTestTypeInformer(client, resyncPeriod, indexers, nil, backoff)
 }
 
 // NewFilteredClusterTestTypeInformer constructs a new informer for ClusterTestType type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -73,11 +75,12 @@ func NewFilteredClusterTestTypeInformer(client versioned.Interface, resyncPeriod
 		&examplev1.ClusterTestType{},
 		resyncPeriod,
 		indexers,
+		backoff,
 	)
 }
 
-func (f *clusterTestTypeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterTestTypeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *clusterTestTypeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration, backoff wait.BackoffManager) cache.SharedIndexInformer {
+	return NewFilteredClusterTestTypeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions, f.backoff)
 }
 
 func (f *clusterTestTypeInformer) Informer() cache.SharedIndexInformer {

@@ -11,6 +11,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration",
     importpath = "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces:go_default_library",

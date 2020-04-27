@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 )
 
@@ -34,19 +35,20 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
 func (v *version) MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer {
-	return &mutatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &mutatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
 func (v *version) ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInformer {
-	return &validatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &validatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

@@ -20,6 +20,7 @@ package v1beta1
 
 import (
 	internalinterfaces "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 // Interface provides access to all the informers in this group version.
@@ -32,14 +33,15 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // CustomResourceDefinitions returns a CustomResourceDefinitionInformer.
 func (v *version) CustomResourceDefinitions() CustomResourceDefinitionInformer {
-	return &customResourceDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &customResourceDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

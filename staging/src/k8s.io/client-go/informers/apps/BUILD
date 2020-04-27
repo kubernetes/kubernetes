@@ -11,6 +11,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/informers/apps",
     importpath = "k8s.io/client-go/informers/apps",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/informers/apps/v1:go_default_library",
         "//staging/src/k8s.io/client-go/informers/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/informers/apps/v1beta2:go_default_library",

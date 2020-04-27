@@ -19,6 +19,7 @@ limitations under the License.
 package rbac
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	v1 "k8s.io/client-go/informers/rbac/v1"
 	v1alpha1 "k8s.io/client-go/informers/rbac/v1alpha1"
@@ -39,24 +40,25 @@ type group struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &group{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &group{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // V1 returns a new v1.Interface.
 func (g *group) V1() v1.Interface {
-	return v1.New(g.factory, g.namespace, g.tweakListOptions)
+	return v1.New(g.factory, g.namespace, g.tweakListOptions, g.backoff)
 }
 
 // V1alpha1 returns a new v1alpha1.Interface.
 func (g *group) V1alpha1() v1alpha1.Interface {
-	return v1alpha1.New(g.factory, g.namespace, g.tweakListOptions)
+	return v1alpha1.New(g.factory, g.namespace, g.tweakListOptions, g.backoff)
 }
 
 // V1beta1 returns a new v1beta1.Interface.
 func (g *group) V1beta1() v1beta1.Interface {
-	return v1beta1.New(g.factory, g.namespace, g.tweakListOptions)
+	return v1beta1.New(g.factory, g.namespace, g.tweakListOptions, g.backoff)
 }

@@ -7,6 +7,7 @@ go_library(
     importpath = "k8s.io/code-generator/_examples/apiserver/informers/internalversion/example3.io",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/code-generator/_examples/apiserver/informers/internalversion/example3.io/internalversion:go_default_library",
         "//staging/src/k8s.io/code-generator/_examples/apiserver/informers/internalversion/internalinterfaces:go_default_library",
     ],

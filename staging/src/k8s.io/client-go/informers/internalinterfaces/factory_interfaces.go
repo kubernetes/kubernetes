@@ -23,12 +23,13 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	kubernetes "k8s.io/client-go/kubernetes"
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// NewInformerFunc takes kubernetes.Interface and time.Duration to return a SharedIndexInformer.
-type NewInformerFunc func(kubernetes.Interface, time.Duration) cache.SharedIndexInformer
+// NewInformerFunc takes kubernetes.Interface, time.Duration and wait.BackoffManager to return a SharedIndexInformer.
+type NewInformerFunc func(kubernetes.Interface, time.Duration, wait.BackoffManager) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {

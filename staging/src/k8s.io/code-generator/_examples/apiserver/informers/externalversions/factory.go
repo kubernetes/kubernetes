@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	cache "k8s.io/client-go/tools/cache"
 	versioned "k8s.io/code-generator/_examples/apiserver/clientset/versioned"
 	example "k8s.io/code-generator/_examples/apiserver/informers/externalversions/example"
@@ -44,6 +45,7 @@ type sharedInformerFactory struct {
 	lock             sync.Mutex
 	defaultResync    time.Duration
 	customResync     map[reflect.Type]time.Duration
+	backoff          wait.BackoffManager
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -65,6 +67,14 @@ func WithCustomResyncConfig(resyncConfig map[v1.Object]time.Duration) SharedInfo
 func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.tweakListOptions = tweakListOptions
+		return factory
+	}
+}
+
+// WithBackoff sets a custom backoff manager on all reflectors of the configured SharedInformerFactory.
+func WithBackoff(backoff wait.BackoffManager) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.backoff = backoff
 		return factory
 	}
 }
@@ -161,7 +171,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 		resyncPeriod = f.defaultResync
 	}
 
-	informer = newFunc(f.client, resyncPeriod)
+	informer = newFunc(f.client, resyncPeriod, f.backoff)
 	f.informers[informerType] = informer
 
 	return informer
@@ -180,13 +190,13 @@ type SharedInformerFactory interface {
 }
 
 func (f *sharedInformerFactory) Example() example.Interface {
-	return example.New(f, f.namespace, f.tweakListOptions)
+	return example.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) SecondExample() example2.Interface {
-	return example2.New(f, f.namespace, f.tweakListOptions)
+	return example2.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) ThirdExample() example3io.Interface {
-	return example3io.New(f, f.namespace, f.tweakListOptions)
+	return example3io.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }

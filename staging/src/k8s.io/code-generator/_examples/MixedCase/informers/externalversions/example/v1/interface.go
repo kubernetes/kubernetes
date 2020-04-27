@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/code-generator/_examples/MixedCase/informers/externalversions/internalinterfaces"
 )
 
@@ -34,19 +35,20 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // ClusterTestTypes returns a ClusterTestTypeInformer.
 func (v *version) ClusterTestTypes() ClusterTestTypeInformer {
-	return &clusterTestTypeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &clusterTestTypeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // TestTypes returns a TestTypeInformer.
 func (v *version) TestTypes() TestTypeInformer {
-	return &testTypeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &testTypeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

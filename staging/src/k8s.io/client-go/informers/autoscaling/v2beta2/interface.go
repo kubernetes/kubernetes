@@ -19,6 +19,7 @@ limitations under the License.
 package v2beta2
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 )
 
@@ -32,14 +33,15 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
 func (v *version) HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer {
-	return &horizontalPodAutoscalerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &horizontalPodAutoscalerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

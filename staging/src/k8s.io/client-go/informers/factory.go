@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	admissionregistration "k8s.io/client-go/informers/admissionregistration"
 	apps "k8s.io/client-go/informers/apps"
 	auditregistration "k8s.io/client-go/informers/auditregistration"
@@ -60,6 +61,7 @@ type sharedInformerFactory struct {
 	lock             sync.Mutex
 	defaultResync    time.Duration
 	customResync     map[reflect.Type]time.Duration
+	backoff          wait.BackoffManager
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -81,6 +83,14 @@ func WithCustomResyncConfig(resyncConfig map[v1.Object]time.Duration) SharedInfo
 func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.tweakListOptions = tweakListOptions
+		return factory
+	}
+}
+
+// WithBackoff sets a custom backoff manager on all reflectors of the configured SharedInformerFactory.
+func WithBackoff(backoff wait.BackoffManager) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.backoff = backoff
 		return factory
 	}
 }
@@ -177,7 +187,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 		resyncPeriod = f.defaultResync
 	}
 
-	informer = newFunc(f.client, resyncPeriod)
+	informer = newFunc(f.client, resyncPeriod, f.backoff)
 	f.informers[informerType] = informer
 
 	return informer
@@ -212,77 +222,77 @@ type SharedInformerFactory interface {
 }
 
 func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
-	return admissionregistration.New(f, f.namespace, f.tweakListOptions)
+	return admissionregistration.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
-	return apps.New(f, f.namespace, f.tweakListOptions)
+	return apps.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Auditregistration() auditregistration.Interface {
-	return auditregistration.New(f, f.namespace, f.tweakListOptions)
+	return auditregistration.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Autoscaling() autoscaling.Interface {
-	return autoscaling.New(f, f.namespace, f.tweakListOptions)
+	return autoscaling.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Batch() batch.Interface {
-	return batch.New(f, f.namespace, f.tweakListOptions)
+	return batch.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Certificates() certificates.Interface {
-	return certificates.New(f, f.namespace, f.tweakListOptions)
+	return certificates.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Coordination() coordination.Interface {
-	return coordination.New(f, f.namespace, f.tweakListOptions)
+	return coordination.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Core() core.Interface {
-	return core.New(f, f.namespace, f.tweakListOptions)
+	return core.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Discovery() discovery.Interface {
-	return discovery.New(f, f.namespace, f.tweakListOptions)
+	return discovery.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Events() events.Interface {
-	return events.New(f, f.namespace, f.tweakListOptions)
+	return events.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
-	return extensions.New(f, f.namespace, f.tweakListOptions)
+	return extensions.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Flowcontrol() flowcontrol.Interface {
-	return flowcontrol.New(f, f.namespace, f.tweakListOptions)
+	return flowcontrol.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Networking() networking.Interface {
-	return networking.New(f, f.namespace, f.tweakListOptions)
+	return networking.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Node() node.Interface {
-	return node.New(f, f.namespace, f.tweakListOptions)
+	return node.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {
-	return policy.New(f, f.namespace, f.tweakListOptions)
+	return policy.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Rbac() rbac.Interface {
-	return rbac.New(f, f.namespace, f.tweakListOptions)
+	return rbac.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Scheduling() scheduling.Interface {
-	return scheduling.New(f, f.namespace, f.tweakListOptions)
+	return scheduling.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Settings() settings.Interface {
-	return settings.New(f, f.namespace, f.tweakListOptions)
+	return settings.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 
 func (f *sharedInformerFactory) Storage() storage.Interface {
-	return storage.New(f, f.namespace, f.tweakListOptions)
+	return storage.New(f, f.namespace, f.tweakListOptions, f.backoff)
 }

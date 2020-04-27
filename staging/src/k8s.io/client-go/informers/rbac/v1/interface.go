@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 )
 
@@ -38,29 +39,30 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // ClusterRoles returns a ClusterRoleInformer.
 func (v *version) ClusterRoles() ClusterRoleInformer {
-	return &clusterRoleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &clusterRoleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // ClusterRoleBindings returns a ClusterRoleBindingInformer.
 func (v *version) ClusterRoleBindings() ClusterRoleBindingInformer {
-	return &clusterRoleBindingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &clusterRoleBindingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Roles returns a RoleInformer.
 func (v *version) Roles() RoleInformer {
-	return &roleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &roleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // RoleBindings returns a RoleBindingInformer.
 func (v *version) RoleBindings() RoleBindingInformer {
-	return &roleBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &roleBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 )
 
@@ -62,89 +63,90 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // ComponentStatuses returns a ComponentStatusInformer.
 func (v *version) ComponentStatuses() ComponentStatusInformer {
-	return &componentStatusInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &componentStatusInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // ConfigMaps returns a ConfigMapInformer.
 func (v *version) ConfigMaps() ConfigMapInformer {
-	return &configMapInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &configMapInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Endpoints returns a EndpointsInformer.
 func (v *version) Endpoints() EndpointsInformer {
-	return &endpointsInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &endpointsInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Events returns a EventInformer.
 func (v *version) Events() EventInformer {
-	return &eventInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &eventInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // LimitRanges returns a LimitRangeInformer.
 func (v *version) LimitRanges() LimitRangeInformer {
-	return &limitRangeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &limitRangeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Namespaces returns a NamespaceInformer.
 func (v *version) Namespaces() NamespaceInformer {
-	return &namespaceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &namespaceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Nodes returns a NodeInformer.
 func (v *version) Nodes() NodeInformer {
-	return &nodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &nodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // PersistentVolumes returns a PersistentVolumeInformer.
 func (v *version) PersistentVolumes() PersistentVolumeInformer {
-	return &persistentVolumeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &persistentVolumeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // PersistentVolumeClaims returns a PersistentVolumeClaimInformer.
 func (v *version) PersistentVolumeClaims() PersistentVolumeClaimInformer {
-	return &persistentVolumeClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &persistentVolumeClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Pods returns a PodInformer.
 func (v *version) Pods() PodInformer {
-	return &podInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &podInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // PodTemplates returns a PodTemplateInformer.
 func (v *version) PodTemplates() PodTemplateInformer {
-	return &podTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &podTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // ReplicationControllers returns a ReplicationControllerInformer.
 func (v *version) ReplicationControllers() ReplicationControllerInformer {
-	return &replicationControllerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &replicationControllerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // ResourceQuotas returns a ResourceQuotaInformer.
 func (v *version) ResourceQuotas() ResourceQuotaInformer {
-	return &resourceQuotaInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &resourceQuotaInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Secrets returns a SecretInformer.
 func (v *version) Secrets() SecretInformer {
-	return &secretInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &secretInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Services returns a ServiceInformer.
 func (v *version) Services() ServiceInformer {
-	return &serviceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &serviceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // ServiceAccounts returns a ServiceAccountInformer.
 func (v *version) ServiceAccounts() ServiceAccountInformer {
-	return &serviceAccountInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &serviceAccountInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

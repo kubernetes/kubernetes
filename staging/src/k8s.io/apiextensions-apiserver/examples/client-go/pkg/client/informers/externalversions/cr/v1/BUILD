@@ -16,6 +16,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/listers/cr/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],

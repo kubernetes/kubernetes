@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	wait "k8s.io/apimachinery/pkg/util/wait"
 	internalinterfaces "k8s.io/sample-apiserver/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
@@ -34,19 +35,20 @@ type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	backoff          wait.BackoffManager
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, backoff wait.BackoffManager) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 // Fischers returns a FischerInformer.
 func (v *version) Fischers() FischerInformer {
-	return &fischerInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+	return &fischerInformer{factory: v.factory, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 
 // Flunders returns a FlunderInformer.
 func (v *version) Flunders() FlunderInformer {
-	return &flunderInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &flunderInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }

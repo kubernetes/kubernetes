@@ -7,6 +7,7 @@ go_library(
     importpath = "k8s.io/client-go/informers/events",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/informers/events/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/informers/internalinterfaces:go_default_library",
     ],
