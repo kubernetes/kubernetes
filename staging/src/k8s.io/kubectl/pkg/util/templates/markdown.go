@@ -133,6 +133,7 @@ func (r *ASCIIRenderer) Table(out *bytes.Buffer, header []byte, body []byte, col
 }
 
 func (r *ASCIIRenderer) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
+	out.WriteString(" ")
 	r.fw(out, link)
 }
 
