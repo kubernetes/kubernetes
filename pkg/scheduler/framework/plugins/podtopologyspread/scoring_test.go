@@ -68,7 +68,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
 					},
 				},
-				NodeNameSet: sets.NewString("node-a", "node-b", "node-x"),
+				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}:  pointer.Int64Ptr(0),
 					{key: "zone", value: "zone2"}:  pointer.Int64Ptr(0),
@@ -102,7 +102,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("bar").Obj()),
 					},
 				},
-				NodeNameSet: sets.NewString("node-a", "node-b"),
+				IgnoredNodes: sets.NewString("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}:  pointer.Int64Ptr(0),
 					{key: "node", value: "node-a"}: pointer.Int64Ptr(0),
@@ -137,7 +137,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
 					},
 				},
-				NodeNameSet: sets.NewString("node-a"),
+				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "node", value: "node-a"}: pointer.Int64Ptr(0),
 					{key: "planet", value: "mars"}: pointer.Int64Ptr(0),
@@ -182,7 +182,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("baz", "sup").Obj()),
 					},
 				},
-				NodeNameSet: sets.NewString("node-a"),
+				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{"planet", "mars"}: pointer.Int64Ptr(0),
 				},
