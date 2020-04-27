@@ -54,6 +54,8 @@ type Cache struct {
 // Service Port combination.
 type ServicePortCache struct {
 	items map[endpointutil.PortMapKey]EfficiencyInfo
+	// lock protects changes to items map.
+	lock sync.Mutex
 }
 
 // EfficiencyInfo stores the number of Endpoints and Slices for calculating
@@ -74,12 +76,16 @@ func NewServicePortCache() *ServicePortCache {
 // Set updates the ServicePortCache to contain the provided EfficiencyInfo
 // for the provided PortMapKey.
 func (spc *ServicePortCache) Set(pmKey endpointutil.PortMapKey, eInfo EfficiencyInfo) {
+	spc.lock.Lock()
+	defer spc.lock.Unlock()
 	spc.items[pmKey] = eInfo
 }
 
 // numEndpoints returns the total number of endpoints represented by a
 // ServicePortCache.
 func (spc *ServicePortCache) numEndpoints() int {
+	spc.lock.Lock()
+	defer spc.lock.Unlock()
 	num := 0
 	for _, eInfo := range spc.items {
 		num += eInfo.Endpoints
@@ -130,8 +136,9 @@ type metricsUpdate struct {
 
 // desiredAndActualSlices returns a metricsUpdate with the desired and actual
 // number of EndpointSlices given the current values in the cache.
-// Must be called holding lock.
 func (c *Cache) desiredAndActualSlices() metricsUpdate {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	mUpdate := metricsUpdate{}
 	for _, spCache := range c.cache {
 		for _, eInfo := range spCache.items {
@@ -143,8 +150,9 @@ func (c *Cache) desiredAndActualSlices() metricsUpdate {
 }
 
 // updateMetrics updates metrics with the values from this Cache.
-// Must be called holding lock.
 func (c *Cache) updateMetrics() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	mUpdate := c.desiredAndActualSlices()
 	NumEndpointSlices.WithLabelValues().Set(float64(mUpdate.actual))
 	DesiredEndpointSlices.WithLabelValues().Set(float64(mUpdate.desired))
