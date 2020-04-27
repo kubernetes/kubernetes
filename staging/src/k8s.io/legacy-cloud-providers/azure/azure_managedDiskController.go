@@ -85,7 +85,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	klog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
 
 	var createZones *[]string
-	if len(options.AvailabilityZone) > 0 {
+	if len(options.AvailabilityZone) > 0 && options.AvailabilityZone != "0" {
 		zoneList := []string{c.common.cloud.GetZoneID(options.AvailabilityZone)}
 		createZones = &zoneList
 	}
@@ -161,11 +161,14 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	model := compute.Disk{
 		Location: &c.common.location,
 		Tags:     newTags,
-		Zones:    createZones,
 		Sku: &compute.DiskSku{
 			Name: diskSku,
 		},
 		DiskProperties: &diskProperties,
+	}
+
+	if createZones != nil && len(*createZones) > 0 {
+		model.Zones = createZones
 	}
 
 	if options.ResourceGroup == "" {
