@@ -93,12 +93,10 @@ func (e *E2EServices) Stop() {
 			klog.Errorf("Failed to stop kubelet: %v", err)
 		}
 	}
-	if e.rmDirs != nil {
-		for _, d := range e.rmDirs {
-			err := os.RemoveAll(d)
-			if err != nil {
-				klog.Errorf("Failed to delete directory %s: %v", d, err)
-			}
+	for _, d := range e.rmDirs {
+		err := os.RemoveAll(d)
+		if err != nil {
+			klog.Errorf("Failed to delete directory %s: %v", d, err)
 		}
 	}
 }
