@@ -195,6 +195,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 						},
 					},
+					nil,
 				)
 
 				defer func() {
@@ -583,6 +584,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 						},
 					},
+					nil,
 				)
 
 				defer func() {

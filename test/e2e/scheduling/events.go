@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -90,6 +90,7 @@ func observeNodeUpdateAfterAction(c clientset.Interface, nodeName string, nodePr
 				}
 			},
 		},
+		nil,
 	)
 
 	// Start the informer and block this goroutine waiting for the started signal.
@@ -147,6 +148,7 @@ func observeEventAfterAction(c clientset.Interface, ns string, eventPredicate fu
 				}
 			},
 		},
+		nil,
 	)
 
 	// Start the informer and block this goroutine waiting for the started signal.

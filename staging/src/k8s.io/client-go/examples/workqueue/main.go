@@ -192,7 +192,7 @@ func main() {
 				queue.Add(key)
 			}
 		},
-	}, cache.Indexers{})
+	}, cache.Indexers{}, nil)
 
 	controller := NewController(queue, indexer, informer)
 

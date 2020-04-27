@@ -91,7 +91,7 @@ type ClusterAuthenticationInfo struct {
 // that holds information about how to aggregated apiservers are recommended (but not required) to configure themselves.
 func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterAuthenticationInfo, kubeClient kubernetes.Interface) *Controller {
 	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
-	kubeSystemConfigMapInformer := corev1informers.NewConfigMapInformer(kubeClient, configMapNamespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	kubeSystemConfigMapInformer := corev1informers.NewConfigMapInformer(kubeClient, configMapNamespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, nil)
 
 	c := &Controller{
 		requiredAuthenticationData:  requiredAuthenticationData,

@@ -119,7 +119,7 @@ func testWatchClientTimeout(t *testing.T, serverURL string, timeout, timeoutSeco
 			return client.CoreV1().ConfigMaps(metav1.NamespaceAll).Watch(context.TODO(), options)
 		},
 	}
-	_, informer := cache.NewIndexerInformer(listWatch, &corev1.ConfigMap{}, 30*time.Minute, cache.ResourceEventHandlerFuncs{}, cache.Indexers{})
+	_, informer := cache.NewIndexerInformer(listWatch, &corev1.ConfigMap{}, 30*time.Minute, cache.ResourceEventHandlerFuncs{}, cache.Indexers{}, nil)
 	informer.Run(stopCh)
 	select {
 	case <-stopCh:

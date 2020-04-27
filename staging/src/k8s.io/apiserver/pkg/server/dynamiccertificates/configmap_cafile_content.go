@@ -82,7 +82,7 @@ func NewDynamicCAFromConfigMapController(purpose, namespace, name, key string, k
 	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
 	uncastConfigmapInformer := corev1informers.NewFilteredConfigMapInformer(kubeClient, namespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, func(listOptions *v1.ListOptions) {
 		listOptions.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
-	})
+	}, nil)
 
 	configmapLister := corev1listers.NewConfigMapLister(uncastConfigmapInformer.GetIndexer())
 

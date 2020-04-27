@@ -542,6 +542,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 						}
 					},
 				},
+				nil,
 			)
 			go podController.Run(stopCh)
 			defer close(stopCh)

@@ -135,7 +135,7 @@ func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (
 				Object: obj.(runtime.Object),
 			})
 		},
-	}, cache.Indexers{})
+	}, cache.Indexers{}, nil)
 
 	go e.run()
 

@@ -250,6 +250,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 					tracker.remember(obj.(*v1.Pod), DEL)
 				},
 			},
+			nil,
 		)
 		go controller.Run(stopCh)
 	})

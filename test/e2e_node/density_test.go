@@ -516,6 +516,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 				go checkPodRunning(p)
 			},
 		},
+		nil,
 	)
 	return controller
 }

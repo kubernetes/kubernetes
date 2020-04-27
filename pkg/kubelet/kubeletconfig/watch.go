@@ -51,7 +51,7 @@ func newSharedNodeInformer(client clientset.Interface, nodeName string,
 		DeleteFunc: deleteFunc,
 	}
 
-	informer := cache.NewSharedInformer(lw, &apiv1.Node{}, resyncPeriod)
+	informer := cache.NewSharedInformer(lw, &apiv1.Node{}, resyncPeriod, nil)
 	informer.AddEventHandler(handler)
 
 	return informer

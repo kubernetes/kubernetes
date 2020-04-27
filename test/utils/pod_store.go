@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -54,7 +54,7 @@ func NewPodStore(c clientset.Interface, namespace string, label labels.Selector,
 	}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	stopCh := make(chan struct{})
-	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0)
+	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0, nil)
 	go reflector.Run(stopCh)
 	if err := wait.PollImmediate(50*time.Millisecond, 2*time.Minute, func() (bool, error) {
 		if len(reflector.LastSyncResourceVersion()) != 0 {

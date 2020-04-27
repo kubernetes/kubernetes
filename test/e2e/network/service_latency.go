@@ -321,6 +321,7 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 				}
 			},
 		},
+		nil,
 	)
 
 	go controller.Run(q.stop)

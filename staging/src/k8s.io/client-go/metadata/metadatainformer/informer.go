@@ -137,6 +137,7 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 			&metav1.PartialObjectMetadata{},
 			resyncPeriod,
 			indexers,
+			nil,
 		),
 	}
 }

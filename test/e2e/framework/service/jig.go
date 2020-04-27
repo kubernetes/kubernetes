@@ -362,6 +362,7 @@ func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 				}
 			},
 		},
+		nil,
 	)
 	defer func() {
 		close(stopCh)

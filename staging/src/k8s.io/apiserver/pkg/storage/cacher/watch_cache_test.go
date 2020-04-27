@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -494,7 +494,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	}
-	r := cache.NewReflector(lw, &v1.Pod{}, store, 0)
+	r := cache.NewReflector(lw, &v1.Pod{}, store, 0, nil)
 	r.ListAndWatch(wait.NeverStop)
 
 	{

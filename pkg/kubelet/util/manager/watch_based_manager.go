@@ -123,6 +123,7 @@ func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
 		c.newObject(),
 		store,
 		0,
+		nil,
 	)
 	stopCh := make(chan struct{})
 	go reflector.Run(stopCh)

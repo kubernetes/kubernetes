@@ -223,7 +223,7 @@ func (r *remoteConfigMap) Informer(client clientset.Interface, handler cache.Res
 
 	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", r.source.ConfigMap.Namespace, fieldSelector)
 
-	informer := cache.NewSharedInformer(lw, &apiv1.ConfigMap{}, resyncPeriod)
+	informer := cache.NewSharedInformer(lw, &apiv1.ConfigMap{}, resyncPeriod, nil)
 	informer.AddEventHandler(handler)
 
 	return informer
