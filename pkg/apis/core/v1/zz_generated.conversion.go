@@ -3585,7 +3585,6 @@ func Convert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.EventLis
 func autoConvert_v1_EventSeries_To_core_EventSeries(in *v1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
 	out.Count = in.Count
 	out.LastObservedTime = in.LastObservedTime
-	out.State = core.EventSeriesState(in.State)
 	return nil
 }
 
@@ -3597,7 +3596,6 @@ func Convert_v1_EventSeries_To_core_EventSeries(in *v1.EventSeries, out *core.Ev
 func autoConvert_core_EventSeries_To_v1_EventSeries(in *core.EventSeries, out *v1.EventSeries, s conversion.Scope) error {
 	out.Count = in.Count
 	out.LastObservedTime = in.LastObservedTime
-	out.State = v1.EventSeriesState(in.State)
 	return nil
 }
 

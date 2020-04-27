@@ -95,18 +95,9 @@ type EventSeries struct {
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`
 	// Time when last Event from the series was seen before last heartbeat.
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime" protobuf:"bytes,2,opt,name=lastObservedTime"`
-	// Information whether this series is ongoing or finished.
-	// Deprecated. Planned removal for 1.18
-	State EventSeriesState `json:"state" protobuf:"bytes,3,opt,name=state"`
+
+	// +k8s:deprecated=state,protobuf=3
 }
-
-type EventSeriesState string
-
-const (
-	EventSeriesStateOngoing  EventSeriesState = "Ongoing"
-	EventSeriesStateFinished EventSeriesState = "Finished"
-	EventSeriesStateUnknown  EventSeriesState = "Unknown"
-)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
