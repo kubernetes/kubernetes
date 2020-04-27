@@ -109,6 +109,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "azure_backoff_test.go",
         "azure_config_test.go",
         "azure_controller_common_test.go",
         "azure_controller_standard_test.go",
@@ -132,7 +133,9 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
@@ -144,6 +147,7 @@ go_test(
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient/mockloadbalancerclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/routeclient/mockrouteclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/routetableclient/mockroutetableclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient/mocksecuritygroupclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/storageaccountclient/mockstorageaccountclient:go_default_library",
