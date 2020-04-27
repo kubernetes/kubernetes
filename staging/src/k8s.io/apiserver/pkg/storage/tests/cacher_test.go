@@ -855,12 +855,12 @@ func TestWatchDispatchBookmarkEvents(t *testing.T) {
 		allowWatchBookmark bool
 	}{
 		{ // test old client won't get Bookmark event
-			timeout:            2 * time.Second,
+			timeout:            3 * time.Second,
 			expected:           false,
 			allowWatchBookmark: false,
 		},
 		{
-			timeout:            2 * time.Second,
+			timeout:            3 * time.Second,
 			expected:           true,
 			allowWatchBookmark: true,
 		},
@@ -909,7 +909,7 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
-	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 	watcher, err := cacher.WatchList(ctx, "pods/ns", "0", pred)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
