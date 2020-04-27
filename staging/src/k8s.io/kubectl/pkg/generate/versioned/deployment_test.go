@@ -86,8 +86,8 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			generator := &DeploymentBasicAppsGeneratorV1{
 				BaseDeploymentGenerator{
-					Name:   tt.deploymentName,
-					Images: tt.images,
+					Name:    tt.deploymentName,
+					PodSpec: PodSpec{Images: tt.images},
 				},
 			}
 			obj, err := generator.StructuredGenerate()

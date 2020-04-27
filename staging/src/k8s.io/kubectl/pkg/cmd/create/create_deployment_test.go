@@ -53,8 +53,8 @@ func Test_generatorFromName(t *testing.T) {
 	{
 		expectedGenerator := &generateversioned.DeploymentBasicGeneratorV1{
 			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:    deploymentName,
+				PodSpec: generateversioned.PodSpec{Images: imageNames},
 			},
 		}
 		assert.Equal(t, expectedGenerator, generator)
@@ -66,8 +66,8 @@ func Test_generatorFromName(t *testing.T) {
 	{
 		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1Beta1{
 			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:    deploymentName,
+				PodSpec: generateversioned.PodSpec{Images: imageNames},
 			},
 		}
 		assert.Equal(t, expectedGenerator, generator)
@@ -79,8 +79,8 @@ func Test_generatorFromName(t *testing.T) {
 	{
 		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1{
 			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:    deploymentName,
+				PodSpec: generateversioned.PodSpec{Images: imageNames},
 			},
 		}
 		assert.Equal(t, expectedGenerator, generator)

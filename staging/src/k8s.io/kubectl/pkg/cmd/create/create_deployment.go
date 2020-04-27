@@ -85,8 +85,8 @@ func generatorFromName(
 	case generateversioned.DeploymentBasicAppsV1GeneratorName:
 		generator := &generateversioned.DeploymentBasicAppsGeneratorV1{
 			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:    deploymentName,
+				PodSpec: generateversioned.PodSpec{Images: imageNames},
 			},
 		}
 		return generator, true
@@ -94,8 +94,8 @@ func generatorFromName(
 	case generateversioned.DeploymentBasicAppsV1Beta1GeneratorName:
 		generator := &generateversioned.DeploymentBasicAppsGeneratorV1Beta1{
 			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:    deploymentName,
+				PodSpec: generateversioned.PodSpec{Images: imageNames},
 			},
 		}
 		return generator, true
@@ -103,8 +103,8 @@ func generatorFromName(
 	case generateversioned.DeploymentBasicV1Beta1GeneratorName:
 		generator := &generateversioned.DeploymentBasicGeneratorV1{
 			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
+				Name:    deploymentName,
+				PodSpec: generateversioned.PodSpec{Images: imageNames},
 			},
 		}
 		return generator, true

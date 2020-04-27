@@ -358,3 +358,43 @@ func TestParseEnv(t *testing.T) {
 		})
 	}
 }
+
+func TestStructuredGenerate(t *testing.T) {
+	tests := []struct {
+		name      string
+		pod       BasicPod
+		expected  *v1.Pod
+		expectErr error
+	}{
+		{
+			name: "test1",
+			pod:  BasicPod{Name: "my-pod", PodSpec: PodSpec{Images: []string{"busybox:v1"}}},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "busybox",
+							Image: "busybox:v1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := tt.pod.StructuredGenerate()
+			if err != tt.expectErr {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.Pod), tt.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", tt.expected, obj.(*v1.Pod))
+			}
+		})
+	}
+}

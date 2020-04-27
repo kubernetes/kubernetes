@@ -18,15 +18,12 @@ package versioned
 
 import (
 	"fmt"
-	"strings"
-
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubectl/pkg/generate"
 )
 
@@ -35,8 +32,8 @@ import (
 // confusion, it's best to keep this struct in the same file as those
 // generators.
 type BaseDeploymentGenerator struct {
-	Name   string
-	Images []string
+	Name    string
+	PodSpec PodSpec
 }
 
 // validate: check if the caller has forgotten to set one of our fields.
@@ -44,10 +41,7 @@ func (b BaseDeploymentGenerator) validate() error {
 	if len(b.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
-	if len(b.Images) == 0 {
-		return fmt.Errorf("at least one image must be specified")
-	}
-	return nil
+	return b.PodSpec.Validate()
 }
 
 // structuredGenerate: determine the fields of a deployment. The struct that
@@ -63,43 +57,11 @@ func (b BaseDeploymentGenerator) structuredGenerate() (
 	if err != nil {
 		return
 	}
-	podSpec = buildPodSpec(b.Images)
+	podSpec = b.PodSpec.Build()
 	labels = map[string]string{}
 	labels["app"] = b.Name
 	selector = metav1.LabelSelector{MatchLabels: labels}
 	return
-}
-
-// buildPodSpec: parse the image strings and assemble them into the Containers
-// of a PodSpec. This is all you need to create the PodSpec for a deployment.
-func buildPodSpec(images []string) v1.PodSpec {
-	podSpec := v1.PodSpec{Containers: []v1.Container{}}
-	for _, imageString := range images {
-		// Retain just the image name
-		imageSplit := strings.Split(imageString, "/")
-		name := imageSplit[len(imageSplit)-1]
-		// Remove any tag or hash
-		if strings.Contains(name, ":") {
-			name = strings.Split(name, ":")[0]
-		}
-		if strings.Contains(name, "@") {
-			name = strings.Split(name, "@")[0]
-		}
-		name = sanitizeAndUniquify(name)
-		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
-	}
-	return podSpec
-}
-
-// sanitizeAndUniquify: replaces characters like "." or "_" into "-" to follow DNS1123 rules.
-// Then add random suffix to make it uniquified.
-func sanitizeAndUniquify(name string) string {
-	if strings.Contains(name, "_") || strings.Contains(name, ".") {
-		name = strings.Replace(name, "_", "-", -1)
-		name = strings.Replace(name, ".", "-", -1)
-		name = fmt.Sprintf("%s-%s", name, utilrand.String(5))
-	}
-	return name
 }
 
 // DeploymentBasicGeneratorV1 supports stable generation of a deployment

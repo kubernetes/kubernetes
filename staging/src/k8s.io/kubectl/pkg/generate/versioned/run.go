@@ -208,7 +208,26 @@ func updatePodPorts(params map[string]string, podSpec *v1.PodSpec) (err error) {
 	return nil
 }
 
-type BasicPod struct{}
+type BasicPod struct {
+	Name    string
+	PodSpec PodSpec
+}
+
+func (p BasicPod) validate() error {
+	return p.PodSpec.Validate()
+}
+
+func (p BasicPod) StructuredGenerate() (runtime.Object, error) {
+	if err := p.validate(); err != nil {
+		return nil, err
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: p.Name,
+		},
+		Spec: p.PodSpec.Build(),
+	}, nil
+}
 
 func (BasicPod) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
