@@ -18,18 +18,19 @@ package kubelet
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/pkg/errors"
 	"k8s.io/klog"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	utilsexec "k8s.io/utils/exec"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 type kubeletFlagsOpts struct {
@@ -37,7 +38,6 @@ type kubeletFlagsOpts struct {
 	featureGates             map[string]bool
 	pauseImage               string
 	registerTaintsUsingFlags bool
-	execer                   utilsexec.Interface
 }
 
 // GetNodeNameAndHostname obtains the name for this Node using the following precedence
@@ -66,7 +66,6 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		featureGates:             cfg.FeatureGates,
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		execer:                   utilsexec.New(),
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
@@ -132,4 +131,10 @@ func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", kubeletEnvFilePath)
 	}
 	return nil
+}
+
+// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+// that should be given to the local kubelet daemon.
+func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
+	return buildKubeletArgMapCommon(opts)
 }

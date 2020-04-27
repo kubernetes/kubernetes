@@ -77,7 +77,7 @@ func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {
 	return kubeadmapiv1beta2.DefaultProxyBindAddressv6
 }
 
-func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint) {
+func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
 	const kind = "KubeProxyConfiguration"
 
 	// The below code is necessary because while KubeProxy may be defined, the user may not

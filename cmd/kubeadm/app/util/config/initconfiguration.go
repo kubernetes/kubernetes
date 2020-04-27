@@ -53,7 +53,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
 		return err
 	}
-	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint)
+	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, &cfg.NodeRegistration)
 }
 
 // SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
@@ -141,9 +141,9 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 }
 
 // SetClusterDynamicDefaults checks and sets values for the ClusterConfiguration object
-func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, LocalAPIEndpoint *kubeadmapi.APIEndpoint) error {
+func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint, nodeRegOpts *kubeadmapi.NodeRegistrationOptions) error {
 	// Default all the embedded ComponentConfig structs
-	componentconfigs.Default(cfg, LocalAPIEndpoint)
+	componentconfigs.Default(cfg, localAPIEndpoint, nodeRegOpts)
 
 	// Resolve possible version labels and validate version string
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
@@ -159,7 +159,7 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, LocalAPIEnd
 			return err
 		}
 		if port == "" {
-			cfg.ControlPlaneEndpoint = net.JoinHostPort(host, strconv.FormatInt(int64(LocalAPIEndpoint.BindPort), 10))
+			cfg.ControlPlaneEndpoint = net.JoinHostPort(host, strconv.FormatInt(int64(localAPIEndpoint.BindPort), 10))
 		}
 	}
 

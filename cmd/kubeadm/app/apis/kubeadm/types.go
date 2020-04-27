@@ -444,7 +444,7 @@ type ComponentConfig interface {
 	Unmarshal(docmap DocumentMap) error
 
 	// Default patches the component config with kubeadm preferred defaults
-	Default(cfg *ClusterConfiguration, localAPIEndpoint *APIEndpoint)
+	Default(cfg *ClusterConfiguration, localAPIEndpoint *APIEndpoint, nodeRegOpts *NodeRegistrationOptions)
 }
 
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig

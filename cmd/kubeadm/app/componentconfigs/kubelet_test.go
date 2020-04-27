@@ -323,7 +323,7 @@ func TestKubeletDefault(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got := &kubeletConfig{}
-			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{})
+			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{}, &kubeadmapi.NodeRegistrationOptions{})
 			if !reflect.DeepEqual(got, &test.expected) {
 				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, got)
 			}
