@@ -90,6 +90,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"timeDuration":                   c.Universe.Type(timeDuration),
 		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
 		"object":                         c.Universe.Type(metav1Object),
+		"waitBackoffManager":             c.Universe.Type(waitBackoffManager),
 	}
 
 	sw.Do(sharedInformerFactoryStruct, m)
@@ -109,6 +110,7 @@ type sharedInformerFactory struct {
 	lock {{.syncMutex|raw}}
 	defaultResync {{.timeDuration|raw}}
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
+	backoff {{.waitBackoffManager|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
 	// startedInformers is used for tracking which informers have been started.
@@ -130,6 +132,14 @@ func WithCustomResyncConfig(resyncConfig map[{{.object|raw}}]{{.timeDuration|raw
 func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.tweakListOptions = tweakListOptions
+		return factory
+	}
+}
+
+// WithBackoff sets a custom backoff manager on all reflectors of the configured SharedInformerFactory.
+func WithBackoff(backoff wait.BackoffManager) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.backoff = backoff
 		return factory
 	}
 }
@@ -226,7 +236,7 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
     resyncPeriod = f.defaultResync
   }
 
-  informer = newFunc(f.client, resyncPeriod)
+  informer = newFunc(f.client, resyncPeriod, f.backoff)
   f.informers[informerType] = informer
 
   return informer
@@ -252,7 +262,7 @@ type SharedInformerFactory interface {
 {{$gvGoNames := .gvGoNames}}
 {{range $groupPkgName, $group := .groupVersions}}
 func (f *sharedInformerFactory) {{index $gvGoNames $groupPkgName}}() {{index $gvInterfaces $groupPkgName|raw}} {
-  return {{index $gvNewFuncs $groupPkgName|raw}}(f, f.namespace, f.tweakListOptions)
+  return {{index $gvNewFuncs $groupPkgName|raw}}(f, f.namespace, f.tweakListOptions, f.backoff)
 }
 {{end}}
 `

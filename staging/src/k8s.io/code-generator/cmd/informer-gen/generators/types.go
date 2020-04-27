@@ -39,4 +39,5 @@ var (
 	metav1NamespaceAll          = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "NamespaceAll"}
 	metav1Object                = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "Object"}
 	watchInterface              = types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}
+	waitBackoffManager          = types.Name{Package: "k8s.io/apimachinery/pkg/util/wait", Name: "BackoffManager"}
 )

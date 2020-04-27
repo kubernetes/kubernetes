@@ -101,6 +101,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"v1ListOptions":                   c.Universe.Type(v1ListOptions),
 		"version":                         namer.IC(g.groupVersion.Version.String()),
 		"watchInterface":                  c.Universe.Type(watchInterface),
+		"waitBackoffManager":              c.Universe.Type(waitBackoffManager),
 	}
 
 	sw.Do(typeInformerInterface, m)
@@ -127,6 +128,7 @@ var typeInformerStruct = `
 type $.type|private$Informer struct {
 	factory $.interfacesSharedInformerFactory|raw$
 	tweakListOptions $.interfacesTweakListOptionsFunc|raw$
+	backoff $.waitBackoffManager|raw$
 	$if .namespaced$namespace string$end$
 }
 `
@@ -135,8 +137,8 @@ var typeInformerPublicConstructor = `
 // New$.type|public$Informer constructs a new informer for $.type|public$ type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func New$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$) $.cacheSharedIndexInformer|raw$ {
-	return NewFiltered$.type|public$Informer(client$if .namespaced$, namespace$end$, resyncPeriod, indexers, nil)
+func New$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, backoff $.waitBackoffManager|raw$) $.cacheSharedIndexInformer|raw$ {
+	return NewFiltered$.type|public$Informer(client$if .namespaced$, namespace$end$, resyncPeriod, indexers, nil, backoff)
 }
 `
 
@@ -144,7 +146,7 @@ var typeFilteredInformerPublicConstructor = `
 // NewFiltered$.type|public$Informer constructs a new informer for $.type|public$ type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) $.cacheSharedIndexInformer|raw$ {
+func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$, backoff $.waitBackoffManager|raw$) $.cacheSharedIndexInformer|raw$ {
 	return $.cacheNewSharedIndexInformer|raw$(
 		&$.cacheListWatch|raw${
 			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
@@ -163,13 +165,14 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 		&$.type|raw${},
 		resyncPeriod,
 		indexers,
+		backoff,
 	)
 }
 `
 
 var typeInformerConstructor = `
-func (f *$.type|private$Informer) defaultInformer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
-	return NewFiltered$.type|public$Informer(client$if .namespaced$, f.namespace$end$, resyncPeriod, $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, f.tweakListOptions)
+func (f *$.type|private$Informer) defaultInformer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$, backoff $.waitBackoffManager|raw$) $.cacheSharedIndexInformer|raw$ {
+	return NewFiltered$.type|public$Informer(client$if .namespaced$, f.namespace$end$, resyncPeriod, $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, f.tweakListOptions, f.backoff)
 }
 `
 

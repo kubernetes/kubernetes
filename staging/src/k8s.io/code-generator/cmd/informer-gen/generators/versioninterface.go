@@ -63,6 +63,7 @@ func (g *versionInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 	m := map[string]interface{}{
 		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
 		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"waitBackoffManager":              c.Universe.Type(waitBackoffManager),
 		"types":                           g.types,
 	}
 
@@ -93,17 +94,18 @@ type version struct {
 	factory $.interfacesSharedInformerFactory|raw$
 	namespace string
 	tweakListOptions $.interfacesTweakListOptionsFunc|raw$
+	backoff $.waitBackoffManager|raw$
 }
 
 // New returns a new Interface.
-func New(f $.interfacesSharedInformerFactory|raw$, namespace string, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) Interface {
-	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f $.interfacesSharedInformerFactory|raw$, namespace string, tweakListOptions $.interfacesTweakListOptionsFunc|raw$, backoff $.waitBackoffManager|raw$) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 `
 
 var versionFuncTemplate = `
 // $.type|publicPlural$ returns a $.type|public$Informer.
 func (v *version) $.type|publicPlural$() $.type|public$Informer {
-	return &$.type|private$Informer{factory: v.factory$if .namespaced$, namespace: v.namespace$end$, tweakListOptions: v.tweakListOptions}
+	return &$.type|private$Informer{factory: v.factory$if .namespaced$, namespace: v.namespace$end$, tweakListOptions: v.tweakListOptions, backoff: v.backoff}
 }
 `

@@ -68,6 +68,7 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 		"runtimeObject":            c.Universe.Type(runtimeObject),
 		"timeDuration":             c.Universe.Type(timeDuration),
 		"v1ListOptions":            c.Universe.Type(v1ListOptions),
+		"waitBackoffManager":       c.Universe.Type(waitBackoffManager),
 	}
 
 	sw.Do(externalSharedInformerFactoryInterface, m)
@@ -76,8 +77,8 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 }
 
 var externalSharedInformerFactoryInterface = `
-// NewInformerFunc takes {{.clientSetPackage|raw}} and {{.timeDuration|raw}} to return a SharedIndexInformer.
-type NewInformerFunc func({{.clientSetPackage|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
+// NewInformerFunc takes {{.clientSetPackage|raw}}, {{.timeDuration|raw}} and {{.waitBackoffManager|raw}} to return a SharedIndexInformer.
+type NewInformerFunc func({{.clientSetPackage|raw}}, {{.timeDuration|raw}}, {{.waitBackoffManager|raw}}) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {

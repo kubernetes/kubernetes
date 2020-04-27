@@ -81,6 +81,7 @@ func (g *groupInterfaceGenerator) GenerateType(c *generator.Context, t *types.Ty
 	m := map[string]interface{}{
 		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
 		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"waitBackoffManager":              c.Universe.Type(waitBackoffManager),
 		"versions":                        versions,
 	}
 
@@ -102,17 +103,18 @@ type group struct {
 	factory $.interfacesSharedInformerFactory|raw$
 	namespace string
 	tweakListOptions  $.interfacesTweakListOptionsFunc|raw$
+	backoff $.waitBackoffManager|raw$
 }
 
 // New returns a new Interface.
-func New(f $.interfacesSharedInformerFactory|raw$, namespace string, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) Interface {
-	return &group{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+func New(f $.interfacesSharedInformerFactory|raw$, namespace string, tweakListOptions $.interfacesTweakListOptionsFunc|raw$, backoff $.waitBackoffManager|raw$) Interface {
+	return &group{factory: f, namespace: namespace, tweakListOptions: tweakListOptions, backoff: backoff}
 }
 
 $range .versions$
 // $.Name$ returns a new $.Interface|raw$.
 func (g *group) $.Name$() $.Interface|raw$ {
-	return $.New|raw$(g.factory, g.namespace, g.tweakListOptions)
+	return $.New|raw$(g.factory, g.namespace, g.tweakListOptions, g.backoff)
 }
 $end$
 `
