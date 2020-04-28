@@ -80,6 +80,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			}
 
 		},
+		Args: cobra.NoArgs,
 	}
 
 	fs := cmd.Flags()

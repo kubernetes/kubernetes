@@ -294,10 +294,7 @@ func (o *Options) processHostnameOverrideFlag() error {
 }
 
 // Validate validates all the required options.
-func (o *Options) Validate(args []string) error {
-	if len(args) != 0 {
-		return errors.New("no arguments are supported")
-	}
+func (o *Options) Validate() error {
 	if errs := validation.Validate(o.config); len(errs) != 0 {
 		return errs.ToAggregate()
 	}
@@ -490,7 +487,7 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Complete(); err != nil {
 				klog.Fatalf("failed complete: %v", err)
 			}
-			if err := opts.Validate(args); err != nil {
+			if err := opts.Validate(); err != nil {
 				klog.Fatalf("failed validate: %v", err)
 			}
 
@@ -498,6 +495,7 @@ with the apiserver API to configure the proxy.`,
 				klog.Exit(err)
 			}
 		},
+		Args: cobra.NoArgs,
 	}
 
 	var err error

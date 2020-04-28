@@ -119,6 +119,7 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 		},
+		Args: cobra.NoArgs,
 	}
 
 	fs := cmd.Flags()

@@ -122,6 +122,7 @@ cluster's shared state through which all other components interact.`,
 
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
+		Args: cobra.NoArgs,
 	}
 
 	fs := cmd.Flags()

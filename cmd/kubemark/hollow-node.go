@@ -148,6 +148,7 @@ func newHollowNodeCommand() *cobra.Command {
 			verflag.PrintAndExitIfRequested()
 			run(s)
 		},
+		Args: cobra.NoArgs,
 	}
 	s.addFlags(cmd.Flags())
 

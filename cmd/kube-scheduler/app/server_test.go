@@ -357,10 +357,9 @@ profiles:
 				t.Fatal(err)
 			}
 
-			var args []string
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			cc, sched, err := Setup(ctx, args, opts)
+			cc, sched, err := Setup(ctx, opts)
 			if err != nil {
 				t.Fatal(err)
 			}
