@@ -124,6 +124,7 @@ func calculateResourceAllocatableRequest(nodeInfo *schedulernodeinfo.NodeInfo, p
 
 // calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod and the
 // PodOverhead feature is enabled, the Overhead is added to the result.
+// podResourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	var podRequest int64
 	for i := range pod.Spec.Containers {
@@ -132,11 +133,20 @@ func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 		podRequest += value
 	}
 
+	for i := range pod.Spec.InitContainers {
+		initContainer := &pod.Spec.InitContainers[i]
+		value := priorityutil.GetNonzeroRequestForResource(resource, &initContainer.Resources.Requests)
+		if podRequest < value {
+			podRequest = value
+		}
+	}
+
 	// If Overhead is being utilized, add to the total requests for the pod
 	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
 		if quantity, found := pod.Spec.Overhead[resource]; found {
 			podRequest += quantity.Value()
 		}
 	}
+
 	return podRequest
 }

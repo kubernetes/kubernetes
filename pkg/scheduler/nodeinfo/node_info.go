@@ -579,6 +579,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
+// resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
@@ -588,6 +589,18 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.
+	}
+
+	for _, ic := range pod.Spec.InitContainers {
+		resPtr.SetMaxResource(ic.Resources.Requests)
+		non0CPUReq, non0MemReq := priorityutil.GetNonzeroRequests(&ic.Resources.Requests)
+		if non0CPU < non0CPUReq {
+			non0CPU = non0CPUReq
+		}
+
+		if non0Mem < non0MemReq {
+			non0Mem = non0MemReq
+		}
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
