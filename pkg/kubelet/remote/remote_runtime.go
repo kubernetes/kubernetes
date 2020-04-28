@@ -473,7 +473,7 @@ func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.C
 	})
 	if err != nil {
 		if r.logReduction.ShouldMessageBePrinted(err.Error(), containerID) {
-			klog.Errorf("ContainerStatus %q from runtime service failed: %v", containerID, err)
+			klog.Errorf("ContainerStats %q from runtime service failed: %v", containerID, err)
 		}
 		return nil, err
 	}
