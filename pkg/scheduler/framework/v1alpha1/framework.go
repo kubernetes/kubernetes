@@ -424,19 +424,15 @@ func (f *framework) RunFilterPlugins(
 	pod *v1.Pod,
 	nodeInfo *NodeInfo,
 ) PluginToStatus {
-	var firstFailedStatus *Status
 	statuses := make(PluginToStatus)
 	for _, pl := range f.filterPlugins {
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
-		if len(statuses) == 0 {
-			firstFailedStatus = pluginStatus
-		}
 		if !pluginStatus.IsSuccess() {
 			if !pluginStatus.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
-				firstFailedStatus = NewStatus(Error, fmt.Sprintf("running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, pluginStatus.Message()))
-				return map[string]*Status{pl.Name(): firstFailedStatus}
+				errStatus := NewStatus(Error, fmt.Sprintf("running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, pluginStatus.Message()))
+				return map[string]*Status{pl.Name(): errStatus}
 			}
 			statuses[pl.Name()] = pluginStatus
 			if !f.runAllFilters {
