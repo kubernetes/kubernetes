@@ -17,7 +17,6 @@ limitations under the License.
 package credentialprovider
 
 import (
-	"reflect"
 	"sort"
 	"sync"
 
@@ -51,10 +50,9 @@ func NewDockerKeyring() DockerKeyring {
 		Providers: make([]DockerConfigProvider, 0),
 	}
 
-	keys := reflect.ValueOf(providers).MapKeys()
-	stringKeys := make([]string, len(keys))
-	for ix := range keys {
-		stringKeys[ix] = keys[ix].String()
+	stringKeys := make([]string, 0, len(providers))
+	for key := range providers {
+		stringKeys = append(stringKeys, key)
 	}
 	sort.Strings(stringKeys)
 
