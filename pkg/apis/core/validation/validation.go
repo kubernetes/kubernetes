@@ -2834,10 +2834,6 @@ const (
 	// restrictions in Linux libc name resolution handling.
 	// Max number of DNS name servers.
 	MaxDNSNameservers = 3
-	// Max number of domains in search path.
-	MaxDNSSearchPaths = 6
-	// Max number of characters in search path.
-	MaxDNSSearchListChars = 256
 )
 
 func validateReadinessGates(readinessGates []core.PodReadinessGate, fldPath *field.Path) field.ErrorList {
@@ -2872,14 +2868,6 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			if ip := net.ParseIP(ns); ip == nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers").Index(i), ns, "must be valid IP address"))
 			}
-		}
-		// Validate searches.
-		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v search paths", MaxDNSSearchPaths)))
-		}
-		// Include the space between search paths.
-		if len(strings.Join(dnsConfig.Searches, " ")) > MaxDNSSearchListChars {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
 		}
 		for i, search := range dnsConfig.Searches {
 			// it is fine to have a trailing dot

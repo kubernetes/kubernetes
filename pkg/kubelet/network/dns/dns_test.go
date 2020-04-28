@@ -98,68 +98,6 @@ func TestParseResolvConf(t *testing.T) {
 	}
 }
 
-func TestFormDNSSearchFitsLimits(t *testing.T) {
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      string("testNode"),
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:         "",
-			Name:        "test_pod",
-			Namespace:   "testNS",
-			Annotations: map[string]string{},
-		},
-	}
-
-	testCases := []struct {
-		hostNames    []string
-		resultSearch []string
-		events       []string
-	}{
-		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
-			[]string{},
-		},
-
-		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
-			[]string{},
-		},
-
-		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", strings.Repeat("B", 256), "BBB"},
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA"},
-			[]string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA"},
-		},
-
-		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC", "DDD"},
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC"},
-			[]string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC"},
-		},
-	}
-
-	for i, tc := range testCases {
-		dnsSearch := configurer.formDNSSearchFitsLimits(tc.hostNames, pod)
-		assert.EqualValues(t, tc.resultSearch, dnsSearch, "test [%d]", i)
-		for _, expectedEvent := range tc.events {
-			expected := fmt.Sprintf("%s %s %s", v1.EventTypeWarning, "DNSConfigForming", expectedEvent)
-			event := fetchEvent(recorder)
-			assert.Equal(t, expected, event, "test [%d]", i)
-		}
-	}
-}
-
 func TestFormDNSNameserversFitsLimits(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{

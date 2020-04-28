@@ -95,38 +95,6 @@ func omitDuplicates(strs []string) []string {
 	return ret
 }
 
-func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Pod) []string {
-	limitsExceeded := false
-
-	if len(composedSearch) > validation.MaxDNSSearchPaths {
-		composedSearch = composedSearch[:validation.MaxDNSSearchPaths]
-		limitsExceeded = true
-	}
-
-	if resolvSearchLineStrLen := len(strings.Join(composedSearch, " ")); resolvSearchLineStrLen > validation.MaxDNSSearchListChars {
-		cutDomainsNum := 0
-		cutDomainsLen := 0
-		for i := len(composedSearch) - 1; i >= 0; i-- {
-			cutDomainsLen += len(composedSearch[i]) + 1
-			cutDomainsNum++
-
-			if (resolvSearchLineStrLen - cutDomainsLen) <= validation.MaxDNSSearchListChars {
-				break
-			}
-		}
-
-		composedSearch = composedSearch[:(len(composedSearch) - cutDomainsNum)]
-		limitsExceeded = true
-	}
-
-	if limitsExceeded {
-		log := fmt.Sprintf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", log)
-		klog.Error(log)
-	}
-	return composedSearch
-}
-
 func (c *Configurer) formDNSNameserversFitsLimits(nameservers []string, pod *v1.Pod) []string {
 	if len(nameservers) > validation.MaxDNSNameservers {
 		nameservers = nameservers[0:validation.MaxDNSNameservers]
@@ -139,7 +107,6 @@ func (c *Configurer) formDNSNameserversFitsLimits(nameservers []string, pod *v1.
 
 func (c *Configurer) formDNSConfigFitsLimits(dnsConfig *runtimeapi.DNSConfig, pod *v1.Pod) *runtimeapi.DNSConfig {
 	dnsConfig.Servers = c.formDNSNameserversFitsLimits(dnsConfig.Servers, pod)
-	dnsConfig.Searches = c.formDNSSearchFitsLimits(dnsConfig.Searches, pod)
 	return dnsConfig
 }
 
@@ -153,44 +120,6 @@ func (c *Configurer) generateSearchesForDNSClusterFirst(hostSearch []string, pod
 	clusterSearch := []string{nsSvcDomain, svcDomain, c.ClusterDomain}
 
 	return omitDuplicates(append(clusterSearch, hostSearch...))
-}
-
-// CheckLimitsForResolvConf checks limits in resolv.conf.
-func (c *Configurer) CheckLimitsForResolvConf() {
-	f, err := os.Open(c.ResolverConfig)
-	if err != nil {
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + err.Error())
-		return
-	}
-	defer f.Close()
-
-	_, hostSearch, _, err := parseResolvConf(f)
-	if err != nil {
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + err.Error())
-		return
-	}
-
-	domainCountLimit := validation.MaxDNSSearchPaths
-
-	if c.ClusterDomain != "" {
-		domainCountLimit -= 3
-	}
-
-	if len(hostSearch) > domainCountLimit {
-		log := fmt.Sprintf("Resolv.conf file '%s' contains search line consisting of more than %d domains!", c.ResolverConfig, domainCountLimit)
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + log)
-		return
-	}
-
-	if len(strings.Join(hostSearch, " ")) > validation.MaxDNSSearchListChars {
-		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, validation.MaxDNSSearchListChars)
-		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + log)
-		return
-	}
 }
 
 // parseResolvConf reads a resolv.conf file from the given reader, and parses

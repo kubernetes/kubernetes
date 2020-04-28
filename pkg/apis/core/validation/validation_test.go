@@ -6309,19 +6309,21 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			desc: "valid: 3 nameservers and 6 search paths",
+			desc: "valid: 3 nameservers and 7 search paths",
 			dnsConfig: &core.PodDNSConfig{
 				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
-				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local."},
+				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local.", "example.com."},
 			},
 			expectedError: false,
 		},
 		{
-			desc: "valid: 256 characters in search path list",
+			desc: "valid: 356 characters in search path list",
 			dnsConfig: &core.PodDNSConfig{
-				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
+				// As of glibc 2.26, we can have an unlimited number of characters in the search path
 				Searches: []string{
 					generateTestSearchPathFunc(1),
+					generateTestSearchPathFunc(50),
+					generateTestSearchPathFunc(50),
 					generateTestSearchPathFunc(50),
 					generateTestSearchPathFunc(50),
 					generateTestSearchPathFunc(50),
@@ -6342,28 +6344,6 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			desc: "invalid: 4 nameservers",
 			dnsConfig: &core.PodDNSConfig{
 				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8", "1.2.3.4"},
-			},
-			expectedError: true,
-		},
-		{
-			desc: "invalid: 7 search paths",
-			dnsConfig: &core.PodDNSConfig{
-				Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local", "exceeded"},
-			},
-			expectedError: true,
-		},
-		{
-			desc: "invalid: 257 characters in search path list",
-			dnsConfig: &core.PodDNSConfig{
-				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
-				Searches: []string{
-					generateTestSearchPathFunc(2),
-					generateTestSearchPathFunc(50),
-					generateTestSearchPathFunc(50),
-					generateTestSearchPathFunc(50),
-					generateTestSearchPathFunc(50),
-					generateTestSearchPathFunc(50),
-				},
 			},
 			expectedError: true,
 		},
