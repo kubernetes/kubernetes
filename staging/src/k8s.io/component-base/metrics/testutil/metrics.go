@@ -101,6 +101,16 @@ func TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricFamily, error) {
 	return textParser.TextToMetricFamilies(in)
 }
 
+// GetMetricFamily returns MetricFamily whose name is equal to metricFamilyName from the metricFamily []*dto.MetricFamily
+func GetMetricFamily(metricFamily []*dto.MetricFamily, metricFamilyName string) *dto.MetricFamily {
+	for _, mf := range metricFamily {
+		if mf.GetName() == metricFamilyName {
+			return mf
+		}
+	}
+	return nil
+}
+
 // ExtractMetricSamples parses the prometheus metric samples from the input string.
 func ExtractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	dec := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
@@ -201,17 +211,12 @@ type Histogram struct {
 // GetHistogramFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
 func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (Histogram, error) {
-	var metricFamily *dto.MetricFamily
 	m, err := gatherer.Gather()
 	if err != nil {
 		return Histogram{}, err
 	}
-	for _, mFamily := range m {
-		if mFamily.GetName() == metricName {
-			metricFamily = mFamily
-			break
-		}
-	}
+
+	metricFamily := GetMetricFamily(m, metricName)
 
 	if metricFamily == nil {
 		return Histogram{}, fmt.Errorf("metric %q not found", metricName)

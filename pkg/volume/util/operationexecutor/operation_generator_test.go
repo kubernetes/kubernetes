@@ -17,7 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
-	"github.com/prometheus/client_model/go"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +26,7 @@ import (
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
@@ -89,57 +90,46 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			"volume_plugin":  expectedPluginName,
 		}
 		// compare the relative change of the metric because of the global state of the prometheus.DefaultGatherer.Gather()
-		storageOperationStatusCountMetricBefore := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
+		storageOperationStatusCountMetricBeforeValue, beforeErr := getMetricCounterValueWithNameAndLabels(metricFamilyName, labelFilter)
 
 		var ee error
 		unmapVolumeFunc.CompleteFunc(&ee)
 
-		storageOperationStatusCountMetricAfter := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
-		if storageOperationStatusCountMetricAfter == nil {
-			t.Fatalf("Couldn't find the metric with name(%s) and labels(%v)", metricFamilyName, labelFilter)
+		storageOperationStatusCountMetricAfterValue, afterErr := getMetricCounterValueWithNameAndLabels(metricFamilyName, labelFilter)
+		if afterErr != nil {
+			t.Fatalf("%s", afterErr)
 		}
 
-		if storageOperationStatusCountMetricBefore == nil {
-			assert.Equal(t, float64(1), *storageOperationStatusCountMetricAfter.Counter.Value, tc.name)
+		if beforeErr != nil {
+			assert.Equal(t, float64(1), storageOperationStatusCountMetricAfterValue, tc.name)
 		} else {
-			metricValueDiff := *storageOperationStatusCountMetricAfter.Counter.Value - *storageOperationStatusCountMetricBefore.Counter.Value
+			metricValueDiff := storageOperationStatusCountMetricAfterValue - storageOperationStatusCountMetricBeforeValue
 			assert.Equal(t, float64(1), metricValueDiff, tc.name)
 		}
 	}
 }
 
-func findMetricWithNameAndLabels(metricFamilyName string, labelFilter map[string]string) *io_prometheus_client.Metric {
-	metricFamily := getMetricFamily(metricFamilyName)
+// getMetricCounterValueWithNameAndLabels returns metric value according to metricFamilyName and labelFilter
+func getMetricCounterValueWithNameAndLabels(metricFamilyName string, labelFilter map[string]string) (float64, error) {
+	gatherer := legacyregistry.DefaultGatherer
+	m, err := gatherer.Gather()
+
+	if err != nil {
+		return 0, fmt.Errorf("couldn't get the metric with name(%s)", metricFamilyName)
+	}
+
+	metricFamily := testutil.GetMetricFamily(m, metricFamilyName)
 	if metricFamily == nil {
-		return nil
+		return 0, fmt.Errorf("couldn't get the metric with name(%s)", metricFamilyName)
 	}
 
 	for _, metric := range metricFamily.GetMetric() {
-		if isLabelsMatchWithMetric(labelFilter, metric) {
-			return metric
+		if testutil.LabelsMatch(metric, labelFilter) {
+			return metric.Counter.GetValue(), nil
 		}
 	}
 
-	return nil
-}
-
-func isLabelsMatchWithMetric(labelFilter map[string]string, metric *io_prometheus_client.Metric) bool {
-	if len(labelFilter) != len(metric.Label) {
-		return false
-	}
-	for labelName, labelValue := range labelFilter {
-		labelFound := false
-		for _, labelPair := range metric.Label {
-			if labelName == *labelPair.Name && labelValue == *labelPair.Value {
-				labelFound = true
-				break
-			}
-		}
-		if !labelFound {
-			return false
-		}
-	}
-	return true
+	return 0, fmt.Errorf("couldn't get the metric with name(%s) and labels(%v)", metricFamilyName, labelFilter)
 }
 
 func getTestOperationGenerator(volumePluginMgr *volume.VolumePluginMgr) OperationGenerator {
@@ -168,16 +158,6 @@ func getTestVolumeToUnmount(pod *v1.Pod, pvSpec v1.PersistentVolumeSpec, pluginN
 		VolumeSpec: volumeSpec,
 	}
 	return volumeToUnmount
-}
-
-func getMetricFamily(metricFamilyName string) *io_prometheus_client.MetricFamily {
-	metricFamilies, _ := legacyregistry.DefaultGatherer.Gather()
-	for _, mf := range metricFamilies {
-		if *mf.Name == metricFamilyName {
-			return mf
-		}
-	}
-	return nil
 }
 
 func initTestPlugins(t *testing.T, plugs []volume.VolumePlugin, pluginName string) (*volume.VolumePluginMgr, string) {
