@@ -215,6 +215,52 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 	}
 }
 
+func TestCacheControl(t *testing.T) {
+	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&framework.MasterConfigOptions{})
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	master, _, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
+
+	rt, err := restclient.TransportFor(master.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths := []string{
+		// untyped
+		"/",
+		// health
+		"/healthz",
+		// openapi
+		"/openapi/v2",
+		// discovery
+		"/api",
+		"/api/v1",
+		"/apis",
+		"/apis/apps",
+		"/apis/apps/v1",
+		// apis
+		"/api/v1/namespaces",
+		"/apis/apps/v1/deployments",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req, err := http.NewRequest("GET", master.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cc := resp.Header.Get("Cache-Control")
+			if !strings.Contains(cc, "private") {
+				t.Errorf("expected private cache-control, got %q", cc)
+			}
+		})
+	}
+}
+
 // Tests that the apiserver returns 202 status code as expected.
 func Test202StatusCode(t *testing.T) {
 	s, clientSet, closeFn := setup(t)
