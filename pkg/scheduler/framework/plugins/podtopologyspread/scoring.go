@@ -35,8 +35,8 @@ const preScoreStateKey = "PreScore" + Name
 // Fields are exported for comparison during testing.
 type preScoreState struct {
 	Constraints []topologySpreadConstraint
-	// NodeNameSet is a string set holding all node names which have all Constraints[*].topologyKey present.
-	NodeNameSet sets.String
+	// IgnoredNodes is a set of node names which miss some Constraints[*].topologyKey.
+	IgnoredNodes sets.String
 	// TopologyPairToPodCounts is keyed with topologyPair, and valued with the number of matching pods.
 	TopologyPairToPodCounts map[topologyPair]*int64
 }
@@ -48,9 +48,9 @@ func (s *preScoreState) Clone() framework.StateData {
 }
 
 // initPreScoreState iterates "filteredNodes" to filter out the nodes which
-// don't have required topologyKey(s), and initialize two maps:
+// don't have required topologyKey(s), and initialize:
 // 1) s.TopologyPairToPodCounts: keyed with both eligible topology pair and node names.
-// 2) s.NodeNameSet: keyed with node name, and valued with a *int64 pointer for eligible node only.
+// 2) s.IgnoredNodes: the set of nodes that shouldn't be scored.
 func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, filteredNodes []*v1.Node) error {
 	var err error
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
@@ -69,6 +69,9 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 	}
 	for _, node := range filteredNodes {
 		if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
+			// Nodes which don't have all required topologyKeys present are ignored
+			// when scoring later.
+			s.IgnoredNodes.Insert(node.Name)
 			continue
 		}
 		for _, constraint := range s.Constraints {
@@ -81,9 +84,6 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 				s.TopologyPairToPodCounts[pair] = new(int64)
 			}
 		}
-		s.NodeNameSet.Insert(node.Name)
-		// For those nodes which don't have all required topologyKeys present, it's intentional to leave
-		// their entries absent in NodeNameSet, so that we're able to score them to 0 afterwards.
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func (pl *PodTopologySpread) PreScore(
 	}
 
 	state := &preScoreState{
-		NodeNameSet:             make(sets.String, len(filteredNodes)),
+		IgnoredNodes:            sets.NewString(),
 		TopologyPairToPodCounts: make(map[topologyPair]*int64),
 	}
 	err = pl.initPreScoreState(state, pod, filteredNodes)
@@ -168,7 +168,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 	}
 
 	// Return if the node is not qualified.
-	if _, ok := s.NodeNameSet[node.Name]; !ok {
+	if s.IgnoredNodes.Has(node.Name) {
 		return 0, nil
 	}
 
@@ -204,8 +204,8 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 	var minScore int64 = math.MaxInt64
 	var total int64
 	for _, score := range scores {
-		// it's mandatory to check if <score.Name> is present in m.NodeNameSet
-		if _, ok := s.NodeNameSet[score.Name]; !ok {
+		// it's mandatory to check if <score.Name> is present in m.IgnoredNodes
+		if s.IgnoredNodes.Has(score.Name) {
 			continue
 		}
 		total += score.Score
@@ -227,7 +227,7 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 			continue
 		}
 
-		if _, ok := s.NodeNameSet[node.Name]; !ok {
+		if s.IgnoredNodes.Has(node.Name) {
 			scores[i].Score = 0
 			continue
 		}
