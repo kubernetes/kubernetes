@@ -68,13 +68,15 @@ func Everything() Selector {
 
 type nothingSelector struct{}
 
-func (n nothingSelector) Matches(_ Labels) bool                                      { return false }
-func (n nothingSelector) Empty() bool                                                { return false }
-func (n nothingSelector) String() string                                             { return "" }
-func (n nothingSelector) Add(_ ...Requirement) Selector                              { return n }
-func (n nothingSelector) Requirements() (Requirements, bool)                         { return nil, false }
-func (n nothingSelector) DeepCopySelector() Selector                                 { return n }
-func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) { return "", false }
+func (n nothingSelector) Matches(_ Labels) bool              { return false }
+func (n nothingSelector) Empty() bool                        { return false }
+func (n nothingSelector) String() string                     { return "" }
+func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
+func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
+func (n nothingSelector) DeepCopySelector() Selector         { return n }
+func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) {
+	return "", false
+}
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
