@@ -38,7 +38,6 @@ import (
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -140,7 +139,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 
 		if status == v1.ConditionTrue {
 			// if taint exist remove taint
-			err = controller.RemoveTaintOffNode(c.kubeClient, node.Name, node, ShutdownTaint)
+			err = cloudnodeutil.RemoveTaintOffNode(c.kubeClient, node.Name, node, ShutdownTaint)
 			if err != nil {
 				klog.Errorf("error patching node taints: %v", err)
 			}
@@ -185,7 +184,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 
 			if shutdown && err == nil {
 				// if node is shutdown add shutdown taint
-				err = controller.AddOrUpdateTaintOnNode(c.kubeClient, node.Name, ShutdownTaint)
+				err = cloudnodeutil.AddOrUpdateTaintOnNode(c.kubeClient, node.Name, ShutdownTaint)
 				if err != nil {
 					klog.Errorf("failed to apply shutdown taint to node %s, it may have been deleted.", node.Name)
 				}
