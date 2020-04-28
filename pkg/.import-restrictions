@@ -4,7 +4,7 @@ rules:
       - ''
     forbiddenPrefixes:
       # prevent pkg/ from depending on cmd/
-      #   note: pkg/kubemark and pkg/api/testing override this
+      #   note: pkg/kubemark overrides this
       - k8s.io/kubernetes/cmd
       # use sigs.k8s.io/yaml instead
       - github.com/ghodss/yaml
