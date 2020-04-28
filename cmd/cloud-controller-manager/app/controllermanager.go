@@ -80,6 +80,14 @@ the cloud specific control loops shipped with Kubernetes.`,
 			}
 
 		},
+		Args: func(cmd *cobra.Command, args []string) error {
+			for _, arg := range args {
+				if len(arg) > 0 {
+					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
+				}
+			}
+			return nil
+		},
 	}
 
 	fs := cmd.Flags()

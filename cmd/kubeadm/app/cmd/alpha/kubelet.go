@@ -104,6 +104,7 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 
 			return kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)

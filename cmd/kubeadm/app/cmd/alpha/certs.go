@@ -100,6 +100,7 @@ func NewCmdCertificateKey() *cobra.Command {
 			fmt.Println(key)
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 }
 
@@ -195,6 +196,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 			}
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 	addRenewFlags(allCmd, flags)
 
@@ -378,6 +380,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 			w.Flush()
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 	addExpirationFlags(cmd, flags)
 

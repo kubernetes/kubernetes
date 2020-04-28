@@ -114,7 +114,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("kube-scheduler will listen insecurely on port %d...", opts.CombinedInsecureServing.BindPort)
 	}
 
-	cc, sched, err := app.Setup(ctx, []string{}, opts)
+	cc, sched, err := app.Setup(ctx, opts)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}

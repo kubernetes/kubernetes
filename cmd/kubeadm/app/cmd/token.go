@@ -173,6 +173,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			return RunListTokens(out, errW, client, printer)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	outputFlags.AddFlags(listCmd)
@@ -226,6 +227,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunGenerateToken(out)
 		},
+		Args: cobra.NoArgs,
 	}
 }
 

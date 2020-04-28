@@ -148,6 +148,14 @@ func newHollowNodeCommand() *cobra.Command {
 			verflag.PrintAndExitIfRequested()
 			run(s)
 		},
+		Args: func(cmd *cobra.Command, args []string) error {
+			for _, arg := range args {
+				if len(arg) > 0 {
+					return fmt.Errorf("%q does not take any arguments, got %q", cmd.CommandPath(), args)
+				}
+			}
+			return nil
+		},
 	}
 	s.addFlags(cmd.Flags())
 
