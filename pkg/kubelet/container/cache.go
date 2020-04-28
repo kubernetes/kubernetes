@@ -125,6 +125,8 @@ func makeDefaultData(id types.UID) *data {
 }
 
 func (c *cache) get(id types.UID) *data {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	d, ok := c.pods[id]
 	if !ok {
 		// Cache should store *all* pod/container information known by the
