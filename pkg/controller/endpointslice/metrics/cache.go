@@ -134,6 +134,7 @@ type metricsUpdate struct {
 
 // desiredAndActualSlices returns a metricsUpdate with the desired and actual
 // number of EndpointSlices given the current values in the cache.
+// Must be called holding lock.
 func (c *Cache) desiredAndActualSlices() metricsUpdate {
 	mUpdate := metricsUpdate{}
 	for _, spCache := range c.cache {
@@ -146,6 +147,7 @@ func (c *Cache) desiredAndActualSlices() metricsUpdate {
 }
 
 // updateMetrics updates metrics with the values from this Cache.
+// Must be called holding lock.
 func (c *Cache) updateMetrics() {
 	mUpdate := c.desiredAndActualSlices()
 	NumEndpointSlices.WithLabelValues().Set(float64(mUpdate.actual))
