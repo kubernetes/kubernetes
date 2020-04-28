@@ -14,7 +14,7 @@ go_library(
         "httpstream.go",
         "websocket.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/server/remotecommand",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
