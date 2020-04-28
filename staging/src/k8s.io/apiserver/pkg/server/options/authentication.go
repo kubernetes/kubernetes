@@ -130,24 +130,6 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 type ClientCertAuthenticationOptions struct {
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
-
-	// CAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
-	// Generally this is the CA bundle file used to authenticate client certificates
-	// If non-nil, this takes priority over the ClientCA file.
-	CAContentProvider dynamiccertificates.CAContentProvider
-}
-
-// GetClientVerifyOptionFn provides verify options for your authenticator while respecting the preferred order of verifiers.
-func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider() (dynamiccertificates.CAContentProvider, error) {
-	if s.CAContentProvider != nil {
-		return s.CAContentProvider, nil
-	}
-
-	if len(s.ClientCA) == 0 {
-		return nil, nil
-	}
-
-	return dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", s.ClientCA)
 }
 
 func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
@@ -251,10 +233,8 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	// get the clientCA information
-	clientCAFileSpecified := len(s.ClientCert.ClientCA) > 0
-	var clientCAProvider dynamiccertificates.CAContentProvider
-	if clientCAFileSpecified {
-		clientCAProvider, err = s.ClientCert.GetClientCAContentProvider()
+	if len(s.ClientCert.ClientCA) > 0 {
+		clientCAProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", s.ClientCert.ClientCA)
 		if err != nil {
 			return fmt.Errorf("unable to load client CA file %q: %v", s.ClientCert.ClientCA, err)
 		}
@@ -267,7 +247,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 		if client == nil {
 			klog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		} else {
-			clientCAProvider, err = dynamiccertificates.NewDynamicCAFromConfigMapController("client-ca", authenticationConfigMapNamespace, authenticationConfigMapName, "client-ca-file", client)
+			clientCAProvider, err := dynamiccertificates.NewDynamicCAFromConfigMapController("client-ca", authenticationConfigMapNamespace, authenticationConfigMapName, "client-ca-file", client)
 			if err != nil {
 				return fmt.Errorf("unable to load configmap based client CA file: %v", err)
 			}

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 )
@@ -166,7 +167,12 @@ func TestToAuthenticationConfig(t *testing.T) {
 		},
 	}
 
-	resultConfig, err := testOptions.ToAuthenticationConfig()
+	clientCertificateCAContentProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", testOptions.ClientCert.ClientCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultConfig, err := testOptions.ToAuthenticationConfig(clientCertificateCAContentProvider)
 	if err != nil {
 		t.Fatal(err)
 	}

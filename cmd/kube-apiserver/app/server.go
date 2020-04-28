@@ -45,6 +45,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -80,6 +81,7 @@ import (
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/master/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -282,7 +284,7 @@ func CreateKubeAPIServerConfig(
 	[]admission.PluginInitializer,
 	error,
 ) {
-	genericConfig, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, err := buildGenericConfig(s.ServerRunOptions, proxyTransport)
+	genericConfig, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, clientCAProvider, err := buildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -350,14 +352,10 @@ func CreateKubeAPIServerConfig(
 			ExtendExpiration:            s.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			ClusterAuthenticationInfo: clusterauthenticationtrust.ClusterAuthenticationInfo{ClientCA: clientCAProvider},
 		},
 	}
-
-	clientCAProvider, err := s.Authentication.ClientCert.GetClientCAContentProvider()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	config.ExtraConfig.ClusterAuthenticationInfo.ClientCA = clientCAProvider
 
 	requestHeaderConfig, err := s.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	if err != nil {
@@ -425,6 +423,7 @@ func buildGenericConfig(
 	pluginInitializers []admission.PluginInitializer,
 	admissionPostStartHook genericapiserver.PostStartHookFunc,
 	storageFactory *serverstorage.DefaultStorageFactory,
+	clientCertificateCAContentProvider dynamiccertificates.CAContentProvider,
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
@@ -440,7 +439,7 @@ func buildGenericConfig(
 	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
+	if clientCertificateCAContentProvider, lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
@@ -498,7 +497,7 @@ func buildGenericConfig(
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, genericConfig.EgressSelector, clientgoExternalClient, versionedInformers)
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, genericConfig.EgressSelector, clientgoExternalClient, versionedInformers, clientCertificateCAContentProvider)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authentication config: %v", err)
 		return
@@ -560,8 +559,8 @@ func buildGenericConfig(
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
-	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
+func BuildAuthenticator(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory, clientCertificateCAContentProvider dynamiccertificates.CAContentProvider) (authenticator.Request, *spec.SecurityDefinitions, error) {
+	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig(clientCertificateCAContentProvider)
 	if err != nil {
 		return nil, nil, err
 	}

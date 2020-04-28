@@ -24,14 +24,15 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -332,10 +333,11 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticator.Config, error) {
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig(clientCertificateCAContentProvider dynamiccertificates.CAContentProvider) (kubeauthenticator.Config, error) {
 	ret := kubeauthenticator.Config{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
+		ClientCAContentProvider: clientCertificateCAContentProvider,
 	}
 
 	if s.Anonymous != nil {
@@ -344,14 +346,6 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 	if s.BootstrapToken != nil {
 		ret.BootstrapToken = s.BootstrapToken.Enable
-	}
-
-	if s.ClientCert != nil {
-		var err error
-		ret.ClientCAContentProvider, err = s.ClientCert.GetClientCAContentProvider()
-		if err != nil {
-			return kubeauthenticator.Config{}, err
-		}
 	}
 
 	if s.OIDC != nil {
@@ -406,28 +400,30 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 	return ret, nil
 }
 
-func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
+func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) (dynamiccertificates.CAContentProvider, error) {
 	if o == nil {
-		return nil
+		return nil, nil
 	}
 
-	if o.ClientCert != nil {
-		clientCertificateCAContentProvider, err := o.ClientCert.GetClientCAContentProvider()
+	var clientCertificateCAContentProvider dynamiccertificates.CAContentProvider
+	if o.ClientCert != nil && len(o.ClientCert.ClientCA) > 0 {
+		var err error
+		clientCertificateCAContentProvider, err = dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", o.ClientCert.ClientCA)
 		if err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
 		}
 		if err = c.Authentication.ApplyClientCert(clientCertificateCAContentProvider, c.SecureServing); err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 	if o.RequestHeader != nil {
 		requestHeaderConfig, err := o.RequestHeader.ToAuthenticationRequestHeaderConfig()
 		if err != nil {
-			return fmt.Errorf("unable to create request header authentication config: %v", err)
+			return nil, fmt.Errorf("unable to create request header authentication config: %v", err)
 		}
 		if requestHeaderConfig != nil {
 			if err = c.Authentication.ApplyClientCert(requestHeaderConfig.CAContentProvider, c.SecureServing); err != nil {
-				return fmt.Errorf("unable to load client CA file: %v", err)
+				return nil, fmt.Errorf("unable to load request header CA file: %v", err)
 			}
 		}
 	}
@@ -437,7 +433,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 		c.Authentication.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
 	}
 
-	return nil
+	return clientCertificateCAContentProvider, nil
 }
 
 // ApplyAuthorization will conditionally modify the authentication options based on the authorization options
