@@ -44,16 +44,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1alpha2.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
@@ -88,16 +86,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1alpha2.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
@@ -147,16 +143,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1alpha2.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
@@ -200,16 +194,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1alpha2.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,
@@ -239,16 +231,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
-				LeaderElection: v1alpha2.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "kube-system",
-						ResourceName:      "kube-scheduler",
-					},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       pointer.BoolPtr(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "endpointsleases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
 				},
 				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 					QPS:         50,

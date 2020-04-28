@@ -41,7 +41,7 @@ type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// LeaderElection defines the configuration of leader election client.
-	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`
+	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:"leaderElection"`
 
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
@@ -122,12 +122,6 @@ type KubeSchedulerProfile struct {
 	// +listType=map
 	// +listMapKey=name
 	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`
-}
-
-// KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
-// to include scheduler specific configuration.
-type KubeSchedulerLeaderElectionConfiguration struct {
-	componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:",inline"`
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for
