@@ -66,6 +66,18 @@ profiles:
   - name: ServiceAffinity
     args:
       affinityLabels: ["bar"]
+  - name: NodeResourcesLeastAllocated
+    args:
+      resources:
+      - name: cpu
+        weight: 2
+      - name: unknown
+        weight: 1
+  - name: NodeResourcesMostAllocated
+    args:
+      resources:
+      - name: memory
+        weight: 1
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -101,6 +113,18 @@ profiles:
 							Name: "ServiceAffinity",
 							Args: &config.ServiceAffinityArgs{
 								AffinityLabels: []string{"bar"},
+							},
+						},
+						{
+							Name: "NodeResourcesLeastAllocated",
+							Args: &config.NodeResourcesLeastAllocatedArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 2}, {Name: "unknown", Weight: 1}},
+							},
+						},
+						{
+							Name: "NodeResourcesMostAllocated",
+							Args: &config.NodeResourcesMostAllocatedArgs{
+								Resources: []config.ResourceSpec{{Name: "memory", Weight: 1}},
 							},
 						},
 					},
@@ -226,6 +250,10 @@ profiles:
   - name: NodeResourcesFit
   - name: OutOfTreePlugin
     args:
+  - name: NodeResourcesLeastAllocated
+    args:
+  - name: NodeResourcesMostAllocated
+    args:
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -242,6 +270,18 @@ profiles:
 							Args: &config.NodeResourcesFitArgs{},
 						},
 						{Name: "OutOfTreePlugin"},
+						{
+							Name: "NodeResourcesLeastAllocated",
+							Args: &config.NodeResourcesLeastAllocatedArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "NodeResourcesMostAllocated",
+							Args: &config.NodeResourcesMostAllocatedArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
 					},
 				},
 			},
@@ -307,6 +347,16 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								},
 							},
 							{
+								Name: "NodeResourcesLeastAllocated",
+								Args: runtime.RawExtension{
+									Object: &v1alpha2.NodeResourcesLeastAllocatedArgs{
+										Resources: []v1alpha2.ResourceSpec{
+											{Name: "mem", Weight: 2},
+										},
+									},
+								},
+							},
+							{
 								Name: "OutOfTreePlugin",
 								Args: runtime.RawExtension{
 									Raw: []byte(`{"foo":"bar"}`),
@@ -350,6 +400,13 @@ profiles:
         Utilization: 1
     name: RequestedToCapacityRatio
   - args:
+      apiVersion: kubescheduler.config.k8s.io/v1alpha2
+      kind: NodeResourcesLeastAllocatedArgs
+      resources:
+      - Name: mem
+        Weight: 2
+    name: NodeResourcesLeastAllocated
+  - args:
       foo: bar
     name: OutOfTreePlugin
 `,
@@ -365,6 +422,12 @@ profiles:
 								Name: "InterPodAffinity",
 								Args: &config.InterPodAffinityArgs{
 									HardPodAffinityWeight: 5,
+								},
+							},
+							{
+								Name: "NodeResourcesMostAllocated",
+								Args: &config.NodeResourcesMostAllocatedArgs{
+									Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}},
 								},
 							},
 							{
@@ -409,6 +472,13 @@ profiles:
       hardPodAffinityWeight: 5
       kind: InterPodAffinityArgs
     name: InterPodAffinity
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1alpha2
+      kind: NodeResourcesMostAllocatedArgs
+      resources:
+      - Name: cpu
+        Weight: 1
+    name: NodeResourcesMostAllocated
   - args:
       foo: bar
     name: OutOfTreePlugin

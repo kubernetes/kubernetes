@@ -20,6 +20,7 @@ import (
 	"net"
 	"strconv"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/kube-scheduler/config/v1alpha2"
@@ -29,6 +30,11 @@ import (
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
+
+var defaultResourceSpec = []v1alpha2.ResourceSpec{
+	{Name: string(v1.ResourceCPU), Weight: 1},
+	{Name: string(v1.ResourceMemory), Weight: 1},
+}
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
@@ -163,5 +169,19 @@ func SetDefaults_InterPodAffinityArgs(obj *v1alpha2.InterPodAffinityArgs) {
 	// Update that object if a new default field is added here.
 	if obj.HardPodAffinityWeight == nil {
 		obj.HardPodAffinityWeight = pointer.Int32Ptr(1)
+	}
+}
+
+func SetDefaults_NodeResourcesLeastAllocatedArgs(obj *v1alpha2.NodeResourcesLeastAllocatedArgs) {
+	if len(obj.Resources) == 0 {
+		// If no resources specified, used the default set.
+		obj.Resources = append(obj.Resources, defaultResourceSpec...)
+	}
+}
+
+func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1alpha2.NodeResourcesMostAllocatedArgs) {
+	if len(obj.Resources) == 0 {
+		// If no resources specified, used the default set.
+		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
