@@ -91,6 +91,7 @@ vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
 vendor/k8s.io/component-base/metrics
+vendor/k8s.io/kube-aggregator/pkg/apiserver
 vendor/k8s.io/kubectl/pkg/cmd/edit
 vendor/k8s.io/kubectl/pkg/cmd/get
 vendor/k8s.io/kubectl/pkg/cmd/scale
