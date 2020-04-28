@@ -325,7 +325,6 @@ runTests() {
     exit 1
   fi
   kube::log::status "Checking kubectl version"
-  export KUBERNETES_MASTER=http://127.0.0.1:${API_PORT}
   kubectl version
 
   # Generate a random namespace name, based on the current time (to make
