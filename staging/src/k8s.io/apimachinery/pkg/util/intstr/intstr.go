@@ -179,7 +179,10 @@ func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
 		if err != nil {
 			return 0, false, fmt.Errorf("invalid value %q: %v", intOrStr.StrVal, err)
 		}
-		return int(v), true, nil
+		if strings.Contain(intOrStr.StrVal, "%") {
+			return int(v), true, nil
+		}
+		return int(v), false, nil
 	}
 	return 0, false, fmt.Errorf("invalid type: neither int nor percentage")
 }
