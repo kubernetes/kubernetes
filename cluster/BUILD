@@ -45,14 +45,6 @@ sh_test(
 )
 
 sh_test(
-    name = "clientbin_test",
-    srcs = ["clientbin.sh"],
-    deps = [
-        "//hack/lib",
-    ],
-)
-
-sh_test(
     name = "kube-util_test",
     srcs = ["kube-util.sh"],
     deps = [
