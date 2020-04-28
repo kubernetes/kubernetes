@@ -152,6 +152,8 @@ func (t *TimedCache) Get(key string, crt AzureCacheReadType) (interface{}, error
 
 // Delete removes an item from the cache.
 func (t *TimedCache) Delete(key string) error {
+	entry.Lock.Lock()
+	defer entry.Lock.Unlock()
 	return t.Store.Delete(&AzureCacheEntry{
 		Key: key,
 	})
@@ -160,6 +162,8 @@ func (t *TimedCache) Delete(key string) error {
 // Set sets the data cache for the key.
 // It is only used for testing.
 func (t *TimedCache) Set(key string, data interface{}) {
+	entry.Lock.Lock()
+	defer entry.Lock.Unlock()
 	t.Store.Add(&AzureCacheEntry{
 		Key:       key,
 		Data:      data,
