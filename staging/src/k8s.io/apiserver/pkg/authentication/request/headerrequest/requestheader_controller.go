@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -41,6 +42,16 @@ const (
 	authenticationRoleName = "extension-apiserver-authentication-reader"
 )
 
+// RequestHeaderAuthRequestProvider a provider that knows how to dynamically fill parts of RequestHeaderConfig struct
+type RequestHeaderAuthRequestProvider interface {
+	UsernameHeaders() []string
+	GroupHeaders() []string
+	ExtraHeaderPrefixes() []string
+	AllowedClientNames() []string
+}
+
+var _ RequestHeaderAuthRequestProvider = &RequestHeaderAuthRequestController{}
+
 type requestHeaderBundle struct {
 	UsernameHeaders     []string
 	GroupHeaders        []string
@@ -48,7 +59,7 @@ type requestHeaderBundle struct {
 	AllowedClientNames  []string
 }
 
-// RequestHeaderAuthRequestController a controller that exposes a set of methods for dynamically filling RequestHeaderConfig struct.
+// RequestHeaderAuthRequestController a controller that exposes a set of methods for dynamically filling parts of RequestHeaderConfig struct.
 // The methods are sourced from the config map which is being monitored by this controller.
 // The controller is primed from the server at the construction time for components that don't want to dynamically react to changes
 // in the config map.
@@ -59,6 +70,7 @@ type RequestHeaderAuthRequestController struct {
 	configmapNamespace string
 
 	configmapLister         corev1listers.ConfigMapNamespaceLister
+	configmapInformer       cache.SharedIndexInformer
 	configmapInformerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
@@ -77,7 +89,6 @@ func NewRequestHeaderAuthRequestController(
 	cmName string,
 	cmNamespace string,
 	client kubernetes.Interface,
-	cmInformer coreinformers.ConfigMapInformer,
 	usernameHeadersKey, groupHeadersKey, extraHeaderPrefixesKey, allowedClientNamesKey string) (*RequestHeaderAuthRequestController, error) {
 	c := &RequestHeaderAuthRequestController{
 		name: "RequestHeaderAuthRequestController",
@@ -98,7 +109,12 @@ func NewRequestHeaderAuthRequestController(
 		return nil, err
 	}
 
-	cmInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
+	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
+	c.configmapInformer = coreinformers.NewFilteredConfigMapInformer(client, c.configmapNamespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, func(listOptions *metav1.ListOptions) {
+		listOptions.FieldSelector = fields.OneTermEqualSelector("metadata.name", c.configmapName).String()
+	})
+
+	c.configmapInformer.AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
 			if cast, ok := obj.(*corev1.ConfigMap); ok {
 				return cast.Name == c.configmapName && cast.Namespace == c.configmapNamespace
@@ -125,8 +141,8 @@ func NewRequestHeaderAuthRequestController(
 		},
 	})
 
-	c.configmapLister = cmInformer.Lister().ConfigMaps(c.configmapNamespace)
-	c.configmapInformerSynced = cmInformer.Informer().HasSynced
+	c.configmapLister = corev1listers.NewConfigMapLister(c.configmapInformer.GetIndexer()).ConfigMaps(c.configmapNamespace)
+	c.configmapInformerSynced = c.configmapInformer.HasSynced
 
 	return c, nil
 }
@@ -154,6 +170,8 @@ func (c *RequestHeaderAuthRequestController) Run(workers int, stopCh <-chan stru
 
 	klog.Infof("Starting %s", c.name)
 	defer klog.Infof("Shutting down %s", c.name)
+
+	go c.configmapInformer.Run(stopCh)
 
 	// wait for caches to fill before starting your work
 	if !cache.WaitForNamedCacheSync(c.name, stopCh, c.configmapInformerSynced) {
@@ -224,6 +242,7 @@ func (c *RequestHeaderAuthRequestController) syncConfigMap(configMap *corev1.Con
 	}
 	if hasChanged {
 		c.exportedRequestHeaderBundle.Store(newRequestHeaderBundle)
+		klog.V(2).Infof("Loaded a new request header values for %v", c.name)
 	}
 	return nil
 }
