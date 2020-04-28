@@ -43,7 +43,7 @@ import (
 
 const nobodyUser = int64(65534)
 
-var _ = SIGDescribe("PodSecurityPolicy", func() {
+var _ = SIGDescribe("PodSecurityPolicy [Feature:PodSecurityPolicy]", func() {
 	f := framework.NewDefaultFramework("podsecuritypolicy")
 	f.SkipPrivilegedPSPBinding = true
 
@@ -53,7 +53,8 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 	var ns string // Test namespace, for convenience
 	ginkgo.BeforeEach(func() {
 		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
-			framework.Skipf("PodSecurityPolicy not enabled")
+			framework.Failf("PodSecurityPolicy not enabled")
+			return
 		}
 		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			framework.Skipf("RBAC not enabled")
