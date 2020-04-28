@@ -69,6 +69,7 @@ type RequestHeaderAuthRequestController struct {
 	configmapName      string
 	configmapNamespace string
 
+	client                  kubernetes.Interface
 	configmapLister         corev1listers.ConfigMapNamespaceLister
 	configmapInformer       cache.SharedIndexInformer
 	configmapInformerSynced cache.InformerSynced
@@ -89,9 +90,11 @@ func NewRequestHeaderAuthRequestController(
 	cmName string,
 	cmNamespace string,
 	client kubernetes.Interface,
-	usernameHeadersKey, groupHeadersKey, extraHeaderPrefixesKey, allowedClientNamesKey string) (*RequestHeaderAuthRequestController, error) {
+	usernameHeadersKey, groupHeadersKey, extraHeaderPrefixesKey, allowedClientNamesKey string) *RequestHeaderAuthRequestController {
 	c := &RequestHeaderAuthRequestController{
 		name: "RequestHeaderAuthRequestController",
+
+		client: client,
 
 		configmapName:      cmName,
 		configmapNamespace: cmNamespace,
@@ -102,11 +105,6 @@ func NewRequestHeaderAuthRequestController(
 		allowedClientNamesKey:  allowedClientNamesKey,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "RequestHeaderAuthRequestController"),
-	}
-
-	// use the live client to prime the controller
-	if err := c.syncOnce(client); err != nil {
-		return nil, err
 	}
 
 	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
@@ -144,7 +142,7 @@ func NewRequestHeaderAuthRequestController(
 	c.configmapLister = corev1listers.NewConfigMapLister(c.configmapInformer.GetIndexer()).ConfigMaps(c.configmapNamespace)
 	c.configmapInformerSynced = c.configmapInformer.HasSynced
 
-	return c, nil
+	return c
 }
 
 func (c *RequestHeaderAuthRequestController) UsernameHeaders() []string {
@@ -184,6 +182,24 @@ func (c *RequestHeaderAuthRequestController) Run(workers int, stopCh <-chan stru
 	<-stopCh
 }
 
+// // RunOnce runs a single sync loop
+func (c *RequestHeaderAuthRequestController) RunOnce() error {
+	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(context.TODO(), c.configmapName, metav1.GetOptions{})
+	switch {
+	case errors.IsNotFound(err):
+		// ignore, authConfigMap is nil now
+		return nil
+	case errors.IsForbidden(err):
+		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
+			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
+			c.configmapName, c.configmapNamespace, c.configmapNamespace, authenticationRoleName)
+		return err
+	case err != nil:
+		return err
+	}
+	return c.syncConfigMap(configMap)
+}
+
 func (c *RequestHeaderAuthRequestController) runWorker() {
 	for c.processNextWorkItem() {
 	}
@@ -206,23 +222,6 @@ func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
 	c.queue.AddRateLimited(dsKey)
 
 	return true
-}
-
-func (c *RequestHeaderAuthRequestController) syncOnce(client kubernetes.Interface) error {
-	configMap, err := client.CoreV1().ConfigMaps(c.configmapNamespace).Get(context.TODO(), c.configmapName, metav1.GetOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		// ignore, authConfigMap is nil now
-		return nil
-	case errors.IsForbidden(err):
-		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
-			c.configmapName, c.configmapNamespace, c.configmapNamespace, authenticationRoleName)
-		return err
-	case err != nil:
-		return err
-	}
-	return c.syncConfigMap(configMap)
 }
 
 // sync reads the config and propagates the changes to exportedRequestHeaderBundle

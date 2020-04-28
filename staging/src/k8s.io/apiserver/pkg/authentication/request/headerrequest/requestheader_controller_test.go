@@ -218,9 +218,10 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 			// test data
 			target := newDefaultTarget()
 			fakeKubeClient := fake.NewSimpleClientset(scenario.cm)
+			target.client = fakeKubeClient
 
 			// act
-			err := target.syncOnce(fakeKubeClient)
+			err := target.RunOnce()
 
 			if err != nil && !scenario.expectErr {
 				t.Errorf("got unexpected error %v", err)

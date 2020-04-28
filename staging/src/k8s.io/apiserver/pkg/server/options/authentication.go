@@ -335,6 +335,11 @@ func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kuber
 		return nil, fmt.Errorf("unable to create request header authentication config: %v", err)
 	}
 
+	//  look up authentication configuration in the cluster and in case of an err defer to authentication-tolerate-lookup-failure flag
+	if err := dynamicRequestHeaderProvider.RunOnce(); err != nil {
+		return nil, err
+	}
+
 	return &authenticatorfactory.RequestHeaderConfig{
 		CAContentProvider:   dynamicRequestHeaderProvider,
 		UsernameHeaders:     headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.UsernameHeaders)),
