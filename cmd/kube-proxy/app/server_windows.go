@@ -31,8 +31,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -43,8 +45,7 @@ import (
 	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
-
-	"k8s.io/klog"
+    "k8s.io/klog"
 )
 
 // NewProxyServer returns a new ProxyServer.
@@ -102,6 +103,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
 		klog.V(0).Info("Using Kernelspace Proxier.")
+
 		proxier, err = winkernel.NewProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
@@ -114,6 +116,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 			healthzServer,
 			config.Winkernel,
 		)
+
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
@@ -151,7 +154,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		OOMScoreAdj:         config.OOMScoreAdj,
 		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
 		HealthzServer:       healthzServer,
-		UseEndpointSlices:   false,
+		UseEndpointSlices:   utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying),
 	}, nil
 }
 

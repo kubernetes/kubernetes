@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
+	"sort"
+	"strings"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 
@@ -35,12 +36,16 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	discovery "k8s.io/api/discovery/v1beta1"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	utilnet "k8s.io/utils/net"
 	"k8s.io/client-go/tools/record"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -169,7 +174,8 @@ func conjureMac(macPrefix string, ip net.IP) string {
 	if ip4 := ip.To4(); ip4 != nil {
 		a, b, c, d := ip4[0], ip4[1], ip4[2], ip4[3]
 		return fmt.Sprintf("%v-%02x-%02x-%02x-%02x", macPrefix, a, b, c, d)
-	}
+	} 
+
 	return "02-11-22-33-44-55"
 }
 
@@ -286,6 +292,7 @@ type endpointsChangeMap struct {
 	lock     sync.Mutex
 	hostname string
 	items    map[types.NamespacedName]*endpointsChange
+	endpointSliceCache *endpointSliceMap
 }
 
 type serviceChange struct {
@@ -310,6 +317,81 @@ type updateServiceMapResult struct {
 }
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
 type proxyEndpointsMap map[proxy.ServicePortName][]*endpointsInfo
+
+var supportedEndpointSliceAddressTypes = sets.NewString(
+	string(discovery.AddressTypeIP), // IP is a deprecated address type
+	string(discovery.AddressTypeIPv4),
+	string(discovery.AddressTypeIPv6),
+)
+
+// EndpointSliceCache is used as a cache of EndpointSlice information.
+type endpointSliceMap struct {
+	// lock protects trackerByServiceMap.
+	lock sync.Mutex
+
+	// trackerByServiceMap is the basis of this cache. It contains endpoint
+	// slice trackers grouped by service name and endpoint slice name. The first
+	// key represents a namespaced service name while the second key represents
+	// an endpoint slice name. Since endpoints can move between slices, we
+	// require slice specific caching to prevent endpoints being removed from
+	// the cache when they may have just moved to a different slice.
+	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
+	hostname         string
+	isIPv6Mode       *bool
+	recorder         record.EventRecorder
+}
+
+// endpointSliceTracker keeps track of EndpointSlices as they have been applied
+// by a proxier along with any pending EndpointSlices that have been updated
+// in this cache but not yet applied by a proxier.
+type endpointSliceTracker struct {
+	applied endpointSliceInfoByName
+	pending endpointSliceInfoByName
+}
+
+// endpointSliceInfoByName groups endpointSliceInfo by the names of the
+// corresponding EndpointSlices.
+type endpointSliceInfoByName map[string]*endpointSliceInfo
+
+// endpointSliceInfo contains just the attributes kube-proxy cares about.
+// Used for caching. Intentionally small to limit memory util.
+type endpointSliceInfo struct {
+	Ports     []discovery.EndpointPort
+	Endpoints []*endpointInfoFromSlice
+	Remove    bool
+}
+
+// endpointInfo contains just the attributes kube-proxy cares about.
+// Used for caching. Intentionally small to limit memory util.
+// Addresses and Topology are copied from EndpointSlice Endpoints.
+type endpointInfoFromSlice struct {
+	Addresses []string
+	Topology  map[string]string
+}
+
+// spToEndpointMap stores groups Endpoint objects by ServicePortName and
+// EndpointSlice name.
+type spToEndpointMap map[proxy.ServicePortName]map[string]endpointsInfo
+
+// NewEndpointSliceMap initializes an endPointSliceMap.
+func newEndpointSliceMap(hostname string, isIPv6Mode *bool, recorder record.EventRecorder) *endpointSliceMap {
+
+	return &endpointSliceMap{
+		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
+		hostname:            hostname,
+		isIPv6Mode:          isIPv6Mode,	
+		recorder:            recorder,
+	}
+}
+
+// newEndpointSliceTracker initializes an endpointSliceTracker.
+func newEndpointSliceTracker() *endpointSliceTracker {
+	return &endpointSliceTracker{
+		applied: endpointSliceInfoByName{},
+		pending: endpointSliceInfoByName{},
+	}
+}
+
 
 func newEndpointsChangeMap(hostname string) endpointsChangeMap {
 	return endpointsChangeMap{
@@ -467,10 +549,11 @@ type Proxier struct {
 	// endpointsSynced and servicesSynced are set to true when corresponding
 	// objects are synced after startup. This is used to avoid updating hns policies
 	// with some partial data after kube-proxy restart.
-	endpointsSynced bool
-	servicesSynced  bool
-	initialized     int32
-	syncRunner      *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	endpointsSynced         bool
+	endpointSlicesSynced    bool
+	servicesSynced          bool
+	initialized             int32
+	syncRunner              *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 
 	// These are effectively const and do not need the mutex to be held.
 	masqueradeAll  bool
@@ -630,12 +713,20 @@ func NewProxier(
 		}
 	}
 
+	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+	endPointsChangeTracker := newEndpointsChangeMap(hostname)
+	isIPv6Mode := false
+
+	if endpointSlicesEnabled {
+		endPointsChangeTracker.endpointSliceCache = newEndpointSliceMap(hostname, &isIPv6Mode, recorder)
+	}
+	
 	proxier := &Proxier{
 		portsMap:            make(map[localPort]closeable),
 		serviceMap:          make(proxyServiceMap),
 		serviceChanges:      newServiceChangeMap(),
 		endpointsMap:        make(proxyEndpointsMap),
-		endpointsChanges:    newEndpointsChangeMap(hostname),
+		endpointsChanges:    endPointsChangeTracker,
 		masqueradeAll:       masqueradeAll,
 		masqueradeMark:      masqueradeMark,
 		clusterCIDR:         clusterCIDR,
@@ -736,7 +827,6 @@ func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.QueuedUpdate()
-		metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	}
 	proxier.syncRunner.Run()
 }
@@ -794,7 +884,13 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying) {
+		proxier.setInitialized(proxier.endpointSlicesSynced)
+	} else {
+		proxier.setInitialized(proxier.endpointsSynced)
+	}
+
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -884,6 +980,42 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.syncProxyRules()
 }
 
+// OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
+// is observed.
+func (proxier *Proxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
+	if proxier.endpointsChanges.endpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
+		proxier.Sync()
+	}
+}
+
+// OnEndpointSliceUpdate is called whenever modification of an existing endpoint
+// slice object is observed.
+func (proxier *Proxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) {
+	if proxier.endpointsChanges.endpointSliceUpdate(endpointSlice, false) && proxier.isInitialized() {
+		proxier.Sync()
+	}
+}
+
+// OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
+// object is observed.
+func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
+	if proxier.endpointsChanges.endpointSliceUpdate(endpointSlice, true) && proxier.isInitialized() {
+		proxier.Sync()
+	}
+}
+
+// OnEndpointSlicesSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
+func (proxier *Proxier) OnEndpointSlicesSynced() {
+
+	proxier.mu.Lock()
+	proxier.endpointSlicesSynced = true
+	proxier.setInitialized(proxier.servicesSynced)
+	proxier.mu.Unlock()
+	// Sync unconditionally - this is called once per lifetime.
+	proxier.syncProxyRules()
+}
+
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svcInfo := range proxier.serviceMap {
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName])
@@ -908,14 +1040,25 @@ func isNetworkNotFoundError(err error) bool {
 func (proxier *Proxier) updateEndpointsMap() (result updateEndpointMapResult) {
 	result.staleEndpoints = make(map[endpointServicePair]bool)
 	result.staleServiceNames = make(map[proxy.ServicePortName]bool)
-
+  
 	endpointsMap := proxier.endpointsMap
 	changes := &proxier.endpointsChanges
 
 	func() {
 		changes.lock.Lock()
 		defer changes.lock.Unlock()
-		for _, change := range changes.items {
+
+		changeList := []*endpointsChange{}
+
+		if changes.endpointSliceCache != nil {
+			changeList = changes.endpointSliceCache.checkoutChanges(proxier.hns)
+		} else {
+			for _, change := range changes.items {
+				changeList = append(changeList, change)
+			}
+		}
+
+		for _, change := range changeList {
 			endpointsMap.unmerge(change.previous, proxier.serviceMap)
 			endpointsMap.merge(change.current, proxier.serviceMap)
 		}
@@ -1340,4 +1483,303 @@ func (proxier *Proxier) syncProxyRules() {
 type endpointServicePair struct {
 	endpoint        string
 	servicePortName proxy.ServicePortName
+}
+
+// byIP helps sort endpoints by IP
+type byIP []*endpointsInfo
+
+func (e byIP) Len() int {
+	return len(e)
+}
+func (e byIP) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+func (e byIP) Less(i, j int) bool {
+	return e[i].ip < e[j].ip
+}
+
+// byAddress helps sort endpointInfo
+type byAddress []*endpointInfoFromSlice
+
+func (e byAddress) Len() int {
+	return len(e)
+}
+func (e byAddress) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+func (e byAddress) Less(i, j int) bool {
+	return strings.Join(e[i].Addresses, ",") < strings.Join(e[j].Addresses, ",")
+}
+
+// byPort helps sort EndpointSlice ports by port number
+type byPort []discovery.EndpointPort
+
+func (p byPort) Len() int {
+	return len(p)
+}
+func (p byPort) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+func (p byPort) Less(i, j int) bool {
+	return *p[i].Port < *p[j].Port
+}
+
+// newEndpointSliceInfo generates endpointSliceInfo from an EndpointSlice.
+func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *endpointSliceInfo {
+	esInfo := &endpointSliceInfo{
+		Ports:     make([]discovery.EndpointPort, len(endpointSlice.Ports)),
+		Endpoints: []*endpointInfoFromSlice{},
+		Remove:    remove,
+	}
+
+	// copy here to avoid mutating shared EndpointSlice object.
+	copy(esInfo.Ports, endpointSlice.Ports)
+	sort.Sort(byPort(esInfo.Ports))
+
+	if !remove {
+		for _, endpoint := range endpointSlice.Endpoints {
+			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
+				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfoFromSlice{
+					Addresses: endpoint.Addresses,
+					Topology:  endpoint.Topology,
+				})
+			}
+		}
+
+		sort.Sort(byAddress(esInfo.Endpoints))
+	}
+	return esInfo
+}
+
+// updatePending updates a pending slice in the cache.
+func (cache *endpointSliceMap) updatePending(endpointSlice *discovery.EndpointSlice, remove bool) bool {
+	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
+	if err != nil {
+		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
+		return false
+	}
+
+	esInfo := newEndpointSliceInfo(endpointSlice, remove)
+
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
+
+	if _, ok := cache.trackerByServiceMap[serviceKey]; !ok {
+		cache.trackerByServiceMap[serviceKey] = newEndpointSliceTracker()
+	}
+
+	changed := cache.esInfoChanged(serviceKey, sliceKey, esInfo)
+
+	if changed {
+		cache.trackerByServiceMap[serviceKey].pending[sliceKey] = esInfo
+	}
+
+	return changed
+}
+
+// checkoutChanges returns a list of all endpointsChanges that are
+// pending and then marks them as applied.
+func (cache *endpointSliceMap) checkoutChanges(hns HostNetworkService) []*endpointsChange {
+	changes := []*endpointsChange{}
+
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
+
+	for serviceNN, esTracker := range cache.trackerByServiceMap {
+		if len(esTracker.pending) == 0 {
+			continue
+		}
+
+		change := &endpointsChange{}
+
+		change.previous = cache.getEndpointsMap(serviceNN, esTracker.applied, hns)
+
+		for name, sliceInfo := range esTracker.pending {
+			if sliceInfo.Remove {
+				delete(esTracker.applied, name)
+			} else {
+				esTracker.applied[name] = sliceInfo
+			}
+
+			delete(esTracker.pending, name)
+		}
+
+		change.current = cache.getEndpointsMap(serviceNN, esTracker.applied, hns)
+		changes = append(changes, change)
+	}
+
+	return changes
+}
+
+// EndpointSliceUpdate updates given service's endpoints change map based on the <previous, current> endpoints pair.
+// It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeMap.
+// If removeSlice is true, slice will be removed, otherwise it will be added or updated.
+func (ect *endpointsChangeMap) endpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
+	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
+		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+		return false
+	}
+
+	// This should never happen
+	if endpointSlice == nil {
+		klog.Error("Nil endpointSlice passed to EndpointSliceUpdate")
+		return false
+	}
+
+	_, _, err := endpointSliceCacheKeys(endpointSlice)
+	if err != nil {
+		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
+		return false
+	}
+
+	metrics.EndpointChangesTotal.Inc()
+
+	ect.lock.Lock()
+	defer ect.lock.Unlock()
+
+	changeNeeded := ect.endpointSliceCache.updatePending(endpointSlice, removeSlice)
+
+	if changeNeeded {
+		metrics.EndpointChangesPending.Inc()
+	}
+
+	return changeNeeded
+}
+
+
+// getEndpointsMap computes an EndpointsMap for a given set of EndpointSlices.
+func (cache *endpointSliceMap) getEndpointsMap(serviceNN types.NamespacedName, sliceInfoByName endpointSliceInfoByName, hns HostNetworkService) proxyEndpointsMap {
+	endpointInfoBySP := cache.endpointInfoByServicePort(serviceNN, sliceInfoByName, hns)
+	return endpointsMapFromEndpointInfo(endpointInfoBySP)
+}
+
+// endpointInfoByServicePort groups endpoint info by service port name and address.
+func (cache *endpointSliceMap) endpointInfoByServicePort(serviceNN types.NamespacedName, sliceInfoByName endpointSliceInfoByName, hns HostNetworkService) spToEndpointMap {
+	endpointInfoBySP := spToEndpointMap{}
+
+	for _, sliceInfo := range sliceInfoByName {
+		for _, port := range sliceInfo.Ports {
+			if port.Name == nil {
+				klog.Warningf("ignoring port with nil name %v", port)
+				continue
+			}
+		
+			if port.Port == nil || *port.Port == int32(0) {
+				klog.Warningf("ignoring invalid endpoint port %s", *port.Name)
+				continue
+			}
+
+			svcPortName := proxy.ServicePortName{
+				NamespacedName: serviceNN,
+				Port:           *port.Name,
+				Protocol:       *port.Protocol,
+			}
+
+			endpointInfoBySP[svcPortName] = cache.addEndpointsByIP(serviceNN, int(*port.Port), endpointInfoBySP[svcPortName], sliceInfo.Endpoints, hns)
+		}
+	}
+
+	return endpointInfoBySP
+}
+
+// addEndpointsByIP adds endpointInfo for each IP.
+func (cache *endpointSliceMap) addEndpointsByIP(serviceNN types.NamespacedName, portNum int, endpointsByIP map[string]endpointsInfo, endpoints []*endpointInfoFromSlice, hns HostNetworkService) map[string]endpointsInfo {
+	if endpointsByIP == nil {
+		endpointsByIP = map[string]endpointsInfo{}
+	}
+
+	// iterate through endpoints to add them to endpointsByIP.
+	for _, endpoint := range endpoints {
+		if len(endpoint.Addresses) == 0 {
+			klog.Warningf("ignoring invalid endpoint port %s with empty addresses", endpoint)
+			continue
+		}
+
+		// Filter out the incorrect IP version case. Any endpoint port that
+		// contains incorrect IP version will be ignored.
+		if cache.isIPv6Mode != nil && utilnet.IsIPv6String(endpoint.Addresses[0]) != *cache.isIPv6Mode {
+			// Emit event on the corresponding service which had a different IP
+			// version than the endpoint.
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Namespace, serviceNN.Name, "")
+			continue
+		}
+
+		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
+		endpointInfoToAdd := newEndpointInfo(endpoint.Addresses[0], uint16(portNum), isLocal, hns) 
+
+		// This logic ensures we're deduping potential overlapping endpoints
+		// isLocal should not vary between matching IPs, but if it does, we
+		// favor a true value here if it exists.
+		if _, exists := endpointsByIP[endpointInfoToAdd.ip]; !exists || isLocal {
+			endpointsByIP[endpointInfoToAdd.ip] = *endpointInfoToAdd 
+		}
+	}
+
+	return endpointsByIP
+}
+
+func (cache *endpointSliceMap) isLocal(hostname string) bool {
+	return len(cache.hostname) > 0 && hostname == cache.hostname
+}
+
+// esInfoChanged returns true if the esInfo parameter should be set as a new
+// pending value in the cache.
+func (cache *endpointSliceMap) esInfoChanged(serviceKey types.NamespacedName, sliceKey string, esInfo *endpointSliceInfo) bool {
+	if _, ok := cache.trackerByServiceMap[serviceKey]; ok {
+		appliedInfo, appliedOk := cache.trackerByServiceMap[serviceKey].applied[sliceKey]
+		pendingInfo, pendingOk := cache.trackerByServiceMap[serviceKey].pending[sliceKey]
+
+		// If there's already a pending value, return whether or not this would
+		// change that.
+		if pendingOk {
+			return !reflect.DeepEqual(esInfo, pendingInfo)
+		}
+
+		// If there's already an applied value, return whether or not this would
+		// change that.
+		if appliedOk {
+			return !reflect.DeepEqual(esInfo, appliedInfo)
+		}
+	}
+
+	// If this is marked for removal and does not exist in the cache, no changes
+	// are necessary.
+	if esInfo.Remove {
+		return false
+	}
+
+	// If not in the cache, and not marked for removal, it should be added.
+	return true
+}
+
+// endpointsMapFromEndpointInfo computes an endpointsMap from endpointInfo that
+// has been grouped by service port and IP.
+func endpointsMapFromEndpointInfo(endpointInfoBySP map[proxy.ServicePortName]map[string]endpointsInfo) proxyEndpointsMap {
+	endpointsMap := proxyEndpointsMap{}
+
+	// transform endpointInfoByServicePort into an endpointsMap with sorted IPs.
+	for svcPortName, endpointInfoByIP := range endpointInfoBySP {
+		if len(endpointInfoByIP) > 0 {
+			endpointsMap[svcPortName] = []*endpointsInfo{}
+			for _, endpointInfo := range endpointInfoByIP { 
+				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], &endpointInfo) 
+			}
+			// Ensure IPs are always returned in the same order to simplify diffing.
+			sort.Sort(byIP(endpointsMap[svcPortName]))
+		}
+	}
+
+	return endpointsMap
+}
+
+// endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.
+func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, string, error) {
+	var err error
+	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
+	if !ok || serviceName == "" {
+		err = fmt.Errorf("No %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
+	} else if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
+		err = fmt.Errorf("Expected EndpointSlice name and namespace to be set: %v", endpointSlice)
+	}
+	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
 }
