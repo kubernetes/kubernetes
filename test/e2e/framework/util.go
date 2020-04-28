@@ -50,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
@@ -57,7 +58,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/controller"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -138,6 +139,10 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
+
+	// AllContainers specifies that all containers be visited
+	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+	AllContainers = InitContainers | Containers | EphemeralContainers
 )
 
 var (
@@ -711,6 +716,66 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
 }
 
+// ContainerType signifies container type
+type ContainerType int
+
+const (
+	// FeatureEphemeralContainers allows running an ephemeral container in pod namespaces to troubleshoot a running pod
+	FeatureEphemeralContainers featuregate.Feature = "EphemeralContainers"
+	// Containers is for normal containers
+	Containers ContainerType = 1 << iota
+	// InitContainers is for init containers
+	InitContainers
+	// EphemeralContainers is for ephemeral containers
+	EphemeralContainers
+)
+
+// allFeatureEnabledContainers returns a ContainerType mask which includes all container
+// types except for the ones guarded by feature gate.
+// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+func allFeatureEnabledContainers() ContainerType {
+	containerType := AllContainers
+	if !utilfeature.DefaultFeatureGate.Enabled(FeatureEphemeralContainers) {
+		containerType &= ^EphemeralContainers
+	}
+	return containerType
+}
+
+// ContainerVisitor is called with each container spec, and returns true
+// if visiting should continue.
+// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+type ContainerVisitor func(container *v1.Container, containerType ContainerType) (shouldContinue bool)
+
+// visitContainers invokes the visitor function with a pointer to every container
+// spec in the given pod spec with type set in mask. If visitor returns false,
+// visiting is short-circuited. visitContainers returns true if visiting completes,
+// false if visiting was short-circuited.
+// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
+func visitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
+	if mask&InitContainers != 0 {
+		for i := range podSpec.InitContainers {
+			if !visitor(&podSpec.InitContainers[i], InitContainers) {
+				return false
+			}
+		}
+	}
+	if mask&Containers != 0 {
+		for i := range podSpec.Containers {
+			if !visitor(&podSpec.Containers[i], Containers) {
+				return false
+			}
+		}
+	}
+	if mask&EphemeralContainers != 0 {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
 // It then tests that the matcher with each expectedOutput matches the output of the specified container.
 func (f *Framework) MatchContainerOutput(
@@ -741,7 +806,7 @@ func (f *Framework) MatchContainerOutput(
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = podutil.VisitContainers(&podStatus.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+		_ = visitContainers(&podStatus.Spec, allFeatureEnabledContainers(), func(c *v1.Container, containerType ContainerType) bool {
 			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				Logf("Failed to get logs from node %q pod %q container %q: %v",
