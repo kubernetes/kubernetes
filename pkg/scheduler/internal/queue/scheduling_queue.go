@@ -499,8 +499,6 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 		unschedulablePods = append(unschedulablePods, pInfo)
 	}
 	p.movePodsToActiveOrBackoffQueue(unschedulablePods, event)
-	p.moveRequestCycle = p.schedulingCycle
-	p.cond.Broadcast()
 }
 
 // NOTE: this function assumes lock has been acquired in caller
