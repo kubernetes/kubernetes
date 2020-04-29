@@ -32,6 +32,8 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//vendor/go.opentelemetry.io/otel/api/core:go_default_library",
+        "//vendor/go.opentelemetry.io/otel/api/global:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],

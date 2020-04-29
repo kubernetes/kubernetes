@@ -18,6 +18,7 @@ package nodeunschedulable
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,6 +50,8 @@ func (pl *NodeUnschedulable) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("nodeunschedulable").Start(ctx, "Filter NodeUnschedulable")
+	defer span.End()
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnknownCondition)
 	}

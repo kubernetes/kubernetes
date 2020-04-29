@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -513,6 +514,9 @@ func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 // Filter invoked at the filter extension point.
 // It checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("interpodaffinity").Start(ctx, "Filter InterPodAffinity")
+	defer span.End()
+
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())

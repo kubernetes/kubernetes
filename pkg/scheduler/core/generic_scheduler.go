@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 	"math"
 	"math/rand"
 	"sort"
@@ -146,6 +147,9 @@ func (g *genericScheduler) snapshot() error {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
 func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
+	ctx, span := global.TraceProvider().Tracer("new-scheduler").Start(ctx, "genericScheduler Schedule")
+	defer span.End()
+
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
@@ -397,6 +401,8 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
 func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.NodeToStatusMap, error) {
+	ctx, span := global.TraceProvider().Tracer("genericScheduler").Start(ctx, "findNodesThatFitPod")
+	defer span.End()
 	s := prof.RunPreFilterPlugins(ctx, state, pod)
 	if !s.IsSuccess() {
 		return nil, nil, s.AsError()
@@ -620,6 +626,8 @@ func (g *genericScheduler) prioritizeNodes(
 	pod *v1.Pod,
 	nodes []*v1.Node,
 ) (framework.NodeScoreList, error) {
+	ctx, span := global.TraceProvider().Tracer("genericScheduler").Start(ctx, "prioritizeNodes")
+	defer span.End()
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(g.extenders) == 0 && !prof.HasScorePlugins() {

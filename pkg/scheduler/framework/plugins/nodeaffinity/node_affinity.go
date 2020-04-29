@@ -19,6 +19,7 @@ package nodeaffinity
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,6 +52,8 @@ func (pl *NodeAffinity) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("nodeaffinity").Start(ctx, "Filter NodeAffinity")
+	defer span.End()
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
@@ -63,6 +66,8 @@ func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState,
 
 // Score invoked at the Score extension point.
 func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	ctx, span := global.TraceProvider().Tracer("nodeaffinity").Start(ctx, "Score NodeAffinity")
+	defer span.End()
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))

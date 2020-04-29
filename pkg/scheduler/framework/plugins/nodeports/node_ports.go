@@ -19,6 +19,7 @@ package nodeports
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -98,6 +99,8 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 
 // Filter invoked at the filter extension point.
 func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("nodeports").Start(ctx, "Filter NodePorts")
+	defer span.End()
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())

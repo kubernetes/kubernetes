@@ -19,6 +19,7 @@ package tainttoleration
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +53,8 @@ func (pl *TaintToleration) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("tainttoleration").Start(ctx, "Filter TaintToleration")
+	defer span.End()
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		return framework.NewStatus(framework.Error, "invalid nodeInfo")
 	}
@@ -136,6 +139,8 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 
 // Score invoked at the Score extension point.
 func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	ctx, span := global.TraceProvider().Tracer("tainttoleration").Start(ctx, "Score TaintToleration")
+	defer span.End()
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil || nodeInfo.Node() == nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))

@@ -11,6 +11,8 @@ go_library(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/kube-scheduler/config/v1alpha2:go_default_library",
+        "//vendor/go.opentelemetry.io/otel/api/global:go_default_library",
     ],
 )
 

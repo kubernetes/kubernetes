@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -284,6 +285,8 @@ func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) 
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
 func (pl *InterPodAffinity) Score(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	ctx, span := global.TraceProvider().Tracer("interpodaffinity").Start(ctx, "Score InterPodAffinity")
+	defer span.End()
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
 	if err != nil || nodeInfo.Node() == nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))

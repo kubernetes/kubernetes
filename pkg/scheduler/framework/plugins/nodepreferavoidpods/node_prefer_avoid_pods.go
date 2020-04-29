@@ -19,6 +19,7 @@ package nodepreferavoidpods
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,8 @@ func (pl *NodePreferAvoidPods) Name() string {
 
 // Score invoked at the score extension point.
 func (pl *NodePreferAvoidPods) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	ctx, span := global.TraceProvider().Tracer("NodePreferAvoidPods").Start(ctx, "Score NodePreferAvoidPods")
+	defer span.End()
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))

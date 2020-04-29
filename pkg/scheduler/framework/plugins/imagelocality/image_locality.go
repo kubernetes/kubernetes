@@ -19,6 +19,7 @@ package imagelocality
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -52,6 +53,8 @@ func (pl *ImageLocality) Name() string {
 
 // Score invoked at the score extension point.
 func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	ctx, span := global.TraceProvider().Tracer("imagelocality").Start(ctx, "Score ImageLocality")
+	defer span.End()
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))

@@ -18,6 +18,7 @@ package volumebinding
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,6 +63,8 @@ func podHasPVCs(pod *v1.Pod) bool {
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("volumebinding").Start(ctx, "Filter VolumeBinding")
+	defer span.End()
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")

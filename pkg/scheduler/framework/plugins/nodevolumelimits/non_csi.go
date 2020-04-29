@@ -19,6 +19,7 @@ package nodevolumelimits
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 	"os"
 	"regexp"
 	"strconv"
@@ -196,6 +197,8 @@ func (pl *nonCSILimits) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("nodevolumelimit").Start(ctx, "Filter nonCSILimits")
+	defer span.End()
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {

@@ -19,6 +19,7 @@ package defaultpodtopologyspread
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -73,6 +74,8 @@ func skipDefaultPodTopologySpread(pod *v1.Pod) bool {
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
 func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	ctx, span := global.TraceProvider().Tracer("defaultpodtopologyspread").Start(ctx, "Score DefaultPodTopologySpread")
+	defer span.End()
 	if skipDefaultPodTopologySpread(pod) {
 		return 0, nil
 	}

@@ -19,6 +19,8 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/core"
+	"go.opentelemetry.io/otel/api/global"
 	"reflect"
 	"time"
 
@@ -311,6 +313,7 @@ func (f *framework) QueueSortFunc() LessFunc {
 // anything but Success. If a non-success status is returned, then the scheduling
 // cycle is aborted.
 func (f *framework) RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (status *Status) {
+	ctx, span := global.TraceProvider().Tracer("framework").Start(ctx, "RunPreFilterPlugins")
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilter, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
@@ -424,6 +427,8 @@ func (f *framework) RunFilterPlugins(
 	pod *v1.Pod,
 	nodeInfo *NodeInfo,
 ) PluginToStatus {
+	ctx, span := global.TraceProvider().Tracer("framework").Start(ctx, "RunFilterPlugins")
+	defer span.End()
 	statuses := make(PluginToStatus)
 	for _, pl := range f.filterPlugins {
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
@@ -494,6 +499,8 @@ func (f *framework) runPreScorePlugin(ctx context.Context, pl PreScorePlugin, st
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
 func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) (ps PluginToNodeScores, status *Status) {
+	ctx, span := global.Tracer("framework").Start(ctx, "RunScorePlugins")
+	defer span.End()
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
@@ -518,6 +525,10 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 				Name:  nodeName,
 				Score: int64(s),
 			}
+			span.AddEvent(ctx, "NodeScore",
+				core.KeyValue{Key: "Node", Value: core.String(nodeName)},
+				core.KeyValue{Key: "Score", Value: core.Int64(s)},
+			)
 		}
 	})
 	if err := errCh.ReceiveError(); err != nil {

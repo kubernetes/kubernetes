@@ -18,6 +18,7 @@ package nodename
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +45,8 @@ func (pl *NodeName) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("nodename").Start(ctx, "Filter NodeName")
+	defer span.End()
 	if nodeInfo.Node() == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}

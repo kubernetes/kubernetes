@@ -19,6 +19,7 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -160,6 +161,9 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 // Checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 // It returns a list of insufficient resources, if empty, then the node has all the resources requested by the pod.
 func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("noderesources").Start(ctx, "Filter NodeResources Fit")
+	defer span.End()
+
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())

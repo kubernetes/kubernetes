@@ -19,6 +19,7 @@ package volumezone
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -78,6 +79,8 @@ func (pl *VolumeZone) Name() string {
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
 func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	ctx, span := global.TraceProvider().Tracer("volumezone").Start(ctx, "Filter VolumeZone")
+	defer span.End()
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {

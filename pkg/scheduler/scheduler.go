@@ -48,8 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 
-	"go.opentelemetry.io/otel/api/core"
-	"go.opentelemetry.io/otel/api/key"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -255,6 +253,8 @@ func New(client clientset.Interface,
 	if err != nil {
 		return nil, err
 	}
+	_, span := global.TraceProvider().Tracer("new-scheduler").Start(context.Background(), "NewScheduler")
+	defer span.End()
 
 	stopEverything := stopCh
 	if stopEverything == nil {
@@ -576,7 +576,7 @@ func (sched *Scheduler) finishBinding(prof *profile.Profile, assumed *v1.Pod, ta
 
 // scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne(ctx context.Context) {
-	ctx, span := global.TraceProvider().Tracer("kube-scheduler").Start(ctx, "schedulerOne")
+	ctx, span := global.TraceProvider().Tracer("kube-scheduler").Start(ctx, "scheduleOne")
 	defer span.End()
 	podInfo := sched.NextPod()
 	// pod could be nil when schedulerQueue is closed
