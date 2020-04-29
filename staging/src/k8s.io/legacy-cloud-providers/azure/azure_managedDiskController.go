@@ -78,10 +78,12 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	var err error
 	klog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
 
-	var createZones *[]string
-	if len(options.AvailabilityZone) > 0 && options.AvailabilityZone != "0" {
-		zoneList := []string{c.common.cloud.GetZoneID(options.AvailabilityZone)}
-		createZones = &zoneList
+	var createZones []string
+	if len(options.AvailabilityZone) > 0 {
+		requestedZone := c.common.cloud.GetZoneID(options.AvailabilityZone)
+		if requestedZone != "" {
+			createZones = append(createZones, requestedZone)
+		}
 	}
 
 	// insert original tags to newTags
@@ -152,8 +154,8 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		DiskProperties: &diskProperties,
 	}
 
-	if createZones != nil && len(*createZones) > 0 {
-		model.Zones = createZones
+	if len(createZones) > 0 {
+		model.Zones = &createZones
 	}
 
 	if options.ResourceGroup == "" {
