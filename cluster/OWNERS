@@ -18,6 +18,3 @@ emeritus_approvers:
   - roberthbailey   # 2019-03-08
   - jbeda
   - zmerlynn
-labels:
-- sig/cluster-lifecycle
-- area/release-eng

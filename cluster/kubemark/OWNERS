@@ -10,3 +10,5 @@ approvers:
   - shyamjvs
   - sig-scalability-approvers
   - wojtek-t
+labels:
+- sig/scalability
