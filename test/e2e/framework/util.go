@@ -59,7 +59,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/kubernetes/pkg/controller"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -1018,11 +1017,6 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 	ExpectEqual(node.Labels[labelKey], labelValue)
-}
-
-// AddOrUpdateTaintOnNode adds the given taint to the given node or updates taint.
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.AddOrUpdateTaintOnNode(c, nodeName, &taint))
 }
 
 // RemoveLabelOffNode is for cleaning up labels temporarily added to node,

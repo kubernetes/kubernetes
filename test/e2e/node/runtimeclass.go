@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 			Value:  "bar",
 			Effect: v1.TaintEffectNoSchedule,
 		}
-		framework.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
+		e2enode.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
 		framework.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
 		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
 

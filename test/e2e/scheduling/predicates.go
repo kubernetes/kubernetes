@@ -585,7 +585,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Value:  "testing-taint-value",
 			Effect: v1.TaintEffectNoSchedule,
 		}
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
@@ -628,7 +628,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Value:  "testing-taint-value",
 			Effect: v1.TaintEffectNoSchedule,
 		}
-		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
