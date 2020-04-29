@@ -53,6 +53,10 @@ var defaultingFixture = &apiextensionsv1.CustomResourceDefinition{
 				Served:  true,
 				Subresources: &apiextensionsv1.CustomResourceSubresources{
 					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.replicas",
+						StatusReplicasPath: ".status.replicas",
+					},
 				},
 			},
 			{
@@ -61,6 +65,10 @@ var defaultingFixture = &apiextensionsv1.CustomResourceDefinition{
 				Served:  false,
 				Subresources: &apiextensionsv1.CustomResourceSubresources{
 					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.replicas",
+						StatusReplicasPath: ".status.replicas",
+					},
 				},
 			},
 		},
@@ -94,6 +102,11 @@ properties:
         default: "v1beta1"
       v1beta2:
         type: string
+      replicas:
+        default: 1
+        format: int32
+        minimum: 0
+        type: integer
   status:
     type: object
     properties:
@@ -110,6 +123,11 @@ properties:
         default: "v1beta1"
       v1beta2:
         type: string
+      replicas:
+        default: 0
+        format: int32
+        minimum: 0
+        type: integer
 `
 
 const defaultingFooV1beta2Schema = `
@@ -131,6 +149,11 @@ properties:
       v1beta2:
         type: string
         default: "v1beta2"
+      replicas:
+        default: 1
+        format: int32
+        minimum: 0
+        type: integer
   status:
     type: object
     properties:
@@ -147,6 +170,11 @@ properties:
       v1beta2:
         type: string
         default: "v1beta2"
+      replicas:
+        default: 0
+        format: int32
+        minimum: 0
+        type: integer
 `
 
 const defaultingFooInstance = `
@@ -274,7 +302,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	// spec.a and spec.b are defaulted in both versions
 	// spec.v1beta1 is defaulted when reading the incoming request
 	// spec.v1beta2 is defaulted when reading the storage response
-	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"spec", "v1beta1"}, {"spec", "v1beta2"}})
+	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"spec", "v1beta1"}, {"spec", "v1beta2"}, {"spec", "replicas"}})
 	mustNotExist(foo.Object, [][]string{{"status"}})
 
 	t.Logf("Updating status and expecting 'a' and 'b' to show up.")
@@ -282,7 +310,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	if foo, err = fooClient.UpdateStatus(context.TODO(), foo, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"status", "a"}, {"status", "b"}})
+	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"status", "a"}, {"status", "b"}, {"status", "replicas"}})
 
 	t.Logf("Add 'c' default to the storage version and wait until GET sees it in both status and spec")
 	addDefault("v1beta2", "c", "C")
