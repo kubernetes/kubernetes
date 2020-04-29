@@ -570,6 +570,10 @@ func (c *cinderVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopolo
 		return nil, err
 	}
 
+	if fstype == "" {
+		fstype = "ext4"
+	}
+
 	volumeMode := c.options.PVC.Spec.VolumeMode
 	if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
 		// Block volumes should not have any FSType
