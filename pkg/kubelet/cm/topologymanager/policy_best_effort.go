@@ -35,13 +35,17 @@ func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
-func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {
+func (p *bestEffortPolicy) canAdmitContainerResult(hint *TopologyHint) bool {
 	return true
 }
 
 func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredProvidersHints := filterProvidersHints(providersHints)
 	bestHint := mergeFilteredHints(p.numaNodes, filteredProvidersHints)
-	admit := p.canAdmitPodResult(&bestHint)
+	admit := p.canAdmitContainerResult(&bestHint)
 	return bestHint, admit
+}
+
+func (p *bestEffortPolicy) CanAdmitPodResult(allContainersHints []TopologyHint) bool {
+	return true
 }

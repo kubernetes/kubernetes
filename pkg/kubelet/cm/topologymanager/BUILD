@@ -9,6 +9,7 @@ go_library(
         "policy_none.go",
         "policy_restricted.go",
         "policy_single_numa_node.go",
+        "pod_level_single_numa_node.go",
         "topology_manager.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager",

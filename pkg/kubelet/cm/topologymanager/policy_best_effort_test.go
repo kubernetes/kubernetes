@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
+func TestPolicyBestEffortCanAdmitContainerResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		hint     TopologyHint
@@ -41,7 +41,7 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	for _, tc := range tcases {
 		numaNodes := []int{0, 1}
 		policy := NewBestEffortPolicy(numaNodes)
-		result := policy.(*bestEffortPolicy).canAdmitPodResult(&tc.hint)
+		result := policy.(*bestEffortPolicy).canAdmitContainerResult(&tc.hint)
 
 		if result != tc.expected {
 			t.Errorf("Expected result to be %t, got %t", tc.expected, result)

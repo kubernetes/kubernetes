@@ -38,7 +38,7 @@ func TestPolicyRestrictedName(t *testing.T) {
 	}
 }
 
-func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
+func TestPolicyRestrictedCanAdmitContainerResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		hint     TopologyHint
@@ -59,7 +59,7 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	for _, tc := range tcases {
 		numaNodes := []int{0, 1}
 		policy := NewRestrictedPolicy(numaNodes)
-		result := policy.(*restrictedPolicy).canAdmitPodResult(&tc.hint)
+		result := policy.(*restrictedPolicy).canAdmitContainerResult(&tc.hint)
 
 		if result != tc.expected {
 			t.Errorf("Expected result to be %t, got %t", tc.expected, result)

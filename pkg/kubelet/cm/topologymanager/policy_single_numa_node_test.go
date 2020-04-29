@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
+func TestPolicySingleNumaNodeCanAdmitContainerResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		hint     TopologyHint
@@ -37,7 +37,7 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 	for _, tc := range tcases {
 		numaNodes := []int{0, 1}
 		policy := NewSingleNumaNodePolicy(numaNodes)
-		result := policy.(*singleNumaNodePolicy).canAdmitPodResult(&tc.hint)
+		result := policy.(*singleNumaNodePolicy).canAdmitContainerResult(&tc.hint)
 
 		if result != tc.expected {
 			t.Errorf("Expected result to be %t, got %t", tc.expected, result)

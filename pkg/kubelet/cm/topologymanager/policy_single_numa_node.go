@@ -39,7 +39,7 @@ func (p *singleNumaNodePolicy) Name() string {
 	return PolicySingleNumaNode
 }
 
-func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) bool {
+func (p *singleNumaNodePolicy) canAdmitContainerResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
 
@@ -72,6 +72,10 @@ func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint)
 		bestHint = TopologyHint{nil, bestHint.Preferred}
 	}
 
-	admit := p.canAdmitPodResult(&bestHint)
+	admit := p.canAdmitContainerResult(&bestHint)
 	return bestHint, admit
+}
+
+func (p *singleNumaNodePolicy) CanAdmitPodResult(allContainersHints []TopologyHint) bool {
+	return true
 }

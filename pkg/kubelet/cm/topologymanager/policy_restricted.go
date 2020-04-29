@@ -34,13 +34,17 @@ func (p *restrictedPolicy) Name() string {
 	return PolicyRestricted
 }
 
-func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
+func (p *restrictedPolicy) canAdmitContainerResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
 
 func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(providersHints)
 	hint := mergeFilteredHints(p.numaNodes, filteredHints)
-	admit := p.canAdmitPodResult(&hint)
+	admit := p.canAdmitContainerResult(&hint)
 	return hint, admit
+}
+
+func (p *restrictedPolicy) CanAdmitPodResult(allContainersHints []TopologyHint) bool {
+	return true
 }

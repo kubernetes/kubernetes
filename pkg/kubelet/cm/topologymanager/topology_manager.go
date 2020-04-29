@@ -232,6 +232,7 @@ func (m *manager) RemoveContainer(containerID string) error {
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
+	var allContainerHints []TopologyHint
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if m.policy.Name() == PolicyNone {
@@ -254,6 +255,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 				Admit:   false,
 			}
 		}
+		allContainerHints = append(allContainerHints, result)
 
 		klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
 		if m.podTopologyHints[string(pod.UID)] == nil {
@@ -271,5 +273,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 		}
 	}
 
-	return lifecycle.PodAdmitResult{Admit: true}
+	podAdmitResult := m.policy.CanAdmitPodResult(allContainerHints)
+
+	return lifecycle.PodAdmitResult{Admit: podAdmitResult}
 }

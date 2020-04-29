@@ -32,10 +32,14 @@ func (p *nonePolicy) Name() string {
 	return PolicyNone
 }
 
-func (p *nonePolicy) canAdmitPodResult(hint *TopologyHint) bool {
+func (p *nonePolicy) canAdmitContainerResult(hint *TopologyHint) bool {
 	return true
 }
 
 func (p *nonePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
-	return TopologyHint{}, p.canAdmitPodResult(nil)
+	return TopologyHint{}, p.canAdmitContainerResult(nil)
+}
+
+func (p *nonePolicy) CanAdmitPodResult(allContainersHints []TopologyHint) bool {
+	return true
 }

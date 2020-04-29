@@ -38,7 +38,7 @@ func TestPolicyNoneName(t *testing.T) {
 	}
 }
 
-func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
+func TestPolicyNoneCanAdmitContainerResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		hint     TopologyHint
@@ -58,7 +58,7 @@ func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
 
 	for _, tc := range tcases {
 		policy := NewNonePolicy()
-		result := policy.(*nonePolicy).canAdmitPodResult(&tc.hint)
+		result := policy.(*nonePolicy).canAdmitContainerResult(&tc.hint)
 
 		if result != tc.expected {
 			t.Errorf("Expected result to be %t, got %t", tc.expected, result)
