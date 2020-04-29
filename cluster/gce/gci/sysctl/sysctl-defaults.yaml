@@ -65,6 +65,8 @@ net.ipv4.udp_wmem_min: "4096"
 # Enforce the following OS default values.
 net.netfilter.nf_conntrack_generic_timeout: "600"
 
+# Disable accepting router advertisements, see b/151945703.
+net.ipv6.conf.default.accept_ra: "0"
 
 ###############################################################################
 # The following parameters are enforced by other Kubernetes/GKE components.
