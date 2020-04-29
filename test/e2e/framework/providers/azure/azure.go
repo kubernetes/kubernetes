@@ -77,7 +77,7 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	}
 
 	// do not use blank zone definition
-	if len(zone) > 0 && zone != "0" {
+	if len(zone) > 0 {
 		volumeOptions.AvailabilityZone = zone
 	}
 	return p.azureCloud.CreateManagedDisk(volumeOptions)
