@@ -13,7 +13,6 @@ go_library(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/capabilities:go_default_library",
-        "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
@@ -29,7 +28,6 @@ go_library(
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/serviceaccount:go_default_library",
-        "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
@@ -43,7 +41,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/openapi:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
@@ -76,10 +73,15 @@ go_library(
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister:go_default_library",
-        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["server_test.go"],
+    embed = [":go_default_library"],
 )
 
 filegroup(
@@ -98,10 +100,4 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["server_test.go"],
-    embed = [":go_default_library"],
 )
