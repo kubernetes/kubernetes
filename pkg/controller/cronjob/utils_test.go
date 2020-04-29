@@ -358,36 +358,25 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		sj.ObjectMeta.CreationTimestamp = testCase.creationTimestamp
-		sj.Status.LastScheduleTime = testCase.lastScheduleTime
-		sj.Spec.StartingDeadlineSeconds = testCase.deadline
+		t.Run(testCase.caseName, func(t *testing.T) {
+			sj.ObjectMeta.CreationTimestamp = testCase.creationTimestamp
+			sj.Status.LastScheduleTime = testCase.lastScheduleTime
+			sj.Spec.StartingDeadlineSeconds = testCase.deadline
 
-		times, err := getRecentUnmetScheduleTimes(sj, testCase.nowTime)
-		if err != nil && !testCase.expectErr {
-			t.Errorf("unexpect getRecentUnmetScheduleTimes err: %v, caseName: %v", err, testCase.caseName)
-		}
+			times, err := getRecentUnmetScheduleTimes(sj, testCase.nowTime)
+			if err != nil && !testCase.expectErr {
+				t.Errorf("unexpect getRecentUnmetScheduleTimes err: %v", err)
+			}
 
-		if err == nil && testCase.expectErr {
-			t.Errorf("expect getRecentUnmetScheduleTimes err, but get err: nil , caseName: %v", testCase.caseName)
-		}
+			if err == nil && testCase.expectErr {
+				t.Errorf("expect getRecentUnmetScheduleTimes err, but get err: nil")
+			}
 
-		if !equal(times, testCase.expectResult) {
-			t.Errorf("getRecentUnmetScheduleTimes expect: %v, get : %v, caseName: %v", testCase.expectResult, times, testCase.caseName)
-		}
+			if !reflect.DeepEqual(times, testCase.expectResult) {
+				t.Errorf("getRecentUnmetScheduleTimes expect: %v, get : %v", testCase.expectResult, times)
+			}
+		})
 	}
-}
-
-func equal(slice1, slice2 []time.Time) bool {
-	if len(slice1) != len(slice2) {
-		return false
-	}
-
-	for i, item1 := range slice1 {
-		if !item1.Equal(slice2[i]) {
-			return false
-		}
-	}
-	return true
 }
 
 func TestByJobStartTime(t *testing.T) {
