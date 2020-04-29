@@ -571,6 +571,8 @@ func (g *genericScheduler) podPassesFiltersOnNode(
 	pod *v1.Pod,
 	info *framework.NodeInfo,
 ) (bool, *framework.Status, error) {
+	ctx, span := global.TraceProvider().Tracer("genericScheduler").Start(ctx, info.Node().Name)
+	defer span.End()
 	var status *framework.Status
 
 	podsAdded := false
