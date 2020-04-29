@@ -1569,20 +1569,6 @@
     other platforms like Windows.
   release: v1.9
   file: test/e2e/common/networking.go
-- testname: Proxy, logs endpoint
-  codename: '[sig-network] Proxy version v1 should proxy logs on node using proxy
-    subresource  [Conformance]'
-  description: Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs
-    endpoint. This endpoint MUST be reachable.
-  release: v1.9
-  file: test/e2e/network/proxy.go
-- testname: Proxy, logs port endpoint
-  codename: '[sig-network] Proxy version v1 should proxy logs on node with explicit
-    kubelet port using proxy subresource  [Conformance]'
-  description: Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs
-    endpoint. This endpoint MUST be reachable.
-  release: v1.9
-  file: test/e2e/network/proxy.go
 - testname: Proxy, logs service endpoint
   codename: '[sig-network] Proxy version v1 should proxy through a service and a pod  [Conformance]'
   description: Select any node in the cluster to invoke  /logs endpoint  using the
