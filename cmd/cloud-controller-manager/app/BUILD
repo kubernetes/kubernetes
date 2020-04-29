@@ -15,7 +15,6 @@ go_library(
         "//pkg/controller/cloud:go_default_library",
         "//pkg/controller/route:go_default_library",
         "//pkg/controller/service:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
