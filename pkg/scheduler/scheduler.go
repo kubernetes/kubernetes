@@ -19,6 +19,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/global"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -46,6 +47,11 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+
+	"go.opentelemetry.io/otel/api/core"
+	"go.opentelemetry.io/otel/api/key"
+	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 const (
@@ -237,6 +243,18 @@ func New(client clientset.Interface,
 	recorderFactory profile.RecorderFactory,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
+
+	_, _, err := jaeger.NewExportPipeline(
+		jaeger.WithCollectorEndpoint(os.Getenv("JAEGER_ENDPOINT")),
+		jaeger.WithProcess(jaeger.Process{
+			ServiceName: "kube-scheduler",
+		}),
+		jaeger.RegisterAsGlobal(),
+		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	stopEverything := stopCh
 	if stopEverything == nil {
@@ -558,6 +576,8 @@ func (sched *Scheduler) finishBinding(prof *profile.Profile, assumed *v1.Pod, ta
 
 // scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne(ctx context.Context) {
+	ctx, span := global.TraceProvider().Tracer("kube-scheduler").Start(ctx, "schedulerOne")
+	defer span.End()
 	podInfo := sched.NextPod()
 	// pod could be nil when schedulerQueue is closed
 	if podInfo == nil || podInfo.Pod == nil {
