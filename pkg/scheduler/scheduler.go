@@ -245,7 +245,7 @@ func New(client clientset.Interface,
 	_, _, err := jaeger.NewExportPipeline(
 		jaeger.WithCollectorEndpoint(os.Getenv("JAEGER_ENDPOINT")),
 		jaeger.WithProcess(jaeger.Process{
-			ServiceName: "kube-scheduler",
+			ServiceName: os.Getenv("POD_NAME"),
 		}),
 		jaeger.RegisterAsGlobal(),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),

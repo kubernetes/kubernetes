@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/core"
 	"go.opentelemetry.io/otel/api/global"
 	"math"
 	"math/rand"
@@ -709,11 +710,15 @@ func (g *genericScheduler) prioritizeNodes(
 		}
 	}
 
-	if klog.V(10) {
-		for i := range result {
+	for i := range result {
+		span.AddEvent(ctx, "Node Score",
+			core.KeyValue{Key:"Node", Value:core.String(result[i].Name)},
+			core.KeyValue{Key:"Score", Value:core.Int64(result[i].Score)})
+		if klog.V(10) {
 			klog.Infof("Host %s => Score %d", result[i].Name, result[i].Score)
 		}
 	}
+
 	return result, nil
 }
 

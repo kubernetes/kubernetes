@@ -314,6 +314,7 @@ func (f *framework) QueueSortFunc() LessFunc {
 // cycle is aborted.
 func (f *framework) RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (status *Status) {
 	ctx, span := global.TraceProvider().Tracer("framework").Start(ctx, "RunPreFilterPlugins")
+	defer span.End()
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preFilter, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
@@ -527,6 +528,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 			}
 			span.AddEvent(ctx, "NodeScore",
 				core.KeyValue{Key: "Node", Value: core.String(nodeName)},
+				core.KeyValue{Key: "Plugin", Value: core.String(pl.Name())},
 				core.KeyValue{Key: "Score", Value: core.Int64(s)},
 			)
 		}
