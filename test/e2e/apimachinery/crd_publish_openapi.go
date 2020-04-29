@@ -511,7 +511,13 @@ func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, grou
 	return setupCRDAndVerifySchemaWithOptions(f, schema, expect, groupSuffix, versions)
 }
 
-func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect []byte, groupSuffix string, versions []string, options ...crd.Option) (*crd.TestCrd, error) {
+func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect []byte, groupSuffix string, versions []string, options ...crd.Option) (tCRD *crd.TestCrd, err error) {
+	defer func() {
+		if err == nil {
+			framework.Logf("sleeping 45 seconds before running the actual tests, we hope that during all API servers converge during that window, see %q for more", "https://github.com/kubernetes/kubernetes/pull/90452")
+			time.Sleep(time.Second * 45)
+		}
+	}()
 	group := fmt.Sprintf("%s-test-%s.example.com", f.BaseName, groupSuffix)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("require at least one version for CRD")
@@ -549,17 +555,17 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 		}
 		crd.Spec.Versions = apiVersions
 	})
-	crd, err := crd.CreateMultiVersionTestCRD(f, group, options...)
+	tCRD, err = crd.CreateMultiVersionTestCRD(f, group, options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRD: %v", err)
 	}
 
-	for _, v := range crd.Crd.Spec.Versions {
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), expect); err != nil {
+	for _, v := range tCRD.Crd.Spec.Versions {
+		if err := waitForDefinition(f.ClientSet, definitionName(tCRD, v.Name), expect); err != nil {
 			return nil, fmt.Errorf("%v", err)
 		}
 	}
-	return crd, nil
+	return tCRD, nil
 }
 
 func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
