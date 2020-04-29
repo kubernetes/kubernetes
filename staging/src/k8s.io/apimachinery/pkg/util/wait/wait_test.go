@@ -731,3 +731,30 @@ func TestJitteredBackoffManagerGetNextBackoff(t *testing.T) {
 		t.Errorf("backoff should be 1, but got %d", backoff)
 	}
 }
+
+func TestJitterBackoffManagerWithRealClock(t *testing.T) {
+	backoffMgr := NewJitteredBackoffManager(1*time.Millisecond, 0, &clock.RealClock{})
+	for i := 0; i < 5; i++ {
+		start := time.Now()
+		<-backoffMgr.Backoff().C()
+		passed := time.Now().Sub(start)
+		if passed < 1*time.Millisecond {
+			t.Errorf("backoff should be at least 1ms, but got %s", passed.String())
+		}
+	}
+}
+
+func TestExponentialBackoffManagerWithRealClock(t *testing.T) {
+	// backoff at least 1ms, 2ms, 4ms, 8ms, 10ms, 10ms, 10ms
+	durationFactors := []time.Duration{1, 2, 4, 8, 10, 10, 10}
+	backoffMgr := NewExponentialBackoffManager(1*time.Millisecond, 10*time.Millisecond, 1*time.Hour, 2.0, 0.0, &clock.RealClock{})
+
+	for i := range durationFactors {
+		start := time.Now()
+		<-backoffMgr.Backoff().C()
+		passed := time.Now().Sub(start)
+		if passed < durationFactors[i]*time.Millisecond {
+			t.Errorf("backoff should be at least %d ms, but got %s", durationFactors[i], passed.String())
+		}
+	}
+}
