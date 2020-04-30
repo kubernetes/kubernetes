@@ -243,17 +243,19 @@ func New(client clientset.Interface,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
-	_, _, err := jaeger.NewExportPipeline(
-		jaeger.WithCollectorEndpoint(os.Getenv("JAEGER_ENDPOINT")),
-		jaeger.WithProcess(jaeger.Process{
-			ServiceName: "kube-scheduler",
-			Tags: []otelcore.KeyValue{{Key:"PodName", Value:otelcore.String(os.Getenv("POD_NAME"))}},
-		}),
-		jaeger.RegisterAsGlobal(),
-		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
-	)
-	if err != nil {
-		return nil, err
+	if len(os.Getenv("JAEGER_ENDPOINT")) != 0 {
+		_, _, err := jaeger.NewExportPipeline(
+			jaeger.WithCollectorEndpoint(os.Getenv("JAEGER_ENDPOINT")),
+			jaeger.WithProcess(jaeger.Process{
+				ServiceName: "kube-scheduler",
+				Tags:        []otelcore.KeyValue{{Key: "PodName", Value: otelcore.String(os.Getenv("POD_NAME"))}},
+			}),
+			jaeger.RegisterAsGlobal(),
+			jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 	_, span := global.TraceProvider().Tracer("new-scheduler").Start(context.Background(), "NewScheduler")
 	defer span.End()
