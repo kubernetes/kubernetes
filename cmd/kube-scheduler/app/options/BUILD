@@ -12,7 +12,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kube-scheduler/app/config:go_default_library",
-        "//pkg/client/leaderelectionconfig:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",
+        "//staging/src/k8s.io/component-base/config/options:go_default_library",
         "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha2:go_default_library",

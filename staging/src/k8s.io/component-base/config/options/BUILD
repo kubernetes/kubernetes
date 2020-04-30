@@ -1,14 +1,11 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["config.go"],
-    importpath = "k8s.io/kubernetes/pkg/client/leaderelectionconfig",
+    srcs = ["leaderelectionconfig.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/config/options",
+    importpath = "k8s.io/component-base/config/options",
+    visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/component-base/config:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
@@ -26,4 +23,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

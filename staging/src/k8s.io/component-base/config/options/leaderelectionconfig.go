@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package leaderelectionconfig
+package options
 
 import (
 	"github.com/spf13/pflag"
-	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/config"
 )
 
-// BindFlags binds the LeaderElectionConfiguration struct fields to a flagset
-func BindFlags(l *componentbaseconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
+// BindLeaderElectionFlags binds the LeaderElectionConfiguration struct fields to a flagset
+func BindLeaderElectionFlags(l *config.LeaderElectionConfiguration, fs *pflag.FlagSet) {
 	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
 		"Start a leader election client and gain leadership before "+
 		"executing the main loop. Enable this when running replicated "+
