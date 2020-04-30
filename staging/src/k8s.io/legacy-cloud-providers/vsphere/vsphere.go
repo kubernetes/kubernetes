@@ -1054,10 +1054,6 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			var wg sync.WaitGroup
 			var localAttachedMaps []map[string]map[string]bool
 			var nodesToRetry []k8stypes.NodeName
-			var globalErr error
-			globalErr = nil
-			globalErrMutex := &sync.Mutex{}
-			nodesToRetryMutex := &sync.Mutex{}
 
 			// Segregate nodes according to VC-DC
 			dcNodes := make(map[string][]k8stypes.NodeName)
@@ -1070,31 +1066,33 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 				VC_DC := nodeInfo.vcServer + nodeInfo.dataCenter.String()
 				dcNodes[VC_DC] = append(dcNodes[VC_DC], nodeName)
 			}
-
+		
+			rNodes := make(chan []k8stypes.NodeName)
+			ech := make(chan error)
 			for _, nodeNames := range dcNodes {
 				localAttachedMap := make(map[string]map[string]bool)
 				localAttachedMaps = append(localAttachedMaps, localAttachedMap)
 				// Start go routines per VC-DC to check disks are attached
-				go func(nodes []k8stypes.NodeName) {
+				go func(nodes []k8stypes.NodeName, rNodes chan []k8stypes.NodeName, ech chan error) {
 					nodesToRetryLocal, err := vs.checkDiskAttached(ctx, nodes, nodeVolumes, localAttachedMap, retry)
 					if err != nil {
 						if !vclib.IsManagedObjectNotFoundError(err) {
-							globalErrMutex.Lock()
-							globalErr = err
-							globalErrMutex.Unlock()
 							klog.Errorf("Failed to check disk attached for nodes: %+v. err: %+v", nodes, err)
+							ech <- err
 						}
 					}
-					nodesToRetryMutex.Lock()
-					nodesToRetry = append(nodesToRetry, nodesToRetryLocal...)
-					nodesToRetryMutex.Unlock()
-					wg.Done()
-				}(nodeNames)
-				wg.Add(1)
+					rNodes <- nodesToRetryLocal
+				}(nodeNames, rNodes, ech)
 			}
-			wg.Wait()
-			if globalErr != nil {
-				return nodesToRetry, globalErr
+
+			// Collect the retry nodes/errors list from goroutines asynchronously
+			for retryCount := dcNodes {
+				select {
+					case e :=  <-ech:
+						return nodesToRetry, e
+					case retryNodes := <- rNodes:
+						nodesToRetry = append(nodesToRetry, retryNodes...)
+					}
 			}
 			for _, localAttachedMap := range localAttachedMaps {
 				for key, value := range localAttachedMap {
