@@ -36,6 +36,13 @@ EXCLUDED_PATTERNS=(
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )
 
+# Exclude generated-files-remake in certain cases, if they're running in a separate job.
+if [[ ${EXCLUDE_FILES_REMAKE:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-generated-files-remake.sh" # run in a separate job
+    )
+fi
+
 # Exclude typecheck in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
