@@ -1392,7 +1392,7 @@ func TestFilterPlugin(t *testing.T) {
 	}
 
 	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "filter-plugin", nil), 2,
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "filter-plugin", nil), 1,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1416,8 +1416,8 @@ func TestFilterPlugin(t *testing.T) {
 			}
 		}
 
-		if filterPlugin.numFilterCalled == 0 {
-			t.Errorf("Expected the filter plugin to be called.")
+		if filterPlugin.numFilterCalled != 1 {
+			t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
 		}
 
 		filterPlugin.reset()

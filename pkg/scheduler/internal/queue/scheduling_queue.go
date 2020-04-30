@@ -395,6 +395,9 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 // schedulable. It drops status of the pod and compares it with old version.
 func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 	strip := func(pod *v1.Pod) *v1.Pod {
+		if pod == nil {
+			return nil
+		}
 		p := pod.DeepCopy()
 		p.ResourceVersion = ""
 		p.Generation = 0
@@ -433,10 +436,11 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 		}
 	}
 
+	podUpdated := isPodUpdated(oldPod, newPod)
 	// If the pod is in the unschedulable queue, updating it may make it schedulable.
 	if usPodInfo := p.unschedulableQ.get(newPod); usPodInfo != nil {
 		p.nominatedPods.update(oldPod, newPod)
-		if isPodUpdated(oldPod, newPod) {
+		if podUpdated {
 			p.unschedulableQ.delete(usPodInfo.Pod)
 			err := p.activeQ.Add(updatePod(usPodInfo, newPod))
 			if err == nil {
@@ -448,6 +452,23 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 		p.unschedulableQ.addOrUpdate(updatePod(usPodInfo, newPod))
 		return nil
 	}
+
+	// Final check before adding to activeQ. See #90616.
+	if !podUpdated {
+		getUnschedulableCond := func(conds []v1.PodCondition) *v1.PodCondition {
+			for _, c := range conds {
+				if c.Type == v1.PodScheduled && c.Status == v1.ConditionFalse {
+					return &c
+				}
+			}
+			return nil
+		}
+		oldCond, newCond := getUnschedulableCond(oldPod.Status.Conditions), getUnschedulableCond(newPod.Status.Conditions)
+		if oldCond == nil && newCond != nil {
+			return nil
+		}
+	}
+
 	// If pod is not in any of the queues, we put it in the active queue.
 	err := p.activeQ.Add(p.newQueuedPodInfo(newPod))
 	if err == nil {
