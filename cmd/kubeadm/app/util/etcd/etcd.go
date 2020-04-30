@@ -269,23 +269,32 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 		return nil, errors.Wrapf(err, "error parsing peer address %s", peerAddrs)
 	}
 
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: dialTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
-	if err != nil {
-		return nil, err
+	// Exponential backoff for the MemberAdd operation (up to ~200 seconds)
+	etcdBackoffAdd := wait.Backoff{
+		Steps:    18,
+		Duration: 100 * time.Millisecond,
+		Factor:   1.5,
+		Jitter:   0.1,
 	}
-	defer cli.Close()
 
 	// Adds a new member to the cluster
 	var lastError error
 	var resp *clientv3.MemberAddResponse
-	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+	err = wait.ExponentialBackoff(etcdBackoffAdd, func() (bool, error) {
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   c.Endpoints,
+			DialTimeout: etcdTimeout,
+			DialOptions: []grpc.DialOption{
+				grpc.WithBlock(), // block until the underlying connection is up
+			},
+			TLS: c.TLS,
+		})
+		if err != nil {
+			lastError = err
+			return false, nil
+		}
+		defer cli.Close()
+
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
 		cancel()
