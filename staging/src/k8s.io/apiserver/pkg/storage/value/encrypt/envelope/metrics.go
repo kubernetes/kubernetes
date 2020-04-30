@@ -67,6 +67,16 @@ var (
 		},
 		[]string{"transformation_type"},
 	)
+
+	dekCacheEvictionsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "dek_cache_evictions_total",
+			Help:           "Total number of DEK cache evictions.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetricsFunc sync.Once
@@ -75,6 +85,7 @@ func registerMetrics() {
 	registerMetricsFunc.Do(func() {
 		legacyregistry.MustRegister(dekCacheFillPercent)
 		legacyregistry.MustRegister(dekCacheInterArrivals)
+		legacyregistry.MustRegister(dekCacheEvictionsTotal)
 	})
 }
 

@@ -167,7 +167,9 @@ func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.T
 	// Use base64 of encKey as the key into the cache because hashicorp/golang-lru
 	// cannot hash []uint8.
 	if t.cacheEnabled {
-		t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer)
+		if t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer) {
+			dekCacheEvictionsTotal.Inc()
+		}
 		dekCacheFillPercent.Set(float64(t.transformers.Len()) / float64(t.cacheSize))
 	}
 	return transformer, nil
