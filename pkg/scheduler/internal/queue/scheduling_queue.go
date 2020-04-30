@@ -563,7 +563,7 @@ func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*v1.Pod {
 func (p *PriorityQueue) PendingPods() []*v1.Pod {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	result := []*v1.Pod{}
+	var result []*v1.Pod
 	for _, pInfo := range p.activeQ.List() {
 		result = append(result, pInfo.(*framework.QueuedPodInfo).Pod)
 	}

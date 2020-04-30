@@ -29,8 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -55,11 +53,6 @@ import (
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
-)
-
-const (
-	initialGetBackoff = 100 * time.Millisecond
-	maximalGetBackoff = time.Minute
 )
 
 // Binder knows how to write a binding.
@@ -205,7 +198,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		Algorithm:       algo,
 		Profiles:        profiles,
 		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
-		Error:           MakeDefaultErrorFunc(c.client, podQueue, c.schedulerCache),
+		Error:           MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
 		StopEverything:  c.StopEverything,
 		SchedulingQueue: podQueue,
 	}, nil
@@ -475,7 +468,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
+func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
 	return func(podInfo *framework.QueuedPodInfo, err error) {
 		pod := podInfo.Pod
 		if err == core.ErrNoNodesAvailable {
@@ -500,40 +493,17 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 			klog.Errorf("Error scheduling %v/%v: %v; retrying", pod.Namespace, pod.Name, err)
 		}
 
-		podSchedulingCycle := podQueue.SchedulingCycle()
-		// Retry asynchronously.
-		// Note that this is extremely rudimentary and we need a more real error handling path.
-		go func() {
-			defer utilruntime.HandleCrash()
-			podID := types.NamespacedName{
-				Namespace: pod.Namespace,
-				Name:      pod.Name,
-			}
-
-			// Get the pod again; it may have changed/been scheduled already.
-			getBackoff := initialGetBackoff
-			for {
-				pod, err := client.CoreV1().Pods(podID.Namespace).Get(context.TODO(), podID.Name, metav1.GetOptions{})
-				if err == nil {
-					if len(pod.Spec.NodeName) == 0 {
-						podInfo.Pod = pod
-						if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podSchedulingCycle); err != nil {
-							klog.Error(err)
-						}
-					}
-					break
-				}
-				if apierrors.IsNotFound(err) {
-					klog.Warningf("A pod %v no longer exists", podID)
-					return
-				}
-				klog.Errorf("Error getting pod %v for retry: %v; retrying...", podID, err)
-				if getBackoff = getBackoff * 2; getBackoff > maximalGetBackoff {
-					getBackoff = maximalGetBackoff
-				}
-				time.Sleep(getBackoff)
-			}
-		}()
+		// Check if the Pod exists in informer cache.
+		cachedPod, err := podLister.Pods(pod.Namespace).Get(pod.Name)
+		if err != nil {
+			klog.Warningf("Pod %v/%v doesn't exist in informer cache: %v", pod.Namespace, pod.Name, err)
+			return
+		}
+		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
+		podInfo.Pod = cachedPod.DeepCopy()
+		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {
+			klog.Error(err)
+		}
 	}
 }
 
