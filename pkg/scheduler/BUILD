@@ -46,6 +46,7 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+        "//vendor/go.opentelemetry.io/otel/api/core:go_default_library",
         "//vendor/go.opentelemetry.io/otel/api/global:go_default_library",
         "//vendor/go.opentelemetry.io/otel/exporters/trace/jaeger:go_default_library",
         "//vendor/go.opentelemetry.io/otel/sdk/trace:go_default_library",
