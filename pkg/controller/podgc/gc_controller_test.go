@@ -18,7 +18,6 @@ package podgc
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -68,12 +67,13 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	testCases := []struct {
+		name            string
 		pods            []nameToPhase
 		threshold       int
 		deletedPodNames sets.String
 	}{
 		{
-			// case 1
+			name: "threshold = 0, disables terminated pod deletion",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
@@ -83,7 +83,7 @@ func TestGCTerminated(t *testing.T) {
 			deletedPodNames: sets.NewString(),
 		},
 		{
-			// case 2
+			name: "threshold = 1, delete pod a which is PodFailed and pod b which is PodSucceeded",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
@@ -93,7 +93,7 @@ func TestGCTerminated(t *testing.T) {
 			deletedPodNames: sets.NewString("a", "b"),
 		},
 		{
-			// case 3
+			name: "threshold = 1, delete pod b which is PodSucceeded",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodRunning},
 				{name: "b", phase: v1.PodSucceeded},
@@ -103,7 +103,7 @@ func TestGCTerminated(t *testing.T) {
 			deletedPodNames: sets.NewString("b"),
 		},
 		{
-			// case 4
+			name: "threshold = 1, delete pod a which is PodFailed",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
@@ -112,7 +112,7 @@ func TestGCTerminated(t *testing.T) {
 			deletedPodNames: sets.NewString("a"),
 		},
 		{
-			// case 5
+			name: "threshold = 5, don't delete pod",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
@@ -123,7 +123,7 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		t.Run(fmt.Sprintf("case: %v", i), func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
 			gcc, podInformer, _ := NewFromClient(client, test.threshold)
 			deletedPodNames := make([]string, 0)
