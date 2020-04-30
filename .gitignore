@@ -94,10 +94,6 @@ network_closure.sh
 # CoreOS stuff
 /cluster/libvirt-coreos/coreos_*.img
 
-# Juju Stuff
-/cluster/juju/charms/*
-/cluster/juju/bundles/local.yaml
-
 # Downloaded Kubernetes binary release
 /kubernetes/
 
