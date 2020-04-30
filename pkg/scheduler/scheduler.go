@@ -50,6 +50,7 @@ import (
 
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	otelcore "go.opentelemetry.io/otel/api/core"
 )
 
 const (
@@ -245,7 +246,8 @@ func New(client clientset.Interface,
 	_, _, err := jaeger.NewExportPipeline(
 		jaeger.WithCollectorEndpoint(os.Getenv("JAEGER_ENDPOINT")),
 		jaeger.WithProcess(jaeger.Process{
-			ServiceName: os.Getenv("POD_NAME"),
+			ServiceName: "kube-scheduler",
+			Tags: []otelcore.KeyValue{{Key:"PodName", Value:otelcore.String(os.Getenv("POD_NAME"))}},
 		}),
 		jaeger.RegisterAsGlobal(),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),

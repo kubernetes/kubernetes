@@ -149,6 +149,7 @@ func (g *genericScheduler) snapshot() error {
 // If it fails, it will return a FitError error with reasons.
 func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	ctx, span := global.TraceProvider().Tracer("new-scheduler").Start(ctx, "genericScheduler Schedule")
+	span.SetAttributes(core.KeyValue{Key:"PodName",Value:core.String(pod.Name)})
 	defer span.End()
 
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
@@ -571,7 +572,8 @@ func (g *genericScheduler) podPassesFiltersOnNode(
 	pod *v1.Pod,
 	info *framework.NodeInfo,
 ) (bool, *framework.Status, error) {
-	ctx, span := global.TraceProvider().Tracer("genericScheduler").Start(ctx, info.Node().Name)
+	ctx, span := global.TraceProvider().Tracer("genericScheduler").Start(ctx, "podPassesFiltersOnNode")
+	span.SetAttributes(core.KeyValue{Key:"Node",Value:core.String(info.Node().Name)})
 	defer span.End()
 	var status *framework.Status
 
