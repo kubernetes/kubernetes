@@ -576,6 +576,8 @@ func (g *Cloud) initializeSubnetworkURLAndIsLegacyNetwork() {
 // WARNING: Calling this could have unexpected behavior if you have in-flight
 // requests. It is best to use this immediately after creating a Cloud.
 func (g *Cloud) SetRateLimiter(rl cloud.RateLimiter) {
+	c.sharedResourceLock.Lock()
+	defer c.sharedResourceLock.Unlock()
 	if rl != nil {
 		g.s.RateLimiter = rl
 	}
