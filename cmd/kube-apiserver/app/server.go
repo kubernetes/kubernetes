@@ -30,17 +30,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-openapi/spec"
 	"github.com/spf13/cobra"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -70,7 +67,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
-	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
@@ -85,7 +81,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 const (
@@ -440,9 +435,6 @@ func buildGenericConfig(
 	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
-		return
-	}
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
@@ -498,9 +490,8 @@ func buildGenericConfig(
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, genericConfig.EgressSelector, clientgoExternalClient, versionedInformers)
-	if err != nil {
-		lastErr = fmt.Errorf("invalid authentication config: %v", err)
+	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
+	if lastErr = s.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
 
@@ -557,35 +548,6 @@ func buildGenericConfig(
 	}
 
 	return
-}
-
-// BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
-	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
-	if err != nil {
-		return nil, nil, err
-	}
-	if s.Authentication.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
-			extclient,
-			versionedInformer.Core().V1().Secrets().Lister(),
-			versionedInformer.Core().V1().ServiceAccounts().Lister(),
-			versionedInformer.Core().V1().Pods().Lister(),
-		)
-	}
-	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-		versionedInformer.Core().V1().Secrets().Lister().Secrets(v1.NamespaceSystem),
-	)
-
-	if EgressSelector != nil {
-		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticatorConfig.CustomDial = egressDialer
-	}
-
-	return authenticatorConfig.New()
 }
 
 // BuildAuthorizer constructs the authorizer
