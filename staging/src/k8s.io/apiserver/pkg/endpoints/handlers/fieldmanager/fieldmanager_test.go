@@ -226,6 +226,78 @@ func TestUpdateApplyConflict(t *testing.T) {
 	}
 }
 
+func TestInvalidManagedFieldsIsDropped(t *testing.T) {
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+
+	patch := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+                        "replicas": 3,
+                        "selector": {
+                                "matchLabels": {
+                                         "app": "nginx"
+                                }
+                        },
+                        "template": {
+                                "metadata": {
+                                        "labels": {
+                                                "app": "nginx"
+                                        }
+                                },
+                                "spec": {
+				        "containers": [{
+					        "name":  "nginx",
+					        "image": "nginx:latest"
+				        }]
+                                }
+                        }
+		}
+	}`)
+	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(patch, &newObj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	if err := f.Update(newObj, "fieldmanager_test"); err != nil {
+		t.Fatalf("failed to update object: %v", err)
+	}
+
+	liveObj := f.liveObj.DeepCopyObject()
+	accessor, err := meta.Accessor(liveObj)
+	if err != nil {
+		panic(fmt.Errorf("couldn't get accessor: %v", err))
+	}
+	// Make managed fields invalid (missing FieldsType)
+	managedFields := accessor.GetManagedFields()
+	managedFields[0].FieldsType = ""
+	managedFields[0].Manager = "replacement"
+	accessor.SetManagedFields(managedFields)
+	// Make a change to the label.
+	labels := accessor.GetLabels()
+	labels["app"] = "my-nginx"
+	accessor.SetLabels(labels)
+
+	if err := f.Update(liveObj, "fieldmanager_test_2"); err != nil {
+		t.Fatalf("failed to update object: %v", err)
+	}
+
+	managedFields = f.ManagedFields()
+	if len(managedFields) != 2 {
+		t.Fatalf("Expected 2 managedfields got: %v", len(managedFields))
+	}
+	if managedFields[0].Manager != "fieldmanager_test" {
+		t.Fatalf("Expected first manager to be 'fieldmanager_test', got: %v", managedFields[0].Manager)
+	}
+	if managedFields[1].Manager != "fieldmanager_test_2" {
+		t.Fatalf("Expected second manager to be 'fieldmanager_test_2', got: %v", managedFields[0].Manager)
+	}
+}
+
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 

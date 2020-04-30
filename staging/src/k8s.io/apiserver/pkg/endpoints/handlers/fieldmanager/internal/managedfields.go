@@ -110,7 +110,30 @@ func EncodeObjectManagedFields(obj runtime.Object, managed ManagedInterface) err
 func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (managed managedStruct, err error) {
 	managed.fields = make(fieldpath.ManagedFields, len(encodedManagedFields))
 	managed.times = make(map[string]*metav1.Time, len(encodedManagedFields))
-	for _, encodedVersionedSet := range encodedManagedFields {
+
+	// If we have exactly one managedFields with no manager and no
+	// version, keep an empty manager to get a reset.
+	if len(encodedManagedFields) == 1 {
+		if mf := encodedManagedFields[0]; mf.Manager == "" && mf.APIVersion == "" {
+			fields, err := decodeVersionedSet(&mf)
+			if err != nil {
+				return managedStruct{}, err
+			}
+			managed.fields["resetManager"] = fields
+			managed.times["resetManager"] = nil
+			return managed, nil
+		}
+	}
+
+	for i, encodedVersionedSet := range encodedManagedFields {
+		switch encodedVersionedSet.FieldsType {
+		case "FieldsV1":
+			// Valid case.
+		case "":
+			return managedStruct{}, fmt.Errorf("missing fieldsType in managed fields entry %d", i)
+		default:
+			return managedStruct{}, fmt.Errorf("invalid fieldsType %q in managed fields entry %d", encodedVersionedSet.FieldsType, i)
+		}
 		manager, err := BuildManagerIdentifier(&encodedVersionedSet)
 		if err != nil {
 			return managedStruct{}, fmt.Errorf("error decoding manager from %v: %v", encodedVersionedSet, err)
