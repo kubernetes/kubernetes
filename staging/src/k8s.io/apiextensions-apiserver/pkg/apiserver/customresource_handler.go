@@ -1247,7 +1247,7 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensi
 
 	specs := []*spec.Swagger{}
 	for _, v := range crd.Spec.Versions {
-		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: true})
+		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: true, StripDefaults: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: false})
 		if err != nil {
 			return nil, err
 		}
