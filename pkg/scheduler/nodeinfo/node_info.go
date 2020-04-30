@@ -173,7 +173,10 @@ func (r *Resource) Add(rl v1.ResourceList) {
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
 		case v1.ResourceEphemeralStorage:
-			r.EphemeralStorage += rQuant.Value()
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				// if the local storage capacity isolation feature gate is disabled, pods request 0 disk.
+				r.EphemeralStorage += rQuant.Value()
+			}
 		default:
 			if v1helper.IsScalarResourceName(rName) {
 				r.AddScalar(rName, rQuant.Value())
@@ -565,21 +568,32 @@ func (n *NodeInfo) resetSlicesIfEmpty() {
 	}
 }
 
+// resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
 		resPtr.Add(c.Resources.Requests)
-
 		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.
 	}
 
+	for _, ic := range pod.Spec.InitContainers {
+		resPtr.SetMaxResource(ic.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
+		if non0CPU < non0CPUReq {
+			non0CPU = non0CPUReq
+		}
+
+		if non0Mem < non0MemReq {
+			non0Mem = non0MemReq
+		}
+	}
+
 	// If Overhead is being utilized, add to the total requests for the pod
 	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
 		resPtr.Add(pod.Spec.Overhead)
-
 		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
 			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
 		}
