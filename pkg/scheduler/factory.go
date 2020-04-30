@@ -40,7 +40,6 @@ import (
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
@@ -162,12 +161,13 @@ func (c *Configurator) create() (*Scheduler, error) {
 	if len(ignoredExtendedResources) > 0 {
 		for i := range c.profiles {
 			prof := &c.profiles[i]
-			prof.PluginConfig = append(prof.PluginConfig,
-				frameworkplugins.NewPluginConfig(
-					noderesources.FitName,
-					schedulerv1alpha2.NodeResourcesFitArgs{IgnoredResources: ignoredExtendedResources},
-				),
-			)
+			pc := schedulerapi.PluginConfig{
+				Name: noderesources.FitName,
+				Args: &schedulerapi.NodeResourcesFitArgs{
+					IgnoredResources: ignoredExtendedResources,
+				},
+			}
+			prof.PluginConfig = append(prof.PluginConfig, pc)
 		}
 	}
 
@@ -280,9 +280,8 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	// HardPodAffinitySymmetricWeight in the policy config takes precedence over
 	// CLI configuration.
 	if policy.HardPodAffinitySymmetricWeight != 0 {
-		v := policy.HardPodAffinitySymmetricWeight
-		args.InterPodAffinityArgs = &schedulerv1alpha2.InterPodAffinityArgs{
-			HardPodAffinityWeight: &v,
+		args.InterPodAffinityArgs = &schedulerapi.InterPodAffinityArgs{
+			HardPodAffinityWeight: policy.HardPodAffinitySymmetricWeight,
 		}
 	}
 

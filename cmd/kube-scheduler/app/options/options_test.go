@@ -203,6 +203,9 @@ profiles:
       disabled:
       - name: baz
   pluginConfig:
+  - name: InterPodAffinity
+    args:
+      hardPodAffinityWeight: 2
   - name: foo
     args:
       bar: baz
@@ -544,6 +547,12 @@ profiles:
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
+								Name: "InterPodAffinity",
+								Args: &kubeschedulerconfig.InterPodAffinityArgs{
+									HardPodAffinityWeight: 2,
+								},
+							},
+							{
 								Name: "foo",
 								Args: &runtime.Unknown{
 									Raw:         []byte(`{"bar":"baz"}`),
@@ -670,9 +679,7 @@ profiles:
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
 							{
 								Name: "InterPodAffinity",
-								Args: &runtime.Unknown{
-									Raw: []byte(`{"hardPodAffinityWeight":5}`),
-								},
+								Args: &kubeschedulerconfig.InterPodAffinityArgs{HardPodAffinityWeight: 5},
 							},
 						},
 					},

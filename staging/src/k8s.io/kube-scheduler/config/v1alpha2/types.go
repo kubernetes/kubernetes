@@ -17,10 +17,14 @@ limitations under the License.
 package v1alpha2
 
 import (
+	"bytes"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1 "k8s.io/kube-scheduler/config/v1"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -73,17 +77,17 @@ type KubeSchedulerConfiguration struct {
 	// Duration to wait for a binding operation to complete before timing out
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
-	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds"`
+	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds,omitempty"`
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.
-	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds"`
+	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds,omitempty"`
 
 	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
 	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
 	// the default value (10s) will be used.
-	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds"`
+	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds,omitempty"`
 
 	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
 	// choose to be scheduled under a particular profile by setting its associated
@@ -91,12 +95,40 @@ type KubeSchedulerConfiguration struct {
 	// with the "default-scheduler" profile, if present here.
 	// +listType=map
 	// +listMapKey=schedulerName
-	Profiles []KubeSchedulerProfile `json:"profiles"`
+	Profiles []KubeSchedulerProfile `json:"profiles,omitempty"`
 
 	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
 	// with the extender. These extenders are shared by all scheduler profiles.
 	// +listType=set
-	Extenders []v1.Extender `json:"extenders"`
+	Extenders []v1.Extender `json:"extenders,omitempty"`
+}
+
+// DecodeNestedObjects decodes plugin args for known types.
+func (c *KubeSchedulerConfiguration) DecodeNestedObjects(d runtime.Decoder) error {
+	for i := range c.Profiles {
+		prof := &c.Profiles[i]
+		for j := range prof.PluginConfig {
+			err := prof.PluginConfig[j].decodeNestedObjects(d)
+			if err != nil {
+				return fmt.Errorf("decoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+			}
+		}
+	}
+	return nil
+}
+
+// EncodeNestedObjects encodes plugin args.
+func (c *KubeSchedulerConfiguration) EncodeNestedObjects(e runtime.Encoder) error {
+	for i := range c.Profiles {
+		prof := &c.Profiles[i]
+		for j := range prof.PluginConfig {
+			err := prof.PluginConfig[j].encodeNestedObjects(e)
+			if err != nil {
+				return fmt.Errorf("encoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+			}
+		}
+	}
+	return nil
 }
 
 // KubeSchedulerProfile is a scheduling profile.
@@ -201,4 +233,42 @@ type PluginConfig struct {
 	Name string `json:"name"`
 	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
 	Args runtime.RawExtension `json:"args,omitempty"`
+}
+
+func (c *PluginConfig) decodeNestedObjects(d runtime.Decoder) error {
+	gvk := SchemeGroupVersion.WithKind(c.Name + "Args")
+	// dry-run to detect and skip out-of-tree plugin args.
+	if _, _, err := d.Decode(nil, &gvk, nil); runtime.IsNotRegisteredError(err) {
+		return nil
+	}
+
+	obj, parsedGvk, err := d.Decode(c.Args.Raw, &gvk, nil)
+	if err != nil {
+		return fmt.Errorf("decoding args for plugin %s: %w", c.Name, err)
+	}
+	if parsedGvk.GroupKind() != gvk.GroupKind() {
+		return fmt.Errorf("args for plugin %s were not of type %s, got %s", c.Name, gvk.GroupKind(), parsedGvk.GroupKind())
+	}
+	c.Args.Object = obj
+	return nil
+}
+
+func (c *PluginConfig) encodeNestedObjects(e runtime.Encoder) error {
+	if c.Args.Object == nil {
+		return nil
+	}
+	var buf bytes.Buffer
+	err := e.Encode(c.Args.Object, &buf)
+	if err != nil {
+		return err
+	}
+	// The <e> encoder might be a YAML encoder, but the parent encoder expects
+	// JSON output, so we convert YAML back to JSON.
+	// This is a no-op if <e> produces JSON.
+	json, err := yaml.YAMLToJSON(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	c.Args.Raw = json
+	return nil
 }

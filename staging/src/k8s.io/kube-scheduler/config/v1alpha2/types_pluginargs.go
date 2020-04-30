@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha2
 
 import (
+	gojson "encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -95,7 +97,7 @@ type RequestedToCapacityRatioArgs struct {
 	Resources []ResourceSpec `json:"resources,omitempty"`
 }
 
-// TODO add JSON tags and backward compatible conversion in v1beta1.
+// TODO add JSON tags and remove custom unmarshalling in v1beta1.
 // UtilizationShapePoint and ResourceSpec fields are not annotated with JSON tags in v1alpha2
 // to maintain backward compatibility with the args shipped with v1.18.
 // See https://github.com/kubernetes/kubernetes/pull/88585#discussion_r405021905
@@ -108,12 +110,26 @@ type UtilizationShapePoint struct {
 	Score int32
 }
 
+// UnmarshalJSON provides case insensitive unmarshalling for the type.
+// TODO remove when copying to v1beta1.
+func (t *UtilizationShapePoint) UnmarshalJSON(data []byte) error {
+	type internal *UtilizationShapePoint
+	return gojson.Unmarshal(data, internal(t))
+}
+
 // ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
 type ResourceSpec struct {
 	// Name of the resource to be managed by RequestedToCapacityRatio function.
 	Name string
 	// Weight of the resource.
 	Weight int64
+}
+
+// UnmarshalJSON provides case insensitive unmarshalling for the type.
+// TODO remove when copying to v1beta1.
+func (t *ResourceSpec) UnmarshalJSON(data []byte) error {
+	type internal *ResourceSpec
+	return gojson.Unmarshal(data, internal(t))
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

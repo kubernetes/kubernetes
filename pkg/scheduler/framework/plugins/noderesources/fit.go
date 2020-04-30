@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -64,14 +64,25 @@ func (f *Fit) Name() string {
 
 // NewFit initializes a new plugin and returns it.
 func NewFit(plArgs runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &schedulerv1alpha2.NodeResourcesFitArgs{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
+	args, err := getFitArgs(plArgs)
+	if err != nil {
 		return nil, err
 	}
-
-	fit := &Fit{}
-	fit.ignoredResources = sets.NewString(args.IgnoredResources...)
+	fit := &Fit{
+		ignoredResources: sets.NewString(args.IgnoredResources...),
+	}
 	return fit, nil
+}
+
+func getFitArgs(obj runtime.Object) (config.NodeResourcesFitArgs, error) {
+	if obj == nil {
+		return config.NodeResourcesFitArgs{}, nil
+	}
+	ptr, ok := obj.(*config.NodeResourcesFitArgs)
+	if !ok {
+		return config.NodeResourcesFitArgs{}, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", obj)
+	}
+	return *ptr, nil
 }
 
 // computePodResourceRequest returns a framework.Resource that covers the largest

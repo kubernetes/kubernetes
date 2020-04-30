@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -165,7 +165,7 @@ func TestServiceAffinity(t *testing.T) {
 			p := &ServiceAffinity{
 				sharedLister:  snapshot,
 				serviceLister: fakeframework.ServiceLister(test.services),
-				args: schedulerv1alpha2.ServiceAffinityArgs{
+				args: config.ServiceAffinityArgs{
 					AffinityLabels: test.labels,
 				},
 			}
@@ -389,7 +389,7 @@ func TestServiceAffinityScore(t *testing.T) {
 			p := &ServiceAffinity{
 				sharedLister:  snapshot,
 				serviceLister: serviceLister,
-				args: schedulerv1alpha2.ServiceAffinityArgs{
+				args: config.ServiceAffinityArgs{
 					AntiAffinityLabelsPreference: test.labels,
 				},
 			}
@@ -606,7 +606,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p := &ServiceAffinity{
-		args: schedulerv1alpha2.ServiceAffinityArgs{
+		args: config.ServiceAffinityArgs{
 			AffinityLabels: []string{"region"},
 		},
 	}

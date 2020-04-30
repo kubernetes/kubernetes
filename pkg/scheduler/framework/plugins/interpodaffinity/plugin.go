@@ -22,9 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -46,7 +45,7 @@ var _ framework.ScorePlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	args         schedulerv1alpha2.InterPodAffinityArgs
+	args         config.InterPodAffinityArgs
 	sharedLister framework.SharedLister
 	sync.Mutex
 }
@@ -66,26 +65,30 @@ func New(plArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, 
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
-	pl := &InterPodAffinity{
+	args, err := getArgs(plArgs)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinityWeight"), args.HardPodAffinityWeight); err != nil {
+		return nil, err
+	}
+	return &InterPodAffinity{
+		args:         args,
 		sharedLister: h.SnapshotSharedLister(),
-	}
-	if err := framework.DecodeInto(plArgs, &pl.args); err != nil {
-		return nil, err
-	}
-	if err := validateArgs(&pl.args); err != nil {
-		return nil, err
-	}
-	if pl.args.HardPodAffinityWeight == nil {
-		pl.args.HardPodAffinityWeight = pointer.Int32Ptr(DefaultHardPodAffinityWeight)
-	}
-	return pl, nil
+	}, nil
 }
 
-func validateArgs(args *schedulerv1alpha2.InterPodAffinityArgs) error {
-	if args.HardPodAffinityWeight == nil {
-		return nil
+func getArgs(obj runtime.Object) (config.InterPodAffinityArgs, error) {
+	if obj == nil {
+		return config.InterPodAffinityArgs{
+			HardPodAffinityWeight: DefaultHardPodAffinityWeight,
+		}, nil
 	}
-	return ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinityWeight"), *args.HardPodAffinityWeight)
+	ptr, ok := obj.(*config.InterPodAffinityArgs)
+	if !ok {
+		return config.InterPodAffinityArgs{}, fmt.Errorf("want args to be of type InterPodAffinityArgs, got %T", obj)
+	}
+	return *ptr, nil
 }
 
 // ValidateHardPodAffinityWeight validates that weight is within allowed range.

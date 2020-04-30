@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	schedulerv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -195,7 +195,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			pl := PodTopologySpread{
 				sharedLister: cache.NewSnapshot(nil, tt.nodes),
-				args: schedulerv1alpha2.PodTopologySpreadArgs{
+				args: config.PodTopologySpreadArgs{
 					DefaultConstraints: tt.defaultConstraints,
 				},
 			}
@@ -729,7 +729,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			snapshot := cache.NewSnapshot(existingPods, allNodes)
 			p := &PodTopologySpread{
 				sharedLister: snapshot,
-				args: schedulerv1alpha2.PodTopologySpreadArgs{
+				args: config.PodTopologySpreadArgs{
 					DefaultConstraints: []v1.TopologySpreadConstraint{
 						{MaxSkew: 1, TopologyKey: v1.LabelHostname, WhenUnsatisfiable: v1.ScheduleAnyway},
 						{MaxSkew: 1, TopologyKey: v1.LabelZoneFailureDomain, WhenUnsatisfiable: v1.ScheduleAnyway},

@@ -25,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1598,90 +1597,58 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			pluginConfig: []config.PluginConfig{
 				{
 					Name: "NodeResourcesFit",
-					Args: &runtime.Unknown{
-						Raw: []byte(`{
-							"ignoredResources": [
-								"foo",
-								"bar"
-							]
-						}`),
+					Args: &config.NodeResourcesFitArgs{
+						IgnoredResources: []string{"foo", "bar"},
 					},
 				},
 				{
 					Name: "PodTopologySpread",
-					Args: &runtime.Unknown{
-						Raw: []byte(`{
-							"defaultConstraints": [
-								{
-									"maxSkew": 1,
-									"topologyKey": "foo",
-									"whenUnsatisfiable": "DoNotSchedule"
-								},
-								{
-									"maxSkew": 10,
-									"topologyKey": "bar",
-									"whenUnsatisfiable": "ScheduleAnyway"
-								}
-							]
-						}`),
+					Args: &config.PodTopologySpreadArgs{
+						DefaultConstraints: []v1.TopologySpreadConstraint{
+							{
+								MaxSkew:           1,
+								TopologyKey:       "foo",
+								WhenUnsatisfiable: v1.DoNotSchedule,
+							},
+							{
+								MaxSkew:           10,
+								TopologyKey:       "bar",
+								WhenUnsatisfiable: v1.ScheduleAnyway,
+							},
+						},
 					},
 				},
 				{
 					Name: "RequestedToCapacityRatio",
-					Args: &runtime.Unknown{
-						Raw: []byte(`{
-							"shape":[
-								"Utilization": 5,
-								"Score": 5
-							],
-							"resources":[
-								"Name": "cpu",
-								"Weight": 10
-							]
-						}`),
+					Args: &config.RequestedToCapacityRatioArgs{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 5, Score: 5},
+						},
+						Resources: []config.ResourceSpec{
+							{Name: "cpu", Weight: 10},
+						},
 					},
 				},
 				{
 					Name: "InterPodAffinity",
-					Args: &runtime.Unknown{
-						Raw: []byte(`{
-							"HardPodAffinityWeight": 100
-						}`),
+					Args: &config.InterPodAffinityArgs{
+						HardPodAffinityWeight: 100,
 					},
 				},
 				{
 					Name: "NodeLabel",
-					Args: &runtime.Unknown{
-						Raw: []byte(`{
-							"presentLabels": [
-								"foo",
-								"bar"
-							],
-							"absentLabels": [
-								"apple"
-							],
-							"presentLabelsPreference": [
-								"dog"
-							],
-							"absentLabelsPreference": [
-								"cat"
-							]
-						}`),
+					Args: &config.NodeLabelArgs{
+						PresentLabels:           []string{"foo", "bar"},
+						AbsentLabels:            []string{"apple"},
+						PresentLabelsPreference: []string{"dog"},
+						AbsentLabelsPreference:  []string{"cat"},
 					},
 				},
 				{
 					Name: "ServiceAffinity",
-					Args: &runtime.Unknown{
-						Raw: []byte(`{
-							affinityLabels: [
-								"foo",
-								"bar"
-							],
-							antiAffinityLabelsPreference: [
-								"disk",
-								"flash"
-							]
-						}`),
+					Args: &config.ServiceAffinityArgs{
+						AffinityLabels:               []string{"foo", "bar"},
+						AntiAffinityLabelsPreference: []string{"disk", "flash"},
 					},
 				},
 			},
