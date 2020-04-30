@@ -65,7 +65,7 @@ func (r *BucketRateLimiter) Forget(item interface{}) {
 // ItemExponentialFailureRateLimiter does a simple baseDelay*2^<num-failures> limit
 // dealing with max failures and expiration are up to the caller
 type ItemExponentialFailureRateLimiter struct {
-	failuresLock sync.Mutex
+	failuresLock sync.RWMutex
 	failures     map[interface{}]int
 
 	baseDelay time.Duration
@@ -108,8 +108,8 @@ func (r *ItemExponentialFailureRateLimiter) When(item interface{}) time.Duration
 }
 
 func (r *ItemExponentialFailureRateLimiter) NumRequeues(item interface{}) int {
-	r.failuresLock.Lock()
-	defer r.failuresLock.Unlock()
+	r.failuresLock.RLock()
+	defer r.failuresLock.RUnlock()
 
 	return r.failures[item]
 }
@@ -123,7 +123,7 @@ func (r *ItemExponentialFailureRateLimiter) Forget(item interface{}) {
 
 // ItemFastSlowRateLimiter does a quick retry for a certain number of attempts, then a slow retry after that
 type ItemFastSlowRateLimiter struct {
-	failuresLock sync.Mutex
+	failuresLock sync.RWMutex
 	failures     map[interface{}]int
 
 	maxFastAttempts int
@@ -156,8 +156,8 @@ func (r *ItemFastSlowRateLimiter) When(item interface{}) time.Duration {
 }
 
 func (r *ItemFastSlowRateLimiter) NumRequeues(item interface{}) int {
-	r.failuresLock.Lock()
-	defer r.failuresLock.Unlock()
+	r.failuresLock.RLock()
+	defer r.failuresLock.RUnlock()
 
 	return r.failures[item]
 }
