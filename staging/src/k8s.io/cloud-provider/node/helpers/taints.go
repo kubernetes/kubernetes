@@ -30,7 +30,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -138,4 +138,103 @@ func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 
 	newNode.Spec.Taints = newTaints
 	return newNode, true, nil
+}
+
+// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+	if len(taints) == 0 {
+		return nil
+	}
+	// Short circuit for limiting amount of API calls.
+	if node != nil {
+		match := false
+		for _, taint := range taints {
+			if TaintExists(node.Spec.Taints, taint) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return nil
+		}
+	}
+
+	firstTry := true
+	return clientretry.RetryOnConflict(updateTaintBackoff, func() error {
+		var err error
+		var oldNode *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+
+		var newNode *v1.Node
+		oldNodeCopy := oldNode
+		updated := false
+		for _, taint := range taints {
+			curNewNode, ok, err := RemoveTaint(oldNodeCopy, taint)
+			if err != nil {
+				return fmt.Errorf("failed to remove taint of node")
+			}
+			updated = updated || ok
+			newNode = curNewNode
+			oldNodeCopy = curNewNode
+		}
+		if !updated {
+			return nil
+		}
+		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+	})
+}
+
+// TaintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
+func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
+	for _, taint := range taints {
+		if taint.MatchTaint(taintToFind) {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
+// false otherwise.
+func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+	newNode := node.DeepCopy()
+	nodeTaints := newNode.Spec.Taints
+	if len(nodeTaints) == 0 {
+		return newNode, false, nil
+	}
+
+	if !TaintExists(nodeTaints, taint) {
+		return newNode, false, nil
+	}
+
+	newTaints, _ := DeleteTaint(nodeTaints, taint)
+	newNode.Spec.Taints = newTaints
+	return newNode, true, nil
+}
+
+// DeleteTaint removes all the taints that have the same key and effect to given taintToDelete.
+func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) {
+	newTaints := []v1.Taint{}
+	deleted := false
+	for i := range taints {
+		if taintToDelete.MatchTaint(&taints[i]) {
+			deleted = true
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, deleted
 }
