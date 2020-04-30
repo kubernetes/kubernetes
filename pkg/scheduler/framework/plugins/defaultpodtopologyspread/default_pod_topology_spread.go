@@ -97,7 +97,7 @@ func (pl *DefaultPodTopologySpread) Score(ctx context.Context, state *framework.
 }
 
 // NormalizeScore invoked after scoring all nodes.
-// For this plugin, it calculates the source of each node
+// For this plugin, it calculates the score of each node
 // based on the number of existing matching pods on the node
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
@@ -116,7 +116,7 @@ func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *f
 		}
 		nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(scores[i].Name)
 		if err != nil {
-			return framework.NewStatus(framework.Error, err.Error())
+			return framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", scores[i].Name, err))
 		}
 		zoneID := utilnode.GetZoneKey(nodeInfo.Node())
 		if zoneID == "" {
@@ -147,7 +147,7 @@ func (pl *DefaultPodTopologySpread) NormalizeScore(ctx context.Context, state *f
 		if haveZones {
 			nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(scores[i].Name)
 			if err != nil {
-				return framework.NewStatus(framework.Error, err.Error())
+				return framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", scores[i].Name, err))
 			}
 
 			zoneID := utilnode.GetZoneKey(nodeInfo.Node())
