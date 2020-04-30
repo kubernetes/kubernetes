@@ -27,13 +27,18 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -557,4 +562,56 @@ func updateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
 	}
 	return rc, pollErr
+}
+
+type rcPatchFunc func(pdb *v1.ReplicationController) ([]byte, error)
+
+func patchRCOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f rcPatchFunc, subresources ...string) (updated *v1.ReplicationController, err error) {
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		old := getRCStatusOrDie(dc, ns, name)
+		patchBytes, err := f(old)
+		if updated, err = cs.CoreV1().ReplicationControllers(ns).Patch(context.TODO(), old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	framework.ExpectNoError(err, "Waiting for the rc update to be processed in namespace %s", ns)
+	waitForRCToBeProcessed(cs, ns, name)
+	return updated, err
+}
+
+func waitForRCToBeProcessed(cs kubernetes.Interface, ns string, name string) {
+	ginkgo.By("Waiting for the rc to be processed")
+	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if rc.Status.ObservedGeneration < rc.Generation {
+			return false, nil
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "Waiting for the rc to be processed in namespace %s", ns)
+}
+
+func getRCStatusOrDie(dc dynamic.Interface, ns string, name string) *v1.ReplicationController {
+	rcStatusResource := v1.SchemeGroupVersion.WithResource("replicationcontroller")
+	unstruct, err := dc.Resource(rcStatusResource).Namespace(ns).Get(context.TODO(), name, metav1.GetOptions{}, "status")
+	rc, err := unstructuredToRC(unstruct)
+	framework.ExpectNoError(err, "Getting the status of the rc %s in namespace %s", name, ns)
+	return rc
+}
+
+func unstructuredToRC(obj *unstructured.Unstructured) (*v1.ReplicationController, error) {
+	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	if err != nil {
+		return nil, err
+	}
+	pdb := &v1.ReplicationController{}
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, pdb)
+	pdb.Kind = ""
+	pdb.APIVersion = ""
+	return pdb, err
 }
