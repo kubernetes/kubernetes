@@ -25,7 +25,7 @@ ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 TEMP_DIR:=$(shell mktemp -d)
-QEMUVERSION=v2.9.1
+QEMUVERSION=v4.2.0-6
 
 SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
