@@ -1320,8 +1320,7 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec *goopenapispec.Swagger, crd *a
 
 	specs := []*goopenapispec.Swagger{}
 	for _, v := range crd.Spec.Versions {
-		// Defaults are not pruned here, but before being served.
-		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripValueValidation: true, StripNullable: true, AllowNonStructural: true})
+		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: false})
 		if err != nil {
 			return nil, err
 		}
