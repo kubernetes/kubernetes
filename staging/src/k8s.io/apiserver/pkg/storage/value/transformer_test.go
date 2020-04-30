@@ -22,6 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -45,7 +49,7 @@ func (t *testTransformer) TransformToStorage(to []byte, context Context) (data [
 
 func TestPrefixFrom(t *testing.T) {
 	testErr := fmt.Errorf("test error")
-	transformErr := fmt.Errorf("transform error")
+	transformErr := status.Error(codes.Internal, "transform error")
 	transformers := []PrefixTransformer{
 		{Prefix: []byte("first:"), Transformer: &testTransformer{from: []byte("value1")}},
 		{Prefix: []byte("second:"), Transformer: &testTransformer{from: []byte("value2")}},
@@ -55,27 +59,65 @@ func TestPrefixFrom(t *testing.T) {
 	p := NewPrefixTransformers(testErr, transformers...)
 
 	testCases := []struct {
-		input  []byte
-		expect []byte
-		stale  bool
-		err    error
-		match  int
+		desc     string
+		input    []byte
+		expect   []byte
+		stale    bool
+		err      error
+		matchIdx int
 	}{
-		{[]byte("first:value"), []byte("value1"), false, nil, 0},
-		{[]byte("second:value"), []byte("value2"), true, nil, 1},
-		{[]byte("third:value"), nil, false, testErr, -1},
-		{[]byte("fails:value"), nil, false, transformErr, 2},
-		{[]byte("stale:value"), []byte("value3"), true, nil, 3},
+		{
+			desc:   "matches the first transformer",
+			input:  []byte("first:value"),
+			expect: []byte("value1"),
+		},
+		{
+			desc:     "matches the second transformer",
+			input:    []byte("second:value"),
+			expect:   []byte("value2"),
+			stale:    true,
+			matchIdx: 1,
+		},
+		{
+			desc:     "no match",
+			input:    []byte("third:value"),
+			err:      status.Error(codes.Internal, testErr.Error()),
+			matchIdx: -1,
+		},
+		{
+			desc:     "matches but fails",
+			input:    []byte("fails:value"),
+			err:      transformErr,
+			matchIdx: 2,
+		},
+		{
+			desc:     "stale",
+			input:    []byte("stale:value"),
+			expect:   []byte("value3"),
+			stale:    true,
+			matchIdx: 3,
+		},
 	}
-	for i, test := range testCases {
-		got, stale, err := p.TransformFromStorage(test.input, nil)
-		if err != test.err || stale != test.stale || !bytes.Equal(got, test.expect) {
-			t.Errorf("%d: unexpected out: %q %t %#v", i, string(got), stale, err)
-			continue
-		}
-		if test.match != -1 && !bytes.Equal([]byte("value"), transformers[test.match].Transformer.(*testTransformer).receivedFrom) {
-			t.Errorf("%d: unexpected value received by transformer: %s", i, transformers[test.match].Transformer.(*testTransformer).receivedFrom)
-		}
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			got, stale, err := p.TransformFromStorage(test.input, nil)
+
+			if d := cmp.Diff(test.err, err); d != "" {
+				t.Errorf("error mismatch (-want +got):\n%s", d)
+			}
+
+			if d := cmp.Diff(test.expect, got); d != "" {
+				t.Errorf("transformation mismatch (-want +got):\n%s", d)
+			}
+
+			if stale != test.stale {
+				t.Errorf("got %t want %t for stale", stale, test.stale)
+			}
+
+			if test.matchIdx != -1 && !bytes.Equal([]byte("value"), transformers[test.matchIdx].Transformer.(*testTransformer).receivedFrom) {
+				t.Errorf("unexpected value received by transformer: %s", transformers[test.matchIdx].Transformer.(*testTransformer).receivedFrom)
+			}
+		})
 	}
 }
 
@@ -172,7 +214,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 			want: `
 	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="unknown"} 1
+  apiserver_storage_transformation_operations_total{status="Internal",transformation_type="from_storage",transformer_prefix="unknown"} 1
   `,
 			err: nil,
 		},

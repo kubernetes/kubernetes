@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -122,7 +125,7 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 	}
 	return &prefixTransformers{
 		transformers: transformers,
-		err:          err,
+		err:          status.Error(codes.Internal, err.Error()),
 	}
 }
 
