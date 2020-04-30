@@ -210,6 +210,11 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	host, err := g.selectHost(priorityList)
 	trace.Step("Prioritizing done")
 
+	span.AddEvent(ctx, "ScheduleResult",
+		core.KeyValue{Key:"SuggestedHost", Value:core.String(host)},
+		core.KeyValue{Key:"EvaluatedNodes", Value:core.Int(len(filteredNodes) + len(filteredNodesStatuses))},
+		core.KeyValue{Key:"FeasibleNodes", Value:core.Int(len(filteredNodes))},
+		)
 	return ScheduleResult{
 		SuggestedHost:  host,
 		EvaluatedNodes: len(filteredNodes) + len(filteredNodesStatuses),
@@ -572,8 +577,7 @@ func (g *genericScheduler) podPassesFiltersOnNode(
 	pod *v1.Pod,
 	info *framework.NodeInfo,
 ) (bool, *framework.Status, error) {
-	ctx, span := global.TraceProvider().Tracer("genericScheduler").Start(ctx, "podPassesFiltersOnNode")
-	span.SetAttributes(core.KeyValue{Key:"Node",Value:core.String(info.Node().Name)})
+	ctx, span := global.TraceProvider().Tracer("genericScheduler").Start(ctx, fmt.Sprintf("Filter %+s", info.Node().Name))
 	defer span.End()
 	var status *framework.Status
 

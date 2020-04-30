@@ -435,11 +435,20 @@ func (f *framework) RunFilterPlugins(
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
 		if !pluginStatus.IsSuccess() {
 			if !pluginStatus.IsUnschedulable() {
+				span.AddEvent(ctx, "FilterError",
+					core.KeyValue{Key:"Plugin", Value: core.String(pl.Name())},
+					core.KeyValue{Key:"Message", Value: core.String(pluginStatus.Message())},
+					)
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
 				errStatus := NewStatus(Error, fmt.Sprintf("running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, pluginStatus.Message()))
 				return map[string]*Status{pl.Name(): errStatus}
 			}
+			span.AddEvent(ctx, "FilterStatus",
+				core.KeyValue{Key:"Plugin", Value:core.String(pl.Name())},
+				core.KeyValue{Key:"Code", Value:core.String(pluginStatus.Code().String())},
+				core.KeyValue{Key:"Message", Value:core.String(pluginStatus.Message())},
+				)
 			statuses[pl.Name()] = pluginStatus
 			if !f.runAllFilters {
 				// Exit early if we don't need to run all filters.
