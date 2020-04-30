@@ -68,9 +68,6 @@ func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plu
 }
 
 func getArgs(obj runtime.Object) (config.NodeLabelArgs, error) {
-	if obj == nil {
-		return config.NodeLabelArgs{}, nil
-	}
 	ptr, ok := obj.(*config.NodeLabelArgs)
 	if !ok {
 		return config.NodeLabelArgs{}, fmt.Errorf("want args to be of type NodeLabelArgs, got %T", obj)

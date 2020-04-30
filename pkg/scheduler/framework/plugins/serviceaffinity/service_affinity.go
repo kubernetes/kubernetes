@@ -78,9 +78,6 @@ func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plu
 }
 
 func getArgs(obj runtime.Object) (config.ServiceAffinityArgs, error) {
-	if obj == nil {
-		return config.ServiceAffinityArgs{}, nil
-	}
 	ptr, ok := obj.(*config.ServiceAffinityArgs)
 	if !ok {
 		return config.ServiceAffinityArgs{}, fmt.Errorf("want args to be of type ServiceAffinityArgs, got %T", obj)

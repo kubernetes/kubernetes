@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -728,7 +729,17 @@ profiles:
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
-					{SchedulerName: "my-nice-scheduler"},
+					{
+						SchedulerName: "my-nice-scheduler",
+						PluginConfig: []kubeschedulerconfig.PluginConfig{
+							{
+								Name: interpodaffinity.Name,
+								Args: &kubeschedulerconfig.InterPodAffinityArgs{
+									HardPodAffinityWeight: 1,
+								},
+							},
+						},
+					},
 				},
 			},
 		},

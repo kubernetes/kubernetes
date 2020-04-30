@@ -96,9 +96,6 @@ func New(plArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, 
 }
 
 func getArgs(obj runtime.Object) (config.PodTopologySpreadArgs, error) {
-	if obj == nil {
-		return config.PodTopologySpreadArgs{}, nil
-	}
 	ptr, ok := obj.(*config.PodTopologySpreadArgs)
 	if !ok {
 		return config.PodTopologySpreadArgs{}, fmt.Errorf("want args to be of type PodTopologySpreadArgs, got %T", obj)

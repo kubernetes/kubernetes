@@ -156,3 +156,12 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 		obj.EnableContentionProfiling = &enableContentionProfiling
 	}
 }
+
+func SetDefaults_InterPodAffinityArgs(obj *v1alpha2.InterPodAffinityArgs) {
+	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
+	// DeprecatedOptions#ApplyTo.
+	// Update that object if a new default field is added here.
+	if obj.HardPodAffinityWeight == nil {
+		obj.HardPodAffinityWeight = pointer.Int32Ptr(1)
+	}
+}

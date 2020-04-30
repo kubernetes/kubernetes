@@ -49,7 +49,6 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
 // Options has all the params needed to run a Scheduler
@@ -104,7 +103,7 @@ func NewOptions() (*Options, error) {
 			UseLegacyPolicyConfig:          false,
 			PolicyConfigMapNamespace:       metav1.NamespaceSystem,
 			SchedulerName:                  corev1.DefaultSchedulerName,
-			HardPodAffinitySymmetricWeight: interpodaffinity.DefaultHardPodAffinityWeight,
+			HardPodAffinitySymmetricWeight: 1,
 		},
 		Metrics: metrics.NewOptions(),
 	}

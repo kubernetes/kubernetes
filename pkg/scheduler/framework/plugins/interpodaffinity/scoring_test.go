@@ -519,7 +519,7 @@ func TestPreferredAffinity(t *testing.T) {
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			p := &InterPodAffinity{
 				args: config.InterPodAffinityArgs{
-					HardPodAffinityWeight: DefaultHardPodAffinityWeight,
+					HardPodAffinityWeight: 1,
 				},
 				sharedLister: snapshot,
 			}

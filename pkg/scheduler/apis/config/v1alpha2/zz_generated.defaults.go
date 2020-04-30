@@ -29,10 +29,15 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&v1alpha2.InterPodAffinityArgs{}, func(obj interface{}) { SetObjectDefaults_InterPodAffinityArgs(obj.(*v1alpha2.InterPodAffinityArgs)) })
 	scheme.AddTypeDefaultingFunc(&v1alpha2.KubeSchedulerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*v1alpha2.KubeSchedulerConfiguration))
 	})
 	return nil
+}
+
+func SetObjectDefaults_InterPodAffinityArgs(in *v1alpha2.InterPodAffinityArgs) {
+	SetDefaults_InterPodAffinityArgs(in)
 }
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *v1alpha2.KubeSchedulerConfiguration) {

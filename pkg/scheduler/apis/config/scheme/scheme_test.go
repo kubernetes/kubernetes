@@ -233,8 +233,9 @@ profiles:
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "InterPodAffinity",
-							// TODO(acondor): Set default values.
-							Args: &config.InterPodAffinityArgs{},
+							Args: &config.InterPodAffinityArgs{
+								HardPodAffinityWeight: 1,
+							},
 						},
 						{
 							Name: "NodeResourcesFit",
