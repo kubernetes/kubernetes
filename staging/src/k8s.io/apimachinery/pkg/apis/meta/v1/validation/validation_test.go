@@ -242,12 +242,8 @@ func TestValidateFieldManagerInvalid(t *testing.T) {
 	}
 }
 
-func TestValidateMangedFieldsInvalid(t *testing.T) {
+func TestValidateManagedFieldsInvalid(t *testing.T) {
 	tests := []metav1.ManagedFieldsEntry{
-		{
-			Operation: metav1.ManagedFieldsOperationUpdate,
-			// FieldsType is missing
-		},
 		{
 			Operation:  metav1.ManagedFieldsOperationUpdate,
 			FieldsType: "RandomVersion",
@@ -274,6 +270,10 @@ func TestValidateMangedFieldsInvalid(t *testing.T) {
 
 func TestValidateMangedFieldsValid(t *testing.T) {
 	tests := []metav1.ManagedFieldsEntry{
+		{
+			Operation: metav1.ManagedFieldsOperationUpdate,
+			// FieldsType is missing
+		},
 		{
 			Operation:  metav1.ManagedFieldsOperationUpdate,
 			FieldsType: "FieldsV1",
