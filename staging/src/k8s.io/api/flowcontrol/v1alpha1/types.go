@@ -266,7 +266,9 @@ type ResourcePolicyRule struct {
 	// matches any specified namespace but does not match a request
 	// that _does not specify_ a namespace in the URL's path (see the
 	// `clusterScope` field for that).  Note that a namespace
-	// specified in a field selector in the URL's query paraneter is
+	// specified in a field selector in the URL's query parameter
+	// is just a filter, and does not cause the cluster-scoped request
+	// to be treated as if it were namespace scoped.
 	// not considered here.
 	// This list may be empty, but only if `clusterScope` is true.
 	// +optional
