@@ -81,6 +81,85 @@ func TestSkipPodUpdate(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "with ServerSideApply changes on Annotations",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod-0",
+					Annotations:     map[string]string{"a": "b"},
+					ResourceVersion: "0",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    "some-actor",
+							Operation:  metav1.ManagedFieldsOperationApply,
+							APIVersion: "v1",
+							FieldsType: "FieldsV1",
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`
+									"f:metadata": {
+									  "f:annotations": {
+										"f:a: {}
+									  }
+									}
+								`),
+							},
+						},
+					},
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-0",
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "pod-0",
+						Annotations:     map[string]string{"a": "c", "d": "e"},
+						ResourceVersion: "1",
+						ManagedFields: []metav1.ManagedFieldsEntry{
+							{
+								Manager:    "some-actor",
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: "v1",
+								FieldsType: "FieldsV1",
+								FieldsV1: &metav1.FieldsV1{
+									Raw: []byte(`
+										"f:metadata": {
+										  "f:annotations": {
+											"f:a: {}
+											"f:d: {}
+										  }
+										}
+									`),
+								},
+							},
+							{
+								Manager:    "some-actor",
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: "v1",
+								FieldsType: "FieldsV1",
+								FieldsV1: &metav1.FieldsV1{
+									Raw: []byte(`
+										"f:metadata": {
+										  "f:annotations": {
+											"f:a: {}
+										  }
+										}
+									`),
+								},
+							},
+						},
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-1",
+					},
+				}
+			},
+			expected: true,
+		},
+		{
 			name: "with changes on Labels",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
