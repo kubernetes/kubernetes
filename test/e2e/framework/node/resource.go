@@ -37,6 +37,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+
+	// TODO remove the direct dependency for internal k8s.io/kubernetes
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/system"
 )
 
@@ -566,6 +569,14 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) 
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 	verifyThatTaintIsGone(c, nodeName, &taint)
+}
+
+// AddOrUpdateTaintOnNode adds the given taint to the given node or updates taint.
+func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
+	// TODO use wrapper methods in expect.go after removing the dependency on this
+	// package from the core e2e framework.
+	err := controller.AddOrUpdateTaintOnNode(c, nodeName, &taint)
+	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 }
 
 // removeNodeTaint is for cleaning up taints temporarily added to node,

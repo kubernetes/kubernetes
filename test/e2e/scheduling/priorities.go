@@ -580,7 +580,7 @@ func addRandomTaintToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 		Value:  fmt.Sprintf("testing-taint-value-%s", string(uuid.NewUUID())),
 		Effect: v1.TaintEffectPreferNoSchedule,
 	}
-	framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+	e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 	return &testTaint
 }
