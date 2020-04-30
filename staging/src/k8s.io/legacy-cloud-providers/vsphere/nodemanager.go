@@ -61,7 +61,7 @@ type NodeManager struct {
 	// Mutexes
 	registeredNodesLock   sync.RWMutex
 	nodeInfoLock          sync.RWMutex
-	credentialManagerLock sync.Mutex
+	credentialManagerLock sync.RWMutex
 }
 
 type NodeDetails struct {
@@ -449,6 +449,8 @@ func (nm *NodeManager) GetNodeInfoWithNodeObject(node *v1.Node) (NodeInfo, error
 }
 
 func (nm *NodeManager) CredentialManager() *SecretCredentialManager {
+	nm.credentialManagerLock.RLock()
+	defer nm.credentialManagerLock.RUnlock()
 	return nm.credentialManager
 }
 
