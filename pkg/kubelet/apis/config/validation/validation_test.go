@@ -118,8 +118,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 0},
 	}
 	const numErrsErrorCase1 = 25
-	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
-		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
+	allErrors := ValidateKubeletConfiguration(errorCase1)
+	if allErrors == nil {
+		t.Errorf("expected an error but got success")
+	} else if len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
+		t.Errorf("expect %d errors, got %d", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
 
 	errorCase2 := &kubeletconfig.KubeletConfiguration{
@@ -152,7 +155,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		ReservedSystemCPUs:          "0-3",
 	}
 	const numErrsErrorCase2 = 1
-	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
-		t.Errorf("expect %d errors, got %v", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
+	allErrors = ValidateKubeletConfiguration(errorCase2)
+	if allErrors == nil {
+		t.Errorf("expected an error but got success")
+	} else if len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
+		t.Errorf("expect %d errors, got %d", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
 }
