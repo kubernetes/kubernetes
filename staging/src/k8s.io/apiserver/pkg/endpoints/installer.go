@@ -629,8 +629,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		var (
 			enableWarningHeaders = utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders)
 
-			warnings   []string
-			deprecated bool
+			warnings       []string
+			deprecated     bool
+			removedRelease string
 		)
 
 		{
@@ -639,6 +640,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			currentMajor, currentMinor, _ := deprecation.MajorMinor(versioninfo.Get())
 			deprecated = deprecation.IsDeprecated(versionedPtrWithGVK, currentMajor, currentMinor)
 			if deprecated {
+				removedRelease = deprecation.RemovedRelease(versionedPtrWithGVK)
 				warnings = append(warnings, deprecation.WarningMessage(versionedPtrWithGVK))
 			}
 		}
@@ -654,9 +656,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 			if needOverride {
 				// need change the reported verb
-				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, handler)
 			} else {
-				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, handler)
 			}
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
@@ -690,7 +692,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -725,7 +727,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulUpdateResource(updater, reqScope, admit))
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -758,7 +760,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -783,7 +785,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = restfulCreateResource(creater, reqScope, admit)
 			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, handler)
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -819,7 +821,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if deleteReturnsDeletedObject {
 				deleteReturnType = producedObject
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -845,7 +847,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -875,7 +877,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -898,7 +900,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			if enableWarningHeaders {
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 			}
@@ -924,7 +926,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if isSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
+				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
 				if enableWarningHeaders {
 					handler = utilwarning.AddWarningsHandler(handler, warnings)
 				}
