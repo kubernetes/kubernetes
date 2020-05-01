@@ -187,9 +187,9 @@ func (*fakeTunnelCreator) newSSHTunnel(string, string, string) (tunnel, error) {
 	return &fakeTunnel{}, nil
 }
 
-func TestSSHTunnelListUpdate(t *testing.T) {
+func TestTunnelListUpdate(t *testing.T) {
 	// Start with an empty tunnel list.
-	l := &SSHTunnelList{
+	l := &TunnelList{
 		adding:        make(map[string]bool),
 		tunnelCreator: &fakeTunnelCreator{},
 	}
@@ -219,7 +219,7 @@ func TestSSHTunnelListUpdate(t *testing.T) {
 	checkTunnelsCorrect(t, l, addressStrings)
 }
 
-func checkTunnelsCorrect(t *testing.T, tunnelList *SSHTunnelList, addresses []string) {
+func checkTunnelsCorrect(t *testing.T, tunnelList *TunnelList, addresses []string) {
 	if err := wait.Poll(100*time.Millisecond, 2*time.Second, func() (bool, error) {
 		return hasCorrectTunnels(tunnelList, addresses), nil
 	}); err != nil {
@@ -227,7 +227,7 @@ func checkTunnelsCorrect(t *testing.T, tunnelList *SSHTunnelList, addresses []st
 	}
 }
 
-func hasCorrectTunnels(tunnelList *SSHTunnelList, addresses []string) bool {
+func hasCorrectTunnels(tunnelList *TunnelList, addresses []string) bool {
 	tunnelList.tunnelsLock.Lock()
 	defer tunnelList.tunnelsLock.Unlock()
 	wantMap := make(map[string]bool)
