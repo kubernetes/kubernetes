@@ -17,76 +17,11 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
-	"io"
 	"reflect"
-	"strings"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/utils/exec"
-)
-
-type fakeCmd struct {
-	b   []byte
-	err error
-}
-
-func (f fakeCmd) Run() error                         { return f.err }
-func (f fakeCmd) CombinedOutput() ([]byte, error)    { return f.b, f.err }
-func (f fakeCmd) Output() ([]byte, error)            { return f.b, f.err }
-func (f fakeCmd) SetDir(dir string)                  {}
-func (f fakeCmd) SetStdin(in io.Reader)              {}
-func (f fakeCmd) SetStdout(out io.Writer)            {}
-func (f fakeCmd) SetStderr(out io.Writer)            {}
-func (f fakeCmd) SetEnv([]string)                    {}
-func (f fakeCmd) Stop()                              {}
-func (f fakeCmd) Start() error                       { return nil }
-func (f fakeCmd) Wait() error                        { return nil }
-func (f fakeCmd) StdoutPipe() (io.ReadCloser, error) { return nil, nil }
-func (f fakeCmd) StderrPipe() (io.ReadCloser, error) { return nil, nil }
-
-type fakeExecer struct {
-	ioMap map[string]fakeCmd
-}
-
-func (f fakeExecer) Command(cmd string, args ...string) exec.Cmd {
-	cmds := []string{cmd}
-	cmds = append(cmds, args...)
-	return f.ioMap[strings.Join(cmds, " ")]
-}
-func (f fakeExecer) CommandContext(ctx context.Context, cmd string, args ...string) exec.Cmd {
-	return f.Command(cmd, args...)
-}
-func (f fakeExecer) LookPath(file string) (string, error) { return "", errors.New("unknown binary") }
-
-var (
-	systemdCgroupExecer = fakeExecer{
-		ioMap: map[string]fakeCmd{
-			"docker info -f {{.CgroupDriver}}": {
-				b: []byte(`systemd`),
-			},
-		},
-	}
-
-	cgroupfsCgroupExecer = fakeExecer{
-		ioMap: map[string]fakeCmd{
-			"docker info -f {{.CgroupDriver}}": {
-				b: []byte(`cgroupfs`),
-			},
-		},
-	}
-
-	errCgroupExecer = fakeExecer{
-		ioMap: map[string]fakeCmd{
-			"docker info -f {{.CgroupDriver}}": {
-				err: errors.New("no such binary: docker"),
-			},
-		},
-	}
 )
 
 func TestBuildKubeletArgMap(t *testing.T) {
@@ -109,7 +44,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 						},
 					},
 				},
-				execer: errCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin": "cni",
@@ -122,7 +56,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					CRISocket: "/var/run/dockershim.sock",
 					Name:      "override-name",
 				},
-				execer: errCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
@@ -136,37 +69,10 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					CRISocket:        "/var/run/dockershim.sock",
 					KubeletExtraArgs: map[string]string{"hostname-override": "override-name"},
 				},
-				execer: errCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
 				"hostname-override": "override-name",
-			},
-		},
-		{
-			name: "systemd cgroup driver",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
-				},
-				execer: systemdCgroupExecer,
-			},
-			expected: map[string]string{
-				"network-plugin": "cni",
-				"cgroup-driver":  "systemd",
-			},
-		},
-		{
-			name: "cgroupfs cgroup driver",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
-				},
-				execer: cgroupfsCgroupExecer,
-			},
-			expected: map[string]string{
-				"network-plugin": "cni",
-				"cgroup-driver":  "cgroupfs",
 			},
 		},
 		{
@@ -175,7 +81,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/containerd.sock",
 				},
-				execer: cgroupfsCgroupExecer,
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -201,7 +106,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					},
 				},
 				registerTaintsUsingFlags: true,
-				execer:                   cgroupfsCgroupExecer,
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
@@ -216,11 +120,9 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					CRISocket: "/var/run/dockershim.sock",
 				},
 				pauseImage: "gcr.io/pause:3.2",
-				execer:     cgroupfsCgroupExecer,
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
-				"cgroup-driver":             "cgroupfs",
 				"pod-infra-container-image": "gcr.io/pause:3.2",
 			},
 		},

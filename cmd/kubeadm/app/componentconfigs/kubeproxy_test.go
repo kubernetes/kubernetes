@@ -297,7 +297,7 @@ func TestKubeProxyDefault(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got := &kubeProxyConfig{}
-			got.Default(&test.clusterCfg, &test.endpoint)
+			got.Default(&test.clusterCfg, &test.endpoint, &kubeadmapi.NodeRegistrationOptions{})
 			if !reflect.DeepEqual(got, &test.expected) {
 				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, got)
 			}

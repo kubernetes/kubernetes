@@ -35,8 +35,9 @@ import (
 func TestDefault(t *testing.T) {
 	clusterCfg := &kubeadmapi.ClusterConfiguration{}
 	localAPIEndpoint := &kubeadmapi.APIEndpoint{}
+	nodeRegOps := &kubeadmapi.NodeRegistrationOptions{}
 
-	Default(clusterCfg, localAPIEndpoint)
+	Default(clusterCfg, localAPIEndpoint, nodeRegOps)
 
 	if len(clusterCfg.ComponentConfigs) != len(known) {
 		t.Errorf("missmatch between supported and defaulted type numbers:\n\tgot: %d\n\texpected: %d", len(clusterCfg.ComponentConfigs), len(known))
