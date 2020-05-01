@@ -25,6 +25,8 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.12
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
@@ -149,6 +151,8 @@ type CertificateSigningRequestCondition struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.12
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 type CertificateSigningRequestList struct {
 	metav1.TypeMeta `json:",inline"`
