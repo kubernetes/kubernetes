@@ -1073,7 +1073,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 				localAttachedMap := make(map[string]map[string]bool)
 				localAttachedMaps = append(localAttachedMaps, localAttachedMap)
 				// Start go routines per VC-DC to check disks are attached
-				go func(nodes []k8stypes.NodeName, rNodes chan []k8stypes.NodeName, ech chan error) {
+				go func(nodes []k8stypes.NodeName) {
 					nodesToRetryLocal, err := vs.checkDiskAttached(ctx, nodes, nodeVolumes, localAttachedMap, retry)
 					if err != nil {
 						if !vclib.IsManagedObjectNotFoundError(err) {
@@ -1082,11 +1082,11 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 						}
 					}
 					rNodes <- nodesToRetryLocal
-				}(nodeNames, rNodes, ech)
+				}(nodeNames)
 			}
 
 			// Collect the retry nodes/errors list from goroutines asynchronously
-			for retryCount := dcNodes {
+			for retryCount := range dcNodes {
 				select {
 					case e :=  <-ech:
 						return nodesToRetry, e
