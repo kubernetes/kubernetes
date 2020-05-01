@@ -339,7 +339,7 @@ func TestStructInput(t *testing.T) {
 		{"empty", "{.Name[*]}", storeData, "", true},
 		{"nested-map", "{.Items[*]}", storeData, "{\"notebooks\":\"5\",\"pencils\":\"1\",\"pens\":\"2\"} {\"pulses\":\"3\",\"rice\":\"1\"} {\"bike\":{\"color\":{\"color\":\"red\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"2\"}},\"car\":{\"color\":{\"color\":\"silver\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"4\"}}}", false},
 		{"nested-map", "{.Items[*][*]}", storeData, "1 3 {\"color\":{\"color\":\"silver\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"4\"}} {\"color\":{\"color\":\"red\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"2\"}} 1 2 5", false},
-		{"nested-map", "{.Items[*][*][*]}", storeData, "{\"color\":\"red\",\"texture\":\"shinning\"} {\"company\":\"any\",\"quantity\":\"2\"} {\"color\":\"silver\",\"texture\":\"shinning\"} {\"company\":\"any\",\"quantity\":\"4\"}", false},
+		{"nested-map", "{.Items[*][*][*]}", storeData, "", true},
 		{"nested-map", "{.Items.driving[*][*]}", storeData, "{\"company\":\"any\",\"quantity\":\"4\"} {\"color\":\"silver\",\"texture\":\"shinning\"} {\"company\":\"any\",\"quantity\":\"2\"} {\"color\":\"red\",\"texture\":\"shinning\"}", false},
 		{"path-map", "{.ItemsArray[0][*]}", storeData, "3", false},
 		{"path-map", "{.ItemsArray[1][*][*]}", storeData, "true 2", false},
