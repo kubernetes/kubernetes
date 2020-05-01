@@ -17,12 +17,21 @@ limitations under the License.
 package create
 
 import (
-	"github.com/spf13/cobra"
+	"context"
+	"fmt"
+	"strings"
 
+	"github.com/spf13/cobra"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -38,22 +47,35 @@ var (
 
 // DeploymentOpts is returned by NewCmdCreateDeployment
 type DeploymentOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	PrintFlags *genericclioptions.PrintFlags
+	PrintObj   func(obj runtime.Object) error
+
+	Name             string
+	Images           []string
+	Namespace        string
+	EnforceNamespace bool
+	FieldManager     string
+
+	Client         appsv1client.AppsV1Interface
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
+
+	genericclioptions.IOStreams
 }
 
 // NewCmdCreateDeployment is a macro command to create a new deployment.
 // This command is better known to users as `kubectl create deployment`.
-// Note that this command overlaps significantly with the `kubectl run` command.
 func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &DeploymentOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
 	}
 
 	cmd := &cobra.Command{
 		Use:                   "deployment NAME --image=image [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
-		Short:                 i18n.T("Create a deployment with the specified name."),
+		Short:                 deploymentLong,
 		Long:                  deploymentLong,
 		Example:               deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -62,56 +84,16 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 		},
 	}
 
-	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+	options.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, "")
-	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
-	cmd.MarkFlagRequired("image")
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
+	cmd.Flags().StringSliceVar(&options.Images, "image", []string{}, "Image name to run.")
+	_ = cmd.MarkFlagRequired("image")
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, "kubectl-create")
+
 	return cmd
-}
-
-// generatorFromName returns the appropriate StructuredGenerator based on the
-// generatorName. If the generatorName is unrecognized, then return (nil,
-// false).
-func generatorFromName(
-	generatorName string,
-	imageNames []string,
-	deploymentName string,
-) (generate.StructuredGenerator, bool) {
-
-	switch generatorName {
-	case generateversioned.DeploymentBasicAppsV1GeneratorName:
-		generator := &generateversioned.DeploymentBasicAppsGeneratorV1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		return generator, true
-
-	case generateversioned.DeploymentBasicAppsV1Beta1GeneratorName:
-		generator := &generateversioned.DeploymentBasicAppsGeneratorV1Beta1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		return generator, true
-
-	case generateversioned.DeploymentBasicV1Beta1GeneratorName:
-		generator := &generateversioned.DeploymentBasicGeneratorV1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		return generator, true
-	}
-
-	return nil, false
 }
 
 // Complete completes all the options
@@ -120,37 +102,126 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
+	o.Name = name
 
-	clientset, err := f.KubernetesClientSet()
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.Client, err = appsv1client.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
 
-	generatorName := cmdutil.GetFlagString(cmd, "generator")
-
-	if len(generatorName) == 0 {
-		generatorName = generateversioned.DeploymentBasicAppsV1GeneratorName
-		generatorNameTemp, err := generateversioned.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.CreateSubcommandOptions.ErrOut)
-		if err != nil {
-			return err
-		}
-		if generatorNameTemp != generatorName {
-			cmdutil.Warning(o.CreateSubcommandOptions.ErrOut, generatorName, generatorNameTemp)
-		} else {
-			generatorName = generatorNameTemp
-		}
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
 	}
 
-	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
-	generator, ok := generatorFromName(generatorName, imageNames, name)
-	if !ok {
-		return errUnsupportedGenerator(cmd, generatorName)
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
 	}
 
-	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
+	return nil
 }
 
 // Run performs the execution of 'create deployment' sub command
 func (o *DeploymentOpts) Run() error {
-	return o.CreateSubcommandOptions.Run()
+	one := int32(1)
+	labels := map[string]string{"app": o.Name}
+	selector := metav1.LabelSelector{MatchLabels: labels}
+	namespace := ""
+	if o.EnforceNamespace {
+		namespace = o.Namespace
+	}
+
+	deploy := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      o.Name,
+			Labels:    labels,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &one,
+			Selector: &selector,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: o.buildPodSpec(),
+			},
+		},
+	}
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(deploy.GroupVersionKind()); err != nil {
+				return err
+			}
+			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		var err error
+		deploy, err = o.Client.Deployments(o.Namespace).Create(context.TODO(), deploy, createOptions)
+		if err != nil {
+			return fmt.Errorf("failed to create deployment: %v", err)
+		}
+	}
+
+	return o.PrintObj(deploy)
+}
+
+// buildPodSpec parses the image strings and assemble them into the Containers
+// of a PodSpec. This is all you need to create the PodSpec for a deployment.
+func (o *DeploymentOpts) buildPodSpec() v1.PodSpec {
+	podSpec := v1.PodSpec{Containers: []v1.Container{}}
+	for _, imageString := range o.Images {
+		// Retain just the image name
+		imageSplit := strings.Split(imageString, "/")
+		name := imageSplit[len(imageSplit)-1]
+		// Remove any tag or hash
+		if strings.Contains(name, ":") {
+			name = strings.Split(name, ":")[0]
+		}
+		if strings.Contains(name, "@") {
+			name = strings.Split(name, "@")[0]
+		}
+		name = sanitizeAndUniquify(name)
+		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
+	}
+	return podSpec
+}
+
+// sanitizeAndUniquify replaces characters like "." or "_" into "-" to follow DNS1123 rules.
+// Then add random suffix to make it uniquified.
+func sanitizeAndUniquify(name string) string {
+	if strings.ContainsAny(name, "_.") {
+		name = strings.Replace(name, "_", "-", -1)
+		name = strings.Replace(name, ".", "-", -1)
+		name = fmt.Sprintf("%s-%s", name, utilrand.String(5))
+	}
+	return name
 }
