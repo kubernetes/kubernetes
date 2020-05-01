@@ -901,10 +901,14 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 // checkExternalServiceReachability ensures service of type externalName resolves to IP address and no fake externalName is set
 // FQDN of kubernetes is used as externalName(for air tight platforms).
 func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) error {
+	// NOTE(claudiub): Windows does not support PQDN.
+	svcName := fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, framework.TestContext.ClusterDNSDomain)
 	// Service must resolve to IP
-	cmd := fmt.Sprintf("nslookup %s", svc.Name)
-	_, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
+	cmd := fmt.Sprintf("nslookup %s", svcName)
+	_, stderr, err := framework.RunHostCmdWithFullOutput(pod.Namespace, pod.Name, cmd)
+	// NOTE(claudiub): nslookup may return 0 on Windows, even though the DNS name was not found. In this case,
+	// we can check stderr for the error.
+	if err != nil || (framework.NodeOSDistroIs("windows") && strings.Contains(stderr, fmt.Sprintf("can't find %s", svcName))) {
 		return fmt.Errorf("ExternalName service %q must resolve to IP", pod.Namespace+"/"+pod.Name)
 	}
 	return nil
