@@ -12,7 +12,6 @@ steps:
       - REGISTRY=gcr.io/$PROJECT_ID
       - IMAGE=gcr.io/$PROJECT_ID/debian-base
       - BUILD_IMAGE=debian-build
-      - HOME=/root
     args:
       - all-push
   - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20200422-b25d964'
@@ -23,7 +22,6 @@ steps:
       - REGISTRY=gcr.io/$PROJECT_ID
       - BASE_REGISTRY=gcr.io/$PROJECT_ID
       - IMAGE=gcr.io/$PROJECT_ID/debian-iptables
-      - HOME=/root
     args:
       - all-push
   - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20200422-b25d964'
