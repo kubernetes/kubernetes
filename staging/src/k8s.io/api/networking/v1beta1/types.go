@@ -17,13 +17,15 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
@@ -48,6 +50,8 @@ type Ingress struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // IngressList is a collection of Ingress.
 type IngressList struct {
@@ -269,6 +273,8 @@ type IngressBackend struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.18
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // IngressClass represents the class of the Ingress, referenced by the Ingress
 // Spec. The `ingressclass.kubernetes.io/is-default-class` annotation can be
@@ -306,6 +312,8 @@ type IngressClassSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.18
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // IngressClassList is a collection of IngressClasses.
 type IngressClassList struct {
