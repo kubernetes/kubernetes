@@ -270,7 +270,8 @@
 		{
 			"SelectorRegexp": "k8s[.]io/kubernetes/third_party/",
 			"AllowedPrefixes": [
-				"k8s.io/kubernetes/third_party/forked/golang/expansion"
+				"k8s.io/kubernetes/third_party/forked/golang/expansion",
+				"k8s.io/kubernetes/third_party/forked/ipvs"
 			],
 			"ForbiddenPrefixes": []
 		},
