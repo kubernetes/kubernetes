@@ -209,7 +209,7 @@ func TestTypesInput(t *testing.T) {
 			`{"name":"two","value":2.002,"type":"float"} {"name":"four","value":4.004,"type":"float"}`, false},
 	}
 
-	testJSONPath(sliceTests, false, t)
+		testJSONPath(sliceTests, false, t)
 }
 
 type book struct {
@@ -237,6 +237,8 @@ type store struct {
 	Name      string
 	Labels    map[string]int
 	Employees map[empName]job
+	Items 	map[string]interface{}
+	ItemsArray []map[string]interface{}
 }
 
 func TestStructInput(t *testing.T) {
@@ -260,6 +262,50 @@ func TestStructInput(t *testing.T) {
 		Employees: map[empName]job{
 			"jason": "manager",
 			"dan":   "clerk",
+		},
+		Items: map[string]interface{}{
+			"study": map[string]string{
+				"pencils": "1",
+				"pens": "2",
+				"notebooks": "5",
+			},
+			"cooking": map[string]string{
+				"rice": "1",
+				"pulses": "3",
+			},
+			"driving": map[string]interface{}{
+				"car": map[string]interface{}{
+					"wheels": map[string]interface{}{
+						"company": "any",
+						"quantity": "4",
+					},
+					"color": map[string]interface{}{
+						"color": "silver",
+						"texture": "shinning",
+					},
+				},
+				"bike": map[string]interface{}{
+					"wheels": map[string]interface{}{
+						"company": "any",
+						"quantity": "2",
+					},
+					"color": map[string]interface{}{
+						"color": "red",
+						"texture": "shinning",
+					},
+				},
+			},
+		},
+		ItemsArray: []map[string]interface{}{
+			map[string]interface{}{
+				"study-item-count": "3",
+			},
+			map[string]interface{}{
+				"cooking-item-count": map[string]interface{}{
+					"count": "2",
+					"isRice": true,
+				},
+			},
 		},
 	}
 
@@ -290,6 +336,15 @@ func TestStructInput(t *testing.T) {
 		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, `{"Color":"red","Price":19.95,"IsNew":true}`, false},
 		{"objects", "{.Labels[*]}", storeData, "10 15 20", false},
 		{"objects", "{$.Employees[*]}", storeData, "manager clerk", false},
+		{"empty", "{.Name[*]}", storeData, "", true},
+		{"nested-map", "{.Items[*]}", storeData, "{\"notebooks\":\"5\",\"pencils\":\"1\",\"pens\":\"2\"} {\"pulses\":\"3\",\"rice\":\"1\"} {\"bike\":{\"color\":{\"color\":\"red\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"2\"}},\"car\":{\"color\":{\"color\":\"silver\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"4\"}}}", false},
+		{"nested-map", "{.Items[*][*]}", storeData, "1 3 {\"color\":{\"color\":\"silver\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"4\"}} {\"color\":{\"color\":\"red\",\"texture\":\"shinning\"},\"wheels\":{\"company\":\"any\",\"quantity\":\"2\"}} 1 2 5", false},
+		{"nested-map", "{.Items[*][*][*]}", storeData, "{\"color\":\"red\",\"texture\":\"shinning\"} {\"company\":\"any\",\"quantity\":\"2\"} {\"color\":\"silver\",\"texture\":\"shinning\"} {\"company\":\"any\",\"quantity\":\"4\"}", false},
+		{"nested-map", "{.Items.driving[*][*]}", storeData, "{\"company\":\"any\",\"quantity\":\"4\"} {\"color\":\"silver\",\"texture\":\"shinning\"} {\"company\":\"any\",\"quantity\":\"2\"} {\"color\":\"red\",\"texture\":\"shinning\"}", false},
+		{"path-map", "{.ItemsArray[0][*]}", storeData, "3", false},
+		{"path-map", "{.ItemsArray[1][*][*]}", storeData, "true 2", false},
+		{"path-map", "{.Items.study.pencils[*]}", storeData, "execute error string is not array or slice", true},
+		{"path-map", "{.Items.study[1]}", storeData, "execute error invalid jsonpath for objects. Index should be an asterisk when applied over an object", true},
 		{"invalid object", "{.Labels[a]}", storeData, "in invalid object, parse {.Labels[a]} error invalid array index a", true},
 	}
 
