@@ -374,6 +374,9 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.7
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=apiextensions.k8s.io,v1,CustomResourceDefinition
 
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
@@ -390,6 +393,9 @@ type CustomResourceDefinition struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.7
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=apiextensions.k8s.io,v1,CustomResourceDefinitionList
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
@@ -454,6 +460,11 @@ type CustomResourceSubresourceScale struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.13
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// This API is never served.  It is used for outbound requests from apiservers.  This will ensure it never gets served accidentally
+// and having the generator against this group will protect future APIs which may be served.
+// +k8s:prerelease-lifecycle-gen:replacement=apiextensions.k8s.io,v1,ConversionReview
 
 // ConversionReview describes a conversion request/response.
 type ConversionReview struct {
