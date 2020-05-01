@@ -148,7 +148,7 @@ func (g *genericScheduler) snapshot() error {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
 func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
-	ctx, span := global.TraceProvider().Tracer("new-scheduler").Start(ctx, "genericScheduler Schedule")
+	ctx, span := global.TraceProvider().Tracer("new-scheduler").Start(ctx, fmt.Sprintf("genericScheduler: Schedule '%s'", pod.Name))
 	span.SetAttributes(core.KeyValue{Key:"PodName",Value:core.String(pod.Name)})
 	defer span.End()
 

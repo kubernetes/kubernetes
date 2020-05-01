@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/api/core"
 	"go.opentelemetry.io/otel/api/global"
 	"sync"
 
@@ -328,6 +329,9 @@ func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+	ctx, span := global.Tracer("interpodaffinity").Start(ctx, "InterPodAffinity")
+	defer span.End()
+
 	var allNodes []*framework.NodeInfo
 	var havePodsWithAffinityNodes []*framework.NodeInfo
 	var err error
@@ -349,6 +353,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	if err != nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("calculating preFilterState: %v", err))
 	}
+	span.AddEvent(ctx, "IncomingPodAffinityMap", core.KeyValue{Key:"map",Value:core.String(fmt.Sprintf("%+v",incomingPodAffinityMap))})
 
 	s := &preFilterState{
 		topologyToMatchedAffinityTerms:             incomingPodAffinityMap,
