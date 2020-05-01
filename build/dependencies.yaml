@@ -118,7 +118,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/pause"
-    version: 3.2
+    version: 3.3
     refPaths:
     - path: build/pause/Makefile
       match: TAG =
