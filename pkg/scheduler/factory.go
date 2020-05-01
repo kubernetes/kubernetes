@@ -490,9 +490,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 				Name:      pod.Name,
 			}
 
-			// An unschedulable pod will be placed in the unschedulable queue.
-			// This ensures that if the pod is nominated to run on a node,
-			// scheduler takes the pod into account when running predicates for the node.
 			// Get the pod again; it may have changed/been scheduled already.
 			getBackoff := initialGetBackoff
 			for {
