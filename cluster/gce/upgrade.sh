@@ -165,7 +165,7 @@ function prepare-upgrade() {
 #   ZONE
 function get-node-env() {
   # TODO(zmerlynn): Make this more reliable with retries.
-  gcloud compute --project ${PROJECT} ssh --zone ${ZONE} ${NODE_NAMES[0]} --command \
+  gcloud compute --project "${PROJECT}" ssh --zone "${ZONE}" "${NODE_NAMES[0]}" --command \
     "curl --fail --silent -H 'Metadata-Flavor: Google' \
       'http://metadata/computeMetadata/v1/instance/attributes/kube-env'" 2>/dev/null
 }
@@ -241,24 +241,31 @@ function prepare-node-upgrade() {
   echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
   setup-base-image
 
-  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
+  SANITIZED_VERSION="${KUBE_VERSION//[\.\+]/-}"
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
   if [ -n "${NODE_SCOPES}" ]; then
     scope_flags="--scopes ${NODE_SCOPES}"
   else
+    # shellcheck disable=SC2034 # 'scope_flags' is used by upstream
     scope_flags="--no-scopes"
   fi
 
   # Get required node env vars from exiting template.
-  local node_env=$(get-node-env)
+  local node_env
+  node_env=$(get-node-env)
   KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
+  export KUBE_PROXY_TOKEN
   NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${node_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")
+  export CA_CERT_BASE64
   EXTRA_DOCKER_OPTS=$(get-env-val "${node_env}" "EXTRA_DOCKER_OPTS")
+  export EXTRA_DOCKER_OPTS
   KUBELET_CERT_BASE64=$(get-env-val "${node_env}" "KUBELET_CERT")
+  export KUBELET_CERT_BASE64
   KUBELET_KEY_BASE64=$(get-env-val "${node_env}" "KUBELET_KEY")
+  export KUBELET_KEY_BASE64
 
   upgrade-node-env
 
@@ -268,7 +275,8 @@ function prepare-node-upgrade() {
 
   # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
   #                 through all create-linux-node-instance-template implementations).
-  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION} ${NODE_INSTANCE_PREFIX})
+  local template_name
+  template_name=$(get-template-name-from-version "${SANITIZED_VERSION}" "${NODE_INSTANCE_PREFIX}")
   create-linux-node-instance-template "${template_name}"
   # The following is echo'd so that callers can get the template name.
   echo "Instance template name: ${template_name}"
@@ -281,7 +289,8 @@ function upgrade-node-env() {
   # the original node.
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
     detect-master
-    local master_env=$(get-master-env)
+    local master_env
+    master_env=$(get-master-env)
     NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   fi
 }
@@ -293,7 +302,8 @@ function upgrade-node-env() {
 function do-single-node-upgrade() {
   local -r instance="$1"
   local kubectl_rc
-  local boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+  local boot_id
+  boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
   if [[ "${kubectl_rc}" != 0 ]]; then
     echo "== FAILED to get bootID ${instance} =="
     echo "${boot_id}"
@@ -313,7 +323,8 @@ function do-single-node-upgrade() {
   # Recreate instance
   echo "== Recreating instance ${instance}. ==" >&2
   local recreate_rc
-  local recreate=$(gcloud compute instance-groups managed recreate-instances "${group}" \
+  local recreate
+  recreate=$(gcloud compute instance-groups managed recreate-instances "${group}" \
     --project="${PROJECT}" \
     --zone="${ZONE}" \
     --instances="${instance}" 2>&1) && recreate_rc=$? || recreate_rc=$?
@@ -329,7 +340,8 @@ function do-single-node-upgrade() {
   # it is a best effort approximation.
   echo "== Waiting for new node to be added to k8s.  ==" >&2
   while true; do
-    local new_boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+    local new_boot_id
+    new_boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
     if [[ "${kubectl_rc}" != 0 ]]; then
       echo "== FAILED to get node ${instance} =="
       echo "${boot_id}"
@@ -346,7 +358,8 @@ function do-single-node-upgrade() {
   # Wait for the node to have Ready=True.
   echo "== Waiting for ${instance} to become ready. ==" >&2
   while true; do
-    local ready=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
+    local ready
+    ready=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
     if [[ "${ready}" != 'True' ]]; then
       echo "Node ${instance} is still not ready: Ready=${ready}"
     else
@@ -374,14 +387,14 @@ function do-node-upgrade() {
   # Do the actual upgrade.
   # NOTE(zmerlynn): If you are changing this gcloud command, update
   #                 test/e2e/cluster_upgrade.go to match this EXACTLY.
-  local template_name=$(get-template-name-from-version ${SANITIZED_VERSION} ${NODE_INSTANCE_PREFIX})
+  local template_name
+  template_name=$(get-template-name-from-version "${SANITIZED_VERSION}" "${NODE_INSTANCE_PREFIX}")
   local old_templates=()
-  local updates=()
-  for group in ${INSTANCE_GROUPS[@]}; do
-    old_templates+=($(gcloud compute instance-groups managed list \
+  for group in "${INSTANCE_GROUPS[@]}"; do
+    while IFS='' read -r line; do old_templates+=("$line"); done < <(gcloud compute instance-groups managed list \
         --project="${PROJECT}" \
         --filter="name ~ '${group}' AND zone:(${ZONE})" \
-        --format='value(instanceTemplate)' || true))
+        --format='value(instanceTemplate)' || true)
     set_instance_template_out=$(gcloud compute instance-groups managed set-instance-template "${group}" \
       --template="${template_name}" \
       --project="${PROJECT}" \
@@ -392,20 +405,20 @@ function do-node-upgrade() {
       return ${set_instance_template_rc}
     fi
     instances=()
-    instances+=($(gcloud compute instance-groups managed list-instances "${group}" \
+    while IFS='' read -r line; do instances+=("$line"); done < <(gcloud compute instance-groups managed list-instances "${group}" \
         --format='value(instance)' \
         --project="${PROJECT}" \
-        --zone="${ZONE}" 2>&1)) && list_instances_rc=$? || list_instances_rc=$?
+        --zone="${ZONE}" 2>&1) && list_instances_rc=$? || list_instances_rc=$?
     if [[ "${list_instances_rc}" != 0 ]]; then
       echo "== FAILED to list instances in group ${group} =="
-      echo "${instances}"
+      echo "${instances[@]}"
       return ${list_instances_rc}
     fi
 
     process_count_left=${node_upgrade_parallelism}
     pids=()
     ret_code_sum=0  # Should stay 0 in the loop iff all parallel node upgrades succeed.
-    for instance in ${instances[@]}; do
+    for instance in "${instances[@]}"; do
       do-single-node-upgrade "${instance}" & pids+=("$!")
 
       # We don't want to run more than ${node_upgrade_parallelism} upgrades at a time,
@@ -415,7 +428,7 @@ function do-node-upgrade() {
       if [[ process_count_left -eq 0 || "${instance}" == "${instances[-1]}" ]]; then
         # Wait for each of the parallel node upgrades to finish.
         for pid in "${pids[@]}"; do
-          wait $pid
+          wait "$pid"
           ret_code_sum=$(( ret_code_sum + $? ))
         done
         # Return even if at least one of the node upgrades failed.
@@ -430,7 +443,7 @@ function do-node-upgrade() {
 
   # Remove the old templates.
   echo "== Deleting old templates in ${PROJECT}. ==" >&2
-  for tmpl in ${old_templates[@]}; do
+  for tmpl in "${old_templates[@]}"; do
     gcloud compute instance-templates delete \
         --quiet \
         --project="${PROJECT}" \
@@ -455,11 +468,11 @@ function update-coredns-config() {
 
   # Get the new installed CoreDNS version
   echo "Waiting for CoreDNS to update"
-  until [[ $(${KUBE_ROOT}/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; do
+  until [[ $("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; do
      sleep 1
   done
   echo "Fetching the latest installed CoreDNS version"
-  NEW_COREDNS_VERSION=$(${KUBE_ROOT}/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
 
   case "$(uname -m)" in
       x86_64*)
@@ -502,37 +515,37 @@ function update-coredns-config() {
 
   # Download the CoreDNS migration tool
   echo "== Downloading the CoreDNS migration tool =="
-  wget -P ${download_dir} "https://github.com/coredns/corefile-migration/releases/download/v1.0.6/corefile-tool-${host_arch}" >/dev/null 2>&1
+  wget -P "${download_dir}" "https://github.com/coredns/corefile-migration/releases/download/v1.0.6/corefile-tool-${host_arch}" >/dev/null 2>&1
 
-  local -r checkSHA=$(sha256sum ${download_dir}/corefile-tool-${host_arch} | cut -d " " -f 1)
+  local -r checkSHA=$(sha256sum "${download_dir}/corefile-tool-${host_arch}" | cut -d " " -f 1)
   if [[ "${checkSHA}" != "${corefile_tool_SHA}" ]]; then
     echo "!!! CheckSum for the CoreDNS migration tool did not match !!!" >&2
     exit 1
   fi
 
-  chmod +x ${download_dir}/corefile-tool-${host_arch}
+  chmod +x "${download_dir}/corefile-tool-${host_arch}"
 
   # Migrate the CoreDNS ConfigMap depending on whether it is being downgraded or upgraded.
-  ${KUBE_ROOT}/cluster/kubectl.sh -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' > ${download_dir}/Corefile-old
+  "${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' > "${download_dir}/Corefile-old"
 
-  if test "$(printf '%s\n' ${CURRENT_COREDNS_VERSION} ${NEW_COREDNS_VERSION} | sort -V | head -n 1)" != ${NEW_COREDNS_VERSION}; then
+  if test "$(printf '%s\n' "${CURRENT_COREDNS_VERSION}" "${NEW_COREDNS_VERSION}" | sort -V | head -n 1)" != "${NEW_COREDNS_VERSION}"; then
      echo "== Upgrading the CoreDNS ConfigMap =="
-     ${download_dir}/corefile-tool-${host_arch} migrate --from ${CURRENT_COREDNS_VERSION} --to ${NEW_COREDNS_VERSION} --corefile ${download_dir}/Corefile-old > ${download_dir}/Corefile
-     ${KUBE_ROOT}/cluster/kubectl.sh -n kube-system create configmap coredns --from-file ${download_dir}/Corefile -o yaml --dry-run=client | ${KUBE_ROOT}/cluster/kubectl.sh apply -f -
+     "${download_dir}/corefile-tool-${host_arch}" migrate --from "${CURRENT_COREDNS_VERSION}" --to "${NEW_COREDNS_VERSION}" --corefile "${download_dir}/Corefile-old" > "${download_dir}/Corefile"
+     "${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system create configmap coredns --from-file "${download_dir}/Corefile" -o yaml --dry-run=client | "${KUBE_ROOT}/cluster/kubectl.sh" apply -f -
   else
      # In case of a downgrade, a custom CoreDNS Corefile will be overwritten by a default Corefile. In that case,
      # the user will need to manually modify the resulting (default) Corefile after the downgrade is complete.
      echo "== Applying the latest default CoreDNS configuration =="
-     gcloud compute --project ${PROJECT}  scp --zone ${ZONE} ${MASTER_NAME}:${coredns_addon_path}/coredns.yaml ${download_dir}/coredns-manifest.yaml > /dev/null
-     ${KUBE_ROOT}/cluster/kubectl.sh apply -f ${download_dir}/coredns-manifest.yaml
+     gcloud compute --project "${PROJECT}"  scp --zone "${ZONE}" "${MASTER_NAME}:${coredns_addon_path}/coredns.yaml" "${download_dir}/coredns-manifest.yaml" > /dev/null
+     "${KUBE_ROOT}/cluster/kubectl.sh" apply -f "${download_dir}/coredns-manifest.yaml"
   fi
 
   echo "== The CoreDNS Config has been updated =="
 }
 
 echo "Fetching the previously installed CoreDNS version"
-CURRENT_COREDNS_VERSION=$(${KUBE_ROOT}/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
-COREDNS_DEPLOY_RESOURCE_VERSION=$(${KUBE_ROOT}/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}')
+CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+COREDNS_DEPLOY_RESOURCE_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}')
 
 master_upgrade=true
 node_upgrade=true
@@ -542,7 +555,7 @@ env_os_distro=false
 node_upgrade_parallelism=1
 
 while getopts ":MNPlcho" opt; do
-  case ${opt} in
+  case "${opt}" in
     M)
       node_upgrade=false
       ;;
@@ -603,7 +616,7 @@ if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]] && [[ "${STORAGE_BACKEND:-}" != "etcd2" ]]
   echo "export STORAGE_MEDIA_TYPE=application/json"
   echo ""
   if [ -t 0 ] && [ -t 1 ]; then
-    read -p "Would you like to continue with the new default, and lose the ability to downgrade to etcd2? [y/N] " confirm
+    read -r -p "Would you like to continue with the new default, and lose the ability to downgrade to etcd2? [y/N] " confirm
     if [[ "${confirm}" != "y" ]]; then
       exit 1
     fi
@@ -638,7 +651,7 @@ if [[ "${master_upgrade}" == "true" ]]; then
     echo "In all cases, it is strongly recommended to have an etcd backup before upgrading."
     echo
     if [ -t 0 ] && [ -t 1 ]; then
-      read -p "Continue with default etcd version, which might upgrade etcd? [y/N] " confirm
+      read -r -p "Continue with default etcd version, which might upgrade etcd? [y/N] " confirm
       if [[ "${confirm}" != "y" ]]; then
         exit 1
       fi
@@ -652,7 +665,7 @@ fi
 print-node-version-info "Pre-Upgrade"
 
 if [[ "${local_binaries}" == "false" ]]; then
-  set_binary_version ${1}
+  set_binary_version "${1}"
 fi
 
 prepare-upgrade
