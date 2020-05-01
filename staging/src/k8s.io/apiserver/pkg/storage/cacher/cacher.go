@@ -51,6 +51,9 @@ const (
 	// storageWatchListPageSize is the cacher's request chunk size of
 	// initial and resync watch lists to storage.
 	storageWatchListPageSize = int64(10000)
+	// defaultBookmarkFrequency defines how frequently watch bookmarks should be send
+	// in addition to sending a bookmark right before watch deadline
+	defaultBookmarkFrequency = time.Minute
 )
 
 // Config contains the configuration for a given Cache.
@@ -154,24 +157,26 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 // second in a bucket, and pop up them once at the timeout. To be more specific,
 // if you set fire time at X, you can get the bookmark within (X-1,X+1) period.
 type watcherBookmarkTimeBuckets struct {
-	lock            sync.Mutex
-	watchersBuckets map[int64][]*cacheWatcher
-	startBucketID   int64
-	clock           clock.Clock
+	lock              sync.Mutex
+	watchersBuckets   map[int64][]*cacheWatcher
+	startBucketID     int64
+	clock             clock.Clock
+	bookmarkFrequency time.Duration
 }
 
-func newTimeBucketWatchers(clock clock.Clock) *watcherBookmarkTimeBuckets {
+func newTimeBucketWatchers(clock clock.Clock, bookmarkFrequency time.Duration) *watcherBookmarkTimeBuckets {
 	return &watcherBookmarkTimeBuckets{
-		watchersBuckets: make(map[int64][]*cacheWatcher),
-		startBucketID:   clock.Now().Unix(),
-		clock:           clock,
+		watchersBuckets:   make(map[int64][]*cacheWatcher),
+		startBucketID:     clock.Now().Unix(),
+		clock:             clock,
+		bookmarkFrequency: bookmarkFrequency,
 	}
 }
 
 // adds a watcher to the bucket, if the deadline is before the start, it will be
 // added to the first one.
 func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
-	nextTime, ok := w.nextBookmarkTime(t.clock.Now())
+	nextTime, ok := w.nextBookmarkTime(t.clock.Now(), t.bookmarkFrequency)
 	if !ok {
 		return false
 	}
@@ -339,7 +344,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		stopCh:           stopCh,
 		clock:            clock,
 		timer:            time.NewTimer(time.Duration(0)),
-		bookmarkWatchers: newTimeBucketWatchers(clock),
+		bookmarkWatchers: newTimeBucketWatchers(clock, defaultBookmarkFrequency),
 	}
 
 	// Ensure that timer is stopped.
@@ -914,9 +919,8 @@ func (c *Cacher) startDispatchingBookmarkEvents() {
 				continue
 			}
 			c.watchersBuffer = append(c.watchersBuffer, watcher)
-			// Given that we send bookmark event once at deadline-2s, never push again
-			// after the watcher pops up from the buckets. Once we decide to change the
-			// strategy to more sophisticated, we may need it here.
+			// Requeue the watcher for the next bookmark if needed.
+			c.bookmarkWatchers.addWatcher(watcher)
 		}
 	}
 }
@@ -1219,13 +1223,28 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	}
 }
 
-func (c *cacheWatcher) nextBookmarkTime(now time.Time) (time.Time, bool) {
-	// For now we return 2s before deadline (and maybe +infinity is now already passed this time)
-	// but it gives us extensibility for the future(false when deadline is not set).
+func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Duration) (time.Time, bool) {
+	// We try to send bookmarks:
+	// (a) roughly every minute
+	// (b) right before the watcher timeout - for now we simply set it 2s before
+	//     the deadline
+	// The former gives us periodicity if the watch breaks due to unexpected
+	// conditions, the later ensures that on timeout the watcher is as close to
+	// now as possible - this covers 99% of cases.
+	heartbeatTime := now.Add(bookmarkFrequency)
 	if c.deadline.IsZero() {
-		return c.deadline, false
+		// Timeout is set by our client libraries (e.g. reflector) as well as defaulted by
+		// apiserver if properly configured. So this shoudln't happen in practice.
+		return heartbeatTime, true
 	}
-	return c.deadline.Add(-2 * time.Second), true
+	if pretimeoutTime := c.deadline.Add(-2 * time.Second); pretimeoutTime.Before(heartbeatTime) {
+		heartbeatTime = pretimeoutTime
+	}
+
+	if heartbeatTime.Before(now) {
+		return time.Time{}, false
+	}
+	return heartbeatTime, true
 }
 
 func getEventObject(object runtime.Object) runtime.Object {

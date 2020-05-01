@@ -558,7 +558,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 	}
 
 	clock := clock.NewFakeClock(time.Now())
-	watchers := newTimeBucketWatchers(clock)
+	watchers := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
 	now := clock.Now()
 	watchers.addWatcher(newWatcher(now.Add(10 * time.Second)))
 	watchers.addWatcher(newWatcher(now.Add(20 * time.Second)))
@@ -743,6 +743,77 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 
 	for _, tc := range testCases {
 		testCacherSendBookmarkEvents(t, tc.allowWatchBookmarks, tc.expectedBookmarks)
+	}
+}
+
+func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+	// Update bookmarkFrequency to speed up test.
+	// Note that the frequency lower than 1s doesn't change much due to
+	// resolution how frequency we recompute.
+	cacher.bookmarkWatchers.bookmarkFrequency = time.Second
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+
+	makePod := func(index int) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", index),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%v", 100+index),
+			},
+		}
+	}
+
+	// Create pod to initialize watch cache.
+	if err := cacher.watchCache.Add(makePod(0)); err != nil {
+		t.Fatalf("failed to add a pod: %v", err)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	w, err := cacher.Watch(ctx, "pods/ns", "100", pred)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	// Create one more pod, to ensure that current RV is higher and thus
+	// bookmarks will be delievere (events are delivered for RV higher
+	// than the max from init events).
+	if err := cacher.watchCache.Add(makePod(1)); err != nil {
+		t.Fatalf("failed to add a pod: %v", err)
+	}
+
+	timeoutCh := time.After(5 * time.Second)
+	lastObservedRV := uint64(0)
+	// Ensure that a watcher gets two bookmarks.
+	for observedBookmarks := 0; observedBookmarks < 2; {
+		select {
+		case event, ok := <-w.ResultChan():
+			if !ok {
+				t.Fatal("Unexpected closed")
+			}
+			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
+			if err != nil {
+				t.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
+			}
+			if event.Type == watch.Bookmark {
+				observedBookmarks++
+				if rv < lastObservedRV {
+					t.Errorf("Unexpected bookmark event resource version %v (last %v)", rv, lastObservedRV)
+				}
+			}
+			lastObservedRV = rv
+		case <-timeoutCh:
+			t.Fatal("Unexpected timeout to receive bookmark events")
+		}
 	}
 }
 
