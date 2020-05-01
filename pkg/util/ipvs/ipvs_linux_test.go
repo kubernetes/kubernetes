@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"testing"
 
-	libipvs "github.com/docker/libnetwork/ipvs"
+	libipvs "k8s.io/kubernetes/third_party/forked/ipvs"
 )
 
 func Test_toVirtualServer(t *testing.T) {
