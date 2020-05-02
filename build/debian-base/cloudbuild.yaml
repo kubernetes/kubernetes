@@ -6,6 +6,7 @@ options:
 steps:
   - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20200422-b25d964'
     entrypoint: make
+    dir: ./build/debian-base
     env:
       - DOCKER_CLI_EXPERIMENTAL=enabled
       - REGISTRY=gcr.io/$PROJECT_ID
