@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -53,15 +52,15 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	}
 
 	earliestPodStartTime := GetPodStartTime(victims.Pods[0])
-	maxPriority := podutil.GetPodPriority(victims.Pods[0])
+	maxPriority := GetPodPriority(victims.Pods[0])
 
 	for _, pod := range victims.Pods {
-		if podutil.GetPodPriority(pod) == maxPriority {
+		if GetPodPriority(pod) == maxPriority {
 			if GetPodStartTime(pod).Before(earliestPodStartTime) {
 				earliestPodStartTime = GetPodStartTime(pod)
 			}
-		} else if podutil.GetPodPriority(pod) > maxPriority {
-			maxPriority = podutil.GetPodPriority(pod)
+		} else if GetPodPriority(pod) > maxPriority {
+			maxPriority = GetPodPriority(pod)
 			earliestPodStartTime = GetPodStartTime(pod)
 		}
 	}
@@ -74,8 +73,8 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 // It takes arguments of the type "interface{}" to be used with SortableList,
 // but expects those arguments to be *v1.Pod.
 func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
-	p1 := podutil.GetPodPriority(pod1)
-	p2 := podutil.GetPodPriority(pod2)
+	p1 := GetPodPriority(pod1)
+	p2 := GetPodPriority(pod2)
 	if p1 != p2 {
 		return p1 > p2
 	}
@@ -108,4 +107,15 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 		//}
 	}
 	return terms
+}
+
+// GetPodPriority returns priority of the given pod.
+func GetPodPriority(pod *v1.Pod) int32 {
+	if pod.Spec.Priority != nil {
+		return *pod.Spec.Priority
+	}
+	// When priority of a running pod is nil, it means it was created at a time
+	// that there was no global default priority class and the priority class
+	// name of the pod was empty. So, we resolve to the static default priority.
+	return 0
 }

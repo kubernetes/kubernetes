@@ -6,8 +6,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )
