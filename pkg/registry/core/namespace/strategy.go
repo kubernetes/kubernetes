@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -37,65 +38,65 @@ import (
 type namespaceStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
+
+	rest.CreationPreparator
+	rest.UpdatePreparator
 }
 
 // Strategy is the default logic that applies when creating and updating Namespace
 // objects via the REST API.
-var Strategy = namespaceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = namespaceStrategy{
+	legacyscheme.Scheme,
+	names.SimpleNameGenerator,
+
+	// TODO: is a direct type creation more readable? What to do about builders then?
+	rest.NewCreationPreparator(
+		// PrepareForCreate
+		func(ctx context.Context, obj runtime.Object) {
+			// on create, status is active
+			namespace := obj.(*api.Namespace)
+			namespace.Status = api.NamespaceStatus{
+				Phase: api.NamespaceActive,
+			}
+			// on create, we require the kubernetes value
+			// we cannot use this in defaults conversion because we let it get removed over life of object
+			hasKubeFinalizer := false
+			for i := range namespace.Spec.Finalizers {
+				if namespace.Spec.Finalizers[i] == api.FinalizerKubernetes {
+					hasKubeFinalizer = true
+					break
+				}
+			}
+			if !hasKubeFinalizer {
+				if len(namespace.Spec.Finalizers) == 0 {
+					namespace.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+				} else {
+					namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
+				}
+			}
+		}, nil,
+	),
+	rest.NewUpdatePreparator(
+		// PrepareForUpdate
+		func(ctx context.Context, obj, old runtime.Object) {
+			newNamespace := obj.(*api.Namespace)
+			oldNamespace := old.(*api.Namespace)
+			newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
+			newNamespace.Status = oldNamespace.Status
+		},
+		// ResetFields
+		map[string]*fieldpath.Set{
+			"v1": fieldpath.NewSet(
+				fieldpath.MakePathOrDie("status"),
+				fieldpath.MakePathOrDie("spec.finalizers"),
+			),
+		},
+	),
+}
 
 // NamespaceScoped is false for namespaces.
 func (namespaceStrategy) NamespaceScoped() bool {
 	return false
-}
-
-// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
-// If no fieldset is defined for a version, nil is returned.
-func (namespaceStrategy) ResetFieldsFor(version string) *fieldpath.Set {
-	set, ok := resetFieldsByVersion[version]
-	if !ok {
-		return nil
-	}
-	return set
-}
-
-var resetFieldsByVersion = map[string]*fieldpath.Set{
-	"v1": fieldpath.NewSet(
-		fieldpath.MakePathOrDie("status"),
-		fieldpath.MakePathOrDie("spec.finalizers"),
-	),
-}
-
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	// on create, status is active
-	namespace := obj.(*api.Namespace)
-	namespace.Status = api.NamespaceStatus{
-		Phase: api.NamespaceActive,
-	}
-	// on create, we require the kubernetes value
-	// we cannot use this in defaults conversion because we let it get removed over life of object
-	hasKubeFinalizer := false
-	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] == api.FinalizerKubernetes {
-			hasKubeFinalizer = true
-			break
-		}
-	}
-	if !hasKubeFinalizer {
-		if len(namespace.Spec.Finalizers) == 0 {
-			namespace.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
-		} else {
-			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
-		}
-	}
-}
-
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newNamespace := obj.(*api.Namespace)
-	oldNamespace := old.(*api.Namespace)
-	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
-	newNamespace.Status = oldNamespace.Status
 }
 
 // Validate validates a new namespace.
@@ -125,30 +126,30 @@ func (namespaceStrategy) AllowUnconditionalUpdate() bool {
 
 type namespaceStatusStrategy struct {
 	namespaceStrategy
+
+	rest.CreationPreparator
+	rest.UpdatePreparator
 }
 
-var StatusStrategy = namespaceStatusStrategy{Strategy}
+var StatusStrategy = namespaceStatusStrategy{
+	Strategy,
 
-// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
-// If no fieldset is defined for a version, nil is returned.
-func (namespaceStatusStrategy) ResetFieldsFor(version string) *fieldpath.Set {
-	set, ok := resetFieldsByVersionForStatus[version]
-	if !ok {
-		return nil
-	}
-	return set
-}
-
-var resetFieldsByVersionForStatus = map[string]*fieldpath.Set{
-	"v1": fieldpath.NewSet(
-		fieldpath.MakePathOrDie("spec"),
+	// TODO: is this correct?
+	Strategy.CreationPreparator,
+	rest.NewUpdatePreparator(
+		// PrepareForUpdate
+		func(ctx context.Context, obj, old runtime.Object) {
+			newNamespace := obj.(*api.Namespace)
+			oldNamespace := old.(*api.Namespace)
+			newNamespace.Spec = oldNamespace.Spec
+		},
+		// ResetFields
+		map[string]*fieldpath.Set{
+			"v1": fieldpath.NewSet(
+				fieldpath.MakePathOrDie("spec"),
+			),
+		},
 	),
-}
-
-func (namespaceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newNamespace := obj.(*api.Namespace)
-	oldNamespace := old.(*api.Namespace)
-	newNamespace.Spec = oldNamespace.Spec
 }
 
 func (namespaceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -157,35 +158,34 @@ func (namespaceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runt
 
 type namespaceFinalizeStrategy struct {
 	namespaceStrategy
+
+	rest.CreationPreparator
+	rest.UpdatePreparator
 }
 
-var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
+var FinalizeStrategy = namespaceFinalizeStrategy{
+	Strategy,
 
-// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
-// If no fieldset is defined for a version, nil is returned.
-func (namespaceFinalizeStrategy) ResetFieldsFor(version string) *fieldpath.Set {
-	set, ok := resetFieldsByVersionForFinalize[version]
-	if !ok {
-		return nil
-	}
-	return set
-}
-
-var resetFieldsByVersionForFinalize = map[string]*fieldpath.Set{
-	"v1": fieldpath.NewSet(
-		fieldpath.MakePathOrDie("status"),
+	// TODO: is this correct?
+	Strategy.CreationPreparator,
+	rest.NewUpdatePreparator(
+		// PrepareForUpdate
+		func(ctx context.Context, obj, old runtime.Object) {
+			newNamespace := obj.(*api.Namespace)
+			oldNamespace := old.(*api.Namespace)
+			newNamespace.Status = oldNamespace.Status
+		},
+		// ResetFields
+		map[string]*fieldpath.Set{
+			"v1": fieldpath.NewSet(
+				fieldpath.MakePathOrDie("status"),
+			),
+		},
 	),
 }
 
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
-}
-
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceFinalizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newNamespace := obj.(*api.Namespace)
-	oldNamespace := old.(*api.Namespace)
-	newNamespace.Status = oldNamespace.Status
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

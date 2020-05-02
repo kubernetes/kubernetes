@@ -67,7 +67,7 @@ var Strategy = podStrategy{
 	legacyscheme.Scheme,
 	names.SimpleNameGenerator,
 
-	// TODO: is a direct type creation more readable? That to do about builders then?
+	// TODO: is a direct type creation more readable? What to do about builders then?
 	rest.NewCreationPreparator(
 		// PrepareForCreate
 		func(ctx context.Context, obj runtime.Object) {
@@ -78,6 +78,16 @@ var Strategy = podStrategy{
 			}
 
 			podutil.DropDisabledPodFields(pod, nil)
+		}, nil,
+	),
+	rest.NewUpdatePreparator(
+		// PrepareForUpdate
+		func(ctx context.Context, obj, old runtime.Object) {
+			newPod := obj.(*api.Pod)
+			oldPod := old.(*api.Pod)
+			newPod.Status = oldPod.Status
+
+			podutil.DropDisabledPodFields(newPod, oldPod)
 		},
 		// ResetFields
 		map[string]*fieldpath.Set{
@@ -95,25 +105,6 @@ var Strategy = podStrategy{
 			}
 			// TODO: add all the fields from podutil.DropDisabledPodFields (a lot)
 			// Maybe create a function for this in podutil and allow setting a path prefix for usability
-		},
-	),
-	rest.NewUpdatePreparator(
-		// PrepareForUpdate
-		func(ctx context.Context, obj, old runtime.Object) {
-			newPod := obj.(*api.Pod)
-			oldPod := old.(*api.Pod)
-			newPod.Status = oldPod.Status
-
-			podutil.DropDisabledPodFields(newPod, oldPod)
-		},
-		// ResetFields
-		// TODO: do we need those twice?
-		// Moving them to a var again defeats the purpose of keeping this stuff closer together
-		map[string]*fieldpath.Set{
-			"v1": fieldpath.NewSet(
-				fieldpath.MakePathOrDie("status"),
-				// TODO: add fields reset by podutil.DropDisabledPodFields
-			),
 		},
 	),
 }
@@ -217,8 +208,6 @@ var StatusStrategy = podStatusStrategy{
 			newPod.OwnerReferences = oldPod.OwnerReferences
 		},
 		// ResetFields
-		// TODO: do we need those twice?
-		// Moving them to a var again defeats the purpose of keeping this stuff closer together
 		map[string]*fieldpath.Set{
 			"v1": fieldpath.NewSet(
 				fieldpath.MakePathOrDie("spec"),

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -42,18 +43,23 @@ import (
 
 // rest implements a RESTStorage for namespaces
 type REST struct {
-	store  *genericregistry.Store
+	store *genericregistry.Store
+	registry.CreateStrategyGetter
+	registry.UpdateStrategyGetter
+
 	status *genericregistry.Store
 }
 
 // StatusREST implements the REST endpoint for changing the status of a namespace.
 type StatusREST struct {
 	store *genericregistry.Store
+	registry.UpdateStrategyGetter
 }
 
 // FinalizeREST implements the REST endpoint for finalizing a namespace.
 type FinalizeREST struct {
 	store *genericregistry.Store
+	registry.UpdateStrategyGetter
 }
 
 // NewREST returns a RESTStorage object that will work against namespaces.
@@ -84,7 +90,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 	finalizeStore := *store
 	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
 
-	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}, nil
+	return &REST{store: store, CreateStrategyGetter: store, UpdateStrategyGetter: store, status: &statusStore},
+		&StatusREST{store: &statusStore, UpdateStrategyGetter: &statusStore},
+		&FinalizeREST{store: &finalizeStore, UpdateStrategyGetter: &finalizeStore}, nil
 }
 
 func (r *REST) NamespaceScoped() bool {
