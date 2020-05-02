@@ -265,6 +265,11 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		location = *req.URL
 		location.Scheme = h.Location.Scheme
 		location.Host = h.Location.Host
+	} else if len(location.RawQuery) == 0 {
+		// When a connection is upgraded, we want to keep the request querystring, even if the request location
+		// is not being used. However, if the location already has its own querystring, we should not overwrite it,
+		// so only do this if there is no location querystring already.
+		location.RawQuery = req.URL.RawQuery
 	}
 
 	clone := utilnet.CloneRequest(req)
