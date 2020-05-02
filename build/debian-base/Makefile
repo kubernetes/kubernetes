@@ -18,7 +18,7 @@ REGISTRY ?= staging-k8s.gcr.io
 IMAGE ?= $(REGISTRY)/debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= v2.0.1
+TAG ?= v2.1.0
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
