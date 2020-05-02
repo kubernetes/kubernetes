@@ -81,7 +81,7 @@ type SSHTunneler struct {
 	InstallSSHKey  InstallSSHKey
 	HealthCheckURL *url.URL
 
-	tunnels *ssh.SSHTunnelList
+	tunnels *ssh.SecureTunnelList
 	clock   clock.Clock
 
 	getAddresses AddressFunc
@@ -129,7 +129,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 		}
 	}
 
-	c.tunnels = ssh.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
+	c.tunnels = ssh.NewSecureTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
 	// Sync loop to ensure that the SSH key has been installed.
 	c.lastSSHKeySync = c.clock.Now().Unix()
 	c.installSSHKeySyncLoop(c.SSHUser, publicKeyFile)
