@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package util
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"os"
 	"path"
 	"sync"
@@ -27,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
-	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -36,23 +36,23 @@ const etcdImage = "3.4.7-0"
 
 // EtcdUpgrade upgrades etcd on GCE.
 func EtcdUpgrade(targetStorage, targetVersion string) error {
-	switch TestContext.Provider {
+	switch framework.TestContext.Provider {
 	case "gce":
 		return etcdUpgradeGCE(targetStorage, targetVersion)
 	default:
-		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
+		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
 }
 
 // MasterUpgrade upgrades master node on GCE/GKE.
-func MasterUpgrade(f *Framework, v string) error {
-	switch TestContext.Provider {
+func MasterUpgrade(f *framework.Framework, v string) error {
+	switch framework.TestContext.Provider {
 	case "gce":
 		return masterUpgradeGCE(v, false)
 	case "gke":
 		return MasterUpgradeGKE(f.Namespace.Name, v)
 	default:
-		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
+		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
 }
 
@@ -63,7 +63,7 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 		"STORAGE_BACKEND="+targetStorage,
 		"TEST_ETCD_IMAGE="+etcdImage)
 
-	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-l", "-M")
+	_, _, err := framework.RunCmdEnv(env, GCEUpgradeScript(), "-l", "-M")
 	return err
 }
 
@@ -77,10 +77,10 @@ func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet b
 func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
 	// TODO: Remove these variables when they're no longer needed for downgrades.
-	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
+	if framework.TestContext.EtcdUpgradeVersion != "" && framework.TestContext.EtcdUpgradeStorage != "" {
 		env = append(env,
-			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
-			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
+			"TEST_ETCD_VERSION="+framework.TestContext.EtcdUpgradeVersion,
+			"STORAGE_BACKEND="+framework.TestContext.EtcdUpgradeStorage,
 			"TEST_ETCD_IMAGE="+etcdImage)
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
@@ -89,22 +89,22 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 	}
 
 	v := "v" + rawV
-	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-M", v)
+	_, _, err := framework.RunCmdEnv(env, GCEUpgradeScript(), "-M", v)
 	return err
 }
 
 // LocationParamGKE returns parameter related to location for gcloud command.
 func LocationParamGKE() string {
-	if TestContext.CloudConfig.MultiMaster {
+	if framework.TestContext.CloudConfig.MultiMaster {
 		// GKE Regional Clusters are being tested.
-		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+		return fmt.Sprintf("--region=%s", framework.TestContext.CloudConfig.Region)
 	}
-	return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	return fmt.Sprintf("--zone=%s", framework.TestContext.CloudConfig.Zone)
 }
 
 // AppendContainerCommandGroupIfNeeded returns container command group parameter if necessary.
 func AppendContainerCommandGroupIfNeeded(args []string) []string {
-	if TestContext.CloudConfig.Region != "" {
+	if framework.TestContext.CloudConfig.Region != "" {
 		// TODO(wojtek-t): Get rid of it once Regional Clusters go to GA.
 		return append([]string{"beta"}, args...)
 	}
@@ -113,19 +113,19 @@ func AppendContainerCommandGroupIfNeeded(args []string) []string {
 
 // MasterUpgradeGKE upgrades master node to the specified version on GKE.
 func MasterUpgradeGKE(namespace string, v string) error {
-	Logf("Upgrading master to %q", v)
+	framework.Logf("Upgrading master to %q", v)
 	args := []string{
 		"container",
 		"clusters",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
 		LocationParamGKE(),
 		"upgrade",
-		TestContext.CloudConfig.Cluster,
+		framework.TestContext.CloudConfig.Cluster,
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
 		"--quiet",
 	}
-	_, _, err := RunCmd("gcloud", AppendContainerCommandGroupIfNeeded(args)...)
+	_, _, err := framework.RunCmd("gcloud", AppendContainerCommandGroupIfNeeded(args)...)
 	if err != nil {
 		return err
 	}
@@ -137,38 +137,38 @@ func MasterUpgradeGKE(namespace string, v string) error {
 
 // GCEUpgradeScript returns path of script for upgrading on GCE.
 func GCEUpgradeScript() string {
-	if len(TestContext.GCEUpgradeScript) == 0 {
-		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
+	if len(framework.TestContext.GCEUpgradeScript) == 0 {
+		return path.Join(framework.TestContext.RepoRoot, "cluster/gce/upgrade.sh")
 	}
-	return TestContext.GCEUpgradeScript
+	return framework.TestContext.GCEUpgradeScript
 }
 
 // WaitForSSHTunnels waits for establishing SSH tunnel to busybox pod.
 func WaitForSSHTunnels(namespace string) {
-	Logf("Waiting for SSH tunnels to establish")
-	RunKubectl(namespace, "run", "ssh-tunnel-test",
+	framework.Logf("Waiting for SSH tunnels to establish")
+	framework.RunKubectl(namespace, "run", "ssh-tunnel-test",
 		"--image=busybox",
 		"--restart=Never",
 		"--command", "--",
 		"echo", "Hello")
-	defer RunKubectl(namespace, "delete", "pod", "ssh-tunnel-test")
+	defer framework.RunKubectl(namespace, "delete", "pod", "ssh-tunnel-test")
 
 	// allow up to a minute for new ssh tunnels to establish
 	wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
-		_, err := RunKubectl(namespace, "logs", "ssh-tunnel-test")
+		_, err := framework.RunKubectl(namespace, "logs", "ssh-tunnel-test")
 		return err == nil, nil
 	})
 }
 
 // NodeKiller is a utility to simulate node failures.
 type NodeKiller struct {
-	config   NodeKillerConfig
+	config   framework.NodeKillerConfig
 	client   clientset.Interface
 	provider string
 }
 
 // NewNodeKiller creates new NodeKiller.
-func NewNodeKiller(config NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
+func NewNodeKiller(config framework.NodeKillerConfig, client clientset.Interface, provider string) *NodeKiller {
 	config.NodeKillerStopCh = make(chan struct{})
 	return &NodeKiller{config, client, provider}
 }
@@ -185,11 +185,11 @@ func (k *NodeKiller) Run(stopCh <-chan struct{}) {
 
 func (k *NodeKiller) pickNodes() []v1.Node {
 	nodes, err := e2enode.GetReadySchedulableNodes(k.client)
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	numNodes := int(k.config.FailureRatio * float64(len(nodes.Items)))
 
 	nodes, err = e2enode.GetBoundedReadySchedulableNodes(k.client, numNodes)
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	return nodes.Items
 }
 
@@ -201,19 +201,19 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 		go func() {
 			defer wg.Done()
 
-			Logf("Stopping docker and kubelet on %q to simulate failure", node.Name)
+			framework.Logf("Stopping docker and kubelet on %q to simulate failure", node.Name)
 			err := e2essh.IssueSSHCommand("sudo systemctl stop docker kubelet", k.provider, &node)
 			if err != nil {
-				Logf("ERROR while stopping node %q: %v", node.Name, err)
+				framework.Logf("ERROR while stopping node %q: %v", node.Name, err)
 				return
 			}
 
 			time.Sleep(k.config.SimulatedDowntime)
 
-			Logf("Rebooting %q to repair the node", node.Name)
+			framework.Logf("Rebooting %q to repair the node", node.Name)
 			err = e2essh.IssueSSHCommand("sudo reboot", k.provider, &node)
 			if err != nil {
-				Logf("ERROR while rebooting node %q: %v", node.Name, err)
+				framework.Logf("ERROR while rebooting node %q: %v", node.Name, err)
 				return
 			}
 		}()

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/test/e2e/util"
 	"math/rand"
 	"net"
 	"net/http"
@@ -3626,7 +3627,7 @@ func restartApiserver(namespace string, cs clientset.Interface) error {
 	if err != nil {
 		return err
 	}
-	return framework.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+	return util.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
 }
 
 func sshRestartMaster() error {

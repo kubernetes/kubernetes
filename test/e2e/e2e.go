@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/test/e2e/util"
 	"os"
 	"os/exec"
 	"path"
@@ -302,7 +303,7 @@ func setupSuite() {
 	}
 
 	if framework.TestContext.NodeKiller.Enabled {
-		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
+		nodeKiller := util.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
 		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCh)
 	}
 }

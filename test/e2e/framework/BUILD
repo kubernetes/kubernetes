@@ -10,7 +10,6 @@ go_library(
         "framework.go",
         "log.go",
         "log_size_monitoring.go",
-        "nodes_util.go",
         "pods.go",
         "ports.go",
         "provider.go",
