@@ -40,5 +40,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
-	sigs.k8s.io/structured-merge-diff/v3 => github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200325145223-0548f89a53da
+	sigs.k8s.io/structured-merge-diff/v3 => github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200502153226-14d2811f4c3a
 )

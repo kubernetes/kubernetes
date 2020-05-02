@@ -280,8 +280,8 @@ github.com/kr/pretty v0.2.0/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfn
 github.com/kr/pty v1.1.5/go.mod h1:9r2w37qlBe7rQ6e1fg1S/9xpWHSnaqNdHD3WcMdbPDA=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200325145223-0548f89a53da h1:3PWfsp2FqW6YAIzXVdzFkf9oZ7el+5wHkuvvJfPE/kQ=
-github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200325145223-0548f89a53da/go.mod h1:s3K4TpTa66PFITnRLxNsvIQe2qnX7dSxcaV3q//kOtw=
+github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200502153226-14d2811f4c3a h1:YzBp+0gIAjqLeHPFAl1oAayPyUP87MhH26OW3NIQ10M=
+github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200502153226-14d2811f4c3a/go.mod h1:s3K4TpTa66PFITnRLxNsvIQe2qnX7dSxcaV3q//kOtw=
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=
 github.com/libopenstorage/openstorage v1.0.0 h1:GLPam7/0mpdP8ZZtKjbfcXJBTIA/T1O6CBErVEFEyIM=
 github.com/libopenstorage/openstorage v1.0.0/go.mod h1:Sp1sIObHjat1BeXhfMqLZ14wnOzEhNx2YQedreMcUyc=

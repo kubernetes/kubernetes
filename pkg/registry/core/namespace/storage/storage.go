@@ -31,7 +31,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -70,8 +69,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		DeleteStrategy:      namespace.Strategy,
 		ReturnDeletedObject: true,
 
-		ResetFieldsProvider: namespace.Strategy,
-
 		ShouldDeleteDuringUpdate: ShouldDeleteNamespaceDuringUpdate,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
@@ -83,25 +80,15 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 
 	statusStore := *store
 	statusStore.UpdateStrategy = namespace.StatusStrategy
-	statusStore.ResetFieldsProvider = namespace.StatusStrategy
 
 	finalizeStore := *store
 	finalizeStore.UpdateStrategy = namespace.FinalizeStrategy
-	finalizeStore.ResetFieldsProvider = namespace.FinalizeStrategy
 
 	return &REST{store: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}, nil
 }
 
 func (r *REST) NamespaceScoped() bool {
 	return r.store.NamespaceScoped()
-}
-
-// ResetFieldsFor implements rest.ResetFieldsProvider.
-func (r *REST) ResetFieldsFor(version string) *fieldpath.Set {
-	if r.store.ResetFieldsProvider != nil {
-		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
-	}
-	return nil
 }
 
 func (r *REST) New() runtime.Object {
@@ -303,14 +290,6 @@ func (r *REST) StorageVersion() runtime.GroupVersioner {
 	return r.store.StorageVersion()
 }
 
-// ResetFieldsFor implements rest.ResetFieldsProvider.
-func (r *StatusREST) ResetFieldsFor(version string) *fieldpath.Set {
-	if r.store.ResetFieldsProvider != nil {
-		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
-	}
-	return nil
-}
-
 func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -325,14 +304,6 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
-}
-
-// ResetFieldsFor implements rest.ResetFieldsProvider.
-func (r *FinalizeREST) ResetFieldsFor(version string) *fieldpath.Set {
-	if r.store.ResetFieldsProvider != nil {
-		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
-	}
-	return nil
 }
 
 func (r *FinalizeREST) New() runtime.Object {

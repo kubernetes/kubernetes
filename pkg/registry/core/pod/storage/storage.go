@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -81,8 +82,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		DeleteStrategy:      registrypod.Strategy,
 		ReturnDeletedObject: true,
 
-		ResetFieldsProvider: registrypod.Strategy,
-
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
@@ -97,7 +96,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	statusStore := *store
 	statusStore.UpdateStrategy = registrypod.StatusStrategy
-	statusStore.ResetFieldsProvider = registrypod.StatusStrategy
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 
@@ -107,7 +105,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Binding:             &BindingREST{store: store},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),
-		Status:              &StatusREST{store: &statusStore},
+		Status:              &StatusREST{store: &statusStore, UpdateStrategyGetter: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
 		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},
 		Proxy:               &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
@@ -262,6 +260,7 @@ func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, crea
 // StatusREST implements the REST endpoint for changing the status of a pod.
 type StatusREST struct {
 	store *genericregistry.Store
+	registry.UpdateStrategyGetter
 }
 
 // New creates a new pod resource

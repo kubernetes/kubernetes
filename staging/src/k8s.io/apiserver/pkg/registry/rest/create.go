@@ -53,6 +53,7 @@ type RESTCreateStrategy interface {
 	// status. Clear the status because status changes are internal. External
 	// callers of an api (users) should not be setting an initial status on
 	// newly created objects.
+	// TODO(kwiesmueller): replace with CreatePreparator once all resources implement it
 	PrepareForCreate(ctx context.Context, obj runtime.Object)
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in

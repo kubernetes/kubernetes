@@ -45,7 +45,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
-        "//vendor/sigs.k8s.io/structured-merge-diff/v3/fieldpath:go_default_library",
     ],
 )
 

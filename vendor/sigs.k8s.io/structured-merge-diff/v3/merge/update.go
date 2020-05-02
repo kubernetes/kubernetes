@@ -41,10 +41,10 @@ func (s *Updater) EnableUnionFeature() {
 	s.enableUnions = true
 }
 
-func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, *typed.Comparison, error) {
+func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, ignored *fieldpath.Set, workflow string, force bool) (fieldpath.ManagedFields, *typed.Comparison, error) {
 	conflicts := fieldpath.ManagedFields{}
 	removed := fieldpath.ManagedFields{}
-	compare, err := oldObject.Compare(newObject)
+	compare, err := oldObject.CompareWithout(newObject, ignored)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to compare objects: %v", err)
 	}
@@ -76,7 +76,7 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 				}
 				return nil, nil, fmt.Errorf("failed to convert new object: %v", err)
 			}
-			compare, err = versionedOldObject.Compare(versionedNewObject)
+			compare, err = versionedOldObject.CompareWithout(versionedNewObject, ignored)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to compare objects: %v", err)
 			}
@@ -119,7 +119,7 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 // that you intend to persist (after applying the patch if this is for a
 // PATCH call), and liveObject must be the original object (empty if
 // this is a CREATE call).
-func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (*typed.TypedValue, fieldpath.ManagedFields, error) {
+func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, ignored *fieldpath.Set, manager string) (*typed.TypedValue, fieldpath.ManagedFields, error) {
 	var err error
 	if s.enableUnions {
 		newObject, err = liveObject.NormalizeUnions(newObject)
@@ -128,7 +128,7 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 		}
 	}
 	managers = shallowCopyManagers(managers)
-	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, true)
+	managers, compare, err := s.update(liveObject, newObject, version, managers, ignored, manager, true)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}
@@ -179,7 +179,7 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to prune fields: %v", err)
 	}
-	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, force)
+	managers, compare, err := s.update(liveObject, newObject, version, managers, nil, manager, force)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}

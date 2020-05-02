@@ -109,12 +109,28 @@ func (tv TypedValue) Merge(pso *TypedValue) (*TypedValue, error) {
 // match), or an error will be returned. Validation errors will be returned if
 // the objects don't conform to the schema.
 func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
+	return tv.CompareWithout(rhs, nil)
+}
+
+// CompareWithout compares the two objects, but ignores the provided set of fields.
+// See the comments on the `Comparison` struct for details on the return value.
+//
+// tv and rhs must both be of the same type (their Schema and TypeRef must
+// match), or an error will be returned. Validation errors will be returned if
+// the objects don't conform to the schema.
+func (tv TypedValue) CompareWithout(rhs *TypedValue, ignored *fieldpath.Set) (c *Comparison, err error) {
 	c = &Comparison{
 		Removed:  fieldpath.NewSet(),
 		Modified: fieldpath.NewSet(),
 		Added:    fieldpath.NewSet(),
 	}
+	if ignored == nil {
+		ignored = fieldpath.NewSet()
+	}
 	_, err = merge(&tv, rhs, func(w *mergingWalker) {
+		if ignored.HasPartial(w.path) {
+			return
+		}
 		if w.lhs == nil {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {
@@ -125,6 +141,9 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 			c.Modified.Insert(w.path)
 		}
 	}, func(w *mergingWalker) {
+		if ignored.HasPartial(w.path) {
+			return
+		}
 		if w.lhs == nil {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {

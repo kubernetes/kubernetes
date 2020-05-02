@@ -39,7 +39,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.
@@ -78,8 +77,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		UpdateStrategy: replicationcontroller.Strategy,
 		DeleteStrategy: replicationcontroller.Strategy,
 
-		ResetFieldsProvider: replicationcontroller.Strategy,
-
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicationcontroller.GetAttrs}
@@ -89,7 +86,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = replicationcontroller.StatusStrategy
-	statusStore.ResetFieldsProvider = replicationcontroller.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
@@ -113,14 +109,6 @@ func (r *REST) Categories() []string {
 // StatusREST implements the REST endpoint for changing the status of a replication controller
 type StatusREST struct {
 	store *genericregistry.Store
-}
-
-// ResetFieldsFor implements rest.ResetFieldsProvider.
-func (r *StatusREST) ResetFieldsFor(version string) *fieldpath.Set {
-	if r.store.ResetFieldsProvider != nil {
-		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
-	}
-	return nil
 }
 
 func (r *StatusREST) New() runtime.Object {

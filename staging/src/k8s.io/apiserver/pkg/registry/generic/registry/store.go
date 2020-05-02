@@ -46,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 
 	"k8s.io/klog"
 )
@@ -58,10 +57,20 @@ type ObjectFunc func(obj runtime.Object) error
 
 // GenericStore interface can be used for type assertions when we need to access the underlying strategies.
 type GenericStore interface {
-	GetCreateStrategy() rest.RESTCreateStrategy
-	GetUpdateStrategy() rest.RESTUpdateStrategy
+	CreateStrategyGetter
+	UpdateStrategyGetter
 	GetDeleteStrategy() rest.RESTDeleteStrategy
 	GetExportStrategy() rest.RESTExportStrategy
+}
+
+// CreateStrategyGetter can be used for type assertions when we need to access the underlying create strategy.
+type CreateStrategyGetter interface {
+	GetCreateStrategy() rest.RESTCreateStrategy
+}
+
+// UpdateStrategyGetter can be used for type assertions when we need to access the underlying update strategy.
+type UpdateStrategyGetter interface {
+	GetUpdateStrategy() rest.RESTUpdateStrategy
 }
 
 // Store implements pkg/api/rest.StandardStorage. It's intended to be
@@ -181,7 +190,7 @@ type Store struct {
 
 	// ResetFieldsProvider is an optional interface providing details about the fields
 	// being reset by the strategy before the resource is persisted
-	ResetFieldsProvider rest.ResetFieldsProvider
+	//rest.ResetFieldsProvider
 
 	// Storage is the interface for the underlying storage for the
 	// resource. It is wrapped into a "DryRunnableStorage" that will
@@ -291,14 +300,6 @@ func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
 // GetExportStrategy implements GenericStore.
 func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
 	return e.ExportStrategy
-}
-
-// ResetFieldsFor implements rest.ResetFieldsProvider.
-func (e *Store) ResetFieldsFor(version string) *fieldpath.Set {
-	if e.ResetFieldsProvider != nil {
-		return e.ResetFieldsProvider.ResetFieldsFor(version)
-	}
-	return nil
 }
 
 // List returns a list of items matching labels and field according to the

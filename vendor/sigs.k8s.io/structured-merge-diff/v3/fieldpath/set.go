@@ -128,6 +128,31 @@ func (s *Set) Has(p Path) bool {
 	}
 }
 
+// HasPartial returns true if PathElement of p is a member of the set.
+// Example:
+// For a set containing .obj
+// any path starting with .obj (like .obj.a) is part of the set.
+func (s *Set) HasPartial(p Path) bool {
+	if len(p) == 0 {
+		// No one owns "the entire object"
+		return false
+	}
+	for {
+		if len(p) == 0 {
+			return false
+		}
+		if s.Members.Has(p[0]) {
+			return true
+		}
+		var ok bool
+		s, ok = s.Children.Get(p[0])
+		if !ok {
+			return false
+		}
+		p = p[1:]
+	}
+}
+
 // Equals returns true if s and s2 have exactly the same members.
 func (s *Set) Equals(s2 *Set) bool {
 	return s.Members.Equals(&s2.Members) && s.Children.Equals(&s2.Children)

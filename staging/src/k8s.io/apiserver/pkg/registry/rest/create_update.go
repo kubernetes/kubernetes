@@ -34,6 +34,7 @@ type RESTCreateUpdateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
+	// TODO(kwiesmueller): replace with UpdatePreparator once all resources implement it
 	PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate

@@ -37,7 +37,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/statefulset"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // StatefulSetStorage includes dummy storage for StatefulSets, and their Status and Scale subresource.
@@ -77,8 +76,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		UpdateStrategy: statefulset.Strategy,
 		DeleteStrategy: statefulset.Strategy,
 
-		ResetFieldsProvider: statefulset.Strategy,
-
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
@@ -88,7 +85,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = statefulset.StatusStrategy
-	statusStore.ResetFieldsProvider = statefulset.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
@@ -104,14 +100,6 @@ func (r *REST) Categories() []string {
 // StatusREST implements the REST endpoint for changing the status of an statefulSet
 type StatusREST struct {
 	store *genericregistry.Store
-}
-
-// ResetFieldsFor implements rest.ResetFieldsProvider.
-func (r *StatusREST) ResetFieldsFor(version string) *fieldpath.Set {
-	if r.store.ResetFieldsProvider != nil {
-		return r.store.ResetFieldsProvider.ResetFieldsFor(version)
-	}
-	return nil
 }
 
 // New returns empty StatefulSet object.

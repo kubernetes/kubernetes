@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -55,52 +56,71 @@ import (
 type podStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
+
+	rest.CreationPreparator
+	rest.UpdatePreparator
 }
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = podStrategy{
+	legacyscheme.Scheme,
+	names.SimpleNameGenerator,
+
+	// TODO: is a direct type creation more readable? That to do about builders then?
+	rest.NewCreationPreparator(
+		// PrepareForCreate
+		func(ctx context.Context, obj runtime.Object) {
+			pod := obj.(*api.Pod)
+			pod.Status = api.PodStatus{
+				Phase:    api.PodPending,
+				QOSClass: qos.GetPodQOS(pod),
+			}
+
+			podutil.DropDisabledPodFields(pod, nil)
+		},
+		// ResetFields
+		map[string]*fieldpath.Set{
+			"v1": fieldpath.NewSet(
+				fieldpath.MakePathOrDie("status"),
+				// TODO: add fields reset by podutil.DropDisabledPodFields
+			),
+		},
+		// ResetFieldsBuilders
+		func(version string, fields *fieldpath.Set) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+				// TODO: add the actual fieldpath here, this is just a probably wrong dummy based on
+				// podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken
+				fields.Insert(fieldpath.MakePathOrDie("spec", "volumes", "projected", "sources", "serviceAccountToken"))
+			}
+			// TODO: add all the fields from podutil.DropDisabledPodFields (a lot)
+			// Maybe create a function for this in podutil and allow setting a path prefix for usability
+		},
+	),
+	rest.NewUpdatePreparator(
+		// PrepareForUpdate
+		func(ctx context.Context, obj, old runtime.Object) {
+			newPod := obj.(*api.Pod)
+			oldPod := old.(*api.Pod)
+			newPod.Status = oldPod.Status
+
+			podutil.DropDisabledPodFields(newPod, oldPod)
+		},
+		// ResetFields
+		// TODO: do we need those twice?
+		// Moving them to a var again defeats the purpose of keeping this stuff closer together
+		map[string]*fieldpath.Set{
+			"v1": fieldpath.NewSet(
+				fieldpath.MakePathOrDie("status"),
+				// TODO: add fields reset by podutil.DropDisabledPodFields
+			),
+		},
+	),
+}
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
 	return true
-}
-
-// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
-// If no fieldset is defined for a version, nil is returned.
-func (podStrategy) ResetFieldsFor(version string) *fieldpath.Set {
-	set, ok := resetFieldsByVersion[version]
-	if !ok {
-		return nil
-	}
-	return set
-}
-
-var resetFieldsByVersion = map[string]*fieldpath.Set{
-	"v1": fieldpath.NewSet(
-		fieldpath.MakePathOrDie("status"),
-		// TODO: add fields reset by podutil.DropDisabledPodFields
-	),
-}
-
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	pod := obj.(*api.Pod)
-	pod.Status = api.PodStatus{
-		Phase:    api.PodPending,
-		QOSClass: qos.GetPodQOS(pod),
-	}
-
-	podutil.DropDisabledPodFields(pod, nil)
-}
-
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newPod := obj.(*api.Pod)
-	oldPod := old.(*api.Pod)
-	newPod.Status = oldPod.Status
-
-	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
 // Validate validates a new pod.
@@ -173,38 +193,40 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 
 type podStatusStrategy struct {
 	podStrategy
+
+	rest.CreationPreparator
+	rest.UpdatePreparator
 }
 
 // StatusStrategy wraps and exports the used podStrategy for the storage package.
-var StatusStrategy = podStatusStrategy{Strategy}
+var StatusStrategy = podStatusStrategy{
+	Strategy,
 
-// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
-// If no fieldset is defined for a version, nil is returned.
-func (podStatusStrategy) ResetFieldsFor(version string) *fieldpath.Set {
-	set, ok := resetFieldsByVersionForStatus[version]
-	if !ok {
-		return nil
-	}
-	return set
-}
+	// TODO: is this correct?
+	Strategy.CreationPreparator,
+	rest.NewUpdatePreparator(
+		// PrepareForUpdate
+		func(ctx context.Context, obj, old runtime.Object) {
+			newPod := obj.(*api.Pod)
+			oldPod := old.(*api.Pod)
+			newPod.Spec = oldPod.Spec
+			newPod.DeletionTimestamp = nil
 
-var resetFieldsByVersionForStatus = map[string]*fieldpath.Set{
-	"v1": fieldpath.NewSet(
-		fieldpath.MakePathOrDie("spec"),
-		fieldpath.MakePathOrDie("deletionTimestamp"),
-		fieldpath.MakePathOrDie("ownerReferences"),
+			// don't allow the pods/status endpoint to touch owner references since old kubelets corrupt them in a way
+			// that breaks garbage collection
+			newPod.OwnerReferences = oldPod.OwnerReferences
+		},
+		// ResetFields
+		// TODO: do we need those twice?
+		// Moving them to a var again defeats the purpose of keeping this stuff closer together
+		map[string]*fieldpath.Set{
+			"v1": fieldpath.NewSet(
+				fieldpath.MakePathOrDie("spec"),
+				fieldpath.MakePathOrDie("metadata", "deletionTimestamp"),
+				fieldpath.MakePathOrDie("metadata", "ownerReferences"),
+			),
+		},
 	),
-}
-
-func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newPod := obj.(*api.Pod)
-	oldPod := old.(*api.Pod)
-	newPod.Spec = oldPod.Spec
-	newPod.DeletionTimestamp = nil
-
-	// don't allow the pods/status endpoint to touch owner references since old kubelets corrupt them in a way
-	// that breaks garbage collection
-	newPod.OwnerReferences = oldPod.OwnerReferences
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

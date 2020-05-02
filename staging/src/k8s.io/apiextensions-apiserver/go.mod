@@ -30,6 +30,7 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+	sigs.k8s.io/structured-merge-diff/v3 v3.0.0
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -54,5 +55,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
-	sigs.k8s.io/structured-merge-diff/v3 => github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200325145223-0548f89a53da
+	sigs.k8s.io/structured-merge-diff/v3 => github.com/kwiesmueller/structured-merge-diff/v3 v3.0.0-20200502153226-14d2811f4c3a
 )

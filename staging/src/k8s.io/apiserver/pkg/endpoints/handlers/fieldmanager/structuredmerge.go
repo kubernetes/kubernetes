@@ -117,12 +117,8 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 
-	if f.resetFields != nil {
-		newObjTyped = newObjTyped.Remove(f.resetFields)
-	}
-
 	// TODO(apelisse) use the first return value when unions are implemented
-	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), manager)
+	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), f.resetFields, manager)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
@@ -169,6 +165,7 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	}
 
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
+	// TODO(kwiesmueller): could we include the same ignored fields here as well instead of removing?
 	newObjTyped, managedFields, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed.Fields(), manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {

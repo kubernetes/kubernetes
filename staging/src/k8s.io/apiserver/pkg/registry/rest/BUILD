@@ -27,6 +27,8 @@ go_library(
         "doc.go",
         "export.go",
         "meta.go",
+        "prepare_create.go",
+        "prepare_update.go",
         "rest.go",
         "table.go",
         "update.go",
