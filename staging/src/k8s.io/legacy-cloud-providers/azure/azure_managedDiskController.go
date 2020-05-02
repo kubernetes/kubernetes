@@ -83,8 +83,12 @@ type ManagedDiskOptions struct {
 func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (string, error) {
 	var err error
 	klog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
-
 	var createZones []string
+
+	if options == nil {
+		return "", fmt.Errorf("AzureDisk - empty ManagedDiskOptions")
+	}
+
 	if len(options.AvailabilityZone) > 0 {
 		requestedZone := c.common.cloud.GetZoneID(options.AvailabilityZone)
 		if requestedZone != "" {
@@ -96,13 +100,11 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	newTags := make(map[string]*string)
 	azureDDTag := "kubernetes-azure-dd"
 	newTags["created-by"] = &azureDDTag
-	if options.Tags != nil {
-		for k, v := range options.Tags {
-			// Azure won't allow / (forward slash) in tags
-			newKey := strings.Replace(k, "/", "-", -1)
-			newValue := strings.Replace(v, "/", "-", -1)
-			newTags[newKey] = &newValue
-		}
+	for k, v := range options.Tags {
+		// Azure won't allow / (forward slash) in tags
+		newKey := strings.Replace(k, "/", "-", -1)
+		newValue := strings.Replace(v, "/", "-", -1)
+		newTags[newKey] = &newValue
 	}
 
 	diskSizeGB := int32(options.SizeGB)
