@@ -81,9 +81,9 @@ type nfsDriver struct {
 }
 
 type nfsVolume struct {
-	serverIP  string
-	serverPod *v1.Pod
-	f         *framework.Framework
+	serverHost string
+	serverPod  *v1.Pod
+	f          *framework.Framework
 }
 
 var _ testsuites.TestDriver = &nfsDriver{}
@@ -129,7 +129,7 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume test
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   nv.serverHost,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
@@ -141,7 +141,7 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   nv.serverIP,
+			Server:   nv.serverHost,
 			Path:     "/",
 			ReadOnly: readOnly,
 		},
@@ -199,12 +199,12 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
-		c, serverPod, serverIP := e2evolume.NewNFSServer(cs, ns.Name, []string{})
+		c, serverPod, serverHost := e2evolume.NewNFSServer(cs, ns.Name, []string{})
 		config.ServerConfig = &c
 		return &nfsVolume{
-			serverIP:  serverIP,
-			serverPod: serverPod,
-			f:         f,
+			serverHost: serverHost,
+			serverPod:  serverPod,
+			f:          f,
 		}
 	case testpatterns.DynamicPV:
 		// Do nothing
