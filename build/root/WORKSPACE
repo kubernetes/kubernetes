@@ -4,53 +4,26 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
-    name = "io_bazel_rules_go",
-    sha256 = "142dd33e38b563605f0d20e89d9ef9eda0fc3cb539a14be1bdb1350de2eda659",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/v0.22.2/rules_go-v0.22.2.tar.gz"),
-)
-
-load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
-
-go_rules_dependencies()
-
-go_register_toolchains(
-    go_version = "1.13.9",
-)
-
-http_archive(
     name = "io_k8s_repo_infra",
-    sha256 = "a6ca952e365600a17f56f0fc8e41016e1d13cfb2b74c0c29bad6bdba3e3d8a4d",
-    strip_prefix = "repo-infra-0.0.3",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/v0.0.3.tar.gz"),
+    sha256 = "7ad484dc5558432ca0666cff68bfc584d52fdb7d3e08905405182a631af56128",
+    strip_prefix = "repo-infra-0.0.4",
+    urls = [
+        "https://github.com/kubernetes/repo-infra/archive/0.0.4.tar.gz",
+    ],
 )
 
 load("@io_k8s_repo_infra//:load.bzl", repo_infra_repositories = "repositories")
 
 repo_infra_repositories()
 
-load("@io_k8s_repo_infra//:repos.bzl", repo_infra_go_repositories = "go_repositories", repo_infra_configure = "configure")
+load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_infra_go_repositories = "go_repositories")
 
 repo_infra_configure(
+    go_version = "1.13.9",
     minimum_bazel_version = "2.2.0",
-    rbe_name = None,
 )
 
 repo_infra_go_repositories()
-
-load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
-
-bazel_skylib_workspace()
-
-load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
-
-rbe_autoconfig(
-    name = "rbe_default",
-    base_container_digest = "sha256:b4dad0bfc4951d619229ab15343a311f2415a16ef83bcaa55b44f4e2bf1cf635",
-    digest = "sha256:b28ddaf98c6e0bb840c5fded3c0a899a7db45bb44f69859f16c37be092bfcb4e",
-    registry = "marketplace.gcr.io",
-    repository = "google/bazel",
-    # tag = "2.2.0",
-)
 
 http_archive(
     name = "io_bazel_rules_docker",
