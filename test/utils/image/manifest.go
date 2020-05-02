@@ -141,6 +141,8 @@ const (
 	CudaVectorAdd
 	// CudaVectorAdd2 image
 	CudaVectorAdd2
+	// DebianIptables Image
+	DebianIptables
 	// EchoServer image
 	EchoServer
 	// Etcd image
@@ -210,6 +212,7 @@ func initImageConfigs() map[int]Config {
 	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
+	configs[DebianIptables] = Config{gcRegistry, "debian-iptables", "v12.0.1"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.7"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
