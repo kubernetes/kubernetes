@@ -25,8 +25,9 @@ import (
 	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	"github.com/miekg/dns"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -186,7 +187,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			}
 			node.Status.Addresses = nodeAddresses
 		} else {
-			var ipAddr net.IP
+			var ipAddr []net.IP
 			var err error
 
 			// 1) Use nodeIP if set (and not "0.0.0.0"/"::")
@@ -197,35 +198,64 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			// For steps 3 and 4, IPv4 addresses are preferred to IPv6 addresses
 			// unless nodeIP is "::", in which case it is reversed.
 			if nodeIPSpecified {
-				ipAddr = nodeIP
+				ipAddr = []net.IP{nodeIP}
 			} else if addr := net.ParseIP(hostname); addr != nil {
-				ipAddr = addr
+				ipAddr = []net.IP{addr}
 			} else {
 				var addrs []net.IP
 				addrs, _ = net.LookupIP(node.Name)
 				for _, addr := range addrs {
 					if err = validateNodeIPFunc(addr); err == nil {
-						if isPreferredIPFamily(addr) {
-							ipAddr = addr
-							break
-						} else if ipAddr == nil {
-							ipAddr = addr
+						if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+							ipAddr = append(ipAddr, addr)
+						} else {
+							if isPreferredIPFamily(addr) {
+								ipAddr = []net.IP{addr}
+								break
+							} else if len(ipAddr) < 1 {
+								ipAddr = []net.IP{addr}
+							}
 						}
 					}
 				}
 
-				if ipAddr == nil {
-					ipAddr, err = utilnet.ResolveBindAddress(nodeIP)
+				// The `net.LookupIP` above can be short-circuited by the local
+				// /etc/hosts file, so we try again using only DNS
+				if len(ipAddr) < 1 && utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+					addrs = findHostIPsViaDNS(node.Name, preferIPv4)
+					for _, addr := range addrs {
+						if err = validateNodeIPFunc(addr); err == nil {
+							ipAddr = append(ipAddr, addr)
+						}
+					}
+				}
+
+				if len(ipAddr) < 1 {
+					addr, err = utilnet.ResolveBindAddress(nodeIP)
+					if addr != nil {
+						ipAddr = []net.IP{addr}
+					}
 				}
 			}
 
-			if ipAddr == nil {
+			if len(ipAddr) < 1 {
 				// We tried everything we could, but the IP address wasn't fetchable; error out
 				return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
 			}
 			node.Status.Addresses = []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
 				{Type: v1.NodeHostName, Address: hostname},
+			}
+			for _, addr := range ipAddr {
+				if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || isPreferredIPFamily(addr) {
+					node.Status.Addresses = append(node.Status.Addresses, v1.NodeAddress{
+						Type:    v1.NodeInternalIP,
+						Address: addr.String(),
+					})
+					if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+						break
+					}
+				}
+
 			}
 		}
 		return nil
@@ -247,6 +277,76 @@ func hasAddressValue(addresses []v1.NodeAddress, addressValue string) bool {
 		}
 	}
 	return false
+}
+
+func findFqdn(name string, domains []string) string {
+	if len(domains) < 1 {
+		return name
+	}
+
+	// If our hostname already ends with one of the search domains, treat it as a FQDN
+	for _, d := range domains {
+		if strings.HasSuffix(name, d) {
+			return name
+		}
+	}
+
+	// Otherwise, use the first search domain as the conventional DNS domain
+	return name + "." + domains[0]
+}
+
+func findHostIPsViaDNS(name string, preferIPv4 bool) (out []net.IP) {
+
+	// Read resolv.conf to find servers
+	cfg, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	if err != nil {
+		// Otherwise, try reasonable defaults
+		cfg = new(dns.ClientConfig)
+		cfg.Servers = []string{
+			"2001:4860:4860::8888",
+			"8.8.8.8",
+			"1.1.1.1",
+		}
+	}
+
+	name = findFqdn(name, cfg.Search)
+
+	recordSet := []uint16{dns.TypeAAAA, dns.TypeA}
+	if preferIPv4 {
+		recordSet = []uint16{dns.TypeA, dns.TypeAAAA}
+	}
+
+	for _, t := range recordSet {
+		out = append(out, dnsQuery(name, cfg.Servers, t)...)
+	}
+
+	return out
+}
+
+func dnsQuery(name string, servers []string, t uint16) (out []net.IP) {
+	m := new(dns.Msg).SetQuestion(dns.Fqdn(name), t)
+
+	for _, s := range servers {
+		in, err := dns.Exchange(m, s+":53")
+		if err != nil {
+			continue
+		}
+
+		for _, rr := range in.Answer {
+			if r, ok := rr.(*dns.AAAA); ok {
+				out = append(out, r.AAAA)
+			} else if r, ok := rr.(*dns.A); ok {
+				out = append(out, r.A)
+			}
+		}
+
+		if len(out) > 0 {
+			break
+		}
+	}
+
+	return out
+
 }
 
 // MachineInfo returns a Setter that updates machine-related information on the node.
