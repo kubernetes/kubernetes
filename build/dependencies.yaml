@@ -104,7 +104,7 @@ dependencies:
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-iptables"
-    version: 12.0.1
+    version: 12.1.0
     refPaths:
     - path: build/debian-iptables/Makefile
       match: TAG\?=
