@@ -102,7 +102,7 @@ def debian_image_dependencies():
             name = "debian-base-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_BASE_DIGEST, arch),
-            registry = "k8s.gcr.io",
+            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-base",
             tag = "v2.0.0",  # ignored, but kept here for documentation
         )
