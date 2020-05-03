@@ -116,6 +116,8 @@ dependencies:
       match: debian_iptables_version=
     - path: build/workspace.bzl
       match: tag =
+    - path: test/utils/image/manifest.go
+      match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "v\d+\.\d+.\d+"}
 
   - name: "k8s.gcr.io/pause"
     version: 3.3
