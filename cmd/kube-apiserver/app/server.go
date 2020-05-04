@@ -113,6 +113,9 @@ func NewAPIServerCommand() *cobra.Command {
 for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.`,
+
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 
