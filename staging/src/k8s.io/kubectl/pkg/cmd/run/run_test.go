@@ -382,6 +382,8 @@ func TestGenerateService(t *testing.T) {
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, buff)
 				},
+
+				Namespace: "test",
 			}
 
 			cmd := &cobra.Command{}
@@ -398,7 +400,7 @@ func TestGenerateService(t *testing.T) {
 				test.params["port"] = test.port
 			}
 
-			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params, "test")
+			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params)
 			if test.expectErr {
 				if err == nil {
 					t.Error("unexpected non-error")
