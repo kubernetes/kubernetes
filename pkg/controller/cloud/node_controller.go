@@ -39,7 +39,6 @@ import (
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -280,7 +279,7 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 	}
 	newNode := node.DeepCopy()
 	newNode.Status.Addresses = nodeAddresses
-	_, _, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
+	_, _, err = cloudnodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
 	if err != nil {
 		klog.Errorf("Error patching node with cloud ip addresses = [%v]", err)
 	}
