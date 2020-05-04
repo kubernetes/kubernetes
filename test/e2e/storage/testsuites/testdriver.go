@@ -226,6 +226,9 @@ type PerTestConfig struct {
 	// the configuration that then has to be used to run tests.
 	// The values above are ignored for such tests.
 	ServerConfig *e2evolume.TestConfig
+
+	// Some drivers run in their own namespace
+	DriverNamespace *v1.Namespace
 }
 
 // GetUniqueDriverName returns unique driver name that can be used parallelly in tests
