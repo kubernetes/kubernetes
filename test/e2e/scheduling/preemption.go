@@ -55,6 +55,8 @@ type priorityPair struct {
 	value int32
 }
 
+var testExtendedResource = v1.ResourceName("scheduling.k8s.io/foo")
+
 var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
@@ -74,6 +76,10 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	ginkgo.AfterEach(func() {
 		for _, pair := range priorityPairs {
 			cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pair.name, *metav1.NewDeleteOptions(0))
+		}
+		for _, node := range nodeList.Items {
+			delete(node.Status.Capacity, testExtendedResource)
+			cs.CoreV1().Nodes().UpdateStatus(context.TODO(), &node, metav1.UpdateOptions{})
 		}
 	})
 
@@ -103,30 +109,20 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// the high priority pod.
 	ginkgo.It("validates basic preemption works", func() {
 		var podRes v1.ResourceList
+
 		// Create one pod per node that uses a lot of the node's resources.
 		ginkgo.By("Create pods that use 60% of node resources.")
 		pods := make([]*v1.Pod, 0, len(nodeList.Items))
-		allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		// Now create victim pods on each of the node with lower priority
 		for i, node := range nodeList.Items {
-			currentCPUUsage, currentMemUsage := getCurrentPodUsageOnTheNode(node.Name, allPods.Items, podRequestedResource)
-			framework.Logf("Current cpu and memory usage %v, %v", currentCPUUsage, currentMemUsage)
-			cpuAllocatable, found := node.Status.Allocatable["cpu"]
-			framework.ExpectEqual(found, true)
-			milliCPU := cpuAllocatable.MilliValue()
-			milliCPU = int64(float64(milliCPU-currentCPUUsage) * float64(0.6))
-			memAllocatable, found := node.Status.Allocatable["memory"]
-			framework.ExpectEqual(found, true)
-			memory := memAllocatable.Value()
-			memory = int64(float64(memory-currentMemUsage) * float64(0.6))
-			// If a node is already heavily utilized let not's create a pod there.
-			if milliCPU <= 0 || memory <= 0 {
-				framework.Logf("Node is heavily utilized, let's not create a pod here")
-				continue
-			}
+			// Update each node to advertise 3 available extended resources
+			node.Status.Capacity[testExtendedResource] = resource.MustParse("3")
+			node, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), &node, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			// Request 2 of the available resources for the victim pods
 			podRes = v1.ResourceList{}
-			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
-			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
+			podRes[testExtendedResource] = resource.MustParse("2")
 
 			// make the first pod low priority and the rest medium priority.
 			priorityName := mediumPriorityClassName
@@ -138,10 +134,23 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				PriorityClassName: priorityName,
 				Resources: &v1.ResourceRequirements{
 					Requests: podRes,
+					Limits:   podRes,
 				},
-				NodeName: node.Name,
+				Affinity: &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchFields: []v1.NodeSelectorRequirement{
+										{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+									},
+								},
+							},
+						},
+					},
+				},
 			}))
-			framework.Logf("Created pod: %v", pods[i].Name)
+			framework.Logf("Created pod: %v with resources: %+v", pods[i].Name, pods[i].Spec.Containers[0].Resources)
 		}
 		if len(pods) < 2 {
 			framework.Failf("We need at least two pods to be created but" +
@@ -162,8 +171,8 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			PriorityClassName: highPriorityClassName,
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
+				Limits:   podRes,
 			},
-			NodeName: pods[0].Spec.NodeName,
 		})
 
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
@@ -174,7 +183,6 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			framework.ExpectNoError(err)
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
-
 		framework.ExpectEqual(podPreempted, true)
 	})
 
@@ -183,30 +191,19 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// this critical pod.
 	ginkgo.It("validates lower priority pod preemption by critical pod", func() {
 		var podRes v1.ResourceList
+
 		// Create one pod per node that uses a lot of the node's resources.
-		ginkgo.By("Create pods that use 60% of node resources.")
+		ginkgo.By("Create pods that use 2/3 of node resources.")
 		pods := make([]*v1.Pod, 0, len(nodeList.Items))
-		allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
 		for i, node := range nodeList.Items {
-			currentCPUUsage, currentMemUsage := getCurrentPodUsageOnTheNode(node.Name, allPods.Items, podRequestedResource)
-			framework.Logf("Current cpu usage and memory usage is %v, %v", currentCPUUsage, currentMemUsage)
-			cpuAllocatable, found := node.Status.Allocatable["cpu"]
-			framework.ExpectEqual(found, true)
-			milliCPU := cpuAllocatable.MilliValue()
-			milliCPU = int64(float64(milliCPU-currentCPUUsage) * float64(0.6))
-			memAllocatable, found := node.Status.Allocatable["memory"]
-			framework.ExpectEqual(found, true)
-			memory := memAllocatable.Value()
-			memory = int64(float64(memory-currentMemUsage) * float64(0.6))
+			// Update each node to advertise 3 available extended resources
+			node.Status.Capacity[testExtendedResource] = resource.MustParse("3")
+			node, err := cs.CoreV1().Nodes().UpdateStatus(context.TODO(), &node, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			// Request 2 of the available resources for the victim pods
 			podRes = v1.ResourceList{}
-			// If a node is already heavily utilized let not's create a pod there.
-			if milliCPU <= 0 || memory <= 0 {
-				framework.Logf("Node is heavily utilized, let's not create a pod there")
-				continue
-			}
-			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
-			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
+			podRes[testExtendedResource] = resource.MustParse("2")
 
 			// make the first pod low priority and the rest medium priority.
 			priorityName := mediumPriorityClassName
@@ -218,8 +215,21 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				PriorityClassName: priorityName,
 				Resources: &v1.ResourceRequirements{
 					Requests: podRes,
+					Limits:   podRes,
 				},
-				NodeName: node.Name,
+				Affinity: &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchFields: []v1.NodeSelectorRequirement{
+										{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+									},
+								},
+							},
+						},
+					},
+				},
 			}))
 			framework.Logf("Created pod: %v", pods[i].Name)
 		}
@@ -250,8 +260,8 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			PriorityClassName: scheduling.SystemClusterCritical,
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
+				Limits:   podRes,
 			},
-			NodeName: pods[0].Spec.NodeName,
 		})
 
 		defer func() {
