@@ -477,6 +477,15 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
 
+	// All containers in the pod are done and the pod may be cleaned up
+	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+		klog.V(3).Infof("Pod %s can be cleaned up due to phase %v", format.Pod(pod), pod.Status.Phase)
+		return podActions{
+			KillPod:       true,
+			CreateSandbox: false,
+		}
+	}
+
 	createPodSandbox, attempt, sandboxID := m.podSandboxChanged(pod, podStatus)
 	changes := podActions{
 		KillPod:           createPodSandbox,

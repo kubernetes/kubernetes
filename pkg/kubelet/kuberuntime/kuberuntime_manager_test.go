@@ -752,6 +752,32 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
 		},
+		"kill pod and don't create sandboxes if phase is PodSucceeded": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Status.Phase = v1.PodSucceeded },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// No container or sandbox exists.
+				status.SandboxStatuses = []*runtimeapi.PodSandboxStatus{}
+				status.ContainerStatuses = []*kubecontainer.ContainerStatus{}
+			},
+			actions: podActions{
+				KillPod:       true,
+				CreateSandbox: false,
+				Attempt:       uint32(0),
+			},
+		},
+		"kill pod and don't create sandboxes if phase is PodFailed": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Status.Phase = v1.PodFailed },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// No container or sandbox exists.
+				status.SandboxStatuses = []*runtimeapi.PodSandboxStatus{}
+				status.ContainerStatuses = []*kubecontainer.ContainerStatus{}
+			},
+			actions: podActions{
+				KillPod:       true,
+				CreateSandbox: false,
+				Attempt:       uint32(0),
+			},
+		},
 		"restart exited containers if RestartPolicy == Always": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
