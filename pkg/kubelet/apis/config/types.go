@@ -347,6 +347,21 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
 	ShowHiddenMetricsForVersion string
+
+	/* Experimental flags */
+
+	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	ExperimentalMounterPath string
+	// experimentalKernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
+	// notification to determine if memory eviction thresholds are crossed rather than polling.
+	ExperimentalKernelMemcgNotification bool
+	// experimentalCheckNodeCapabilitiesBeforeMount, if set, enables a check prior to mount operations to
+	// verify that the required components (binaries, etc.) to mount the volume are available on the underlying node.
+	// If the check is enabled and fails the mount operation fails.
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool
+	// experimentalNodeAllocatableIgnoreEvictionThreshold, if set, will avoid including `EvictionHard` while computing Node Allocatable.
+	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
+	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

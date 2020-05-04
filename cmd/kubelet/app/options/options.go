@@ -123,18 +123,7 @@ type KubeletFlags struct {
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
-	ExperimentalMounterPath string
-	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
-	// +optional
-	ExperimentalKernelMemcgNotification bool
-	// This flag, if set, enables a check prior to mount operations to verify that the required components
-	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
-	// and fails the mount operation fails.
-	ExperimentalCheckNodeCapabilitiesBeforeMount bool
-	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
-	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
+
 	// Node Labels are the node labels to add when registering the node in the cluster
 	NodeLabels map[string]string
 	// lockFilePath is the path that kubelet will use to as a lock file.
@@ -191,21 +180,20 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 
 	return &KubeletFlags{
-		EnableServer:                        true,
-		ContainerRuntimeOptions:             *NewContainerRuntimeOptions(),
-		CertDirectory:                       "/var/lib/kubelet/pki",
-		RootDirectory:                       defaultRootDir,
-		MasterServiceNamespace:              metav1.NamespaceDefault,
-		MaxContainerCount:                   -1,
-		MaxPerPodContainerCount:             1,
-		MinimumGCAge:                        metav1.Duration{Duration: 0},
-		NonMasqueradeCIDR:                   "10.0.0.0/8",
-		RegisterSchedulable:                 true,
-		ExperimentalKernelMemcgNotification: false,
-		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
-		NodeLabels:                          make(map[string]string),
-		RegisterNode:                        true,
-		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
+		EnableServer:            true,
+		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
+		CertDirectory:           "/var/lib/kubelet/pki",
+		RootDirectory:           defaultRootDir,
+		MasterServiceNamespace:  metav1.NamespaceDefault,
+		MaxContainerCount:       -1,
+		MaxPerPodContainerCount: 1,
+		MinimumGCAge:            metav1.Duration{Duration: 0},
+		NonMasqueradeCIDR:       "10.0.0.0/8",
+		RegisterSchedulable:     true,
+		RemoteRuntimeEndpoint:   remoteRuntimeEndpoint,
+		NodeLabels:              make(map[string]string),
+		RegisterNode:            true,
+		SeccompProfileRoot:      filepath.Join(defaultRootDir, "seccomp"),
 		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
 		NodeStatusMaxImages:         50,
 		EnableCAdvisorJSONEndpoints: false,
@@ -371,12 +359,8 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.Var(utiltaints.NewTaintsVar(&f.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
 
 	// EXPERIMENTAL FLAGS
-	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
-	fs.BoolVar(&f.ExperimentalKernelMemcgNotification, "experimental-kernel-memcg-notification", f.ExperimentalKernelMemcgNotification, "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.")
 	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "[Experimental] The endpoint of remote runtime service. Currently unix socket endpoint is supported on Linux, while npipe and tcp endpoints are supported on windows.  Examples:'unix:///var/run/dockershim.sock', 'npipe:////./pipe/dockershim'")
 	fs.StringVar(&f.RemoteImageEndpoint, "image-service-endpoint", f.RemoteImageEndpoint, "[Experimental] The endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. Currently unix socket endpoint is supported on Linux, while npipe and tcp endpoints are supported on windows.  Examples:'unix:///var/run/dockershim.sock', 'npipe:////./pipe/dockershim'")
-	fs.BoolVar(&f.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", f.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required components (binaries, etc.) before performing the mount")
-	fs.BoolVar(&f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "experimental-allocatable-ignore-eviction", f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "When set to 'true', Hard Eviction Thresholds will be ignored while calculating Node Allocatable. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details. [default=false]")
 	bindableNodeLabels := cliflag.ConfigurationMap(f.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", fmt.Sprintf("<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','. Labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", ")))
 	fs.StringVar(&f.LockFilePath, "lock-file", f.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
@@ -528,6 +512,12 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Beta feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated. This flag can only be used with --container-runtime=remote.")
 	fs.Int32Var(&c.ContainerLogMaxFiles, "container-log-max-files", c.ContainerLogMaxFiles, "<Warning: Beta feature> Set the maximum number of container log files that can be present for a container. The number must be >= 2. This flag can only be used with --container-runtime=remote.")
 	fs.StringSliceVar(&c.AllowedUnsafeSysctls, "allowed-unsafe-sysctls", c.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
+
+	// Experimental Flags
+	fs.StringVar(&c.ExperimentalMounterPath, "experimental-mounter-path", c.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
+	fs.BoolVar(&c.ExperimentalKernelMemcgNotification, "experimental-kernel-memcg-notification", c.ExperimentalKernelMemcgNotification, "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.")
+	fs.BoolVar(&c.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", c.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required components (binaries, etc.) before performing the mount")
+	fs.BoolVar(&c.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "experimental-allocatable-ignore-eviction", c.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "When set to 'true', Hard Eviction Thresholds will be ignored while calculating Node Allocatable. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details. [default=false]")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.Int64Var(&c.MaxOpenFiles, "max-open-files", c.MaxOpenFiles, "Number of files that can be opened by Kubelet process.")

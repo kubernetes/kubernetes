@@ -767,6 +767,29 @@ type KubeletConfiguration struct {
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 	// +optional
 	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+
+	/* Experimental flags */
+
+	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	// Default: ""
+	// +optional
+	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
+	// experimentalKernelMemcgNotification, if set, the kubelet will integrate with the kernel memcg notification
+	// to determine if memory eviction thresholds are crossed rather than polling.
+	// Default: false
+	// +optional
+	ExperimentalKernelMemcgNotification bool `json:"experimentalKernelMemcgNotification,omitempty"`
+	// experimentalCheckNodeCapabilitiesBeforeMount, if set, enables a check prior to mount operations to
+	// verify that the required components (binaries, etc.) to mount the volume are available on the underlying node.
+	// If the check is enabled and fails the mount operation fails.
+	// Default: false
+	// +optional
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"experimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
+	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
+	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
+	// Default: false
+	// +optional
+	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool `json:"experimentalNodeAllocatableIgnoreEvictionThreshold,omitempty"`
 }
 
 type KubeletAuthorizationMode string
