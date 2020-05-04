@@ -47,7 +47,10 @@ const (
 	resourceVersionTooHighRetrySeconds = 1
 
 	// eventFreshDuration is time duration of events we want to keep.
-	eventFreshDuration = 5 * time.Minute
+	// We set it to `defaultBookmarkFrequency` plus epsilon to maximize
+	// chances that last bookmark was sent within kept history, at the
+	// same time, minimizing the needed memory usage.
+	eventFreshDuration = 75 * time.Second
 
 	// defaultLowerBoundCapacity is a default value for event cache capacity's lower bound.
 	// 100 is minimum in NewHeuristicWatchCacheSizes.
@@ -55,9 +58,6 @@ const (
 	defaultLowerBoundCapacity = 100
 
 	// defaultUpperBoundCapacity  should be able to keep eventFreshDuration of history.
-	// With the current 102400 value though, it's not enough for leases in 5k-node cluster,
-	// but that is conscious decision.
-	// TODO: Validate if the current value is high enough for large scale clusters.
 	defaultUpperBoundCapacity = 100 * 1024
 )
 
