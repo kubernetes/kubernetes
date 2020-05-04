@@ -518,6 +518,11 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
 		failureMessage = "Job was active longer than specified deadline"
+	} else if job.Spec.ActiveDeadlineSeconds != nil {
+		// ensure that we have an item in the queue that will trigger a sync at the end of the job's deadline period
+		timeElapsed := time.Now().Sub(job.Status.StartTime.Time)
+		timeRemaining := (time.Duration(*job.Spec.ActiveDeadlineSeconds) * time.Second) - timeElapsed
+		jm.queue.AddAfter(key, timeRemaining)
 	}
 
 	if jobFailed {
