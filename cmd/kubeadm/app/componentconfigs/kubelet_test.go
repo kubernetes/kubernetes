@@ -155,6 +155,12 @@ func TestKubeletUnmarshal(t *testing.T) {
 }
 
 func TestKubeletDefault(t *testing.T) {
+	var resolverConfig string
+	if isSystemdResolvedActive, _ := isServiceActive("systemd-resolved"); isSystemdResolvedActive {
+		// If systemd-resolved is active, we need to set the default resolver config
+		resolverConfig = kubeletSystemdResolverConfig
+	}
+
 	tests := []struct {
 		name       string
 		clusterCfg kubeadmapi.ClusterConfiguration
@@ -185,6 +191,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
+					ResolverConfig:     resolverConfig,
 				},
 			},
 		},
@@ -217,6 +224,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
+					ResolverConfig:     resolverConfig,
 				},
 			},
 		},
@@ -252,6 +260,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
+					ResolverConfig:     resolverConfig,
 				},
 			},
 		},
@@ -285,6 +294,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
+					ResolverConfig:     resolverConfig,
 				},
 			},
 		},
@@ -315,6 +325,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
+					ResolverConfig:     resolverConfig,
 				},
 			},
 		},
@@ -325,7 +336,7 @@ func TestKubeletDefault(t *testing.T) {
 			got := &kubeletConfig{}
 			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{}, &kubeadmapi.NodeRegistrationOptions{})
 			if !reflect.DeepEqual(got, &test.expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, got)
+				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, *got)
 			}
 		})
 	}
