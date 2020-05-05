@@ -278,9 +278,11 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 	}
 	newCfg[cfgIDToken] = idToken
 
-	// Persist new config and if successful, update the in memory config.
-	if err = p.persister.Persist(newCfg); err != nil {
-		return "", fmt.Errorf("could not persist new tokens: %v", err)
+	if p.persister != nil {
+		// Persist new config and if successful, update the in memory config.
+		if err = p.persister.Persist(newCfg); err != nil {
+			return "", fmt.Errorf("could not persist new tokens: %v", err)
+		}
 	}
 	p.cfg = newCfg
 
