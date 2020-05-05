@@ -440,11 +440,6 @@ function ConvertTo_MaskLength
   return $bits.Length
 }
 
-# Returns the "management" subnet on which the Windows pods+kubelet will
-# communicate with the rest of the Kubernetes cluster without NAT. In GCE this
-# is the subnet that VM internal IPs are allocated from.
-#
-# This function will fail if Add_InitialHnsNetwork() has not been called first.
 # Returns a network adapter object for the "management" interface via which the
 # Windows pods+kubelet will communicate with the rest of the Kubernetes cluster.
 #
