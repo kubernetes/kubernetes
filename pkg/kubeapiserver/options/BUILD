@@ -19,6 +19,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
     deps = [
+        "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
@@ -51,6 +52,8 @@ go_library(
         "//plugin/pkg/admission/storage/persistentvolume/resize:go_default_library",
         "//plugin/pkg/admission/storage/storageclass/setdefault:go_default_library",
         "//plugin/pkg/admission/storage/storageobjectinuseprotection:go_default_library",
+        "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
@@ -62,11 +65,13 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 

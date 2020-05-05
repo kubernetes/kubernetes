@@ -18,63 +18,150 @@ package podlogs
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"path"
 	"strings"
 	"testing"
 	"time"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+type caWithClient struct {
+	CACert     []byte
+	ClientCert []byte
+	ClientKey  []byte
+}
+
+func newTestCAWithClient(caSubject pkix.Name, caSerial *big.Int, clientSubject pkix.Name, subjectSerial *big.Int) (*caWithClient, error) {
+	ca := &x509.Certificate{
+		SerialNumber:          caSerial,
+		Subject:               caSubject,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+
+	caPrivateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, err
+	}
+
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivateKey.PublicKey, caPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	caPEM := new(bytes.Buffer)
+	err = pem.Encode(caPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	clientCert := &x509.Certificate{
+		SerialNumber: subjectSerial,
+		Subject:      clientSubject,
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+
+	clientCertPrivateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, err
+	}
+
+	clientCertPrivateKeyPEM := new(bytes.Buffer)
+	err = pem.Encode(clientCertPrivateKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(clientCertPrivateKey),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	clientCertBytes, err := x509.CreateCertificate(rand.Reader, clientCert, ca, &clientCertPrivateKey.PublicKey, caPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	clientCertPEM := new(bytes.Buffer)
+	err = pem.Encode(clientCertPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: clientCertBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &caWithClient{
+		CACert:     caPEM.Bytes(),
+		ClientCert: clientCertPEM.Bytes(),
+		ClientKey:  clientCertPrivateKeyPEM.Bytes(),
+	}, nil
+}
+
 func TestClientCA(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	// I have no idea what this cert is, but it doesn't matter, we just want something that always fails validation
-	differentClientCA := []byte(`-----BEGIN CERTIFICATE-----
-MIIDQDCCAiigAwIBAgIJANWw74P5KJk2MA0GCSqGSIb3DQEBCwUAMDQxMjAwBgNV
-BAMMKWdlbmVyaWNfd2ViaG9va19hZG1pc3Npb25fcGx1Z2luX3Rlc3RzX2NhMCAX
-DTE3MTExNjAwMDUzOVoYDzIyOTEwOTAxMDAwNTM5WjAjMSEwHwYDVQQDExh3ZWJo
-b29rLXRlc3QuZGVmYXVsdC5zdmMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
-AoIBAQDXd/nQ89a5H8ifEsigmMd01Ib6NVR3bkJjtkvYnTbdfYEBj7UzqOQtHoLa
-dIVmefny5uIHvj93WD8WDVPB3jX2JHrXkDTXd/6o6jIXHcsUfFTVLp6/bZ+Anqe0
-r/7hAPkzA2A7APyTWM3ZbEeo1afXogXhOJ1u/wz0DflgcB21gNho4kKTONXO3NHD
-XLpspFqSkxfEfKVDJaYAoMnYZJtFNsa2OvsmLnhYF8bjeT3i07lfwrhUZvP+7Gsp
-7UgUwc06WuNHjfx1s5e6ySzH0QioMD1rjYneqOvk0pKrMIhuAEWXqq7jlXcDtx1E
-j+wnYbVqqVYheHZ8BCJoVAAQGs9/AgMBAAGjZDBiMAkGA1UdEwQCMAAwCwYDVR0P
-BAQDAgXgMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDATApBgNVHREEIjAg
-hwR/AAABghh3ZWJob29rLXRlc3QuZGVmYXVsdC5zdmMwDQYJKoZIhvcNAQELBQAD
-ggEBAD/GKSPNyQuAOw/jsYZesb+RMedbkzs18sSwlxAJQMUrrXwlVdHrA8q5WhE6
-ABLqU1b8lQ8AWun07R8k5tqTmNvCARrAPRUqls/ryER+3Y9YEcxEaTc3jKNZFLbc
-T6YtcnkdhxsiO136wtiuatpYL91RgCmuSpR8+7jEHhuFU01iaASu7ypFrUzrKHTF
-bKwiLRQi1cMzVcLErq5CDEKiKhUkoDucyARFszrGt9vNIl/YCcBOkcNvM3c05Hn3
-M++C29JwS3Hwbubg6WO3wjFjoEhpCwU6qRYUz3MRp4tHO4kxKXx+oQnUiFnR7vW0
-YkNtGc1RUDHwecCTFpJtPb7Yu/E=
------END CERTIFICATE-----
-`)
-	differentFrontProxyCA := []byte(`-----BEGIN CERTIFICATE-----
-MIIBqDCCAU2gAwIBAgIUfbqeieihh/oERbfvRm38XvS/xHAwCgYIKoZIzj0EAwIw
-GjEYMBYGA1UEAxMPSW50ZXJtZWRpYXRlLUNBMCAXDTE2MTAxMTA1MDYwMFoYDzIx
-MTYwOTE3MDUwNjAwWjAUMRIwEAYDVQQDEwlNeSBDbGllbnQwWTATBgcqhkjOPQIB
-BggqhkjOPQMBBwNCAARv6N4R/sjMR65iMFGNLN1GC/vd7WhDW6J4X/iAjkRLLnNb
-KbRG/AtOUZ+7upJ3BWIRKYbOabbQGQe2BbKFiap4o3UwczAOBgNVHQ8BAf8EBAMC
-BaAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQU
-K/pZOWpNcYai6eHFpmJEeFpeQlEwHwYDVR0jBBgwFoAUX6nQlxjfWnP6aM1meO/Q
-a6b3a9kwCgYIKoZIzj0EAwIDSQAwRgIhAIWTKw/sjJITqeuNzJDAKU4xo1zL+xJ5
-MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
------END CERTIFICATE-----
+	frontProxyCA, err := newTestCAWithClient(
+		pkix.Name{
+			CommonName: "test-front-proxy-ca",
+		},
+		big.NewInt(43),
+		pkix.Name{
+			CommonName:   "test-aggregated-apiserver",
+			Organization: []string{"system:masters"},
+		},
+		big.NewInt(86),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-`)
+	clientCA, err := newTestCAWithClient(
+		pkix.Name{
+			CommonName: "test-client-ca",
+		},
+		big.NewInt(42),
+		pkix.Name{
+			CommonName:   "system:admin",
+			Organization: []string{"system:masters"},
+		},
+		big.NewInt(84),
+	)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	clientCAFilename := ""
 	frontProxyCAFilename := ""
 
@@ -83,12 +170,13 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			clientCAFilename = opts.Authentication.ClientCert.ClientCA
 			frontProxyCAFilename = opts.Authentication.RequestHeader.ClientCAFile
+			opts.Authentication.RequestHeader.AllowedNames = append(opts.Authentication.RequestHeader.AllowedNames, "test-aggregated-apiserver")
 			dynamiccertificates.FileRefreshDuration = 1 * time.Second
 		},
 	})
 
 	// wait for request header info
-	err := wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,10 +187,10 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 	}
 
 	// when we run this the second time, we know which one we are expecting
-	if err := ioutil.WriteFile(clientCAFilename, differentClientCA, 0644); err != nil {
+	if err := ioutil.WriteFile(clientCAFilename, clientCA.CACert, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(frontProxyCAFilename, differentFrontProxyCA, 0644); err != nil {
+	if err := ioutil.WriteFile(frontProxyCAFilename, frontProxyCA.CACert, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,7 +201,7 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 		t.Fatal(err)
 	}
 
-	expectedCAs := []string{"webhook-test.default.svc", "My Client"}
+	expectedCAs := []string{"test-client-ca", "test-front-proxy-ca"}
 	if len(expectedCAs) != len(acceptableCAs) {
 		t.Fatal(strings.Join(acceptableCAs, ":"))
 	}
@@ -128,7 +216,7 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 	if err != nil {
 		t.Error(err)
 	}
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=", 1))
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", string(frontProxyCA.CACert), 1))
 	if err != nil {
 		t.Error(err)
 	}
@@ -137,7 +225,68 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 	if err != nil {
 		t.Error(err)
 	}
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "M++C29JwS3Hwbubg6WO3wjFjoEhpCwU6qRYUz3MRp4tHO4kxKXx+oQnUiFnR7vW0", 1))
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", string(clientCA.CACert), 1))
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Test an aggregated apiserver client (signed by the new front proxy CA) is authorized
+	extensionApiserverClient, err := kubernetes.NewForConfig(&rest.Config{
+		Host: kubeconfig.Host,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData:     kubeconfig.TLSClientConfig.CAData,
+			CAFile:     kubeconfig.TLSClientConfig.CAFile,
+			ServerName: kubeconfig.TLSClientConfig.ServerName,
+			KeyData:    frontProxyCA.ClientKey,
+			CertData:   frontProxyCA.ClientCert,
+		},
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// Call an endpoint to make sure we are authenticated
+	err = extensionApiserverClient.AuthorizationV1().RESTClient().
+		Post().
+		Resource("subjectaccessreviews").
+		VersionedParams(&metav1.CreateOptions{}, scheme.ParameterCodec).
+		Body(&authorizationv1.SubjectAccessReview{
+			Spec: authorizationv1.SubjectAccessReviewSpec{
+				ResourceAttributes: &authorizationv1.ResourceAttributes{
+					Verb:      "create",
+					Resource:  "pods",
+					Namespace: "default",
+				},
+				User: "deads2k",
+			},
+		}).
+		SetHeader("X-Remote-User", "test-aggregated-apiserver").
+		SetHeader("X-Remote-Group", "system:masters").
+		Do().
+		Into(&authorizationv1.SubjectAccessReview{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Test a client signed by the new ClientCA is authorized
+	testClient, err := kubernetes.NewForConfig(&rest.Config{
+		Host: kubeconfig.Host,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData:     kubeconfig.TLSClientConfig.CAData,
+			CAFile:     kubeconfig.TLSClientConfig.CAFile,
+			ServerName: kubeconfig.TLSClientConfig.ServerName,
+			KeyData:    clientCA.ClientKey,
+			CertData:   clientCA.ClientCert,
+		},
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// Call an endpoint to make sure we are authenticated
+	_, err = testClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		t.Error(err)
 	}
