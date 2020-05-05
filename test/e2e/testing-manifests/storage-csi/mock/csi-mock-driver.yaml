@@ -15,10 +15,9 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.6.0
+          image: quay.io/k8scsi/csi-provisioner:v2.0.0-rc1
           args:
             - "--csi-address=$(ADDRESS)"
-            - "--connection-timeout=15s"
             # Topology support is needed for the pod rescheduling test
             # ("storage capacity" in csi_mock_volume.go).
             - "--feature-gates=Topology=true"
