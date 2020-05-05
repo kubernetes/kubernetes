@@ -29,6 +29,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/spec"
+
 	"sigs.k8s.io/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -753,5 +755,58 @@ func Test_defaultDeprecationWarning(t *testing.T) {
 				t.Errorf("defaultDeprecationWarning() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildOpenAPIModelsForApply(t *testing.T) {
+	// This is a list of validation that we expect to work.
+	tests := []apiextensionsv1.CustomResourceValidation{
+		apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type:       "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{"num": {Type: "integer", Description: "v1beta1 num field"}},
+			},
+		},
+		apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type:         "",
+				XIntOrString: true,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		crd := apiextensionsv1.CustomResourceDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: "example.stable.example.com", UID: types.UID("12345")},
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "stable.example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
+					Plural: "examples", Singular: "example", Kind: "Example", ShortNames: []string{"ex"}, ListKind: "ExampleList", Categories: []string{"all"},
+				},
+				Conversion:            &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter},
+				Scope:                 apiextensionsv1.ClusterScoped,
+				PreserveUnknownFields: false,
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+					{
+						Name: "v1beta1", Served: true, Storage: true,
+						Subresources: &apiextensionsv1.CustomResourceSubresources{Status: &apiextensionsv1.CustomResourceSubresourceStatus{}},
+						Schema:       &test,
+					},
+				},
+			},
+		}
+		if _, err := buildOpenAPIModelsForApply(&spec.Swagger{
+			SwaggerProps: spec.SwaggerProps{
+				Info: &spec.Info{
+					InfoProps: spec.InfoProps{
+						Title:   "title",
+						Version: "v1",
+					},
+				},
+				Swagger: "2.0",
+			},
+		}, &crd); err != nil {
+			t.Fatalf("failed to convert to apply model: %v", err)
+		}
 	}
 }
