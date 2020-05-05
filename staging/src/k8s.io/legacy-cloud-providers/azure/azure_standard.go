@@ -69,7 +69,7 @@ const (
 )
 
 var errNotInVMSet = errors.New("vm is not in the vmset")
-var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
+var providerIDRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
 var backendPoolIDRE = regexp.MustCompile(`^/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Network/loadBalancers/(.+)/backendAddressPools/(?:.*)`)
 var nicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/networkInterfaces/(?:.*)`)
 var publicIPResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/publicIPAddresses/(?:.*)`)
@@ -161,8 +161,8 @@ func isMasterNode(node *v1.Node) bool {
 }
 
 // returns the deepest child's identifier from a full identifier string.
-func getLastSegment(ID string) (string, error) {
-	parts := strings.Split(ID, "/")
+func getLastSegment(ID, separator string) (string, error) {
+	parts := strings.Split(ID, separator)
 	name := parts[len(parts)-1]
 	if len(name) == 0 {
 		return "", fmt.Errorf("resource name was missing from identifier")
@@ -497,7 +497,7 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 	publicIP := ""
 	if ipConfig.PublicIPAddress != nil && ipConfig.PublicIPAddress.ID != nil {
 		pipID := *ipConfig.PublicIPAddress.ID
-		pipName, err := getLastSegment(pipID)
+		pipName, err := getLastSegment(pipID, "/")
 		if err != nil {
 			return "", "", fmt.Errorf("failed to publicIP name for node %q with pipID %q", name, pipID)
 		}
@@ -567,7 +567,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 			// already added in the list
 			continue
 		}
-		asName, err := getLastSegment(asID)
+		asName, err := getLastSegment(asID, "/")
 		if err != nil {
 			klog.Errorf("as.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
 			return nil, err
@@ -658,7 +658,7 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 	if err != nil {
 		return network.Interface{}, err
 	}
-	nicName, err := getLastSegment(primaryNicID)
+	nicName, err := getLastSegment(primaryNicID, "/")
 	if err != nil {
 		return network.Interface{}, err
 	}
