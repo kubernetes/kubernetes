@@ -97,6 +97,11 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName, crt cacheReadTy
 // AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI.
 // return (lun, error)
 func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) (int32, error) {
+	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
+	if err != nil {
+		return -1, err
+	}
+
 	if isManagedDisk {
 		diskName := path.Base(diskURI)
 		resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
@@ -116,16 +121,14 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			attachErr := fmt.Sprintf(
 				"disk(%s) already attached to node(%s), could not be attached to node(%s)",
 				diskURI, *disk.ManagedBy, nodeName)
-			attachedNode := path.Base(*disk.ManagedBy)
+			attachedNode, err := vmset.GetNodeNameByProviderID(*disk.ManagedBy)
+			if err != nil {
+				return -1, err
+			}
 			klog.V(2).Infof("found dangling volume %s attached to node %s", diskURI, attachedNode)
-			danglingErr := volerr.NewDanglingError(attachErr, types.NodeName(attachedNode), "")
+			danglingErr := volerr.NewDanglingError(attachErr, attachedNode, "")
 			return -1, danglingErr
 		}
-	}
-
-	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
-	if err != nil {
-		return -1, err
 	}
 
 	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
