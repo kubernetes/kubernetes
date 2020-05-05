@@ -275,13 +275,16 @@ func Test_NodesShutdown(t *testing.T) {
 		updatedNodes []*v1.Node
 	}{
 		{
-			name: "node is not ready and was shutdown",
+			name: "node is not ready and was shutdown, but exists",
 			fnh: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:              "node0",
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+						},
+						Spec: v1.NodeSpec{
+							ProviderID: "node0",
 						},
 						Status: v1.NodeStatus{
 							Conditions: []v1.NodeCondition{
@@ -300,6 +303,7 @@ func Test_NodesShutdown(t *testing.T) {
 			},
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            true,
+				ExistsByProviderID:      true,
 				ErrShutdownByProviderID: nil,
 			},
 			updatedNodes: []*v1.Node{
@@ -309,6 +313,7 @@ func Test_NodesShutdown(t *testing.T) {
 						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
 					},
 					Spec: v1.NodeSpec{
+						ProviderID: "node0",
 						Taints: []v1.Taint{
 							*ShutdownTaint,
 						},
@@ -415,6 +420,37 @@ func Test_NodesShutdown(t *testing.T) {
 				ErrShutdownByProviderID: nil,
 			},
 			updatedNodes: []*v1.Node{},
+		},
+		{
+			name: "node is shutdown but provider says it does not exist",
+			fnh: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionUnknown,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+								},
+							},
+						},
+					},
+				},
+				Clientset:    fake.NewSimpleClientset(),
+				UpdatedNodes: []*v1.Node{},
+			},
+			fakeCloud: &fakecloud.Cloud{
+				NodeShutdown:            true,
+				ExistsByProviderID:      false,
+				ErrShutdownByProviderID: nil,
+			},
+			updatedNodes: []*v1.Node{}, // should be empty because node does not exist
 		},
 	}
 
