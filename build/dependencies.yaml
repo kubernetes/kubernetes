@@ -10,7 +10,7 @@ dependencies:
 
   # then after merge and successful postsubmit image push / promotion, bump this
   - name: "agnhost: dependents"
-    version: "2.20"
+    version: "2.21"
     refPaths:
     - path: test/utils/image/manifest.go
       match: configs\[Agnhost\] = Config{promoterE2eRegistry, "agnhost", "\d+\.\d+"}
