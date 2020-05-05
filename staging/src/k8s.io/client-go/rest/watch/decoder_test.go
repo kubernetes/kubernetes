@@ -50,28 +50,29 @@ func TestDecoder(t *testing.T) {
 		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, getDecoder()), getDecoder())
 		expect := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
-		go func(eventType interface{}) {
+		eType := eventType
+		go func() {
 			data, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expect)
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
 			event := metav1.WatchEvent{
-				Type:   string(eventType),
+				Type:   string(eType),
 				Object: runtime.RawExtension{Raw: json.RawMessage(data)},
 			}
 			if err := encoder.Encode(&event); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 			in.Close()
-		}(eventType)
+		}()
 
 		done := make(chan struct{})
-		go func(eventType interface{}) {
+		go func() {
 			action, got, err := decoder.Decode()
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
-			if e, a := eventType, action; e != a {
+			if e, a := eType, action; e != a {
 				t.Errorf("Expected %v, got %v", e, a)
 			}
 			if e, a := expect, got; !apiequality.Semantic.DeepDerivative(e, a) {
@@ -79,7 +80,7 @@ func TestDecoder(t *testing.T) {
 			}
 			t.Logf("Exited read")
 			close(done)
-		}(eventType)
+		}()
 		<-done
 
 		done = make(chan struct{})
