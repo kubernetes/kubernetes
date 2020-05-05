@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -414,6 +415,127 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			} else {
 				framework.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
 			}
+		}
+	})
+
+	/*
+	   Testname: Projected service account token file ownership and permission.
+	   Description: Ensure that Projected Service Account Token is mounted with
+	               correct file ownership and permissino mounted. We test the
+	               following scenarios here.
+	   1. RunAsUser is set,
+	   2. FsGroup is set,
+	   3. RunAsUser and FsGroup are set,
+	   4. Default, neither RunAsUser nor FsGroup is set,
+
+	   Containers MUST verify that the projected service account token can be
+	   read and has correct file mode set including ownership and permission.
+	*/
+	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup] [Feature:TokenRequestProjection]", func() {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+
+		var (
+			podName         = "test-pod-" + string(uuid.NewUUID())
+			containerName   = "test-container"
+			volumeName      = "test-volume"
+			volumeMountPath = "/test-volume"
+			tokenVolumePath = "/test-volume/token"
+			int64p          = func(i int64) *int64 { return &i }
+		)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							Projected: &v1.ProjectedVolumeSource{
+								Sources: []v1.VolumeProjection{
+									{
+										ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+											Path:              "token",
+											ExpirationSeconds: int64p(60 * 60),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  containerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args: []string{
+							"mounttest",
+							fmt.Sprintf("--file_perm=%v", tokenVolumePath),
+							fmt.Sprintf("--file_owner=%v", tokenVolumePath),
+							fmt.Sprintf("--file_content=%v", tokenVolumePath),
+						},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: volumeMountPath,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		testcases := []struct {
+			runAsUser bool
+			fsGroup   bool
+			wantPerm  string
+			wantUID   int64
+			wantGID   int64
+		}{
+			{
+				runAsUser: true,
+				wantPerm:  "-rw-------",
+				wantUID:   1000,
+				wantGID:   0,
+			},
+			{
+				fsGroup:  true,
+				wantPerm: "-rw-r-----",
+				wantUID:  0,
+				wantGID:  10000,
+			},
+			{
+				runAsUser: true,
+				fsGroup:   true,
+				wantPerm:  "-rw-r-----",
+				wantUID:   1000,
+				wantGID:   10000,
+			},
+			{
+				wantPerm: "-rw-r--r--",
+				wantUID:  0,
+				wantGID:  0,
+			},
+		}
+
+		for _, tc := range testcases {
+			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+			if tc.runAsUser {
+				pod.Spec.SecurityContext.RunAsUser = &tc.wantUID
+			}
+			if tc.fsGroup {
+				pod.Spec.SecurityContext.FSGroup = &tc.wantGID
+			}
+
+			output := []string{
+				fmt.Sprintf("perms of file \"%v\": %s", tokenVolumePath, tc.wantPerm),
+				fmt.Sprintf("content of file \"%v\": %s", tokenVolumePath, ".+"),
+				fmt.Sprintf("owner UID of \"%v\": %d", tokenVolumePath, tc.wantUID),
+				fmt.Sprintf("owner GID of \"%v\": %d", tokenVolumePath, tc.wantGID),
+			}
+			f.TestContainerOutputRegexp("service account token: ", pod, 0, output)
 		}
 	})
 
