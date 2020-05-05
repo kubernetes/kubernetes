@@ -188,11 +188,14 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 
 		resourceWatchChan := resourceWatch.ResultChan()
 		ginkgo.By("waiting for the ConfigMap to be added")
+		foundWatchEvent := false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Added {
+				foundWatchEvent = true
 				break
 			}
 		}
+		framework.ExpectEqual(true, foundWatchEvent, "expected to find a watch.Delete event configmap %s", testConfigMapName)
 
 		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -210,11 +213,14 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ConfigMap")
 		ginkgo.By("waiting for the ConfigMap to be modified")
+		foundWatchEvent = false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Modified {
+				foundWatchEvent = true
 				break
 			}
 		}
+		framework.ExpectEqual(true, foundWatchEvent, "expected to find a watch.Modified event configmap %s", testConfigMapName)
 
 		ginkgo.By("fetching the ConfigMap")
 		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
@@ -246,12 +252,14 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		})
 		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
 		ginkgo.By("waiting for the ConfigMap to be deleted")
+		foundWatchEvent = false
 		for watchEvent := range resourceWatchChan {
 			if watchEvent.Type == watch.Deleted {
+				foundWatchEvent = true
 				break
 			}
-			fmt.Println("failed to find Deleted watchEvent")
 		}
+		framework.ExpectEqual(true, foundWatchEvent, "expected to find a watch.Deleted event configmap %s", testConfigMapName)
 	})
 })
 
