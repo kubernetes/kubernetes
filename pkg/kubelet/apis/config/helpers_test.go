@@ -132,9 +132,12 @@ var (
 	kubeletConfigurationPathFieldPaths = sets.NewString(
 		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
+		"LockFilePath",
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
 		"ResolverConfig",
+		"SeccompProfileRoot",
+		"VolumePluginDir",
 	)
 
 	// KubeletConfiguration fields that do not contain file paths.
@@ -166,6 +169,7 @@ var (
 		"EnableControllerAttachDetach",
 		"EnableDebuggingHandlers",
 		"EnforceNodeAllocatable[*]",
+		"ExitOnLockContention",
 		"EventBurst",
 		"EventRecordQPS",
 		"EvictionHard[*]",
@@ -200,6 +204,7 @@ var (
 		"StaticPodURLHeader[*][*]",
 		"MaxOpenFiles",
 		"MaxPods",
+		"NodeStatusMaxImages",
 		"NodeStatusUpdateFrequency.Duration",
 		"NodeStatusReportFrequency.Duration",
 		"NodeLeaseDurationSeconds",
@@ -225,6 +230,5 @@ var (
 		"TypeMeta.APIVersion",
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
-		"VolumePluginDir",
 	)
 )

@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -226,5 +227,11 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.VolumePluginDir == "" {
 		obj.VolumePluginDir = DefaultVolumePluginDir
+	}
+	if obj.NodeStatusMaxImages == 0 {
+		obj.NodeStatusMaxImages = 50
+	}
+	if obj.SeccompProfileRoot == "" {
+		obj.SeccompProfileRoot = filepath.Join(kubeletconfigv1beta1.DefaultRootDir, "seccomp")
 	}
 }

@@ -37,6 +37,8 @@ const (
 	// and kube-proxy is running in iptables mode, hairpin packets will be
 	// dropped by the container bridge.
 	HairpinNone = "none"
+	// DefaultRootDir defines the default root directory used by Kubelet.
+	DefaultRootDir = "/var/lib/kubelet"
 )
 
 // ResourceChangeDetectionStrategy denotes a mode in which internal
@@ -767,6 +769,31 @@ type KubeletConfiguration struct {
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 	// +optional
 	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+
+	/* Experimental flags */
+
+	// lockFilePath is the path that kubelet will use to as a lock file.
+	// It uses this file as a lock to synchronize with other kubelet processes
+	// that may be running.
+	// Default: ""
+	// +optional
+	LockFilePath string `json:"lockFilePath,omitempty"`
+	// exitOnLockContention is a flag that signifies to the kubelet that it is running
+	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+	// This will cause the kubelet to listen to inotify events on the lock file,
+	// releasing it and exiting when another process tries to open that file.
+	// Default: false
+	// +optional
+	ExitOnLockContention bool `json:"exitOnLockContention,omitempty"`
+	// seccompProfileRoot is the directory path for seccomp profiles.
+	// Default: ""
+	// +optional
+	SeccompProfileRoot string `json:"seccompProfileRoot,omitempty"`
+	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	// This is an experimental, short-term flag to help with node scalability.
+	// Default: 50
+	// +optional
+	NodeStatusMaxImages int32 `json:"nodeStatusMaxImages,omitempty"`
 }
 
 type KubeletAuthorizationMode string

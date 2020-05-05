@@ -347,6 +347,22 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
 	ShowHiddenMetricsForVersion string
+
+	/* Experimental flags */
+
+	// lockFilePath is the path that kubelet will use to as a lock file.
+	// It uses this file as a lock to synchronize with other kubelet processes that may be running.
+	LockFilePath string
+	// exitOnLockContention is a flag that signifies to the kubelet that it is running
+	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+	// This will cause the kubelet to listen to inotify events on the lock file,
+	// releasing it and exiting when another process tries to open that file.
+	ExitOnLockContention bool
+	// seccompProfileRoot is the directory path for seccomp profiles.
+	SeccompProfileRoot string
+	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	// This is an experimental, short-term flag to help with node scalability.
+	NodeStatusMaxImages int32
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/google/gofuzz"
@@ -64,6 +65,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
 			obj.NodeLeaseDurationSeconds = 40
+			obj.NodeStatusMaxImages = 50
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
 			obj.TopologyManagerPolicy = kubeletconfig.NoneTopologyManagerPolicy
@@ -96,6 +98,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ContainerLogMaxSize = "10Mi"
 			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
 			obj.AllowedUnsafeSysctls = []string{}
+			obj.SeccompProfileRoot = filepath.Join(v1beta1.DefaultRootDir, "seccomp")
 			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
 		},
 	}
