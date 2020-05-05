@@ -16,7 +16,6 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +groupName=apiregistration.k8s.io
-// +k8s:prerelease-lifecycle-gen=true
 
 // Package apiregistration is the internal version of the API.
 package apiregistration // import "k8s.io/kube-aggregator/pkg/apis/apiregistration"

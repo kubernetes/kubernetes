@@ -14,7 +14,6 @@ go_library(
         "register.go",
         "types.go",
         "zz_generated.deepcopy.go",
-        "zz_generated.prerelease-lifecycle.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration",
     importpath = "k8s.io/kube-aggregator/pkg/apis/apiregistration",
