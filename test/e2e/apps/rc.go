@@ -19,7 +19,6 @@ package apps
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -565,7 +564,7 @@ func updateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 	return rc, pollErr
 }
 
-type rcPatchFunc func(pdb *v1.ReplicationController) ([]byte, error)
+type rcPatchFunc func(rc *v1.ReplicationController) ([]byte, error)
 
 func patchRCOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f rcPatchFunc, subresources ...string) (updated *v1.ReplicationController) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -591,7 +590,7 @@ func waitForRCToBeProcessed(cs kubernetes.Interface, ns string, name string) {
 			return false, err
 		}
 		if rc.Status.ObservedGeneration < rc.Generation {
-			return false, errors.New(fmt.Sprintf("the ObservedGeneration for ReplicationController %s in namespaced %s is %v", name, ns, rc.Status.ObservedGeneration))
+			return false, fmt.Errorf("the ObservedGeneration for ReplicationController %s in namespaced %s is %v", name, ns, rc.Status.ObservedGeneration)
 		}
 		return true, nil
 	})
@@ -611,9 +610,9 @@ func unstructuredToRC(obj *unstructured.Unstructured) (*v1.ReplicationController
 	if err != nil {
 		return nil, err
 	}
-	pdb := &v1.ReplicationController{}
-	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, pdb)
-	pdb.Kind = ""
-	pdb.APIVersion = ""
-	return pdb, err
+	rc := &v1.ReplicationController{}
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, rc)
+	rc.Kind = ""
+	rc.APIVersion = ""
+	return rc, err
 }
