@@ -79,8 +79,15 @@ func newCache() *cache {
 
 var spewConfig = &spew.ConfigState{DisableMethods: true, Indent: " "}
 
-func cacheKey(c *api.ExecConfig) string {
-	return spewConfig.Sprint(c)
+func cacheKey(conf *api.ExecConfig, cluster clientauthentication.Cluster) string {
+	key := struct {
+		conf    *api.ExecConfig
+		cluster clientauthentication.Cluster
+	}{
+		conf:    conf,
+		cluster: cluster,
+	}
+	return spewConfig.Sprint(key)
 }
 
 type cache struct {
@@ -109,12 +116,12 @@ func (c *cache) put(s string, a *Authenticator) *Authenticator {
 }
 
 // GetAuthenticator returns an exec-based plugin for providing client credentials.
-func GetAuthenticator(config *api.ExecConfig) (*Authenticator, error) {
-	return newAuthenticator(globalCache, config)
+func GetAuthenticator(config *api.ExecConfig, cluster clientauthentication.Cluster) (*Authenticator, error) {
+	return newAuthenticator(globalCache, config, cluster)
 }
 
-func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) {
-	key := cacheKey(config)
+func newAuthenticator(c *cache, config *api.ExecConfig, cluster clientauthentication.Cluster) (*Authenticator, error) {
+	key := cacheKey(config, cluster)
 	if a, ok := c.get(key); ok {
 		return a, nil
 	}
@@ -125,9 +132,10 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 	}
 
 	a := &Authenticator{
-		cmd:   config.Command,
-		args:  config.Args,
-		group: gv,
+		cmd:     config.Command,
+		args:    config.Args,
+		group:   gv,
+		cluster: cluster,
 
 		stdin:       os.Stdin,
 		stderr:      os.Stderr,
@@ -147,10 +155,11 @@ func newAuthenticator(c *cache, config *api.ExecConfig) (*Authenticator, error) 
 // The plugin input and output are defined by the API group client.authentication.k8s.io.
 type Authenticator struct {
 	// Set by the config
-	cmd   string
-	args  []string
-	group schema.GroupVersion
-	env   []string
+	cmd     string
+	args    []string
+	group   schema.GroupVersion
+	env     []string
+	cluster clientauthentication.Cluster
 
 	// Stubbable for testing
 	stdin       io.Reader
@@ -297,21 +306,16 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		Spec: clientauthentication.ExecCredentialSpec{
 			Response:    r,
 			Interactive: a.interactive,
+			Cluster:     a.cluster,
 		},
 	}
 
 	env := append(a.environ(), a.env...)
-	if a.group == v1alpha1.SchemeGroupVersion {
-		// Input spec disabled for beta due to lack of use. Possibly re-enable this later if
-		// someone wants it back.
-		//
-		// See: https://github.com/kubernetes/kubernetes/issues/61796
-		data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
-		if err != nil {
-			return fmt.Errorf("encode ExecCredentials: %v", err)
-		}
-		env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
+	data, err := runtime.Encode(codecs.LegacyCodec(a.group), cred)
+	if err != nil {
+		return fmt.Errorf("encode ExecCredentials: %v", err)
 	}
+	env = append(env, fmt.Sprintf("%s=%s", execInfoEnv, data))
 
 	stdout := &bytes.Buffer{}
 	cmd := exec.Command(a.cmd, a.args...)
