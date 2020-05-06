@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -27,16 +26,11 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-)
-
-const (
-	defaultImagePullTimeout = 15 * time.Minute
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -48,7 +42,6 @@ type applyFlags struct {
 	dryRun             bool
 	etcdUpgrade        bool
 	renewCerts         bool
-	imagePullTimeout   time.Duration
 	kustomizeDir       string
 }
 
@@ -60,10 +53,9 @@ func (f *applyFlags) sessionIsInteractive() bool {
 // NewCmdApply returns the cobra command for `kubeadm upgrade apply`
 func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
-		applyPlanFlags:   apf,
-		imagePullTimeout: defaultImagePullTimeout,
-		etcdUpgrade:      true,
-		renewCerts:       true,
+		applyPlanFlags: apf,
+		etcdUpgrade:    true,
+		renewCerts:     true,
 	}
 
 	cmd := &cobra.Command{
@@ -88,7 +80,6 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
-	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
 	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
 
 	return cmd
@@ -145,22 +136,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 		}
 	}
 
-	// Set the timeout as flags.imagePullTimeout to ensure that Prepuller truly respects 'image-pull-timeout' flag
-	waiter := getWaiter(flags.dryRun, client, flags.imagePullTimeout)
-
-	// Use a prepuller implementation based on creating DaemonSets
-	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
-	klog.V(1).Infoln("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(client, waiter, &cfg.ClusterConfiguration)
-	componentsToPrepull := constants.ControlPlaneComponents
-	if cfg.Etcd.External == nil && flags.etcdUpgrade {
-		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
-	}
-	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
-		return errors.Wrap(err, "[upgrade/prepull] Failed prepulled the images for the control plane components error")
-	}
-
-	waiter = getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
+	waiter := getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
 
 	// Now; perform the upgrade procedure
 	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
