@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -98,6 +99,7 @@ type VSphere struct {
 	nodeManager          *NodeManager
 	vmUUID               string
 	isSecretInfoProvided bool
+	isSecretManaged      bool
 }
 
 // Represents a vSphere instance where one or more kubernetes nodes are running.
@@ -175,6 +177,8 @@ type VSphereConfig struct {
 		SecretName string `gcfg:"secret-name"`
 		// Secret Namespace where secret will be present that has vCenter credentials.
 		SecretNamespace string `gcfg:"secret-namespace"`
+		// Secret changes being ingnored for cloud resources
+		SecretNotManaged bool `gcfg:"secret-not-managed"`
 	}
 
 	VirtualCenter map[string]*VirtualCenterConfig
@@ -275,6 +279,15 @@ func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory)
 			Cache: &SecretCache{
 				VirtualCenter: make(map[string]*Credential),
 			},
+		}
+		if vs.isSecretManaged {
+			klog.V(4).Infof("Setting up secret informers for vSphere Cloud Provider")
+			secretInformer := informerFactory.Core().V1().Secrets().Informer()
+			secretInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+				AddFunc:    vs.SecretAdded,
+				UpdateFunc: vs.SecretUpdated,
+			})
+			klog.V(4).Infof("Secret informers in vSphere cloud provider initialized")
 		}
 		vs.nodeManager.UpdateCredentialManager(secretCredentialManager)
 	}
@@ -530,6 +543,7 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 			registeredNodes:    make(map[string]*v1.Node),
 		},
 		isSecretInfoProvided: isSecretInfoProvided,
+		isSecretManaged:      !cfg.Global.SecretNotManaged,
 		cfg:                  &cfg,
 	}
 	return &vs, nil
@@ -1456,6 +1470,54 @@ func (vs *VSphere) NodeDeleted(obj interface{}) {
 	klog.V(4).Infof("Node deleted: %+v", node)
 	if err := vs.nodeManager.UnRegisterNode(node); err != nil {
 		klog.Errorf("failed to delete node %s: %v", node.Name, err)
+	}
+}
+
+// Notification handler when credentials secret is added.
+func (vs *VSphere) SecretAdded(obj interface{}) {
+	secret, ok := obj.(*v1.Secret)
+	if secret == nil || !ok {
+		klog.Warningf("Unrecognized secret object %T", obj)
+		return
+	}
+
+	if secret.Name != vs.cfg.Global.SecretName ||
+		secret.Namespace != vs.cfg.Global.SecretNamespace {
+		return
+	}
+
+	klog.V(4).Infof("secret added: %+v", obj)
+	vs.refreshNodesForSecretChange()
+}
+
+// Notification handler when credentials secret is updated.
+func (vs *VSphere) SecretUpdated(obj interface{}, newObj interface{}) {
+	oldSecret, ok := obj.(*v1.Secret)
+	if oldSecret == nil || !ok {
+		klog.Warningf("Unrecognized secret object %T", obj)
+		return
+	}
+
+	secret, ok := newObj.(*v1.Secret)
+	if secret == nil || !ok {
+		klog.Warningf("Unrecognized secret object %T", newObj)
+		return
+	}
+
+	if secret.Name != vs.cfg.Global.SecretName ||
+		secret.Namespace != vs.cfg.Global.SecretNamespace ||
+		reflect.DeepEqual(secret.Data, oldSecret.Data) {
+		return
+	}
+
+	klog.V(4).Infof("secret updated: %+v", newObj)
+	vs.refreshNodesForSecretChange()
+}
+
+func (vs *VSphere) refreshNodesForSecretChange() {
+	err := vs.nodeManager.refreshNodes()
+	if err != nil {
+		klog.Errorf("failed to rediscover nodes: %v", err)
 	}
 }
 
