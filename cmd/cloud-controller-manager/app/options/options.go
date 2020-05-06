@@ -39,7 +39,6 @@ import (
 	ccmconfigscheme "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/scheme"
 	ccmconfigv1alpha1 "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
-	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -57,9 +56,9 @@ const (
 
 // CloudControllerManagerOptions is the main context object for the controller manager.
 type CloudControllerManagerOptions struct {
-	Generic           *cmoptions.GenericControllerManagerConfigurationOptions
-	KubeCloudShared   *cmoptions.KubeCloudSharedOptions
-	ServiceController *cmoptions.ServiceControllerOptions
+	Generic           *GenericControllerManagerConfigurationOptions
+	KubeCloudShared   *KubeCloudSharedOptions
+	ServiceController *ServiceControllerOptions
 
 	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
 	// TODO: remove insecure serving mode
@@ -82,9 +81,9 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 	}
 
 	s := CloudControllerManagerOptions{
-		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
-		KubeCloudShared: cmoptions.NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
-		ServiceController: &cmoptions.ServiceControllerOptions{
+		Generic:         NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
+		KubeCloudShared: NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
+		ServiceController: &ServiceControllerOptions{
 			ServiceControllerConfiguration: &componentConfig.ServiceController,
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),

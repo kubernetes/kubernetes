@@ -22,7 +22,6 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	configv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -37,5 +36,4 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration) {
 	SetDefaults_CloudControllerManagerConfiguration(in)
-	configv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 }

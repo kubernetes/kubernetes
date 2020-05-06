@@ -183,6 +183,8 @@ type GenericControllerManagerConfiguration struct {
 
 // KubeCloudSharedConfiguration contains elements shared by both kube-controller manager
 // and cloud-controller manager, but not genericconfig.
+// TODO: remove this duplicated copy of KubeCloudSharedConfiguration when original copy in
+// cmd/cloud-controller-manager is moved to staging
 type KubeCloudSharedConfiguration struct {
 	// CloudProviderConfiguration holds configuration for CloudProvider related features.
 	CloudProvider CloudProviderConfiguration
@@ -228,6 +230,8 @@ type AttachDetachControllerConfiguration struct {
 }
 
 // CloudProviderConfiguration contains basically elements about cloud provider.
+// TODO: remove this duplicated copy of CloudProviderConfiguration when original copy in
+// cmd/cloud-controller-manager is moved to staging
 type CloudProviderConfiguration struct {
 	// Name is the provider for cloud services.
 	Name string

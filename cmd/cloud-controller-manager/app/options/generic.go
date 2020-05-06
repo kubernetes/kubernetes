@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,22 +22,20 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	cliflag "k8s.io/component-base/cli/flag"
+	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // GenericControllerManagerConfigurationOptions holds the options which are generic.
-// TODO: remove this duplicate option when GenericControllerManagerConfigurationOptions
-// in cmd/cloud-controller-manager is moved to staging
 type GenericControllerManagerConfigurationOptions struct {
-	*kubectrlmgrconfig.GenericControllerManagerConfiguration
+	*ccmconfig.GenericControllerManagerConfiguration
 	Debugging *DebuggingOptions
 }
 
 // NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
+func NewGenericControllerManagerConfigurationOptions(cfg *ccmconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
 		GenericControllerManagerConfiguration: cfg,
 		Debugging:                             RecommendedDebuggingOptions(),
@@ -68,7 +66,7 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.Nam
 }
 
 // ApplyTo fills up generic config with options.
-func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) error {
+func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *ccmconfig.GenericControllerManagerConfiguration) error {
 	if o == nil {
 		return nil
 	}

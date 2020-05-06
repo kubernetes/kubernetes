@@ -11,11 +11,11 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/controller/apis/config:go_default_library",
         "//pkg/controller/service/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/component-base/config:go_default_library",
     ],
 )
 

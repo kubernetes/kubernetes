@@ -21,8 +21,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kubectrlmgrconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/service/config/v1alpha1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -45,7 +46,50 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	}
 
 	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
-	kubectrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
+	RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
+	// Use the default RecommendedDefaultKubeCloudSharedConfiguration options
+	RecommendedDefaultKubeCloudSharedConfiguration(&obj.KubeCloudShared)
+
 	// Use the default RecommendedDefaultServiceControllerConfiguration options
 	serviceconfigv1alpha1.RecommendedDefaultServiceControllerConfiguration(&obj.ServiceController)
+}
+
+func RecommendedDefaultGenericControllerManagerConfiguration(obj *GenericControllerManagerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.Address == "" {
+		obj.Address = "0.0.0.0"
+	}
+	if obj.MinResyncPeriod == zero {
+		obj.MinResyncPeriod = metav1.Duration{Duration: 12 * time.Hour}
+	}
+	if obj.ControllerStartInterval == zero {
+		obj.ControllerStartInterval = metav1.Duration{Duration: 0 * time.Second}
+	}
+	if len(obj.Controllers) == 0 {
+		obj.Controllers = []string{"*"}
+	}
+
+	if len(obj.LeaderElection.ResourceLock) == 0 {
+		obj.LeaderElection.ResourceLock = "endpointsleases"
+	}
+
+	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
+	componentbaseconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
+	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
+}
+
+func RecommendedDefaultKubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration) {
+	zero := metav1.Duration{}
+	if obj.NodeMonitorPeriod == zero {
+		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
+	}
+	if obj.ClusterName == "" {
+		obj.ClusterName = "kubernetes"
+	}
+	if obj.ConfigureCloudRoutes == nil {
+		obj.ConfigureCloudRoutes = utilpointer.BoolPtr(true)
+	}
+	if obj.RouteReconciliationPeriod == zero {
+		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}
+	}
 }

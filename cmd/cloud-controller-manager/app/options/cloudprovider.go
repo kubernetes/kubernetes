@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,14 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 )
 
 // CloudProviderOptions holds the cloudprovider options.
-// TODO: remove this duplicate option when CloudProviderOptions in cmd/cloud-controller-manager
-// is moved to staging
 type CloudProviderOptions struct {
-	*kubectrlmgrconfig.CloudProviderConfiguration
+	*ccmconfig.CloudProviderConfiguration
 }
 
 // Validate checks validation of cloudprovider options.
@@ -45,7 +43,7 @@ func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up cloudprovider config with options.
-func (s *CloudProviderOptions) ApplyTo(cfg *kubectrlmgrconfig.CloudProviderConfiguration) error {
+func (s *CloudProviderOptions) ApplyTo(cfg *ccmconfig.CloudProviderConfiguration) error {
 	if s == nil {
 		return nil
 	}

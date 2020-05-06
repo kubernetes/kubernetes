@@ -67,6 +67,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 
 	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
 	RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
+	// Use the default RecommendedDefaultKubeCloudSharedConfiguration options
+	RecommendedDefaultKubeCloudSharedConfiguration(&obj.KubeCloudShared)
 	// Use the default RecommendedDefaultHPAControllerConfiguration options
 	attachdetachconfigv1alpha1.RecommendedDefaultAttachDetachControllerConfiguration(&obj.AttachDetachController)
 	// Use the default RecommendedDefaultCSRSigningControllerConfiguration options
@@ -135,7 +137,7 @@ func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrcon
 	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 }
 
-func SetDefaults_KubeCloudSharedConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeCloudSharedConfiguration) {
+func RecommendedDefaultKubeCloudSharedConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeCloudSharedConfiguration) {
 	zero := metav1.Duration{}
 	if obj.NodeMonitorPeriod == zero {
 		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}

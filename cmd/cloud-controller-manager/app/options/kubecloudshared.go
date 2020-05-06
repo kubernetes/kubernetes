@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,26 +19,24 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
 // and cloud-controller-manager.
-// TODO: remove this duplicate option when KubeCloudSharedOptions
-// in cmd/cloud-controller-manager is moved to staging
 type KubeCloudSharedOptions struct {
-	*kubectrlmgrconfig.KubeCloudSharedConfiguration
+	*ccmconfig.KubeCloudSharedConfiguration
 	CloudProvider *CloudProviderOptions
 }
 
 // NewKubeCloudSharedOptions returns common/default configuration values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewKubeCloudSharedOptions(cfg *kubectrlmgrconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
+func NewKubeCloudSharedOptions(cfg *ccmconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
 	o := &KubeCloudSharedOptions{
 		KubeCloudSharedConfiguration: cfg,
 		CloudProvider: &CloudProviderOptions{
-			CloudProviderConfiguration: &kubectrlmgrconfig.CloudProviderConfiguration{},
+			CloudProviderConfiguration: &ccmconfig.CloudProviderConfiguration{},
 		},
 	}
 
@@ -72,7 +70,7 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up KubeCloudShared config with options.
-func (o *KubeCloudSharedOptions) ApplyTo(cfg *kubectrlmgrconfig.KubeCloudSharedConfiguration) error {
+func (o *KubeCloudSharedOptions) ApplyTo(cfg *ccmconfig.KubeCloudSharedConfiguration) error {
 	if o == nil {
 		return nil
 	}
