@@ -44,13 +44,15 @@ var (
 	sctpPort    = -1
 	shellPath   = "/bin/sh"
 	serverReady = &atomicBool{0}
+	certFile    = ""
+	privKeyFile = ""
 )
 
 // CmdNetexec is used by agnhost Cobra.
 var CmdNetexec = &cobra.Command{
 	Use:   "netexec",
-	Short: "Creates HTTP, UDP, and (optionally) SCTP servers with various endpoints",
-	Long: `Starts a HTTP server on given port with the following endpoints:
+	Short: "Creates HTTP(S), UDP, and (optionally) SCTP servers with various endpoints",
+	Long: `Starts a HTTP(S) server on given port with the following endpoints:
 
 - /: Returns the request's timestamp.
 - /clientip: Returns the request's IP address.
@@ -97,6 +99,10 @@ responding to the same commands as the UDP server.
 
 func init() {
 	CmdNetexec.Flags().IntVar(&httpPort, "http-port", 8080, "HTTP Listen Port")
+	CmdNetexec.Flags().StringVar(&certFile, "tls-cert-file", "",
+		"File containing an x509 certificate for HTTPS. (CA cert, if any, concatenated after server cert)")
+	CmdNetexec.Flags().StringVar(&privKeyFile, "tls-private-key-file", "",
+		"File containing an x509 private key matching --tls-cert-file")
 	CmdNetexec.Flags().IntVar(&udpPort, "udp-port", 8081, "UDP Listen Port")
 	CmdNetexec.Flags().IntVar(&sctpPort, "sctp-port", -1, "SCTP Listen Port")
 }
@@ -125,10 +131,17 @@ func main(cmd *cobra.Command, args []string) {
 	if sctpPort != -1 {
 		go startSCTPServer(sctpPort)
 	}
-	startHTTPServer(httpPort)
+
+	addRoutes()
+	if len(certFile) > 0 {
+		// only start HTTPS server if a cert is provided
+		startHTTPSServer(httpPort, certFile, privKeyFile)
+	} else {
+		startHTTPServer(httpPort)
+	}
 }
 
-func startHTTPServer(httpPort int) {
+func addRoutes() {
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/clientip", clientIPHandler)
 	http.HandleFunc("/echo", echoHandler)
@@ -141,6 +154,13 @@ func startHTTPServer(httpPort int) {
 	// older handlers
 	http.HandleFunc("/hostName", hostNameHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
+}
+
+func startHTTPSServer(httpsPort int, certFile, privKeyFile string) {
+	log.Fatal(http.ListenAndServeTLS(fmt.Sprintf(":%d", httpPort), certFile, privKeyFile, nil))
+}
+
+func startHTTPServer(httpPort int) {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
 }
 
