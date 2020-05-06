@@ -19,8 +19,10 @@ package rest
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
 
+	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/transport"
 )
@@ -89,12 +91,22 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		Proxy: c.Proxy,
 	}
 
-	if c.ExecProvider != nil && c.AuthProvider != nil {
+	if c.Exec.ExecProvider != nil && c.AuthProvider != nil {
 		return nil, errors.New("execProvider and authProvider cannot be used in combination")
 	}
 
-	if c.ExecProvider != nil {
-		provider, err := exec.GetAuthenticator(c.ExecProvider)
+	if c.Exec.ExecProvider != nil {
+		caData, err := dataFromSliceOrFile(c.CAData, c.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load CA bundle for execProvider: %v", err)
+		}
+		cluster := clientauthentication.Cluster{
+			Server:     c.Host,
+			ServerName: c.TLSClientConfig.ServerName,
+			CAData:     caData,
+			Config:     c.Exec.Config,
+		}
+		provider, err := exec.GetAuthenticator(c.Exec.ExecProvider, cluster)
 		if err != nil {
 			return nil, err
 		}

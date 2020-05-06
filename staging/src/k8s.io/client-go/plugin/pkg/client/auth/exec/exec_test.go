@@ -117,6 +117,21 @@ func TestCacheKey(t *testing.T) {
 		},
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
 	}
+	c1c := clientauthentication.Cluster{
+		Server:     "foo",
+		ServerName: "bar",
+		CAData:     []byte("baz"),
+		Config: &runtime.Unknown{
+			TypeMeta: runtime.TypeMeta{
+				APIVersion: "",
+				Kind:       "",
+			},
+			Raw:             []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"audience":"snorlax"}}`),
+			ContentEncoding: "",
+			ContentType:     "application/json",
+		},
+	}
+
 	c2 := &api.ExecConfig{
 		Command: "foo-bar",
 		Args:    []string{"1", "2"},
@@ -127,6 +142,21 @@ func TestCacheKey(t *testing.T) {
 		},
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
 	}
+	c2c := clientauthentication.Cluster{
+		Server:     "foo",
+		ServerName: "bar",
+		CAData:     []byte("baz"),
+		Config: &runtime.Unknown{
+			TypeMeta: runtime.TypeMeta{
+				APIVersion: "",
+				Kind:       "",
+			},
+			Raw:             []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"audience":"snorlax"}}`),
+			ContentEncoding: "",
+			ContentType:     "application/json",
+		},
+	}
+
 	c3 := &api.ExecConfig{
 		Command: "foo-bar",
 		Args:    []string{"1", "2"},
@@ -136,9 +166,49 @@ func TestCacheKey(t *testing.T) {
 		},
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
 	}
-	key1 := cacheKey(c1)
-	key2 := cacheKey(c2)
-	key3 := cacheKey(c3)
+	c3c := clientauthentication.Cluster{
+		Server:     "foo",
+		ServerName: "bar",
+		CAData:     []byte("baz"),
+		Config: &runtime.Unknown{
+			TypeMeta: runtime.TypeMeta{
+				APIVersion: "",
+				Kind:       "",
+			},
+			Raw:             []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"audience":"snorlax"}}`),
+			ContentEncoding: "",
+			ContentType:     "application/json",
+		},
+	}
+
+	c4 := &api.ExecConfig{
+		Command: "foo-bar",
+		Args:    []string{"1", "2"},
+		Env: []api.ExecEnvVar{
+			{Name: "3", Value: "4"},
+			{Name: "5", Value: "6"},
+		},
+		APIVersion: "client.authentication.k8s.io/v1alpha1",
+	}
+	c4c := clientauthentication.Cluster{
+		Server:     "foo",
+		ServerName: "bar",
+		CAData:     []byte("baz"),
+		Config: &runtime.Unknown{
+			TypeMeta: runtime.TypeMeta{
+				APIVersion: "",
+				Kind:       "",
+			},
+			Raw:             []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"audience":"panda"}}`),
+			ContentEncoding: "",
+			ContentType:     "application/json",
+		},
+	}
+
+	key1 := cacheKey(c1, c1c)
+	key2 := cacheKey(c2, c2c)
+	key3 := cacheKey(c3, c3c)
+	key4 := cacheKey(c4, c4c)
 	if key1 != key2 {
 		t.Error("key1 and key2 didn't match")
 	}
@@ -147,6 +217,9 @@ func TestCacheKey(t *testing.T) {
 	}
 	if key2 == key3 {
 		t.Error("key2 and key3 matched")
+	}
+	if key3 == key4 {
+		t.Error("key3 and key4 matched")
 	}
 }
 
@@ -173,6 +246,7 @@ func TestRefreshCreds(t *testing.T) {
 		name          string
 		config        api.ExecConfig
 		exitCode      int
+		cluster       clientauthentication.Cluster
 		output        string
 		interactive   bool
 		response      *clientauthentication.Response
@@ -393,6 +467,16 @@ func TestRefreshCreds(t *testing.T) {
 			config: api.ExecConfig{
 				APIVersion: "client.authentication.k8s.io/v1beta1",
 			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"cluster": {
+						"server": "",
+						"config": null
+					}
+				}
+			}`,
 			output: `{
 				"kind": "ExecCredential",
 				"apiVersion": "client.authentication.k8s.io/v1beta1",
@@ -407,6 +491,16 @@ func TestRefreshCreds(t *testing.T) {
 			config: api.ExecConfig{
 				APIVersion: "client.authentication.k8s.io/v1beta1",
 			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"cluster": {
+						"server": "",
+						"config": null
+					}
+				}
+			}`,
 			output: `{
 				"kind": "ExecCredential",
 				"apiVersion": "client.authentication.k8s.io/v1beta1",
@@ -473,6 +567,106 @@ func TestRefreshCreds(t *testing.T) {
 			wantErr:       true,
 			wantErrSubstr: "73",
 		},
+		{
+			name: "alpha-with-cluster-is-ignored",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1alpha1",
+			},
+			cluster: clientauthentication.Cluster{
+				Server:     "foo",
+				ServerName: "bar",
+				CAData:     []byte("baz"),
+				Config: &runtime.Unknown{
+					TypeMeta: runtime.TypeMeta{
+						APIVersion: "",
+						Kind:       "",
+					},
+					Raw:             []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"audience":"panda"}}`),
+					ContentEncoding: "",
+					ContentType:     "application/json",
+				},
+			},
+			response: &clientauthentication.Response{
+				Header: map[string][]string{
+					"WWW-Authenticate": {`Basic realm="Access to the staging site", charset="UTF-8"`},
+				},
+				Code: 401,
+			},
+			wantInput: `{
+				"kind":"ExecCredential",
+				"apiVersion":"client.authentication.k8s.io/v1alpha1",
+				"spec": {
+					"response": {
+						"header": {
+							"WWW-Authenticate": [
+								"Basic realm=\"Access to the staging site\", charset=\"UTF-8\""
+							]
+						},
+						"code": 401
+					}
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1alpha1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-with-cluster-is-serialized",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			},
+			cluster: clientauthentication.Cluster{
+				Server:     "foo",
+				ServerName: "bar",
+				CAData:     []byte("baz"),
+				Config: &runtime.Unknown{
+					TypeMeta: runtime.TypeMeta{
+						APIVersion: "",
+						Kind:       "",
+					},
+					Raw:             []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"audience":"snorlax"}}`),
+					ContentEncoding: "",
+					ContentType:     "application/json",
+				},
+			},
+			response: &clientauthentication.Response{
+				Header: map[string][]string{
+					"WWW-Authenticate": {`Basic realm="Access to the staging site", charset="UTF-8"`},
+				},
+				Code: 401,
+			},
+			wantInput: `{
+				"kind":"ExecCredential",
+				"apiVersion":"client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"cluster": {
+						"server": "foo",
+						"serverName": "bar",
+						"caData": "YmF6",
+						"config": {
+							"apiVersion": "group/v1",
+							"kind": "PluginConfig",
+							"spec": {
+								"audience": "snorlax"
+							}
+						}
+					}
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
 	}
 
 	for _, test := range tests {
@@ -491,7 +685,7 @@ func TestRefreshCreds(t *testing.T) {
 				})
 			}
 
-			a, err := newAuthenticator(newCache(), &c)
+			a, err := newAuthenticator(newCache(), &c, test.cluster)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -569,7 +763,7 @@ func TestRoundTripper(t *testing.T) {
 		Command:    "./testdata/test-plugin.sh",
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
 	}
-	a, err := newAuthenticator(newCache(), &c)
+	a, err := newAuthenticator(newCache(), &c, clientauthentication.Cluster{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -694,7 +888,7 @@ func TestTLSCredentials(t *testing.T) {
 	a, err := newAuthenticator(newCache(), &api.ExecConfig{
 		Command:    "./testdata/test-plugin.sh",
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
-	})
+	}, clientauthentication.Cluster{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -784,7 +978,7 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 		Command:    "./testdata/test-plugin.sh",
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
 	}
-	a, err := newAuthenticator(newCache(), &c)
+	a, err := newAuthenticator(newCache(), &c, clientauthentication.Cluster{})
 	if err != nil {
 		t.Fatal(err)
 	}
