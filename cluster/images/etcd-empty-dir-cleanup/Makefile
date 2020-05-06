@@ -20,7 +20,7 @@ ETCD_VERSION = 3.4.7
 REGISTRY = k8s.gcr.io
 # Images should be pushed to staging-k8s.gcr.io.
 PUSH_REGISTRY = staging-k8s.gcr.io
-TAG = 3.4.7.0
+TAG = 3.4.7.1
 
 clean:
 	rm -rf etcdctl etcd-v$(ETCD_VERSION)-linux-amd64 etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz

@@ -73,12 +73,12 @@ def cri_tarballs():
 
 # Use go get -u github.com/estesp/manifest-tool to find these values
 _DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:ebda8587ec0f49eb88ee3a608ef018484908cbc5aa32556a0d78356088c185d4",
-    "amd64": "sha256:d7be39e143d4e6677a28c81c0a84868b40800fc979dea1848bb19d526668a00c",
-    "arm": "sha256:fc731da13b0bc9013b85a86b583fc92e50869b5bc8e7aa6ca730ec0240954c7d",
-    "arm64": "sha256:12502c3eed050fa9b6d5fe353a44bfc5f437dc325c8912b1a48dcc180df36f1e",
-    "ppc64le": "sha256:4277aa59b63c5a1369e6d84a295ecc4ffa08985dcf114de9f7b6de1af4fcbc86",
-    "s390x": "sha256:78ef2a6b017539379c1654b4e52ba8519bfec821c62d0b3a1dbd15104b711e21",
+    "manifest": "sha256:b118abac0bcf633b9db4086584ee718526fe394cf1bd18aee036e6cc497860f6",
+    "amd64": "sha256:a67798e4746faaab3fde5b7407fa8bba75d8b1214d168dc7ad2b5364f6fc4319",
+    "arm": "sha256:3ab4332e481610acbcba7a801711e29506b4bd4ecb38f72590253674d914c449",
+    "arm64": "sha256:8d53ac4da977eb20d6219ee49b9cdff8c066831ecab0e4294d0a02179d26b1d7",
+    "ppc64le": "sha256:a631023e795fe18df7faa8fe1264e757a6c74a232b9a2659657bf65756f3f4aa",
+    "s390x": "sha256:dac908eaa61d2034aec252576a470a7e4ab184c361f89170526f707a0c3c6082",
 }
 
 _DEBIAN_IPTABLES_DIGEST = {
@@ -102,9 +102,9 @@ def debian_image_dependencies():
             name = "debian-base-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_BASE_DIGEST, arch),
-            registry = "k8s.gcr.io",
+            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-base",
-            tag = "v2.0.0",  # ignored, but kept here for documentation
+            tag = "v2.1.0",  # ignored, but kept here for documentation
         )
 
         container_pull(

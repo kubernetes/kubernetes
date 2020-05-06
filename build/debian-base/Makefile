@@ -14,7 +14,7 @@
 
 all: all-build
 
-REGISTRY ?= staging-k8s.gcr.io
+REGISTRY ?= gcr.io/k8s-staging-build-image
 IMAGE ?= $(REGISTRY)/debian-base
 BUILD_IMAGE ?= debian-build
 
