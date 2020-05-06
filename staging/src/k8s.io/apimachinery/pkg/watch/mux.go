@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog"
 )
 
 // FullChannelBehavior controls how the Broadcaster reacts if a watcher's watch
@@ -225,6 +226,7 @@ func (m *Broadcaster) distribute(event Event) {
 			case w.result <- event:
 			case <-w.stopped:
 			default: // Don't block if the event can't be queued.
+				klog.Warningf("dropping events: %+v", event)
 			}
 		}
 	} else {
