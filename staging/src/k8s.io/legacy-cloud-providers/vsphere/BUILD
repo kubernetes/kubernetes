@@ -79,6 +79,7 @@ go_test(
         "//vendor/github.com/vmware/govmomi/vapi/tags:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
