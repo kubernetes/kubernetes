@@ -360,8 +360,8 @@ function kube::release::create_docker_images_for_server() {
 
     for wrappable in $binaries; do
 
-      local binary_name=${wrappable%%,*}
-      local base_image=${wrappable##*,}
+      local binary_name base_image owner
+      IFS=$',' read -r binary_name base_image owner <<< "$wrappable"
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_build_path="${binary_file_path}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
@@ -377,6 +377,7 @@ function kube::release::create_docker_images_for_server() {
         cat <<EOF > "${docker_file_path}"
 FROM ${base_image}
 COPY ${binary_name} /usr/local/bin/${binary_name}
+RUN chown ${owner} /usr/local/bin/${binary_name}
 EOF
         # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
         if [[ "${base_image}" =~ busybox ]]; then
