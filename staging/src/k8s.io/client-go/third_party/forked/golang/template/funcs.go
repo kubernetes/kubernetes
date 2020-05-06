@@ -283,7 +283,6 @@ const (
 	integerKind
 	stringKind
 	uintKind
-	sliceKind
 )
 
 func basicKind(v reflect.Value) (kind, error) {
@@ -300,8 +299,6 @@ func basicKind(v reflect.Value) (kind, error) {
 		return complexKind, nil
 	case reflect.String:
 		return stringKind, nil
-	case reflect.Slice:
-		return sliceKind, nil
 	}
 	return invalidKind, errBadComparisonType
 }
@@ -456,15 +453,12 @@ func mtc(pattern interface{}, strs ...interface{}) (bool, error) {
 	hasUnmatch := false
 	for _, str := range strs {
 		vStr := reflect.ValueOf(str)
-		kStr, err := basicKind(vStr)
-		if err != nil {
-			return false, err
-		}
+		kStr := vStr.Kind()
 		var strToMatch string
 		switch kStr {
-		case stringKind:
+		case reflect.String:
 			strToMatch = vStr.String()
-		case sliceKind:
+		case reflect.Slice:
 			// only accept []byte slice
 			kElem := vStr.Type().Elem().Kind()
 			// byte is alias of uint8
