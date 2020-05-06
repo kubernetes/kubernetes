@@ -19,7 +19,6 @@ package gcp
 import (
 	"encoding/xml"
 	"fmt"
-	"k8s.io/kubernetes/test/e2e/util"
 	"os"
 	"os/exec"
 	"path"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	apps "k8s.io/kubernetes/test/e2e/upgrades/apps"
 	"k8s.io/kubernetes/test/e2e/upgrades/storage"
+	nodeutil "k8s.io/kubernetes/test/e2e/util"
 	"k8s.io/kubernetes/test/utils/junit"
 
 	"github.com/onsi/ginkgo"
@@ -110,7 +110,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, masterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(util.MasterUpgrade(f, target))
+				framework.ExpectNoError(nodeutil.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
@@ -151,7 +151,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, clusterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(util.MasterUpgrade(f, target))
+				framework.ExpectNoError(nodeutil.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -184,7 +184,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(util.MasterUpgrade(f, target))
+				framework.ExpectNoError(nodeutil.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -207,7 +207,7 @@ var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 			upgradeFunc := func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, etcdTest)
-				framework.ExpectNoError(util.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
+				framework.ExpectNoError(nodeutil.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
 		})
@@ -232,7 +232,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(util.MasterUpgrade(f, target))
+				framework.ExpectNoError(nodeutil.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
@@ -250,7 +250,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(util.MasterUpgrade(f, target))
+				framework.ExpectNoError(nodeutil.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -272,7 +272,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(util.MasterUpgrade(f, target))
+				framework.ExpectNoError(nodeutil.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				start := time.Now()
 				defer finalizeUpgradeTest(start, statefulUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(util.MasterUpgrade(f, target))
+				framework.ExpectNoError(nodeutil.MasterUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -333,7 +333,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				start := time.Now()
 				defer finalizeUpgradeTest(start, kubeProxyUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(util.MasterUpgradeGCEWithKubeProxyDaemonSet(target, true))
+				framework.ExpectNoError(nodeutil.MasterUpgradeGCEWithKubeProxyDaemonSet(target, true))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -363,7 +363,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, false))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(util.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
+				framework.ExpectNoError(nodeutil.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -641,10 +641,10 @@ func nodeUpgradeGCE(rawV, img string, enableKubeProxyDaemonSet bool) error {
 	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
 	if img != "" {
 		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
-		_, _, err := framework.RunCmdEnv(env, util.GCEUpgradeScript(), "-N", "-o", v)
+		_, _, err := framework.RunCmdEnv(env, nodeutil.GCEUpgradeScript(), "-N", "-o", v)
 		return err
 	}
-	_, _, err := framework.RunCmdEnv(env, util.GCEUpgradeScript(), "-N", v)
+	_, _, err := framework.RunCmdEnv(env, nodeutil.GCEUpgradeScript(), "-N", v)
 	return err
 }
 
@@ -660,7 +660,7 @@ func nodeUpgradeGKE(namespace string, v string, img string) error {
 			"container",
 			"clusters",
 			fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-			util.LocationParamGKE(),
+			nodeutil.LocationParamGKE(),
 			"upgrade",
 			framework.TestContext.CloudConfig.Cluster,
 			fmt.Sprintf("--node-pool=%s", np),
@@ -670,13 +670,13 @@ func nodeUpgradeGKE(namespace string, v string, img string) error {
 		if len(img) > 0 {
 			args = append(args, fmt.Sprintf("--image-type=%s", img))
 		}
-		_, _, err = framework.RunCmd("gcloud", util.AppendContainerCommandGroupIfNeeded(args)...)
+		_, _, err = framework.RunCmd("gcloud", nodeutil.AppendContainerCommandGroupIfNeeded(args)...)
 
 		if err != nil {
 			return err
 		}
 
-		util.WaitForSSHTunnels(namespace)
+		nodeutil.WaitForSSHTunnels(namespace)
 	}
 	return nil
 }
@@ -686,12 +686,12 @@ func nodePoolsGKE() ([]string, error) {
 		"container",
 		"node-pools",
 		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-		util.LocationParamGKE(),
+		nodeutil.LocationParamGKE(),
 		"list",
 		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
 		"--format=get(name)",
 	}
-	stdout, _, err := framework.RunCmd("gcloud", util.AppendContainerCommandGroupIfNeeded(args)...)
+	stdout, _, err := framework.RunCmd("gcloud", nodeutil.AppendContainerCommandGroupIfNeeded(args)...)
 	if err != nil {
 		return nil, err
 	}
