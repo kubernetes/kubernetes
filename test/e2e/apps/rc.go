@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -566,19 +567,20 @@ func updateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 
 type rcPatchFunc func(pdb *v1.ReplicationController) ([]byte, error)
 
-func patchRCOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f rcPatchFunc, subresources ...string) (updated *v1.ReplicationController, err error) {
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+func patchRCOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f rcPatchFunc, subresources ...string) (updated *v1.ReplicationController) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		old := getRCStatusOrDie(dc, ns, name)
 		patchBytes, err := f(old)
+		framework.ExpectNoError(err, "Failed to run ReplicationController patch function for resource %s", name)
 		if updated, err = cs.CoreV1().ReplicationControllers(ns).Patch(context.TODO(), old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...); err != nil {
 			return err
 		}
 		return nil
 	})
 
-	framework.ExpectNoError(err, "Waiting for the rc update to be processed in namespace %s", ns)
+	framework.ExpectNoError(err, "failed to patch the rc %q in namespace %q", name, ns)
 	waitForRCToBeProcessed(cs, ns, name)
-	return updated, err
+	return updated
 }
 
 func waitForRCToBeProcessed(cs kubernetes.Interface, ns string, name string) {
@@ -589,18 +591,18 @@ func waitForRCToBeProcessed(cs kubernetes.Interface, ns string, name string) {
 			return false, err
 		}
 		if rc.Status.ObservedGeneration < rc.Generation {
-			return false, nil
+			return false, errors.New(fmt.Sprintf("the ObservedGeneration for ReplicationController %s in namespaced %s is %v", name, ns, rc.Status.ObservedGeneration))
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Waiting for the rc to be processed in namespace %s", ns)
+	framework.ExpectNoError(err, "The ReplicationController %q in namespace %q did not update after %v", name, ns, schedulingTimeout)
 }
 
 func getRCStatusOrDie(dc dynamic.Interface, ns string, name string) *v1.ReplicationController {
 	rcStatusResource := v1.SchemeGroupVersion.WithResource("replicationcontroller")
 	unstruct, err := dc.Resource(rcStatusResource).Namespace(ns).Get(context.TODO(), name, metav1.GetOptions{}, "status")
 	rc, err := unstructuredToRC(unstruct)
-	framework.ExpectNoError(err, "Getting the status of the rc %s in namespace %s", name, ns)
+	framework.ExpectNoError(err, "Failed to get ReplicationController %q in namespace %q", name, ns)
 	return rc
 }
 
