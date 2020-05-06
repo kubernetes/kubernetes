@@ -124,17 +124,7 @@ func (g *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 		return []v1.NodeAddress{}, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
 	}
 
-	if len(instance.NetworkInterfaces) < 1 {
-		return []v1.NodeAddress{}, fmt.Errorf("could not find network interfaces for providerID %q", providerID)
-	}
-	networkInterface := instance.NetworkInterfaces[0]
-
-	nodeAddresses := []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: networkInterface.NetworkIP}}
-	for _, config := range networkInterface.AccessConfigs {
-		nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: config.NatIP})
-	}
-
-	return nodeAddresses, nil
+	return nodeAddressesFromInstance(instance)
 }
 
 // instanceByProviderID returns the cloudprovider instance of the node
@@ -163,7 +153,45 @@ func (g *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 
 // InstanceMetadataByProviderID returns metadata of the specified instance.
 func (g *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
-	return nil, fmt.Errorf("unimplemented")
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
+	defer cancel()
+
+	if providerID == "" {
+		return nil, fmt.Errorf("couldn't compute InstanceMetadata for empty providerID")
+	}
+
+	_, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
+	if err != nil {
+		return nil, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
+	}
+
+	addresses, err := nodeAddressesFromInstance(instance)
+	if err != nil {
+		return nil, err
+	}
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		Type:          lastComponent(instance.MachineType),
+		NodeAddresses: addresses,
+	}, nil
+}
+
+func nodeAddressesFromInstance(instance *compute.Instance) ([]v1.NodeAddress, error) {
+	if len(instance.NetworkInterfaces) < 1 {
+		return nil, fmt.Errorf("could not find network interfaces for instanceID %q", instance.Id)
+	}
+	networkInterface := instance.NetworkInterfaces[0]
+
+	nodeAddresses := []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: networkInterface.NetworkIP}}
+	for _, config := range networkInterface.AccessConfigs {
+		nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: config.NatIP})
+	}
+	return nodeAddresses, nil
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
