@@ -212,7 +212,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 				},
 			}
 
-			watchChs := make([]chan int, len(tc.reqs))
+			watchChs := make(chan int, len(tc.reqs))
 			for _, url := range tc.reqs {
 				req, err := http.NewRequest(http.MethodGet, s.URL+url, nil)
 				if err != nil {
