@@ -543,6 +543,9 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 				pass, err = template.LessEqual(left, right)
 			case ">=":
 				pass, err = template.GreaterEqual(left, right)
+			case "=~":
+				// left is string to match, right is regex pattern
+				pass, err = template.Match(right, left)
 			default:
 				return results, fmt.Errorf("unrecognized filter operator %s", node.Operator)
 			}

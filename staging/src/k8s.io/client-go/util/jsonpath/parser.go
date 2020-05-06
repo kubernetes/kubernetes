@@ -370,7 +370,7 @@ Loop:
 	if p.next() != ']' {
 		return fmt.Errorf("unclosed array expect ]")
 	}
-	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
+	reg := regexp.MustCompile(`^([^!<>=~]+)([!<>=~]+)(.+?)$`)
 	text := p.consumeText()
 	text = text[:len(text)-2]
 	value := reg.FindStringSubmatch(text)

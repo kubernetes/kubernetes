@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -21,6 +22,7 @@ var Greater = gt
 var LessEqual = le
 var Less = lt
 var NotEqual = ne
+var Match = mtc
 
 // FuncMap is the type of the map defining the mapping from names to functions.
 // Each function must have either a single return value, or two return values of
@@ -50,6 +52,7 @@ var builtins = FuncMap{
 	"le": le, // <=
 	"lt": lt, // <
 	"ne": ne, // !=
+	"match": mtc, // =~
 }
 
 var builtinFuncs = createValueFuncs(builtins)
@@ -266,6 +269,7 @@ var (
 	errBadComparisonType = errors.New("invalid type for comparison")
 	errBadComparison     = errors.New("incompatible types for comparison")
 	errNoComparison      = errors.New("missing argument for comparison")
+	errBadStringRegex    = errors.New("invalid type for regex match")
 )
 
 type kind int
@@ -279,6 +283,7 @@ const (
 	integerKind
 	stringKind
 	uintKind
+	sliceKind
 )
 
 func basicKind(v reflect.Value) (kind, error) {
@@ -295,6 +300,8 @@ func basicKind(v reflect.Value) (kind, error) {
 		return complexKind, nil
 	case reflect.String:
 		return stringKind, nil
+	case reflect.Slice:
+		return sliceKind, nil
 	}
 	return invalidKind, errBadComparisonType
 }
@@ -428,6 +435,57 @@ func ge(arg1, arg2 interface{}) (bool, error) {
 		return false, err
 	}
 	return !lessThan, nil
+}
+
+// mtc evaluates the strs against given regex pattern
+// using regexp.MatchString(pattern, str)
+// param "pattern" must be string type, "str" could be string or []byte type
+func mtc(pattern interface{}, strs ...interface{}) (bool, error) {
+	vPtn := reflect.ValueOf(pattern)
+	kPtn, err := basicKind(vPtn)
+	if err != nil {
+		return false, err
+	}
+	if kPtn != stringKind {
+		return false, fmt.Errorf("regex pattern must be string type")
+	}
+	if len(strs) == 0 {
+		return false, fmt.Errorf("no str given for match")
+	}
+	// flag to indicate non-match case
+	hasUnmatch := false
+	for _, str := range strs {
+		vStr := reflect.ValueOf(str)
+		kStr, err := basicKind(vStr)
+		if err != nil {
+			return false, err
+		}
+		var strToMatch string
+		switch kStr {
+		case stringKind:
+			strToMatch = vStr.String()
+		case sliceKind:
+			// only accept []byte slice
+			kElem := vStr.Type().Elem().Kind()
+			// byte is alias of uint8
+			if kElem != reflect.Uint8 {
+				return false, errBadStringRegex
+			}
+			strToMatch = string(vStr.Bytes())
+		default:
+			return false, errBadStringRegex
+		}
+		matched, err := regexp.MatchString(vPtn.String(), strToMatch)
+		if err != nil {
+			return false, err
+		}
+		hasUnmatch = !matched
+		// non-match found, no need to match remaining str
+		if hasUnmatch {
+			return false, nil
+		}
+	}
+	return !hasUnmatch, nil
 }
 
 // HTML escaping.
