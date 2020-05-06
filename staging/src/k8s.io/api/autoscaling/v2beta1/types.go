@@ -375,7 +375,6 @@ type ExternalMetricStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.22
-// +k8s:prerelease-lifecycle-gen:removed=1.25
 // +k8s:prerelease-lifecycle-gen:replacement=autoscaling,v2beta2,HorizontalPodAutoscaler
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
@@ -401,7 +400,6 @@ type HorizontalPodAutoscaler struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.22
-// +k8s:prerelease-lifecycle-gen:removed=1.25
 // +k8s:prerelease-lifecycle-gen:replacement=autoscaling,v2beta2,HorizontalPodAutoscalerList
 
 // HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.

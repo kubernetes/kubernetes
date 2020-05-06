@@ -19,10 +19,6 @@ package apiregistration
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.7
-// +k8s:prerelease-lifecycle-gen:deprecated=1.19
-// +k8s:prerelease-lifecycle-gen:removed=1.22
-// +k8s:prerelease-lifecycle-gen:replacement=apiregistration.k8s.io,v1,APIServiceList
 
 // APIServiceList is a list of APIService objects.
 type APIServiceList struct {
@@ -133,10 +129,6 @@ type APIServiceStatus struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.7
-// +k8s:prerelease-lifecycle-gen:deprecated=1.19
-// +k8s:prerelease-lifecycle-gen:removed=1.22
-// +k8s:prerelease-lifecycle-gen:replacement=apiregistration.k8s.io,v1,APIService
 
 // APIService represents a server for a particular GroupVersion.
 // Name must be "version.group".
