@@ -71,7 +71,11 @@ def cri_tarballs():
             urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-%s.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION, arch)),
         )
 
-# Use go get -u github.com/estesp/manifest-tool to find these values
+# Use skopeo to find these values: https://github.com/containers/skopeo
+#
+# Example
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.0
 _DEBIAN_BASE_DIGEST = {
     "manifest": "sha256:b118abac0bcf633b9db4086584ee718526fe394cf1bd18aee036e6cc497860f6",
     "amd64": "sha256:a67798e4746faaab3fde5b7407fa8bba75d8b1214d168dc7ad2b5364f6fc4319",
@@ -81,6 +85,11 @@ _DEBIAN_BASE_DIGEST = {
     "s390x": "sha256:dac908eaa61d2034aec252576a470a7e4ab184c361f89170526f707a0c3c6082",
 }
 
+# Use skopeo to find these values: https://github.com/containers/skopeo
+#
+# Example
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.0
 _DEBIAN_IPTABLES_DIGEST = {
     "manifest": "sha256:1ae6d76dea462973759ff1c4e02263867da1f85db9aa10462a030ca421cbf0e9",
     "amd64": "sha256:2fb9fa09123a41e6369cac04eb29e26237fe9e43da8e18f676d18d8fffb906fc",
@@ -104,6 +113,7 @@ def debian_image_dependencies():
             digest = _digest(_DEBIAN_BASE_DIGEST, arch),
             registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-base",
+            # Ensure the digests above are updated to match a new tag
             tag = "v2.1.0",  # ignored, but kept here for documentation
         )
 
@@ -113,6 +123,7 @@ def debian_image_dependencies():
             digest = _digest(_DEBIAN_IPTABLES_DIGEST, arch),
             registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-iptables",
+            # Ensure the digests above are updated to match a new tag
             tag = "v12.1.0",  # ignored, but kept here for documentation
         )
 
