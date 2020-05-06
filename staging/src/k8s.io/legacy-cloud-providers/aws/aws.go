@@ -1646,6 +1646,11 @@ func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return false, nil
 }
 
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (c *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
 func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	// In the future it is possible to also return an endpoint as:

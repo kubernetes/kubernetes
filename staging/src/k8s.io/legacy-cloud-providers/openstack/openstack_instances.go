@@ -152,6 +152,11 @@ func (i *Instances) InstanceShutdownByProviderID(ctx context.Context, providerID
 	return false, nil
 }
 
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (i *Instances) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 // InstanceID returns the kubelet's cloud provider ID.
 func (os *OpenStack) InstanceID() (string, error) {
 	if len(os.localInstanceID) == 0 {

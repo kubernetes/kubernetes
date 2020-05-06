@@ -230,6 +230,11 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 	return strings.ToLower(powerStatus) == vmPowerStateStopped || strings.ToLower(powerStatus) == vmPowerStateDeallocated, nil
 }
 
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (az *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 func (az *Cloud) isCurrentInstance(name types.NodeName, metadataVMName string) (bool, error) {
 	nodeName := mapNodeNameToVMName(name)
 

@@ -161,6 +161,11 @@ func (g *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return false, cloudprovider.NotImplemented
 }
 
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (g *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
 // with the specified unique providerID This method will not be called from the
 // node that is requesting this ID. i.e. metadata service and other local

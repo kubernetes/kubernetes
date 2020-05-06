@@ -163,6 +163,7 @@ type Instances interface {
 	// ProviderID is a unique identifier of the node. This will not be called
 	// from the node whose nodeaddresses are being queried. i.e. local metadata
 	// services cannot be used in this method to obtain nodeaddresses
+	// Deprecated: Remove once all calls are migrated to InstanceMetadataByProviderID
 	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist, we must return ("", cloudprovider.InstanceNotFound)
@@ -171,6 +172,7 @@ type Instances interface {
 	// InstanceType returns the type of the specified instance.
 	InstanceType(ctx context.Context, name types.NodeName) (string, error)
 	// InstanceTypeByProviderID returns the type of the specified instance.
+	// Deprecated: Remove once all calls are migrated to InstanceMetadataByProviderID
 	InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
@@ -181,9 +183,12 @@ type Instances interface {
 	// InstanceExistsByProviderID returns true if the instance for the given provider exists.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 	// This method should still return true for instances that exist but are stopped/sleeping.
+	// Deprecated: Remove once all calls are migrated to InstanceMetadataByProviderID
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceMetadataByProviderID returns the instance's metadata.
+	InstanceMetadataByProviderID(ctx context.Context, providerID string) (*InstanceMetadata, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -249,4 +254,14 @@ type Zones interface {
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
 type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
+}
+
+// InstanceMetadata contains metadata about the specific instance.
+type InstanceMetadata struct {
+	// ProviderID is provider's id that instance belongs to.
+	ProviderID string
+	// Type is instance's type.
+	Type string
+	// NodeAddress contains information for the instance's address.
+	NodeAddresses []v1.NodeAddress
 }

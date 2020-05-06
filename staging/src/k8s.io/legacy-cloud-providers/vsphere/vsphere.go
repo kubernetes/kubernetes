@@ -770,6 +770,11 @@ func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID 
 	return !isActive, nil
 }
 
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (vs *VSphere) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
 

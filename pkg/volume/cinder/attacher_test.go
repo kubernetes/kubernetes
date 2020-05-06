@@ -734,6 +734,10 @@ func (instances *instances) InstanceShutdownByProviderID(ctx context.Context, pr
 	return false, errors.New("unimplemented")
 }
 
+func (instances *instances) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	return nil, errors.New("unimplemented")
+}
+
 func (instances *instances) List(filter string) ([]types.NodeName, error) {
 	return []types.NodeName{}, errors.New("Not implemented")
 }
