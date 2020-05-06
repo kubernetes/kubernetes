@@ -212,7 +212,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 				},
 			}
 
-			watchChs := make([]chan int, 0)
+			watchChs := make([]chan int, len(tc.reqs))
 			for _, url := range tc.reqs {
 				req, err := http.NewRequest(http.MethodGet, s.URL+url, nil)
 				if err != nil {
@@ -225,8 +225,6 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 				// encounter watch bytes received, does not expect to be broken
 				if url == urlWatch || url == urlWatchWithGoaway {
-					ch := make(chan int)
-					watchChs = append(watchChs, ch)
 					go func() {
 						count := 0
 						for {
@@ -240,7 +238,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 										t.Errorf("watch received not EOF err: %v", err)
 									}
 								}
-								ch <- count
+								watchChs <- count
 								return
 							}
 							count += n
@@ -256,9 +254,9 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 			// check if watch request is broken by GOAWAY response
 			watchTimeout := time.NewTimer(time.Second * 10)
-			for _, watchCh := range watchChs {
+			for range tc.reqs {
 				select {
-				case n := <-watchCh:
+				case n := <-watchChs:
 					if n != watchExpectSendBytes {
 						t.Fatalf("in-flight watch was broken by GOAWAY response, expect go bytes: %d, actual got: %d", watchExpectSendBytes, n)
 					}
