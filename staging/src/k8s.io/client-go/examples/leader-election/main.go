@@ -35,15 +35,7 @@ import (
 )
 
 func buildConfig(kubeconfig string) (*rest.Config, error) {
-	if kubeconfig != "" {
-		cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, err
-		}
-		return cfg, nil
-	}
-
-	cfg, err := rest.InClusterConfig()
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
 		return nil, err
 	}
