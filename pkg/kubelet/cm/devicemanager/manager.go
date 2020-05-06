@@ -390,6 +390,21 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 
 }
 
+//@klueska I'm not sure that it is sufficient to revert resource allocation in device manager.
+func (m *ManagerImpl) DeAllocate(pod *v1.Pod, container *v1.Container) error {
+	podUID := string(pod.UID)
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if _, PodToDeAllocate := m.podDevices[podUID]; PodToDeAllocate {
+		m.podDevices.delete([]string{podUID})
+		m.allocatedDevices = m.podDevices.devices()
+	}
+
+	return nil
+}
+
 // UpdatePluginResources updates node resources based on devices already allocated to pods.
 func (m *ManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod

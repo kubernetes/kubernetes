@@ -83,6 +83,10 @@ type HintProvider interface {
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
 	Allocate(pod *v1.Pod, container *v1.Container) error
+	// DeAllocate triggers resource de-allocation to occur on the HintProvider.
+	// topology manager call this function to reclaim allocated resources,
+	// when pod is rejected by topologycal reason.
+	DeAllocate(pod *v1.Pod, container *v1.Container) error
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -229,6 +233,20 @@ func (m *manager) RemoveContainer(containerID string) error {
 	return nil
 }
 
+//@klueska this is another example to show how to use DeAllocate API excepts pod-level-single-numa-node policy.
+//call DeAllocate function of all registered hint providers for all containers in a pod.
+func (m *manager) reclaimAllResources(pod *v1.Pod) {
+	klog.Infof("[topologymanager] pod(%v) is reject, reclaim all resources for the pod.", pod.UID)
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		for _, provider := range m.hintProviders {
+			err := provider.DeAllocate(pod, &container)
+			if err != nil {
+				klog.Errorf("[topologymanager] DeAllocate failed for container(%v) due to %v, which is unexpected", container.Name, err)
+			}
+		}
+	}
+}
+
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
@@ -237,6 +255,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 		if m.policy.Name() == PolicyNone {
 			err := m.allocateAlignedResources(pod, &container)
 			if err != nil {
+				m.reclaimAllResources(pod)
 				return lifecycle.PodAdmitResult{
 					Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
 					Reason:  "UnexpectedAdmissionError",
@@ -248,6 +267,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 
 		result, admit := m.calculateAffinity(pod, &container)
 		if !admit {
+			m.reclaimAllResources(pod)
 			return lifecycle.PodAdmitResult{
 				Message: "Resources cannot be allocated with Topology locality",
 				Reason:  "TopologyAffinityError",
@@ -263,6 +283,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 
 		err := m.allocateAlignedResources(pod, &container)
 		if err != nil {
+			m.reclaimAllResources(pod)
 			return lifecycle.PodAdmitResult{
 				Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
 				Reason:  "UnexpectedAdmissionError",
