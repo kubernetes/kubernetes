@@ -244,6 +244,21 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	return nil
 }
 
+//@klueska I bileve it is sufficient for cpu manager.
+func (p *staticPolicy) DeAllocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
+		klog.Infof("[cpumanager] static policy: DeAllocate (pod: %s, container: %s)", pod.Name, container.Name)
+
+		if toRelease, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+			s.Delete(string(pod.UID), container.Name)
+			// Mutate the shared pool, adding released cpus.
+			s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+		}
+	}
+
+	return nil
+}
+
 func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
 	klog.Infof("[cpumanager] static policy: RemoveContainer (pod: %s, container: %s)", podUID, containerName)
 	if toRelease, ok := s.GetCPUSet(podUID, containerName); ok {

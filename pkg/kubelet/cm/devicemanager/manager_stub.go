@@ -49,6 +49,11 @@ func (h *ManagerStub) Allocate(pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
+// DeAllocate simply returns nil.
+func (h *ManagerStub) DeAllocate(pod *v1.Pod, container *v1.Container) error {
+	return nil
+}
+
 // UpdatePluginResources simply returns nil.
 func (h *ManagerStub) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	return nil
