@@ -127,28 +127,33 @@ var (
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
-	if i := strings.Index(arg, ":"); i == -1 {
+	i := strings.Index(arg, ":")
+
+	if i == -1 {
 		return fileSpec{File: arg}, nil
-	} else if i > 0 {
-		file := arg[i+1:]
-		pod := arg[:i]
-		pieces := strings.Split(pod, "/")
-		if len(pieces) == 1 {
-			return fileSpec{
-				PodName: pieces[0],
-				File:    file,
-			}, nil
-		}
-		if len(pieces) == 2 {
-			return fileSpec{
-				PodNamespace: pieces[0],
-				PodName:      pieces[1],
-				File:         file,
-			}, nil
-		}
+	}
+	// filespec starting with a semicolon is invalid
+	if i == 0 {
+		return fileSpec{}, errFileSpecDoesntMatchFormat
 	}
 
-	return fileSpec{}, errFileSpecDoesntMatchFormat
+	pod, file := arg[:i], arg[i+1:]
+	pieces := strings.Split(pod, "/")
+	switch len(pieces) {
+	case 1:
+		return fileSpec{
+			PodName: pieces[0],
+			File:    file,
+		}, nil
+	case 2:
+		return fileSpec{
+			PodNamespace: pieces[0],
+			PodName:      pieces[1],
+			File:         file,
+		}, nil
+	default:
+		return fileSpec{}, errFileSpecDoesntMatchFormat
+	}
 }
 
 // Complete completes all the required options
