@@ -18,6 +18,7 @@ package clientauthentication
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -49,6 +50,10 @@ type ExecCredentialSpec struct {
 	// interactive prompt.
 	// +optional
 	Interactive bool
+
+	// Cluster contains information to allow an exec plugin to communicate
+	// with the kubernetes cluster being authenticated to.
+	Cluster Cluster
 }
 
 // ExecCredentialStatus holds credentials for the transport to use.
@@ -74,4 +79,43 @@ type Response struct {
 	Header map[string][]string
 	// Code is the HTTP status code returned by the server.
 	Code int32
+}
+
+// Cluster contains information to allow an exec plugin to communicate
+// with the kubernetes cluster being authenticated to.
+type Cluster struct {
+	// Server is the address of the kubernetes cluster (https://hostname:port).
+	Server string
+	// ServerName is passed to the server for SNI and is used in the client to check server
+	// certificates against. If ServerName is empty, the hostname used to contact the
+	// server is used.
+	// +optional
+	ServerName string
+	// CAData contains PEM-encoded certificate authority certificates.
+	// If empty, system roots should be used.
+	// +listType=atomic
+	// +optional
+	CAData []byte
+	// Config holds additional config data that is specific to the exec
+	// plugin with regards to the cluster being authenticated to.
+	//
+	// This data is sourced from the clientcmd Cluster object's extensions[exec] field:
+	//
+	// clusters:
+	// - name: my-cluster
+	//   cluster:
+	//     ...
+	//     extensions:
+	//     - name: exec  # reserved extension name for per cluster exec config
+	//       extension:
+	//         audience: 06e3fbd18de8  # arbitrary config
+	//
+	// In some environments, the user config may be exactly the same across many clusters
+	// (i.e. call this exec plugin) minus some details that are specific to each cluster
+	// such as the audience.  This field allows the per cluster config to be directly
+	// specified with the cluster info.  Using this field to store secret data is not
+	// recommended as one of the prime benefits of exec plugins is that no secrets need
+	// to be stored directly in the kubeconfig.
+	// +optional
+	Config runtime.Object
 }

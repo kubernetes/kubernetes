@@ -23,10 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/imdario/mergo"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	"github.com/imdario/mergo"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -834,6 +835,11 @@ apiVersion: v1
 clusters:
 - cluster:
     server: https://localhost:8080
+    extensions:
+    - name: exec
+      extension:
+        audience: foo
+        other: bar
   name: foo-cluster
 contexts:
 - context:
@@ -865,10 +871,16 @@ users:
 	if err != nil {
 		t.Error(err)
 	}
-	if !reflect.DeepEqual(config.ExecProvider.Args, []string{"arg-1", "arg-2"}) {
-		t.Errorf("Got args %v when they should be %v\n", config.ExecProvider.Args, []string{"arg-1", "arg-2"})
+	if !reflect.DeepEqual(config.Exec.ExecProvider.Args, []string{"arg-1", "arg-2"}) {
+		t.Errorf("Got args %v when they should be %v\n", config.Exec.ExecProvider.Args, []string{"arg-1", "arg-2"})
 	}
-
+	want := &runtime.Unknown{
+		Raw:         []byte(`{"audience":"foo","other":"bar"}`),
+		ContentType: "application/json",
+	}
+	if !reflect.DeepEqual(config.Exec.Config, want) {
+		t.Errorf("Got config %v when it should be %v\n", config.Exec.Config, want)
+	}
 }
 
 func TestCleanANSIEscapeCodes(t *testing.T) {
