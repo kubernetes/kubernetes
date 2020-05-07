@@ -86,7 +86,8 @@ func TestConstantMaps(t *testing.T) {
 		if strings.HasPrefix(declName, "VersionTLS") {
 			discoveredVersions[declName] = true
 		}
-		if strings.HasPrefix(declName, "TLS_RSA_") || strings.HasPrefix(declName, "TLS_ECDHE_") {
+		if strings.HasPrefix(declName, "TLS_RSA_") || strings.HasPrefix(declName, "TLS_ECDHE_") ||
+			strings.HasPrefix(declName, "TLS_AES_") || strings.HasPrefix(declName, "TLS_CHACHA20_") {
 			discoveredCiphers[declName] = true
 		}
 	}
