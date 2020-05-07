@@ -142,6 +142,13 @@ var (
 			Buckets:        metrics.LinearBuckets(5, 5, 10),
 			StabilityLevel: metrics.ALPHA,
 		})
+	PreemptionVictimsCount = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "total_pod_preemption_victims",
+			Help:           "Total number of selected preemption victims",
+			StabilityLevel: metrics.ALPHA,
+		})
 	PreemptionAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,

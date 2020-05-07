@@ -442,6 +442,7 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 
 		}
 		metrics.PreemptionVictims.Observe(float64(len(victims)))
+		metrics.PreemptionVictimsCount.Add(float64(len(victims)))
 	}
 	// Clearing nominated pods should happen outside of "if node != nil". Node could
 	// be nil when a pod with nominated node name is eligible to preempt again,
