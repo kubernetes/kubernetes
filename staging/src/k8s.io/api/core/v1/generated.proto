@@ -3552,6 +3552,14 @@ message PodSpec {
   // +listMapKey=topologyKey
   // +listMapKey=whenUnsatisfiable
   repeated TopologySpreadConstraint topologySpreadConstraints = 33;
+
+  // If set to true, the fully qualified domain name (FQDN) of a Pod is set as hostname of its containers.
+  // In Linux, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
+  // In Windows, this means setting the COMPUTERNAME to FQDN.
+  // If a pod does not have FQDN, this has no effect.
+  // Default to false.
+  // +optional
+  optional bool hostnameFQDN = 35;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

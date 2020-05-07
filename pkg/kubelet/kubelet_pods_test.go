@@ -2385,3 +2385,71 @@ func TestTruncatePodHostname(t *testing.T) {
 		assert.Equal(t, test.output, output)
 	}
 }
+
+func TestGetHostNameForKernel(t *testing.T) {
+	testcases := []struct {
+		description      string
+		hostname         string
+		hostDomain       string
+		hostnameFQDN     bool
+		expectedHostname string
+		expectError      bool
+	}{{
+		description:      "no hostDomain, hostnameFQDN false",
+		hostname:         "test.pod.hostname",
+		hostDomain:       "",
+		hostnameFQDN:     false,
+		expectedHostname: "test.pod.hostname",
+		expectError:      false,
+	}, {
+		description:      "no hostDomain, hostnameFQDN true",
+		hostname:         "test.pod.hostname",
+		hostDomain:       "",
+		hostnameFQDN:     true,
+		expectedHostname: "test.pod.hostname",
+		expectError:      false,
+	}, {
+		description:      "valid hostDomain, hostnameFQDN false",
+		hostname:         "test.pod.hostname",
+		hostDomain:       "svc.subdomain.local",
+		hostnameFQDN:     false,
+		expectedHostname: "test.pod.hostname",
+		expectError:      false,
+	}, {
+		description:      "valid hostDomain, hostnameFQDN true",
+		hostname:         "test.pod.hostname",
+		hostDomain:       "svc.subdomain.local",
+		hostnameFQDN:     true,
+		expectedHostname: "test.pod.hostname.svc.subdomain.local",
+		expectError:      false,
+	}, {
+		description:      "FQDN is too long, hostnameFQDN false",
+		hostname:         "1234567.1234567",                                         //8*2-1=15 chars
+		hostDomain:       "1234567.1234567.1234567.1234567.1234567.1234567.1234567", //8*7-1=55 chars
+		hostnameFQDN:     false,                                                     //FQDN=15 + 1(dot) + 55 = 71 chars
+		expectedHostname: "1234567.1234567",
+		expectError:      false,
+	}, {
+		description:      "FQDN is too long, hostnameFQDN true",
+		hostname:         "1234567.1234567",                                         //8*2-1=15 chars
+		hostDomain:       "1234567.1234567.1234567.1234567.1234567.1234567.1234567", //8*7-1=55 chars
+		hostnameFQDN:     true,                                                      //FQDN=15 + 1(dot) + 55 = 71 chars
+		expectedHostname: "",
+		expectError:      true,
+	}}
+
+	for _, tc := range testcases {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+		t.Logf("TestCase: %q", tc.description)
+		outputHostname, err := kubelet.GetHostNameForKernel(tc.hostname, tc.hostDomain, tc.hostnameFQDN)
+		if tc.expectError {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, tc.expectedHostname, outputHostname)
+	}
+
+}

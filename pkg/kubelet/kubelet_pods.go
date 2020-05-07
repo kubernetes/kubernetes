@@ -435,6 +435,21 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	return cgroupParent
 }
 
+// GetHostNameForKernel gets hostname value to set in the hostname field (the nodename field of struct utsname) of the pod.
+func (kl *Kubelet) GetHostNameForKernel(hostname string, hostDomainName string, hostnameFQDN bool) (string, error) {
+	kernelhostname := hostname
+	if len(hostDomainName) > 0 && hostnameFQDN {
+		fqdnHostname := fmt.Sprintf("%s.%s", hostname, hostDomainName)
+		// FQDN has to be 63 chars to fit in hostname (specification is 64bytes which is 63 chars and the null terminating char).
+		const hostnameMaxLen = 63
+		if len(fqdnHostname) > hostnameMaxLen {
+			return "", fmt.Errorf("Failed to set FQDN in hostname, Pod hostname %s is too long (%d characters is the limit)", fqdnHostname, hostnameMaxLen)
+		}
+		kernelhostname = fqdnHostname
+	}
+	return kernelhostname, nil
+}
+
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
@@ -447,7 +462,10 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	if err != nil {
 		return nil, nil, err
 	}
-	opts.Hostname = hostname
+	opts.Hostname, err = kl.GetHostNameForKernel(hostname, hostDomainName, pod.Spec.HostnameFQDN)
+	if err != nil {
+		return nil, nil, err
+	}
 	podName := volumeutil.GetUniquePodName(pod)
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 

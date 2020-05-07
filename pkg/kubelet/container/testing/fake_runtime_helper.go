@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
 	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -56,6 +57,14 @@ func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error
 // This is not used by docker runtime.
 func (f *FakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	return f.HostName, f.HostDomain, f.Err
+}
+
+func (f *FakeRuntimeHelper) GetHostNameForKernel(hostname string, hostDomainName string, hostnameFQDN bool) (string, error) {
+	if len(hostDomainName) > 0 && hostnameFQDN {
+		return fmt.Sprintf("%s.%s", hostname, hostDomainName), f.Err
+	} else {
+		return fmt.Sprintf("%s", hostname), f.Err
+	}
 }
 
 func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {

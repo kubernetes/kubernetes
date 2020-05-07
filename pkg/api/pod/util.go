@@ -443,6 +443,12 @@ func dropDisabledFields(
 		// Set TopologySpreadConstraints to nil only if feature is disabled and it is not used
 		podSpec.TopologySpreadConstraints = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HostnameFQDN) && !hostnameFQDNInUse(oldPodSpec) {
+		// Set HostnameFQDN to false only if feature is disabled and it is not used
+		podSpec.HostnameFQDN = false
+	}
+
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
@@ -729,6 +735,17 @@ func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
 		return false
 	}
 	if len(podStatus.PodIPs) > 1 {
+		return true
+	}
+	return false
+}
+
+// hostnameFQDNInUse returns true if any pod's spec defines hostnameFQDN field.
+func hostnameFQDNInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	if podSpec.HostnameFQDN {
 		return true
 	}
 	return false

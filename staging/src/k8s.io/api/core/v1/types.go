@@ -3056,6 +3056,13 @@ type PodSpec struct {
 	// +listMapKey=topologyKey
 	// +listMapKey=whenUnsatisfiable
 	TopologySpreadConstraints []TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty" patchStrategy:"merge" patchMergeKey:"topologyKey" protobuf:"bytes,33,opt,name=topologySpreadConstraints"`
+	// If set to true, the fully qualified domain name (FQDN) of a Pod is set as hostname of its containers.
+	// In Linux, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
+	// In Windows, this means setting the COMPUTERNAME to FQDN.
+	// If a pod does not have FQDN, this has no effect.
+	// Default to false.
+	// +optional
+	HostnameFQDN bool `json:"hostnameFQDN,omitempty" protobuf:"varint,35,opt,name=hostnameFQDN"`
 }
 
 type UnsatisfiableConstraintAction string

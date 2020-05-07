@@ -52,6 +52,7 @@ type RuntimeHelper interface {
 	GetPodCgroupParent(pod *v1.Pod) string
 	GetPodDir(podUID types.UID) string
 	GeneratePodHostNameAndDomain(pod *v1.Pod) (hostname string, hostDomain string, err error)
+	GetHostNameForKernel(hostname string, hostDomainName string, hostnameFQDN bool) (string, error)
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
