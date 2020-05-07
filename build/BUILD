@@ -20,6 +20,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//build/go-runner:all-srcs",
         "//build/release-tars:all-srcs",
         "//build/visible_to:all-srcs",
     ],
