@@ -34,9 +34,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/system"
 
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -250,7 +250,7 @@ func getOneTimeResourceUsageOnNode(
 		return nil, err
 	}
 
-	f := func(name string, newStats *kubeletstatsv1alpha1.ContainerStats) *ContainerResourceUsage {
+	f := func(name string, newStats *ContainerStats) *ContainerResourceUsage {
 		if newStats == nil || newStats.CPU == nil || newStats.Memory == nil {
 			return nil
 		}
@@ -288,7 +288,7 @@ func getOneTimeResourceUsageOnNode(
 }
 
 // getStatsSummary contacts kubelet for the container information.
-func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
+func getStatsSummary(c clientset.Interface, nodeName string) (*e2ekubelet.Summary, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 	defer cancel()
 
@@ -303,7 +303,7 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 		return nil, err
 	}
 
-	summary := kubeletstatsv1alpha1.Summary{}
+	summary := Summary{}
 	err = json.Unmarshal(data, &summary)
 	if err != nil {
 		return nil, err
