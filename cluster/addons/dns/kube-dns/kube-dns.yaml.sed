@@ -93,6 +93,13 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      topologySpreadConstraints:
+      - maxSkew: 2
+        topologyKey: node
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            k8s-app: kube-dns
       nodeSelector:
         kubernetes.io/os: linux
       volumes:
