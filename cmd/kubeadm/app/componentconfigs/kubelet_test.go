@@ -229,7 +229,45 @@ func TestKubeletDefault(t *testing.T) {
 			},
 		},
 		{
-			name: "Service subnet, dual stack defaulting works",
+			name: "Service subnet, explicitly disabled dual stack defaulting works",
+			clusterCfg: kubeadmapi.ClusterConfiguration{
+				FeatureGates: map[string]bool{
+					features.IPv6DualStack: false,
+				},
+				Networking: kubeadmapi.Networking{
+					ServiceSubnet: "192.168.0.0/16",
+				},
+			},
+			expected: kubeletConfig{
+				config: kubeletconfig.KubeletConfiguration{
+					FeatureGates: map[string]bool{
+						features.IPv6DualStack: false,
+					},
+					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
+					ClusterDNS:    []string{"192.168.0.10"},
+					Authentication: kubeletconfig.KubeletAuthentication{
+						X509: kubeletconfig.KubeletX509Authentication{
+							ClientCAFile: constants.CACertName,
+						},
+						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
+							Enabled: utilpointer.BoolPtr(kubeletAuthenticationAnonymousEnabled),
+						},
+						Webhook: kubeletconfig.KubeletWebhookAuthentication{
+							Enabled: utilpointer.BoolPtr(kubeletAuthenticationWebhookEnabled),
+						},
+					},
+					Authorization: kubeletconfig.KubeletAuthorization{
+						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
+					},
+					HealthzBindAddress: kubeletHealthzBindAddress,
+					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
+					RotateCertificates: kubeletRotateCertificates,
+					ResolverConfig:     resolverConfig,
+				},
+			},
+		},
+		{
+			name: "Service subnet, enabled dual stack defaulting works",
 			clusterCfg: kubeadmapi.ClusterConfiguration{
 				FeatureGates: map[string]bool{
 					features.IPv6DualStack: true,
@@ -240,7 +278,9 @@ func TestKubeletDefault(t *testing.T) {
 			},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
-					FeatureGates:  map[string]bool{},
+					FeatureGates: map[string]bool{
+						features.IPv6DualStack: true,
+					},
 					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
 					ClusterDNS:    []string{"192.168.0.10"},
 					Authentication: kubeletconfig.KubeletAuthentication{
