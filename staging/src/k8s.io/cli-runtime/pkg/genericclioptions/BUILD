@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "builder_flags.go",
         "builder_flags_fake.go",
+        "client_config.go",
         "config_flags.go",
         "config_flags_fake.go",
         "doc.go",

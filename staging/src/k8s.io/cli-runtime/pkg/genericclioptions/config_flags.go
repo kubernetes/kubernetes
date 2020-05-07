@@ -55,16 +55,7 @@ const (
 	flagHTTPCacheDir     = "cache-dir"
 )
 
-var (
-	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
-	ErrEmptyConfig  = clientcmd.NewEmptyConfigError(`Missing or incomplete configuration info.  Please point to an existing, complete config file:
-
-  1. Via the command-line flag --kubeconfig
-  2. Via the KUBECONFIG environment variable
-  3. In your home directory as ~/.kube/config
-
-To view or setup config directly use the 'config' command.`)
-)
+var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
@@ -119,12 +110,7 @@ type ConfigFlags struct {
 // to a .kubeconfig file, loading rules, and config flag overrides.
 // Expects the AddFlags method to have been called.
 func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
-	config, err := f.ToRawKubeConfigLoader().ClientConfig()
-	// replace client-go's ErrEmptyConfig error with our custom, more verbose version
-	if clientcmd.IsEmptyConfig(err) {
-		return nil, ErrEmptyConfig
-	}
-	return config, err
+	return f.ToRawKubeConfigLoader().ClientConfig()
 }
 
 // ToRawKubeConfigLoader binds config flag values to config overrides
@@ -204,16 +190,11 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 		overrides.Timeout = *f.Timeout
 	}
 
-	var clientConfig clientcmd.ClientConfig
-
 	// we only have an interactive prompt when a password is allowed
 	if f.Password == nil {
-		clientConfig = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
-	} else {
-		clientConfig = clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
+		return &clientConfig{clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)}
 	}
-
-	return clientConfig
+	return &clientConfig{clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)}
 }
 
 // toRawKubePersistentConfigLoader binds config flag values to config overrides
