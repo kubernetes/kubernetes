@@ -452,7 +452,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 			createValidation: rest.ValidateAllObjectFunc,
 			updateValidation: admissionValidation,
-			admissionCheck:   admissionMutation,
 
 			codec: codec,
 

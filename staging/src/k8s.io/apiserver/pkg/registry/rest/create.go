@@ -102,6 +102,12 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetClusterName("")
 	}
 
+	if mutateObjectFunc, ok := MutateObjectFuncFrom(ctx); ok {
+		if err := mutateObjectFunc(ctx, obj, nil); err != nil {
+			return err
+		}
+	}
+
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}

@@ -140,24 +140,14 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 				return newObj, nil
 			})
 		}
-
-		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
-				isNotZeroObject, err := hasUID(oldObj)
-				if err != nil {
-					return nil, fmt.Errorf("unexpected error when extracting UID from oldObj: %v", err.Error())
-				} else if !isNotZeroObject {
-					if mutatingAdmission.Handles(admission.Create) {
-						return newObj, mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope)
-					}
-				} else {
-					if mutatingAdmission.Handles(admission.Update) {
-						return newObj, mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope)
-					}
-				}
-				return newObj, nil
-			})
+		genAttr := func(newobj, oldobj runtime.Object) admission.Attributes {
+			if oldobj == nil {
+				return admission.NewAttributesRecord(newobj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo)
+			} else {
+				return admission.NewAttributesRecord(newobj, oldobj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo)
+			}
 		}
+		ctx = rest.WithMutateObjectFunc(ctx, rest.AdmissionToMutateObjectFunc(admit, genAttr, scope))
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,

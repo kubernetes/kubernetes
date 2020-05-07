@@ -173,7 +173,37 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			userInfo,
 		)
 
-		mutatingAdmission, _ := admit.(admission.MutationInterface)
+		genAttr := func(newobj, oldobj runtime.Object) admission.Attributes {
+			if oldobj == nil {
+				return admission.NewAttributesRecord(
+					newobj,
+					nil,
+					scope.Kind,
+					namespace,
+					name,
+					scope.Resource,
+					scope.Subresource,
+					admission.Create,
+					patchToCreateOptions(options),
+					dryrun.IsDryRun(options.DryRun),
+					userInfo)
+			} else {
+				return admission.NewAttributesRecord(
+					newobj,
+					oldobj,
+					scope.Kind,
+					namespace,
+					name,
+					scope.Resource,
+					scope.Subresource,
+					admission.Update,
+					patchToUpdateOptions(options),
+					dryrun.IsDryRun(options.DryRun),
+					userInfo)
+			}
+		}
+		ctx = rest.WithMutateObjectFunc(ctx, rest.AdmissionToMutateObjectFunc(admit, genAttr, scope))
+
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
 			ResourceRequest: true,
@@ -204,7 +234,6 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, scope), scope.Authorizer, createAuthorizerAttributes),
 			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes, scope),
-			admissionCheck:   mutatingAdmission,
 
 			codec: codec,
 
@@ -267,7 +296,6 @@ type patcher struct {
 	// Validation functions
 	createValidation rest.ValidateObjectFunc
 	updateValidation rest.ValidateObjectUpdateFunc
-	admissionCheck   admission.MutationInterface
 
 	codec runtime.Codec
 
@@ -522,30 +550,6 @@ func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime
 	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo)
 }
 
-// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
-// and is given the currently persisted object and the patched object as input.
-// TODO: rename this function because the name implies it is related to applyPatcher
-func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-	p.trace.Step("About to check admission control")
-	var operation admission.Operation
-	var options runtime.Object
-	if hasUID, err := hasUID(currentObject); err != nil {
-		return nil, err
-	} else if !hasUID {
-		operation = admission.Create
-		currentObject = nil
-		options = patchToCreateOptions(p.options)
-	} else {
-		operation = admission.Update
-		options = patchToUpdateOptions(p.options)
-	}
-	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
-		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation, options)
-		return patchedObject, p.admissionCheck.Admit(ctx, attributes, p.objectInterfaces)
-	}
-	return patchedObject, nil
-}
-
 // patchResource divides PatchResource for easier unit testing
 func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runtime.Object, bool, error) {
 	p.namespace = request.NamespaceValue(ctx)
@@ -580,7 +584,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	}
 
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch)
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)
@@ -594,7 +598,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		// it is safe to remove managedFields (which can be large) and try again.
 		if isTooLargeError(err) && p.patchType != types.ApplyPatchType {
 			if _, accessorErr := meta.Accessor(p.restPatcher.New()); accessorErr == nil {
-				p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, func(_ context.Context, obj, _ runtime.Object) (runtime.Object, error) {
+				p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, func(_ context.Context, obj, _ runtime.Object) (runtime.Object, error) {
 					accessor, _ := meta.Accessor(obj)
 					accessor.SetManagedFields(nil)
 					return obj, nil

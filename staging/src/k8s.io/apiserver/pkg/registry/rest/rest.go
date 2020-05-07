@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/admission"
 )
 
 //TODO:
@@ -348,4 +349,37 @@ type StorageVersionProvider interface {
 	// an object will be converted to before persisted in etcd, given a
 	// list of kinds the object might belong to.
 	StorageVersion() runtime.GroupVersioner
+}
+
+type MutateFuncKeyType int
+
+const (
+	MutateObjectFuncKey MutateFuncKeyType = iota
+)
+
+type MutateObjectFunc func(ctx context.Context, obj, old runtime.Object) error
+
+type GenerateAdmissionAttributesFunc func(obj, old runtime.Object) admission.Attributes
+
+func AdmissionToMutateObjectFunc(admit admission.Interface, genAttr GenerateAdmissionAttributesFunc, o admission.ObjectInterfaces) MutateObjectFunc {
+	mutatingAdmission, ok := admit.(admission.MutationInterface)
+	if !ok {
+		return func(ctx context.Context, obj, old runtime.Object) error { return nil }
+	}
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		finalAttributes := genAttr(obj, old)
+		if !mutatingAdmission.Handles(finalAttributes.GetOperation()) {
+			return nil
+		}
+		return mutatingAdmission.Admit(ctx, finalAttributes, o)
+	}
+}
+
+func MutateObjectFuncFrom(ctx context.Context) (MutateObjectFunc, bool) {
+	f, ok := ctx.Value(MutateObjectFuncKey).(MutateObjectFunc)
+	return f, ok
+}
+
+func WithMutateObjectFunc(ctx context.Context, f MutateObjectFunc) context.Context {
+	return context.WithValue(ctx, MutateObjectFuncKey, f)
 }

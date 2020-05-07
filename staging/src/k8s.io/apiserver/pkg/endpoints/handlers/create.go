@@ -141,6 +141,19 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		trace.Step("About to store object in database")
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
+		genAttr := func(newobj, oldobj runtime.Object) admission.Attributes {
+			// in case the generated name is populated
+			if len(name) == 0 {
+				if metadata, err := meta.Accessor(obj); err == nil {
+					name = metadata.GetName()
+				}
+			}
+
+			return admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
+		}
+
+		ctx = rest.WithMutateObjectFunc(ctx, rest.AdmissionToMutateObjectFunc(admit, genAttr, scope))
+
 		requestFunc := func() (runtime.Object, error) {
 			return r.Create(
 				ctx,
@@ -159,11 +172,6 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err)
-				}
-			}
-			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
-				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
-					return nil, err
 				}
 			}
 			result, err := requestFunc()

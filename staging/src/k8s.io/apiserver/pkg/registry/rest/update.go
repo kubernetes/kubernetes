@@ -133,6 +133,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 		objectMeta.SetDeletionGracePeriodSeconds(oldMeta.GetDeletionGracePeriodSeconds())
 	}
 
+	if mutateObjectFunc, ok := MutateObjectFuncFrom(ctx); ok {
+		if err := mutateObjectFunc(ctx, obj, old); err != nil {
+			return err
+		}
+	}
+
 	// Ensure some common fields, like UID, are validated for all resources.
 	errs, err := validateCommonFields(obj, old, strategy)
 	if err != nil {
