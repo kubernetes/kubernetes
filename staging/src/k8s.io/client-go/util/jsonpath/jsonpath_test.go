@@ -56,26 +56,10 @@ func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 			t.Errorf("in %s, execute error %v", test.name, err)
 		}
 		out := buf.String()
-		if out != test.expect && !elementsExistsInSlice(strings.Split(out, " "), strings.Split(test.expect, " "))  {
+		if out != test.expect  {
 			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
 		}
 	}
-}
-
-func elementsExistsInSlice(a, b []string) bool {
-	for _, e := range a {
-		found := false
-		for _, ele := range b {
-			if e == ele {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return found
-		}
-	}
-	return true
 }
 
 // testJSONPathSortOutput test cases related to map, the results may print in random order
@@ -229,14 +213,13 @@ type bicycle struct {
 	IsNew bool
 }
 
-type empName string
 type job string
 type store struct {
 	Book      []book
 	Bicycle   []bicycle
 	Name      string
 	Labels    map[string]int
-	Employees map[empName]job
+	Employees map[string]job
 	Items 	map[string]interface{}
 	ItemsArray []map[string]interface{}
 }
@@ -259,7 +242,7 @@ func TestStructInput(t *testing.T) {
 			"web/html": 15,
 			"k8s-app":  20,
 		},
-		Employees: map[empName]job{
+		Employees: map[string]job{
 			"jason": "manager",
 			"dan":   "clerk",
 		},
@@ -334,15 +317,15 @@ func TestStructInput(t *testing.T) {
 		{"recurarray", "{..Book[2]}", storeData,
 			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false},
 		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, `{"Color":"red","Price":19.95,"IsNew":true}`, false},
-		{"objects", "{.Labels[*]}", storeData, "10 15 20", false},
-		{"objects", "{$.Employees[*]}", storeData, "manager clerk", false},
+		{"objects", "{.Labels[*]}", storeData, "10 20 15", false},
+		{"objects", "{$.Employees[*]}", storeData, "clerk manager", false},
 		{"empty", "{.Name[*]}", storeData, "", true},
-		{"nested-map", "{.Items[*]}", storeData, `{"notebooks":"5","pencils":"1","pens":"2"} {"pulses":"3","rice":"1"} {"bike":{"color":{"color":"red","texture":"shinning"},"wheels":{"company":"any","quantity":"2"}},"car":{"color":{"color":"silver","texture":"shinning"},"wheels":{"company":"any","quantity":"4"}}}`, false},
-		{"nested-map", "{.Items[*][*]}", storeData, `1 3 {"color":{"color":"silver","texture":"shinning"},"wheels":{"company":"any","quantity":"4"}} {"color":{"color":"red","texture":"shinning"},"wheels":{"company":"any","quantity":"2"}} 1 2 5`, false},
+		{"nested-map", "{.Items[*]}", storeData, `{"pulses":"3","rice":"1"} {"bike":{"color":{"color":"red","texture":"shinning"},"wheels":{"company":"any","quantity":"2"}},"car":{"color":{"color":"silver","texture":"shinning"},"wheels":{"company":"any","quantity":"4"}}} {"notebooks":"5","pencils":"1","pens":"2"}`, false},
+		{"nested-map", "{.Items[*][*]}", storeData, `3 1 {"color":{"color":"red","texture":"shinning"},"wheels":{"company":"any","quantity":"2"}} {"color":{"color":"silver","texture":"shinning"},"wheels":{"company":"any","quantity":"4"}} 5 1 2`, false},
 		{"nested-map", "{.Items[*][*][*]}", storeData, "", true},
-		{"nested-map", "{.Items.driving[*][*]}", storeData, `{"company":"any","quantity":"4"} {"color":"silver","texture":"shinning"} {"company":"any","quantity":"2"} {"color":"red","texture":"shinning"}`, false},
+		{"nested-map", "{.Items.driving[*][*]}", storeData, `{"color":"red","texture":"shinning"} {"company":"any","quantity":"2"} {"color":"silver","texture":"shinning"} {"company":"any","quantity":"4"}`, false},
 		{"path-map", "{.ItemsArray[0][*]}", storeData, "3", false},
-		{"path-map", "{.ItemsArray[1][*][*]}", storeData, "true 2", false},
+		{"path-map", "{.ItemsArray[1][*][*]}", storeData, "2 true", false},
 		{"path-map", "{.Items.study.pencils[*]}", storeData, "execute error string is not array or slice", true},
 		{"path-map", "{.Items.study[1]}", storeData, "execute error invalid jsonpath for objects. Index should be an asterisk when applied over an object", true},
 		{"invalid object", "{.Labels[a]}", storeData, "in invalid object, parse {.Labels[a]} error invalid array index a", true},
