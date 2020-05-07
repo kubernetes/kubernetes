@@ -530,7 +530,7 @@ func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Inte
 }
 
 func waitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs clientset.Interface) error {
-	const csiNodeRegisterTimeout = 1 * time.Minute
+	const csiNodeRegisterTimeout = 5 * time.Minute
 
 	waitErr := wait.PollImmediate(10*time.Second, csiNodeRegisterTimeout, func() (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
