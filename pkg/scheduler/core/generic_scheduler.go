@@ -18,11 +18,15 @@ package core
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"go.opentelemetry.io/otel/api/core"
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/api/trace"
 	"math"
 	"math/rand"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -148,8 +152,22 @@ func (g *genericScheduler) snapshot() error {
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
 func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
+	annotation, ok := pod.Annotations["trace.kubernetes.io/context"]
+	if ok {
+		propagator := trace.DefaultHTTPPropagator()
+		reqHeader := &http.Header{}
+		decodedContextBytes, err := base64.StdEncoding.DecodeString(annotation)
+		if err != nil {
+			return result, err
+		}
+		err = json.Unmarshal(decodedContextBytes, reqHeader)
+		if err != nil {
+			return result, err
+		}
+		ctx = propagator.Extract(ctx, reqHeader)
+	}
 	ctx, span := global.TraceProvider().Tracer("new-scheduler").Start(ctx, fmt.Sprintf("genericScheduler: Schedule '%s'", pod.Name))
-	span.SetAttributes(core.KeyValue{Key:"PodName",Value:core.String(pod.Name)})
+	span.SetAttributes(core.KeyValue{Key: "PodName", Value: core.String(pod.Name)})
 	defer span.End()
 
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
@@ -211,10 +229,10 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	trace.Step("Prioritizing done")
 
 	span.AddEvent(ctx, "ScheduleResult",
-		core.KeyValue{Key:"SuggestedHost", Value:core.String(host)},
-		core.KeyValue{Key:"EvaluatedNodes", Value:core.Int(len(filteredNodes) + len(filteredNodesStatuses))},
-		core.KeyValue{Key:"FeasibleNodes", Value:core.Int(len(filteredNodes))},
-		)
+		core.KeyValue{Key: "SuggestedHost", Value: core.String(host)},
+		core.KeyValue{Key: "EvaluatedNodes", Value: core.Int(len(filteredNodes) + len(filteredNodesStatuses))},
+		core.KeyValue{Key: "FeasibleNodes", Value: core.Int(len(filteredNodes))},
+	)
 	return ScheduleResult{
 		SuggestedHost:  host,
 		EvaluatedNodes: len(filteredNodes) + len(filteredNodesStatuses),
@@ -720,8 +738,8 @@ func (g *genericScheduler) prioritizeNodes(
 
 	for i := range result {
 		span.AddEvent(ctx, "Node Score",
-			core.KeyValue{Key:"Node", Value:core.String(result[i].Name)},
-			core.KeyValue{Key:"Score", Value:core.Int64(result[i].Score)})
+			core.KeyValue{Key: "Node", Value: core.String(result[i].Name)},
+			core.KeyValue{Key: "Score", Value: core.Int64(result[i].Score)})
 		if klog.V(10) {
 			klog.Infof("Host %s => Score %d", result[i].Name, result[i].Score)
 		}
