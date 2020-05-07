@@ -26,7 +26,7 @@ spec:
     command:
     - /bin/sh
     - -c
-    - exec kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    - exec kube-proxy {{api_servers_with_port}} --kubeconfig={{kubeconfig}} {{cluster_cidr}} --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
     {{container_env}}
     {{kube_cache_mutation_detector_env_name}}
       {{kube_cache_mutation_detector_env_value}}
@@ -42,9 +42,9 @@ spec:
     - mountPath: /var/log
       name: varlog
       readOnly: false
-    - mountPath: /var/lib/kube-proxy/kubeconfig
+    - mountPath: {{kubeconfig}}
       name: kubeconfig
-      readOnly: false
+      readOnly: true
     - mountPath: /run/xtables.lock
       name: iptableslock
       readOnly: false
@@ -59,8 +59,8 @@ spec:
       path: /etc/ssl/certs
     name: etc-ssl-certs
   - hostPath:
-      path: /var/lib/kube-proxy/kubeconfig
-      type: FileOrCreate
+      path: {{kubeconfig}}
+      type: File
     name: kubeconfig
   - hostPath:
       path: /var/log

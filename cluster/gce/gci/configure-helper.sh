@@ -1482,7 +1482,10 @@ function prepare-log-file {
 function prepare-kube-proxy-manifest-variables {
   local -r src_file=$1;
 
-  local -r kubeconfig="--kubeconfig=/var/lib/kube-proxy/kubeconfig"
+  local kubeconfig="/var/lib/kube-proxy/kubeconfig"
+  if [[ -z "${KUBE_PROXY_TOKEN:-}" && -e "/var/lib/kubelet/kubeconfig" ]]; then
+    kubeconfig="/var/lib/kubelet/kubeconfig"
+  fi
   local kube_docker_registry="k8s.gcr.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
@@ -2364,6 +2367,8 @@ EOF
     fi
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
+  elif [[ -z "${KUBE_PROXY_TOKEN:-}" ]]; then
+    setup-addon-manifests "addons" "kube-proxy/kubelet-user-standalone"
   fi
   if ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]); then
@@ -2856,7 +2861,9 @@ function main() {
     create-node-pki
     create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
-      create-kubeproxy-user-kubeconfig
+      if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
+        create-kubeproxy-user-kubeconfig
+      fi
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
