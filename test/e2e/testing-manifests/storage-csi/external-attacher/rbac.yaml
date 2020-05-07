@@ -34,6 +34,9 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
 #Secret permission is optional.
 #Enable it if you need value from secret.
 #For example, you have key `csi.storage.k8s.io/controller-publish-secret-name` in StorageClass.parameters
