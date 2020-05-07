@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 
 	"k8s.io/client-go/third_party/forked/golang/template"
@@ -288,8 +289,13 @@ func (j *JSONPath) evalMap(input []reflect.Value, hasAsterisk bool) ([]reflect.V
 			continue
 		}
 		if value.Kind() == reflect.Map {
-			for _, e := range value.MapKeys() {
-				result = append(result, value.MapIndex(e))
+			var keyStr []string
+			for _, key := range value.MapKeys() {
+				keyStr = append(keyStr, key.String())
+			}
+			sort.Strings(keyStr)
+			for _, key := range keyStr {
+				result = append(result, value.MapIndex(reflect.ValueOf(key)))
 			}
 		}
 	}
