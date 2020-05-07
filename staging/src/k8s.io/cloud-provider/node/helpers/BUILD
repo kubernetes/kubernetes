@@ -43,7 +43,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["address_test.go"],
+    srcs = [
+        "address_test.go",
+        "taints_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
