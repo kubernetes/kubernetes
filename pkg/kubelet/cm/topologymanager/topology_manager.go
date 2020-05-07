@@ -85,7 +85,7 @@ type HintProvider interface {
 	Allocate(pod *v1.Pod, container *v1.Container) error
 	// DeAllocate triggers resource de-allocation to occur on the HintProvider.
 	// topology manager call this function to reclaim allocated resources,
-	// when pod is rejected by topologycal reason.
+	// when pod is rejected by topological reason.
 	DeAllocate(pod *v1.Pod, container *v1.Container) error
 }
 
@@ -152,6 +152,9 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 
 	case PolicySingleNumaNode:
 		policy = NewSingleNumaNodePolicy(numaNodes)
+
+	case PolicyPodLevelSingleNumaNode:
+		policy = NewPodLevelSingleNumaNodePolicy(numaNodes)
 
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
@@ -264,8 +267,37 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
 
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		if m.policy.Name() == PolicyNone {
+	if m.policy.Name() != PolicyPodLevelSingleNumaNode {
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			if m.policy.Name() == PolicyNone {
+				err := m.allocateAlignedResources(pod, &container)
+				if err != nil {
+					m.reclaimAllResources(pod)
+					return lifecycle.PodAdmitResult{
+						Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+						Reason:  "UnexpectedAdmissionError",
+						Admit:   false,
+					}
+				}
+				continue
+			}
+
+			result, admit := m.calculateAffinity(pod, &container)
+			if !admit {
+				m.reclaimAllResources(pod)
+				return lifecycle.PodAdmitResult{
+					Message: "Resources cannot be allocated with Topology locality",
+					Reason:  "TopologyAffinityError",
+					Admit:   false,
+				}
+			}
+
+			klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
+			if m.podTopologyHints[string(pod.UID)] == nil {
+				m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)
+			}
+			m.podTopologyHints[string(pod.UID)][container.Name] = result
+
 			err := m.allocateAlignedResources(pod, &container)
 			if err != nil {
 				m.reclaimAllResources(pod)
@@ -275,35 +307,59 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 					Admit:   false,
 				}
 			}
-			continue
 		}
+	} else {
+		// initialize numaHints
+		var numaHints []bitmask.BitMask
 
-		result, admit := m.calculateAffinity(pod, &container)
-		if !admit {
-			m.reclaimAllResources(pod)
-			return lifecycle.PodAdmitResult{
-				Message: "Resources cannot be allocated with Topology locality",
-				Reason:  "TopologyAffinityError",
-				Admit:   false,
+		// Loop NUMA nodes
+		for numaHint := range numaHints {
+			// Loop containers
+			for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+				// GetTopologyHints for each hintProvider
+				for _, provider := range m.hintProviders {
+					// Get the TopologyHints from a provider.
+					hints := provider.GetTopologyHints(pod, container)
+					providersHints = append(providersHints, hints)
+					klog.Infof("[topologymanager] TopologyHints for pod '%v', container '%v': %v", pod.Name, container.Name, hints)
+				}
+				// Merge() -> filterSingleNumaHints : remove all topology hint except single-numa-node
+				singleNumaHints = filterSingleNumaHints(providersHints)
+				// Merge() -> mergeFilteredHints : calculate bestHint (== bestHint is numaHint or nil)
+				bestHint := mergeFilteredHints(, singleNumaHints)
+				if !bestHint.IsEqual(numaHint) {
+					m.reclaimAllResources(pod)
+					break // break the container loop
+				}
+				// Merge() -> canAdmitContainerResult()
+				admit := p.canAdmitPodResult(&bestHint)
+				if !admit {
+					m.reclaimAllResources(pod)
+					break // break the container loop
+				}
+				// Asign PodTopologyHints : mapping PID, CName, bestHint
+				klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
+				if m.podTopologyHints[string(pod.UID)] == nil {
+					m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)
+				}
+				m.podTopologyHints[string(pod.UID)][container.Name] = bestHint
+				// Allocate()
+				err := m.allocateAlignedResources(pod, &container)
+				if err != nil {
+					m.reclaimAllResources(pod)
+					break // break the container loop
+				}
 			}
+			// End of container loop
 		}
-
-		klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
-		if m.podTopologyHints[string(pod.UID)] == nil {
-			m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)
-		}
-		m.podTopologyHints[string(pod.UID)][container.Name] = result
-
-		err := m.allocateAlignedResources(pod, &container)
-		if err != nil {
+		// End of Pod Loop(== NUMA idx loop)
+		// Check canAdmitPodResult()
+		if admit {
+			break // break the Pod loop
+		} else {
 			m.reclaimAllResources(pod)
-			return lifecycle.PodAdmitResult{
-				Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
-				Reason:  "UnexpectedAdmissionError",
-				Admit:   false,
-			}
+			continue // continue the Pod loop
 		}
 	}
-
 	return lifecycle.PodAdmitResult{Admit: true}
 }
