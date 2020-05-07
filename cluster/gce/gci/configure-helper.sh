@@ -2564,6 +2564,10 @@ function gke-master-start {
     echo "Running GKE internal configuration script"
     . "${KUBE_HOME}/bin/gke-internal-configure-helper.sh"
     gke-internal-master-start
+ elif [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
+   echo "setting up local admin kubeconfig"
+   create-kubeconfig "local-admin" "${KUBE_BEARER_TOKEN}"
+   echo "export KUBECONFIG=/etc/srv/kubernetes/local-admin/kubeconfig" > /etc/profile.d/kubeconfig.sh
   fi
 }
 
