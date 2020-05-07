@@ -128,8 +128,7 @@ type FIFO struct {
 	// Indication the queue is closed.
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
 	// Currently, not used to gate any of CRED operations.
-	closed     bool
-	closedLock sync.Mutex
+	closed bool
 }
 
 var (
@@ -138,8 +137,8 @@ var (
 
 // Close the queue.
 func (f *FIFO) Close() {
-	f.closedLock.Lock()
-	defer f.closedLock.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	f.closed = true
 	f.cond.Broadcast()
 }
@@ -262,8 +261,8 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 
 // IsClosed checks if the queue is closed
 func (f *FIFO) IsClosed() bool {
-	f.closedLock.Lock()
-	defer f.closedLock.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	if f.closed {
 		return true
 	}
@@ -284,7 +283,7 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 			// When Close() is called, the f.closed is set and the condition is broadcasted.
 			// Which causes this loop to continue and return from the Pop().
-			if f.IsClosed() {
+			if f.closed {
 				return nil, ErrFIFOClosed
 			}
 
