@@ -110,7 +110,7 @@ dependencies:
       match: TAG\?=
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: 12.0.1
+    version: 12.1.0
     refPaths:
     - path: build/common.sh
       match: debian_iptables_version=
