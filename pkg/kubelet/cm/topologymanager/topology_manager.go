@@ -237,6 +237,9 @@ func (m *manager) RemoveContainer(containerID string) error {
 //call DeAllocate function of all registered hint providers for all containers in a pod.
 func (m *manager) reclaimAllResources(pod *v1.Pod) {
 	klog.Infof("[topologymanager] pod(%v) is reject, reclaim all resources for the pod.", pod.UID)
+
+    podUIDString := string(pod.UID)
+
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		for _, provider := range m.hintProviders {
 			err := provider.DeAllocate(pod, &container)
@@ -244,6 +247,16 @@ func (m *manager) reclaimAllResources(pod *v1.Pod) {
 				klog.Errorf("[topologymanager] DeAllocate failed for container(%v) due to %v, which is unexpected", container.Name, err)
 			}
 		}
+
+		if _, exists := m.podTopologyHints[podUIDString]; exists {
+			delete(m.podTopologyHints[podUIDString], container.Name)
+		}
+	}
+
+	//since this function touches m.podTopologyHints, it should be called only in Admit function.
+	//otherwise we need to put a lock here
+	if _, exists := m.podTopologyHints[podUIDString]; exists {
+		delete(m.podTopologyHints, podUIDString)
 	}
 }
 
