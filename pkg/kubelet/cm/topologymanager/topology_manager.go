@@ -65,6 +65,8 @@ type manager struct {
 	podMap map[string]string
 	//Topology Manager Policy
 	policy Policy
+	//NUMA nodes of host machine
+	numaNodes []int
 }
 
 // HintProvider is an interface for components that want to collaborate to
@@ -150,7 +152,13 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		policy = NewRestrictedPolicy(numaNodes)
 
 	case PolicySingleNumaNode:
-		policy = NewSingleNumaNodePolicy(numaNodes)
+		//this is to test the new policy with 'single-numa-node' policy flag
+		//new flag will be added
+		policy = NewPodLevelSingleNumaNodePolicy(numaNodes)
+		//policy = NewSingleNumaNodePolicy(numaNodes)
+
+	case PolicyPodLevelSingleNumaNode:
+		policy = NewPodLevelSingleNumaNodePolicy(numaNodes)
 
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
@@ -164,6 +172,7 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		podTopologyHints: pth,
 		podMap:           pm,
 		policy:           policy,
+		numaNodes:        numaNodes,
 	}
 
 	return manager, nil
@@ -236,7 +245,7 @@ func (m *manager) RemoveContainer(containerID string) error {
 func (m *manager) reclaimAllResources(pod *v1.Pod) {
 	klog.Infof("[topologymanager] pod(%v) is reject, reclaim all resources for the pod.", pod.UID)
 
-    podUIDString := string(pod.UID)
+	podUIDString := string(pod.UID)
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		for _, provider := range m.hintProviders {
@@ -258,9 +267,99 @@ func (m *manager) reclaimAllResources(pod *v1.Pod) {
 	}
 }
 
+// Most major part of pod-level-single-numa-node is implemented here,
+// Since hint provider and policy interfaces are designed by container basis.
+func (m *manager) runPodBasisAdmitLogic(pod *v1.Pod) lifecycle.PodAdmitResult {
+	// Loop all NUMA nodes
+	for node := range m.numaNodes {
+		currentNumaAffinity, _ := bitmask.NewBitMask(node)
+		isAdmitted := true
+
+		// Loop containers
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+
+			// set empty slice of map to store hints from providers
+			providersHints := []map[string][]TopologyHint{}
+
+			// Loop through all registered hint providers to get topology hints
+			//ex) []map[string][]TopologyHint{
+			//      {"cpu" : {01, T}, {10, T}, {11, F}},
+			//      {"gpu" : {01, T}, {10, T}, {11, F}},
+			//      {"fpga" : nil}, // no preference
+			//      nil, // no preference
+			//    }
+			for _, provider := range m.hintProviders {
+				// Get the TopologyHints from a provider.
+				hints := provider.GetTopologyHints(pod, &container)
+				providersHints = append(providersHints, hints)
+				klog.Infof("[topologymanager] TopologyHints for pod '%v', container '%v': %v", pod.Name, container.Name, hints)
+			}
+
+			// filter out hints that indicates ohter than current visiting numa node
+			// so that policy.Merge can deal with  hints only for current visiting NUMA node.
+			// it allows this policy running with low time complexity of hint merging algorithm.
+			//ex) []map[string][]TopologyHint{  //assumption here is current numa node is 01.
+			//      {"cpu" : {01, T}},
+			//      {"gpu" : {01, T}},
+			//      {"fpga" : nil}, // no preference
+			//      nil, // no preference
+			//    }
+			providersHints = filterProvidersHintsForCurrentNumaNode(providersHints, currentNumaAffinity)
+
+			// run hint merging algorithm for container
+			bestHint, admit := m.policy.Merge(providersHints)
+
+			// the policy found a container cannot bound on the current NUMA node.
+			// the policy allows TopologyHint{nil, true} since it means no preference of topology.
+			if !admit || (bestHint.NUMANodeAffinity != nil && !bestHint.NUMANodeAffinity.IsEqual(currentNumaAffinity)) {
+				// revert resource pre-allocation for the pod
+				m.reclaimAllResources(pod)
+
+				// make to move to the next numa node
+				isAdmitted = false
+				break
+			}
+
+			// Assign PodTopologyHints : mapping PID, CName, bestHint
+			klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, bestHint)
+			if m.podTopologyHints[string(pod.UID)] == nil {
+				m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)
+			}
+			m.podTopologyHints[string(pod.UID)][container.Name] = bestHint
+
+			// Allocate resources
+			err := m.allocateAlignedResources(pod, &container)
+			if err != nil {
+				m.reclaimAllResources(pod)
+				return lifecycle.PodAdmitResult{
+					Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+					Reason:  "UnexpectedAdmissionError",
+					Admit:   false,
+				}
+			}
+		}
+
+		if isAdmitted {
+			// all containers in the pod get resource allocation from current NUMA node
+			return lifecycle.PodAdmitResult{Admit: true}
+		}
+	}
+
+	//If a Pod is not admitted on any numa node, reject the pod.
+	return lifecycle.PodAdmitResult{
+		Message: fmt.Sprintf("Resources cannot be allocated with Topology locality"),
+		Reason:  "TopologyAffinityError",
+		Admit:   false,
+	}
+}
+
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	klog.Infof("[topologymanager] Topology Admit Handler")
 	pod := attrs.Pod
+
+	if m.policy.Name() == PolicyPodLevelSingleNumaNode {
+		return m.runPodBasisAdmitLogic(pod)
+	}
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if m.policy.Name() == PolicyNone {
@@ -301,4 +400,40 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	}
 
 	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+// This function returns filtered providersHints, filtered hints has
+// the topology hint, which indicates no preference of topology,
+// and the topology hint matched with given NUMA affinity.
+func filterProvidersHintsForCurrentNumaNode(providersHints []map[string][]TopologyHint, currentAffinity bitmask.BitMask) []map[string][]TopologyHint {
+	// set empty slice of map here
+	filteredProvidersHints := []map[string][]TopologyHint{}
+	for _, hints := range providersHints {
+		// empty map indicates no hints are provided
+		// assume that provider has no preference for topology-aware allocation
+		if len(hints) == 0 {
+			filteredProvidersHints = append(filteredProvidersHints, hints)
+			continue
+		}
+		// Otherwise
+		providerHints := make(map[string][]TopologyHint)
+		for resource := range hints {
+			// The function don't touch the below two type of hint.
+			// nil slice of hint indicates no prerference for topology-aware allocation
+			// empty slice of hint indecates no possible NUMA affinities
+			if hints[resource] == nil || len(hints[resource]) == 0 {
+				providerHints[resource] = hints[resource]
+				continue
+			}
+			providerHints[resource] = make([]TopologyHint, 0)
+			for _, hint := range hints[resource] {
+				if !hint.NUMANodeAffinity.IsEqual(currentAffinity) {
+					continue
+				}
+				providerHints[resource] = append(providerHints[resource], hint)
+			}
+		}
+		filteredProvidersHints = append(filteredProvidersHints, providerHints)
+	}
+	return filteredProvidersHints
 }
