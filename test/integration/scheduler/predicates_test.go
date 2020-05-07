@@ -78,6 +78,46 @@ func TestInterPodAffinity(t *testing.T) {
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-affinity-doesnotexist",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "security",
+												Operator: metav1.LabelSelectorOpDoesNotExist,
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "fakename2",
+					Labels: podLabel2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+					NodeName:   nodes[0].Name,
+				},
+			}},
+			node: nodes[0],
+			fits: false,
+			test: "validates that PodAffinity with operator DoesNotExist does not schedule onto a node where the label exists",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
 					Labels: podLabel2,
 				},
