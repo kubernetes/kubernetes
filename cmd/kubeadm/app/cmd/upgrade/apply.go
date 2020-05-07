@@ -18,9 +18,11 @@ package upgrade
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -28,9 +30,15 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	utilsexec "k8s.io/utils/exec"
+)
+
+const (
+	defaultImagePullTimeout = 15 * time.Minute
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -42,6 +50,7 @@ type applyFlags struct {
 	dryRun             bool
 	etcdUpgrade        bool
 	renewCerts         bool
+	imagePullTimeout   time.Duration
 	kustomizeDir       string
 }
 
@@ -53,9 +62,10 @@ func (f *applyFlags) sessionIsInteractive() bool {
 // NewCmdApply returns the cobra command for `kubeadm upgrade apply`
 func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
-		applyPlanFlags: apf,
-		etcdUpgrade:    true,
-		renewCerts:     true,
+		applyPlanFlags:   apf,
+		imagePullTimeout: defaultImagePullTimeout,
+		etcdUpgrade:      true,
+		renewCerts:       true,
 	}
 
 	cmd := &cobra.Command{
@@ -80,6 +90,9 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
+	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
+	// TODO: The flag was deprecated in 1.19; remove the flag following a GA deprecation policy of 12 months or 2 releases (whichever is longer)
+	cmd.Flags().MarkDeprecated("image-pull-timeout", "This flag is deprecated and will be removed in a future version.")
 	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
 
 	return cmd
@@ -134,6 +147,17 @@ func runApply(flags *applyFlags, userVersion string) error {
 		if err := InteractivelyConfirmUpgrade("Are you sure you want to proceed with the upgrade?"); err != nil {
 			return err
 		}
+	}
+
+	if !flags.dryRun {
+		fmt.Println("[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster")
+		fmt.Println("[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection")
+		fmt.Println("[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'")
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.NewString(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("[upgrade/prepull] Would pull the required images (like 'kubeadm config images pull')")
 	}
 
 	waiter := getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
