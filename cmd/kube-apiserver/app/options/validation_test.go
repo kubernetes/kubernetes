@@ -142,3 +142,70 @@ func TestClusterSerivceIPRange(t *testing.T) {
 		})
 	}
 }
+
+func getIPnetFromCIDR(cidr string) *net.IPNet {
+	_, ipnet, _ := net.ParseCIDR(cidr)
+	return ipnet
+}
+
+func TestValidateMaxCIDRRange(t *testing.T) {
+	testCases := []struct {
+		// tc.cidr, tc.maxCIDRBits, tc.cidrFlag) tc.expectedErrorMessage
+		name                 string
+		cidr                 net.IPNet
+		maxCIDRBits          int
+		cidrFlag             string
+		expectedErrorMessage string
+		expectErrors         bool
+	}{
+		{
+			name:                 "valid ipv4 cidr",
+			cidr:                 *getIPnetFromCIDR("10.92.0.0/12"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "",
+			expectErrors:         false,
+		},
+		{
+			name:                 "valid ipv6 cidr",
+			cidr:                 *getIPnetFromCIDR("3000::/108"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "",
+			expectErrors:         false,
+		},
+		{
+			name:                 "ipv4 cidr to big",
+			cidr:                 *getIPnetFromCIDR("10.92.0.0/8"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "specified --service-cluster-ip-range is too large; for 32-bit addresses, the mask must be >= 12",
+			expectErrors:         true,
+		},
+		{
+			name:                 "ipv6 cidr to big",
+			cidr:                 *getIPnetFromCIDR("3000::/64"),
+			maxCIDRBits:          20,
+			cidrFlag:             "--service-cluster-ip-range",
+			expectedErrorMessage: "specified --service-cluster-ip-range is too large; for 128-bit addresses, the mask must be >= 108",
+			expectErrors:         true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateMaxCIDRRange(tc.cidr, tc.maxCIDRBits, tc.cidrFlag)
+			if err != nil && !tc.expectErrors {
+				t.Errorf("expected no errors, error found %+v", err)
+			}
+
+			if err == nil && tc.expectErrors {
+				t.Errorf("expected errors, no errors found")
+			}
+
+			if err != nil && tc.expectErrors && err.Error() != tc.expectedErrorMessage {
+				t.Errorf("Expected error message: \"%s\"\nGot: \"%s\"", tc.expectedErrorMessage, err.Error())
+			}
+		})
+	}
+}
