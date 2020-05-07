@@ -68,23 +68,32 @@ def cri_tarballs():
             urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-linux-%s.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION, arch)),
         )
 
-# Use go get -u github.com/estesp/manifest-tool to find these values
-_DEBIAN_BASE_DIGEST = { # v1.0.1
-    "manifest": "sha256:fea5ea4d6fb518231a0934f974c7ec5c6fc3e2f0dfdf3a0d7a12780a1df924bb",
-    "amd64": "sha256:7e9f2f88b813e8f39648252d5b3a380db32a4ba44220becf9f1b25c00be49594",
-    "arm": "sha256:91de8bb15da762ce75da317e842fd42dac1812e11b4c768f0894e407d21ab3f8",
-    "arm64": "sha256:3d4ab00d26393a2c16967b26a818d171be5b30a53e8e0152313bc57f72fc2d2b",
-    "ppc64le": "sha256:62787bdcacdce1d8f5c12561ccce32f65393a04c06b09bb34b15b8365fc363fe",
-    "s390x": "sha256:72e96f69e2aba1848d91934d904233b549e565c60f81d4e1c79ca9927182ef86",
+# Use skopeo to find these values: https://github.com/containers/skopeo
+#
+# Example
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.0
+_DEBIAN_BASE_DIGEST = {
+    "manifest": "sha256:b118abac0bcf633b9db4086584ee718526fe394cf1bd18aee036e6cc497860f6",
+    "amd64": "sha256:a67798e4746faaab3fde5b7407fa8bba75d8b1214d168dc7ad2b5364f6fc4319",
+    "arm": "sha256:3ab4332e481610acbcba7a801711e29506b4bd4ecb38f72590253674d914c449",
+    "arm64": "sha256:8d53ac4da977eb20d6219ee49b9cdff8c066831ecab0e4294d0a02179d26b1d7",
+    "ppc64le": "sha256:a631023e795fe18df7faa8fe1264e757a6c74a232b9a2659657bf65756f3f4aa",
+    "s390x": "sha256:dac908eaa61d2034aec252576a470a7e4ab184c361f89170526f707a0c3c6082",
 }
 
-_DEBIAN_IPTABLES_DIGEST = { # v11.0.3
-    "manifest": "sha256:25c4396386a2d3f2f4785da473d3428bc542a6f774feee830e8b6bc6b053d11b",
-    "amd64": "sha256:1e531753f00f944e1f9d8b0ce63cf85b18afbe8e4d4608f5af974759ecb27ad1",
-    "arm": "sha256:eb9d3dae7109adbf3f7229aee92ac6dc99cc5f6aa48d5ffc92a3a03b46712c60",
-    "arm64": "sha256:273c8bbd034fbc22a02a7e08e8b543c6f0ba0e11c55b0a8c3c321e096d9c832e",
-    "ppc64le": "sha256:eab4fd0544662b2c46f6f8204239d0f2773eafade747f3199519d1fb17b9f0f7",
-    "s390x": "sha256:3a0cea52fd69178c28de7356b2df144735ee7aa2bcb909e6bdc6ee28680ef014",
+# Use skopeo to find these values: https://github.com/containers/skopeo
+#
+# Example
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:v12.1.0
+_DEBIAN_IPTABLES_DIGEST = {
+    "manifest": "sha256:1ae6d76dea462973759ff1c4e02263867da1f85db9aa10462a030ca421cbf0e9",
+    "amd64": "sha256:2fb9fa09123a41e6369cac04eb29e26237fe9e43da8e18f676d18d8fffb906fc",
+    "arm": "sha256:a0e97386c073a2990265938fa15dc0db575efdb4d13c0ea63a79e0590813a998",
+    "arm64": "sha256:2a7df97e2c702d9852cc6234aff89b4671cd5b09086ac2b5383411315e5f115d",
+    "ppc64le": "sha256:f5289a6494328b7ccb695e3add65b33ca380b77fcfc9715e474f0efe26e1c506",
+    "s390x": "sha256:1b91a2788750552913377bf1bc99a095544dfb523d80a55674003c974c8e0905",
 }
 
 _DEBIAN_HYPERKUBE_BASE_DIGEST = {
@@ -108,18 +117,20 @@ def debian_image_dependencies():
             name = "debian-base-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_BASE_DIGEST, arch),
-            registry = "k8s.gcr.io",
+            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-base",
-            tag = "v1.0.1",  # ignored, but kept here for documentation
+            # Ensure the digests above are updated to match a new tag
+            tag = "v2.1.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
             name = "debian-iptables-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_IPTABLES_DIGEST, arch),
-            registry = "k8s.gcr.io",
+            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-iptables",
-            tag = "v11.0.3",  # ignored, but kept here for documentation
+            # Ensure the digests above are updated to match a new tag
+            tag = "v12.1.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
