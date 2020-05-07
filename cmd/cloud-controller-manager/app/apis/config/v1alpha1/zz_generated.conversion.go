@@ -21,11 +21,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	config "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	serviceconfigv1alpha1 "k8s.io/cloud-provider/service/config/v1alpha1"
+	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	configv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
-	serviceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/service/config/v1alpha1"
 )
 
 func init() {

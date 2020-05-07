@@ -41,8 +41,6 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 const region = "us-central"
@@ -74,7 +72,7 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 
 	client := fake.NewSimpleClientset()
 
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, NoResyncPeriodFunc())
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
@@ -87,6 +85,12 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	client.ClearActions() // ignore any client calls made in init()
 
 	return controller, cloud, client
+}
+
+// NoResyncPeriodFunc is copied from k8s.io/kubernetes/pkg/controller/controller_utils.go
+// Returns 0 for resyncPeriod in case resyncing is not needed.
+func NoResyncPeriodFunc() time.Duration {
+	return 0
 }
 
 // TODO(@MrHohn): Verify the end state when below issue is resolved:

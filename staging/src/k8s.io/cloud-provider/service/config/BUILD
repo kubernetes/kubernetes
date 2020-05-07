@@ -7,7 +7,8 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/controller/service/config",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/service/config",
+    importpath = "k8s.io/cloud-provider/service/config",
     visibility = ["//visibility:public"],
 )
 
@@ -22,7 +23,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/controller/service/config/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/service/config/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

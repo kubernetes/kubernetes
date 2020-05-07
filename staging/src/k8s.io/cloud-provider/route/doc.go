@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package
-
-package config // import "k8s.io/kubernetes/pkg/controller/service/config"
+// Package route contains code for syncing cloud routing rules with
+// the list of registered nodes.
+package route // import "k8s.io/cloud-provider/route"

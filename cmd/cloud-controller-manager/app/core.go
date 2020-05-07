@@ -27,11 +27,11 @@ import (
 	"strings"
 
 	cloudprovider "k8s.io/cloud-provider"
+	cloudcontrollers "k8s.io/cloud-provider/cloud"
+	routecontroller "k8s.io/cloud-provider/route"
+	"k8s.io/cloud-provider/service"
 	"k8s.io/klog"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
-	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
-	routecontroller "k8s.io/kubernetes/pkg/controller/route"
-	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	netutils "k8s.io/utils/net"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -83,7 +83,7 @@ func startCloudNodeLifecycleController(ctx *cloudcontrollerconfig.CompletedConfi
 
 func startServiceController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
 	// Start the service controller
-	serviceController, err := servicecontroller.New(
+	serviceController, err := service.New(
 		cloud,
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
 		ctx.SharedInformers.Core().V1().Services(),

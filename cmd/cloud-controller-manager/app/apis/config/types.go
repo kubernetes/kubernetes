@@ -18,8 +18,8 @@ package config
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	serviceconfig "k8s.io/cloud-provider/service/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
-	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

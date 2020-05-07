@@ -36,9 +36,11 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/cloud-provider/api:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/cloud:all-srcs",
         "//staging/src/k8s.io/cloud-provider/fake:all-srcs",
         "//staging/src/k8s.io/cloud-provider/node:all-srcs",
-        "//staging/src/k8s.io/cloud-provider/service/helpers:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/route:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/service:all-srcs",
         "//staging/src/k8s.io/cloud-provider/volume:all-srcs",
     ],
     tags = ["automanaged"],
