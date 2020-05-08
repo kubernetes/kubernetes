@@ -362,7 +362,7 @@ func TestReentrantRollback(t *testing.T) {
 }
 
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod
-// will requeue a Recreate deployment iff there is no other pod returned from the
+// will requeue a recreate deployment if there is no other pod returned from the
 // client.
 func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
 	f := newFixture(t)
