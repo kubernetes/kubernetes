@@ -466,7 +466,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			trace: utiltrace.New("Patch", utiltrace.Field{"name", name}),
 		}
 
-		resultObj, _, err := p.patchResource(ctx, &RequestScope{})
+		resultObj, _, _, err := p.patchResource(ctx, &RequestScope{})
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)

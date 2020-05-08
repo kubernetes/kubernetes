@@ -183,6 +183,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 		trace.Step("Object stored in database")
 
+		w.Header().Set(metav1.ObjectChangePersistedHeader, "true")
+
 		code := http.StatusCreated
 		status, ok := result.(*metav1.Status)
 		if ok && err == nil && status.Code == 0 {

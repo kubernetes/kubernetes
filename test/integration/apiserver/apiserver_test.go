@@ -1845,3 +1845,89 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 		}
 	}
 }
+
+func TestChangePersistedHeader(t *testing.T) {
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+                },
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	resp, err := client.CoreV1().RESTClient().Post().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Body(obj).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v: %v", err, resp)
+	}
+
+	wasPersisted := false
+	// We use the response so that there are no changes.
+	if _, err := client.CoreV1().RESTClient().Put().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Body(resp).Do(context.TODO()).WasPersisted(&wasPersisted).Get(); err != nil {
+		t.Fatalf("failed to update deployment: %v", err)
+	}
+
+	if wasPersisted {
+		t.Fatalf("Object isn't supposed to have changed.")
+	}
+
+	// Sends a no-op patch.
+	if _, err := client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Body([]byte(`{}`)).Do(context.TODO()).WasPersisted(&wasPersisted).Get(); err != nil {
+		t.Fatalf("failed to update deployment: %v", err)
+	}
+
+	if wasPersisted {
+		t.Fatalf("Object isn't supposed to have changed after empty patch.")
+	}
+
+	// Add a label patch.
+	if _, err := client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Body([]byte(`{"metadata": {"labels": {"new-label": "yes"}}}`)).Do(context.TODO()).WasPersisted(&wasPersisted).Get(); err != nil {
+		t.Fatalf("failed to update deployment: %v", err)
+	}
+
+	if !wasPersisted {
+		t.Fatalf("Object is supposed to have changed after patch.")
+	}
+}

@@ -1316,3 +1316,10 @@ type PartialObjectMetadataList struct {
 	// items contains each of the included items.
 	Items []PartialObjectMetadata `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// ObjectChangePersistedHeader is a header inserted in the response to
+// modifying request indicated whether a change to the object has been
+// persisted. The value of that field is a boolean "true" or "false".
+// That field may be missing if we can't determine if the change was
+// persisted.
+const ObjectChangePersistedHeader = "X-Object-Change-Persisted"

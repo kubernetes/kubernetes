@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/internal"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -220,7 +222,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			trace: trace,
 		}
 
-		result, wasCreated, err := p.patchResource(ctx, scope)
+		result, wasCreated, wasPersisted, err := p.patchResource(ctx, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -232,6 +234,10 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			return
 		}
 		trace.Step("Self-link added")
+
+		if wasPersisted != nil {
+			w.Header().Set(metav1.ObjectChangePersistedHeader, strconv.FormatBool(*wasPersisted))
+		}
 
 		status := http.StatusOK
 		if wasCreated {
@@ -547,7 +553,7 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 }
 
 // patchResource divides PatchResource for easier unit testing
-func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runtime.Object, bool, error) {
+func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runtime.Object, bool, *bool, error) {
 	p.namespace = request.NamespaceValue(ctx)
 	switch p.patchType {
 	case types.JSONPatchType, types.MergePatchType:
@@ -558,7 +564,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	case types.StrategicMergePatchType:
 		schemaReferenceObj, err := p.unsafeConvertor.ConvertToVersion(p.restPatcher.New(), p.kind.GroupVersion())
 		if err != nil {
-			return nil, false, err
+			return nil, false, nil, err
 		}
 		p.mechanism = &smpPatcher{
 			patcher:            p,
@@ -576,11 +582,12 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		}
 		p.forceAllowCreate = true
 	default:
-		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
+		return nil, false, nil, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}
 
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
+	updateChanged := handlers.UpdatePersistedChange{}
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, updateChanged.TrackResourceVersion)
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)
@@ -604,7 +611,12 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		}
 		return result, err
 	})
-	return result, wasCreated, err
+
+	var wasPersisted *bool
+	if persisted, err := updateChanged.WasPersisted(result); err == nil {
+		wasPersisted = &persisted
+	}
+	return result, wasCreated, wasPersisted, err
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to

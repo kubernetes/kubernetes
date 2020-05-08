@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/internal"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -174,6 +176,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		trace.Step("About to store object in database")
 		wasCreated := false
+		updateChanged := handlers.UpdatePersistedChange{}
+		transformers = append(transformers, updateChanged.TrackResourceVersion)
 		requestFunc := func() (runtime.Object, error) {
 			obj, created, err := r.Update(
 				ctx,
@@ -210,6 +214,10 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			return
 		}
 		trace.Step("Object stored in database")
+
+		if wasPersisted, err := updateChanged.WasPersisted(result); err == nil {
+			w.Header().Set(metav1.ObjectChangePersistedHeader, strconv.FormatBool(wasPersisted))
+		}
 
 		status := http.StatusOK
 		if wasCreated {

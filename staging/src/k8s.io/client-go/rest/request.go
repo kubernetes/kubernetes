@@ -963,6 +963,14 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 	return result.body, result.err
 }
 
+func (r *Request) changePersisted(resp *http.Response) bool {
+	// Defaults to true if missing or has invalid value.
+	if wasPersisted, err := strconv.ParseBool(resp.Header.Get(metav1.ObjectChangePersistedHeader)); err == nil {
+		return wasPersisted
+	}
+	return true
+}
+
 // transformResponse converts an API response into a structured API object
 func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
 	var body []byte
@@ -1017,9 +1025,10 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 				return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
 			}
 			return Result{
-				body:        body,
-				contentType: contentType,
-				statusCode:  resp.StatusCode,
+				body:         body,
+				contentType:  contentType,
+				statusCode:   resp.StatusCode,
+				wasPersisted: r.changePersisted(resp),
 			}
 		}
 	}
@@ -1033,19 +1042,21 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		retryAfter, _ := retryAfterSeconds(resp)
 		err := r.newUnstructuredResponseError(body, isTextResponse(resp), resp.StatusCode, req.Method, retryAfter)
 		return Result{
-			body:        body,
-			contentType: contentType,
-			statusCode:  resp.StatusCode,
-			decoder:     decoder,
-			err:         err,
+			body:         body,
+			contentType:  contentType,
+			statusCode:   resp.StatusCode,
+			wasPersisted: r.changePersisted(resp),
+			decoder:      decoder,
+			err:          err,
 		}
 	}
 
 	return Result{
-		body:        body,
-		contentType: contentType,
-		statusCode:  resp.StatusCode,
-		decoder:     decoder,
+		body:         body,
+		contentType:  contentType,
+		statusCode:   resp.StatusCode,
+		wasPersisted: r.changePersisted(resp),
+		decoder:      decoder,
 	}
 }
 
@@ -1180,10 +1191,11 @@ func retryAfterSeconds(resp *http.Response) (int, bool) {
 
 // Result contains the result of calling Request.Do().
 type Result struct {
-	body        []byte
-	contentType string
-	err         error
-	statusCode  int
+	body         []byte
+	contentType  string
+	err          error
+	statusCode   int
+	wasPersisted bool
 
 	decoder runtime.Decoder
 }
@@ -1257,6 +1269,13 @@ func (r Result) Into(obj runtime.Object) error {
 		}
 	}
 	return nil
+}
+
+// WasPersisted updates the provided bool pointer to whether the server
+// has updated the resource.
+func (r Result) WasPersisted(wasPersisted *bool) Result {
+	*wasPersisted = r.wasPersisted
+	return r
 }
 
 // WasCreated updates the provided bool pointer to whether the server returned
