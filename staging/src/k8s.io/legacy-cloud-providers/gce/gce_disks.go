@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -809,7 +809,11 @@ func (g *Cloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, newSi
 	}
 
 	// GCE resizes in chunks of GiBs
-	requestGIB := volumehelpers.RoundUpToGiB(newSize)
+	requestGIB, err := volumehelpers.RoundUpToGiB(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
 
 	// If disk is already of size equal or greater than requested size, we simply return
