@@ -26,7 +26,7 @@ REGISTRY_LOGIN_URL="${REGISTRY_LOGIN_URL:-https://api.ng.bluemix.net}"
 
 # User defined
 # number of real workers in spawnTester cluster
-NUM_NODES="${NUM_NODES:-2}"
+NUM_NODES="${NUM_NODES:-21}"
 # spec of real workers in spawnTester cluster
 NODE_SIZE=${NODE_SIZE:-u2c.2x4}
 DESIRED_NODES="${DESIRED_NODES:-10}"
