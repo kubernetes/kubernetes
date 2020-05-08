@@ -4,7 +4,7 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:private"].
 )
 
 filegroup(
