@@ -43,29 +43,11 @@ func (p *podLevelSingleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) boo
 	return hint.Preferred
 }
 
-// Return hints that have valid bitmasks with exactly one bit set.
-func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
-	var filteredResourcesHints [][]TopologyHint
-	for _, oneResourceHints := range allResourcesHints {
-		var filtered []TopologyHint
-		for _, hint := range oneResourceHints {
-			if hint.NUMANodeAffinity == nil && hint.Preferred == true {
-				filtered = append(filtered, hint)
-			}
-			if hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() == 1 && hint.Preferred == true {
-				filtered = append(filtered, hint)
-			}
-		}
-		filteredResourcesHints = append(filteredResourcesHints, filtered)
-	}
-	return filteredResourcesHints
-}
-
 func (p *podLevelSingleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(providersHints)
 	// Filter to only include don't cares and hints with a single NUMA node.
-	singleNumaHints := filterSingleNumaHints(filteredHints)
-	bestHint := mergeFilteredHints(p.numaNodes, singleNumaHints)
+	//singleNumaHints := filterSingleNumaHints(filteredHints)
+	bestHint := mergeFilteredHints(p.numaNodes, filteredHints)
 
 	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 	if bestHint.NUMANodeAffinity.IsEqual(defaultAffinity) {

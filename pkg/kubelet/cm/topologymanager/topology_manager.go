@@ -65,6 +65,8 @@ type manager struct {
 	podMap map[string]string
 	//Topology Manager Policy
 	policy Policy
+	//NUMA nodes of host machine
+	numaNodes []int
 }
 
 // HintProvider is an interface for components that want to collaborate to
@@ -168,6 +170,7 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		podTopologyHints: pth,
 		podMap:           pm,
 		policy:           policy,
+		numaNodes:        numaNodes,
 	}
 
 	return manager, nil
@@ -309,57 +312,76 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 			}
 		}
 	} else {
-		// initialize numaHints
-		var numaHints []bitmask.BitMask
-
 		// Loop NUMA nodes
-		for numaHint := range numaHints {
+		for node := range m.numaNodes {
+
+			currentNumaAffinity, _ := bitmask.NewBitMask(node)
+
+			podAdmission := true
+
 			// Loop containers
 			for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+
+				// set empty slice of map here
+				providersHints := []map[string][]TopologyHint{}
+
 				// GetTopologyHints for each hintProvider
 				for _, provider := range m.hintProviders {
 					// Get the TopologyHints from a provider.
-					hints := provider.GetTopologyHints(pod, container)
+					hints := provider.GetTopologyHints(pod, &container)
 					providersHints = append(providersHints, hints)
 					klog.Infof("[topologymanager] TopologyHints for pod '%v', container '%v': %v", pod.Name, container.Name, hints)
 				}
-				// Merge() -> filterSingleNumaHints : remove all topology hint except single-numa-node
-				singleNumaHints = filterSingleNumaHints(providersHints)
-				// Merge() -> mergeFilteredHints : calculate bestHint (== bestHint is numaHint or nil)
-				bestHint := mergeFilteredHints(, singleNumaHints)
-				if !bestHint.IsEqual(numaHint) {
+
+				// filter out hints that indicates ohter than current numa node
+				providersHints = filterProvidersHintsForCurrentNumaNode(providersHints, currentNumaAffinity)
+
+				// run hint merging algorithm for container
+				bestHint, admit := m.policy.Merge(providersHints)
+
+				
+				if !admit || !bestHint.NUMANodeAffinity.IsEqual(currentNumaAffinity){
+					// revert resource allocation when container is not admittable
 					m.reclaimAllResources(pod)
-					break // break the container loop
+
+					// move to next numa node
+					podAdmission = false
+					break
 				}
-				// Merge() -> canAdmitContainerResult()
-				admit := p.canAdmitPodResult(&bestHint)
-				if !admit {
-					m.reclaimAllResources(pod)
-					break // break the container loop
-				}
+
 				// Asign PodTopologyHints : mapping PID, CName, bestHint
-				klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, result)
+				klog.Infof("[topologymanager] Topology Affinity for (pod: %v container: %v): %v", pod.UID, container.Name, bestHint)
 				if m.podTopologyHints[string(pod.UID)] == nil {
 					m.podTopologyHints[string(pod.UID)] = make(map[string]TopologyHint)
 				}
 				m.podTopologyHints[string(pod.UID)][container.Name] = bestHint
-				// Allocate()
+
+				// Allocate resources
 				err := m.allocateAlignedResources(pod, &container)
 				if err != nil {
 					m.reclaimAllResources(pod)
-					break // break the container loop
+					return lifecycle.PodAdmitResult{
+						Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+						Reason:  "UnexpectedAdmissionError",
+						Admit:   false,
+					}
 				}
 			}
-			// End of container loop
-		}
-		// End of Pod Loop(== NUMA idx loop)
-		// Check canAdmitPodResult()
-		if admit {
-			break // break the Pod loop
-		} else {
-			m.reclaimAllResources(pod)
-			continue // continue the Pod loop
+
+			
+			if podAdmission {
+				// pod is admitted on current NUMA node
+				return lifecycle.PodAdmitResult{Admit: true}
+			} 
+
+			// otherwise move to next numa node
+			
 		}
 	}
+
 	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+func filterProvidersHintsForCurrentNumaNode(providersHints []map[string][]TopologyHint, currentAffinity bitmask.BitMask) []map[string][]TopologyHint {
+	return nil
 }
