@@ -20,6 +20,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/vsphere_volume",
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
@@ -27,6 +28,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
