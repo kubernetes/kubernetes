@@ -48,11 +48,9 @@ function cleanup {
 kube::util::trap_add cleanup EXIT
 
 # Copy the contents of the kube directory into the nice clean place (which is NOT shaped like a GOPATH)
-_kubetmp="${_tmpdir}"
+_kubetmp="${_tmpdir}/kubernetes"
 mkdir -p "${_kubetmp}"
-# should create ${_kubectmp}/kubernetes
-git archive --format=tar --prefix=kubernetes/ "$(git write-tree)" | (cd "${_kubetmp}" && tar xf -)
-_kubetmp="${_kubetmp}/kubernetes"
+tar --exclude=.git --exclude="./_*" -c . | (cd "${_kubetmp}" && tar xf -)
 
 # Do all our work in module mode
 export GO111MODULE=on
