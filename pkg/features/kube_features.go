@@ -383,6 +383,7 @@ const (
 
 	// owner: @andyzhangx
 	// alpha: v1.15
+	// beta: v1.19
 	//
 	// Enables the Azure Disk in-tree driver to Azure Disk Driver migration feature.
 	CSIMigrationAzureDisk featuregate.Feature = "CSIMigrationAzureDisk"
@@ -623,7 +624,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationGCEComplete:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWS:                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires AWS EBS CSI driver)
 	CSIMigrationAWSComplete:        {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureDisk:          {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureDisk:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure Disk CSI driver)
 	CSIMigrationAzureDiskComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFile:          {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFileComplete:  {Default: false, PreRelease: featuregate.Alpha},
