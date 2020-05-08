@@ -410,6 +410,19 @@ const (
 	// Expects Azure File CSI Driver to be installed and configured on all nodes.
 	CSIMigrationAzureFileComplete featuregate.Feature = "CSIMigrationAzureFileComplete"
 
+	// owner: @divyenpatel
+	// alpha: v1.19
+	//
+	// Enables the vSphere in-tree driver to vSphere CSI Driver migration feature.
+	CSIMigrationvSphere featuregate.Feature = "CSIMigrationvSphere"
+
+	// owner: @divyenpatel
+	// alpha: v1.19
+	//
+	// Disables the vSphere in-tree driver.
+	// Expects vSphere CSI Driver to be installed and configured on all nodes.
+	CSIMigrationvSphereComplete featuregate.Feature = "CSIMigrationvSphereComplete"
+
 	// owner: @gnufied
 	// alpha: v1.18
 	// Allows user to configure volume permission change policy for fsGroups when mounting
@@ -631,6 +644,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationAzureDiskComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFile:          {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFileComplete:  {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationvSphere:            {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationvSphereComplete:    {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                     {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
 	CSIMigrationOpenStackComplete:  {Default: false, PreRelease: featuregate.Alpha},

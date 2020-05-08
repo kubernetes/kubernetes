@@ -219,6 +219,9 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
 		},
+		csitranslationplugins.VSphereInTreePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+		},
 	}
 
 	// Initializing the label management channels

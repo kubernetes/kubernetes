@@ -9,6 +9,7 @@ go_library(
         "gce_pd.go",
         "in_tree_volume.go",
         "openstack_cinder.go",
+        "vsphere_volume.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/csi-translation-lib/plugins",
     importpath = "k8s.io/csi-translation-lib/plugins",
@@ -45,6 +46,7 @@ go_test(
         "azure_file_test.go",
         "gce_pd_test.go",
         "in_tree_volume_test.go",
+        "vsphere_volume_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
