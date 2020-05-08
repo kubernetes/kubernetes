@@ -254,7 +254,11 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 			// check if watch request is broken by GOAWAY response
 			watchTimeout := time.NewTimer(time.Second * 10)
+			done := false
 			for range tc.reqs {
+				if done {
+					break
+				}
 				select {
 				case n := <-watchChs:
 					if n != watchExpectSendBytes {
@@ -262,6 +266,8 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 					}
 				case <-watchTimeout.C:
 					t.Error("watch receive timeout")
+					close(watchChs)
+					done = true // Exit for loop
 				}
 			}
 		})
