@@ -351,5 +351,24 @@ func TestNodeAddresses(t *testing.T) {
 		if !reflect.DeepEqual(ipAddresses, test.expected) {
 			t.Errorf("Test [%s] unexpected ipAddresses: %s, expected %q", test.name, ipAddresses, test.expected)
 		}
+
+		// address should be get again from IMDS if it is not found in cache.
+		err = cloud.metadata.imsCache.Delete(metadataCacheKey)
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
+		ipAddresses, err = cloud.NodeAddresses(context.Background(), types.NodeName(test.nodeName))
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Test [%s] unexpected nil err", test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+			}
+		}
+		if !reflect.DeepEqual(ipAddresses, test.expected) {
+			t.Errorf("Test [%s] unexpected ipAddresses: %s, expected %q", test.name, ipAddresses, test.expected)
+		}
 	}
 }
