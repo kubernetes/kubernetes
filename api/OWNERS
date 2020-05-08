@@ -6,4 +6,4 @@ options:
 approvers:
 - api-approvers
 reviewers:
-- api-reviewers
+- api-reviewer
