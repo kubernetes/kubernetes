@@ -20,7 +20,7 @@ filegroup(
         "//cluster/images/etcd/migrate:all-srcs",
         "//cluster/images/kubemark:all-srcs",
     ],
-    tags = ["automanaged"],
+    tags = ["automanaged"].
 )
 
 pkg_tar(
