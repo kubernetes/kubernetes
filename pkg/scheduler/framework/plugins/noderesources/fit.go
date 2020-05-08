@@ -75,9 +75,6 @@ func NewFit(plArgs runtime.Object, _ framework.FrameworkHandle) (framework.Plugi
 }
 
 func getFitArgs(obj runtime.Object) (config.NodeResourcesFitArgs, error) {
-	if obj == nil {
-		return config.NodeResourcesFitArgs{}, nil
-	}
 	ptr, ok := obj.(*config.NodeResourcesFitArgs)
 	if !ok {
 		return config.NodeResourcesFitArgs{}, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", obj)

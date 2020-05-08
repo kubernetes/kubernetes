@@ -92,9 +92,6 @@ func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Framewo
 }
 
 func getRequestedToCapacityRatioArgs(obj runtime.Object) (config.RequestedToCapacityRatioArgs, error) {
-	if obj == nil {
-		return config.RequestedToCapacityRatioArgs{}, nil
-	}
 	ptr, ok := obj.(*config.RequestedToCapacityRatioArgs)
 	if !ok {
 		return config.RequestedToCapacityRatioArgs{}, fmt.Errorf("want args to be of type RequestedToCapacityRatioArgs, got %T", obj)

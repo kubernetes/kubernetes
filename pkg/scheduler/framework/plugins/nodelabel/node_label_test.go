@@ -318,7 +318,7 @@ func TestNodeLabelFilterWithoutNode(t *testing.T) {
 	var pod *v1.Pod
 	t.Run("node does not exist", func(t *testing.T) {
 		nodeInfo := framework.NewNodeInfo()
-		p, err := New(nil, nil)
+		p, err := New(&config.NodeLabelArgs{}, nil)
 		if err != nil {
 			t.Fatalf("Failed to create plugin: %v", err)
 		}
@@ -332,7 +332,7 @@ func TestNodeLabelFilterWithoutNode(t *testing.T) {
 func TestNodeLabelScoreWithoutNode(t *testing.T) {
 	t.Run("node does not exist", func(t *testing.T) {
 		fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(cache.NewEmptySnapshot()))
-		p, err := New(nil, fh)
+		p, err := New(&config.NodeLabelArgs{}, fh)
 		if err != nil {
 			t.Fatalf("Failed to create plugin: %+v", err)
 		}

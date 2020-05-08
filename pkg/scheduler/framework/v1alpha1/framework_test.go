@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	v1 "k8s.io/api/core/v1"
@@ -133,19 +134,19 @@ type TestPlugin struct {
 	inj  injectedResult
 }
 
-type TestPluginPreFilterExtension struct {
-	inj injectedResult
+func (pl *TestPlugin) AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *NodeInfo) *Status {
+	return NewStatus(Code(pl.inj.PreFilterAddPodStatus), "injected status")
 }
-
-func (e *TestPluginPreFilterExtension) AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *NodeInfo) *Status {
-	return NewStatus(Code(e.inj.PreFilterAddPodStatus), "injected status")
-}
-func (e *TestPluginPreFilterExtension) RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *NodeInfo) *Status {
-	return NewStatus(Code(e.inj.PreFilterRemovePodStatus), "injected status")
+func (pl *TestPlugin) RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *NodeInfo) *Status {
+	return NewStatus(Code(pl.inj.PreFilterRemovePodStatus), "injected status")
 }
 
 func (pl *TestPlugin) Name() string {
 	return pl.name
+}
+
+func (pl *TestPlugin) Less(*QueuedPodInfo, *QueuedPodInfo) bool {
+	return false
 }
 
 func (pl *TestPlugin) Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
@@ -161,7 +162,7 @@ func (pl *TestPlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Po
 }
 
 func (pl *TestPlugin) PreFilterExtensions() PreFilterExtensions {
-	return &TestPluginPreFilterExtension{inj: pl.inj}
+	return pl
 }
 
 func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status {
@@ -453,6 +454,97 @@ func TestNewFrameworkErrors(t *testing.T) {
 			_, err := NewFramework(registry, tc.plugins, tc.pluginCfg)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func recordingPluginFactory(name string, result map[string]runtime.Object) PluginFactory {
+	return func(args runtime.Object, f FrameworkHandle) (Plugin, error) {
+		result[name] = args
+		return &TestPlugin{
+			name: name,
+		}, nil
+	}
+}
+
+func TestNewFrameworkPluginDefaults(t *testing.T) {
+	// In-tree plugins that use args.
+	pluginsWithArgs := []string{"InterPodAffinity", "NodeLabel", "NodeResourcesFit", "RequestedToCapacityRatio", "PodTopologySpread"}
+	plugins := config.Plugins{
+		Filter: &config.PluginSet{},
+	}
+	// Use all plugins in Filter.
+	for _, name := range pluginsWithArgs {
+		plugins.Filter.Enabled = append(plugins.Filter.Enabled, config.Plugin{Name: name})
+	}
+	// Set required extension points.
+	onePlugin := &config.PluginSet{
+		Enabled: []config.Plugin{{Name: pluginsWithArgs[0]}},
+	}
+	plugins.QueueSort = onePlugin
+	plugins.Bind = onePlugin
+
+	tests := []struct {
+		name      string
+		pluginCfg []config.PluginConfig
+		wantCfg   map[string]runtime.Object
+	}{
+		{
+			name: "empty plugin config",
+			wantCfg: map[string]runtime.Object{
+				"InterPodAffinity": &config.InterPodAffinityArgs{
+					HardPodAffinityWeight: 1,
+				},
+				"NodeLabel":                &config.NodeLabelArgs{},
+				"NodeResourcesFit":         &config.NodeResourcesFitArgs{},
+				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{},
+				"PodTopologySpread":        &config.PodTopologySpreadArgs{},
+			},
+		},
+		{
+			name: "some overridden plugin config",
+			pluginCfg: []config.PluginConfig{
+				{
+					Name: "InterPodAffinity",
+					Args: &config.InterPodAffinityArgs{
+						HardPodAffinityWeight: 3,
+					},
+				},
+				{
+					Name: "NodeResourcesFit",
+					Args: &config.NodeResourcesFitArgs{
+						IgnoredResources: []string{"example.com/foo"},
+					},
+				},
+			},
+			wantCfg: map[string]runtime.Object{
+				"InterPodAffinity": &config.InterPodAffinityArgs{
+					HardPodAffinityWeight: 3,
+				},
+				"NodeLabel": &config.NodeLabelArgs{},
+				"NodeResourcesFit": &config.NodeResourcesFitArgs{
+					IgnoredResources: []string{"example.com/foo"},
+				},
+				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{},
+				"PodTopologySpread":        &config.PodTopologySpreadArgs{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// result will hold plugin args passed to factories.
+			result := make(map[string]runtime.Object)
+			registry := make(Registry, len(pluginsWithArgs))
+			for _, name := range pluginsWithArgs {
+				registry[name] = recordingPluginFactory(name, result)
+			}
+			_, err := NewFramework(registry, &plugins, tt.pluginCfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tt.wantCfg, result); diff != "" {
+				t.Errorf("unexpected plugin args (-want,+got):\n%s", diff)
 			}
 		})
 	}

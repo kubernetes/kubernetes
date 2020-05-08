@@ -402,7 +402,10 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p, _ := NewFit(nil, nil)
+	p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterNodeResourcesFit" from cycleState: not found`)
@@ -449,7 +452,10 @@ func TestNotEnoughRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, _ := NewFit(nil, nil)
+			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 			cycleState := framework.NewCycleState()
 			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
 			if !preFilterStatus.IsSuccess() {
@@ -505,7 +511,10 @@ func TestStorageRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, _ := NewFit(nil, nil)
+			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 			cycleState := framework.NewCycleState()
 			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
 			if !preFilterStatus.IsSuccess() {
