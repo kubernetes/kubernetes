@@ -339,6 +339,10 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 				parameters[k] = v.(string)
 			}
 		}
+
+		if snapshotProvider, ok := snapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
+		}
 	case d.SnapshotClass.FromFile != "":
 		snapshotClass, err := loadSnapshotClass(d.SnapshotClass.FromFile)
 		framework.ExpectNoError(err, "load snapshot class from %s", d.SnapshotClass.FromFile)
@@ -347,6 +351,10 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 			for k, v := range params {
 				parameters[k] = v.(string)
 			}
+		}
+
+		if snapshotProvider, ok := snapshotClass.Object["driver"]; ok {
+			snapshotter = snapshotProvider.(string)
 		}
 	}
 
