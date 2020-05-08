@@ -1271,6 +1271,162 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 	}
 }
 
+// TestErrorsDontFail
+func TestErrorsDontFail(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// Tries to create with a managed fields that has an empty `fieldsType`.
+	_, err := client.CoreV1().RESTClient().Post().
+		Namespace("default").
+		Resource("configmaps").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "test-cm",
+				"namespace": "default",
+				"managedFields": [{
+					"manager": "apply_test",
+					"operation": "Apply",
+					"apiVersion": "v1",
+					"time": "2019-07-08T09:31:18Z",
+					"fieldsType": "",
+					"fieldsV1": {}
+				}],
+				"labels": {
+					"test-label": "test"
+				}
+			},
+			"data": {
+				"key": "value"
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object with empty fieldsType: %v", err)
+	}
+}
+
+func TestErrorsDontFailUpdate(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	_, err := client.CoreV1().RESTClient().Post().
+		Namespace("default").
+		Resource("configmaps").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "test-cm",
+				"namespace": "default",
+				"labels": {
+					"test-label": "test"
+				}
+			},
+			"data": {
+				"key": "value"
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Put().
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "test-cm",
+				"namespace": "default",
+				"managedFields": [{
+					"manager": "apply_test",
+					"operation": "Apply",
+					"apiVersion": "v1",
+					"time": "2019-07-08T09:31:18Z",
+					"fieldsType": "",
+					"fieldsV1": {}
+				}],
+				"labels": {
+					"test-label": "test"
+				}
+			},
+			"data": {
+				"key": "value"
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to update object with empty fieldsType: %v", err)
+	}
+}
+
+func TestErrorsDontFailPatch(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	_, err := client.CoreV1().RESTClient().Post().
+		Namespace("default").
+		Resource("configmaps").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "test-cm",
+				"namespace": "default",
+				"labels": {
+					"test-label": "test"
+				}
+			},
+			"data": {
+				"key": "value"
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.JSONPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`[{"op": "replace", "path": "/metadata/managedFields", "value": [{
+			"manager": "apply_test",
+			"operation": "Apply",
+			"apiVersion": "v1",
+			"time": "2019-07-08T09:31:18Z",
+			"fieldsType": "",
+			"fieldsV1": {}
+		}]}]`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to patch object with empty FieldsType: %v", err)
+	}
+
+}
+
 var podBytes = []byte(`
 apiVersion: v1
 kind: Pod

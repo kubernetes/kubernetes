@@ -34,6 +34,14 @@ type Managed struct {
 	Times  map[string]*metav1.Time
 }
 
+// NewEmptyManaged creates an empty ManagedInterface.
+func NewEmptyManaged() Managed {
+	return Managed{
+		fieldpath.ManagedFields{},
+		map[string]*metav1.Time{},
+	}
+}
+
 // RemoveObjectManagedFields removes the ManagedFields from the object
 // before we merge so that it doesn't appear in the ManagedFields
 // recursively.
