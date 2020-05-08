@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"k8s.io/klog"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v2/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v2/merge"
@@ -99,15 +98,11 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	}
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
-		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object: %v", err)
-		return newObj, managed, nil
+		return nil, nil, fmt.Errorf("failed to convert new object (%v) to smd typed: %v", newObjVersioned.GetObjectKind().GroupVersionKind(), err)
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
-		// Return newObj and just by-pass fields update. This really shouldn't happen.
-		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object: %v", err)
-		return newObj, managed, nil
+		return nil, nil, fmt.Errorf("failed to convert live object (%v) to smd typed: %v", liveObjVersioned.GetObjectKind().GroupVersionKind(), err)
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 
