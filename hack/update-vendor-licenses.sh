@@ -187,11 +187,11 @@ fi
 # Loop through every vendored package
 for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
   if [[ -e "staging/src/${PACKAGE}" ]]; then
-    echo "${PACKAGE} is a staging package, skipping" > /dev/stderr
+    echo "${PACKAGE} is a staging package, skipping" >&2
     continue
   fi
   if [[ ! -e "${DEPS_DIR}/${PACKAGE}" ]]; then
-    echo "${PACKAGE} doesn't exist in ${DEPS_DIR}, skipping" > /dev/stderr
+    echo "${PACKAGE} doesn't exist in ${DEPS_DIR}, skipping" >&2
     continue
   fi
   echo "${PACKAGE}"
@@ -214,7 +214,7 @@ for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
       file="${CONTENT[${PACKAGE}-COPYING]-}"
     fi
     if [[ -z "${file}" ]]; then
-      cat > /dev/stderr << __EOF__
+      cat >&2 << __EOF__
 No license could be found for ${PACKAGE} - aborting.
 
 Options:
