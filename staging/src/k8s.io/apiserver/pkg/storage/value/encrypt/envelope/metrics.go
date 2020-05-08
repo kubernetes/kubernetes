@@ -63,7 +63,7 @@ var (
 			Name:           "dek_cache_inter_arrival_time_seconds",
 			Help:           "Time (in seconds) of inter arrival of transformation requests.",
 			StabilityLevel: metrics.ALPHA,
-			Buckets:        metrics.ExponentialBuckets(60, 2, 10),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 		},
 		[]string{"transformation_type"},
 	)
