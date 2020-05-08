@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -588,6 +589,29 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			framework.ExpectNoError(err)
 
+			// Verify that statuful set will be scaled up in order.
+			wg := sync.WaitGroup{}
+			var orderErr error
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				expectedOrder := []string{ssName + "-0", ssName + "-1", ssName + "-2"}
+				ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), statefulSetTimeout)
+				defer cancel()
+
+				_, orderErr = watchtools.Until(ctx, pl.ResourceVersion, w, func(event watch.Event) (bool, error) {
+					if event.Type != watch.Added {
+						return false, nil
+					}
+					pod := event.Object.(*v1.Pod)
+					if pod.Name == expectedOrder[0] {
+						expectedOrder = expectedOrder[1:]
+					}
+					return len(expectedOrder) == 0, nil
+				})
+			}()
+
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			setHTTPProbe(ss)
@@ -609,27 +633,35 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForRunningAndReady(c, 3, ss)
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled up in order")
-			expectedOrder := []string{ssName + "-0", ssName + "-1", ssName + "-2"}
-			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), statefulSetTimeout)
-			defer cancel()
-			_, err = watchtools.Until(ctx, pl.ResourceVersion, w, func(event watch.Event) (bool, error) {
-				if event.Type != watch.Added {
-					return false, nil
-				}
-				pod := event.Object.(*v1.Pod)
-				if pod.Name == expectedOrder[0] {
-					expectedOrder = expectedOrder[1:]
-				}
-				return len(expectedOrder) == 0, nil
-
-			})
-			framework.ExpectNoError(err)
+			wg.Wait()
+			framework.ExpectNoError(orderErr)
 
 			ginkgo.By("Scale down will halt with unhealthy stateful pod")
 			pl, err = f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
 			framework.ExpectNoError(err)
+
+			// Verify that statuful set will be scaled down in order.
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				expectedOrder := []string{ssName + "-2", ssName + "-1", ssName + "-0"}
+				ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), statefulSetTimeout)
+				defer cancel()
+
+				_, orderErr = watchtools.Until(ctx, pl.ResourceVersion, w, func(event watch.Event) (bool, error) {
+					if event.Type != watch.Deleted {
+						return false, nil
+					}
+					pod := event.Object.(*v1.Pod)
+					if pod.Name == expectedOrder[0] {
+						expectedOrder = expectedOrder[1:]
+					}
+					return len(expectedOrder) == 0, nil
+				})
+			}()
 
 			breakHTTPProbe(c, ss)
 			e2estatefulset.WaitForStatusReadyReplicas(c, ss, 0)
@@ -642,21 +674,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.Scale(c, ss, 0)
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled down in reverse order")
-			expectedOrder = []string{ssName + "-2", ssName + "-1", ssName + "-0"}
-			ctx, cancel = watchtools.ContextWithOptionalTimeout(context.Background(), statefulSetTimeout)
-			defer cancel()
-			_, err = watchtools.Until(ctx, pl.ResourceVersion, w, func(event watch.Event) (bool, error) {
-				if event.Type != watch.Deleted {
-					return false, nil
-				}
-				pod := event.Object.(*v1.Pod)
-				if pod.Name == expectedOrder[0] {
-					expectedOrder = expectedOrder[1:]
-				}
-				return len(expectedOrder) == 0, nil
-
-			})
-			framework.ExpectNoError(err)
+			wg.Wait()
+			framework.ExpectNoError(orderErr)
 		})
 
 		/*
