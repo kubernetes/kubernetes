@@ -15,7 +15,7 @@
 # set default shell
 SHELL=/bin/bash -o pipefail
 
-TAG ?= 0.1.0
+TAG ?= v0.1.1
 REGISTRY ?= k8s.gcr.io
 
 IMGNAME = go-runner
