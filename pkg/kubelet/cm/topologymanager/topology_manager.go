@@ -338,7 +338,6 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 
 				// run hint merging algorithm for container
 				bestHint, admit := m.policy.Merge(providersHints)
-
 				
 				if !admit || !bestHint.NUMANodeAffinity.IsEqual(currentNumaAffinity){
 					// revert resource allocation when container is not admittable
@@ -375,6 +374,15 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 			} 
 
 			// otherwise move to next numa node
+
+			//if this is last numa node but pod is not admitted, reject a pod
+			if (lastNode) {
+				return lifecycle.PodAdmitResult{
+						Message: fmt.Sprintf("Allocate failed due to %v, which is unexpected", err),
+						Reason:  "UnexpectedAdmissionError",
+						Admit:   false,
+				}
+			}
 			
 		}
 	}
@@ -383,5 +391,36 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 }
 
 func filterProvidersHintsForCurrentNumaNode(providersHints []map[string][]TopologyHint, currentAffinity bitmask.BitMask) []map[string][]TopologyHint {
+
+/*
+
+
+providersHints : = []map{
+map["res1"]TopologyHint{[{01, T}, {10, T}, {11, F}, ]},
+map["res2"]TopologyHint{[{01, T}, {10, T}, {11, F}, ]},
+
+just let them go
+map["empty_map"]TopologyHint{}, //only struct
+map["nil_slice"]TopologyHint{nil},
+map["empty_slice"]TopologyHint{[/*slice is empty*/]},
+
+
+//make them empty slice not nill slice
+//map["res2"]TopologyHint{[{11, T}, ]}, =>empty_slice , since it is impossible to allocate resource on numa 01
+//map["res2"]TopologyHint{[{10, T}, ]}, => empty_slice
+//}
+  
+//filterdHints := [[{01/T, 10/T, 11/F }], [nil/T], [nil/F]]
+
+
+//no affinity((no preference)
+//empty map => TH{nil, true}
+
+//no preference
+//map["res"]TopologyHint{nil} => TH(nil, true)
+
+//no support(impossible)
+//map["res"]TopologyHint{[/*empty slice*/]} => TH(nil, false)
+
 	return nil
 }

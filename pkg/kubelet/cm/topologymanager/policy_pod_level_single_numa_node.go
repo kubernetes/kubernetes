@@ -45,8 +45,12 @@ func (p *podLevelSingleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) boo
 
 func (p *podLevelSingleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredHints := filterProvidersHints(providersHints)
+
+	//[[{01/T, 10/T, 11/F }], [nil/T], [nil/F]]
+
 	// Filter to only include don't cares and hints with a single NUMA node.
 	//singleNumaHints := filterSingleNumaHints(filteredHints)
+
 	bestHint := mergeFilteredHints(p.numaNodes, filteredHints)
 
 	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
