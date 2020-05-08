@@ -322,7 +322,7 @@ function install-exec-auth-plugin {
   local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
   echo "Downloading gke-exec-auth-plugin license"
   download-or-bust "" "${license_url}"
-  mv "${KUBE_HOME}/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
+  mv "${KUBE_HOME}/LICENSES/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
 }
 
 function install-kube-manifests {

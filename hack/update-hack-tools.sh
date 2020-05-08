@@ -38,6 +38,6 @@ pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   go mod tidy
   go mod vendor
 
-  LICENSE_ROOT="${PWD}" VENDOR_LICENSE_FILE="LICENSES" "${KUBE_ROOT}/hack/update-vendor-licenses.sh"
+  LICENSE_ROOT="${PWD}" "${KUBE_ROOT}/hack/update-vendor-licenses.sh"
   rm -rf vendor
 popd >/dev/null
