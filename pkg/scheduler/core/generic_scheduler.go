@@ -131,7 +131,6 @@ type genericScheduler struct {
 	pdbLister                policylisters.PodDisruptionBudgetLister
 	disablePreemption        bool
 	percentageOfNodesToScore int32
-	enableNonPreempting      bool
 	nextStartNodeIndex       int
 }
 
@@ -259,7 +258,7 @@ func (g *genericScheduler) Preempt(ctx context.Context, prof *profile.Profile, s
 	if !ok || fitError == nil {
 		return nil, nil, nil, nil
 	}
-	if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfos(), g.enableNonPreempting) {
+	if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfos()) {
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
@@ -1053,8 +1052,8 @@ func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, fitErr *FitError
 // considered for preemption.
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
-func podEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister, enableNonPreempting bool) bool {
-	if enableNonPreempting && pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
+func podEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister) bool {
+	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
 		return false
 	}
@@ -1108,8 +1107,7 @@ func NewGenericScheduler(
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pdbLister policylisters.PodDisruptionBudgetLister,
 	disablePreemption bool,
-	percentageOfNodesToScore int32,
-	enableNonPreempting bool) ScheduleAlgorithm {
+	percentageOfNodesToScore int32) ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
 		schedulingQueue:          podQueue,
@@ -1119,6 +1117,5 @@ func NewGenericScheduler(
 		pdbLister:                pdbLister,
 		disablePreemption:        disablePreemption,
 		percentageOfNodesToScore: percentageOfNodesToScore,
-		enableNonPreempting:      enableNonPreempting,
 	}
 }

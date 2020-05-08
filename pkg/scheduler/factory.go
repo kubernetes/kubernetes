@@ -101,8 +101,6 @@ type Configurator struct {
 
 	podMaxBackoffSeconds int64
 
-	enableNonPreempting bool
-
 	profiles          []schedulerapi.KubeSchedulerProfile
 	registry          framework.Registry
 	nodeInfoSnapshot  *internalcache.Snapshot
@@ -204,7 +202,6 @@ func (c *Configurator) create() (*Scheduler, error) {
 		GetPodDisruptionBudgetLister(c.informerFactory),
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
-		c.enableNonPreempting,
 	)
 
 	return &Scheduler{
