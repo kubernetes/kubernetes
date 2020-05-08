@@ -144,8 +144,6 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 	}
 
 	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func() {
-		var err error
-
 		l := init()
 		defer func() {
 			cleanup(l)
