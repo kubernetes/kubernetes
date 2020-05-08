@@ -18,7 +18,7 @@
 
 set -o errexit
 set -o nounset
-set -o pipefail
+set -o pipefai
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
