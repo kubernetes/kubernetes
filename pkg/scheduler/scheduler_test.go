@@ -820,7 +820,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
-		false,
 	)
 
 	errChan := make(chan error, 1)
@@ -1175,7 +1174,6 @@ func TestSchedulerBinding(t *testing.T) {
 				nil,
 				false,
 				0,
-				false,
 			)
 			sched := Scheduler{
 				Algorithm:      algo,

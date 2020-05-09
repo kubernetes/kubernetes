@@ -817,8 +817,7 @@ func TestGenericScheduler(t *testing.T) {
 				pvcLister,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
-				schedulerapi.DefaultPercentageOfNodesToScore,
-				false)
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), test.pod)
 			if !reflect.DeepEqual(err, test.wErr) {
 				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
@@ -845,7 +844,7 @@ func makeScheduler(nodes []*v1.Node) *genericScheduler {
 		internalqueue.NewSchedulingQueue(nil),
 		emptySnapshot,
 		nil, nil, nil, false,
-		schedulerapi.DefaultPercentageOfNodesToScore, false)
+		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
 }
@@ -1139,8 +1138,7 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				false,
-				schedulerapi.DefaultPercentageOfNodesToScore,
-				false).(*genericScheduler)
+				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
 			scheduler.nodeInfoSnapshot = snapshot
 
 			ctx := context.Background()
@@ -1619,8 +1617,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				nil,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
-				schedulerapi.DefaultPercentageOfNodesToScore,
-				false)
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			g := scheduler.(*genericScheduler)
 
 			assignDefaultStartTime(test.pods)
@@ -2416,8 +2413,7 @@ func TestPreempt(t *testing.T) {
 				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
-				schedulerapi.DefaultPercentageOfNodesToScore,
-				true)
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
 			preFilterStatus := fwk.RunPreFilterPlugins(context.Background(), state, test.pod)
