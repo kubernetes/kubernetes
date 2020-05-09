@@ -306,6 +306,10 @@ oom_score = -999
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 EOF
 
+  local -r sandbox_root="${CONTAINERD_SANDBOX_RUNTIME_ROOT:-"/run/containerd/runsc"}"
+  # shim_config_path is the path of gvisor-containerd-shim config file.
+  local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"${sandbox_root}/config.toml"}"
+
   if [[ -n "${CONTAINERD_SANDBOX_RUNTIME_HANDLER:-}" ]]; then
     # Setup opt directory for containerd plugins.
     local -r containerd_opt_path="${CONTAINERD_HOME}/opt/containerd"
@@ -314,7 +318,15 @@ EOF
     mkdir -p "${containerd_opt_path}/lib"
 
     local -r containerd_sandbox_pod_annotations=${CONTAINERD_SANDBOX_POD_ANNOTATIONS:-'"dev.gvisor.*"'}
-    cat >> "${config_path}" <<EOF
+
+    # Runtime configuration changed starting in containerd 1.3. Check the
+    # version and apply the respective configuration.
+    local -r version="$(containerd --version | awk '{ print $3 }')"
+    echo "containerd version ${version}"
+    local -r major="$(echo ${version} | awk -F '.' '{ print $1 }')"
+    local -r minor="$(echo ${version} | awk -F '.' '{ print $2 }')"
+    if [[ "${major}" -eq 1 && "${minor}" -le 2 ]]; then
+      cat >> "${config_path}" <<EOF
 [plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
   runtime_type = "${CONTAINERD_SANDBOX_RUNTIME_TYPE:-}"
   pod_annotations = [ ${containerd_sandbox_pod_annotations} ]
@@ -324,6 +336,19 @@ EOF
 [plugins.opt]
   path = "${containerd_opt_path}"
 EOF
+    else
+      cat >> "${config_path}" <<EOF
+[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
+  runtime_type = "${CONTAINERD_SANDBOX_RUNTIME_TYPE:-}"
+  pod_annotations = [ ${containerd_sandbox_pod_annotations} ]
+[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}.options]
+  TypeUrl = "io.containerd.runsc.v1.options"
+  ConfigPath = "${shim_config_path}"
+
+[plugins.opt]
+  path = "${containerd_opt_path}"
+EOF
+    fi
   fi
   chmod 644 "${config_path}"
 
@@ -333,9 +358,6 @@ EOF
     # gvisor_platform is the platform to use for gvisor.
     local -r gvisor_platform="${GVISOR_PLATFORM:-"ptrace"}"
     local -r gvisor_net_raw="${GVISOR_NET_RAW:-"true"}"
-    local -r sandbox_root="${CONTAINERD_SANDBOX_RUNTIME_ROOT:-"/run/containerd/runsc"}"
-    # shim_config_path is the path of gvisor-containerd-shim config file.
-    local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"${sandbox_root}/config.toml"}"
     mkdir -p "${sandbox_root}"
     cat > "${shim_config_path}" <<EOF
 binary_name = "${CONTAINERD_SANDBOX_RUNTIME_ENGINE:-}"
