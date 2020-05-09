@@ -38,17 +38,6 @@ func (fs *fakeStreamer) StreamOoms(outStream chan<- *oomparser.OomInstance) {
 	}
 }
 
-// TestStartingWatcher tests that the watcher, using the actual streamer
-// and not the fake, starts successfully.
-func TestStartingWatcher(t *testing.T) {
-	fakeRecorder := &record.FakeRecorder{}
-	node := &v1.ObjectReference{}
-
-	oomWatcher, err := NewWatcher(fakeRecorder)
-	assert.NoError(t, err)
-	assert.NoError(t, oomWatcher.Start(node))
-}
-
 // TestWatcherRecordsEventsForOomEvents ensures that our OomInstances coming
 // from `StreamOoms` are translated into events in our recorder.
 func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
