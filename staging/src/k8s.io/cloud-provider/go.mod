@@ -5,6 +5,8 @@ module k8s.io/cloud-provider
 go 1.13
 
 require (
+	github.com/google/go-cmp v0.4.0
+	github.com/stretchr/testify v1.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
