@@ -39,8 +39,6 @@ import (
 )
 
 func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
-	var err error
-
 	ginkgo.By("Creating testing namespaces")
 	wg := &sync.WaitGroup{}
 	wg.Add(totalNS)
@@ -49,7 +47,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 			defer wg.Done()
 			defer ginkgo.GinkgoRecover()
 			ns := fmt.Sprintf("nslifetest-%v", n)
-			_, err = f.CreateNamespace(ns, nil)
+			_, err := f.CreateNamespace(ns, nil)
 			framework.ExpectNoError(err, "failed to create namespace: %s", ns)
 		}(n)
 	}
