@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -33,167 +34,188 @@ import (
 	"k8s.io/client-go/tools/record"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 func Test_NodesDeleted(t *testing.T) {
 	testcases := []struct {
-		name        string
-		fnh         *testutil.FakeNodeHandler
-		fakeCloud   *fakecloud.Cloud
-		deleteNodes []*v1.Node
+		name            string
+		fakeCloud       *fakecloud.Cloud
+		existingNode    *v1.Node
+		expectedNode    *v1.Node
+		expectedDeleted bool
 	}{
 		{
 			name: "node is not ready and does not exist",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
 				},
-				DeletedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
-			},
-			deleteNodes: []*v1.Node{
-				testutil.NewNode("node0"),
 			},
 		},
 		{
 			name: "node is not ready and provider returns err",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						},
-						Spec: v1.NodeSpec{
-							ProviderID: "node0",
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
 				},
-				DeletedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
 			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
 				ErrByProviderID:    errors.New("err!"),
 			},
-			deleteNodes: []*v1.Node{},
 		},
 		{
 			name: "node is not ready but still exists",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						},
-						Spec: v1.NodeSpec{
-							ProviderID: "node0",
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
 				},
-				DeletedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
 			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: true,
 			},
-			deleteNodes: []*v1.Node{},
 		},
 		{
 			name: "node ready condition is unknown, node doesn't exist",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionUnknown,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
 				},
-				DeletedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
-			},
-			deleteNodes: []*v1.Node{
-				testutil.NewNode("node0"),
 			},
 		},
 		{
 			name: "node ready condition is unknown, node exists",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionUnknown,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
 				},
-				DeletedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:       false,
 				ExistsByProviderID: true,
@@ -201,55 +223,68 @@ func Test_NodesDeleted(t *testing.T) {
 					types.NodeName("node0"): "foo://12345",
 				},
 			},
-			deleteNodes: []*v1.Node{},
 		},
 		{
 			name: "node is ready, but provider said it is deleted (maybe a bug in provider)",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-						},
-						Spec: v1.NodeSpec{
-							ProviderID: "node0",
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 						},
 					},
 				},
-				DeletedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
 			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
 			},
-			deleteNodes: []*v1.Node{},
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			informer := informers.NewSharedInformerFactory(testcase.fnh.Clientset, time.Second)
+			clientset := fake.NewSimpleClientset(testcase.existingNode)
+			informer := informers.NewSharedInformerFactory(clientset, time.Second)
 			nodeInformer := informer.Core().V1().Nodes()
 
-			if err := syncNodeStore(nodeInformer, testcase.fnh); err != nil {
+			if err := syncNodeStore(nodeInformer, clientset); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
 			eventBroadcaster := record.NewBroadcaster()
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				nodeLister:        nodeInformer.Lister(),
-				kubeClient:        testcase.fnh,
+				kubeClient:        clientset,
 				cloud:             testcase.fakeCloud,
 				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
 				nodeMonitorPeriod: 1 * time.Second,
@@ -258,10 +293,14 @@ func Test_NodesDeleted(t *testing.T) {
 			eventBroadcaster.StartLogging(klog.Infof)
 			cloudNodeLifecycleController.MonitorNodes()
 
-			if !reflect.DeepEqual(testcase.fnh.DeletedNodes, testcase.deleteNodes) {
-				t.Logf("actual nodes: %v", testcase.fnh.DeletedNodes)
-				t.Logf("expected nodes: %v", testcase.deleteNodes)
-				t.Error("unexpected deleted nodes")
+			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), testcase.existingNode.Name, metav1.GetOptions{})
+			if testcase.expectedDeleted != apierrors.IsNotFound(err) {
+				t.Fatalf("unexpected error happens when getting the node: %v", err)
+			}
+			if !reflect.DeepEqual(updatedNode, testcase.expectedNode) {
+				t.Logf("actual nodes: %v", updatedNode)
+				t.Logf("expected nodes: %v", testcase.expectedNode)
+				t.Error("unexpected updated nodes")
 			}
 		})
 	}
@@ -269,204 +308,191 @@ func Test_NodesDeleted(t *testing.T) {
 
 func Test_NodesShutdown(t *testing.T) {
 	testcases := []struct {
-		name         string
-		fnh          *testutil.FakeNodeHandler
-		fakeCloud    *fakecloud.Cloud
-		updatedNodes []*v1.Node
+		name            string
+		fakeCloud       *fakecloud.Cloud
+		existingNode    *v1.Node
+		expectedNode    *v1.Node
+		expectedDeleted bool
 	}{
 		{
 			name: "node is not ready and was shutdown, but exists",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
-						},
-						Spec: v1.NodeSpec{
-							ProviderID: "node0",
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
 						},
 					},
 				},
-				UpdatedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+					Taints: []v1.Taint{
+						*ShutdownTaint,
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            true,
 				ExistsByProviderID:      true,
 				ErrShutdownByProviderID: nil,
 			},
-			updatedNodes: []*v1.Node{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "node0",
-						CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
-					},
-					Spec: v1.NodeSpec{
-						ProviderID: "node0",
-						Taints: []v1.Taint{
-							*ShutdownTaint,
-						},
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{
-								Type:               v1.NodeReady,
-								Status:             v1.ConditionFalse,
-								LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-								LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-							},
-						},
-					},
-				},
-			},
 		},
 		{
 			name: "node is not ready, but there is error checking if node is shutdown",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
 						},
 					},
 				},
-				UpdatedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            false,
 				ErrShutdownByProviderID: errors.New("err!"),
 			},
-			updatedNodes: []*v1.Node{},
 		},
 		{
 			name: "node is not ready and is not shutdown",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionFalse,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
 						},
 					},
 				},
-				UpdatedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            false,
 				ErrShutdownByProviderID: nil,
 			},
-			updatedNodes: []*v1.Node{},
 		},
 		{
 			name: "node is ready but provider says it's shutdown (maybe a bug by provider)",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionTrue,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
 						},
 					},
 				},
-				UpdatedNodes: []*v1.Node{},
-				Clientset:    fake.NewSimpleClientset(),
 			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			expectedDeleted: false,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            true,
 				ErrShutdownByProviderID: nil,
 			},
-			updatedNodes: []*v1.Node{},
 		},
 		{
 			name: "node is shutdown but provider says it does not exist",
-			fnh: &testutil.FakeNodeHandler{
-				Existing: []*v1.Node{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "node0",
-							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
-						},
-						Status: v1.NodeStatus{
-							Conditions: []v1.NodeCondition{
-								{
-									Type:               v1.NodeReady,
-									Status:             v1.ConditionUnknown,
-									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
-								},
-							},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.Local),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
 						},
 					},
 				},
-				Clientset:    fake.NewSimpleClientset(),
-				UpdatedNodes: []*v1.Node{},
 			},
+			expectedDeleted: true,
 			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            true,
 				ExistsByProviderID:      false,
 				ErrShutdownByProviderID: nil,
 			},
-			updatedNodes: []*v1.Node{}, // should be empty because node does not exist
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			informer := informers.NewSharedInformerFactory(testcase.fnh.Clientset, time.Second)
+			clientset := fake.NewSimpleClientset(testcase.existingNode)
+			informer := informers.NewSharedInformerFactory(clientset, time.Second)
 			nodeInformer := informer.Core().V1().Nodes()
 
-			if err := syncNodeStore(nodeInformer, testcase.fnh); err != nil {
+			if err := syncNodeStore(nodeInformer, clientset); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
 			eventBroadcaster := record.NewBroadcaster()
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				nodeLister:        nodeInformer.Lister(),
-				kubeClient:        testcase.fnh,
+				kubeClient:        clientset,
 				cloud:             testcase.fakeCloud,
 				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
 				nodeMonitorPeriod: 1 * time.Second,
@@ -475,17 +501,21 @@ func Test_NodesShutdown(t *testing.T) {
 			eventBroadcaster.StartLogging(klog.Infof)
 			cloudNodeLifecycleController.MonitorNodes()
 
-			if !reflect.DeepEqual(testcase.fnh.UpdatedNodes, testcase.updatedNodes) {
-				t.Logf("actual nodes: %v", testcase.fnh.UpdatedNodes)
-				t.Logf("expected nodes: %v", testcase.updatedNodes)
+			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), testcase.existingNode.Name, metav1.GetOptions{})
+			if testcase.expectedDeleted != apierrors.IsNotFound(err) {
+				t.Fatalf("unexpected error happens when getting the node: %v", err)
+			}
+			if !reflect.DeepEqual(updatedNode, testcase.expectedNode) {
+				t.Logf("actual nodes: %v", updatedNode)
+				t.Logf("expected nodes: %v", testcase.expectedNode)
 				t.Error("unexpected updated nodes")
 			}
 		})
 	}
 }
 
-func syncNodeStore(nodeinformer coreinformers.NodeInformer, f *testutil.FakeNodeHandler) error {
-	nodes, err := f.List(context.TODO(), metav1.ListOptions{})
+func syncNodeStore(nodeinformer coreinformers.NodeInformer, f *fake.Clientset) error {
+	nodes, err := f.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
