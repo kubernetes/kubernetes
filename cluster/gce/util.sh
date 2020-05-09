@@ -3382,7 +3382,7 @@ function check-cluster() {
   local start_time=$(date +%s)
   local curl_out=$(mktemp)
   kube::util::trap_add "rm -f ${curl_out}" EXIT
-  until curl --cacert "${CERT_DIR}/pki/ca.crt" \
+  until curl -vsS --cacert "${CERT_DIR}/pki/ca.crt" \
           -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           ${secure} \
           --max-time 5 --fail \
