@@ -54,33 +54,44 @@ func TestIsMasterNode(t *testing.T) {
 func TestGetLastSegment(t *testing.T) {
 	tests := []struct {
 		ID        string
+		separator string
 		expected  string
 		expectErr bool
 	}{
 		{
 			ID:        "",
+			separator: "/",
 			expected:  "",
 			expectErr: true,
 		},
 		{
 			ID:        "foo/",
+			separator: "/",
 			expected:  "",
 			expectErr: true,
 		},
 		{
 			ID:        "foo/bar",
+			separator: "/",
 			expected:  "bar",
 			expectErr: false,
 		},
 		{
 			ID:        "foo/bar/baz",
+			separator: "/",
 			expected:  "baz",
+			expectErr: false,
+		},
+		{
+			ID:        "k8s-agentpool-36841236-vmss_1",
+			separator: "_",
+			expected:  "1",
 			expectErr: false,
 		},
 	}
 
 	for _, test := range tests {
-		s, e := getLastSegment(test.ID)
+		s, e := getLastSegment(test.ID, test.separator)
 		if test.expectErr && e == nil {
 			t.Errorf("Expected err, but it was nil")
 			continue
