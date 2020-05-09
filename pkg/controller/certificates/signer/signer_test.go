@@ -42,7 +42,7 @@ import (
 func TestSigner(t *testing.T) {
 	clock := clock.FakeClock{}
 
-	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
+	s, err := newSigner(capi.LegacyUnknownSignerName, "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -118,6 +118,8 @@ func TestHandle(t *testing.T) {
 		signerName string
 		// if true, expect an error to be returned
 		err bool
+		// if true, expect an error to be returned during construction
+		constructionErr bool
 		// additional verification function
 		verify func(*testing.T, []testclient.Action)
 	}{
@@ -206,9 +208,10 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
-			name:       "should do nothing if an unrecognised signerName is used",
-			signerName: "kubernetes.io/not-recognised",
-			approved:   true,
+			name:            "should do nothing if an unrecognised signerName is used",
+			signerName:      "kubernetes.io/not-recognised",
+			constructionErr: true,
+			approved:        true,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -225,9 +228,10 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
-			name:       "should do nothing if signerName does not start with kubernetes.io",
-			signerName: "example.com/sample-name",
-			approved:   true,
+			name:            "should do nothing if signerName does not start with kubernetes.io",
+			signerName:      "example.com/sample-name",
+			constructionErr: true,
+			approved:        true,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -235,9 +239,10 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
-			name:       "should do nothing if signerName starts with kubernetes.io but is unrecognised",
-			signerName: "kubernetes.io/not-a-real-signer",
-			approved:   true,
+			name:            "should do nothing if signerName starts with kubernetes.io but is unrecognised",
+			signerName:      "kubernetes.io/not-a-real-signer",
+			constructionErr: true,
+			approved:        true,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -249,9 +254,17 @@ func TestHandle(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			client := &fake.Clientset{}
-			s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour)
-			if err != nil {
+			s, err := newSigner(c.signerName, "./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour)
+			switch {
+			case c.constructionErr && err != nil:
+				return
+			case c.constructionErr && err == nil:
+				t.Fatalf("expected failure during construction of controller")
+			case !c.constructionErr && err != nil:
 				t.Fatalf("failed to create signer: %v", err)
+
+			case !c.constructionErr && err == nil:
+				// continue with rest of test
 			}
 
 			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, usages: c.usages, org: c.org, dnsNames: c.dnsNames})
