@@ -1,4 +1,6 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+licenses(["notice"])
 
 go_library(
     name = "go_default_library",
@@ -7,8 +9,7 @@ go_library(
         "ipvs.go",
         "netlink.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/docker/libnetwork/ipvs",
-    importpath = "github.com/docker/libnetwork/ipvs",
+    importpath = "k8s.io/kubernetes/third_party/forked/ipvs",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -39,4 +40,10 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["netlink_test.go"],
+    embed = [":go_default_library"],
 )

@@ -27,8 +27,8 @@ import (
 	"syscall"
 	"time"
 
-	libipvs "github.com/docker/libnetwork/ipvs"
 	"k8s.io/klog"
+	libipvs "k8s.io/kubernetes/third_party/forked/ipvs"
 	utilexec "k8s.io/utils/exec"
 )
 

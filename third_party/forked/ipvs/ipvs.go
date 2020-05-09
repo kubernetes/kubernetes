@@ -1,5 +1,8 @@
 // +build linux
 
+// Code and documentation copyright 2015 Docker, inc.
+// Code released under the Apache 2.0 license. Docs released under Creative commons.
+
 package ipvs
 
 import (
