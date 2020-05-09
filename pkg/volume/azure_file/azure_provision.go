@@ -36,8 +36,12 @@ import (
 	utilstrings "k8s.io/utils/strings"
 )
 
-var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
-var _ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
+var (
+	_ volume.DeletableVolumePlugin     = &azureFilePlugin{}
+	_ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
+
+	resourceGroupAnnotation = "kubernetes.io/azure-file-resource-group"
+)
 
 // Abstract interface to file share operations.
 // azure cloud provider should implement it
@@ -61,6 +65,9 @@ func (plugin *azureFilePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, er
 	if err != nil {
 		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
+	}
+	if spec.PersistentVolume != nil && spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation] != "" {
+		resourceGroup = spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation]
 	}
 
 	return plugin.newDeleterInternal(spec, &azureSvc{}, azure, resourceGroup)
@@ -94,13 +101,16 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 }
 
 func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	azure, _, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
 	if len(options.PVC.Spec.AccessModes) == 0 {
 		options.PVC.Spec.AccessModes = plugin.GetAccessModes()
+	}
+	if resourceGroup != "" {
+		options.PVC.ObjectMeta.Annotations[resourceGroupAnnotation] = resourceGroup
 	}
 	return plugin.newProvisionerInternal(options, azure)
 }
@@ -181,6 +191,10 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		shareName = strings.Replace(name, "--", "-", -1)
 	}
 
+	if resourceGroup == "" {
+		resourceGroup = a.options.PVC.ObjectMeta.Annotations[resourceGroupAnnotation]
+	}
+
 	// when use azure file premium, account kind should be specified as FileStorage
 	accountKind := string(storage.StorageV2)
 	if strings.HasPrefix(strings.ToLower(sku), "premium") {
@@ -203,6 +217,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			Labels: map[string]string{},
 			Annotations: map[string]string{
 				util.VolumeDynamicallyCreatedByKey: "azure-file-dynamic-provisioner",
+				resourceGroupAnnotation:            resourceGroup,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

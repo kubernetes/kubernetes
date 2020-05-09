@@ -169,6 +169,9 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 	if err != nil {
 		return oldSize, err
 	}
+	if spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation] != "" {
+		resourceGroup = spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation]
+	}
 
 	secretName, secretNamespace, err := getSecretNameAndNamespace(spec, spec.PersistentVolume.Spec.ClaimRef.Namespace)
 	if err != nil {
