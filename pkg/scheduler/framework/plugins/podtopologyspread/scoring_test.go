@@ -315,6 +315,68 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 		},
 		{
+			// matching pods spread as 2/1/0/3.
+			// With maxSkew=2, counts change internally to 2/1/1/3.
+			name: "one constraint on node, all 4 nodes are candidates, maxSkew=2",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(2, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d2").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d3").Node("node-d").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
+			},
+			failedNodes: []*v1.Node{},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 60},  // +20, compared to maxSkew=1
+				{Name: "node-b", Score: 100}, // +20, compared to maxSkew=1
+				{Name: "node-c", Score: 100},
+				{Name: "node-d", Score: 20}, // +20, compared to maxSkew=1
+			},
+		},
+		{
+			// matching pods spread as 4/3/2/1.
+			// With maxSkew=3, counts change internally to 4/3/2/2.
+			name: "one constraint on node, all 4 nodes are candidates, maxSkew=3",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(3, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b3").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c2").Node("node-c").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
+			},
+			failedNodes: []*v1.Node{},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 42},  // +28 compared to maxSkew=1
+				{Name: "node-b", Score: 71},  // +29 compared to maxSkew=1
+				{Name: "node-c", Score: 100}, // +29 compared to maxSkew=1
+				{Name: "node-d", Score: 100},
+			},
+		},
+		{
 			// matching pods spread as 4/2/1/~3~ (node4 is not a candidate)
 			name: "one constraint on node, 3 out of 4 nodes are candidates",
 			pod: st.MakePod().Name("p").Label("foo", "").
