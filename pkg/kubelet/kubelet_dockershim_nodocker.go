@@ -1,7 +1,7 @@
-// +build !linux,!windows,!dockerless
+// +build dockerless
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,16 +16,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockershim
+package kubelet
 
 import (
-	"context"
 	"fmt"
-
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
-// ImageFsInfo returns information of the filesystem that is used to store images.
-func (ds *dockerService) ImageFsInfo(_ context.Context, r *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+	kubeDeps *Dependencies,
+	crOptions *config.ContainerRuntimeOptions,
+	runtimeCgroups string,
+	remoteRuntimeEndpoint string,
+	remoteImageEndpoint string,
+	nonMasqueradeCIDR string) error {
+
+	return fmt.Errorf("trying to use docker runtime, w/ Kubelet compiled w/o docker support")
 }

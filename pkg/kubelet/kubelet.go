@@ -70,13 +70,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	"k8s.io/kubernetes/pkg/kubelet/legacy"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -213,7 +212,7 @@ type Dependencies struct {
 	CAdvisorInterface       cadvisor.Interface
 	Cloud                   cloudprovider.Interface
 	ContainerManager        cm.ContainerManager
-	DockerClientConfig      *dockershim.ClientConfig
+	DockerOptions           *DockerOptions
 	EventClient             v1core.EventsGetter
 	HeartbeatClient         clientset.Interface
 	OnHeartbeatFailure      func()
@@ -232,9 +231,18 @@ type Dependencies struct {
 	RemoteRuntimeService    internalapi.RuntimeService
 	RemoteImageService      internalapi.ImageManagerService
 	criHandler              http.Handler
-	dockerLegacyService     dockershim.DockerLegacyService
+	dockerLegacyService     legacy.DockerLegacyService
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
+}
+
+// DockerOptions contains docker specific configuration. Importantly, since it
+// lives outside of `dockershim`, it should not depend on the `docker/docker`
+// client library.
+type DockerOptions struct {
+	DockerEndpoint            string
+	RuntimeRequestTimeout     time.Duration
+	ImagePullProgressDeadline time.Duration
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -306,46 +314,15 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	switch containerRuntime {
 	case kubetypes.DockerContainerRuntime:
-		// TODO: These need to become arguments to a standalone docker shim.
-		pluginSettings := dockershim.NetworkPluginSettings{
-			HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
-			NonMasqueradeCIDR:  nonMasqueradeCIDR,
-			PluginName:         crOptions.NetworkPluginName,
-			PluginConfDir:      crOptions.CNIConfDir,
-			PluginBinDirString: crOptions.CNIBinDir,
-			PluginCacheDir:     crOptions.CNICacheDir,
-			MTU:                int(crOptions.NetworkPluginMTU),
-		}
-
-		// Create and start the CRI shim running as a grpc server.
-		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
-		ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
-			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
-		if err != nil {
-			return err
-		}
-		if crOptions.RedirectContainerStreaming {
-			kubeDeps.criHandler = ds
-		}
-
-		// The unix socket for kubelet <-> dockershim communication, dockershim start before runtime service init.
-		klog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
+		runDockershim(
+			kubeCfg,
+			kubeDeps,
+			crOptions,
+			runtimeCgroups,
 			remoteRuntimeEndpoint,
-			remoteImageEndpoint)
-		klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-		dockerServer := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
-		if err := dockerServer.Start(); err != nil {
-			return err
-		}
-
-		// Create dockerLegacyService when the logging driver is not supported.
-		supported, err := ds.IsCRISupportedLogDriver()
-		if err != nil {
-			return err
-		}
-		if !supported {
-			kubeDeps.dockerLegacyService = ds
-		}
+			remoteImageEndpoint,
+			nonMasqueradeCIDR,
+		)
 	case kubetypes.RemoteContainerRuntime:
 		// No-op.
 		break
@@ -1155,7 +1132,7 @@ type Kubelet struct {
 
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
-	dockerLegacyService dockershim.DockerLegacyService
+	dockerLegacyService legacy.DockerLegacyService
 
 	// StatsProvider provides the node and the container stats.
 	*stats.StatsProvider

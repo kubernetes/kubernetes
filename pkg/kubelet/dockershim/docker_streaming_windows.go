@@ -1,4 +1,4 @@
-// +build windows
+// +build windows,!dockerless
 
 /*
 Copyright 2019 The Kubernetes Authors.
