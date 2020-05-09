@@ -22,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/controllers/node:go_default_library",
         "//staging/src/k8s.io/cloud-provider/controllers/route:go_default_library",
         "//staging/src/k8s.io/cloud-provider/controllers/service:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
