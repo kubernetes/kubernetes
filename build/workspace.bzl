@@ -50,7 +50,7 @@ _ETCD_TARBALL_ARCH_SHA256 = {
 def release_dependencies():
     cni_tarballs()
     cri_tarballs()
-    debian_image_dependencies()
+    image_dependencies()
     etcd_tarballs()
 
 def cni_tarballs():
@@ -99,14 +99,37 @@ _DEBIAN_IPTABLES_DIGEST = {
     "s390x": "sha256:1b91a2788750552913377bf1bc99a095544dfb523d80a55674003c974c8e0905",
 }
 
+# Use skopeo to find these values: https://github.com/containers/skopeo
+#
+# Example
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/go-runner:v0.1.1
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/go-runner:v0.1.1
+_GO_RUNNER_DIGEST = {
+    "manifest": "sha256:4892faa2de0533bc1af72b9b233936f21a9e7362063345d170de1a8f464f2ad8",
+    "amd64": "sha256:821e48a96d46aa53d2f7f5ef9d9093ed69979957a0a7092d1c09c44d81028a9d",
+    "arm": "sha256:2cc042179887b6baa0792e156b53f4cb94181b1a99153790402bd8e517e8cf56",
+    "arm64": "sha256:00ca7f34275349330a5d8ddffd15e2980fe5b2cbdd410f063f4e7617e0e71c29",
+    "ppc64le": "sha256:3e25e0d0e9d17033f3e86d4af5787c7fc5f1173e174d77eebdc14df1a06f1c99",
+    "s390x": "sha256:3e34e290cd35a90285991a575e2e79fddfb161c66f13bc5662a1cc0a4ade32e0",
+}
+
 def _digest(d, arch):
     if arch not in d:
         print("WARNING: %s not found in %r" % (arch, d))
         return d["manifest"]
     return d[arch]
 
-def debian_image_dependencies():
+def image_dependencies():
     for arch in SERVER_PLATFORMS["linux"]:
+        container_pull(
+            name = "go-runner-linux-" + arch,
+            architecture = arch,
+            digest = _digest(_GO_RUNNER_DIGEST, arch),
+            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
+            repository = "go-runner",
+            tag = "v0.1.1",  # ignored, but kept here for documentation
+        )
+
         container_pull(
             name = "debian-base-" + arch,
             architecture = arch,

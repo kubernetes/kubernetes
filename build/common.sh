@@ -96,12 +96,13 @@ kube::build::get_docker_wrapped_binaries() {
   local arch=$1
   local debian_base_version=v2.1.0
   local debian_iptables_version=v12.1.0
+  local go_runner_version=v0.1.1
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
-    "kube-apiserver,${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
+    "kube-apiserver,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
     "kube-controller-manager,${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
-    "kube-scheduler,${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
+    "kube-scheduler,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
     "kube-proxy,${KUBE_BASE_IMAGE_REGISTRY}/debian-iptables-${arch}:${debian_iptables_version}"
   )
 

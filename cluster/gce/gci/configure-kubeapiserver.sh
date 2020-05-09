@@ -354,6 +354,7 @@ function start-kube-apiserver {
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
 
+  params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
