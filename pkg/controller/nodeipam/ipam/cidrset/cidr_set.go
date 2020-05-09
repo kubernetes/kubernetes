@@ -35,7 +35,7 @@ type CidrSet struct {
 	clusterMaskSize int
 	maxCIDRs        int
 	nextCandidate   int
-	used            big.Int
+	used            map[int]int
 	subNetMaskSize  int
 }
 
@@ -77,6 +77,7 @@ func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) (*CidrSet, error) {
 		clusterMaskSize: clusterMaskSize,
 		maxCIDRs:        maxCIDRs,
 		subNetMaskSize:  subNetMaskSize,
+		used:            make(map[int]int),
 	}, nil
 }
 
@@ -142,7 +143,7 @@ func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 	nextUnused := -1
 	for i := 0; i < s.maxCIDRs; i++ {
 		candidate := (i + s.nextCandidate) % s.maxCIDRs
-		if s.used.Bit(candidate) == 0 {
+		if s.used[candidate] == 0 {
 			nextUnused = candidate
 			break
 		}
@@ -152,7 +153,7 @@ func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 	}
 	s.nextCandidate = (nextUnused + 1) % s.maxCIDRs
 
-	s.used.SetBit(&s.used, nextUnused, 1)
+	s.used[nextUnused] = 1
 
 	return s.indexToCIDRBlock(nextUnused), nil
 }
@@ -216,7 +217,9 @@ func (s *CidrSet) Release(cidr *net.IPNet) error {
 	s.Lock()
 	defer s.Unlock()
 	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 0)
+		if s.used[i] > 0 {
+			s.used[i]--
+		}
 	}
 	return nil
 }
@@ -232,7 +235,7 @@ func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 	s.Lock()
 	defer s.Unlock()
 	for i := begin; i <= end; i++ {
-		s.used.SetBit(&s.used, i, 1)
+		s.used[i]++
 	}
 
 	return nil
