@@ -83,6 +83,7 @@ const (
 	// owner: @apelisse
 	// alpha: v1.12
 	// beta: v1.13
+	// stable: v1.18
 	//
 	// Allow requests to be processed but not stored, so that
 	// validation, merging, mutation can be tested without
@@ -165,7 +166,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DynamicAuditing:         {Default: false, PreRelease: featuregate.Alpha},
 	APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
-	DryRun:                  {Default: true, PreRelease: featuregate.Beta},
+	DryRun:                  {Default: true, PreRelease: featuregate.GA},
 	RemainingItemCount:      {Default: true, PreRelease: featuregate.Beta},
 	ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
 	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
