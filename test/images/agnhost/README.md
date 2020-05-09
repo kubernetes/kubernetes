@@ -392,8 +392,14 @@ Starts a HTTP(S) server on given port with the following endpoints:
     Acceptable values: `http`, `udp`, `sctp`.
   - `tries`: The number of times the request will be performed. Default value: `1`.
 - `/echo`: Returns the given `msg` (`/echo?msg=echoed_msg`)
-- `/exit`: Closes the server with the given code (`/exit?code=some-code`). The `code`
-  is expected to be an integer [0-127] or empty; if it is not, it will return an error message.
+- `/exit`: Closes the server with the given code and graceful shutdown. The endpoint's parameters
+	are:
+	- `code`: The exit code for the process. Default value: 0. Allows an integer [0-127].
+	- `timeout`: The amount of time to wait for connections to close before shutting down.
+		Acceptable values are golang durations. If 0 the process will exit immediately without
+		shutdown.
+	- `wait`: The amount of time to wait before starting shutdown. Acceptable values are
+	  golang durations. If 0 the process will start shutdown immediately.
 - `/healthz`: Returns `200 OK` if the server is ready, `412 Status Precondition Failed`
   otherwise. The server is considered not ready if the UDP server did not start yet or
   it exited.
