@@ -5,9 +5,11 @@ module k8s.io/csi-translation-lib
 go 1.12
 
 require (
+	github.com/stretchr/testify v1.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/cloud-provider v0.0.0
+	k8s.io/klog v1.0.0
 )
 
 replace (
