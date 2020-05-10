@@ -27,11 +27,11 @@ import (
 	"strings"
 
 	cloudprovider "k8s.io/cloud-provider"
+	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	"k8s.io/klog/v2"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
-	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	netutils "k8s.io/utils/net"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
