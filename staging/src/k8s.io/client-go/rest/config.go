@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	gruntime "runtime"
@@ -127,6 +128,13 @@ type Config struct {
 
 	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// Proxy is the the proxy func to be used for all requests made by this
+	// transport. If Proxy is nil, http.ProxyFromEnvironment is used. If Proxy
+	// returns a nil *URL, no proxy is used.
+	//
+	// socks5 proxying does not currently support spdy streaming endpoints.
+	Proxy func(*http.Request) (*url.URL, error)
 
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
@@ -560,6 +568,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		Burst:              config.Burst,
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
+		Proxy:              config.Proxy,
 	}
 }
 
@@ -601,5 +610,6 @@ func CopyConfig(config *Config) *Config {
 		RateLimiter:        config.RateLimiter,
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
+		Proxy:              config.Proxy,
 	}
 }

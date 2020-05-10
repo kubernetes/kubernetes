@@ -20,16 +20,17 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
-	"github.com/imdario/mergo"
-	"k8s.io/klog"
-
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog"
+
+	"github.com/imdario/mergo"
 )
 
 var (
@@ -150,6 +151,13 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	if configClusterInfo.ProxyURL != "" {
+		u, err := parseProxyURL(configClusterInfo.ProxyURL)
+		if err != nil {
+			return nil, err
+		}
+		clientConfig.Proxy = http.ProxyURL(u)
+	}
 
 	if len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)

@@ -23,10 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/imdario/mergo"
-
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/imdario/mergo"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -328,6 +328,84 @@ func TestCertificateData(t *testing.T) {
 	matchByteArg(caData, clientConfig.TLSClientConfig.CAData, t)
 	matchByteArg(certData, clientConfig.TLSClientConfig.CertData, t)
 	matchByteArg(keyData, clientConfig.TLSClientConfig.KeyData, t)
+}
+
+func TestProxyURL(t *testing.T) {
+	tests := []struct {
+		desc      string
+		proxyURL  string
+		expectErr bool
+	}{
+		{
+			desc: "no proxy-url",
+		},
+		{
+			desc:     "socks5 proxy-url",
+			proxyURL: "socks5://example.com",
+		},
+		{
+			desc:     "https proxy-url",
+			proxyURL: "https://example.com",
+		},
+		{
+			desc:     "http proxy-url",
+			proxyURL: "http://example.com",
+		},
+		{
+			desc:      "bad scheme proxy-url",
+			proxyURL:  "socks6://example.com",
+			expectErr: true,
+		},
+		{
+			desc:      "no scheme proxy-url",
+			proxyURL:  "example.com",
+			expectErr: true,
+		},
+		{
+			desc:      "not a url proxy-url",
+			proxyURL:  "chewbacca@example.com",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.proxyURL, func(t *testing.T) {
+
+			config := clientcmdapi.NewConfig()
+			config.Clusters["clean"] = &clientcmdapi.Cluster{
+				Server:   "https://localhost:8443",
+				ProxyURL: test.proxyURL,
+			}
+			config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{}
+			config.Contexts["clean"] = &clientcmdapi.Context{
+				Cluster:  "clean",
+				AuthInfo: "clean",
+			}
+			config.CurrentContext = "clean"
+
+			clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil)
+
+			clientConfig, err := clientBuilder.ClientConfig()
+			if test.expectErr {
+				if err == nil {
+					t.Fatal("Expected error constructing config")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error constructing config: %v", err)
+			}
+
+			if test.proxyURL == "" {
+				return
+			}
+			gotURL, err := clientConfig.Proxy(nil)
+			if err != nil {
+				t.Fatalf("Unexpected error from proxier: %v", err)
+			}
+			matchStringArg(test.proxyURL, gotURL.String(), t)
+		})
+	}
 }
 
 func TestBasicAuthData(t *testing.T) {
