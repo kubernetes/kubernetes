@@ -482,14 +482,26 @@ func GetClientURL(localEndpoint *kubeadmapi.APIEndpoint) string {
 	return "https://" + net.JoinHostPort(localEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenClientPort))
 }
 
+// GetClientURLByIP creates an HTTPS URL based on an IP address
+// and the client listening port.
+func GetClientURLByIP(ip string) string {
+	return "https://" + net.JoinHostPort(ip, strconv.Itoa(constants.EtcdListenClientPort))
+}
+
 // GetPeerURL creates an HTTPS URL that uses the configured advertise
 // address and peer port for the API controller
 func GetPeerURL(localEndpoint *kubeadmapi.APIEndpoint) string {
 	return "https://" + net.JoinHostPort(localEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdListenPeerPort))
 }
 
-// GetClientURLByIP creates an HTTPS URL based on an IP address
+// GetMetricsURL creates an HTTP URL that uses the configured advertise
+// address and client port for the API controller
+func GetMetricsURL(localEndpoint *kubeadmapi.APIEndpoint) string {
+	return "http://" + net.JoinHostPort(localEndpoint.AdvertiseAddress, strconv.Itoa(constants.EtcdMetricsPort))
+}
+
+// GetMeticsURLByIP creates an HTTP URL based on an IP address
 // and the client listening port.
-func GetClientURLByIP(ip string) string {
-	return "https://" + net.JoinHostPort(ip, strconv.Itoa(constants.EtcdListenClientPort))
+func GetMeticsURLByIP(ip string) string {
+	return "http://" + net.JoinHostPort(ip, strconv.Itoa(constants.EtcdMetricsPort))
 }
