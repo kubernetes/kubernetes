@@ -6,7 +6,8 @@ go_library(
         "controller.go",
         "doc.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/controller/service",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/controllers/service",
+    importpath = "k8s.io/cloud-provider/controllers/service",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -65,10 +66,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/controller/service/config:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
