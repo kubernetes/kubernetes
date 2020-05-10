@@ -18,15 +18,9 @@ package flowcontrol
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
-
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
 
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -161,66 +156,34 @@ func getMetrics(c clientset.Interface) (string, error) {
 	return string(resp), err
 }
 
-func getSharedConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int, error) {
+func getSharedConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int64, error) {
 	resp, err := getMetrics(c)
 	if err != nil {
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
+	metric := testutil.NewMetrics()
+	if err := testutil.ParseMetrics(string(resp), &metric); err != nil {
+		return nil, err
 	}
 
-	concurrency := make(map[string]int)
-	for {
-		var v model.Vector
-		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				return concurrency, nil
-			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
-		}
-		for _, metric := range v {
-			switch name := string(metric.Metric[model.MetricNameLabel]); name {
-			case sharedConcurrencyMetricsName:
-				concurrency[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
-			}
-		}
-	}
+	concurrency := testutil.GetMetricValuesForLabel(metric, sharedConcurrencyMetricsName, labelPriorityLevel)
+	return concurrency, nil
 }
 
-func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, error) {
+func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int64, error) {
 	resp, err := getMetrics(c)
 	if err != nil {
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
+	metric := testutil.NewMetrics()
+	if err := testutil.ParseMetrics(string(resp), &metric); err != nil {
+		return nil, err
 	}
 
-	reqCounts := make(map[string]int)
-	for {
-		var v model.Vector
-		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				return reqCounts, nil
-			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
-		}
-		for _, metric := range v {
-			switch name := string(metric.Metric[model.MetricNameLabel]); name {
-			case dispatchedRequestCountMetricsName:
-				reqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
-			}
-		}
-	}
+	reqCounts := testutil.GetMetricValuesForLabel(metric, dispatchedRequestCountMetricsName, labelPriorityLevel)
+	return reqCounts, nil
 }
 
 func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrolv1alpha1.PriorityLevelConfiguration, *flowcontrolv1alpha1.FlowSchema, error) {
