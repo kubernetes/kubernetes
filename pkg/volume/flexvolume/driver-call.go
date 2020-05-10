@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"k8s.io/klog"
@@ -122,6 +123,16 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 	}
 	execPath := dc.plugin.getExecutable()
 
+	if st, err := os.Stat(execPath); err != nil {
+		return nil, errors.New(fmt.Sprintf(">>>> unable to stat file : %q", err))
+	} else {
+		klog.Warningf(">>>> stat for %s : %#v", execPath, st)
+		klog.Warningf(">>>> File name:", st.Name())
+		klog.Warningf(">>>> Size in bytes:", st.Size())
+		klog.Warningf(">>>> Permissions:", st.Mode())
+		klog.Warningf(">>>> Last modified:", st.ModTime())
+		klog.Warningf(">>>> Is Directory: ", st.IsDir())
+	}
 	cmd := dc.plugin.runner.Command(execPath, dc.args...)
 
 	timeout := false
