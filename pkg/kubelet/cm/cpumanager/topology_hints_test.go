@@ -50,24 +50,19 @@ func TestGetTopologyHints(t *testing.T) {
 		Topology: []cadvisorapi.Node{
 			{Id: 0,
 				Cores: []cadvisorapi.Core{
-					{Id: 0, Threads: []int{0, 6}},
-					{Id: 1, Threads: []int{1, 7}},
-					{Id: 2, Threads: []int{2, 8}},
+					{SocketID: 0, Id: 0, Threads: []int{0, 6}},
+					{SocketID: 0, Id: 1, Threads: []int{1, 7}},
+					{SocketID: 0, Id: 2, Threads: []int{2, 8}},
 				},
 			},
 			{Id: 1,
 				Cores: []cadvisorapi.Core{
-					{Id: 0, Threads: []int{3, 9}},
-					{Id: 1, Threads: []int{4, 10}},
-					{Id: 2, Threads: []int{5, 11}},
+					{SocketID: 1, Id: 0, Threads: []int{3, 9}},
+					{SocketID: 1, Id: 1, Threads: []int{4, 10}},
+					{SocketID: 1, Id: 2, Threads: []int{5, 11}},
 				},
 			},
 		},
-	}
-
-	numaNodeInfo := topology.NUMANodeInfo{
-		0: cpuset.NewCPUSet(0, 6, 1, 7, 2, 8),
-		1: cpuset.NewCPUSet(3, 9, 4, 10, 5, 11),
 	}
 
 	tcases := []struct {
@@ -237,7 +232,7 @@ func TestGetTopologyHints(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		topology, _ := topology.Discover(&machineInfo, numaNodeInfo)
+		topology, _ := topology.Discover(&machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
