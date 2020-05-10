@@ -30,6 +30,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -406,6 +408,25 @@ type testServiceLister struct {
 
 func (ls testServiceLister) List(labels.Selector) ([]*v1.Service, error) {
 	return ls.services, nil
+}
+
+func (ls testServiceLister) Get(name string) (*v1.Service, error) {
+	for _, service := range ls.services {
+		if service.ObjectMeta.Name == name {
+			return service, nil
+		}
+	}
+	return nil, apierrors.NewNotFound(v1.Resource("service"), name)
+}
+
+func (ls testServiceLister) Services(namespace string) corelisters.ServiceNamespaceLister {
+	filterServices := []*v1.Service{}
+	for _, service := range ls.services {
+		if service.ObjectMeta.Namespace == namespace {
+			filterServices = append(filterServices, service)
+		}
+	}
+	return &testServiceLister{services: filterServices}
 }
 
 type envs []kubecontainer.EnvVar

@@ -42,7 +42,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -822,10 +821,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	return klet, nil
 }
 
-type serviceLister interface {
-	List(labels.Selector) ([]*v1.Service, error)
-}
-
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	kubeletConfiguration kubeletconfiginternal.KubeletConfiguration
@@ -888,7 +883,7 @@ type Kubelet struct {
 	// masterServiceNamespace is the namespace that the master service is exposed in.
 	masterServiceNamespace string
 	// serviceLister knows how to list services
-	serviceLister serviceLister
+	serviceLister corelisters.ServiceLister
 	// serviceHasSynced indicates whether services have been sync'd at least once.
 	// Check this before trusting a response from the lister.
 	serviceHasSynced cache.InformerSynced

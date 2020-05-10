@@ -493,7 +493,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	return opts, cleanupAction, nil
 }
 
-var masterServices = sets.NewString("kubernetes")
+var masterServiceName = "kubernetes"
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a
 // pod in namespace ns should see.
@@ -509,30 +509,34 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 		// Kubelets without masters (e.g. plain GCE ContainerVM) don't set env vars.
 		return m, nil
 	}
-	services, err := kl.serviceLister.List(labels.Everything())
-	if err != nil {
-		return m, fmt.Errorf("failed to list services when setting up env vars")
+
+	// add environment variables for other services in the same namespace,
+	// if enableServiceLinks is true.
+	if enableServiceLinks {
+		services, err := kl.serviceLister.Services(ns).List(labels.Everything())
+		if err != nil {
+			return m, fmt.Errorf("failed to list services when setting up env vars")
+		}
+
+		for _, service := range services {
+			// ignore services where ClusterIP is "None" or empty
+			if !v1helper.IsServiceIPSet(service) {
+				continue
+			}
+
+			serviceMap[service.Name] = service
+		}
 	}
 
-	// project the services in namespace ns onto the master services
-	for i := range services {
-		service := services[i]
-		// ignore services where ClusterIP is "None" or empty
-		if !v1helper.IsServiceIPSet(service) {
-			continue
+	// always add environment variables for the master service if no service
+	// in the local namespace already populated information for that service name
+	if _, hasMasterService := serviceMap[masterServiceName]; !hasMasterService {
+		masterService, err := kl.serviceLister.Services(kl.masterServiceNamespace).Get(masterServiceName)
+		if err != nil && !errors.IsNotFound(err) {
+			return m, fmt.Errorf("failed to get %s service", masterServiceName)
 		}
-		serviceName := service.Name
-
-		// We always want to add environment variabled for master services
-		// from the master service namespace, even if enableServiceLinks is false.
-		// We also add environment variables for other services in the same
-		// namespace, if enableServiceLinks is true.
-		if service.Namespace == kl.masterServiceNamespace && masterServices.Has(serviceName) {
-			if _, exists := serviceMap[serviceName]; !exists {
-				serviceMap[serviceName] = service
-			}
-		} else if service.Namespace == ns && enableServiceLinks {
-			serviceMap[serviceName] = service
+		if err == nil && v1helper.IsServiceIPSet(masterService) {
+			serviceMap[masterService.Name] = masterService
 		}
 	}
 
