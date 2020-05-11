@@ -144,8 +144,8 @@ func (es mockScheduler) Schedule(ctx context.Context, profile *profile.Profile, 
 func (es mockScheduler) Extenders() []core.SchedulerExtender {
 	return nil
 }
-func (es mockScheduler) Preempt(ctx context.Context, i *profile.Profile, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
-	return nil, nil, nil, nil
+func (es mockScheduler) Preempt(ctx context.Context, i *profile.Profile, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (string, []*v1.Pod, []*v1.Pod, error) {
+	return "", nil, nil, nil
 }
 
 func TestSchedulerCreation(t *testing.T) {

@@ -499,10 +499,10 @@ func (f *fakeExtender) IsIgnorable() bool {
 }
 
 func (f *fakeExtender) ProcessPreemption(
-	pod *v1.Pod,
-	nodeToVictims map[*v1.Node]*extenderv1.Victims,
-	nodeInfos framework.NodeInfoLister,
-) (map[*v1.Node]*extenderv1.Victims, error) {
+	_ *v1.Pod,
+	_ map[string]*extenderv1.Victims,
+	_ framework.NodeInfoLister,
+) (map[string]*extenderv1.Victims, error) {
 	return nil, nil
 }
 
@@ -515,8 +515,8 @@ func (f *fakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) (filteredNodes []*v
 }
 
 func (f *fakeExtender) Prioritize(
-	pod *v1.Pod,
-	nodes []*v1.Node,
+	_ *v1.Pod,
+	_ []*v1.Node,
 ) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error) {
 	return nil, 0, nil
 }
