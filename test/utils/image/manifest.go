@@ -32,6 +32,7 @@ type RegistryList struct {
 	DockerGluster           string `yaml:"dockerGluster"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
+	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
@@ -73,6 +74,7 @@ func initReg() RegistryList {
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		// TODO: After the domain flip, this should instead be k8s.gcr.io/k8s-artifacts-prod/e2e-test-images
 		PromoterE2eRegistry: "us.gcr.io/k8s-artifacts-prod/e2e-test-images",
+		BuildImageRegistry:  "us.gcr.io/k8s-artifacts-prod/build-image",
 		InvalidRegistry:     "invalid.com/invalid",
 		GcRegistry:          "k8s.gcr.io",
 		GcrReleaseRegistry:  "gcr.io/gke-release",
@@ -106,6 +108,7 @@ var (
 	dockerGluster           = registry.DockerGluster
 	e2eRegistry             = registry.E2eRegistry
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
+	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
@@ -141,6 +144,8 @@ const (
 	CudaVectorAdd
 	// CudaVectorAdd2 image
 	CudaVectorAdd2
+	// DebianIptables Image
+	DebianIptables
 	// EchoServer image
 	EchoServer
 	// Etcd image
@@ -210,6 +215,7 @@ func initImageConfigs() map[int]Config {
 	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
+	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "v12.1.0"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.7"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}

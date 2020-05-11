@@ -18,7 +18,6 @@ package network
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"net"
@@ -35,6 +34,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	netutils "k8s.io/utils/net"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -81,8 +81,6 @@ var _ = SIGDescribe("Network", func() {
 		}
 
 		// Create a pod to check the conntrack entries on the host node
-		// It mounts the host /proc/net folder to be able to access
-		// the nf_conntrack file with the host conntrack entries
 		privileged := true
 
 		hostExecPod := &v1.Pod{
@@ -97,43 +95,17 @@ var _ = SIGDescribe("Network", func() {
 				Containers: []v1.Container{
 					{
 						Name:            "e2e-net-exec",
-						Image:           kubeProxyE2eImage,
+						Image:           imageutils.GetE2EImage(imageutils.DebianIptables),
 						ImagePullPolicy: v1.PullIfNotPresent,
-						Args:            []string{"pause"},
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      "proc-net",
-								MountPath: "/rootfs/proc/net",
-								ReadOnly:  true,
-							},
-						},
+						Command:         []string{"sleep", "600"},
 						SecurityContext: &v1.SecurityContext{
 							Privileged: &privileged,
-						},
-					},
-				},
-				Volumes: []v1.Volume{
-					{
-						Name: "proc-net",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/proc/net",
-							},
 						},
 					},
 				},
 			},
 		}
 		fr.PodClient().CreateSync(hostExecPod)
-		defer fr.PodClient().DeleteSync(hostExecPod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-
-		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
-		_, err = framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec",
-			"ls /rootfs/proc/net/nf_conntrack")
-		if err != nil && strings.Contains(err.Error(), "No such file or directory") {
-			e2eskipper.Skipf("The node %s does not support /proc/net/nf_conntrack", clientNodeInfo.name)
-		}
-		framework.ExpectNoError(err)
 
 		// Create the client and server pods
 		clientPodSpec := &v1.Pod{
@@ -202,7 +174,6 @@ var _ = SIGDescribe("Network", func() {
 			serverNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(serverPodSpec)
-		defer fr.PodClient().DeleteSync(serverPodSpec.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
 		// The server should be listening before spawning the client pod
 		if readyErr := e2epod.WaitForPodsReady(fr.ClientSet, fr.Namespace.Name, serverPodSpec.Name, 0); readyErr != nil {
@@ -215,22 +186,25 @@ var _ = SIGDescribe("Network", func() {
 			clientNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(clientPodSpec)
-		defer fr.PodClient().DeleteSync(clientPodSpec.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
-		ginkgo.By("Checking /proc/net/nf_conntrack for the timeout")
+		ginkgo.By("Checking conntrack entries for the timeout")
 		// These must be synchronized from the default values set in
 		// pkg/apis/../defaults.go ConntrackTCPCloseWaitTimeout. The
 		// current defaults are hidden in the initialization code.
 		const epsilonSeconds = 60
 		const expectedTimeoutSeconds = 60 * 60
 		// the conntrack file uses the IPv6 expanded format
-		ip := fullIPv6(net.ParseIP(serverNodeInfo.nodeIP))
+		ip := serverNodeInfo.nodeIP
+		ipFamily := "ipv4"
+		if netutils.IsIPv6String(ip) {
+			ipFamily = "ipv6"
+		}
 		// Obtain the corresponding conntrack entry on the host checking
 		// the nf_conntrack file from the pod e2e-net-exec.
 		// It retries in a loop if the entry is not found.
-		cmd := fmt.Sprintf("cat /rootfs/proc/net/nf_conntrack "+
-			"| grep -m 1 'CLOSE_WAIT.*dst=%v.*dport=%v' ",
-			ip, testDaemonTCPPort)
+		cmd := fmt.Sprintf("conntrack -L -f %s -d %v"+
+			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
+			ipFamily, ip, testDaemonTCPPort)
 		if err := wait.PollImmediate(1*time.Second, postFinTimeoutSeconds, func() (bool, error) {
 			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
@@ -239,15 +213,14 @@ var _ = SIGDescribe("Network", func() {
 				return false, nil
 			}
 			framework.Logf("conntrack entry for node %v and port %v:  %v", serverNodeInfo.nodeIP, testDaemonTCPPort, result)
-			// Timeout in seconds is available as the fifth column of
-			// the matched entry in /proc/net/nf_conntrack.
+			// Timeout in seconds is available as the third column of the matched entry
 			line := strings.Fields(result)
-			if len(line) < 5 {
+			if len(line) < 3 {
 				return false, fmt.Errorf("conntrack entry does not have a timeout field: %v", line)
 			}
-			timeoutSeconds, err := strconv.Atoi(line[4])
+			timeoutSeconds, err := strconv.Atoi(line[2])
 			if err != nil {
-				return false, fmt.Errorf("failed to convert matched timeout %s to integer: %v", line[4], err)
+				return false, fmt.Errorf("failed to convert matched timeout %s to integer: %v", line[2], err)
 			}
 			if math.Abs(float64(timeoutSeconds-expectedTimeoutSeconds)) < epsilonSeconds {
 				return true, nil
@@ -372,22 +345,3 @@ var _ = SIGDescribe("Network", func() {
 		}
 	})
 })
-
-// fullIPv6 returns a string with the IP representation
-// if IPv6 it returns the expanded address format
-// credit https://stackoverflow.com/a/52003106/4532704
-func fullIPv6(ip net.IP) string {
-	if ip.To4() == nil {
-		dst := make([]byte, hex.EncodedLen(len(ip)))
-		_ = hex.Encode(dst, ip)
-		return string(dst[0:4]) + ":" +
-			string(dst[4:8]) + ":" +
-			string(dst[8:12]) + ":" +
-			string(dst[12:16]) + ":" +
-			string(dst[16:20]) + ":" +
-			string(dst[20:24]) + ":" +
-			string(dst[24:28]) + ":" +
-			string(dst[28:])
-	}
-	return ip.String()
-}
