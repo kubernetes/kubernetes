@@ -93,6 +93,8 @@ type KubeSchedulerConfiguration struct {
 	// Duration to wait for a binding operation to complete before timing out
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
+	// DEPRECATED: BindTimeoutSeconds in deprecated.
+	// TODO(#90958) Remove this and the versioned counterparts in future API versions.
 	BindTimeoutSeconds int64
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.

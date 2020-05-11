@@ -115,3 +115,13 @@ type ServiceAffinityArgs struct {
 	// AntiAffinityLabelsPreference are the labels to consider for service anti affinity scoring.
 	AntiAffinityLabelsPreference []string
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeBindingArgs holds arguments used to configure the VolumeBinding plugin.
+type VolumeBindingArgs struct {
+	metav1.TypeMeta
+
+	// BindTimeoutSeconds is the timeout in seconds in volume binding.
+	BindTimeoutSeconds int64
+}

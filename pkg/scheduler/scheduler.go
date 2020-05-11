@@ -34,11 +34,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -47,8 +47,6 @@ import (
 )
 
 const (
-	// BindTimeoutSeconds defines the default bind timeout
-	BindTimeoutSeconds = 100
 	// SchedulerError is the reason recorded for events when an error occurs during scheduling a pod.
 	SchedulerError = "SchedulerError"
 	// Percentage of plugin metrics to be sampled.
@@ -100,9 +98,6 @@ type Scheduler struct {
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
-
-	// VolumeBinder handles PVC/PV binding for the pod.
-	VolumeBinder scheduling.SchedulerVolumeBinder
 
 	// Disable pod preemption or not.
 	DisablePreemption bool
@@ -223,7 +218,7 @@ var defaultSchedulerOptions = schedulerOptions{
 	},
 	disablePreemption:        false,
 	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-	bindTimeoutSeconds:       BindTimeoutSeconds,
+	bindTimeoutSeconds:       volumebinding.DefaultBindTimeoutSeconds,
 	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 }
@@ -247,15 +242,6 @@ func New(client clientset.Interface,
 	}
 
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-	volumeBinder := scheduling.NewVolumeBinder(
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Storage().V1().CSINodes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Storage().V1().StorageClasses(),
-		time.Duration(options.bindTimeoutSeconds)*time.Second,
-	)
 
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
@@ -269,7 +255,6 @@ func New(client clientset.Interface,
 		recorderFactory:          recorderFactory,
 		informerFactory:          informerFactory,
 		podInformer:              podInformer,
-		volumeBinder:             volumeBinder,
 		schedulerCache:           schedulerCache,
 		StopEverything:           stopEverything,
 		disablePreemption:        options.disablePreemption,
@@ -455,29 +440,6 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 	return nodeName, err
 }
 
-// bindVolumes will make the API update with the assumed bindings and wait until
-// the PV controller has completely finished the binding operation.
-//
-// If binding errors, times out or gets undone, then an error will be returned to
-// retry scheduling.
-func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
-	klog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
-	err := sched.VolumeBinder.BindPodVolumes(assumed)
-	if err != nil {
-		klog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
-
-		// Unassume the Pod and retry scheduling
-		if forgetErr := sched.SchedulerCache.ForgetPod(assumed); forgetErr != nil {
-			klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
-		}
-
-		return err
-	}
-
-	klog.V(5).Infof("Success binding volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
-	return nil
-}
-
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // assume modifies `assumed`.
 func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
@@ -614,21 +576,6 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPod := assumedPodInfo.Pod
 
-	// Assume volumes first before assuming the pod.
-	//
-	// If all volumes are completely bound, then allBound is true and binding will be skipped.
-	//
-	// Otherwise, binding of volumes is started after the pod is assumed, but before pod binding.
-	//
-	// This function modifies 'assumedPod' if volume binding is required.
-	allBound, err := sched.VolumeBinder.AssumePodVolumes(assumedPod, scheduleResult.SuggestedHost)
-	if err != nil {
-		sched.recordSchedulingFailure(prof, assumedPodInfo, err, SchedulerError,
-			fmt.Sprintf("AssumePodVolumes failed: %v", err))
-		metrics.PodScheduleErrors.Inc()
-		return
-	}
-
 	// Run "reserve" plugins.
 	if sts := prof.RunReservePlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
 		sched.recordSchedulingFailure(prof, assumedPodInfo, sts.AsError(), SchedulerError, sts.Message())
@@ -695,18 +642,6 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			prof.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			sched.recordSchedulingFailure(prof, assumedPodInfo, waitOnPermitStatus.AsError(), reason, waitOnPermitStatus.Message())
 			return
-		}
-
-		// Bind volumes first before Pod
-		if !allBound {
-			err := sched.bindVolumes(assumedPod)
-			if err != nil {
-				sched.recordSchedulingFailure(prof, assumedPodInfo, err, "VolumeBindingFailed", err.Error())
-				metrics.PodScheduleErrors.Inc()
-				// trigger un-reserve plugins to clean up state associated with the reserved Pod
-				prof.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-				return
-			}
 		}
 
 		// Run "prebind" plugins.

@@ -125,9 +125,29 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: tainttoleration.Name, Weight: 1},
 			},
 		},
+		Reserve: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
+				{Name: volumebinding.Name},
+			},
+		},
+		Unreserve: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
+				{Name: volumebinding.Name},
+			},
+		},
+		PreBind: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
+				{Name: volumebinding.Name},
+			},
+		},
 		Bind: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: defaultbinder.Name},
+			},
+		},
+		PostBind: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
+				{Name: volumebinding.Name},
 			},
 		},
 	}

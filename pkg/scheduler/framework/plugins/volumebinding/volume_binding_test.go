@@ -102,7 +102,7 @@ func TestVolumeBinding(t *testing.T) {
 			nodeInfo.SetNode(item.node)
 			fakeVolumeBinder := scheduling.NewFakeVolumeBinder(item.volumeBinderConfig)
 			p := &VolumeBinding{
-				binder: fakeVolumeBinder,
+				Binder: fakeVolumeBinder,
 			}
 			gotStatus := p.Filter(context.Background(), nil, item.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, item.wantStatus) {
