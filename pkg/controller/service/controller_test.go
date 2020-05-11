@@ -475,50 +475,6 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}
 }
 
-func TestGetNodeConditionPredicate(t *testing.T) {
-	tests := []struct {
-		node         v1.Node
-		expectAccept bool
-		name         string
-	}{
-		{
-			node:         v1.Node{},
-			expectAccept: false,
-			name:         "empty",
-		},
-		{
-			node: v1.Node{
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{Type: v1.NodeReady, Status: v1.ConditionTrue},
-					},
-				},
-			},
-			expectAccept: true,
-			name:         "basic",
-		},
-		{
-			node: v1.Node{
-				Spec: v1.NodeSpec{Unschedulable: true},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{Type: v1.NodeReady, Status: v1.ConditionTrue},
-					},
-				},
-			},
-			expectAccept: false,
-			name:         "unschedulable",
-		},
-	}
-	pred := getNodeConditionPredicate()
-	for _, test := range tests {
-		accept := pred(&test.node)
-		if accept != test.expectAccept {
-			t.Errorf("Test failed for %s, expected %v, saw %v", test.name, test.expectAccept, accept)
-		}
-	}
-}
-
 func TestProcessServiceCreateOrUpdate(t *testing.T) {
 	controller, _, client := newController()
 
