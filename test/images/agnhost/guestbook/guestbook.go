@@ -77,16 +77,18 @@ func registerNode(registerTo, port string) {
 	}
 
 	hostPort := net.JoinHostPort(registerTo, backendPort)
-	_, err := net.ResolveTCPAddr("tcp", hostPort)
-	if err != nil {
-		log.Fatalf("--slaveof param and/or --backend-port param are invalid. %v", err)
-		return
-	}
 
 	request := fmt.Sprintf("register?host=%s", getIP(hostPort).String())
 	log.Printf("Registering to master: %s/%s", hostPort, request)
 	start := time.Now()
 	for time.Since(start) < timeout {
+		_, err := net.ResolveTCPAddr("tcp", hostPort)
+		if err != nil {
+			log.Printf("--slaveof param and/or --backend-port param are invalid. %v. Retrying in 1 second.", err)
+			time.Sleep(sleep)
+			continue
+		}
+
 		response, err := dialHTTP(request, hostPort)
 		if err != nil {
 			log.Printf("encountered error while registering to master: %v. Retrying in 1 second.", err)
