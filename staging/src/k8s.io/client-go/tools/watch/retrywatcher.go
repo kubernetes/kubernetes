@@ -44,7 +44,6 @@ type resourceVersionGetter interface {
 // RetryWatcher will make sure that in case the underlying watcher is closed (e.g. due to API timeout or etcd timeout)
 // it will get restarted from the last point without the consumer even knowing about it.
 // RetryWatcher does that by inspecting events and keeping track of resourceVersion.
-// Especially useful when using watch.UntilWithoutRetry where premature termination is causing issues and flakes.
 // Please note that this is not resilient to etcd cache not having the resource version anymore - you would need to
 // use Informers for that.
 type RetryWatcher struct {

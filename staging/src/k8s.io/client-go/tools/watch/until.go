@@ -42,18 +42,14 @@ type ConditionFunc func(event watch.Event) (bool, error)
 // ErrWatchClosed is returned when the watch channel is closed before timeout in UntilWithoutRetry.
 var ErrWatchClosed = errors.New("watch closed before UntilWithoutRetry timeout")
 
-// UntilWithoutRetry reads items from the watch until each provided condition succeeds, and then returns the last watch
+// untilWithoutRetry reads items from the watch until each provided condition succeeds, and then returns the last watch
 // encountered. The first condition that returns an error terminates the watch (and the event is also returned).
 // If no event has been received, the returned event will be nil.
 // Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
 // Waits until context deadline or until context is canceled.
 //
-// Warning: Unless you have a very specific use case (probably a special Watcher) don't use this function!!!
-// Warning: This will fail e.g. on API timeouts and/or 'too old resource version' error.
-// Warning: You are most probably looking for a function *Until* or *UntilWithSync* below,
-// Warning: solving such issues.
-// TODO: Consider making this function private to prevent misuse when the other occurrences in our codebase are gone.
-func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...ConditionFunc) (*watch.Event, error) {
+// Warning: This is implementation detail for Until() function and shouldn't be used outside this package.
+func untilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...ConditionFunc) (*watch.Event, error) {
 	ch := watcher.ResultChan()
 	defer watcher.Stop()
 	var lastEvent *watch.Event
@@ -93,6 +89,11 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 	return lastEvent, nil
 }
 
+// FIXME: Remove
+func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...ConditionFunc) (*watch.Event, error) {
+	return untilWithoutRetry(ctx, watcher, conditions...)
+}
+
 // Until wraps the watcherClient's watch function with RetryWatcher making sure that watcher gets restarted in case of errors.
 // The initialResourceVersion will be given to watch method when first called. It shall not be "" or "0"
 // given the underlying WATCH call issues (#74022). If you want the initial list ("", "0") done for you use ListWatchUntil instead.
@@ -109,7 +110,7 @@ func Until(ctx context.Context, initialResourceVersion string, watcherClient cac
 		return nil, err
 	}
 
-	return UntilWithoutRetry(ctx, w, conditions...)
+	return untilWithoutRetry(ctx, w, conditions...)
 }
 
 // UntilWithSync creates an informer from lw, optionally checks precondition when the store is synced,
