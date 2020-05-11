@@ -357,6 +357,9 @@ func (a *HorizontalController) reconcileKey(key string) (deleted bool, err error
 		delete(a.scaleDownEvents, key)
 		return true, nil
 	}
+	if err != nil {
+		return false, err
+	}
 
 	return false, a.reconcileAutoscaler(hpa, key)
 }
