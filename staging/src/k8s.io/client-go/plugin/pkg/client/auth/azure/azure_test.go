@@ -222,6 +222,27 @@ func TestAzureTokenSource(t *testing.T) {
 			}
 		})
 
+		t.Run("validate token with nil persiter", func(t *testing.T) {
+			fakeAccessToken := "fake token 1"
+			fakeSource := fakeTokenSource{token: newFakeAzureToken(fakeAccessToken, time.Now().Add(3600*time.Second))}
+			cfg := make(map[string]string)
+			tokenCache := newAzureTokenCache()
+			tokenSource := newAzureTokenSource(&fakeSource, tokenCache, cfg, configMode, nil)
+			token, err := tokenSource.Token()
+			if err != nil {
+				t.Errorf("failed to retrieve the token form cache: %v", err)
+			}
+
+			wantCacheLen := 1
+			if len(tokenCache.cache) != wantCacheLen {
+				t.Errorf("Token() cache length error: got %v, want %v", len(tokenCache.cache), wantCacheLen)
+			}
+
+			if token != tokenCache.cache[azureTokenKey] {
+				t.Error("Token() returned token != cached token")
+			}
+		})
+
 		t.Run("validate token against cache", func(t *testing.T) {
 			fakeAccessToken := "fake token 1"
 			fakeSource := fakeTokenSource{token: newFakeAzureToken(fakeAccessToken, time.Now().Add(3600*time.Second))}
