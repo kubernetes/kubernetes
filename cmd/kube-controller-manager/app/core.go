@@ -83,6 +83,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ComponentConfig.KubeCloudShared.ClusterName,
+		utilfeature.DefaultFeatureGate,
 	)
 	if err != nil {
 		// This error shouldn't fail. It lives like this as a legacy.

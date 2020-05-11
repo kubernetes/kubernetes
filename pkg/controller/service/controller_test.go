@@ -33,14 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog"
 )
 
 const region = "us-central"
@@ -70,21 +72,43 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	cloud := &fakecloud.Cloud{}
 	cloud.Region = region
 
-	client := fake.NewSimpleClientset()
+	kubeClient := fake.NewSimpleClientset()
 
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
-	controller, _ := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
+
+	controller := &Controller{
+		cloud:            cloud,
+		knownHosts:       []*v1.Node{},
+		kubeClient:       kubeClient,
+		clusterName:      "test-cluster",
+		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
+		eventBroadcaster: broadcaster,
+		eventRecorder:    recorder,
+		nodeLister:       nodeInformer.Lister(),
+		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
+	}
+
+	balancer, _ := cloud.LoadBalancer()
+	controller.balancer = balancer
+
+	controller.serviceLister = serviceInformer.Lister()
+
 	controller.nodeListerSynced = alwaysReady
 	controller.serviceListerSynced = alwaysReady
 	controller.eventRecorder = record.NewFakeRecorder(100)
 
-	cloud.Calls = nil     // ignore any cloud calls made in init()
-	client.ClearActions() // ignore any client calls made in init()
+	cloud.Calls = nil         // ignore any cloud calls made in init()
+	kubeClient.ClearActions() // ignore any client calls made in init()
 
-	return controller, cloud, client
+	return controller, cloud, kubeClient
 }
 
 // TODO(@MrHohn): Verify the end state when below issue is resolved:
@@ -1367,10 +1391,12 @@ func Test_getNodeConditionPredicate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, serviceNodeExclusionFeature, tt.enableExclusion)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, legacyNodeRoleBehaviorFeature, tt.enableLegacy)()
+			c := &Controller{
+				legacyNodeRoleFeatureEnabled:       tt.enableLegacy,
+				serviceNodeExclusionFeatureEnabled: tt.enableExclusion,
+			}
 
-			if result := getNodeConditionPredicate()(tt.input); result != tt.want {
+			if result := c.getNodeConditionPredicate()(tt.input); result != tt.want {
 				t.Errorf("getNodeConditionPredicate() = %v, want %v", result, tt.want)
 			}
 		})
