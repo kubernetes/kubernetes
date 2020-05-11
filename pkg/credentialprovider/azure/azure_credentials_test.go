@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
@@ -96,6 +97,30 @@ func Test(t *testing.T) {
 }
 
 func TestParseACRLoginServerFromImage(t *testing.T) {
+	configStr := `
+    {
+        "aadClientId": "foo",
+        "aadClientSecret": "bar"
+    }`
+	result := []containerregistry.Registry{
+		{
+			Name: to.StringPtr("foo"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.io"),
+			},
+		},
+	}
+	fakeClient := &fakeClient{
+		results: result,
+	}
+
+	provider := &acrProvider{
+		registryClient: fakeClient,
+	}
+	provider.loadConfig(bytes.NewBufferString(configStr))
+	provider.environment = &azure.Environment{
+		ContainerRegistryDNSSuffix: ".azurecr.my.cloud",
+	}
 	tests := []struct {
 		image    string
 		expected string
@@ -124,9 +149,13 @@ func TestParseACRLoginServerFromImage(t *testing.T) {
 			image:    "foo.azurecr.us/bar/image:version",
 			expected: "foo.azurecr.us",
 		},
+		{
+			image:    "foo.azurecr.my.cloud/bar/image:version",
+			expected: "foo.azurecr.my.cloud",
+		},
 	}
 	for _, test := range tests {
-		if loginServer := parseACRLoginServerFromImage(test.image); loginServer != test.expected {
+		if loginServer := provider.parseACRLoginServerFromImage(test.image); loginServer != test.expected {
 			t.Errorf("function parseACRLoginServerFromImage returns \"%s\" for image %s, expected \"%s\"", loginServer, test.image, test.expected)
 		}
 	}
