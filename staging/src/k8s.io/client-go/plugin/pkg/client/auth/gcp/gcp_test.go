@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
+	restclient "k8s.io/client-go/rest"
 )
 
 type fakeOutput struct {
@@ -453,6 +454,7 @@ func Test_cmdTokenSource_roundTrip(t *testing.T) {
 			Expiry:      fakeExpiry,
 		},
 	}
+	persister := &fakePersister{}
 
 	cmdCache := map[string]string{
 		"cmd-path": "/path/to/tokensource/cmd",
@@ -473,42 +475,74 @@ func Test_cmdTokenSource_roundTrip(t *testing.T) {
 		name                     string
 		res                      http.Response
 		baseCache, expectedCache map[string]string
+		persister                restclient.AuthProviderConfigPersister
 	}{
 		{
 			"Unauthorized",
 			http.Response{StatusCode: http.StatusUnauthorized},
 			make(map[string]string),
 			make(map[string]string),
+			persister,
 		},
 		{
 			"Unauthorized, nonempty defaultCache",
 			http.Response{StatusCode: http.StatusUnauthorized},
 			cmdCache,
 			cmdCache,
+			persister,
 		},
 		{
 			"Authorized",
 			http.Response{StatusCode: http.StatusOK},
 			make(map[string]string),
 			simpleCacheUpdated,
+			persister,
 		},
 		{
 			"Authorized, nonempty defaultCache",
 			http.Response{StatusCode: http.StatusOK},
 			cmdCache,
 			cmdCacheUpdated,
+			persister,
+		},
+		{
+			"Unauthorized",
+			http.Response{StatusCode: http.StatusUnauthorized},
+			make(map[string]string),
+			make(map[string]string),
+			nil,
+		},
+		{
+			"Unauthorized, nonempty defaultCache",
+			http.Response{StatusCode: http.StatusUnauthorized},
+			cmdCache,
+			cmdCache,
+			nil,
+		},
+		{
+			"Authorized",
+			http.Response{StatusCode: http.StatusOK},
+			make(map[string]string),
+			simpleCacheUpdated,
+			nil,
+		},
+		{
+			"Authorized, nonempty defaultCache",
+			http.Response{StatusCode: http.StatusOK},
+			cmdCache,
+			cmdCacheUpdated,
+			nil,
 		},
 	}
 
-	persister := &fakePersister{}
 	req := http.Request{Header: http.Header{}}
 
 	for _, tc := range tests {
-		cts, err := newCachedTokenSource(accessToken, fakeExpiry.String(), persister, fs, tc.baseCache)
+		cts, err := newCachedTokenSource(accessToken, fakeExpiry.String(), tc.persister, fs, tc.baseCache)
 		if err != nil {
 			t.Fatalf("unexpected error from newCachedTokenSource: %v", err)
 		}
-		authProvider := gcpAuthProvider{cts, persister}
+		authProvider := gcpAuthProvider{cts, tc.persister}
 
 		fakeTransport := MockTransport{&tc.res}
 		transport := (authProvider.WrapTransport(&fakeTransport))
@@ -519,8 +553,10 @@ func Test_cmdTokenSource_roundTrip(t *testing.T) {
 
 		transport.RoundTrip(&req)
 
-		if got := persister.read(); !reflect.DeepEqual(got, tc.expectedCache) {
-			t.Errorf("got cache %v, want %v", got, tc.expectedCache)
+		if tc.persister != nil {
+			if got := persister.read(); !reflect.DeepEqual(got, tc.expectedCache) {
+				t.Errorf("got cache %v, want %v", got, tc.expectedCache)
+			}
 		}
 	}
 
