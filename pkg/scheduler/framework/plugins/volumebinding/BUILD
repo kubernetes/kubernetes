@@ -7,9 +7,13 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/volume/scheduling:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
