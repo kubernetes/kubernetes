@@ -341,9 +341,10 @@ func (ts *azureTokenSource) storeTokenInCfg(token *azureToken) error {
 	newCfg[cfgExpiresOn] = string(token.token.ExpiresOn)
 	newCfg[cfgConfigMode] = strconv.Itoa(int(ts.configMode))
 
-	err := ts.persister.Persist(newCfg)
-	if err != nil {
-		return fmt.Errorf("persisting the configuration: %v", err)
+	if ts.persister != nil {
+		if err := ts.persister.Persist(newCfg); err != nil {
+			return fmt.Errorf("persisting the configuration: %v", err)
+		}
 	}
 	ts.cfg = newCfg
 	return nil

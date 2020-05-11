@@ -374,7 +374,11 @@ func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 	if res.StatusCode == 401 {
 		klog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
-		t.persister.Persist(t.resetCache)
+		if t.persister != nil {
+			if err := t.persister.Persist(t.resetCache); err != nil {
+				klog.V(4).Infof("Failed to persist token: %v", err)
+			}
+		}
 	}
 
 	return res, nil
