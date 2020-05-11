@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller"
@@ -151,18 +152,22 @@ func TestQuota(t *testing.T) {
 }
 
 func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Clientset) {
-	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	selector := fields.OneTermEqualSelector("metadata.name", quota.Name).String()
+	lw := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = selector
+			return clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(context.TODO(), options)
+		},
 	}
 
-	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(context.TODO(), quota, metav1.CreateOptions{}); err != nil {
+	createdQuota, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(context.TODO(), quota, metav1.CreateOptions{})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+	_, err = watchtools.Until(ctx, createdQuota.ResourceVersion, lw, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Modified:
 		default:
@@ -210,18 +215,22 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		},
 	}
 
-	w, err := clientset.CoreV1().ReplicationControllers(namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: rc.Name}))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	selector := fields.OneTermEqualSelector("metadata.name", rc.Name).String()
+	lw := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = selector
+			return clientset.CoreV1().ReplicationControllers(namespace).Watch(context.TODO(), options)
+		},
 	}
 
-	if _, err := clientset.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), rc, metav1.CreateOptions{}); err != nil {
+	createdRC, err := clientset.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), rc, metav1.CreateOptions{})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+	_, err = watchtools.Until(ctx, createdRC.ResourceVersion, lw, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Modified:
 		default:

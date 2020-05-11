@@ -31,6 +31,7 @@ import (
 
 	rbacapi "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -43,6 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -652,18 +654,25 @@ func TestBootstrapping(t *testing.T) {
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
-	watcher, err := clientset.RbacV1().ClusterRoles().Watch(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	rolesExist := func(store cache.Store) (bool, error) {
+		return len(store.List()) > 0, nil
 	}
+	roleAdded := func(event watch.Event) (bool, error) {
+		return event.Type == watch.Added, nil
+	}
+
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return clientset.RbacV1().ClusterRoles().List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return clientset.RbacV1().ClusterRoles().Watch(context.TODO(), options)
+		},
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
-		if event.Type != watch.Added {
-			return false, nil
-		}
-		return true, nil
-	})
+	_, err := watchtools.UntilWithSync(ctx, lw, &rbacapi.ClusterRole{}, rolesExist, roleAdded)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
