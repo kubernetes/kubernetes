@@ -113,6 +113,15 @@ _GO_RUNNER_DIGEST = {
     "s390x": "sha256:3e34e290cd35a90285991a575e2e79fddfb161c66f13bc5662a1cc0a4ade32e0",
 }
 
+_DEBIAN_BASH_DIGEST = {
+    "manifest": "sha256:d3ed8e51fb454645adffbd5a5677fedd47884604f1e674a3f10943da39aafdb5",
+    "amd64": "sha256:a7097e950b9061b42d7f832eccad3bb7d60a10c69b115bdd37bcb2990da2f94e",
+    "arm": "sha256:5cc37d51175e4b2eabca4dabcae1e19a1511c070f6faec09e2399e46f68b6cae",
+    "arm64": "sha256:9b9b925e104904cca35f6e2bf0ec56830a777e0bf217b1e66074de5f4a964dea",
+    "ppc64le": "sha256:3cb1a3104276885f20a4099cce23128d0c9161563b2c7b4489cf9a972ad24cf9",
+    "s390x": "sha256:76a678ac27b6f8d96a8aa042dc3f5b5695d42371d52a8b35a8ad5509a178d426",
+}
+
 def _digest(d, arch):
     if arch not in d:
         print("WARNING: %s not found in %r" % (arch, d))
@@ -148,6 +157,16 @@ def image_dependencies():
             repository = "debian-iptables",
             # Ensure the digests above are updated to match a new tag
             tag = "v12.1.0",  # ignored, but kept here for documentation
+        )
+
+        container_pull(
+            name = "debian-bash-" + arch,
+            architecture = arch,
+            digest = _digest(_DEBIAN_BASH_DIGEST, arch),
+            registry = "gcr.io/kubernetes-development-244305",
+            repository = "debian-bash",
+            # Ensure the digests above are updated to match a new tag
+            tag = "v0.1.0",  # ignored, but kept here for documentation
         )
 
 def etcd_tarballs():

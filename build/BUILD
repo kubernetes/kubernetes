@@ -35,7 +35,7 @@ DOCKERIZED_BINARIES = {
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@go-runner-linux-{ARCH}//image",
+        "base": "@debian-bash-{ARCH}//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {

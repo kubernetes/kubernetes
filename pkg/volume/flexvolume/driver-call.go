@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	"k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -133,7 +134,24 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 		klog.Warningf(">>>> Last modified:", st.ModTime())
 		klog.Warningf(">>>> Is Directory: ", st.IsDir())
 	}
-	cmd := dc.plugin.runner.Command(execPath, dc.args...)
+	var cmd exec.Cmd
+	if script, err := os.Open(execPath); err != nil {
+		return nil, errors.New(fmt.Sprintf(">>>> unable to open file : %q", err))
+	} else {
+		bytes := make([]byte, 2)
+		if _, err = script.Read(bytes); err != nil {
+			return nil, errors.New(fmt.Sprintf(">>>> unable to read file : %q", err))
+		}
+		if string(bytes) == "#!" {
+			args := []string{execPath}
+			args = append(args, dc.args...)
+			klog.Warningf(">>>> running /bin/sh with args - %q", args)
+			cmd = dc.plugin.runner.Command("/bin/sh", args...)
+		} else {
+			klog.Warningf(">>>> running %q with args - %q", execPath, dc.args)
+			cmd = dc.plugin.runner.Command(execPath, dc.args...)
+		}
+	}
 
 	timeout := false
 	if dc.Timeout > 0 {
