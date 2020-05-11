@@ -14,7 +14,6 @@ import (
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 
-	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
 	"github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy"
 	"github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/imagereferencemutators"
 	"github.com/openshift/apiserver-library-go/pkg/admission/quota/clusterresourcequota"
@@ -34,60 +33,59 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv"
 )
 
-type KubeAPIServerConfigFunc func(config *genericapiserver.Config, versionedInformers clientgoinformers.SharedInformerFactory, pluginInitializers *[]admission.PluginInitializer) error
-
-func NewOpenShiftKubeAPIServerConfigPatch(kubeAPIServerConfig *kubecontrolplanev1.KubeAPIServerConfig) KubeAPIServerConfigFunc {
-	return func(genericConfig *genericapiserver.Config, kubeInformers clientgoinformers.SharedInformerFactory, pluginInitializers *[]admission.PluginInitializer) error {
-		openshiftInformers, err := newInformers(genericConfig.LoopbackClientConfig)
-		if err != nil {
-			return err
-		}
-
-		// AUTHORIZER
-		genericConfig.RequestInfoResolver = apiserverconfig.OpenshiftRequestInfoResolver()
-		// END AUTHORIZER
-
-		// Inject OpenShift API long running endpoints (like for binary builds).
-		// TODO: We should disable the timeout code for aggregated endpoints as this can cause problems when upstream add additional endpoints.
-		genericConfig.LongRunningFunc = apiserverconfig.IsLongRunningRequest
-
-		// ADMISSION
-		clusterQuotaMappingController := newClusterQuotaMappingController(kubeInformers.Core().V1().Namespaces(), openshiftInformers.OpenshiftQuotaInformers.Quota().V1().ClusterResourceQuotas())
-		genericConfig.AddPostStartHookOrDie("quota.openshift.io-clusterquotamapping", func(context genericapiserver.PostStartHookContext) error {
-			go clusterQuotaMappingController.Run(5, context.StopCh)
-			return nil
-		})
-
-		*pluginInitializers = append(*pluginInitializers,
-			imagepolicy.NewInitializer(imagereferencemutators.KubeImageMutators{}, kubeAPIServerConfig.ImagePolicyConfig.InternalRegistryHostname),
-			restrictusers.NewInitializer(openshiftInformers.getOpenshiftUserInformers()),
-			sccadmission.NewInitializer(openshiftInformers.getOpenshiftSecurityInformers().Security().V1().SecurityContextConstraints()),
-			clusterresourcequota.NewInitializer(
-				openshiftInformers.getOpenshiftQuotaInformers().Quota().V1().ClusterResourceQuotas(),
-				clusterQuotaMappingController.GetClusterQuotaMapper(),
-				generic.NewRegistry(install.NewQuotaConfigurationForAdmission().Evaluators()),
-			),
-			nodeenv.NewInitializer(kubeAPIServerConfig.ProjectConfig.DefaultNodeSelector),
-			admissionrestconfig.NewInitializer(*rest.CopyConfig(genericConfig.LoopbackClientConfig)),
-		)
-		// END ADMISSION
-
-		// HANDLER CHAIN (with oauth server and web console)
-		genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(kubeAPIServerConfig.ConsolePublicURL, kubeAPIServerConfig.AuthConfig.OAuthMetadataFile)
-		if err != nil {
-			return err
-		}
-		// END HANDLER CHAIN
-
-		genericConfig.AddPostStartHookOrDie("openshift.io-startkubeinformers", func(context genericapiserver.PostStartHookContext) error {
-			go kubeInformers.Start(context.StopCh)
-			go openshiftInformers.Start(context.StopCh)
-			return nil
-		})
-		enablement.AppendPostStartHooksOrDie(genericConfig)
-
+func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, kubeInformers clientgoinformers.SharedInformerFactory, pluginInitializers *[]admission.PluginInitializer) error {
+	if !enablement.IsOpenShift() {
 		return nil
 	}
+
+	openshiftInformers, err := newInformers(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return err
+	}
+
+	// AUTHORIZER
+	genericConfig.RequestInfoResolver = apiserverconfig.OpenshiftRequestInfoResolver()
+	// END AUTHORIZER
+
+	// Inject OpenShift API long running endpoints (like for binary builds).
+	// TODO: We should disable the timeout code for aggregated endpoints as this can cause problems when upstream add additional endpoints.
+	genericConfig.LongRunningFunc = apiserverconfig.IsLongRunningRequest
+
+	// ADMISSION
+	clusterQuotaMappingController := newClusterQuotaMappingController(kubeInformers.Core().V1().Namespaces(), openshiftInformers.OpenshiftQuotaInformers.Quota().V1().ClusterResourceQuotas())
+	genericConfig.AddPostStartHookOrDie("quota.openshift.io-clusterquotamapping", func(context genericapiserver.PostStartHookContext) error {
+		go clusterQuotaMappingController.Run(5, context.StopCh)
+		return nil
+	})
+
+	*pluginInitializers = append(*pluginInitializers,
+		imagepolicy.NewInitializer(imagereferencemutators.KubeImageMutators{}, enablement.OpenshiftConfig().ImagePolicyConfig.InternalRegistryHostname),
+		restrictusers.NewInitializer(openshiftInformers.getOpenshiftUserInformers()),
+		sccadmission.NewInitializer(openshiftInformers.getOpenshiftSecurityInformers().Security().V1().SecurityContextConstraints()),
+		clusterresourcequota.NewInitializer(
+			openshiftInformers.getOpenshiftQuotaInformers().Quota().V1().ClusterResourceQuotas(),
+			clusterQuotaMappingController.GetClusterQuotaMapper(),
+			generic.NewRegistry(install.NewQuotaConfigurationForAdmission().Evaluators()),
+		),
+		nodeenv.NewInitializer(enablement.OpenshiftConfig().ProjectConfig.DefaultNodeSelector),
+		admissionrestconfig.NewInitializer(*rest.CopyConfig(genericConfig.LoopbackClientConfig)),
+	)
+	// END ADMISSION
+
+	// HANDLER CHAIN (with oauth server and web console)
+	genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(enablement.OpenshiftConfig().ConsolePublicURL, enablement.OpenshiftConfig().AuthConfig.OAuthMetadataFile)
+	if err != nil {
+		return err
+	}
+	// END HANDLER CHAIN
+
+	genericConfig.AddPostStartHookOrDie("openshift.io-startkubeinformers", func(context genericapiserver.PostStartHookContext) error {
+		go openshiftInformers.Start(context.StopCh)
+		return nil
+	})
+	enablement.AppendPostStartHooksOrDie(genericConfig)
+
+	return nil
 }
 
 // newInformers is only exposed for the build's integration testing until it can be fixed more appropriately.
