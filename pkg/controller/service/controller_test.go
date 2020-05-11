@@ -41,8 +41,6 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 const region = "us-central"
@@ -74,7 +72,7 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 
 	client := fake.NewSimpleClientset()
 
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
