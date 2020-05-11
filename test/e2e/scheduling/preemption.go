@@ -214,6 +214,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				PriorityClassName: priorityName,
 				Resources: &v1.ResourceRequirements{
 					Requests: podRes,
+					Limits:   podRes,
 				},
 				Affinity: &v1.Affinity{
 					NodeAffinity: &v1.NodeAffinity{
