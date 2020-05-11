@@ -120,16 +120,14 @@ cluster's shared state through which all other components interact.`,
 			verflag.PrintAndExitIfRequested()
 
 			if len(s.OpenShiftConfig) > 0 {
+				// if we are running openshift, we modify the admission chain defaults accordingly
+				admissionenablement.InstallOpenShiftAdmissionPlugins(s)
+
 				openshiftConfig, err := enablement.GetOpenshiftConfig(s.OpenShiftConfig)
 				if err != nil {
 					klog.Fatal(err)
 				}
 				enablement.ForceOpenShift(openshiftConfig)
-
-				// this forces a patch to be called
-				// TODO we're going to try to remove bits of the patching.
-				configPatchFn := openshiftkubeapiserver.NewOpenShiftKubeAPIServerConfigPatch(openshiftConfig)
-				OpenShiftKubeAPIServerConfigPatch = configPatchFn
 
 				args, err := openshiftkubeapiserver.ConfigToFlags(openshiftConfig)
 				if err != nil {
@@ -145,8 +143,6 @@ cluster's shared state through which all other components interact.`,
 				cliflag.PrintFlags(cmd.Flags())
 
 				enablement.ForceGlobalInitializationForOpenShift()
-				admissionenablement.InstallOpenShiftAdmissionPlugins(s)
-
 			} else {
 				// print default flags
 				cliflag.PrintFlags(cmd.Flags())
@@ -601,7 +597,7 @@ func buildGenericConfig(
 		return
 	}
 
-	if err := PatchKubeAPIServerConfig(genericConfig, versionedInformers, &pluginInitializers); err != nil {
+	if err := openshiftkubeapiserver.OpenShiftKubeAPIServerConfigPatch(genericConfig, versionedInformers, &pluginInitializers); err != nil {
 		lastErr = fmt.Errorf("failed to patch: %v", err)
 		return
 	}
