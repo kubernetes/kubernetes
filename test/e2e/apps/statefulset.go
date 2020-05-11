@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	klabels "k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -767,12 +766,20 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			ginkgo.By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
+
 			fieldSelector := fields.OneTermEqualSelector("metadata.name", statefulPodName).String()
+			pl, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
+				FieldSelector: fieldSelector,
+			})
+			framework.ExpectNoError(err)
+			if len(pl.Items) > 0 {
+				pod := pl.Items[0]
+				framework.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
+					pod.Namespace, pod.Name, pod.UID, pod.Status.Phase)
+				initialStatefulPodUID = pod.UID
+			}
+
 			lw := &cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
-					options.FieldSelector = fieldSelector
-					return f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), options)
-				},
 				WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 					options.FieldSelector = fieldSelector
 					return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), options)
@@ -781,7 +788,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), statefulPodTimeout)
 			defer cancel()
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod at least once
-			_, err = watchtools.ListWatchUntil(ctx, lw, func(event watch.Event) (bool, error) {
+			_, err = watchtools.Until(ctx, pl.ResourceVersion, lw, func(event watch.Event) (bool, error) {
 				pod := event.Object.(*v1.Pod)
 				switch event.Type {
 				case watch.Deleted:

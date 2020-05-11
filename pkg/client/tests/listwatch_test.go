@@ -17,22 +17,16 @@ limitations under the License.
 package tests
 
 import (
-	"context"
 	"net/http/httptest"
 	"net/url"
 	"testing"
-	"time"
 
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/cache"
-	watchtools "k8s.io/client-go/tools/watch"
 	utiltesting "k8s.io/client-go/util/testing"
 )
 
@@ -174,66 +168,5 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// This test merely tests that the correct request is made.
 		lw.Watch(metav1.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
-	}
-}
-
-type lw struct {
-	list  runtime.Object
-	watch watch.Interface
-}
-
-func (w lw) List(options metav1.ListOptions) (runtime.Object, error) {
-	return w.list, nil
-}
-
-func (w lw) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return w.watch, nil
-}
-
-func TestListWatchUntil(t *testing.T) {
-	fw := watch.NewFake()
-	go func() {
-		obj := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "2",
-			},
-		}
-		fw.Modify(obj)
-	}()
-	listwatch := lw{
-		list: &v1.PodList{
-			ListMeta: metav1.ListMeta{
-				ResourceVersion: "1",
-			},
-			Items: []v1.Pod{{}},
-		},
-		watch: fw,
-	}
-
-	conditions := []watchtools.ConditionFunc{
-		func(event watch.Event) (bool, error) {
-			t.Logf("got %#v", event)
-			return event.Type == watch.Added, nil
-		},
-		func(event watch.Event) (bool, error) {
-			t.Logf("got %#v", event)
-			return event.Type == watch.Modified, nil
-		},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	lastEvent, err := watchtools.ListWatchUntil(ctx, listwatch, conditions...)
-	if err != nil {
-		t.Fatalf("expected nil error, got %#v", err)
-	}
-	if lastEvent == nil {
-		t.Fatal("expected an event")
-	}
-	if lastEvent.Type != watch.Modified {
-		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
-	}
-	if got, isPod := lastEvent.Object.(*v1.Pod); !isPod {
-		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }
