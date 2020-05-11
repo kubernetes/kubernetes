@@ -41,6 +41,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/rawhttp"
@@ -703,17 +704,20 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		*outputObjects = false
 	}
 
-	// print watched changes
-	w, err := r.Watch(rv)
-	if err != nil {
-		return err
+	lw := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return r.Watch(options.ResourceVersion)
+		},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
-		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
+		// FIXME: Currently there is no way to kill it from the test, which is causing
+		// a couple tests to timeout (as watches are restarted).
+		// FIXME: We can probably execute test via Execute and use the context here.
+		_, err := watchtools.Until(ctx, rv, lw, func(e watch.Event) (bool, error) {
 			objToPrint := e.Object
 			if o.OutputWatchEvents {
 				objToPrint = &metav1.WatchEvent{Type: string(e.Type), Object: runtime.RawExtension{Object: objToPrint}}

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 )
 
@@ -56,12 +57,12 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	}
 
 	// Watch until we observe a pod
-	options.ResourceVersion = podList.ResourceVersion
-	w, err := client.Pods(namespace).Watch(context.TODO(), options)
-	if err != nil {
-		return nil, 0, err
+	lw := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = selector
+			return client.Pods(namespace).Watch(context.TODO(), options)
+		},
 	}
-	defer w.Stop()
 
 	condition := func(event watch.Event) (bool, error) {
 		return event.Type == watch.Added || event.Type == watch.Modified, nil
@@ -69,7 +70,7 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-	event, err := watchtools.UntilWithoutRetry(ctx, w, condition)
+	event, err := watchtools.Until(ctx, podList.ResourceVersion, lw, condition)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -39,6 +39,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -286,12 +287,11 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 			}
 		}
 
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = nameSelector
-		watchOptions.ResourceVersion = gottenObjList.GetResourceVersion()
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
-		if err != nil {
-			return gottenObj, false, err
+		lw := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = nameSelector
+				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
+			},
 		}
 
 		timeout := endTime.Sub(time.Now())
@@ -302,7 +302,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 		}
 
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, Wait{errOut: o.ErrOut}.IsDeleted)
+		watchEvent, err := watchtools.Until(ctx, gottenObjList.GetResourceVersion(), lw, Wait{errOut: o.ErrOut}.IsDeleted)
 		cancel()
 		switch {
 		case err == nil:
@@ -381,12 +381,11 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 			resourceVersion = gottenObjList.GetResourceVersion()
 		}
 
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = nameSelector
-		watchOptions.ResourceVersion = resourceVersion
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
-		if err != nil {
-			return gottenObj, false, err
+		lw := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = nameSelector
+				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
+			},
 		}
 
 		timeout := endTime.Sub(time.Now())
@@ -397,7 +396,7 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 		}
 
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, w.isConditionMet)
+		watchEvent, err := watchtools.Until(ctx, resourceVersion, lw, w.isConditionMet)
 		cancel()
 		switch {
 		case err == nil:
