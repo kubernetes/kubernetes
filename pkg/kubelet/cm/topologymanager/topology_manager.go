@@ -152,10 +152,7 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		policy = NewRestrictedPolicy(numaNodes)
 
 	case PolicySingleNumaNode:
-		//this is to test the new policy with 'single-numa-node' policy flag
-		//new flag will be added
-		policy = NewPodLevelSingleNumaNodePolicy(numaNodes)
-		//policy = NewSingleNumaNodePolicy(numaNodes)
+		policy = NewSingleNumaNodePolicy(numaNodes)
 
 	case PolicyPodLevelSingleNumaNode:
 		policy = NewPodLevelSingleNumaNodePolicy(numaNodes)

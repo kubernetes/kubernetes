@@ -66,6 +66,9 @@ const (
 	// SingleNumaNodeTopologyManager Policy iis a mode in which kubelet only allows
 	// pods with a single NUMA alignment of CPU and device resources.
 	SingleNumaNodeTopologyManager = "single-numa-node"
+	// PodLevelSingleNumaNodeTopologyManager Policy is a mode in which kubelet
+	// only allows all resources of Pod with a single NUMA alignment.
+	PodLevelSingleNumaNodeTopologyManager = "pod-level-single-numa-node"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -7,6 +7,7 @@ go_library(
         "policy.go",
         "policy_best_effort.go",
         "policy_none.go",
+        "policy_pod_level_single_numa_node.go",
         "policy_restricted.go",
         "policy_single_numa_node.go",
         "topology_manager.go",
