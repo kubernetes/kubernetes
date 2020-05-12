@@ -41,13 +41,10 @@ var (
 
 	cronjobExample = templates.Examples(`
 		# Create a cronjob
-		kubectl create cronjob my-job --image=busybox
+		kubectl create cronjob my-job --image=busybox --schedule="*/1 * * * *"
 
 		# Create a cronjob with command
-		kubectl create cronjob my-job --image=busybox -- date
-
-		# Create a cronjob with schedule
-		kubectl create cronjob test-job --image=busybox --schedule="*/1 * * * *"`)
+		kubectl create cronjob my-job --image=busybox --schedule="*/1 * * * *" -- date`)
 )
 
 type CreateCronJobOptions struct {
