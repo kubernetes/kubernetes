@@ -4606,6 +4606,17 @@ func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 		if len(toleration.Effect) != 0 {
 			w.Write(LEVEL_0, ":%s", toleration.Effect)
 		}
+		// tolerations:
+		// - operator: "Exists"
+		// is a special case which tolerates everything
+		if toleration.Operator == corev1.TolerationOpExists && len(toleration.Value) == 0 {
+			if len(toleration.Key) != 0 {
+				w.Write(LEVEL_0, " op=Exists")
+			} else {
+				w.Write(LEVEL_0, "op=Exists")
+			}
+		}
+
 		if toleration.TolerationSeconds != nil {
 			w.Write(LEVEL_0, " for %ds", *toleration.TolerationSeconds)
 		}

@@ -179,6 +179,7 @@ func TestDescribePodTolerations(t *testing.T) {
 		},
 		Spec: corev1.PodSpec{
 			Tolerations: []corev1.Toleration{
+				{Operator: corev1.TolerationOpExists},
 				{Key: "key0", Operator: corev1.TolerationOpExists},
 				{Key: "key1", Value: "value1"},
 				{Key: "key2", Operator: corev1.TolerationOpEqual, Value: "value2", Effect: corev1.TaintEffectNoSchedule},
@@ -193,7 +194,8 @@ func TestDescribePodTolerations(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "key0\n") ||
+	if !strings.Contains(out, "  op=Exists\n") ||
+		!strings.Contains(out, "key0 op=Exists\n") ||
 		!strings.Contains(out, "key1=value1\n") ||
 		!strings.Contains(out, "key2=value2:NoSchedule\n") ||
 		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
