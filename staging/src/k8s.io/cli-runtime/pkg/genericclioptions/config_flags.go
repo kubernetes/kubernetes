@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/client-go/util/userdir"
 )
 
 const (
@@ -55,7 +56,22 @@ const (
 	flagHTTPCacheDir     = "cache-dir"
 )
 
-var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+var (
+	defaultHTTPCacheDir string
+	localCacheDir       string
+)
+
+func init() {
+	userCacheDir := userdir.UserCacheDir()
+	if len(userCacheDir) != 0 {
+		localCacheDir = filepath.Join(userCacheDir, "kubernetes-cli")
+	} else {
+		// fail to get the os user cache dir
+		// fallback to the default behaviour
+		localCacheDir = filepath.Join(homedir.HomeDir(), ".kube")
+	}
+	defaultHTTPCacheDir = filepath.Join(localCacheDir, "http-cache")
+}
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
@@ -226,12 +242,12 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 
 	// retrieve a user-provided value for the "cache-dir"
 	// defaulting to ~/.kube/http-cache if no user-value is given.
-	httpCacheDir := defaultCacheDir
+	httpCacheDir := defaultHTTPCacheDir
 	if f.CacheDir != nil {
 		httpCacheDir = *f.CacheDir
 	}
 
-	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
+	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(localCacheDir, "cache", "discovery"), config.Host)
 	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
@@ -326,7 +342,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		Timeout:    stringptr("0"),
 		KubeConfig: stringptr(""),
 
-		CacheDir:         stringptr(defaultCacheDir),
+		CacheDir:         stringptr(defaultHTTPCacheDir),
 		ClusterName:      stringptr(""),
 		AuthInfoName:     stringptr(""),
 		Context:          stringptr(""),
