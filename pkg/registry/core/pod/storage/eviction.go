@@ -111,16 +111,10 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		return nil, errors.NewBadRequest("name in URL does not match name in Eviction object")
 	}
 
-	deletionOptions, err := propagateDryRun(eviction, options)
+	originalDeleteOptions, err := propagateDryRun(eviction, options)
 	if err != nil {
 		return nil, err
 	}
-
-	obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	pod := obj.(*api.Pod)
 
 	if createValidation != nil {
 		if err := createValidation(ctx, eviction.DeepCopyObject()); err != nil {
@@ -128,58 +122,54 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		}
 	}
 
-	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
-	// There is no need to check for pdb.
-	if canIgnorePDB(pod) {
-		deleteRefresh := false
-		continueToPDBs := false
-		// Preserve current deletionOptions if we need to fall through to checking PDBs later.
-		preservedDeletionOptions := deletionOptions.DeepCopy()
-		err := retry.RetryOnConflict(EvictionsRetry, func() error {
-			if deleteRefresh {
-				// If we hit a conflict error, get the latest pod
-				obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				pod = obj.(*api.Pod)
-				if !canIgnorePDB(pod) {
-					// Pod is no longer in a state where we can skip checking
-					// PDBs, continue to PDB checks.
-					continueToPDBs = true
-					// restore original deletion options because we may have
-					// modified them.
-					deletionOptions = preservedDeletionOptions
-					return nil
-				}
-			}
-			if shouldEnforceResourceVersion(pod) && resourceVersionIsUnset(preservedDeletionOptions) {
-				// Set deletionOptions.Preconditions.ResourceVersion to ensure we're not
-				// racing with another PDB-impacting process elsewhere.
-				if deletionOptions.Preconditions == nil {
-					deletionOptions.Preconditions = &metav1.Preconditions{}
-				}
-				deletionOptions.Preconditions.ResourceVersion = &pod.ResourceVersion
-			} else {
-				// restore original deletion options because we may have
-				// modified them.
-				deletionOptions = preservedDeletionOptions
-			}
-			_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
-			if err != nil {
-				deleteRefresh = true
-				return err
-			}
-			return nil
-		})
-		if !continueToPDBs {
-			if err != nil {
-				return nil, err
-			}
-			return &metav1.Status{
-				Status: metav1.StatusSuccess}, nil
+	var pod *api.Pod
+	deletedPod := false
+	err = retry.RetryOnConflict(EvictionsRetry, func() error {
+		obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
+		pod = obj.(*api.Pod)
+
+		// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
+		// There is no need to check for pdb.
+		if !canIgnorePDB(pod) {
+			// Pod is not in a state where we can skip checking PDBs, exit the loop, and continue to PDB checks.
+			return nil
+		}
+
+		// the PDB can be ignored, so delete the pod
+		deletionOptions := originalDeleteOptions.DeepCopy()
+		if shouldEnforceResourceVersion(pod) && resourceVersionIsUnset(originalDeleteOptions) {
+			// Set deletionOptions.Preconditions.ResourceVersion to ensure we're not
+			// racing with another PDB-impacting process elsewhere.
+			if deletionOptions.Preconditions == nil {
+				deletionOptions.Preconditions = &metav1.Preconditions{}
+			}
+			deletionOptions.Preconditions.ResourceVersion = &pod.ResourceVersion
+		}
+		_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
+		if err != nil {
+			return err
+		}
+		deletedPod = true
+		return nil
+	})
+	switch {
+	case err != nil:
+		// this can happen in cases where the PDB can be ignored, but there was a problem issuing the pod delete:
+		// maybe we conflicted two many times or we didn't have permission or something else weird.
+		return nil, err
+
+	case deletedPod:
+		// this happens when we successfully deleted the pod.  In this case, we're done executing because we've evicted/deleted the pod
+		return &metav1.Status{Status: metav1.StatusSuccess}, nil
+
+	default:
+		// this happens when we didn't have an error and we didn't delete the pod. The only branch that happens on is when
+		// we cannot ignored the PDB for this pod, so this is the fall through case.
 	}
+
 	var rtStatus *metav1.Status
 	var pdbName string
 	err = func() error {
@@ -214,7 +204,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 			// If it was false already, or if it becomes false during the course of our retries,
 			// raise an error marked as a 429.
-			if err = r.checkAndDecrement(pod.Namespace, pod.Name, *pdb, dryrun.IsDryRun(deletionOptions.DryRun)); err != nil {
+			if err = r.checkAndDecrement(pod.Namespace, pod.Name, *pdb, dryrun.IsDryRun(originalDeleteOptions.DryRun)); err != nil {
 				refresh = true
 				return err
 			}
@@ -236,7 +226,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
+	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, originalDeleteOptions.DeepCopy())
 	if err != nil {
 		return nil, err
 	}
