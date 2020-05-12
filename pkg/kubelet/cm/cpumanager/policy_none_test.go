@@ -50,6 +50,23 @@ func TestNonePolicyAllocate(t *testing.T) {
 	}
 }
 
+func TestNonePolicyDeAllocate(t *testing.T) {
+	policy := &nonePolicy{}
+
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+	}
+
+	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
+
+	container := &testPod.Spec.Containers[0]
+	err := policy.Allocate(st, testPod, container)
+	if err != nil {
+		t.Errorf("NonePolicy DeAllocate() error. expected no error but got: %v", err)
+	}
+}
+
 func TestNonePolicyRemove(t *testing.T) {
 	policy := &nonePolicy{}
 

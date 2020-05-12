@@ -108,6 +108,10 @@ func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Containe
 	return p.err
 }
 
+func (p *mockPolicy) DeAllocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+	return p.err
+}
+
 func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
 	return p.err
 }
@@ -203,6 +207,34 @@ func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) 
 		})
 	}
 
+	return pod
+}
+
+func makeMultiContainerPodWithContainerName(podName, podUID string, containers []struct{ name, cpuRequest, cpuLimit string }) *v1.Pod {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{},
+		},
+	}
+
+	for _, container := range containers {
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+			Name: container.name,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(container.cpuRequest),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(container.cpuLimit),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+				},
+			},
+		})
+	}
+
+	pod.Name = podName
+	pod.UID = types.UID(podUID)
 	return pod
 }
 

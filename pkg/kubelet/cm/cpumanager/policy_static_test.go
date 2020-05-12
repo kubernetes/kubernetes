@@ -819,3 +819,96 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		}
 	}
 }
+
+/*I think we can add unittest for DeAllocate here*/
+type staticPolicyTestForDeAllocate struct {
+	description     string
+	topo            *topology.CPUTopology
+	stAssignments   state.ContainerCPUAssignments
+	stDefaultCPUSet cpuset.CPUSet
+	pod             *v1.Pod
+	expCSet         cpuset.CPUSet
+}
+
+func TestStaticPolicyTestForDeAllocate(t *testing.T) {
+	testCases := []staticPolicyTestForDeAllocate{
+		{
+			description: "DeAllocate cpu assignments for single container",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainer1": cpuset.NewCPUSet(0, 6, 1, 7),
+				},
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 8, 9, 10, 11),
+			pod: makeMultiContainerPodWithContainerName(
+				"fakePod",
+				"fakePodUID",
+				[]struct{ name, cpuRequest, cpuLimit string }{{"fakeContainer1", "4000m", "4000m"}},
+			),
+			expCSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			description: "DeAllocate cpu assignments for multiple containers",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainer1": cpuset.NewCPUSet(0, 6, 1, 7),
+					"fakeContainer2": cpuset.NewCPUSet(2, 8),
+				},
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(3, 4, 5, 9, 10, 11),
+			pod: makeMultiContainerPodWithContainerName(
+				"fakePod",
+				"fakePodUID",
+				[]struct{ name, cpuRequest, cpuLimit string }{{"fakeContainer1", "4000m", "4000m"}, {"fakeContainer2", "2000m", "2000m"}},
+			),
+			expCSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			description: "attempts invalid DeAllocate",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainer1": cpuset.NewCPUSet(0, 6, 1, 7),
+					"fakeContainer2": cpuset.NewCPUSet(2, 8),
+				},
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(3, 4, 5, 9, 10, 11),
+			pod: makeMultiContainerPodWithContainerName(
+				"invalidPod",
+				"invalidUID",
+				[]struct{ name, cpuRequest, cpuLimit string }{{"fakeContainer1", "4000m", "4000m"}, {"fakeContainer2", "2000m", "2000m"}},
+			),
+			expCSet: cpuset.NewCPUSet(3, 4, 5, 9, 10, 11),
+		},
+	}
+
+	for _, tc := range testCases {
+		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		policy := p.(*staticPolicy)
+		st := &mockState{
+			assignments:   tc.stAssignments,
+			defaultCPUSet: tc.stDefaultCPUSet,
+		}
+		err := policy.Start(st)
+		if err != nil {
+			t.Errorf("StaticPolicy Start() error (%v)", err)
+			continue
+		}
+
+		for _, container := range tc.pod.Spec.Containers {
+			err := policy.DeAllocate(st, tc.pod, &container)
+			if err != nil {
+				t.Errorf("StaticPolicy DeAllocate() returns error (%v).", err)
+				continue
+			}
+		}
+
+		cset := st.GetDefaultCPUSet()
+		if !reflect.DeepEqual(tc.expCSet, cset) {
+			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v but got %v",
+				tc.description, tc.expCSet, cset)
+		}
+	}
+}
