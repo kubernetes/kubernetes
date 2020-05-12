@@ -1069,6 +1069,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only to a server in different namespace.")
+			protocolTCP := v1.ProtocolTCP
 			protocolUDP := v1.ProtocolUDP
 			policyAllowToServerInNSB := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1087,6 +1088,10 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
 							Ports: []networkingv1.NetworkPolicyPort{
+								{
+									Protocol: &protocolTCP,
+									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+								},
 								// Allow DNS look-ups
 								{
 									Protocol: &protocolUDP,
