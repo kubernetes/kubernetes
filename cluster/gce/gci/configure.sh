@@ -573,6 +573,9 @@ function install-kube-binary-config {
     mv "${src_dir}/kubelet" "${KUBE_BIN}"
     mv "${src_dir}/kubectl" "${KUBE_BIN}"
 
+    # Some older images have LICENSES baked-in as a file. Presumably they will
+    # have the directory baked-in eventually.
+    rm -rf "${KUBE_HOME}"/LICENSES
     mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
     mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
   fi
