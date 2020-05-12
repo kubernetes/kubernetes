@@ -752,3 +752,62 @@ func TestAdmit(t *testing.T) {
 		}
 	}
 }
+
+func TestReclaimAllResources(t *testing.T) {
+
+	tcases := []struct {
+		name             string
+		podTopologyHints map[string]map[string]TopologyHint
+		pod              *v1.Pod
+		expectedHints    map[string]map[string]TopologyHint
+	}{
+		{
+			name:             "Test with empty podTopologyHints",
+			podTopologyHints: map[string]map[string]TopologyHint{},
+			pod:              makeSimplePodWithMultipleContainers("fakePodName", "fakePodUID", []string{"fakeContainerName"}),
+			expectedHints:    map[string]map[string]TopologyHint{},
+		},
+		{
+			name:             "Test with sane podTopologyHints map",
+			podTopologyHints: map[string]map[string]TopologyHint{"fakePodUID": {"fakeContainerName": TopologyHint{NewTestBitMask(0), true}}},
+			pod:              makeSimplePodWithMultipleContainers("fakePodName", "fakePodUID", []string{"fakeContainerName"}),
+			expectedHints:    map[string]map[string]TopologyHint{},
+		},
+		{
+			name:             "Test with invalid pod",
+			podTopologyHints: map[string]map[string]TopologyHint{"fakePodUID": {"fakeContainerName": TopologyHint{NewTestBitMask(0), true}}},
+			pod:              makeSimplePodWithMultipleContainers("invalidFakePodName", "invalidFakePodUID", []string{"invalidFakeContainerName"}),
+			expectedHints:    map[string]map[string]TopologyHint{"fakePodUID": {"fakeContainerName": TopologyHint{NewTestBitMask(0), true}}},
+		},
+	}
+
+	for _, tc := range tcases {
+		mngr := manager{}
+		mngr.podTopologyHints = tc.podTopologyHints
+		mngr.reclaimAllResources(tc.pod)
+		actual := mngr.podTopologyHints
+		if !reflect.DeepEqual(tc.expectedHints, actual) {
+			t.Errorf("Test Case: %s", tc.name)
+			t.Errorf("Expected result to be %v, got %v", tc.expectedHints, actual)
+		}
+	}
+}
+
+func makeSimplePodWithMultipleContainers(podName, podUID string, containerNames []string) *v1.Pod {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{},
+		},
+	}
+
+	for _, containerName := range containerNames {
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+			Name: containerName,
+		})
+	}
+
+	pod.Name = podName
+	pod.UID = types.UID(podUID)
+
+	return pod
+}
