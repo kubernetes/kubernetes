@@ -1276,7 +1276,7 @@ filename | sha512 hash
 
 ### Feature
 
-- aggragation api will have alpha support for network proxy ([#87515](https://github.com/kubernetes/kubernetes/pull/87515), [@Sh4d1](https://github.com/Sh4d1)) [SIG API Machinery]
+- The aggregation API will have alpha support for network proxy ([#87515](https://github.com/kubernetes/kubernetes/pull/87515), [@Sh4d1](https://github.com/Sh4d1)) [SIG API Machinery]
 - API request throttling (due to a high rate of requests) is now reported in client-go logs at log level 2.  The messages are of the form
   
   Throttling request took 1.50705208s, request: GET:<URL>
