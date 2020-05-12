@@ -1122,7 +1122,7 @@ func TestValidateIngress(t *testing.T) {
 			if gv == nil {
 				gv = &networkingv1.SchemeGroupVersion
 			}
-			errs := validateIngress(ingress, IngressValidationOptions{requireRegexPath: true}, *gv)
+			errs := validateIngress(ingress, IngressValidationOptions{}, *gv)
 			if len(testCase.expectErrsOnFields) != len(errs) {
 				t.Fatalf("Expected %d errors, got %d errors: %v", len(testCase.expectErrsOnFields), len(errs), errs)
 			}
@@ -1138,10 +1138,9 @@ func TestValidateIngress(t *testing.T) {
 func TestValidateIngressRuleValue(t *testing.T) {
 	fldPath := field.NewPath("testing.http.paths[0].path")
 	testCases := map[string]struct {
-		pathType         networking.PathType
-		path             string
-		requireRegexPath bool
-		expectedErrs     field.ErrorList
+		pathType     networking.PathType
+		path         string
+		expectedErrs field.ErrorList
 	}{
 		"implementation specific: no leading slash": {
 			pathType:     networking.PathTypeImplementationSpecific,
@@ -1242,7 +1241,7 @@ func TestValidateIngressRuleValue(t *testing.T) {
 				},
 			}
 
-			errs := validateIngressRuleValue(irv, field.NewPath("testing"), IngressValidationOptions{requireRegexPath: true})
+			errs := validateIngressRuleValue(irv, field.NewPath("testing"), IngressValidationOptions{})
 
 			if len(errs) != len(testCase.expectedErrs) {
 				t.Fatalf("Expected %d errors, got %d (%+v)", len(testCase.expectedErrs), len(errs), errs)
@@ -1335,7 +1334,7 @@ func TestValidateIngressCreate(t *testing.T) {
 					},
 				}}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec.rules[0].http.paths[0].path"), "/([a-z0-9]*)[", "must be a valid regex")},
+			expectedErrs: field.ErrorList{},
 		},
 		"Spec.Backend.Resource field not allowed on create": {
 			tweakIngress: func(ingress *networking.Ingress) {
@@ -1484,7 +1483,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec.rules[0].http.paths[0].path"), "/bar[", "must be a valid regex")},
+			expectedErrs: field.ErrorList{},
 		},
 		"invalid regex path -> valid regex path": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1956,7 +1955,7 @@ func TestValidateIngressTLS(t *testing.T) {
 	errorCases[badWildcardTLSErr] = badWildcardTLS
 
 	for k, v := range errorCases {
-		errs := validateIngress(&v, IngressValidationOptions{requireRegexPath: true}, networkingv1beta1.SchemeGroupVersion)
+		errs := validateIngress(&v, IngressValidationOptions{}, networkingv1beta1.SchemeGroupVersion)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		} else {
@@ -1980,7 +1979,7 @@ func TestValidateIngressTLS(t *testing.T) {
 	}
 	validCases[fmt.Sprintf("spec.tls[0].hosts: Valid value: '%v'", wildHost)] = goodWildcardTLS
 	for k, v := range validCases {
-		errs := validateIngress(&v, IngressValidationOptions{requireRegexPath: true}, networkingv1beta1.SchemeGroupVersion)
+		errs := validateIngress(&v, IngressValidationOptions{}, networkingv1beta1.SchemeGroupVersion)
 		if len(errs) != 0 {
 			t.Errorf("expected success for %q", k)
 		}
