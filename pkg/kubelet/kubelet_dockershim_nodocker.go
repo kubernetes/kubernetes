@@ -32,5 +32,5 @@ func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	remoteImageEndpoint string,
 	nonMasqueradeCIDR string) error {
 
-	return fmt.Errorf("trying to use docker runtime, w/ Kubelet compiled w/o docker support")
+	return fmt.Errorf("trying to use docker runtime when Kubelet was compiled without docker support")
 }
