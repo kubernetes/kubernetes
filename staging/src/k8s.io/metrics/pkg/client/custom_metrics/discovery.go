@@ -107,15 +107,11 @@ func (d *apiVersionsFromDiscovery) chooseVersion(apiGroup *metav1.APIGroup) (sch
 // If none is specified, it will use the first known one.
 func (d *apiVersionsFromDiscovery) PreferredVersion() (schema.GroupVersion, error) {
 	d.mu.RLock()
+	defer d.mu.Unlock()
 	if d.prefVersion != nil {
 		// if we've already got one, proceed with that
-		defer d.mu.RUnlock()
 		return *d.prefVersion, nil
 	}
-	d.mu.RUnlock()
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
 
 	// double check, someone might have beaten us to it
 	if d.prefVersion != nil {
