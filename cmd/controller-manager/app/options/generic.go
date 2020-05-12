@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	cliflag "k8s.io/component-base/cli/flag"
+	kubectrlmgrconfig "k8s.io/kube-controller-manager/config"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // GenericControllerManagerConfigurationOptions holds the options which are generic.

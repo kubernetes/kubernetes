@@ -19,7 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	kubectrlmgrconfig "k8s.io/cloud-provider"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
