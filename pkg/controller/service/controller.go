@@ -176,6 +176,20 @@ func New(
 				s.nodeSyncLoop()
 			},
 			UpdateFunc: func(old, cur interface{}) {
+				oldNode, ok := old.(*v1.Node)
+				if !ok {
+					return
+				}
+
+				curNode, ok := cur.(*v1.Node)
+				if !ok {
+					return
+				}
+
+				if !shouldSyncNode(oldNode, curNode) {
+					return
+				}
+
 				s.nodeSyncLoop()
 			},
 			DeleteFunc: func(old interface{}) {
@@ -647,6 +661,30 @@ func getNodeConditionPredicate() NodeConditionPredicate {
 		}
 		return true
 	}
+}
+
+func shouldSyncNode(oldNode, newNode *v1.Node) bool {
+	if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
+		return true
+	}
+
+	if !reflect.DeepEqual(oldNode.Labels, newNode.Labels) {
+		return true
+	}
+
+	return nodeReadyConditionStatus(oldNode) != nodeReadyConditionStatus(newNode)
+}
+
+func nodeReadyConditionStatus(node *v1.Node) v1.ConditionStatus {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type != v1.NodeReady {
+			continue
+		}
+
+		return condition.Status
+	}
+
+	return ""
 }
 
 // nodeSyncLoop handles updating the hosts pointed to by all load

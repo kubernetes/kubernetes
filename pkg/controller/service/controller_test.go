@@ -1486,3 +1486,122 @@ func TestListWithPredicate(t *testing.T) {
 		})
 	}
 }
+
+func Test_shouldSyncNode(t *testing.T) {
+	testcases := []struct {
+		name       string
+		oldNode    *v1.Node
+		newNode    *v1.Node
+		shouldSync bool
+	}{
+		{
+			name: "spec.unschedable field changed",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					Unschedulable: false,
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			shouldSync: true,
+		},
+		{
+			name: "labels changed",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node",
+					Labels: map[string]string{},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+					Labels: map[string]string{
+						labelNodeRoleExcludeBalancer: "",
+					},
+				},
+			},
+			shouldSync: true,
+		},
+		{
+			name: "ready condition changed",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			shouldSync: true,
+		},
+		{
+			name: "not relevant condition changed and no ready condition",
+			oldNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeNetworkUnavailable,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			newNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeNetworkUnavailable,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			shouldSync: false,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			shouldSync := shouldSyncNode(testcase.oldNode, testcase.newNode)
+			if shouldSync != testcase.shouldSync {
+				t.Logf("actual shouldSyncNode: %v", shouldSync)
+				t.Logf("expected shouldSyncNode: %v", testcase.shouldSync)
+				t.Errorf("unexpected result from shouldSyncNode")
+			}
+		})
+	}
+}
