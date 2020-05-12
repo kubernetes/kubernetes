@@ -25,6 +25,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -65,13 +68,54 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).
 type PodInfo struct {
-	Pod *v1.Pod
+	Pod                       *v1.Pod
+	RequiredAffinityTerms     []AffinityTerm
+	RequiredAntiAffinityTerms []AffinityTerm
+}
+
+// AffinityTerm is a processed version of v1.PodAffinityTerm.
+type AffinityTerm struct {
+	Namespaces  sets.String
+	Selector    labels.Selector
+	TopologyKey string
+}
+
+func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) *AffinityTerm {
+	namespaces := schedutil.GetNamespacesFromPodAffinityTerm(pod, term)
+	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+	if err != nil {
+		klog.Errorf("Cannot process label selector: %v", err)
+		return nil
+	}
+	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey}
+}
+
+// getAffinityTerms receives a Pod and affinity terms and returns the namespaces and
+// selectors of the terms.
+func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) []AffinityTerm {
+	if v1Terms == nil {
+		return nil
+	}
+
+	var terms []AffinityTerm
+	for _, term := range v1Terms {
+		t := newAffinityTerm(pod, &term)
+		if t == nil {
+			// We get here if the label selector failed to process, this is not supposed
+			// to happen because the pod should have been validated by the api server.
+			return nil
+		}
+		terms = append(terms, *t)
+	}
+	return terms
 }
 
 // NewPodInfo return a new PodInfo
 func NewPodInfo(pod *v1.Pod) *PodInfo {
 	return &PodInfo{
-		Pod: pod,
+		Pod:                       pod,
+		RequiredAffinityTerms:     getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity)),
+		RequiredAntiAffinityTerms: getAffinityTerms(pod, schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity)),
 	}
 }
 

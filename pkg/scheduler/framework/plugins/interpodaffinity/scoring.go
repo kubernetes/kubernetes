@@ -48,7 +48,7 @@ func (s *preScoreState) Clone() framework.StateData {
 
 // A "processed" representation of v1.WeightedAffinityTerm.
 type weightedAffinityTerm struct {
-	affinityTerm
+	framework.AffinityTerm
 	weight int32
 }
 
@@ -58,7 +58,7 @@ func newWeightedAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm, weight int32
 	if err != nil {
 		return nil, err
 	}
-	return &weightedAffinityTerm{affinityTerm: affinityTerm{namespaces: namespaces, selector: selector, topologyKey: term.TopologyKey}, weight: weight}, nil
+	return &weightedAffinityTerm{AffinityTerm: framework.AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey}, weight: weight}, nil
 }
 
 func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm) ([]*weightedAffinityTerm, error) {
@@ -87,13 +87,13 @@ func (m scoreMap) processTerm(
 		return
 	}
 
-	match := schedutil.PodMatchesTermsNamespaceAndSelector(podToCheck, term.namespaces, term.selector)
-	tpValue, tpValueExist := fixedNode.Labels[term.topologyKey]
+	match := schedutil.PodMatchesTermsNamespaceAndSelector(podToCheck, term.Namespaces, term.Selector)
+	tpValue, tpValueExist := fixedNode.Labels[term.TopologyKey]
 	if match && tpValueExist {
-		if m[term.topologyKey] == nil {
-			m[term.topologyKey] = make(map[string]int64)
+		if m[term.TopologyKey] == nil {
+			m[term.TopologyKey] = make(map[string]int64)
 		}
-		m[term.topologyKey][tpValue] += int64(term.weight * int32(multiplier))
+		m[term.TopologyKey][tpValue] += int64(term.weight * int32(multiplier))
 	}
 	return
 }

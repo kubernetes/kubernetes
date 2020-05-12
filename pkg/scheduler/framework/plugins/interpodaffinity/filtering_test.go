@@ -2035,7 +2035,6 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		pod                     *v1.Pod
 		wantAffinityPodsMap     topologyToMatchedTermCount
 		wantAntiAffinityPodsMap topologyToMatchedTermCount
-		wantErr                 bool
 	}{
 		{
 			name:  "nil test",
@@ -2195,11 +2194,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			l, _ := s.NodeInfos().List()
-			gotAffinityPodsMap, gotAntiAffinityPodsMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(tt.pod, l)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			gotAffinityPodsMap, gotAntiAffinityPodsMap := getTPMapMatchingIncomingAffinityAntiAffinity(framework.NewPodInfo(tt.pod), l)
 			if !reflect.DeepEqual(gotAffinityPodsMap, tt.wantAffinityPodsMap) {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAffinityPodsMap = %#v, want %#v", gotAffinityPodsMap, tt.wantAffinityPodsMap)
 			}
