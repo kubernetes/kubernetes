@@ -113,13 +113,13 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 		name         string
 	}{
 		{
-			// Node1 scores (used resources) on 0-10 scale
-			// CPU Score: (0 * 100)  / 4000 = 0
-			// Memory Score: (0 * 100) / 10000 = 0
+			// Node1 scores (used resources) on 0-MaxNodeScore scale
+			// CPU Score: (0 * MaxNodeScore)  / 4000 = 0
+			// Memory Score: (0 * MaxNodeScore) / 10000 = 0
 			// Node1 Score: (0 + 0) / 2 = 0
-			// Node2 scores (used resources) on 0-10 scale
-			// CPU Score: (0 * 100) / 4000 = 0
-			// Memory Score: (0 * 100) / 10000 = 0
+			// Node2 scores (used resources) on 0-MaxNodeScore scale
+			// CPU Score: (0 * MaxNodeScore) / 4000 = 0
+			// Memory Score: (0 * MaxNodeScore) / 10000 = 0
 			// Node2 Score: (0 + 0) / 2 = 0
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
@@ -127,13 +127,13 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			name:         "nothing scheduled, nothing requested",
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: (3000 * 100) / 4000 = 75
-			// Memory Score: (5000 * 100) / 10000 = 50
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: (3000 * MaxNodeScore) / 4000 = 75
+			// Memory Score: (5000 * MaxNodeScore) / 10000 = 50
 			// Node1 Score: (75 + 50) / 2 = 6
-			// Node2 scores on 0-10 scale
-			// CPU Score: (3000 * 100) / 6000 = 50
-			// Memory Score: (5000 * 100) / 10000 = 50
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: (3000 * MaxNodeScore) / 6000 = 50
+			// Memory Score: (5000 * MaxNodeScore) / 10000 = 50
 			// Node2 Score: (50 + 50) / 2 = 50
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
@@ -141,13 +141,13 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: (6000 * 100) / 10000 = 60
-			// Memory Score: (0 * 100) / 20000 = 100
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: (6000 * MaxNodeScore) / 10000 = 60
+			// Memory Score: (0 * MaxNodeScore) / 20000 = 0
 			// Node1 Score: (60 + 0) / 2 = 30
-			// Node2 scores on 0-10 scale
-			// CPU Score: (6000 * 100) / 10000 = 60
-			// Memory Score: (5000 * 100) / 20000 = 25
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: (6000 * MaxNodeScore) / 10000 = 60
+			// Memory Score: (5000 * MaxNodeScore) / 20000 = 25
 			// Node2 Score: (60 + 25) / 2 = 42
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
@@ -161,13 +161,13 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			},
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: (6000 * 100) / 10000 = 60
-			// Memory Score: (5000 * 100) / 20000 = 25
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: (6000 * MaxNodeScore) / 10000 = 60
+			// Memory Score: (5000 * MaxNodeScore) / 20000 = 25
 			// Node1 Score: (60 + 25) / 2 = 42
-			// Node2 scores on 0-10 scale
-			// CPU Score: (6000 * 100) / 10000 = 60
-			// Memory Score: (10000 * 100) / 20000 = 50
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: (6000 * MaxNodeScore) / 10000 = 60
+			// Memory Score: (10000 * MaxNodeScore) / 20000 = 50
 			// Node2 Score: (60 + 50) / 2 = 55
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
@@ -179,12 +179,12 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			},
 		},
 		{
-			// Node1 scores on 0-10 scale
+			// Node1 scores on 0-MaxNodeScore scale
 			// CPU Score: 5000 > 4000 return 0
-			// Memory Score: (9000 * 100) / 10000 = 90
+			// Memory Score: (9000 * MaxNodeScore) / 10000 = 90
 			// Node1 Score: (0 + 90) / 2 = 45
-			// Node2 scores on 0-10 scale
-			// CPU Score: (5000 * 100) / 10000 = 50
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: (5000 * MaxNodeScore) / 10000 = 50
 			// Memory Score: 9000 > 8000 return 0
 			// Node2 Score: (50 + 0) / 2 = 25
 			pod:          &v1.Pod{Spec: bigCPUAndMemory},
