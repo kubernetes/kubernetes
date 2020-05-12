@@ -6,6 +6,7 @@ go_library(
         "controlplane.go",
         "data.go",
         "kubeletconfig.go",
+        "preflight.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node",
     visibility = ["//visibility:public"],
@@ -17,11 +18,14 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
         "//cmd/kubeadm/app/phases/upgrade:go_default_library",
+        "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
