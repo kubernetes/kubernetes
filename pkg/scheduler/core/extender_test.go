@@ -353,7 +353,7 @@ func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
 	return !f.unInterested
 }
 
-var _ SchedulerExtender = &FakeExtender{}
+var _ framework.Extender = &FakeExtender{}
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
@@ -575,7 +575,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			extenders := []SchedulerExtender{}
+			extenders := []framework.Extender{}
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}

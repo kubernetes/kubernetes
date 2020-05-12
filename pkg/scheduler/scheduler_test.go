@@ -141,7 +141,7 @@ func (es mockScheduler) Schedule(ctx context.Context, profile *profile.Profile, 
 	return es.result, es.err
 }
 
-func (es mockScheduler) Extenders() []core.SchedulerExtender {
+func (es mockScheduler) Extenders() []framework.Extender {
 	return nil
 }
 func (es mockScheduler) Preempt(ctx context.Context, i *profile.Profile, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (string, []*v1.Pod, []*v1.Pod, error) {
@@ -815,7 +815,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
 		internalcache.NewEmptySnapshot(),
-		[]core.SchedulerExtender{},
+		[]framework.Extender{},
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
@@ -1104,14 +1104,14 @@ priorities:
 func TestSchedulerBinding(t *testing.T) {
 	table := []struct {
 		podName      string
-		extenders    []core.SchedulerExtender
+		extenders    []framework.Extender
 		wantBinderID int
 		name         string
 	}{
 		{
 			name:    "the extender is not a binder",
 			podName: "pod0",
-			extenders: []core.SchedulerExtender{
+			extenders: []framework.Extender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 			},
 			wantBinderID: -1, // default binding.
@@ -1119,7 +1119,7 @@ func TestSchedulerBinding(t *testing.T) {
 		{
 			name:    "one of the extenders is a binder and interested in pod",
 			podName: "pod0",
-			extenders: []core.SchedulerExtender{
+			extenders: []framework.Extender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
@@ -1128,7 +1128,7 @@ func TestSchedulerBinding(t *testing.T) {
 		{
 			name:    "one of the extenders is a binder, but not interested in pod",
 			podName: "pod1",
-			extenders: []core.SchedulerExtender{
+			extenders: []framework.Extender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},

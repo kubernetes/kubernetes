@@ -108,7 +108,7 @@ type ScheduleAlgorithm interface {
 	Preempt(context.Context, *profile.Profile, *framework.CycleState, *v1.Pod, error) (selectedNode string, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 	// Extenders returns a slice of extender config. This is exposed for
 	// testing.
-	Extenders() []SchedulerExtender
+	Extenders() []framework.Extender
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -125,7 +125,7 @@ type ScheduleResult struct {
 type genericScheduler struct {
 	cache                    internalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
-	extenders                []SchedulerExtender
+	extenders                []framework.Extender
 	nodeInfoSnapshot         *internalcache.Snapshot
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                policylisters.PodDisruptionBudgetLister
@@ -210,7 +210,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	}, err
 }
 
-func (g *genericScheduler) Extenders() []SchedulerExtender {
+func (g *genericScheduler) Extenders() []framework.Extender {
 	return g.extenders
 }
 
@@ -1103,7 +1103,7 @@ func NewGenericScheduler(
 	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
 	nodeInfoSnapshot *internalcache.Snapshot,
-	extenders []SchedulerExtender,
+	extenders []framework.Extender,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pdbLister policylisters.PodDisruptionBudgetLister,
 	disablePreemption bool,

@@ -126,10 +126,10 @@ func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile) (fram
 
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
-	var extenders []core.SchedulerExtender
+	var extenders []framework.Extender
 	var ignoredExtendedResources []string
 	if len(c.extenders) != 0 {
-		var ignorableExtenders []core.SchedulerExtender
+		var ignorableExtenders []framework.Extender
 		for ii := range c.extenders {
 			klog.V(2).Infof("Creating extender with config %+v", c.extenders[ii])
 			extender, err := core.NewHTTPExtender(&c.extenders[ii])

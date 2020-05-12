@@ -813,7 +813,7 @@ func TestGenericScheduler(t *testing.T) {
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				snapshot,
-				[]SchedulerExtender{},
+				[]framework.Extender{},
 				pvcLister,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
@@ -1134,7 +1134,7 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				emptySnapshot,
-				[]SchedulerExtender{},
+				[]framework.Extender{},
 				nil,
 				nil,
 				false,
@@ -1613,7 +1613,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				nil,
 				internalqueue.NewSchedulingQueue(nil),
 				snapshot,
-				[]SchedulerExtender{},
+				[]framework.Extender{},
 				nil,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
@@ -2391,7 +2391,7 @@ func TestPreempt(t *testing.T) {
 				cachedNodeInfo.SetNode(node)
 				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
-			var extenders []SchedulerExtender
+			var extenders []framework.Extender
 			for _, extender := range test.extenders {
 				// Set nodeInfoMap as extenders cached node information.
 				extender.cachedNodeNameToInfo = cachedNodeInfoMap
