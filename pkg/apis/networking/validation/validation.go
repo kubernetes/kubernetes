@@ -197,7 +197,6 @@ var ValidateIngressName = apimachineryvalidation.NameIsDNSSubdomain
 
 // IngressValidationOptions cover beta to GA transitions for HTTP PathType
 type IngressValidationOptions struct {
-	allowResourceBackend bool
 }
 
 // ValidateIngress validates Ingresses on create and update.
@@ -211,10 +210,7 @@ func validateIngress(ingress *networking.Ingress, opts IngressValidationOptions,
 func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
 	var opts IngressValidationOptions
-	opts = IngressValidationOptions{
-		// TODO(cmluciano): Allow resource backend for 1.19.
-		allowResourceBackend: false,
-	}
+	opts = IngressValidationOptions{}
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
 	if annotationIsSet && ingress.Spec.IngressClassName != nil {
@@ -228,9 +224,7 @@ func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVe
 func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
 	var opts IngressValidationOptions
-	opts = IngressValidationOptions{
-		allowResourceBackend: resourceBackendPresent(oldIngress),
-	}
+	opts = IngressValidationOptions{}
 
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
 	return allErrs
@@ -383,8 +377,6 @@ func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.P
 	switch {
 	case hasResourceBackend && hasServiceBackend:
 		return append(allErrs, field.Invalid(fldPath, "", "cannot set both resource and service backends"))
-	case hasResourceBackend && !opts.allowResourceBackend:
-		return append(allErrs, field.Forbidden(fldPath.Child("resource"), "not supported; only service backends are supported in this version"))
 	case hasResourceBackend:
 		allErrs = append(allErrs, validateIngressTypedLocalObjectReference(backend.Resource, fldPath.Child("resource"))...)
 	default:
@@ -467,21 +459,4 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	}
 
 	return allErrs
-}
-
-func resourceBackendPresent(ingress *networking.Ingress) bool {
-	if ingress.Spec.Backend != nil && ingress.Spec.Backend.Resource != nil {
-		return true
-	}
-	for _, rule := range ingress.Spec.Rules {
-		if rule.HTTP == nil {
-			continue
-		}
-		for _, path := range rule.HTTP.Paths {
-			if path.Backend.Resource != nil {
-				return true
-			}
-		}
-	}
-	return false
 }

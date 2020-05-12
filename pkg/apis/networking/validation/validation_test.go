@@ -1336,14 +1336,14 @@ func TestValidateIngressCreate(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{},
 		},
-		"Spec.Backend.Resource field not allowed on create": {
+		"Spec.Backend.Resource field allowed on create": {
 			tweakIngress: func(ingress *networking.Ingress) {
 				ingress.Spec.Backend = &networking.IngressBackend{
 					Resource: resourceBackend}
 			},
-			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.backend.resource"), "not supported; only service backends are supported in this version")},
+			expectedErrs: field.ErrorList{},
 		},
-		"Paths.Backend.Resource field not allowed on create": {
+		"Paths.Backend.Resource field allowed on create": {
 			tweakIngress: func(ingress *networking.Ingress) {
 				ingress.Spec.Rules = []networking.IngressRule{{
 					Host: "foo.bar.com",
@@ -1359,7 +1359,7 @@ func TestValidateIngressCreate(t *testing.T) {
 					},
 				}}
 			},
-			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.rules[0].http.paths[0].backend.resource"), "not supported; only service backends are supported in this version")},
+			expectedErrs: field.ErrorList{},
 		},
 	}
 
@@ -1543,13 +1543,13 @@ func TestValidateIngressUpdate(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{},
 		},
-		"new Backend.Resource not allowed on update": {
+		"new Backend.Resource allowed on update": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
 				oldIngress.Spec.Backend = &defaultBackend
 				newIngress.Spec.Backend = &networking.IngressBackend{
 					Resource: resourceBackend}
 			},
-			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.backend.resource"), "not supported; only service backends are supported in this version")},
+			expectedErrs: field.ErrorList{},
 		},
 		"old Backend.Resource allowed on update": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1686,7 +1686,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}}
 			},
-			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.rules[0].http.paths[0].backend.resource"), "not supported; only service backends are supported in this version")},
+			expectedErrs: field.ErrorList{},
 		},
 	}
 
@@ -2075,153 +2075,5 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
 		}
-	}
-}
-
-func TestValidateResourceBackendPresent(t *testing.T) {
-	implementationPathType := networking.PathTypeImplementationSpecific
-	defaultBackend := networking.IngressBackend{
-		ServiceName: "default-backend",
-		ServicePort: intstr.FromInt(80),
-	}
-	resourceBackend := &api.TypedLocalObjectReference{
-		APIGroup: utilpointer.StringPtr("example.com"),
-		Kind:     "foo",
-		Name:     "bar",
-	}
-	baseIngress := networking.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: networking.IngressSpec{
-			Backend: &networking.IngressBackend{
-				ServiceName: "default-backend",
-				ServicePort: intstr.FromInt(80),
-			},
-			Rules: []networking.IngressRule{
-				{
-					Host: "foo.bar.com",
-					IngressRuleValue: networking.IngressRuleValue{
-						HTTP: &networking.HTTPIngressRuleValue{
-							Paths: []networking.HTTPIngressPath{
-								{
-									Path:     "/foo",
-									PathType: &implementationPathType,
-									Backend:  defaultBackend,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
-					{IP: "127.0.0.1"},
-				},
-			},
-		},
-	}
-	testCases := map[string]struct {
-		groupVersion          *schema.GroupVersion
-		tweakIngress          func(ing *networking.Ingress)
-		expectResourceBackend bool
-	}{
-		"nil spec.Backend and no paths": {
-			tweakIngress: func(ing *networking.Ingress) {
-				ing.Spec.Backend = nil
-				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path = ""
-			},
-			expectResourceBackend: false,
-		},
-		"nil spec.Backend.Resource and no paths": {
-			tweakIngress: func(ing *networking.Ingress) {
-				ing.Spec.Backend = nil
-				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []networking.HTTPIngressPath{}
-			},
-			expectResourceBackend: false,
-		},
-		"non-nil spec.Backend.Resource and no paths": {
-			tweakIngress: func(ing *networking.Ingress) {
-				ing.Spec.Backend = &networking.IngressBackend{
-					Resource: resourceBackend,
-				}
-				ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path = ""
-			},
-			expectResourceBackend: true,
-		},
-		"nil spec.Backend, one rule with nil HTTP ": {
-			tweakIngress: func(ing *networking.Ingress) {
-				ing.Spec.Backend = nil
-				ing.Spec.Rules[0].IngressRuleValue.HTTP = nil
-			},
-			expectResourceBackend: false,
-		},
-		"nil spec.Backend, one rule with non-nil HTTP, no paths": {
-			tweakIngress: func(ing *networking.Ingress) {
-				ing.Spec.Backend = nil
-				ing.Spec.Rules[0].IngressRuleValue = networking.IngressRuleValue{
-					HTTP: &networking.HTTPIngressRuleValue{
-						Paths: []networking.HTTPIngressPath{},
-					},
-				}
-			},
-			expectResourceBackend: false,
-		},
-		"nil spec.Backend, one rule with non-nil HTTP, one path with nil Backend.Resource": {
-			tweakIngress: func(ing *networking.Ingress) {
-				ing.Spec.Backend = nil
-				ing.Spec.Rules[0].IngressRuleValue = networking.IngressRuleValue{
-					HTTP: &networking.HTTPIngressRuleValue{
-						Paths: []networking.HTTPIngressPath{
-							{
-								Path:     "/foo",
-								PathType: &implementationPathType,
-								Backend: networking.IngressBackend{
-									Resource: nil,
-								},
-							},
-						},
-					},
-				}
-			},
-			expectResourceBackend: false,
-		},
-		"nil spec.Backend, one rule with non-nil HTTP, one path with non-nil Backend.Resource": {
-			tweakIngress: func(ing *networking.Ingress) {
-				ing.Spec.Backend = nil
-				ing.Spec.Rules[0].IngressRuleValue = networking.IngressRuleValue{
-					HTTP: &networking.HTTPIngressRuleValue{
-						Paths: []networking.HTTPIngressPath{
-							{
-								Path:     "/foo",
-								PathType: &implementationPathType,
-								Backend: networking.IngressBackend{
-									Resource: resourceBackend,
-								},
-							},
-						},
-					},
-				}
-			},
-			expectResourceBackend: true,
-		},
-	}
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			ingress := baseIngress.DeepCopy()
-			testCase.tweakIngress(ingress)
-			gv := testCase.groupVersion
-			if gv == nil {
-				gv = &networkingv1.SchemeGroupVersion
-			}
-			isBackendAllowed := resourceBackendPresent(ingress)
-			if isBackendAllowed != testCase.expectResourceBackend {
-				t.Errorf("Expected resourceBackendPresent to return: %v, got: %v", testCase.expectResourceBackend, isBackendAllowed)
-			}
-		})
 	}
 }
