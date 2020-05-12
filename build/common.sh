@@ -164,6 +164,9 @@ function kube::build::verify_prereqs() {
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${KUBE_ROOT}/.dockerized-kube-version-defs"
+
+  # Without this, the user's umask can leak through.
+  umask 0022
 }
 
 # ---------------------------------------------------------------------------
