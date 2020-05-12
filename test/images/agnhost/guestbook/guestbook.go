@@ -84,14 +84,14 @@ func registerNode(registerTo, port string) {
 	for time.Since(start) < timeout {
 		_, err := net.ResolveTCPAddr("tcp", hostPort)
 		if err != nil {
-			log.Printf("--slaveof param and/or --backend-port param are invalid. %v. Retrying in 1 second.", err)
+			log.Printf("unable to resolve %s, --slaveof param and/or --backend-port param are invalid: %v. Retrying in %s.", hostPort, err, sleep)
 			time.Sleep(sleep)
 			continue
 		}
 
 		response, err := dialHTTP(request, hostPort)
 		if err != nil {
-			log.Printf("encountered error while registering to master: %v. Retrying in 1 second.", err)
+			log.Printf("encountered error while registering to master: %v. Retrying in %s.", err, sleep)
 			time.Sleep(sleep)
 			continue
 		}
