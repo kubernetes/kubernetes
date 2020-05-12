@@ -57,13 +57,6 @@ const (
 	// proportions in case the deployment has surge replicas.
 	MaxReplicasAnnotation = "deployment.kubernetes.io/max-replicas"
 
-	// RollbackRevisionNotFound is not found rollback event reason
-	RollbackRevisionNotFound = "DeploymentRollbackRevisionNotFound"
-	// RollbackTemplateUnchanged is the template unchanged rollback event reason
-	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
-	// RollbackDone is the done rollback event reason
-	RollbackDone = "DeploymentRollback"
-
 	// Reasons for deployment conditions
 	//
 	// Progressing:

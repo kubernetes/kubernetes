@@ -625,13 +625,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.sync(d, rsList)
 	}
 
-	// rollback is not re-entrant in case the underlying replica sets are updated with a new
-	// revision so we should ensure that we won't proceed to update replica sets until we
-	// make sure that the deployment has cleaned up its rollback spec in subsequent enqueues.
-	if getRollbackTo(d) != nil {
-		return dc.rollback(d, rsList)
-	}
-
 	scalingEvent, err := dc.isScalingEvent(d, rsList)
 	if err != nil {
 		return err

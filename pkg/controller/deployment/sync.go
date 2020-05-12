@@ -57,8 +57,8 @@ func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaS
 		return err
 	}
 
-	// Clean up the deployment when it's paused and no rollback is in flight.
-	if d.Spec.Paused && getRollbackTo(d) == nil {
+	// Clean up the deployment when it's paused.
+	if d.Spec.Paused {
 		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
 			return err
 		}
