@@ -70,6 +70,7 @@ func TestNewManager(t *testing.T) {
 				t.Errorf("Unexpected policy name. Have: %q wants %q", rawMgr.policy.Name(), tc.expectedPolicy)
 			}
 		}
+
 	}
 }
 
@@ -86,6 +87,11 @@ func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container
 
 func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
 	//return allocateError
+	return nil
+}
+
+func (m *mockHintProvider) DeAllocate(pod *v1.Pod, container *v1.Container) error {
+	//return DeAllocateError
 	return nil
 }
 
