@@ -131,7 +131,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ExpectHaveKey(updated.Status.DisruptedPods, pod.Name, "Expecting the DisruptedPods have %s", pod.Name)
 
 		ginkgo.By("Patching PodDisruptionBudget status")
-		patched, _ := patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1beta1.PodDisruptionBudget) (bytes []byte, err error) {
+		patched := patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1beta1.PodDisruptionBudget) (bytes []byte, err error) {
 			oldBytes, err := json.Marshal(old)
 			framework.ExpectNoError(err, "failed to marshal JSON for old data")
 			old.Status.DisruptedPods = make(map[string]metav1.Time)
@@ -374,8 +374,8 @@ type updateFunc func(pdb *policyv1beta1.PodDisruptionBudget) *policyv1beta1.PodD
 type updateRestAPI func(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudget, opts metav1.UpdateOptions) (*policyv1beta1.PodDisruptionBudget, error)
 type patchFunc func(pdb *policyv1beta1.PodDisruptionBudget) ([]byte, error)
 
-func updatePDBOrDie(cs kubernetes.Interface, ns string, name string, f updateFunc, api updateRestAPI) (updated *policyv1beta1.PodDisruptionBudget, err error) {
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+func updatePDBOrDie(cs kubernetes.Interface, ns string, name string, f updateFunc, api updateRestAPI) (updated *policyv1beta1.PodDisruptionBudget) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		old, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -389,11 +389,11 @@ func updatePDBOrDie(cs kubernetes.Interface, ns string, name string, f updateFun
 
 	framework.ExpectNoError(err, "Waiting for the PDB update to be processed in namespace %s", ns)
 	waitForPdbToBeProcessed(cs, ns, name)
-	return updated, err
+	return updated
 }
 
-func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f patchFunc, subresources ...string) (updated *policyv1beta1.PodDisruptionBudget, err error) {
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, name string, f patchFunc, subresources ...string) (updated *policyv1beta1.PodDisruptionBudget) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		old := getPDBStatusOrDie(dc, ns, name)
 		patchBytes, err := f(old)
 		if updated, err = cs.PolicyV1beta1().PodDisruptionBudgets(ns).Patch(context.TODO(), old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...); err != nil {
@@ -404,7 +404,7 @@ func patchPDBOrDie(cs kubernetes.Interface, dc dynamic.Interface, ns string, nam
 
 	framework.ExpectNoError(err, "Waiting for the pdb update to be processed in namespace %s", ns)
 	waitForPdbToBeProcessed(cs, ns, name)
-	return updated, err
+	return updated
 }
 
 func deletePDBOrDie(cs kubernetes.Interface, ns string, name string) {
