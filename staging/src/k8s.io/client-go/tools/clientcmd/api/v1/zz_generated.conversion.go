@@ -172,6 +172,8 @@ func autoConvert_v1_AuthInfo_To_api_AuthInfo(in *AuthInfo, out *api.AuthInfo, s 
 	out.Password = in.Password
 	out.AuthProvider = (*api.AuthProviderConfig)(unsafe.Pointer(in.AuthProvider))
 	out.Exec = (*api.ExecConfig)(unsafe.Pointer(in.Exec))
+	out.QPS = in.QPS
+	out.Burst = in.Burst
 	if err := Convert_Slice_v1_NamedExtension_To_Map_string_To_runtime_Object(&in.Extensions, &out.Extensions, s); err != nil {
 		return err
 	}
@@ -198,6 +200,8 @@ func autoConvert_api_AuthInfo_To_v1_AuthInfo(in *api.AuthInfo, out *AuthInfo, s 
 	out.Password = in.Password
 	out.AuthProvider = (*AuthProviderConfig)(unsafe.Pointer(in.AuthProvider))
 	out.Exec = (*ExecConfig)(unsafe.Pointer(in.Exec))
+	out.QPS = in.QPS
+	out.Burst = in.Burst
 	if err := Convert_Map_string_To_runtime_Object_To_Slice_v1_NamedExtension(&in.Extensions, &out.Extensions, s); err != nil {
 		return err
 	}
