@@ -181,6 +181,12 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 	}
 }
 
+// SyncInformerFactory starts informer and waits for caches to be synced
+func SyncInformerFactory(testCtx *TestContext) {
+	testCtx.InformerFactory.Start(testCtx.Ctx.Done())
+	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+}
+
 // CleanupTest cleans related resources which were created during integration test
 func CleanupTest(t *testing.T, testCtx *TestContext) {
 	// Kill the scheduler.
@@ -407,11 +413,6 @@ func InitTestSchedulerWithOptions(
 
 	stopCh := make(chan struct{})
 	eventBroadcaster.StartRecordingToSink(stopCh)
-
-	testCtx.InformerFactory.Start(testCtx.Scheduler.StopEverything)
-	testCtx.InformerFactory.WaitForCacheSync(testCtx.Scheduler.StopEverything)
-
-	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	return testCtx
 }

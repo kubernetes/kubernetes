@@ -539,6 +539,8 @@ func TestMultipleSchedulers(t *testing.T) {
 	// 5. create and start a scheduler with name "foo-scheduler"
 	fooProf := kubeschedulerconfig.KubeSchedulerProfile{SchedulerName: fooScheduler}
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, true, nil, time.Second, scheduler.WithProfiles(fooProf))
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled
