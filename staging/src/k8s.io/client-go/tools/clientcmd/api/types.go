@@ -142,6 +142,15 @@ type AuthInfo struct {
 	// Exec specifies a custom exec-based authentication plugin for the kubernetes cluster.
 	// +optional
 	Exec *ExecConfig `json:"exec,omitempty"`
+
+	// qps indicates the maximum rate tokens will be added to the token bucket for use by a client.
+	// If it's zero, the created RESTClient will use DefaultQPS: 5
+	// Set to -1 to turn off rate limiting.
+	QPS float32 `json:"qps,omitempty"`
+	// burst is the maximum number of tokens to "save up" for immediate use.
+	// If it's zero, the created RESTClient will use DefaultBurst: 10.
+	Burst int32 `json:"burst,omitempty"`
+
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`

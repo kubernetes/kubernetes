@@ -235,6 +235,12 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 			Extra:    configAuthInfo.ImpersonateUserExtra,
 		}
 	}
+	if configAuthInfo.QPS != 0 {
+		config.QPS = configAuthInfo.QPS
+	}
+	if configAuthInfo.Burst != 0 {
+		config.Burst = int(configAuthInfo.Burst)
+	}
 	if len(configAuthInfo.ClientCertificate) > 0 || len(configAuthInfo.ClientCertificateData) > 0 {
 		config.CertFile = configAuthInfo.ClientCertificate
 		config.CertData = configAuthInfo.ClientCertificateData

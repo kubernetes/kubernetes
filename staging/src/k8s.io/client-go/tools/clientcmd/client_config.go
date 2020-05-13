@@ -179,6 +179,12 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 			Extra:    configAuthInfo.ImpersonateUserExtra,
 		}
 	}
+	if configAuthInfo.QPS != 0 {
+		clientConfig.QPS = configAuthInfo.QPS
+	}
+	if configAuthInfo.Burst != 0 {
+		clientConfig.Burst = int(configAuthInfo.Burst)
+	}
 
 	// only try to read the auth information if we are secure
 	if restclient.IsConfigTransportTLS(*clientConfig) {
@@ -252,6 +258,12 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 			Groups:   configAuthInfo.ImpersonateGroups,
 			Extra:    configAuthInfo.ImpersonateUserExtra,
 		}
+	}
+	if configAuthInfo.QPS != 0 {
+		mergedConfig.QPS = configAuthInfo.QPS
+	}
+	if configAuthInfo.Burst != 0 {
+		mergedConfig.Burst = int(configAuthInfo.Burst)
 	}
 	if len(configAuthInfo.ClientCertificate) > 0 || len(configAuthInfo.ClientCertificateData) > 0 {
 		mergedConfig.CertFile = configAuthInfo.ClientCertificate

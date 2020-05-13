@@ -53,6 +53,8 @@ const (
 	flagPassword         = "password"
 	flagTimeout          = "request-timeout"
 	flagHTTPCacheDir     = "cache-dir"
+	flagClientQPS        = "kube-api-qps"
+	flagClientBurst      = "kube-api-burst"
 )
 
 var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
@@ -96,6 +98,8 @@ type ConfigFlags struct {
 	Username         *string
 	Password         *string
 	Timeout          *string
+	ClientQPS        *float32
+	ClientBurst      *int32
 
 	clientConfig clientcmd.ClientConfig
 	lock         sync.Mutex
@@ -156,6 +160,12 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.Password != nil {
 		overrides.AuthInfo.Password = *f.Password
+	}
+	if f.ClientQPS != nil {
+		overrides.AuthInfo.QPS = *f.ClientQPS
+	}
+	if f.ClientBurst != nil {
+		overrides.AuthInfo.Burst = *f.ClientBurst
 	}
 
 	// bind cluster flags
@@ -290,6 +300,12 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Context != nil {
 		flags.StringVar(f.Context, flagContext, *f.Context, "The name of the kubeconfig context to use")
 	}
+	if f.ClientQPS != nil {
+		flags.Float32Var(f.ClientQPS, flagClientQPS, *f.ClientQPS, "QPS to use while talking with kubernetes apiserver.")
+	}
+	if f.ClientBurst != nil {
+		flags.Int32Var(f.ClientBurst, flagClientBurst, *f.ClientBurst, "Burst to use while talking with kubernetes apiserver.")
+	}
 
 	if f.APIServer != nil {
 		flags.StringVarP(f.APIServer, flagAPIServer, "s", *f.APIServer, "The address and port of the Kubernetes API server")
@@ -339,12 +355,22 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		BearerToken:      stringptr(""),
 		Impersonate:      stringptr(""),
 		ImpersonateGroup: &impersonateGroup,
+		ClientQPS:        float32ptr(0),
+		ClientBurst:      int32ptr(0),
 
 		usePersistentConfig: usePersistentConfig,
 	}
 }
 
 func stringptr(val string) *string {
+	return &val
+}
+
+func float32ptr(val float32) *float32 {
+	return &val
+}
+
+func int32ptr(val int32) *int32 {
 	return &val
 }
 
