@@ -372,7 +372,6 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		3.	container restarts
 		4.	delete cleanly
 	*/
-
 	framework.ConformanceIt("should not change the subpath mount on a container restart if the environment variable changes [sig-storage][Slow]", func() {
 		envVars := []v1.EnvVar{
 			{
