@@ -246,13 +246,12 @@ function get-or-generate-uuid(){
   fi
 
   # each line of the ssdmap looks like "${device} persistent-uuid"
+  local myuuid
   if grep -q "${device}" "${ssdmap}"; then
     #create symlink based on saved uuid
-    local myuuid
     myuuid=$(grep "${device}" "${ssdmap}" | cut -d ' ' -f 2)
   else
     # generate new uuid and add it to the map
-    local myuuid
     if ! myuuid=$(uuidgen); then
       echo "Failed to generate valid UUID with uuidgen" >&2
       exit 2
