@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -1036,3 +1037,54 @@ var (
 	hardSpread = v1.DoNotSchedule
 	softSpread = v1.ScheduleAnyway
 )
+
+func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
+	tests := []struct {
+		name   string
+		init   func(kubernetes.Interface) error
+		pod    *pausePodConfig
+		update func(kubernetes.Interface) error
+	}{
+		{
+			name: "node gets added",
+			pod: &pausePodConfig{
+				Name: "pod-1",
+			},
+			update: func(cs kubernetes.Interface) error {
+				_, err := createNode(cs, "node-1", nil)
+				return err
+			},
+		},
+		// TODO(#91111): Add more test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "scheduler-informer")
+			defer testutils.CleanupTest(t, testCtx)
+			if tt.init != nil {
+				if err := tt.init(testCtx.ClientSet); err != nil {
+					t.Fatal(err)
+				}
+			}
+			tt.pod.Namespace = testCtx.NS.Name
+			pod, err := createPausePod(testCtx.ClientSet, initPausePod(tt.pod))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				t.Errorf("Pod %v got scheduled: %v", pod.Name, err)
+			}
+			if err := tt.update(testCtx.ClientSet); err != nil {
+				t.Fatal(err)
+			}
+			if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				t.Errorf("Pod %v was not scheduled: %v", pod.Name, err)
+			}
+			// Make sure pending queue is empty.
+			pendingPods := len(testCtx.Scheduler.SchedulingQueue.PendingPods())
+			if pendingPods != 0 {
+				t.Errorf("pending pods queue is not empty, size is: %d", pendingPods)
+			}
+		})
+	}
+}
