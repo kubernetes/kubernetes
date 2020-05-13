@@ -256,7 +256,12 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *
 			Annotations: annotations,
 			Labels:      cronJob.Spec.JobTemplate.Labels,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(cronJob, cronJob.GroupVersionKind()),
+				{
+					APIVersion: batchv1beta1.SchemeGroupVersion.String(),
+					Kind:       cronJob.Kind,
+					Name:       cronJob.GetName(),
+					UID:        cronJob.GetUID(),
+				},
 			},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
