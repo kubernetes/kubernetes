@@ -549,6 +549,8 @@ func (az *Cloud) configAzureClients(
 	loadBalancerClientConfig := azClientConfig.WithRateLimiter(az.Config.LoadBalancerRateLimit)
 	securityGroupClientConfig := azClientConfig.WithRateLimiter(az.Config.SecurityGroupRateLimit)
 	publicIPClientConfig := azClientConfig.WithRateLimiter(az.Config.PublicIPAddressRateLimit)
+	// TODO(ZeroMagic): add azurefileRateLimit
+	fileClientConfig := azClientConfig.WithRateLimiter(nil)
 
 	// If uses network resources in different AAD Tenant, update Authorizer for VM/VMSS client config
 	if multiTenantServicePrincipalToken != nil {
@@ -591,8 +593,7 @@ func (az *Cloud) configAzureClients(
 	az.LoadBalancerClient = loadbalancerclient.New(loadBalancerClientConfig)
 	az.SecurityGroupsClient = securitygroupclient.New(securityGroupClientConfig)
 	az.PublicIPAddressesClient = publicipclient.New(publicIPClientConfig)
-	// fileClient is not based on armclient, but it's still backoff retried.
-	az.FileClient = fileclient.NewAzureFileClient(&az.Environment, azClientConfig.Backoff)
+	az.FileClient = fileclient.New(fileClientConfig)
 }
 
 func (az *Cloud) getAzureClientConfig(servicePrincipalToken *adal.ServicePrincipalToken) *azclients.ClientConfig {

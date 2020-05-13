@@ -36,8 +36,12 @@ import (
 	utilstrings "k8s.io/utils/strings"
 )
 
-var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
-var _ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
+var (
+	_ volume.DeletableVolumePlugin     = &azureFilePlugin{}
+	_ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
+
+	resourceGroupAnnotation = "kubernetes.io/azure-file-resource-group"
+)
 
 // Abstract interface to file share operations.
 // azure cloud provider should implement it
@@ -45,28 +49,31 @@ type azureCloudProvider interface {
 	// create a file share
 	CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, requestGiB int) (string, string, error)
 	// delete a file share
-	DeleteFileShare(accountName, accountKey, shareName string) error
+	DeleteFileShare(resourceGroup, accountName, shareName string) error
 	// resize a file share
-	ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error
+	ResizeFileShare(resourceGroup, accountName, name string, sizeGiB int) error
 }
 
 type azureFileDeleter struct {
 	*azureFile
-	accountName, accountKey, shareName string
-	azureProvider                      azureCloudProvider
+	resourceGroup, accountName, shareName string
+	azureProvider                         azureCloudProvider
 }
 
 func (plugin *azureFilePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
+	if spec.PersistentVolume != nil && spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation] != "" {
+		resourceGroup = spec.PersistentVolume.ObjectMeta.Annotations[resourceGroupAnnotation]
+	}
 
-	return plugin.newDeleterInternal(spec, &azureSvc{}, azure)
+	return plugin.newDeleterInternal(spec, &azureSvc{}, azure, resourceGroup)
 }
 
-func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureUtil, azure azureCloudProvider) (volume.Deleter, error) {
+func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureUtil, azure azureCloudProvider, resourceGroup string) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureFile == nil {
 		return nil, fmt.Errorf("invalid PV spec")
 	}
@@ -76,30 +83,34 @@ func (plugin *azureFilePlugin) newDeleterInternal(spec *volume.Spec, util azureU
 		return nil, err
 	}
 	shareName := spec.PersistentVolume.Spec.AzureFile.ShareName
-	if accountName, accountKey, err := util.GetAzureCredentials(plugin.host, secretNamespace, secretName); err != nil {
+	if accountName, _, err := util.GetAzureCredentials(plugin.host, secretNamespace, secretName); err != nil {
 		return nil, err
 	} else {
+
 		return &azureFileDeleter{
 			azureFile: &azureFile{
 				volName: spec.Name(),
 				plugin:  plugin,
 			},
+			resourceGroup: resourceGroup,
 			shareName:     shareName,
 			accountName:   accountName,
-			accountKey:    accountKey,
 			azureProvider: azure,
 		}, nil
 	}
 }
 
 func (plugin *azureFilePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
+	azure, resourceGroup, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		klog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
 	if len(options.PVC.Spec.AccessModes) == 0 {
 		options.PVC.Spec.AccessModes = plugin.GetAccessModes()
+	}
+	if resourceGroup != "" {
+		options.PVC.ObjectMeta.Annotations[resourceGroupAnnotation] = resourceGroup
 	}
 	return plugin.newProvisionerInternal(options, azure)
 }
@@ -124,7 +135,7 @@ func (f *azureFileDeleter) GetPath() string {
 
 func (f *azureFileDeleter) Delete() error {
 	klog.V(4).Infof("deleting volume %s", f.shareName)
-	return f.azureProvider.DeleteFileShare(f.accountName, f.accountKey, f.shareName)
+	return f.azureProvider.DeleteFileShare(f.resourceGroup, f.accountName, f.shareName)
 }
 
 type azureFileProvisioner struct {
@@ -180,6 +191,10 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		shareName = strings.Replace(name, "--", "-", -1)
 	}
 
+	if resourceGroup == "" {
+		resourceGroup = a.options.PVC.ObjectMeta.Annotations[resourceGroupAnnotation]
+	}
+
 	// when use azure file premium, account kind should be specified as FileStorage
 	accountKind := string(storage.StorageV2)
 	if strings.HasPrefix(strings.ToLower(sku), "premium") {
@@ -202,6 +217,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			Labels: map[string]string{},
 			Annotations: map[string]string{
 				util.VolumeDynamicallyCreatedByKey: "azure-file-dynamic-provisioner",
+				resourceGroupAnnotation:            resourceGroup,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -224,11 +240,11 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 }
 
 // Return cloud provider
-func getAzureCloudProvider(cloudProvider cloudprovider.Interface) (azureCloudProvider, error) {
+func getAzureCloudProvider(cloudProvider cloudprovider.Interface) (azureCloudProvider, string, error) {
 	azureCloudProvider, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azureCloudProvider == nil {
-		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, "", fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
-	return azureCloudProvider, nil
+	return azureCloudProvider, azureCloudProvider.ResourceGroup, nil
 }

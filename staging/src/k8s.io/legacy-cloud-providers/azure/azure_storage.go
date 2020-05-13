@@ -46,7 +46,7 @@ func (az *Cloud) CreateFileShare(shareName, accountName, accountType, accountKin
 		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
 
-	if err := az.createFileShare(account, key, shareName, requestGiB); err != nil {
+	if err := az.createFileShare(resourceGroup, account, shareName, requestGiB); err != nil {
 		return "", "", fmt.Errorf("failed to create share %s in account %s: %v", shareName, account, err)
 	}
 	klog.V(4).Infof("created share %s in account %s", shareName, account)
@@ -54,8 +54,8 @@ func (az *Cloud) CreateFileShare(shareName, accountName, accountType, accountKin
 }
 
 // DeleteFileShare deletes a file share using storage account name and key
-func (az *Cloud) DeleteFileShare(accountName, accountKey, shareName string) error {
-	if err := az.deleteFileShare(accountName, accountKey, shareName); err != nil {
+func (az *Cloud) DeleteFileShare(resourceGroup, accountName, shareName string) error {
+	if err := az.deleteFileShare(resourceGroup, accountName, shareName); err != nil {
 		return err
 	}
 	klog.V(4).Infof("share %s deleted", shareName)
@@ -63,6 +63,6 @@ func (az *Cloud) DeleteFileShare(accountName, accountKey, shareName string) erro
 }
 
 // ResizeFileShare resizes a file share
-func (az *Cloud) ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
-	return az.resizeFileShare(accountName, accountKey, name, sizeGiB)
+func (az *Cloud) ResizeFileShare(resourceGroup, accountName, name string, sizeGiB int) error {
+	return az.resizeFileShare(resourceGroup, accountName, name, sizeGiB)
 }

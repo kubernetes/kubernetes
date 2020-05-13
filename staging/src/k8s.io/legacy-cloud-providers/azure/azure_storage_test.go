@@ -145,3 +145,87 @@ func TestCreateFileShare(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteFileShare(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cloud := &Cloud{}
+	mockFileClient := mockfileclient.NewMockInterface(ctrl)
+	mockFileClient.EXPECT().DeleteFileShare(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	cloud.FileClient = mockFileClient
+
+	tests := []struct {
+		rg   string
+		acct string
+		name string
+
+		expectErr bool
+	}{
+		{
+			rg:   "rg",
+			acct: "bar",
+			name: "foo",
+
+			expectErr: false,
+		},
+	}
+
+	for _, test := range tests {
+		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
+		cloud.StorageAccountClient = mockStorageAccountsClient
+
+		err := cloud.DeleteFileShare(test.rg, test.acct, test.name)
+		if test.expectErr && err == nil {
+			t.Errorf("unexpected non-error")
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+	}
+}
+
+func TestResizeFileShare(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cloud := &Cloud{}
+	mockFileClient := mockfileclient.NewMockInterface(ctrl)
+	mockFileClient.EXPECT().ResizeFileShare(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	cloud.FileClient = mockFileClient
+
+	tests := []struct {
+		rg   string
+		acct string
+		name string
+		gb   int
+
+		expectErr bool
+	}{
+		{
+			rg:   "rg",
+			acct: "bar",
+			name: "foo",
+			gb:   10,
+
+			expectErr: false,
+		},
+	}
+
+	for _, test := range tests {
+		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
+		cloud.StorageAccountClient = mockStorageAccountsClient
+
+		err := cloud.ResizeFileShare(test.rg, test.acct, test.name, test.gb)
+		if test.expectErr && err == nil {
+			t.Errorf("unexpected non-error")
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+	}
+}

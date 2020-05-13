@@ -48,43 +48,43 @@ func (m *MockInterface) EXPECT() *MockInterfaceMockRecorder {
 }
 
 // CreateFileShare mocks base method
-func (m *MockInterface) CreateFileShare(accountName, accountKey, name string, sizeGiB int) error {
+func (m *MockInterface) CreateFileShare(resourceGroupName, accountName, name string, sizeGiB int) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateFileShare", accountName, accountKey, name, sizeGiB)
+	ret := m.ctrl.Call(m, "CreateFileShare", resourceGroupName, accountName, name, sizeGiB)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateFileShare indicates an expected call of CreateFileShare
-func (mr *MockInterfaceMockRecorder) CreateFileShare(accountName, accountKey, name, sizeGiB interface{}) *gomock.Call {
+func (mr *MockInterfaceMockRecorder) CreateFileShare(resourceGroupName, accountName, name, sizeGiB interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileShare", reflect.TypeOf((*MockInterface)(nil).CreateFileShare), accountName, accountKey, name, sizeGiB)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileShare", reflect.TypeOf((*MockInterface)(nil).CreateFileShare), resourceGroupName, accountName, name, sizeGiB)
 }
 
 // DeleteFileShare mocks base method
-func (m *MockInterface) DeleteFileShare(accountName, accountKey, name string) error {
+func (m *MockInterface) DeleteFileShare(resourceGroupName, accountName, name string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteFileShare", accountName, accountKey, name)
+	ret := m.ctrl.Call(m, "DeleteFileShare", resourceGroupName, accountName, name)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteFileShare indicates an expected call of DeleteFileShare
-func (mr *MockInterfaceMockRecorder) DeleteFileShare(accountName, accountKey, name interface{}) *gomock.Call {
+func (mr *MockInterfaceMockRecorder) DeleteFileShare(resourceGroupName, accountName, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFileShare", reflect.TypeOf((*MockInterface)(nil).DeleteFileShare), accountName, accountKey, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFileShare", reflect.TypeOf((*MockInterface)(nil).DeleteFileShare), resourceGroupName, accountName, name)
 }
 
 // ResizeFileShare mocks base method
-func (m *MockInterface) ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
+func (m *MockInterface) ResizeFileShare(resourceGroupName, accountName, name string, sizeGiB int) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResizeFileShare", accountName, accountKey, name, sizeGiB)
+	ret := m.ctrl.Call(m, "ResizeFileShare", resourceGroupName, accountName, name, sizeGiB)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ResizeFileShare indicates an expected call of ResizeFileShare
-func (mr *MockInterfaceMockRecorder) ResizeFileShare(accountName, accountKey, name, sizeGiB interface{}) *gomock.Call {
+func (mr *MockInterfaceMockRecorder) ResizeFileShare(resourceGroupName, accountName, name, sizeGiB interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeFileShare", reflect.TypeOf((*MockInterface)(nil).ResizeFileShare), accountName, accountKey, name, sizeGiB)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeFileShare", reflect.TypeOf((*MockInterface)(nil).ResizeFileShare), resourceGroupName, accountName, name, sizeGiB)
 }
