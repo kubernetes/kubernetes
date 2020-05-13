@@ -35,7 +35,7 @@ import (
 func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection"))...)
-	allErrs = append(allErrs, validateKubeSchedulerLeaderElectionConfiguration(field.NewPath("leaderElection"), &cc.LeaderElection)...)
+	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
 
 	profilesPath := field.NewPath("profiles")
 	if len(cc.Profiles) == 0 {
@@ -100,15 +100,6 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 		}
 	}
 	// TODO(#88093): Validate that all plugin configs for the queue sort extension match.
-	return allErrs
-}
-
-func validateKubeSchedulerLeaderElectionConfiguration(fldPath *field.Path, cc *config.KubeSchedulerLeaderElectionConfiguration) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if !cc.LeaderElectionConfiguration.LeaderElect {
-		return allErrs
-	}
-	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, fldPath)...)
 	return allErrs
 }
 

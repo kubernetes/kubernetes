@@ -61,7 +61,7 @@ type KubeSchedulerConfiguration struct {
 	AlgorithmSource SchedulerAlgorithmSource
 
 	// LeaderElection defines the configuration of leader election client.
-	LeaderElection KubeSchedulerLeaderElectionConfiguration
+	LeaderElection componentbaseconfig.LeaderElectionConfiguration
 
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
@@ -171,12 +171,6 @@ type SchedulerPolicyConfigMapSource struct {
 	Namespace string
 	// Name is the name of the policy config map.
 	Name string
-}
-
-// KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
-// to include scheduler specific configuration.
-type KubeSchedulerLeaderElectionConfiguration struct {
-	componentbaseconfig.LeaderElectionConfiguration
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for
