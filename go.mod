@@ -110,7 +110,7 @@ require (
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
 	gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
-	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+	google.golang.org/api v0.15.1
 	google.golang.org/grpc v1.26.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
@@ -269,7 +269,7 @@ replace (
 	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
 	github.com/google/pprof => github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57
 	github.com/google/uuid => github.com/google/uuid v1.1.1
-	github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.4
+	github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.1.0
 	github.com/gopherjs/gopherjs => github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
@@ -418,7 +418,7 @@ replace (
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
-	google.golang.org/api => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+	google.golang.org/api => google.golang.org/api v0.15.1
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
 	google.golang.org/grpc => google.golang.org/grpc v1.26.0

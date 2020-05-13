@@ -31,7 +31,6 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
-	computebeta "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1135,16 +1134,12 @@ func TestEnsureInternalLoadBalancerGlobalAccess(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 	assert.NotEmpty(t, status.Ingress)
-	betaRuleDescString := fmt.Sprintf(`{"kubernetes.io/service-name":"%s","kubernetes.io/api-version":"beta"}`, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}.String())
-	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
 	if !fwdRule.AllowGlobalAccess {
 		t.Errorf("Unexpected false value for AllowGlobalAccess")
-	}
-	if fwdRule.Description != betaRuleDescString {
-		t.Errorf("Expected description %s, Got %s", betaRuleDescString, fwdRule.Description)
-	}
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
 	}
 	// remove the annotation
 	delete(svc.Annotations, ServiceAnnotationILBAllowGlobalAccess)
@@ -1153,16 +1148,12 @@ func TestEnsureInternalLoadBalancerGlobalAccess(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 	assert.NotEmpty(t, status.Ingress)
-	gaRuleDescString := fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}.String())
-	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
 	if err != nil {
-		t.Errorf("Unexpected error %v", err)
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
 	}
 	if fwdRule.AllowGlobalAccess {
 		t.Errorf("Unexpected true value for AllowGlobalAccess")
-	}
-	if fwdRule.Description != gaRuleDescString {
-		t.Errorf("Expected description %s, Got %s", gaRuleDescString, fwdRule.Description)
 	}
 	// Delete the service
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
@@ -1192,9 +1183,9 @@ func TestEnsureInternalLoadBalancerDisableGlobalAccess(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 	assert.NotEmpty(t, status.Ingress)
-	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
 	if err != nil {
-		t.Errorf("Unexpected error %v", err)
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
 	}
 	if !fwdRule.AllowGlobalAccess {
 		t.Errorf("Unexpected false value for AllowGlobalAccess")
@@ -1207,9 +1198,9 @@ func TestEnsureInternalLoadBalancerDisableGlobalAccess(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 	assert.NotEmpty(t, status.Ingress)
-	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
 	if err != nil {
-		t.Errorf("Unexpected error %v", err)
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
 	}
 	if fwdRule.AllowGlobalAccess {
 		t.Errorf("Unexpected true value for AllowGlobalAccess")
@@ -1249,9 +1240,9 @@ func TestGlobalAccessChangeScheme(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 	assert.NotEmpty(t, status.Ingress)
-	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
 	if err != nil {
-		t.Errorf("Unexpected error %v", err)
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
 	}
 	if !fwdRule.AllowGlobalAccess {
 		t.Errorf("Unexpected false value for AllowGlobalAccess")
@@ -1265,9 +1256,9 @@ func TestGlobalAccessChangeScheme(t *testing.T) {
 	assert.NotEmpty(t, status.Ingress)
 	// Firewall is deleted when the service is deleted
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, false)
-	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
 	if err != nil {
-		t.Errorf("Unexpected error %v", err)
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
 	}
 	if fwdRule.AllowGlobalAccess {
 		t.Errorf("Unexpected true value for AllowGlobalAccess")
@@ -1309,77 +1300,78 @@ func TestUnmarshalEmptyAPIVersion(t *testing.T) {
 	}
 }
 
-func TestForwardingRuleCompositeEqual(t *testing.T) {
+func TestForwardingRulesEqual(t *testing.T) {
 	t.Parallel()
 
-	vals := DefaultTestClusterValues()
-	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	fwdRules := []*compute.ForwardingRule{
+		{
+			Name:                "empty-ip-address-fwd-rule",
+			IPAddress:           "",
+			Ports:               []string{"123"},
+			IPProtocol:          "TCP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+		},
+		{
+			Name:                "tcp-fwd-rule",
+			IPAddress:           "10.0.0.0",
+			Ports:               []string{"123"},
+			IPProtocol:          "TCP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+		},
+		{
+			Name:                "udp-fwd-rule",
+			IPAddress:           "10.0.0.0",
+			Ports:               []string{"123"},
+			IPProtocol:          "UDP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+		},
+		{
+			Name:                "global-access-fwd-rule",
+			IPAddress:           "10.0.0.0",
+			Ports:               []string{"123"},
+			IPProtocol:          "TCP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+			AllowGlobalAccess:   true,
+		},
+	}
 
-	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
-	gaRule := &compute.ForwardingRule{
-		Name:                lbName,
-		IPAddress:           "",
-		Ports:               []string{"123"},
-		IPProtocol:          "TCP",
-		LoadBalancingScheme: string(cloud.SchemeInternal),
-	}
-	betaRule := &computebeta.ForwardingRule{
-		Name:                lbName + "-beta",
-		IPAddress:           "",
-		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s","apiVersion":"beta"}`, svc.Name),
-		Ports:               []string{"123"},
-		IPProtocol:          "TCP",
-		LoadBalancingScheme: string(cloud.SchemeInternal),
-		AllowGlobalAccess:   false,
-	}
-	betaRuleGlobalAccess := &computebeta.ForwardingRule{
-		Name:                lbName + "-globalaccess",
-		IPAddress:           "",
-		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s","apiVersion":"beta"}`, svc.Name),
-		Ports:               []string{"123"},
-		IPProtocol:          "TCP",
-		LoadBalancingScheme: string(cloud.SchemeInternal),
-		AllowGlobalAccess:   true,
-	}
-	err = gce.CreateRegionForwardingRule(gaRule, gce.region)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	err = gce.CreateBetaRegionForwardingRule(betaRule, gce.region)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	err = gce.CreateBetaRegionForwardingRule(betaRuleGlobalAccess, gce.region)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	frcGA, err := toForwardingRuleComposite(gaRule)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	frcBeta, err := toForwardingRuleComposite(betaRule)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	frcBetaGlobalAccess, err := toForwardingRuleComposite(betaRuleGlobalAccess)
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	if !frcGA.Equal(frcBeta) {
-		t.Errorf("Expected frcGA and frcBeta rules to be equal, got false")
-	}
-	if frcBeta.Equal(frcBetaGlobalAccess) {
-		t.Errorf("Expected FrcBeta and FrcBetaGlobalAccess rules to be unequal, got true")
-	}
-	if frcGA.Equal(frcBetaGlobalAccess) {
-		t.Errorf("Expected frcGA and frcBetaGlobalAccess rules to be unequal, got true")
-	}
-	// Enabling globalAccess in FrcBeta to make equality fail with FrcGA
-	frcBeta.allowGlobalAccess = true
-	if frcGA.Equal(frcBeta) {
-		t.Errorf("Expected frcGA and frcBeta rules to be unequal, got true")
+	for _, tc := range []struct {
+		desc       string
+		oldFwdRule *compute.ForwardingRule
+		newFwdRule *compute.ForwardingRule
+		expect     bool
+	}{
+		{
+			desc:       "empty ip address matches any ip",
+			oldFwdRule: fwdRules[0],
+			newFwdRule: fwdRules[1],
+			expect:     true,
+		},
+		{
+			desc:       "global access enabled",
+			oldFwdRule: fwdRules[1],
+			newFwdRule: fwdRules[3],
+			expect:     false,
+		},
+		{
+			desc:       "IP protocol changed",
+			oldFwdRule: fwdRules[1],
+			newFwdRule: fwdRules[2],
+			expect:     false,
+		},
+		{
+			desc:       "same forwarding rule",
+			oldFwdRule: fwdRules[3],
+			newFwdRule: fwdRules[3],
+			expect:     true,
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := forwardingRulesEqual(tc.oldFwdRule, tc.newFwdRule)
+			if got != tc.expect {
+				t.Errorf("forwardingRulesEqual(_, _) = %t, want %t", got, tc.expect)
+			}
+		})
 	}
 }
 
