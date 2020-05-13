@@ -493,7 +493,21 @@ func TestRelistWithReinspection(t *testing.T) {
 	assert.Equal(t, errors.New("inspection error"), actualErr)
 	assert.Exactly(t, []*PodLifecycleEvent{}, actualEvents)
 
-	// listing 3 - pretend the transient container has now disappeared, leaving just the infra
+	// listing 3 - pretend runtime was in the middle of creating the non-infra container for the pod
+	// and return an error during inspection
+	// GetPodStatus should only be called once in a relist when returning error more than one time
+	runtimeMock.On("GetPods", true).Return(podsWithTransientContainer, nil).Once()
+	runtimeMock.On("GetPodStatus", podID, "", "").Return(badStatus, errors.New("inspection error")).Once()
+
+	// it will panic if calling GetPodStatus more than once in a relist
+	pleg.relist()
+	actualEvents = getEventsFromChannel(ch)
+	actualStatus, actualErr = pleg.cache.Get(podID)
+	assert.Equal(t, badStatus, actualStatus)
+	assert.Equal(t, errors.New("inspection error"), actualErr)
+	assert.Exactly(t, []*PodLifecycleEvent{}, actualEvents)
+
+	// listing 4 - pretend the transient container has now disappeared, leaving just the infra
 	// container. Make sure the pod is reinspected for its status and the cache is updated.
 	runtimeMock.On("GetPods", true).Return(pods, nil).Once()
 	runtimeMock.On("GetPodStatus", podID, "", "").Return(goodStatus, nil).Once()
@@ -505,7 +519,7 @@ func TestRelistWithReinspection(t *testing.T) {
 	assert.Equal(t, nil, actualErr)
 	// no events are expected because relist #1 set the old pod record which has the infra container
 	// running. relist #2 had the inspection error and therefore didn't modify either old or new.
-	// relist #3 forced the reinspection of the pod to retrieve its status, but because the list of
+	// relist #4 forced the reinspection of the pod to retrieve its status, but because the list of
 	// containers was the same as relist #1, nothing "changed", so there are no new events.
 	assert.Exactly(t, []*PodLifecycleEvent{}, actualEvents)
 }
