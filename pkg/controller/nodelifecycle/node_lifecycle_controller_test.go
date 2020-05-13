@@ -3288,14 +3288,14 @@ func TestReconcileNodeLabels(t *testing.T) {
 			},
 		},
 		{
-			Name: "Create OS/arch stable labels when they don't exist",
+			Name: "Create OS/arch beta labels when they don't exist",
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelOS:   "linux",
-						kubeletapis.LabelArch: "amd64",
+						v1.LabelOSStable:   "linux",
+						v1.LabelArchStable: "amd64",
 					},
 				},
 			},
@@ -3307,16 +3307,16 @@ func TestReconcileNodeLabels(t *testing.T) {
 			},
 		},
 		{
-			Name: "Reconcile OS/arch stable labels to match beta labels",
+			Name: "Reconcile OS/arch beta labels to match stable labels",
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelOS:   "linux",
-						kubeletapis.LabelArch: "amd64",
-						v1.LabelOSStable:      "windows",
-						v1.LabelArchStable:    "arm",
+						kubeletapis.LabelOS:   "windows",
+						kubeletapis.LabelArch: "arm",
+						v1.LabelOSStable:      "linux",
+						v1.LabelArchStable:    "amd64",
 					},
 				},
 			},

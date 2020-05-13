@@ -43,7 +43,6 @@ go_library(
         "//pkg/apis/core/v1/helper/qos:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/fieldpath:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/podresources:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
@@ -184,7 +183,6 @@ go_test(
     deps = [
         "//pkg/apis/core/install:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/config:go_default_library",
