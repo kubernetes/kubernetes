@@ -154,7 +154,33 @@ func (i *Instances) InstanceShutdownByProviderID(ctx context.Context, providerID
 
 // InstanceMetadataByProviderID returns metadata of the specified instance.
 func (i *Instances) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
-	return nil, fmt.Errorf("unimplemented")
+	if providerID == "" {
+		return nil, fmt.Errorf("couldn't compute InstanceMetadata for empty providerID")
+	}
+
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+	srv, err := servers.Get(i.compute, instanceID).Extract()
+	if err != nil {
+		return nil, err
+	}
+
+	instanceType, err := srvInstanceType(srv)
+	if err != nil {
+		return nil, err
+	}
+	addresses, err := nodeAddresses(srv)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		Type:          instanceType,
+		NodeAddresses: addresses,
+	}, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.
