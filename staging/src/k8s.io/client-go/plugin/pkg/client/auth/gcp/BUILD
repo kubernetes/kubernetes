@@ -10,7 +10,10 @@ go_test(
     name = "go_default_test",
     srcs = ["gcp_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/golang.org/x/oauth2:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//vendor/golang.org/x/oauth2:go_default_library",
+    ],
 )
 
 go_library(
