@@ -384,6 +384,16 @@ func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	return d
 }
 
+func GetRequestTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
+	timeout, err := cmd.Flags().GetString("request-timeout")
+	if err != nil {
+		// If we couldn't access the flag, treat it as the flag isn't set.
+		// This should only happen in unit tests.
+		return time.Duration(0), nil
+	}
+	return clientcmd.ParseTimeout(timeout)
+}
+
 func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 	timeout := GetFlagDuration(cmd, "pod-running-timeout")
 	if timeout <= 0 {

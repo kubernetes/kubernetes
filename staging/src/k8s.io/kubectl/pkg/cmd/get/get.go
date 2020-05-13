@@ -710,7 +710,11 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	rt, err := cmdutil.GetRequestTimeoutFlag(cmd)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), rt)
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
