@@ -1648,7 +1648,27 @@ func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 
 // InstanceMetadataByProviderID returns metadata of the specified instance.
 func (c *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
-	return nil, fmt.Errorf("unimplemented")
+	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := describeInstance(c.ec2, instanceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO ignore checking whether `*instance.State.Name == ec2.InstanceStateNameTerminated` here.
+	// If not behave as expected, add it.
+	addresses, err := extractNodeAddresses(instance)
+	if err != nil {
+		return nil, err
+	}
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		Type:          aws.StringValue(instance.InstanceType),
+		NodeAddresses: addresses,
+	}, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
