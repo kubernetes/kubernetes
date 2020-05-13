@@ -369,6 +369,26 @@ spec:
 		t.Fatalf("failed to add a new list item to the object as a different applier: %v:\n%v", err, string(result))
 	}
 	verifyNumPorts(t, result, 2)
+
+	result, err = rest.Patch(types.MergePatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Body([]byte(`{"metadata":{"managedFields": [{}]}}`)).
+		SetHeader("Accept", "application/json").
+		DoRaw(context.TODO())
+	if err != nil {
+		t.Fatalf("failed to clear managedFields: %v:\n%v", err, string(result))
+	}
+
+	obj := unstructured.Unstructured{}
+	err = obj.UnmarshalJSON(result)
+	if err != nil {
+		t.Fatalf("failed to find managedFields in response: %v:\n%v", err, string(result))
+	}
+
+	if len(obj.GetManagedFields()) > 0 {
+		t.Fatalf("failed to clear managedFields, got: %v", obj.GetManagedFields())
+	}
 }
 
 // TestApplyCRDNonStructuralSchema tests that when a CRD has a non-structural schema in its validation field,
