@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -50,11 +50,35 @@ func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
 
+// Order by attepmt number of creating the sanbox.
+type podSandboxByAttempt []*runtimeapi.PodSandbox
+
+func (p podSandboxByAttempt) Len() int      { return len(p) }
+func (p podSandboxByAttempt) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p podSandboxByAttempt) Less(i, j int) bool {
+	if p[i].Metadata.Attempt == p[j].Metadata.Attempt {
+		return p[i].CreatedAt > p[j].CreatedAt
+	}
+	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
+}
+
 type containerStatusByCreated []*kubecontainer.ContainerStatus
 
 func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
+
+// Order by restart count of container.
+type containerStatusByRestartCount []*kubecontainer.ContainerStatus
+
+func (c containerStatusByRestartCount) Len() int      { return len(c) }
+func (c containerStatusByRestartCount) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+func (c containerStatusByRestartCount) Less(i, j int) bool {
+	if c[i].RestartCount == c[j].RestartCount {
+		return c[i].CreatedAt.After(c[j].CreatedAt)
+	}
+	return c[i].RestartCount > c[j].RestartCount
+}
 
 // toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.ContainerState.
 func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.ContainerState {

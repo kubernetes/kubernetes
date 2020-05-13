@@ -433,7 +433,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 		statuses[i] = cStatus
 	}
 
-	sort.Sort(containerStatusByCreated(statuses))
+	sort.Sort(containerStatusByRestartCount(statuses))
 	return statuses, nil
 }
 
