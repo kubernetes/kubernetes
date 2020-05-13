@@ -23,13 +23,13 @@ See the [documentation][doc] for a complete API specification.
 ## Development Status
 Stable.
 
-<hr>
+___
 Released under the [MIT License](LICENSE.txt).
 
 [doc-img]: https://godoc.org/github.com/uber-go/atomic?status.svg
 [doc]: https://godoc.org/go.uber.org/atomic
-[ci-img]: https://travis-ci.org/uber-go/atomic.svg?branch=master
-[ci]: https://travis-ci.org/uber-go/atomic
+[ci-img]: https://travis-ci.com/uber-go/atomic.svg?branch=master
+[ci]: https://travis-ci.com/uber-go/atomic
 [cov-img]: https://codecov.io/gh/uber-go/atomic/branch/master/graph/badge.svg
 [cov]: https://codecov.io/gh/uber-go/atomic
 [reportcard-img]: https://goreportcard.com/badge/go.uber.org/atomic
