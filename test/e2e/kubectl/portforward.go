@@ -322,11 +322,6 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	ginkgo.By("Sending the expected data to the local port")
 	fmt.Fprint(conn, "abc")
 
-	ginkgo.By("Closing the write half of the client's connection")
-	if err = conn.CloseWrite(); err != nil {
-		framework.Failf("Couldn't close the write half of the client's connection: %v", err)
-	}
-
 	ginkgo.By("Reading data from the local port")
 	fromServer, err := ioutil.ReadAll(conn)
 	if err != nil {
@@ -341,6 +336,11 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 			framework.Logf("Logs of portforwardtester pod: %v", podlogs)
 		}
 		framework.Failf("Expected %q from server, got %q", e, a)
+	}
+
+	ginkgo.By("Closing the write half of the client's connection")
+	if err = conn.CloseWrite(); err != nil {
+		framework.Failf("Couldn't close the write half of the client's connection: %v", err)
 	}
 
 	ginkgo.By("Waiting for the target pod to stop running")
