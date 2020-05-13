@@ -353,7 +353,7 @@ func NewProxier(ipt utiliptables.Interface,
 	kernelHandler KernelHandler,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
+	if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 0); err != nil {
 		return nil, err
 	}
 
