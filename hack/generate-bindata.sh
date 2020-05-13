@@ -33,7 +33,10 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need, but only from vendor/...
-go install k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata
+if [[ ! "${SKIP_INSTALL_GO_BINDATA:-}" ]]; then
+  # Only install if being called directly to allow being called from origin in a vendored path.
+  GO111MODULE=off go install ./vendor/github.com/go-bindata/go-bindata/...
+fi
 
 # run the generation from the root directory for stable output
 pushd "${KUBE_ROOT}" >/dev/null
