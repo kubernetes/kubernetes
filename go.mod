@@ -415,7 +415,7 @@ replace (
 	go.uber.org/zap => go.uber.org/zap v1.10.0
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/exp => golang.org/x/exp v0.0.0-20191227195350-da58074b4299
-	golang.org/x/image => golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
+	golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6
 	golang.org/x/mod => golang.org/x/mod v0.0.0-20190513183733-4bf6d317e70e
