@@ -2,12 +2,9 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "klog.go",
-        "klog_file.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/klog",
-    importpath = "k8s.io/klog",
+    srcs = ["logr.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/go-logr/logr",
+    importpath = "github.com/go-logr/logr",
     visibility = ["//visibility:public"],
 )
 
@@ -20,10 +17,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/k8s.io/klog/v2:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

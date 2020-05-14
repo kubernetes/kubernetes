@@ -108,6 +108,7 @@ filegroup(
         "//vendor/github.com/fsnotify/fsnotify:all-srcs",
         "//vendor/github.com/ghodss/yaml:all-srcs",
         "//vendor/github.com/go-bindata/go-bindata:all-srcs",
+        "//vendor/github.com/go-logr/logr:all-srcs",
         "//vendor/github.com/go-openapi/analysis:all-srcs",
         "//vendor/github.com/go-openapi/errors:all-srcs",
         "//vendor/github.com/go-openapi/jsonpointer:all-srcs",

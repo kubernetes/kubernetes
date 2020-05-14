@@ -6,9 +6,10 @@ go_library(
         "klog.go",
         "klog_file.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/klog",
-    importpath = "k8s.io/klog",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/klog/v2",
+    importpath = "k8s.io/klog/v2",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/go-logr/logr:go_default_library"],
 )
 
 filegroup(
@@ -20,10 +21,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/k8s.io/klog/v2:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

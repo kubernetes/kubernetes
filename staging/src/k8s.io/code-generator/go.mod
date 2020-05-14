@@ -15,8 +15,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0 // indirect
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 // indirect
-	k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12
+	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
