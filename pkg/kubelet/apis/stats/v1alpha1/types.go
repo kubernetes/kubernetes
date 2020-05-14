@@ -262,7 +262,7 @@ type AcceleratorStats struct {
 // VolumeStats contains data about Volume filesystem usage.
 type VolumeStats struct {
 	// Embedded FsStats
-	FsStats
+	FsStats `json:",inline"`
 	// Name is the name given to the Volume
 	// +optional
 	Name string `json:"name,omitempty"`
