@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -207,7 +207,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	// Lines of the form "search example.com" overrule - last one wins.
 	searches = []string{}
 
-	// Lines of the form "option ndots:5 attempts:2" overrule - last one wins.
+	// Lines of the form "option ndots:5 attempts:2" accumulate.
 	// Each option is recorded as an element in the array.
 	options = []string{}
 
@@ -237,7 +237,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			}
 		}
 		if fields[0] == "options" {
-			options = fields[1:]
+			options = append(options, fields[1:]...)
 		}
 	}
 
