@@ -1044,3 +1044,138 @@ func allocateStubFunc() func(devs []string) (*pluginapi.AllocateResponse, error)
 		return resps, nil
 	}
 }
+
+type MockDevice struct {
+	podUID   string
+	cName    string
+	resource string
+	devices  sets.String
+	resp     *pluginapi.ContainerAllocateResponse
+}
+
+func makeFakePod(fakeUID string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID(fakeUID),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "fakeContainerName",
+				},
+			},
+		},
+	}
+}
+
+func TestDeAllocate(t *testing.T) {
+	testCases := []struct {
+		description  string
+		podDevices   []MockDevice
+		testPod      *v1.Pod
+		expectedPods sets.String
+	}{
+		{
+			description:  "Test empty podDevices and empty pod",
+			podDevices:   nil,
+			testPod:      &v1.Pod{},
+			expectedPods: sets.NewString(),
+		},
+		{
+			description:  "Test empty podDevices with valid podUID",
+			podDevices:   nil,
+			testPod:      makeFakePod("fakePodUID"),
+			expectedPods: sets.NewString(),
+		},
+		{
+			description: "Test populated podDevices with empty pod",
+			podDevices: []MockDevice{
+				{
+					"fakePodUID",
+					"fakeContainerName",
+					"fakeResourceName",
+					nil,
+					nil,
+				},
+			},
+			testPod:      &v1.Pod{},
+			expectedPods: sets.NewString("fakePodUID"),
+		},
+		{
+			description: "Test populated podDevices with valid pod, no deleted podDevice",
+			podDevices: []MockDevice{
+				{
+					"fakePodUID",
+					"fakeContainerName",
+					"fakeResourceName",
+					nil,
+					nil,
+				},
+			},
+			testPod:      makeFakePod("inValidPodUID"),
+			expectedPods: sets.NewString("fakePodUID"),
+		},
+		{
+			description: "Test populated podDevices with valid pod, one deleted podDevice",
+			podDevices: []MockDevice{
+				{
+					"fakePodUID",
+					"fakeContainerName",
+					"fakeResourceName",
+					nil,
+					nil,
+				},
+			},
+			testPod:      makeFakePod("fakePodUID"),
+			expectedPods: sets.NewString(),
+		},
+		{
+			description: "Test populated podDevices with valid pod, one deleted podDevice2",
+			podDevices: []MockDevice{
+				{
+					"fakePodUID1",
+					"fakeContainerName",
+					"fakeResourceName",
+					nil,
+					nil,
+				},
+				{
+					"fakePodUID2",
+					"fakeContainerName",
+					"fakeResourceName",
+					nil,
+					nil,
+				},
+				{
+					"fakePodUID3",
+					"fakeContainerName",
+					"fakeResourceName",
+					nil,
+					nil,
+				},
+			},
+			testPod:      makeFakePod("fakePodUID2"),
+			expectedPods: sets.NewString("fakePodUID1", "fakePodUID3"),
+		},
+	}
+
+	for _, tc := range testCases {
+		// create a temp device manager
+		testManager := &ManagerImpl{
+			podDevices: make(podDevices),
+		}
+
+		//polulate podDevices
+		for _, d := range tc.podDevices {
+			testManager.podDevices.insert(d.podUID, d.cName, d.resource, d.devices, d.resp)
+		}
+
+		for _, container := range tc.testPod.Spec.Containers {
+			testManager.DeAllocate(tc.testPod, &container)
+		}
+
+		if !reflect.DeepEqual(tc.expectedPods, testManager.podDevices.pods()) {
+			t.Errorf("Result: expectedPods %v but got %v", tc.expectedPods, testManager.podDevices.pods())
+		}
+	}
+}
