@@ -272,8 +272,8 @@ function get-or-generate-uuid(){
 function safe-format-and-mount() {
   local device
   local mountpoint
-  device=$1
-  mountpoint=$2
+  device="$1"
+  mountpoint="$2"
 
   # Format only if the disk is not already formatted.
   if ! tune2fs -l "${device}" ; then
@@ -292,8 +292,8 @@ function safe-format-and-mount() {
 function unique-uuid-bind-mount(){
   local mountpoint
   local actual_device
-  mountpoint=$1
-  actual_device=$2
+  mountpoint="$1"
+  actual_device="$2"
 
   # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
   udevadm control --reload-rules
