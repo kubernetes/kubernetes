@@ -332,7 +332,7 @@ func responsibleForPod(pod *v1.Pod, schedulerName string) bool {
 // skipPodUpdate checks whether the specified pod update should be ignored.
 // This function will return true if
 //   - The pod has already been assumed, AND
-//   - The pod has only its ResourceVersion, Spec.NodeName and/or Annotations
+//   - The pod has only its ResourceVersion, Spec.NodeName, Annotations, ManagedFields and/or Finalizers
 //     updated.
 func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	// Non-assumed pods should never be skipped.
@@ -366,6 +366,8 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 		// Annotations must be excluded for the reasons described in
 		// https://github.com/kubernetes/kubernetes/issues/52914.
 		p.Annotations = nil
+		// Finalizers must be excluded because scheduled result can not be affected
+		p.Finalizers = nil
 		return p
 	}
 	assumedPodCopy, podCopy := f(assumedPod), f(pod)
