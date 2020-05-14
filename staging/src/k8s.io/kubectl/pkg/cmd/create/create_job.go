@@ -85,10 +85,11 @@ func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOption
 func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateJobOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:     "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
-		Short:   jobLong,
-		Long:    jobLong,
-		Example: jobExample,
+		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
+		DisableFlagsInUseLine: true,
+		Short:                 jobLong,
+		Long:                  jobLong,
+		Example:               jobExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
