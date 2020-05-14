@@ -27,9 +27,6 @@ const (
 
 	// A counter-like value that is only expected to increase.
 	MetricCumulative MetricType = "cumulative"
-
-	// Rate over a time period.
-	MetricDelta MetricType = "delta"
 )
 
 // DataType for metric being exported.

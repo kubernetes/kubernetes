@@ -169,6 +169,8 @@ filegroup(
         "//vendor/github.com/google/cadvisor/machine:all-srcs",
         "//vendor/github.com/google/cadvisor/manager:all-srcs",
         "//vendor/github.com/google/cadvisor/metrics:all-srcs",
+        "//vendor/github.com/google/cadvisor/nvm:all-srcs",
+        "//vendor/github.com/google/cadvisor/perf:all-srcs",
         "//vendor/github.com/google/cadvisor/stats:all-srcs",
         "//vendor/github.com/google/cadvisor/storage:all-srcs",
         "//vendor/github.com/google/cadvisor/summary:all-srcs",

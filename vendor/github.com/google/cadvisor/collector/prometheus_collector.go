@@ -209,7 +209,7 @@ func prometheusLabelSetToCadvisorLabel(promLabels model.Metric) string {
 		b.WriteString(l.GetValue())
 	}
 
-	return string(b.Bytes())
+	return b.String()
 }
 
 // Returns collected metrics and the next collection time of the collector

@@ -9,8 +9,7 @@ go_library(
     deps = [
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
-        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
