@@ -41,7 +41,7 @@ function convert-manifest-params {
   for flag in "${FLAGS[@]}"; do
     params+="\n\"$flag\","
   done
-  if [ -n "${params[*]}" ]; then
+  if [ -n "$params" ]; then
     echo "${params::-1}"  #  drop trailing comma
   fi
 }
