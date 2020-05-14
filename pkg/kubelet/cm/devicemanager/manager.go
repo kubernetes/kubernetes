@@ -125,8 +125,9 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	return newManagerImpl(pluginapi.KubeletSocket, numaNodeInfo, topologyAffinityStore)
+func NewManagerImpl(numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store, KubeletRootDir string) (*ManagerImpl, error) {
+	socketPath := filepath.Join(KubeletRootDir, pluginapi.KubeletSocket)
+	return newManagerImpl(socketPath, numaNodeInfo, topologyAffinityStore)
 }
 
 func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
