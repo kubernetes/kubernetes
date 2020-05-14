@@ -83,6 +83,9 @@ type HintProvider interface {
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
 	Allocate(pod *v1.Pod, container *v1.Container) error
+	// DeAllocate triggers resource de-allocation to occur on the HintProvider.
+	// topology manager call this function to reclaim allocated resources,
+	DeAllocate(pod *v1.Pod, container *v1.Container) error
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -227,6 +230,32 @@ func (m *manager) RemoveContainer(containerID string) error {
 	}
 
 	return nil
+}
+
+// Call DeAllocate function of all registered hint providers for all containers in a pod.
+func (m *manager) reclaimAllResources(pod *v1.Pod) {
+	klog.Infof("[topologymanager] pod(%v) is reject, reclaim all resources for the pod.", pod.UID)
+
+    podUIDString := string(pod.UID)
+
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		for _, provider := range m.hintProviders {
+			err := provider.DeAllocate(pod, &container)
+			if err != nil {
+				klog.Errorf("[topologymanager] DeAllocate failed for container(%v) due to %v, which is unexpected", container.Name, err)
+			}
+		}
+
+		if _, exists := m.podTopologyHints[podUIDString]; exists {
+			delete(m.podTopologyHints[podUIDString], container.Name)
+		}
+	}
+
+	// since this function touches m.podTopologyHints, it should be called only in Admit function.
+	// otherwise we need to put a lock here
+	if _, exists := m.podTopologyHints[podUIDString]; exists {
+		delete(m.podTopologyHints, podUIDString)
+	}
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {

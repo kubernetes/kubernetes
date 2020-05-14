@@ -41,6 +41,10 @@ type Manager interface {
 	// (environment variables, mount points and device files).
 	Allocate(pod *v1.Pod, container *v1.Container) error
 
+	// DeAllocate reverts device allocation by updating podDevices.
+	// So, Device Manager can allocate reverted device to an another container.
+	DeAllocate(pod *v1.Pod, container *v1.Container) error
+
 	// UpdatePluginResources updates node resources based on devices already
 	// allocated to pods. The node object is provided for the device manager to
 	// update the node capacity to reflect the currently available devices.

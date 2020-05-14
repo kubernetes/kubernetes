@@ -60,6 +60,11 @@ type Manager interface {
 	// e.g. at pod admission time.
 	Allocate(pod *v1.Pod, container *v1.Container) error
 
+	// Called to reclaim allocated cpu resources of given container.
+	// called at some point prior to the AddContainer() call for a container,
+	// e.g. at pod admission time.
+	DeAllocate(pod *v1.Pod, container *v1.Container) error
+
 	// AddContainer is called between container create and container start
 	// so that initial CPU affinity settings can be written through to the
 	// container runtime before the first process begins to execute.
@@ -222,6 +227,19 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	err := m.policy.Allocate(m.state, p, c)
 	if err != nil {
 		klog.Errorf("[cpumanager] Allocate error: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (m *manager) DeAllocate(p *v1.Pod, c *v1.Container) error {
+	m.Lock()
+	defer m.Unlock()
+
+	err := m.policy.DeAllocate(m.state, p, c)
+	if err != nil {
+		klog.Errorf("[cpumanager] DeAllocate error: %v", err)
 		return err
 	}
 

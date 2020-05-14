@@ -48,6 +48,10 @@ func (p *nonePolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Containe
 	return nil
 }
 
+func (p *nonePolicy) DeAllocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+	return nil
+}
+
 func (p *nonePolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
 	return nil
 }
