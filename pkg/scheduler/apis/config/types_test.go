@@ -22,6 +22,67 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestPluginsAppend(t *testing.T) {
+	tests := []struct {
+		name            string
+		customPlugins   *Plugins
+		defaultPlugins  *Plugins
+		expectedPlugins *Plugins
+	}{
+		{
+			name: "AppendPlugin",
+			customPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "CustomPlugin"},
+					},
+				},
+			},
+			defaultPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedPlugins: &Plugins{
+				QueueSort: &PluginSet{},
+				PreFilter: &PluginSet{},
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+						{Name: "CustomPlugin"},
+					},
+				},
+				PreScore:  &PluginSet{},
+				Score:     &PluginSet{},
+				Reserve:   &PluginSet{},
+				Permit:    &PluginSet{},
+				PreBind:   &PluginSet{},
+				Bind:      &PluginSet{},
+				PostBind:  &PluginSet{},
+				Unreserve: &PluginSet{},
+			},
+		},
+		{
+			name:            "AppendNilPlugin",
+			customPlugins:   nil,
+			defaultPlugins:  &Plugins{},
+			expectedPlugins: &Plugins{},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.defaultPlugins.Append(test.customPlugins)
+			if d := cmp.Diff(test.expectedPlugins, test.defaultPlugins); d != "" {
+				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
 func TestPluginsApply(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -187,6 +248,36 @@ func TestPluginsApply(t *testing.T) {
 				Bind:      &PluginSet{Enabled: []Plugin{}},
 				PostBind:  &PluginSet{Enabled: []Plugin{}},
 				Unreserve: &PluginSet{Enabled: []Plugin{}},
+			},
+		},
+		{
+			name:          "ApplyNilCustomPlugin",
+			customPlugins: nil,
+			defaultPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedPlugins: &Plugins{
+				QueueSort: nil,
+				PreFilter: nil,
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+				PreScore:  nil,
+				Score:     nil,
+				Reserve:   nil,
+				Permit:    nil,
+				PreBind:   nil,
+				Bind:      nil,
+				PostBind:  nil,
+				Unreserve: nil,
 			},
 		},
 	}
