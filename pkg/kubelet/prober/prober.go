@@ -173,6 +173,12 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		if host == "" {
 			host = status.PodIP
 		}
+		var initDelay int32
+		if probeType == readiness {
+			initDelay = p.InitialDelaySeconds
+		}
+		timeout = time.Duration(p.TimeoutSeconds+initDelay) * time.Second
+		klog.Infof("prober for %q with timeout: %v", host, timeout)
 		port, err := extractPort(p.HTTPGet.Port, container)
 		if err != nil {
 			return probe.Unknown, "", err
