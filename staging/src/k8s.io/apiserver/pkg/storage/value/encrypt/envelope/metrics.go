@@ -56,6 +56,17 @@ var (
 		},
 	)
 
+	lastRequestArrivalTime = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "last_request_arrival_time_seconds",
+			Help:           "Last time a request arrived.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"transformation_type"},
+	)
+
 	dekCacheInterArrivals = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Namespace:      namespace,
@@ -75,10 +86,12 @@ func registerMetrics() {
 	registerMetricsFunc.Do(func() {
 		legacyregistry.MustRegister(dekCacheFillPercent)
 		legacyregistry.MustRegister(dekCacheInterArrivals)
+		legacyregistry.MustRegister(lastRequestArrivalTime)
 	})
 }
 
 func recordArrival(transformationType string, start time.Time) {
+	lastRequestArrivalTime.WithLabelValues(transformationType).SetToCurrentTime()
 	switch transformationType {
 	case fromStorageLabel:
 		lockLastFromStorage.Lock()
