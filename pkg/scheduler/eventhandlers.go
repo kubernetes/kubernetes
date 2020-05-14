@@ -206,10 +206,6 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
-	if sched.VolumeBinder != nil {
-		// Volume binder only wants to keep unassigned pods
-		sched.VolumeBinder.DeletePodBindings(pod)
-	}
 	prof, err := sched.profileForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
