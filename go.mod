@@ -190,6 +190,9 @@ replace (
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu => github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b
 	github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
+	github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
+	github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
+	github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
 	github.com/cilium/ebpf => github.com/cilium/ebpf v0.0.0-20191113100448-d9fb101ca1fb
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
@@ -268,7 +271,7 @@ replace (
 	github.com/google/go-cmp => github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
-	github.com/google/pprof => github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57
+	github.com/google/pprof => github.com/google/pprof v0.0.0-20191218002539-d4f498aebedc
 	github.com/google/uuid => github.com/google/uuid v1.1.1
 	github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
@@ -287,6 +290,7 @@ replace (
 	github.com/heketi/heketi => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
 	github.com/heketi/tests => github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6
 	github.com/hpcloud/tail => github.com/hpcloud/tail v1.0.0
+	github.com/ianlancetaylor/demangle => github.com/ianlancetaylor/demangle v0.0.0-20200414190113-039b1ae3a340
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/inconshreveable/mousetrap => github.com/inconshreveable/mousetrap v1.0.0
 	github.com/ishidawataru/sctp => github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
