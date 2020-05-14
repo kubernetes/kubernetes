@@ -97,7 +97,7 @@ func SplitYAMLDocuments(yamlBytes []byte) (kubeadmapi.DocumentMap, error) {
 			return nil, err
 		}
 		if len(gvk.Group) == 0 || len(gvk.Version) == 0 || len(gvk.Kind) == 0 {
-			return nil, errors.New("invalid configuration: kind and apiVersion is mandatory information that needs to be specified")
+			return nil, errors.Errorf("invalid configuration for GroupVersionKind %+v: kind and apiVersion is mandatory information that must be specified", gvk)
 		}
 
 		// Check whether the kind has been registered before. If it has, throw an error
