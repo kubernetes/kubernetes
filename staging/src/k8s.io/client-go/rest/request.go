@@ -390,6 +390,7 @@ func (r *Request) Body(obj interface{}) *Request {
 	case []byte:
 		glogBody("Request Body", t)
 		r.body = bytes.NewReader(t)
+		r.SetHeader("Content-Type", "application/json")
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
