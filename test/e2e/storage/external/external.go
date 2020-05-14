@@ -297,7 +297,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 		framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
 		framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
-		err = utils.PatchItems(f, items...)
+		err = utils.PatchItems(f, f.Namespace, items...)
 		framework.ExpectNoError(err, "patch items")
 
 		sc, ok = items[0].(*storagev1.StorageClass)

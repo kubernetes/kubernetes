@@ -263,7 +263,7 @@ OUTER:
 
 // WaitForNamespacesDeleted waits for the namespaces to be deleted.
 func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeout time.Duration) error {
-	ginkgo.By("Waiting for namespaces to vanish")
+	ginkgo.By(fmt.Sprintf("Waiting for namespaces %+v to vanish", namespaces))
 	nsMap := map[string]bool{}
 	for _, ns := range namespaces {
 		nsMap[ns] = true
