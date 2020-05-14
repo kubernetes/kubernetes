@@ -22,7 +22,7 @@ import (
 	"math/rand"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Field is a key value pair that provides additional details about the trace.
@@ -97,7 +97,7 @@ func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
 	lastStepTime := t.startTime
 	for _, step := range t.steps {
 		stepDuration := step.stepTime.Sub(lastStepTime)
-		if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4) {
+		if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
 			buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] ", tracenum, step.stepTime.Sub(t.startTime), stepDuration))
 			buffer.WriteString(step.msg)
 			if len(step.fields) > 0 {
@@ -109,7 +109,7 @@ func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
 		lastStepTime = step.stepTime
 	}
 	stepDuration := endTime.Sub(lastStepTime)
-	if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4) {
+	if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
 		buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] END\n", tracenum, endTime.Sub(t.startTime), stepDuration))
 	}
 
