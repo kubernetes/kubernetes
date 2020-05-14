@@ -135,8 +135,6 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		}
 		if generatorNameTemp != generatorName {
 			cmdutil.Warning(o.CreateSubcommandOptions.ErrOut, generatorName, generatorNameTemp)
-		} else {
-			generatorName = generatorNameTemp
 		}
 	}
 
