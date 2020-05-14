@@ -503,13 +503,13 @@ func TestMultipleSchedulers(t *testing.T) {
 	}
 
 	defaultScheduler := "default-scheduler"
-	testPodFitsDefault, err := createPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "pod-fits-default", Namespace: testCtx.NS.Name, SchedulerName: defaultScheduler}))
+	testPodFitsDefault, err := createPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{Name: "pod-fits-default", Namespace: testCtx.NS.Name, SchedulerName: defaultScheduler}))
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	fooScheduler := "foo-scheduler"
-	testPodFitsFoo, err := createPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "pod-fits-foo", Namespace: testCtx.NS.Name, SchedulerName: fooScheduler}))
+	testPodFitsFoo, err := createPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{Name: "pod-fits-foo", Namespace: testCtx.NS.Name, SchedulerName: fooScheduler}))
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -634,7 +634,7 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 		{Name: "baz", Namespace: testCtx.NS.Name, SchedulerName: "default-scheduler"},
 		{Name: "zet", Namespace: testCtx.NS.Name, SchedulerName: "custom-scheduler"},
 	} {
-		if _, err := createPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, pc)); err != nil {
+		if _, err := createPausePod(testCtx.ClientSet, initPausePod(pc)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -774,7 +774,7 @@ func TestSchedulerInformers(t *testing.T) {
 			description: "Pod cannot be scheduled when node is occupied by pods scheduled by other schedulers",
 			nodes:       []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:          "pod1",
 					Namespace:     testCtx.NS.Name,
 					Resources:     defaultPodRes,
@@ -782,7 +782,7 @@ func TestSchedulerInformers(t *testing.T) {
 					NodeName:      "node-1",
 					SchedulerName: "foo-scheduler",
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:          "pod2",
 					Namespace:     testCtx.NS.Name,
 					Resources:     defaultPodRes,
@@ -791,7 +791,7 @@ func TestSchedulerInformers(t *testing.T) {
 					SchedulerName: "bar-scheduler",
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "unschedulable-pod",
 				Namespace: testCtx.NS.Name,
 				Resources: defaultPodRes,

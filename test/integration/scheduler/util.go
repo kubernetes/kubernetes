@@ -209,7 +209,7 @@ type pausePodConfig struct {
 
 // initPausePod initializes a pod API object from the given config. It is used
 // mainly in pod creation process.
-func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
+func initPausePod(conf *pausePodConfig) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        conf.Name,
@@ -265,7 +265,7 @@ func createPausePodWithResource(cs clientset.Interface, podName string,
 			},
 		}
 	}
-	return createPausePod(cs, initPausePod(cs, &conf))
+	return createPausePod(cs, initPausePod(&conf))
 }
 
 // runPausePod creates a pod with "Pause" image and the given config and waits
