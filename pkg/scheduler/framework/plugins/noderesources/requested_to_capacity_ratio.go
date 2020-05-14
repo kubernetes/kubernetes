@@ -76,10 +76,6 @@ func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Framewo
 			resourceToWeightMap[v1.ResourceName(resource.Name)] = 1
 		}
 	}
-	if len(args.Resources) == 0 {
-		// If no resources specified, used the default set.
-		resourceToWeightMap = defaultRequestedRatioResources
-	}
 
 	return &RequestedToCapacityRatio{
 		handle: handle,

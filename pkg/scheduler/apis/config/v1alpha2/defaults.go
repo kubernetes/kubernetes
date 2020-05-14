@@ -185,3 +185,10 @@ func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1alpha2.NodeResourcesMostA
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
+
+func SetDefaults_RequestedToCapacityRatioArgs(obj *v1alpha2.RequestedToCapacityRatioArgs) {
+	if len(obj.Resources) == 0 {
+		// If no resources specified, used the default set.
+		obj.Resources = append(obj.Resources, defaultResourceSpec...)
+	}
+}
