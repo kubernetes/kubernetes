@@ -14,7 +14,6 @@ require (
 
 replace (
 	golang.org/x/image => golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
-	golang.org/x/lint => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6
 	golang.org/x/mod => golang.org/x/mod v0.0.0-20190513183733-4bf6d317e70e
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
