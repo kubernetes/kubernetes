@@ -23,10 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/klog"
@@ -236,6 +238,8 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 
 	pdName := volumeSource.PDName
 
+	// In the case of running on Windows, we currently use Get-GcePdName module
+	// to get disk ID.
 	if runtime.GOOS == "windows" {
 		exec := attacher.host.GetExec(gcePersistentDiskPluginName)
 		id, err := getDiskID(pdName, exec)
@@ -249,7 +253,12 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 	if volumeSource.Partition != 0 {
 		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
-
+	// When using ntfs file system on Linux node, it currently assumed that ntfs file system
+	// was partitioned and formatted by a Windows node (Format and partition ntfs is not supported when
+	// running on Linux). So the partition number is set to 1.
+	if volumeSource.FSType == "ntfs" {
+		partition = "1"
+	}
 	sdBefore, err := filepath.Glob(diskSDPattern)
 	if err != nil {
 		klog.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
@@ -393,8 +402,43 @@ func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string)
 		if err != nil {
 			return err
 		}
+		target, err := getPathTarget(deviceMountPath)
+		if err != nil {
+			return err
+		}
+		if err = dismount(target); err != nil {
+			return err
+		}
 	}
 	return mount.CleanupMountPoint(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName), false)
+}
+
+// dismount the targeting device for Windows
+func dismount(target string) error {
+	cmd := fmt.Sprintf("mountvol %s /P", target)
+	output, err := exec.Command("cmd", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("dismount %s failed: %v, output: %q", target, err, string(output))
+	}
+	return nil
+}
+
+// Get device target from the device mount path
+func getPathTarget(path string) (string, error) {
+	cmd := fmt.Sprintf("(Get-Item %s).Target", path)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("get path %s target failed: %v, output: %q", path, err, string(output))
+	}
+	target := string(output)
+	if len(target) < 1 {
+		return "", fmt.Errorf("get device path for %s failed, output is empty", target)
+	}
+	target = strings.TrimSpace(target)
+	if strings.HasPrefix(target, "Volume") {
+		target = "\\\\?\\" + target
+	}
+	return target, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) CanAttach(spec *volume.Spec) (bool, error) {
