@@ -48,8 +48,6 @@ import (
 	"github.com/onsi/gomega"
 )
 
-type cleanupFuncs func()
-
 const (
 	csiNodeLimitUpdateTimeout  = 5 * time.Minute
 	csiPodUnschedulableTimeout = 5 * time.Minute
@@ -102,7 +100,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	type mockDriverSetup struct {
 		cs           clientset.Interface
 		config       *testsuites.PerTestConfig
-		testCleanups []cleanupFuncs
+		testCleanups []func()
 		pods         []*v1.Pod
 		pvcs         []*v1.PersistentVolumeClaim
 		sc           map[string]*storagev1.StorageClass
@@ -377,7 +375,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
-				err = checkPodLogs(m.cs, f.Namespace.Name, driverPodName, driverContainerName, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled)
+				err = checkPodLogs(m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled)
 				framework.ExpectNoError(err)
 			})
 		}
@@ -700,7 +698,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						framework.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
 					}
 					time.Sleep(1 * time.Second)
-					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, f.Namespace.Name, driverPodName, driverContainerName)
+					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName)
 					framework.ExpectNoError(err, "while waiting for initial CSI calls")
 					if index == 0 {
 						// No CSI call received yet
@@ -724,7 +722,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
-					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, f.Namespace.Name, driverPodName, driverContainerName)
+					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName)
 					if err != nil {
 						return true, err
 					}
@@ -852,7 +850,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				var calls []mockCSICall
 				err = wait.PollImmediateUntil(time.Second, func() (done bool, err error) {
-					c, index, err := compareCSICalls(deterministicCalls, expected, m.cs, f.Namespace.Name, driverPodName, driverContainerName)
+					c, index, err := compareCSICalls(deterministicCalls, expected, m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName)
 					if err != nil {
 						return true, fmt.Errorf("error waiting for expected CSI calls: %s", err)
 					}
@@ -1090,7 +1088,7 @@ type mockCSICall struct {
 func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContainerName string, pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled bool) error {
 	expectedAttributes := map[string]string{
 		"csi.storage.k8s.io/pod.name":            pod.Name,
-		"csi.storage.k8s.io/pod.namespace":       namespace,
+		"csi.storage.k8s.io/pod.namespace":       pod.Namespace,
 		"csi.storage.k8s.io/pod.uid":             string(pod.UID),
 		"csi.storage.k8s.io/serviceAccount.name": "default",
 	}
