@@ -583,68 +583,46 @@ func testHasNodeAddress(t *testing.T, addrs []v1.NodeAddress, addressType v1.Nod
 	t.Errorf("Did not find expected address: %s:%s in %v", addressType, address, addrs)
 }
 
-func TestNodeAddresses(t *testing.T) {
-	// Note instance0 and instance1 have the same name
-	// (we test that this produces an error)
-	var instance0 ec2.Instance
-	var instance1 ec2.Instance
-	var instance2 ec2.Instance
-
-	// ClusterID needs to be set
+func makeInstance(num int, privateIP, publicIP, privateDNSName, publicDNSName string, setNetInterface bool) ec2.Instance {
 	var tag ec2.Tag
 	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
 	tag.Value = aws.String(TestClusterID)
 	tags := []*ec2.Tag{&tag}
 
-	//0
-	instance0.InstanceId = aws.String("i-0")
-	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
-	instance0.PrivateIpAddress = aws.String("192.168.0.1")
-	instance0.PublicDnsName = aws.String("instance-same.ec2.external")
-	instance0.PublicIpAddress = aws.String("1.2.3.4")
-	instance0.NetworkInterfaces = []*ec2.InstanceNetworkInterface{
-		{
-			Status: aws.String(ec2.NetworkInterfaceStatusInUse),
-			PrivateIpAddresses: []*ec2.InstancePrivateIpAddress{
-				{
-					PrivateIpAddress: aws.String("192.168.0.1"),
-				},
-			},
+	instance := ec2.Instance{
+		InstanceId:       aws.String(fmt.Sprintf("i-%d", num)),
+		PrivateDnsName:   aws.String(privateDNSName),
+		PrivateIpAddress: aws.String(privateIP),
+		PublicDnsName:    aws.String(publicDNSName),
+		PublicIpAddress:  aws.String(publicIP),
+		InstanceType:     aws.String("c3.large"),
+		Tags:             tags,
+		Placement:        &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")},
+		State: &ec2.InstanceState{
+			Name: aws.String("running"),
 		},
 	}
-	instance0.InstanceType = aws.String("c3.large")
-	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	instance0.Tags = tags
-	state0 := ec2.InstanceState{
-		Name: aws.String("running"),
+	if setNetInterface == true {
+		instance.NetworkInterfaces = []*ec2.InstanceNetworkInterface{
+			{
+				Status: aws.String(ec2.NetworkInterfaceStatusInUse),
+				PrivateIpAddresses: []*ec2.InstancePrivateIpAddress{
+					{
+						PrivateIpAddress: aws.String(privateIP),
+					},
+				},
+			},
+		}
 	}
-	instance0.State = &state0
+	return instance
+}
 
-	//1
-	instance1.InstanceId = aws.String("i-1")
-	instance1.PrivateDnsName = aws.String("instance-same.ec2.internal")
-	instance1.PrivateIpAddress = aws.String("192.168.0.2")
-	instance1.InstanceType = aws.String("c3.large")
-	instance1.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	instance1.Tags = tags
-	state1 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance1.State = &state1
-
-	//2
-	instance2.InstanceId = aws.String("i-2")
-	instance2.PrivateDnsName = aws.String("instance-other.ec2.internal")
-	instance2.PrivateIpAddress = aws.String("192.168.0.1")
-	instance2.PublicIpAddress = aws.String("1.2.3.4")
-	instance2.InstanceType = aws.String("c3.large")
-	instance2.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	instance2.Tags = tags
-	state2 := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance2.State = &state2
-
+func TestNodeAddresses(t *testing.T) {
+	// Note instance0 and instance1 have the same name
+	// (we test that this produces an error)
+	instance0 := makeInstance(0, "192.168.0.1", "1.2.3.4", "instance-same.ec2.internal", "instance-same.ec2.external", true)
+	instance1 := makeInstance(1, "192.168.0.2", "", "instance-same.ec2.internal", "", false)
+	instance2 := makeInstance(2, "192.168.0.1", "1.2.3.4", "instance-other.ec2.internal", "", false)
 	instances := []*ec2.Instance{&instance0, &instance1, &instance2}
 
 	aws1, _ := mockInstancesResp(&instance0, []*ec2.Instance{&instance0})
@@ -677,26 +655,7 @@ func TestNodeAddresses(t *testing.T) {
 }
 
 func TestNodeAddressesWithMetadata(t *testing.T) {
-	var instance ec2.Instance
-
-	// ClusterID needs to be set
-	var tag ec2.Tag
-	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
-	tag.Value = aws.String(TestClusterID)
-	tags := []*ec2.Tag{&tag}
-
-	instanceName := "instance.ec2.internal"
-	instance.InstanceId = aws.String("i-0")
-	instance.PrivateDnsName = &instanceName
-	instance.PublicIpAddress = aws.String("2.3.4.5")
-	instance.InstanceType = aws.String("c3.large")
-	instance.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
-	instance.Tags = tags
-	state := ec2.InstanceState{
-		Name: aws.String("running"),
-	}
-	instance.State = &state
-
+	instance := makeInstance(0, "", "2.3.4.5", "instance.ec2.internal", "", false)
 	instances := []*ec2.Instance{&instance}
 	awsCloud, awsServices := mockInstancesResp(&instance, instances)
 
