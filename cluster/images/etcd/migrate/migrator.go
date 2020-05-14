@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/blang/semver"
@@ -159,7 +158,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 	if err != nil {
 		return nil, err
 	}
-	err = exec.Command("mv", m.dataDirectory.path, backupDir).Run()
+	err = os.Rename(m.dataDirectory.path, backupDir)
 	if err != nil {
 		return nil, err
 	}

@@ -20,6 +20,8 @@ go_library(
         "migrate_client.go",
         "migrate_server.go",
         "migrator.go",
+        "util_others.go",
+        "utils_windows.go",
         "versions.go",
     ],
     importpath = "k8s.io/kubernetes/cluster/images/etcd/migrate",
@@ -30,7 +32,42 @@ go_library(
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

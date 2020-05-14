@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -88,7 +87,7 @@ func (d *DataDirectory) Backup() error {
 	if err != nil {
 		return err
 	}
-	err = exec.Command("cp", "-r", d.path, backupDir).Run()
+	err = copyDirectory(d.path, backupDir)
 	if err != nil {
 		return err
 	}
