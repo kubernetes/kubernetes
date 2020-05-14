@@ -61,7 +61,7 @@ go_library(
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/util/procfs:go_default_library",
@@ -219,7 +219,7 @@ go_test(
         "//vendor/github.com/onsi/gomega/gstruct:go_default_library",
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [

@@ -43,7 +43,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/api/v1/resource:go_default_library",

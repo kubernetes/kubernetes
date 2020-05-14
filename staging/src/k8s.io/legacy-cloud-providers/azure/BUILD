@@ -100,7 +100,7 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/rubiojr/go-vhd/vhd:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],

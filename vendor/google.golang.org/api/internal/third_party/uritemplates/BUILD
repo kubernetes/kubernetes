@@ -3,12 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "klog.go",
-        "klog_file.go",
+        "uritemplates.go",
+        "utils.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/klog",
-    importpath = "k8s.io/klog",
-    visibility = ["//visibility:public"],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/internal/third_party/uritemplates",
+    importpath = "google.golang.org/api/internal/third_party/uritemplates",
+    visibility = ["//vendor/google.golang.org/api:__subpackages__"],
 )
 
 filegroup(
@@ -20,10 +20,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/k8s.io/klog/v2:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

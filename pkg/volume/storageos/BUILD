@@ -25,7 +25,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/github.com/storageos/go-api:go_default_library",
         "//vendor/github.com/storageos/go-api/types:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",

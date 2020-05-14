@@ -70,7 +70,7 @@ go_library(
         "//vendor/github.com/docker/docker/api/types/strslice:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
         "//vendor/github.com/docker/go-connections/nat:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [

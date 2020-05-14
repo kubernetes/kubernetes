@@ -65,7 +65,7 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud/pagination:go_default_library",
         "//vendor/github.com/mitchellh/mapstructure:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
     ],

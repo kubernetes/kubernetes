@@ -91,7 +91,7 @@ go_library(
         "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/gopkg.in/natefinch/lumberjack.v2:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
     ] + select({
