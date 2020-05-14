@@ -194,8 +194,8 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			// 3) Lookup the IP from node name by DNS
 			// 4) Try to get the IP from the network interface used as default gateway
 			//
-			// For steps 3 and 4, IPv4 addresses are preferred to IPv6 addresses
-			// unless nodeIP is "::", in which case it is reversed.
+			// For steps 3 and 4, IPv4 addresses are used unless
+			// nodeIP is "::", in which case IPv6 addresses are used.
 			if nodeIPSpecified {
 				ipAddr = nodeIP
 			} else if addr := net.ParseIP(hostname); addr != nil {
@@ -208,8 +208,6 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 						if isPreferredIPFamily(addr) {
 							ipAddr = addr
 							break
-						} else if ipAddr == nil {
-							ipAddr = addr
 						}
 					}
 				}
