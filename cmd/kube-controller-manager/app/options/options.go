@@ -23,6 +23,7 @@ import (
 	"net"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -187,7 +188,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 
 	// Set the PairName but leave certificate directory blank to generate in-memory by default
 	s.SecureServing.ServerCert.CertDirectory = ""
-	s.SecureServing.ServerCert.PairName = "kube-controller-manager"
+	s.SecureServing.ServerCert.PairName = KubeControllerManagerUserAgent
 	s.SecureServing.BindPort = ports.KubeControllerManagerPort
 
 	gcIgnoredResources := make([]garbagecollectorconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
@@ -196,8 +197,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	}
 
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
-	s.Generic.LeaderElection.ResourceName = "kube-controller-manager"
-	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
+	s.Generic.LeaderElection.ResourceName = KubeControllerManagerUserAgent
+	s.Generic.LeaderElection.ResourceNamespace = metav1.NamespaceSystem
 
 	return &s, nil
 }
@@ -443,6 +444,6 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events(metav1.NamespaceAll)})
 	return eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: userAgent})
 }
