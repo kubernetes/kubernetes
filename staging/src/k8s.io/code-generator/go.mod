@@ -13,7 +13,7 @@ require (
 	github.com/mailru/easyjson v0.7.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0 // indirect
-	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 // indirect
+	golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4 // indirect
 	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9

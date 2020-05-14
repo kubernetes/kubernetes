@@ -227,6 +227,9 @@ func InternalIP() (string, error) { return defaultClient.InternalIP() }
 // ExternalIP returns the instance's primary external (public) IP address.
 func ExternalIP() (string, error) { return defaultClient.ExternalIP() }
 
+// Email calls Client.Email on the default client.
+func Email(serviceAccount string) (string, error) { return defaultClient.Email(serviceAccount) }
+
 // Hostname returns the instance's hostname. This will be of the form
 // "<instanceID>.c.<projID>.internal".
 func Hostname() (string, error) { return defaultClient.Hostname() }
@@ -301,7 +304,10 @@ func (c *Client) getETag(suffix string) (value, etag string, err error) {
 		host = metadataIP
 	}
 	u := "http://" + host + "/computeMetadata/v1/" + suffix
-	req, _ := http.NewRequest("GET", u, nil)
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return "", "", err
+	}
 	req.Header.Set("Metadata-Flavor", "Google")
 	req.Header.Set("User-Agent", userAgent)
 	res, err := c.hc.Do(req)
@@ -367,6 +373,16 @@ func (c *Client) InternalIP() (string, error) {
 	return c.getTrimmed("instance/network-interfaces/0/ip")
 }
 
+// Email returns the email address associated with the service account.
+// The account may be empty or the string "default" to use the instance's
+// main account.
+func (c *Client) Email(serviceAccount string) (string, error) {
+	if serviceAccount == "" {
+		serviceAccount = "default"
+	}
+	return c.getTrimmed("instance/service-accounts/" + serviceAccount + "/email")
+}
+
 // ExternalIP returns the instance's primary external (public) IP address.
 func (c *Client) ExternalIP() (string, error) {
 	return c.getTrimmed("instance/network-interfaces/0/access-configs/0/external-ip")
@@ -394,11 +410,7 @@ func (c *Client) InstanceTags() ([]string, error) {
 
 // InstanceName returns the current VM's instance ID string.
 func (c *Client) InstanceName() (string, error) {
-	host, err := c.Hostname()
-	if err != nil {
-		return "", err
-	}
-	return strings.Split(host, ".")[0], nil
+	return c.getTrimmed("instance/name")
 }
 
 // Zone returns the current VM's zone, such as "us-central1-b".

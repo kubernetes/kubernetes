@@ -11,9 +11,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/gogo/protobuf v1.3.1
-	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
+	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 	github.com/golang/protobuf v1.3.3
-	github.com/google/btree v1.0.0 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
@@ -27,7 +26,6 @@ require (
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/appengine v1.5.0 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog v1.0.0
@@ -36,11 +34,17 @@ require (
 )
 
 replace (
-	cloud.google.com/go => cloud.google.com/go v0.38.0
+	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
+	github.com/google/pprof => github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57
+	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
+	go.opencensus.io => go.opencensus.io v0.21.0
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20190312203227-4b39c73a6495
+	golang.org/x/lint => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
+	google.golang.org/appengine => google.golang.org/appengine v1.5.0
+	honnef.co/go/tools => honnef.co/go/tools v0.0.0-20190418001031-e561f6794a2a
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go

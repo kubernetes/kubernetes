@@ -1,6 +1,6 @@
 # bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690 => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 bitbucket.org/bertimus9/systemstat
-# cloud.google.com/go v0.51.0 => cloud.google.com/go v0.38.0
+# cloud.google.com/go v0.51.0 => cloud.google.com/go v0.51.0
 cloud.google.com/go/compute/metadata
 # github.com/Azure/azure-sdk-for-go v40.2.0+incompatible => github.com/Azure/azure-sdk-for-go v40.2.0+incompatible
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
@@ -298,7 +298,7 @@ github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
-# github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef => github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
+# github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 github.com/golang/groupcache/lru
 # github.com/golang/mock v1.3.1 => github.com/golang/mock v1.3.1
 github.com/golang/mock/gomock
@@ -799,7 +799,7 @@ go.mongodb.org/mongo-driver/bson/bsonrw
 go.mongodb.org/mongo-driver/bson/bsontype
 go.mongodb.org/mongo-driver/bson/primitive
 go.mongodb.org/mongo-driver/x/bsonx/bsoncore
-# go.opencensus.io v0.21.0 => go.opencensus.io v0.21.0
+# go.opencensus.io v0.22.2 => go.opencensus.io v0.21.0
 go.opencensus.io
 go.opencensus.io/internal
 go.opencensus.io/internal/tagencoding
@@ -905,7 +905,7 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20191024005414-555d28b269f0 => golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
+# golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4 => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/go/ast/astutil
@@ -970,7 +970,7 @@ google.golang.org/api/pubsub/v1
 google.golang.org/api/tpu/v1
 google.golang.org/api/transport/http
 google.golang.org/api/transport/http/internal/propagation
-# google.golang.org/appengine v1.5.0 => google.golang.org/appengine v1.5.0
+# google.golang.org/appengine v1.6.5 => google.golang.org/appengine v1.5.0
 google.golang.org/appengine
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/app_identity
