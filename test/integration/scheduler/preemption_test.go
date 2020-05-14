@@ -148,6 +148,8 @@ func TestPreemption(t *testing.T) {
 		false, nil, time.Second,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
@@ -527,8 +529,14 @@ func TestPodPriorityResolution(t *testing.T) {
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
+
+	// Waiting for all controllers to sync
+	testutils.SyncInformerFactory(testCtx)
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
+
+	// Run all controllers
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	tests := []struct {
 		Name             string

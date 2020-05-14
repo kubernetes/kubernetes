@@ -102,13 +102,15 @@ func TestTaintNodeByCondition(t *testing.T) {
 		t.Errorf("Failed to create node controller: %v", err)
 		return
 	}
-	go nc.Run(testCtx.Ctx.Done())
 
-	// Waiting for all controller sync.
+	// Waiting for all controllers to sync
 	externalInformers.Start(testCtx.Ctx.Done())
 	externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-	testCtx.InformerFactory.Start(testCtx.Ctx.Done())
-	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	testutils.SyncInformerFactory(testCtx)
+
+	// Run all controllers
+	go nc.Run(testCtx.Ctx.Done())
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
