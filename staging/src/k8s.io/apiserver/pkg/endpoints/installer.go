@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
@@ -820,7 +821,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					return nil, err
 				}
 			}
-			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
+			if err := AddObjectParams(ws, route, versionedListOptions, "watch", "allowWatchBookmarks"); err != nil {
 				return nil, err
 			}
 			addParams(route, action.Params)
@@ -962,12 +963,13 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 // Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
 // the JSON field name. If a description struct tag is set on the field, that description is used on the
 // query parameter. In essence, it converts a standard JSON top level object into a query param schema.
-func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}) error {
+func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}, excludedNames ...string) error {
 	sv, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return err
 	}
 	st := sv.Type()
+	excludedNameSet := sets.NewString(excludedNames...)
 	switch st.Kind() {
 	case reflect.Struct:
 		for i := 0; i < st.NumField(); i++ {
@@ -993,7 +995,9 @@ func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 				if len(jsonName) == 0 {
 					continue
 				}
-
+				if excludedNameSet.Has(jsonName) {
+					continue
+				}
 				var desc string
 				if docable, ok := obj.(documentable); ok {
 					desc = docable.SwaggerDoc()[jsonName]
