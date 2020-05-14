@@ -257,7 +257,7 @@ replace (
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
+	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 	github.com/golang/mock => github.com/golang/mock v1.3.1
 	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
 	github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
