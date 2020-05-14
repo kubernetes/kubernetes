@@ -5,14 +5,14 @@ module k8s.io/legacy-cloud-providers
 go 1.13
 
 require (
-	cloud.google.com/go v0.38.0
+	cloud.google.com/go v0.51.0
 	github.com/Azure/azure-sdk-for-go v40.2.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.9.6
 	github.com/Azure/go-autorest/autorest/adal v0.8.2
 	github.com/Azure/go-autorest/autorest/mocks v0.3.0
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
-	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
+	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317
 	github.com/aws/aws-sdk-go v1.28.2
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/golang/mock v1.3.1
@@ -23,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	google.golang.org/api v0.15.1
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/warnings.v0 v0.1.1 // indirect
@@ -40,8 +40,11 @@ require (
 )
 
 replace (
+	cloud.google.com/go => cloud.google.com/go v0.38.0
+	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
