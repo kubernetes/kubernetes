@@ -199,7 +199,7 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 		return c, err
 	})
 
-	tunnel, err := client.CreateGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
