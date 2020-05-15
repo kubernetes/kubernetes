@@ -146,10 +146,15 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 	timeout := util.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &timeout
-	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
-		HostPath: &v1.HostPathVolumeSource{
-			Path: spec.PersistentVolume.Spec.HostPath.Path,
-		},
+	for idx, volume := range pod.Spec.Volumes {
+		if volume.Name == "pv-recycler-volume" {
+			pod.Spec.Volumes[idx].VolumeSource = v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: spec.PersistentVolume.Spec.HostPath.Path,
+				},
+			}
+			break
+		}
 	}
 	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }

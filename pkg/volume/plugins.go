@@ -1047,9 +1047,9 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 			RestartPolicy:         v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
-					Name: "vol",
+					Name: "pv-recycler-volume",
 					// IMPORTANT!  All plugins using this template MUST
-					// override pod.Spec.Volumes[0].VolumeSource Recycler
+					// override pv-recycler-volume's VolumeSource
 					// implementations without a valid VolumeSource will fail.
 					VolumeSource: v1.VolumeSource{},
 				},
@@ -1062,7 +1062,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/*  && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []v1.VolumeMount{
 						{
-							Name:      "vol",
+							Name:      "pv-recycler-volume",
 							MountPath: "/scrub",
 						},
 					},
@@ -1075,13 +1075,19 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 
 // Check validity of recycle pod template
 // List of checks:
-// - at least one volume is defined in the recycle pod template
+// - a volume named "pv-recycler-volume" is defined in the recycle pod template
 // If successful, returns nil
-// if unsuccessful, returns an error.
+// if unsuccessful, creates the volume in the template.
+// IMPORTANT!  All plugins using this template MUST
+// override pv-recycler-volume's VolumeSource
+// implementations without a valid VolumeSource will fail.
 func ValidateRecyclerPodTemplate(pod *v1.Pod) error {
-	if len(pod.Spec.Volumes) < 1 {
-		return fmt.Errorf("does not contain any volume(s)")
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == "pv-recycler-volume" {
+			return nil
+		}
 	}
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "pv-recycler-volume", VolumeSource: v1.VolumeSource{}})
 	return nil
 }
 

@@ -19,7 +19,7 @@ package volume
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -133,7 +133,7 @@ func Test_ValidatePodTemplate(t *testing.T) {
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
 				{
-					Name:         "vol",
+					Name:         "pv-recycler-volume",
 					VolumeSource: v1.VolumeSource{},
 				},
 			},
@@ -160,8 +160,7 @@ func Test_ValidatePodTemplate(t *testing.T) {
 			},
 		},
 	}
-	// want = an error
-	if got := ValidateRecyclerPodTemplate(pod); got == nil {
-		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got, "Error: pod specification does not contain any volume(s).")
+	if got := ValidateRecyclerPodTemplate(pod); got != want {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got.Error(), want)
 	}
 }

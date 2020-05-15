@@ -161,11 +161,16 @@ func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &timeout
 	pod.GenerateName = "pv-recycler-nfs-"
-	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
-		NFS: &v1.NFSVolumeSource{
-			Server: spec.PersistentVolume.Spec.NFS.Server,
-			Path:   spec.PersistentVolume.Spec.NFS.Path,
-		},
+	for idx, volume := range pod.Spec.Volumes {
+		if volume.Name == "pv-recycler-volume" {
+			pod.Spec.Volumes[idx].VolumeSource = v1.VolumeSource{
+				NFS: &v1.NFSVolumeSource{
+					Server: spec.PersistentVolume.Spec.NFS.Server,
+					Path:   spec.PersistentVolume.Spec.NFS.Path,
+				},
+			}
+			break
+		}
 	}
 	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
