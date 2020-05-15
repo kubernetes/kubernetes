@@ -1829,7 +1829,7 @@ func collectPodsAndNetworkPolicies(f *framework.Framework, podClient *v1.Pod) ([
 		logs, logErr = e2epod.GetPreviousPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, fmt.Sprintf("%s-container", podClient.Name))
 	}
 	if logErr != nil {
-		framework.Failf("Error getting container logs: %s", logErr)
+		framework.Logf("Error getting container logs: %s", logErr)
 	}
 
 	// Collect current NetworkPolicies applied in the test namespace.
