@@ -68,9 +68,11 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).
 type PodInfo struct {
-	Pod                       *v1.Pod
-	RequiredAffinityTerms     []AffinityTerm
-	RequiredAntiAffinityTerms []AffinityTerm
+	Pod                        *v1.Pod
+	RequiredAffinityTerms      []AffinityTerm
+	RequiredAntiAffinityTerms  []AffinityTerm
+	PreferredAffinityTerms     []WeightedAffinityTerm
+	PreferredAntiAffinityTerms []WeightedAffinityTerm
 }
 
 // AffinityTerm is a processed version of v1.PodAffinityTerm.
@@ -78,6 +80,12 @@ type AffinityTerm struct {
 	Namespaces  sets.String
 	Selector    labels.Selector
 	TopologyKey string
+}
+
+// WeightedAffinityTerm is a "processed" representation of v1.WeightedAffinityTerm.
+type WeightedAffinityTerm struct {
+	AffinityTerm
+	Weight int32
 }
 
 func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) *AffinityTerm {
@@ -110,12 +118,44 @@ func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) []AffinityTerm 
 	return terms
 }
 
+// getWeightedAffinityTerms returns the list of processed affinity terms.
+func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm) []WeightedAffinityTerm {
+	if v1Terms == nil {
+		return nil
+	}
+
+	var terms []WeightedAffinityTerm
+	for _, term := range v1Terms {
+		t := newAffinityTerm(pod, &term.PodAffinityTerm)
+		if t == nil {
+			// We get here if the label selector failed to process, this is not supposed
+			// to happen because the pod should have been validated by the api server.
+			return nil
+		}
+		terms = append(terms, WeightedAffinityTerm{AffinityTerm: *t, Weight: term.Weight})
+	}
+	return terms
+}
+
 // NewPodInfo return a new PodInfo
 func NewPodInfo(pod *v1.Pod) *PodInfo {
+	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
+	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
+	if affinity := pod.Spec.Affinity; affinity != nil {
+		if a := affinity.PodAffinity; a != nil {
+			preferredAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+		if a := affinity.PodAntiAffinity; a != nil {
+			preferredAntiAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
+
 	return &PodInfo{
-		Pod:                       pod,
-		RequiredAffinityTerms:     getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity)),
-		RequiredAntiAffinityTerms: getAffinityTerms(pod, schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity)),
+		Pod:                        pod,
+		RequiredAffinityTerms:      getAffinityTerms(pod, schedutil.GetPodAffinityTerms(pod.Spec.Affinity)),
+		RequiredAntiAffinityTerms:  getAffinityTerms(pod, schedutil.GetPodAntiAffinityTerms(pod.Spec.Affinity)),
+		PreferredAffinityTerms:     getWeightedAffinityTerms(pod, preferredAffinityTerms),
+		PreferredAntiAffinityTerms: getWeightedAffinityTerms(pod, preferredAntiAffinityTerms),
 	}
 }
 
