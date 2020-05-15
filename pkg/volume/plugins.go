@@ -354,6 +354,8 @@ type AttachDetachVolumeHost interface {
 	// CSIDriverLister returns the informer lister for the CSIDriver API Object
 	CSIDriverLister() storagelisters.CSIDriverLister
 
+	// VolumeAttachmentLister returns the informer lister for the VolumeAttachment API Object
+	VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister
 	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
 	// to the attachDetachController
 	IsAttachDetachController() bool
