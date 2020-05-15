@@ -33,7 +33,7 @@ require (
 	github.com/coredns/corefile-migration v1.0.6
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cpuguy83/go-md2man v1.0.10
 	github.com/cyphar/filepath-securejoin v0.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1
@@ -53,7 +53,7 @@ require (
 	github.com/go-openapi/validate v0.19.5
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.1
-	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
+	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
 	github.com/golang/mock v1.3.1
 	github.com/google/cadvisor v0.36.1-0.20200323171535-8af10c683a96
 	github.com/google/go-cmp v0.4.0
@@ -91,10 +91,10 @@ require (
 	github.com/robfig/cron v1.1.0
 	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
 	github.com/spf13/afero v1.2.2
-	github.com/spf13/cobra v0.0.5
+	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.3.2
+	github.com/spf13/viper v1.4.0
 	github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 	github.com/stretchr/testify v1.4.0
 	github.com/thecodeteam/goscaleio v0.1.0
@@ -201,13 +201,14 @@ replace (
 	github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.0
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
 	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.6
+	github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.2
 	github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
-	github.com/coreos/go-etcd => github.com/coreos/go-etcd v2.0.0+incompatible
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea // 97fdf19511ea is the SHA for git tag v4
+	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cpuguy83/go-md2man => github.com/cpuguy83/go-md2man v1.0.10
+	github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/creack/pty => github.com/creack/pty v1.1.7
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.2
 	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
@@ -256,7 +257,7 @@ replace (
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
+	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
 	github.com/golang/mock => github.com/golang/mock v1.3.1
 	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
 	github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
@@ -365,27 +366,29 @@ replace (
 	github.com/rogpeppe/fastuuid => github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 	github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
+	github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
 	github.com/sergi/go-diff => github.com/sergi/go-diff v1.0.0
+	github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
 	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
 	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.4
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
 	github.com/spf13/cast => github.com/spf13/cast v1.3.0
-	github.com/spf13/cobra => github.com/spf13/cobra v0.0.5
+	github.com/spf13/cobra => github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper => github.com/spf13/viper v1.3.2
+	github.com/spf13/viper => github.com/spf13/viper v1.4.0
 	github.com/storageos/go-api => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 	github.com/stretchr/objx => github.com/stretchr/objx v0.2.0
 	github.com/stretchr/testify => github.com/stretchr/testify v1.4.0
 	github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 	github.com/thecodeteam/goscaleio => github.com/thecodeteam/goscaleio v0.1.0
 	github.com/tidwall/pretty => github.com/tidwall/pretty v1.0.0
-	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
-	github.com/ugorji/go/codec => github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8
+	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5
+	github.com/ugorji/go => github.com/ugorji/go v1.1.4
 	github.com/urfave/cli => github.com/urfave/cli v1.20.0
 	github.com/urfave/negroni => github.com/urfave/negroni v1.0.0
 	github.com/vektah/gqlparser => github.com/vektah/gqlparser v1.1.2
@@ -399,7 +402,7 @@ replace (
 	go.etcd.io/etcd => go.etcd.io/etcd v0.5.0-alpha.5.0.20200401174654-e694b7bb0875 // e694b7bb0875 is the SHA for git tag v3.4.7
 	go.mongodb.org/mongo-driver => go.mongodb.org/mongo-driver v1.1.2
 	go.opencensus.io => go.opencensus.io v0.21.0
-	go.uber.org/atomic => go.uber.org/atomic v1.3.2
+	go.uber.org/atomic => go.uber.org/atomic v1.4.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
 	go.uber.org/zap => go.uber.org/zap v1.10.0
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975

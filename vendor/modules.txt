@@ -167,11 +167,13 @@ github.com/coreos/go-systemd/daemon
 github.com/coreos/go-systemd/dbus
 github.com/coreos/go-systemd/journal
 github.com/coreos/go-systemd/util
-# github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
+# github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 github.com/coreos/pkg/capnslog
 github.com/coreos/pkg/dlopen
 # github.com/cpuguy83/go-md2man v1.0.10 => github.com/cpuguy83/go-md2man v1.0.10
 github.com/cpuguy83/go-md2man/md2man
+# github.com/cpuguy83/go-md2man/v2 v2.0.0 => github.com/cpuguy83/go-md2man/v2 v2.0.0
+github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/cyphar/filepath-securejoin v0.2.2 => github.com/cyphar/filepath-securejoin v0.2.2
 github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.1 => github.com/davecgh/go-spew v1.1.1
@@ -294,7 +296,7 @@ github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
-# github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903 => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
+# github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef => github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
 github.com/golang/groupcache/lru
 # github.com/golang/mock v1.3.1 => github.com/golang/mock v1.3.1
 github.com/golang/mock/gomock
@@ -615,10 +617,14 @@ github.com/robfig/cron
 github.com/rubiojr/go-vhd/vhd
 # github.com/russross/blackfriday v1.5.2 => github.com/russross/blackfriday v1.5.2
 github.com/russross/blackfriday
+# github.com/russross/blackfriday/v2 v2.0.1 => github.com/russross/blackfriday/v2 v2.0.1
+github.com/russross/blackfriday/v2
 # github.com/satori/go.uuid v1.2.0 => github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
+# github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
+github.com/shurcooL/sanitized_anchor_name
 # github.com/sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.4 => github.com/soheilhy/cmux v0.1.4
@@ -628,14 +634,14 @@ github.com/spf13/afero
 github.com/spf13/afero/mem
 # github.com/spf13/cast v1.3.0 => github.com/spf13/cast v1.3.0
 github.com/spf13/cast
-# github.com/spf13/cobra v0.0.5 => github.com/spf13/cobra v0.0.5
+# github.com/spf13/cobra v1.0.0 => github.com/spf13/cobra v1.0.0
 github.com/spf13/cobra
 github.com/spf13/cobra/doc
 # github.com/spf13/jwalterweatherman v1.1.0 => github.com/spf13/jwalterweatherman v1.1.0
 github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5 => github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# github.com/spf13/viper v1.3.2 => github.com/spf13/viper v1.3.2
+# github.com/spf13/viper v1.4.0 => github.com/spf13/viper v1.4.0
 github.com/spf13/viper
 # github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 github.com/storageos/go-api
@@ -653,7 +659,7 @@ github.com/syndtr/gocapability/capability
 # github.com/thecodeteam/goscaleio v0.1.0 => github.com/thecodeteam/goscaleio v0.1.0
 github.com/thecodeteam/goscaleio
 github.com/thecodeteam/goscaleio/types/v1
-# github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8 => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
+# github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 => github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5
 github.com/tmc/grpc-websocket-proxy/wsproxy
 # github.com/vishvananda/netlink v1.1.0 => github.com/vishvananda/netlink v1.1.0
 github.com/vishvananda/netlink
@@ -806,7 +812,7 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
-# go.uber.org/atomic v1.3.2 => go.uber.org/atomic v1.3.2
+# go.uber.org/atomic v1.4.0 => go.uber.org/atomic v1.4.0
 go.uber.org/atomic
 # go.uber.org/multierr v1.1.0 => go.uber.org/multierr v1.1.0
 go.uber.org/multierr

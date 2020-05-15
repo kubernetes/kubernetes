@@ -8,7 +8,7 @@ require (
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
@@ -29,7 +29,9 @@ require (
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
+	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200401174654-e694b7bb0875
+	go.uber.org/atomic v1.4.0 // indirect
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
