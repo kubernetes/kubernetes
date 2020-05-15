@@ -267,16 +267,16 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 	}{
 		{
 
-			//  Node1 scores (used resources) on 0-10 scale
+			//  Node1 scores (used resources) on 0-MaxNodeScore scale
 			//  Node1 Score:
 			//  rawScoringFunction(used + requested / available)
 			//  resourceScoringFunction((0+0),8)
-			//      = 100 - (8-0)*(100/8) = 0 = rawScoringFunction(0)
+			//      = maxUtilization - (8-0)*(maxUtilization/8) = 0 = rawScoringFunction(0)
 			//  Node1 Score: 0
-			//  Node2 scores (used resources) on 0-10 scale
+			//  Node2 scores (used resources) on 0-MaxNodeScore scale
 			//  rawScoringFunction(used + requested / available)
 			//  resourceScoringFunction((0+0),4)
-			//      = 100 - (4-0)*(100/4) = 0 = rawScoringFunction(0)
+			//      = maxUtilization - (4-0)*(maxUtilization/4) = 0 = rawScoringFunction(0)
 			//  Node2 Score: 0
 
 			pod:          &v1.Pod{Spec: noResources},
@@ -287,16 +287,16 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 		{
 
-			// Node1 scores (used resources) on 0-10 scale
+			// Node1 scores (used resources) on 0-MaxNodeScore scale
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			//  = maxUtilization - (8-2)*(maxUtilization/8) = 25 = rawScoringFunction(25)
 			// Node1 Score: 2
-			// Node2 scores (used resources) on 0-10 scale
+			// Node2 scores (used resources) on 0-MaxNodeScore scale
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),4)
-			//  = 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			//  = maxUtilization - (4-2)*(maxUtilization/4) = 50 = rawScoringFunction(50)
 			// Node2 Score: 5
 
 			pod:          &v1.Pod{Spec: extendedResourcePod1},
@@ -310,16 +310,16 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 		{
 
-			// Node1 scores (used resources) on 0-10 scale
+			// Node1 scores (used resources) on 0-MaxNodeScore scale
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+2),8)
-			//  = 100 - (8-2)*(100/8) = 25 =rawScoringFunction(25)
+			//  = maxUtilization - (8-2)*(maxUtilization/8) = 25 = rawScoringFunction(25)
 			// Node1 Score: 2
-			// Node2 scores (used resources) on 0-10 scale
+			// Node2 scores (used resources) on 0-MaxNodeScore scale
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((2+2),4)
-			//  = 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			//  = maxUtilization - (4-4)*(maxUtilization/4) = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
 
 			pod:          &v1.Pod{Spec: extendedResourcePod1},
@@ -333,16 +333,16 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 		{
 
-			// Node1 scores (used resources) on 0-10 scale
+			// Node1 scores (used resources) on 0-MaxNodeScore scale
 			// Node1 Score:
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+4),8)
-			//  = 100 - (8-4)*(100/8) = 50 = rawScoringFunction(50)
+			//  = maxUtilization - (8-4)*(maxUtilization/8) = 50 = rawScoringFunction(50)
 			// Node1 Score: 5
-			// Node2 scores (used resources) on 0-10 scale
+			// Node2 scores (used resources) on 0-MaxNodeScore scale
 			// rawScoringFunction(used + requested / available)
 			// resourceScoringFunction((0+4),4)
-			//  = 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			//  = maxUtilization - (4-4)*(maxUtilization/4) = maxUtilization = rawScoringFunction(maxUtilization)
 			// Node2 Score: 10
 
 			pod:          &v1.Pod{Spec: extendedResourcePod2},

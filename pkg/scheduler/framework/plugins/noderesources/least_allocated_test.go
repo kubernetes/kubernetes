@@ -98,27 +98,27 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 		name         string
 	}{
 		{
-			// Node1 scores (remaining resources) on 0-10 scale
-			// CPU Score: ((4000 - 0) *100) / 4000 = 100
-			// Memory Score: ((10000 - 0) *100) / 10000 = 100
+			// Node1 scores (remaining resources) on 0-MaxNodeScore scale
+			// CPU Score: ((4000 - 0) * MaxNodeScore) / 4000 = MaxNodeScore
+			// Memory Score: ((10000 - 0) * MaxNodeScore) / 10000 = MaxNodeScore
 			// Node1 Score: (100 + 100) / 2 = 100
-			// Node2 scores (remaining resources) on 0-10 scale
-			// CPU Score: ((4000 - 0) *100) / 4000 = 100
-			// Memory Score: ((10000 - 0) *10) / 10000 = 100
-			// Node2 Score: (100 + 100) / 2 = 100
+			// Node2 scores (remaining resources) on 0-MaxNodeScore scale
+			// CPU Score: ((4000 - 0) * MaxNodeScore) / 4000 = MaxNodeScore
+			// Memory Score: ((10000 - 0) * MaxNodeScore) / 10000 = MaxNodeScore
+			// Node2 Score: (MaxNodeScore + MaxNodeScore) / 2 = MaxNodeScore
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "nothing scheduled, nothing requested",
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: ((4000 - 3000) *100) / 4000 = 25
-			// Memory Score: ((10000 - 5000) *100) / 10000 = 50
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: ((4000 - 3000) * MaxNodeScore) / 4000 = 25
+			// Memory Score: ((10000 - 5000) * MaxNodeScore) / 10000 = 50
 			// Node1 Score: (25 + 50) / 2 = 37
-			// Node2 scores on 0-10 scale
-			// CPU Score: ((6000 - 3000) *100) / 6000 = 50
-			// Memory Score: ((10000 - 5000) *100) / 10000 = 50
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: ((6000 - 3000) * MaxNodeScore) / 6000 = 50
+			// Memory Score: ((10000 - 5000) * MaxNodeScore) / 10000 = 50
 			// Node2 Score: (50 + 50) / 2 = 50
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
@@ -126,14 +126,14 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: ((4000 - 0) *100) / 4000 = 100
-			// Memory Score: ((10000 - 0) *100) / 10000 = 100
-			// Node1 Score: (100 + 100) / 2 = 100
-			// Node2 scores on 0-10 scale
-			// CPU Score: ((4000 - 0) *100) / 4000 = 100
-			// Memory Score: ((10000 - 0) *100) / 10000 = 100
-			// Node2 Score: (100 + 100) / 2 = 100
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: ((4000 - 0) * MaxNodeScore) / 4000 = MaxNodeScore
+			// Memory Score: ((10000 - 0) * MaxNodeScore) / 10000 = MaxNodeScore
+			// Node1 Score: (MaxNodeScore + MaxNodeScore) / 2 = MaxNodeScore
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: ((4000 - 0) * MaxNodeScore) / 4000 = MaxNodeScore
+			// Memory Score: ((10000 - 0) * MaxNodeScore) / 10000 = MaxNodeScore
+			// Node2 Score: (MaxNodeScore + MaxNodeScore) / 2 = MaxNodeScore
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
@@ -146,13 +146,13 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			},
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: ((10000 - 6000) *100) / 10000 = 40
-			// Memory Score: ((20000 - 0) *100) / 20000 = 100
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: ((10000 - 6000) * MaxNodeScore) / 10000 = 40
+			// Memory Score: ((20000 - 0) * MaxNodeScore) / 20000 = MaxNodeScore
 			// Node1 Score: (40 + 100) / 2 = 70
-			// Node2 scores on 0-10 scale
-			// CPU Score: ((10000 - 6000) *100) / 10000 = 40
-			// Memory Score: ((20000 - 5000) *100) / 20000 = 75
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: ((10000 - 6000) * MaxNodeScore) / 10000 = 40
+			// Memory Score: ((20000 - 5000) * MaxNodeScore) / 20000 = 75
 			// Node2 Score: (40 + 75) / 2 = 57
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
@@ -166,13 +166,13 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			},
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: ((10000 - 6000) *10) / 10000 = 40
-			// Memory Score: ((20000 - 5000) *10) / 20000 = 75
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: ((10000 - 6000) * MaxNodeScore) / 10000 = 40
+			// Memory Score: ((20000 - 5000) * MaxNodeScore) / 20000 = 75
 			// Node1 Score: (40 + 75) / 2 = 57
-			// Node2 scores on 0-10 scale
-			// CPU Score: ((10000 - 6000) *100) / 10000 = 40
-			// Memory Score: ((20000 - 10000) *100) / 20000 = 50
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: ((10000 - 6000) * MaxNodeScore) / 10000 = 40
+			// Memory Score: ((20000 - 10000) * MaxNodeScore) / 20000 = 50
 			// Node2 Score: (40 + 50) / 2 = 45
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
@@ -184,13 +184,13 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			},
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: ((10000 - 6000) *100) / 10000 = 40
-			// Memory Score: ((20000 - 5000) *100) / 20000 = 75
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: ((10000 - 6000) * MaxNodeScore) / 10000 = 40
+			// Memory Score: ((20000 - 5000) * MaxNodeScore) / 20000 = 75
 			// Node1 Score: (40 + 75) / 2 = 57
-			// Node2 scores on 0-10 scale
-			// CPU Score: ((10000 - 6000) *100) / 10000 = 40
-			// Memory Score: ((50000 - 10000) *100) / 50000 = 80
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: ((10000 - 6000) * MaxNodeScore) / 10000 = 40
+			// Memory Score: ((50000 - 10000) * MaxNodeScore) / 50000 = 80
 			// Node2 Score: (40 + 80) / 2 = 60
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
@@ -202,13 +202,13 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			},
 		},
 		{
-			// Node1 scores on 0-10 scale
-			// CPU Score: ((4000 - 6000) *100) / 4000 = 0
-			// Memory Score: ((10000 - 0) *100) / 10000 = 100
-			// Node1 Score: (0 + 100) / 2 = 50
-			// Node2 scores on 0-10 scale
-			// CPU Score: ((4000 - 6000) *100) / 4000 = 0
-			// Memory Score: ((10000 - 5000) *100) / 10000 = 50
+			// Node1 scores on 0-MaxNodeScore scale
+			// CPU Score: ((4000 - 6000) * MaxNodeScore) / 4000 = 0
+			// Memory Score: ((10000 - 0) * MaxNodeScore) / 10000 = MaxNodeScore
+			// Node1 Score: (0 + MaxNodeScore) / 2 = 50
+			// Node2 scores on 0-MaxNodeScore scale
+			// CPU Score: ((4000 - 6000) * MaxNodeScore) / 4000 = 0
+			// Memory Score: ((10000 - 5000) * MaxNodeScore) / 10000 = 50
 			// Node2 Score: (0 + 50) / 2 = 25
 			pod:          &v1.Pod{Spec: cpuOnly},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},

@@ -51,7 +51,7 @@ func (ma *MostAllocated) Score(ctx context.Context, state *framework.CycleState,
 	// ma.score favors nodes with most requested resources.
 	// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 	// based on the maximum of the average of the fraction of requested to capacity.
-	// Details: (cpu(10 * sum(requested) / capacity) + memory(10 * sum(requested) / capacity)) / 2
+	// Details: (cpu(MaxNodeScore * sum(requested) / capacity) + memory(MaxNodeScore * sum(requested) / capacity)) / weightSum
 	return ma.score(pod, nodeInfo)
 }
 
@@ -83,13 +83,11 @@ func mostResourceScorer(requested, allocable resourceToValueMap, includeVolumes 
 
 }
 
-// The used capacity is calculated on a scale of 0-10
-// 0 being the lowest priority and 10 being the highest.
+// The used capacity is calculated on a scale of 0-MaxNodeScore (MaxNodeScore is
+// constant with value set to 100).
+// 0 being the lowest priority and 100 being the highest.
 // The more resources are used the higher the score is. This function
-// is almost a reversed version of least_requested_priority.calculateUnusedScore
-// (10 - calculateUnusedScore). The main difference is in rounding. It was added to
-// keep the final formula clean and not to modify the widely used (by users
-// in their default scheduling policies) calculateUsedScore.
+// is almost a reversed version of noderesources.leastRequestedScore.
 func mostRequestedScore(requested, capacity int64) int64 {
 	if capacity == 0 {
 		return 0
