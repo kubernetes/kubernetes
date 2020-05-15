@@ -64,6 +64,20 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
+	test300600900 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/300",
+			},
+			{
+				Image: "gcr.io/600",
+			},
+			{
+				Image: "gcr.io/900",
+			},
+		},
+	}
+
 	node403002000 := v1.NodeStatus{
 		Images: []v1.ContainerImage{
 			{
@@ -104,6 +118,52 @@ func TestImageLocalityPriority(t *testing.T) {
 					"gcr.io/10:v1",
 				},
 				SizeBytes: int64(10 * mb),
+			},
+		},
+	}
+
+	node60040900 := v1.NodeStatus{
+		Images: []v1.ContainerImage{
+			{
+				Names: []string{
+					"gcr.io/600:" + parsers.DefaultImageTag,
+				},
+				SizeBytes: int64(600 * mb),
+			},
+			{
+				Names: []string{
+					"gcr.io/40:" + parsers.DefaultImageTag,
+				},
+				SizeBytes: int64(40 * mb),
+			},
+			{
+				Names: []string{
+					"gcr.io/900:" + parsers.DefaultImageTag,
+				},
+				SizeBytes: int64(900 * mb),
+			},
+		},
+	}
+
+	node300600900 := v1.NodeStatus{
+		Images: []v1.ContainerImage{
+			{
+				Names: []string{
+					"gcr.io/300:" + parsers.DefaultImageTag,
+				},
+				SizeBytes: int64(300 * mb),
+			},
+			{
+				Names: []string{
+					"gcr.io/600:" + parsers.DefaultImageTag,
+				},
+				SizeBytes: int64(600 * mb),
+			},
+			{
+				Names: []string{
+					"gcr.io/900:" + parsers.DefaultImageTag,
+				},
+				SizeBytes: int64(900 * mb),
 			},
 		},
 	}
@@ -180,6 +240,25 @@ func TestImageLocalityPriority(t *testing.T) {
 			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010), makeImageNode("machine3", nodeWithNoImages)},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 65}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
 			name:         "if exceed limit, use limit (with node which has no images present)",
+		},
+		{
+			// Pod: gcr.io/300 gcr.io/600 gcr.io/900
+
+			// Node1
+			// Image: gcr.io/600:latest 600MB, gcr.io/900:latest 900MB
+			// Score: 100 (600M * 2/3 + 900M * 2/3 = 1000M >= 1000M, max-threshold)
+
+			// Node2
+			// Image: gcr.io/300:latest 300MB, gcr.io/600:latest 600MB, gcr.io/900:latest 900MB
+			// Score: 100 (300M * 1/3 + 600M * 2/3 + 900M * 2/3) >= 1000M, max-threshold)
+
+			// Node3
+			// Image:
+			// Score: 0
+			pod:          &v1.Pod{Spec: test300600900},
+			nodes:        []*v1.Node{makeImageNode("machine1", node60040900), makeImageNode("machine2", node300600900), makeImageNode("machine3", nodeWithNoImages)},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 100}, {Name: "machine2", Score: 100}, {Name: "machine3", Score: 0}},
+			name:         "max threshold haven't considered the size of containers to be run for the pod",
 		},
 	}
 
