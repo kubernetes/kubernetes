@@ -192,3 +192,9 @@ func SetDefaults_RequestedToCapacityRatioArgs(obj *v1alpha2.RequestedToCapacityR
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
+
+func SetDefaults_VolumeBindingArgs(obj *v1alpha2.VolumeBindingArgs) {
+	if obj.BindTimeoutSeconds == nil {
+		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
+	}
+}

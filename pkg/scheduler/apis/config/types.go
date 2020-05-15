@@ -90,7 +90,7 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored.
 	PercentageOfNodesToScore int32
 
-	// Duration to wait for a binding operation to complete before timing out
+	// BindTimeoutSeconds is the timeout in seconds in volume binding operation.
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
 	// DEPRECATED: BindTimeoutSeconds in deprecated.

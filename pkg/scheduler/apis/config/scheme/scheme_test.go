@@ -78,6 +78,9 @@ profiles:
       resources:
       - name: memory
         weight: 1
+  - name: VolumeBinding
+    args:
+      bindTimeoutSeconds: 300
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -126,6 +129,12 @@ profiles:
 							Name: "NodeResourcesMostAllocated",
 							Args: &config.NodeResourcesMostAllocatedArgs{
 								Resources: []config.ResourceSpec{{Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "VolumeBinding",
+							Args: &config.VolumeBindingArgs{
+								BindTimeoutSeconds: 300,
 							},
 						},
 					},
@@ -255,6 +264,8 @@ profiles:
     args:
   - name: NodeResourcesMostAllocated
     args:
+  - name: VolumeBinding
+    args:
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -281,6 +292,12 @@ profiles:
 							Name: "NodeResourcesMostAllocated",
 							Args: &config.NodeResourcesMostAllocatedArgs{
 								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "VolumeBinding",
+							Args: &config.VolumeBindingArgs{
+								BindTimeoutSeconds: 600,
 							},
 						},
 					},
@@ -331,6 +348,14 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Args: runtime.RawExtension{
 									Object: &v1alpha2.InterPodAffinityArgs{
 										HardPodAffinityWeight: pointer.Int32Ptr(5),
+									},
+								},
+							},
+							{
+								Name: "VolumeBinding",
+								Args: runtime.RawExtension{
+									Object: &v1alpha2.VolumeBindingArgs{
+										BindTimeoutSeconds: pointer.Int64Ptr(300),
 									},
 								},
 							},
@@ -392,6 +417,11 @@ profiles:
     name: InterPodAffinity
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1alpha2
+      bindTimeoutSeconds: 300
+      kind: VolumeBindingArgs
+    name: VolumeBinding
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1alpha2
       kind: RequestedToCapacityRatioArgs
       resources:
       - Name: lower
@@ -429,6 +459,12 @@ profiles:
 								Name: "NodeResourcesMostAllocated",
 								Args: &config.NodeResourcesMostAllocatedArgs{
 									Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}},
+								},
+							},
+							{
+								Name: "VolumeBinding",
+								Args: &config.VolumeBindingArgs{
+									BindTimeoutSeconds: 300,
 								},
 							},
 							{
@@ -480,6 +516,11 @@ profiles:
       - Name: cpu
         Weight: 1
     name: NodeResourcesMostAllocated
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1alpha2
+      bindTimeoutSeconds: 300
+      kind: VolumeBindingArgs
+    name: VolumeBinding
   - args:
       foo: bar
     name: OutOfTreePlugin
