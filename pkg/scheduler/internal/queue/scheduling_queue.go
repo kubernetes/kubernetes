@@ -532,21 +532,19 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 	var podsToMove []*framework.QueuedPodInfo
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		up := pInfo.Pod
-		affinity := up.Spec.Affinity
-		if affinity != nil && affinity.PodAffinity != nil {
-			terms := util.GetPodAffinityTerms(affinity.PodAffinity)
-			for _, term := range terms {
-				namespaces := util.GetNamespacesFromPodAffinityTerm(up, &term)
-				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-				if err != nil {
-					klog.Errorf("Error getting label selectors for pod: %v.", up.Name)
-				}
-				if util.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-					podsToMove = append(podsToMove, pInfo)
-					break
-				}
+		terms := util.GetPodAffinityTerms(up.Spec.Affinity)
+		for _, term := range terms {
+			namespaces := util.GetNamespacesFromPodAffinityTerm(up, &term)
+			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+			if err != nil {
+				klog.Errorf("Error getting label selectors for pod: %v.", up.Name)
+			}
+			if util.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+				podsToMove = append(podsToMove, pInfo)
+				break
 			}
 		}
+
 	}
 	return podsToMove
 }

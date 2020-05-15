@@ -83,28 +83,28 @@ func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 }
 
 // GetPodAffinityTerms gets pod affinity terms by a pod affinity object.
-func GetPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTerm) {
-	if podAffinity != nil {
-		if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = podAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+func GetPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAffinity != nil {
+		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(podAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, podAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 		//}
 	}
 	return terms
 }
 
 // GetPodAntiAffinityTerms gets pod affinity terms by a pod anti-affinity.
-func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.PodAffinityTerm) {
-	if podAntiAffinity != nil {
-		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+func GetPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAntiAffinity != nil {
+		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 		//}
 	}
 	return terms
