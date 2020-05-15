@@ -649,7 +649,11 @@ func (util *rbdUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 	var err error
 
 	// Convert to MB that rbd defaults on.
-	sz := int(volumehelpers.RoundUpToMiB(newSize))
+	sz, err := volumehelpers.RoundUpToMiBInt(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+
 	newVolSz := fmt.Sprintf("%d", sz)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dMi", sz))
 
