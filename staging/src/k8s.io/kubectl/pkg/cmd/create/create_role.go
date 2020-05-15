@@ -134,6 +134,7 @@ type CreateRoleOptions struct {
 	Client         clientgorbacv1.RbacV1Interface
 	Mapper         meta.RESTMapper
 	PrintObj       func(obj runtime.Object) error
+	FieldManager   string
 
 	genericclioptions.IOStreams
 }
@@ -172,7 +173,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	cmd.Flags().StringSliceVar(&o.Verbs, "verb", o.Verbs, "Verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
 	cmd.Flags().StringArrayVar(&o.ResourceNames, "resource-name", o.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
-
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
 
@@ -355,6 +356,9 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 	// Create role.
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(role.GroupVersionKind()); err != nil {
 				return err

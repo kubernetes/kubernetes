@@ -56,6 +56,7 @@ type TaintOptions struct {
 	selector       string
 	overwrite      bool
 	all            bool
+	fieldManager   string
 
 	ClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
 
@@ -122,6 +123,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing taints.")
 	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all nodes in the cluster")
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.fieldManager, "kubectl-taint")
 	return cmd
 }
 
@@ -339,6 +341,7 @@ func (o TaintOptions) RunTaint() error {
 		}
 		helper := resource.
 			NewHelper(client, mapping).
+			WithFieldManager(o.fieldManager).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer)
 
 		var outputObj runtime.Object

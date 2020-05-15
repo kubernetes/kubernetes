@@ -62,6 +62,7 @@ type LabelOptions struct {
 	selector        string
 	fieldSelector   string
 	outputFormat    string
+	fieldManager    string
 
 	// results of arg parsing
 	resources    []string
@@ -150,6 +151,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	usage := "identifying the resource to update the labels"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-label")
 
 	return cmd
 }
@@ -334,7 +336,8 @@ func (o *LabelOptions) RunLabel() error {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping).
-				DryRun(o.dryRunStrategy == cmdutil.DryRunServer)
+				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
+				WithFieldManager(o.fieldManager)
 
 			if createdPatch {
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)

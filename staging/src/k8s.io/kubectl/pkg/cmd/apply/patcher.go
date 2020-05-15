@@ -82,7 +82,7 @@ func newPatcher(o *ApplyOptions, info *resource.Info) (*Patcher, error) {
 
 	return &Patcher{
 		Mapping:       info.Mapping,
-		Helper:        resource.NewHelper(info.Client, info.Mapping),
+		Helper:        resource.NewHelper(info.Client, info.Mapping).WithFieldManager(o.FieldManager),
 		DynamicClient: o.DynamicClient,
 		Overwrite:     o.Overwrite,
 		BackOff:       clockwork.NewRealClock(),

@@ -123,6 +123,7 @@ type RunOptions struct {
 	Quiet          bool
 	Schedule       string
 	TTY            bool
+	fieldManager   string
 
 	genericclioptions.IOStreams
 }
@@ -198,6 +199,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().StringVar(&opt.Schedule, "schedule", opt.Schedule, i18n.T("A schedule in the Cron format the job should be run with."))
 	cmd.Flags().MarkDeprecated("schedule", "has no effect and will be removed in the future.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
 }
 
 func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -662,6 +664,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		actualObj, err = resource.
 			NewHelper(client, mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+			WithFieldManager(o.fieldManager).
 			Create(namespace, false, obj)
 		if err != nil {
 			return nil, err

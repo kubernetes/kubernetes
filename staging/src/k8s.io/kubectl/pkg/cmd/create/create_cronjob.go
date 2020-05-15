@@ -63,6 +63,7 @@ type CreateCronJobOptions struct {
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
 	Builder        *resource.Builder
+	FieldManager   string
 
 	genericclioptions.IOStreams
 }
@@ -98,6 +99,7 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
 	cmd.Flags().StringVar(&o.Schedule, "schedule", o.Schedule, "A schedule in the Cron format the job should be run with.")
 	cmd.Flags().StringVar(&o.Restart, "restart", o.Restart, "job's restart policy. supported values: OnFailure, Never")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	return cmd
 }
@@ -171,6 +173,9 @@ func (o *CreateCronJobOptions) Run() error {
 
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(cronjob.GroupVersionKind()); err != nil {
 				return err

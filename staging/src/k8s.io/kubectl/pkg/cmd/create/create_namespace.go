@@ -65,6 +65,7 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, generateversioned.NamespaceV1GeneratorName)
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
 
 	return cmd
 }

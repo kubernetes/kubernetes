@@ -430,10 +430,13 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 }
 
+func AddFieldManagerFlagVar(cmd *cobra.Command, p *string, defaultFieldManager string) {
+	cmd.Flags().StringVar(p, "field-manager", defaultFieldManager, "Name of the manager used to track field ownership.")
+}
+
 func AddServerSideApplyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
 	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
-	cmd.Flags().String("field-manager", "kubectl", "Name of the manager used to track field ownership.")
 }
 
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {

@@ -67,6 +67,7 @@ type CreateJobOptions struct {
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
 	Builder        *resource.Builder
+	FieldManager   string
 
 	genericclioptions.IOStreams
 }
@@ -101,7 +102,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
 	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
-
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
 
@@ -201,6 +202,9 @@ func (o *CreateJobOptions) Run() error {
 	}
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(job.GroupVersionKind()); err != nil {
 				return err
