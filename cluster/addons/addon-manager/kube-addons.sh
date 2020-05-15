@@ -28,28 +28,34 @@
 
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 KUBECTL_OPTS=${KUBECTL_OPTS:-}
-# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by
-# default.
+# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by default.
 # This is currently the same with the default in:
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go
-KUBECTL_PRUNE_WHITELIST=(
-  core/v1/ConfigMap
-  core/v1/Endpoints
-  core/v1/Namespace
-  core/v1/PersistentVolumeClaim
-  core/v1/PersistentVolume
-  core/v1/Pod
-  core/v1/ReplicationController
-  core/v1/Secret
-  core/v1/Service
-  batch/v1/Job
-  batch/v1beta1/CronJob
-  apps/v1/DaemonSet
-  apps/v1/Deployment
-  apps/v1/ReplicaSet
-  apps/v1/StatefulSet
-  extensions/v1beta1/Ingress
-)
+# https://github.com/kubernetes/kubectl/blob/master/pkg/cmd/apply/prune.go.
+# To override the default list with other values, set
+# KUBECTL_PRUNE_WHITELIST_OVERRIDE environment variable to space-separated
+# names of resources to whitelist.
+if [ -z "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}" ]; then
+  KUBECTL_PRUNE_WHITELIST=(
+    core/v1/ConfigMap
+    core/v1/Endpoints
+    core/v1/Namespace
+    core/v1/PersistentVolumeClaim
+    core/v1/PersistentVolume
+    core/v1/Pod
+    core/v1/ReplicationController
+    core/v1/Secret
+    core/v1/Service
+    batch/v1/Job
+    batch/v1beta1/CronJob
+    apps/v1/DaemonSet
+    apps/v1/Deployment
+    apps/v1/ReplicaSet
+    apps/v1/StatefulSet
+    extensions/v1beta1/Ingress
+  )
+else
+  read -ra KUBECTL_PRUNE_WHITELIST <<< "${KUBECTL_PRUNE_WHITELIST_OVERRIDE}"
+fi
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}
 ADDON_PATH=${ADDON_PATH:-/etc/kubernetes/addons}
