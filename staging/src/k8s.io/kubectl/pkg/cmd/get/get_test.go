@@ -1938,6 +1938,7 @@ func TestWatchTableLabelSelector(t *testing.T) {
 				if req.URL.Query().Get("watch") == "true" {
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[2:])}, nil
 				}
+				// FIXME: podTableObjBody doesn't propagate ListMeta
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, podList.Items...)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
@@ -1952,7 +1953,7 @@ func TestWatchTableLabelSelector(t *testing.T) {
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("selector", "a=b")
-	cmd.SetArgs([]string("pods"})
+	cmd.SetArgs([]string{"pods"})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -2007,7 +2008,7 @@ func TestWatchFieldSelector(t *testing.T) {
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("field-selector", "a=b")
-	cmd.SetArgs([]string("pods"})
+	cmd.SetArgs([]string{"pods"})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -2062,7 +2063,7 @@ func TestWatchTableFieldSelector(t *testing.T) {
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("field-selector", "a=b")
-	cmd.SetArgs([]string("pods"})
+	cmd.SetArgs([]string{"pods"})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -2110,7 +2111,7 @@ func TestWatchResource(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.SetArgs([]string("pods", "foo"})
+	cmd.SetArgs([]string{"pods", "foo"})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -2158,7 +2159,7 @@ func TestWatchStatus(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.SetArgs([]string("pods", "foo"})
+	cmd.SetArgs([]string{"pods", "foo"})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -2208,7 +2209,7 @@ func TestWatchTableResource(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.SetArgs([]string("pods", "foo"})
+	cmd.SetArgs([]string{"pods", "foo"})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -2318,7 +2319,7 @@ func TestWatchResourceTable(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.SetArgs([]string("pods"})
+	cmd.SetArgs([]string{"pods"})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -2582,7 +2583,11 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("filename", "../../../testdata/controller.yaml")
-	cmd.Run(cmd, []string{})
+	cmd.SetArgs([]string{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	cmd.ExecuteContext(ctx)
 
 	expected := `NAME   AGE
 foo    <unknown>
@@ -2625,7 +2630,11 @@ func TestWatchOnlyResource(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
-	cmd.Run(cmd, []string{"pods", "foo"})
+	cmd.SetArgs([]string{"pods", "foo"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	cmd.ExecuteContext(ctx)
 
 	expected := `NAME   AGE
 foo    <unknown>
@@ -2667,7 +2676,11 @@ func TestWatchOnlyTableResource(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
-	cmd.Run(cmd, []string{"pods", "foo"})
+	cmd.SetArgs([]string{"pods", "foo"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	cmd.ExecuteContext(ctx)
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
@@ -2712,7 +2725,11 @@ func TestWatchOnlyList(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
-	cmd.Run(cmd, []string{"pods"})
+	cmd.SetArgs([]string{"pods"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	cmd.ExecuteContext(ctx)
 
 	expected := `NAME   AGE
 foo    <unknown>
@@ -2757,7 +2774,11 @@ func TestWatchOnlyTableList(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
-	cmd.Run(cmd, []string{"pods"})
+	cmd.SetArgs([]string{"pods"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	cmd.ExecuteContext(ctx)
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
 foo    0/0              0          <unknown>
