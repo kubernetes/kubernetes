@@ -180,6 +180,27 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "with changes on Finalizers",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-0",
+					Finalizers: []string{"a", "b"},
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "pod-0",
+						Finalizers: []string{"c", "d"},
+					},
+				}
+			},
+			expected: true,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			c := &Scheduler{
