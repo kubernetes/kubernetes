@@ -341,7 +341,7 @@ func TestStructInput(t *testing.T) {
 	failStoreTests := []jsonpathTest{
 		{"invalid identifier", "{hello}", storeData, "unrecognized identifier hello", false},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found", false},
-		{"invalid object", "{.Labels[0]}", storeData, "invalid jsonpath for objects. Index should be an asterisk when applied over an object", false},
+		{"invalid object", "{.Labels[0]}", storeData, "key not found: used index for a map", false},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>", false},
 		{"redundant end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end", false},
 	}
