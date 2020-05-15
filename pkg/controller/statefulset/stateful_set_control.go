@@ -224,17 +224,19 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	equalRevisions := history.FindEqualRevisions(revisions, updateRevision)
 	equalCount := len(equalRevisions)
 
-	if equalCount > 0 && history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
+	if equalCount > 0 {
 		// if the equivalent revision is immediately prior the update revision has not changed
-		updateRevision = revisions[revisionCount-1]
-	} else if equalCount > 0 {
-		// if the equivalent revision is not immediately prior we will roll back by incrementing the
-		// Revision of the equivalent revision
-		updateRevision, err = ssc.controllerHistory.UpdateControllerRevision(
-			equalRevisions[equalCount-1],
-			updateRevision.Revision)
-		if err != nil {
-			return nil, nil, collisionCount, err
+		if history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
+			updateRevision = revisions[revisionCount-1]
+		} else {
+			// if the equivalent revision is not immediately prior we will roll back by incrementing the
+			// Revision of the equivalent revision
+			updateRevision, err = ssc.controllerHistory.UpdateControllerRevision(
+				equalRevisions[equalCount-1],
+				updateRevision.Revision)
+			if err != nil {
+				return nil, nil, collisionCount, err
+			}
 		}
 	} else {
 		//if there is no equivalent revision we create a new one
