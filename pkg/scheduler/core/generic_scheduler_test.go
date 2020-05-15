@@ -813,7 +813,7 @@ func TestGenericScheduler(t *testing.T) {
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				snapshot,
-				[]SchedulerExtender{},
+				[]framework.Extender{},
 				pvcLister,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
@@ -1134,7 +1134,7 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				emptySnapshot,
-				[]SchedulerExtender{},
+				[]framework.Extender{},
 				nil,
 				nil,
 				false,
@@ -1161,10 +1161,10 @@ func TestZeroRequest(t *testing.T) {
 	}
 }
 
-func printNodeToVictims(nodeToVictims map[*v1.Node]*extenderv1.Victims) string {
+func printNodeNameToVictims(nodeNameToVictims map[string]*extenderv1.Victims) string {
 	var output string
-	for node, victims := range nodeToVictims {
-		output += node.Name + ": ["
+	for nodeName, victims := range nodeNameToVictims {
+		output += nodeName + ": ["
 		for _, pod := range victims.Pods {
 			output += pod.Name + ", "
 		}
@@ -1178,12 +1178,12 @@ type victims struct {
 	numPDBViolations int64
 }
 
-func checkPreemptionVictims(expected map[string]victims, nodeToPods map[*v1.Node]*extenderv1.Victims) error {
+func checkPreemptionVictims(expected map[string]victims, nodeToPods map[string]*extenderv1.Victims) error {
 	if len(expected) == len(nodeToPods) {
 		for k, victims := range nodeToPods {
-			if expVictims, ok := expected[k.Name]; ok {
+			if expVictims, ok := expected[k]; ok {
 				if len(victims.Pods) != len(expVictims.pods) {
-					return fmt.Errorf("unexpected number of pods. expected: %v, got: %v", expected, printNodeToVictims(nodeToPods))
+					return fmt.Errorf("unexpected number of pods. expected: %v, got: %v", expected, printNodeNameToVictims(nodeToPods))
 				}
 				prevPriority := int32(math.MaxInt32)
 				for _, p := range victims.Pods {
@@ -1200,11 +1200,11 @@ func checkPreemptionVictims(expected map[string]victims, nodeToPods map[*v1.Node
 					return fmt.Errorf("unexpected numPDBViolations. expected: %d, got: %d", expVictims.numPDBViolations, victims.NumPDBViolations)
 				}
 			} else {
-				return fmt.Errorf("unexpected machines. expected: %v, got: %v", expected, printNodeToVictims(nodeToPods))
+				return fmt.Errorf("unexpected machines. expected: %v, got: %v", expected, printNodeNameToVictims(nodeToPods))
 			}
 		}
 	} else {
-		return fmt.Errorf("unexpected number of machines. expected: %v, got: %v", expected, printNodeToVictims(nodeToPods))
+		return fmt.Errorf("unexpected number of machines. expected: %v, got: %v", expected, printNodeNameToVictims(nodeToPods))
 	}
 	return nil
 }
@@ -1613,7 +1613,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				nil,
 				internalqueue.NewSchedulingQueue(nil),
 				snapshot,
-				[]SchedulerExtender{},
+				[]framework.Extender{},
 				nil,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
@@ -1916,7 +1916,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			node := pickOneNodeForPreemption(candidateNodes)
 			found := false
 			for _, nodeName := range test.expected {
-				if node.Name == nodeName {
+				if node == nodeName {
 					found = true
 					break
 				}
@@ -2391,7 +2391,7 @@ func TestPreempt(t *testing.T) {
 				cachedNodeInfo.SetNode(node)
 				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
-			var extenders []SchedulerExtender
+			var extenders []framework.Extender
 			for _, extender := range test.extenders {
 				// Set nodeInfoMap as extenders cached node information.
 				extender.cachedNodeNameToInfo = cachedNodeInfoMap
@@ -2429,10 +2429,10 @@ func TestPreempt(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
-			if node != nil && node.Name != test.expectedNode {
-				t.Errorf("expected node: %v, got: %v", test.expectedNode, node.GetName())
+			if len(node) != 0 && node != test.expectedNode {
+				t.Errorf("expected node: %v, got: %v", test.expectedNode, node)
 			}
-			if node == nil && len(test.expectedNode) != 0 {
+			if len(node) == 0 && len(test.expectedNode) != 0 {
 				t.Errorf("expected node: %v, got: nothing", test.expectedNode)
 			}
 			if len(victims) != len(test.expectedPods) {
@@ -2452,14 +2452,14 @@ func TestPreempt(t *testing.T) {
 				// Mark the victims for deletion and record the preemptor's nominated node name.
 				now := metav1.Now()
 				victim.DeletionTimestamp = &now
-				test.pod.Status.NominatedNodeName = node.Name
+				test.pod.Status.NominatedNodeName = node
 			}
 			// Call preempt again and make sure it doesn't preempt any more pods.
 			node, victims, _, err = scheduler.Preempt(context.Background(), prof, state, test.pod, error(&FitError{Pod: test.pod, FilteredNodesStatuses: failedNodeToStatusMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
-			if node != nil && len(victims) > 0 {
+			if len(node) != 0 && len(victims) > 0 {
 				t.Errorf("didn't expect any more preemption. Node %v is selected for preemption.", node)
 			}
 			close(stop)

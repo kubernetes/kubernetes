@@ -159,36 +159,37 @@ func (f *FakeExtender) SupportsPreemption() bool {
 
 func (f *FakeExtender) ProcessPreemption(
 	pod *v1.Pod,
-	nodeToVictims map[*v1.Node]*extenderv1.Victims,
+	nodeNameToVictims map[string]*extenderv1.Victims,
 	nodeInfos framework.NodeInfoLister,
-) (map[*v1.Node]*extenderv1.Victims, error) {
-	nodeToVictimsCopy := map[*v1.Node]*extenderv1.Victims{}
-	// We don't want to change the original nodeToVictims
-	for k, v := range nodeToVictims {
+) (map[string]*extenderv1.Victims, error) {
+	nodeNameToVictimsCopy := map[string]*extenderv1.Victims{}
+	// We don't want to change the original nodeNameToVictims
+	for k, v := range nodeNameToVictims {
 		// In real world implementation, extender's user should have their own way to get node object
 		// by name if needed (e.g. query kube-apiserver etc).
 		//
 		// For test purpose, we just use node from parameters directly.
-		nodeToVictimsCopy[k] = v
+		nodeNameToVictimsCopy[k] = v
 	}
 
-	for node, victims := range nodeToVictimsCopy {
+	for nodeName, victims := range nodeNameToVictimsCopy {
 		// Try to do preemption on extender side.
-		extenderVictimPods, extendernPDBViolations, fits, err := f.selectVictimsOnNodeByExtender(pod, node)
+		nodeInfo, _ := nodeInfos.Get(nodeName)
+		extenderVictimPods, extenderPDBViolations, fits, err := f.selectVictimsOnNodeByExtender(pod, nodeInfo.Node())
 		if err != nil {
 			return nil, err
 		}
 		// If it's unfit after extender's preemption, this node is unresolvable by preemption overall,
 		// let's remove it from potential preemption nodes.
 		if !fits {
-			delete(nodeToVictimsCopy, node)
+			delete(nodeNameToVictimsCopy, nodeName)
 		} else {
 			// Append new victims to original victims
-			nodeToVictimsCopy[node].Pods = append(victims.Pods, extenderVictimPods...)
-			nodeToVictimsCopy[node].NumPDBViolations = victims.NumPDBViolations + int64(extendernPDBViolations)
+			nodeNameToVictimsCopy[nodeName].Pods = append(victims.Pods, extenderVictimPods...)
+			nodeNameToVictimsCopy[nodeName].NumPDBViolations = victims.NumPDBViolations + int64(extenderPDBViolations)
 		}
 	}
-	return nodeToVictimsCopy, nil
+	return nodeNameToVictimsCopy, nil
 }
 
 // selectVictimsOnNodeByExtender checks the given nodes->pods map with predicates on extender's side.
@@ -352,7 +353,7 @@ func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
 	return !f.unInterested
 }
 
-var _ SchedulerExtender = &FakeExtender{}
+var _ framework.Extender = &FakeExtender{}
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
@@ -574,7 +575,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			extenders := []SchedulerExtender{}
+			extenders := []framework.Extender{}
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}

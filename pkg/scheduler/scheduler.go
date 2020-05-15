@@ -393,14 +393,12 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 		return "", err
 	}
 
-	node, victims, nominatedPodsToClear, err := sched.Algorithm.Preempt(ctx, prof, state, preemptor, scheduleErr)
+	nodeName, victims, nominatedPodsToClear, err := sched.Algorithm.Preempt(ctx, prof, state, preemptor, scheduleErr)
 	if err != nil {
 		klog.Errorf("Error preempting victims to make room for %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
 		return "", err
 	}
-	var nodeName = ""
-	if node != nil {
-		nodeName = node.Name
+	if len(nodeName) != 0 {
 		// Update the scheduling queue with the nominated pod information. Without
 		// this, there would be a race condition between the next scheduling cycle
 		// and the time the scheduler receives a Pod Update for the nominated pod.
