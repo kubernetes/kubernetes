@@ -714,7 +714,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), rt)
+	ctx, cancel := context.WithTimeout(cmd.Context(), rt)
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {

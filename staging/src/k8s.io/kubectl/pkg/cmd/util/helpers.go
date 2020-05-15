@@ -389,7 +389,7 @@ func GetRequestTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 	if err != nil {
 		// If we couldn't access the flag, treat it as the flag isn't set.
 		// This should only happen in unit tests.
-		return time.Duration(0), nil
+		return time.Duration(168*time.Hour), nil
 	}
 	return clientcmd.ParseTimeout(timeout)
 }
