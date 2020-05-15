@@ -1,4 +1,50 @@
 dependencies:
+  - name: "cni"
+    version: 0.7.5
+    refPaths:
+    - path: build/debian-hyperkube-base/Makefile
+      match: CNI_VERSION=
+    - path: build/rpms/kubeadm.spec
+      match: kubernetes-cni
+    - path: build/rpms/kubelet.spec
+      match: kubernetes-cni
+    - path: build/workspace.bzl
+      match: CNI_VERSION =
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CNI_VERSION=
+    - path: test/e2e_node/remote/utils.go
+      match: cniVersion[\t\n\f\r ]*=
+
+  - name: "coredns-kube-up"
+    version: 1.6.5
+    refPaths:
+    - path: cluster/addons/dns/coredns/coredns.yaml.base
+      match: k8s.gcr.io/coredns
+    - path: cluster/addons/dns/coredns/coredns.yaml.in
+      match: k8s.gcr.io/coredns
+    - path: cluster/addons/dns/coredns/coredns.yaml.sed
+      match: k8s.gcr.io/coredns
+
+  - name: "coredns-kubeadm"
+    version: 1.6.5
+    refPaths:
+    - path: cmd/kubeadm/app/constants/constants.go
+      match: CoreDNSVersion =
+
+  - name: "crictl"
+    version: 1.16.1
+    refPaths:
+    - path: build/workspace.bzl
+      match: CRI_TOOLS_VERSION =
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CRICTL_VERSION=
+
+  - name: "docker"
+    version: 19.03
+    refPaths:
+    - path: vendor/k8s.io/system-validators/validators/docker_validator.go
+      match: latestValidatedDockerVersion
+
   - name: "etcd"
     version: 3.4.3
     refPaths:
@@ -24,13 +70,6 @@ dependencies:
     - path: test/e2e/framework/nodes_util.go
       match: const etcdImage
 
-  - name: "docker"
-    version: 19.03
-    refPaths:
-    - path: vendor/k8s.io/system-validators/validators/docker_validator.go
-      match: latestValidatedDockerVersion
-
-
   - name: "golang"
     version: 1.13.9
     refPaths:
@@ -38,44 +77,7 @@ dependencies:
     - path: test/images/Makefile
       match: GOLANG_VERSION
 
-
-  - name: "cni"
-    version: 0.7.5
+  - name: "k8s.gcr.io/kube-cross: dependents"
+    version: v1.13.9-5
     refPaths:
-    - path: build/debian-hyperkube-base/Makefile
-      match: CNI_VERSION=
-    - path: build/rpms/kubeadm.spec
-      match: kubernetes-cni
-    - path: build/rpms/kubelet.spec
-      match: kubernetes-cni
-    - path: build/workspace.bzl
-      match: CNI_VERSION =
-    - path: cluster/gce/gci/configure.sh
-      match: DEFAULT_CNI_VERSION=
-    - path: test/e2e_node/remote/utils.go
-      match: cniVersion[\t\n\f\r ]*=
-
-
-  - name: "coredns-kube-up"
-    version: 1.6.5
-    refPaths:
-    - path: cluster/addons/dns/coredns/coredns.yaml.base
-      match: k8s.gcr.io/coredns
-    - path: cluster/addons/dns/coredns/coredns.yaml.in
-      match: k8s.gcr.io/coredns
-    - path: cluster/addons/dns/coredns/coredns.yaml.sed
-      match: k8s.gcr.io/coredns
-
-  - name: "coredns-kubeadm"
-    version: 1.6.5
-    refPaths:
-    - path: cmd/kubeadm/app/constants/constants.go
-      match: CoreDNSVersion =
-
-  - name: "crictl"
-    version: 1.16.1
-    refPaths:
-    - path: build/workspace.bzl
-      match: CRI_TOOLS_VERSION =
-    - path: cluster/gce/gci/configure.sh
-      match: DEFAULT_CRICTL_VERSION=
+    - path: build/build-image/cross/VERSION
