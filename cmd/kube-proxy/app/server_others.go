@@ -106,7 +106,7 @@ func newProxyServer(
 	execer := exec.New()
 
 	iptInterface = utiliptables.New(execer, protocol)
-	kernelHandler = ipvs.NewLinuxKernelHandler()
+	kernelHandler = ipvs.NewLinuxKernelIPVSHandler()
 	ipsetInterface = utilipset.New(execer)
 	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
 	if string(config.Mode) == proxyModeIPVS && err != nil {

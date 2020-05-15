@@ -17,6 +17,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/util/iptables",
     deps = [
+        "//pkg/util/kernel:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",

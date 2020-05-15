@@ -55,6 +55,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
+	"k8s.io/kubernetes/pkg/util/kernel"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 
@@ -562,26 +563,26 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 	return info
 }
 
-// KernelHandler can handle the current installed kernel modules.
+// KernelHandler can handle the current installed kernel modules for ipvs.
 type KernelHandler interface {
+	kernel.Handler
 	GetModules() ([]string, error)
-	GetKernelVersion() (string, error)
 }
 
-// LinuxKernelHandler implements KernelHandler interface.
-type LinuxKernelHandler struct {
-	executor utilexec.Interface
+// LinuxKernelIPVSHandler implements KernelHandler interface.
+type LinuxKernelIPVSHandler struct {
+	kernel.LinuxKernelHandler
 }
 
-// NewLinuxKernelHandler initializes LinuxKernelHandler with exec.
-func NewLinuxKernelHandler() *LinuxKernelHandler {
-	return &LinuxKernelHandler{
-		executor: utilexec.New(),
+// NewLinuxKernelIPVSHandler initializes LinuxKernelIPVSHandler with exec.
+func NewLinuxKernelIPVSHandler() *LinuxKernelIPVSHandler {
+	return &LinuxKernelIPVSHandler{
+		*kernel.NewLinuxKernelHandler(),
 	}
 }
 
 // GetModules returns all installed kernel modules.
-func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
+func (handle *LinuxKernelIPVSHandler) GetModules() ([]string, error) {
 	// Check whether IPVS required kernel modules are built-in
 	kernelVersionStr, err := handle.GetKernelVersion()
 	if err != nil {
@@ -631,7 +632,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 			bmods = append(bmods, module)
 		} else {
 			// Try to load the required IPVS kernel modules if not built in
-			err := handle.executor.Command("modprobe", "--", module).Run()
+			err := handle.Executor.Command("modprobe", "--", module).Run()
 			if err != nil {
 				klog.Warningf("Failed to load kernel module %v with modprobe. "+
 					"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", module)
@@ -663,17 +664,6 @@ func getFirstColumn(r io.Reader) ([]string, error) {
 		}
 	}
 	return words, nil
-}
-
-// GetKernelVersion returns currently running kernel version.
-func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
-	kernelVersionFile := "/proc/sys/kernel/osrelease"
-	fileContent, err := ioutil.ReadFile(kernelVersionFile)
-	if err != nil {
-		return "", fmt.Errorf("error reading osrelease file %q: %v", kernelVersionFile, err)
-	}
-
-	return strings.TrimSpace(string(fileContent)), nil
 }
 
 // CanUseIPVSProxier returns true if we can use the ipvs Proxier.

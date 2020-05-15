@@ -69,6 +69,7 @@ go_library(
         "//pkg/util/ipset:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/ipvs:go_default_library",
+        "//pkg/util/kernel:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",

@@ -29,6 +29,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/util/kernel"
 	utilexec "k8s.io/utils/exec"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -162,6 +163,10 @@ var MinCheckVersion = utilversion.MustParseGeneric("1.4.11")
 // used for port mapping to be fully randomized
 var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
 
+// RandomFullyMinKernelVersion is the minimum kernel version from which the --random-fully flag is supported,
+// More details please refer to https://github.com/kubernetes/kubernetes/pull/91137
+var RandomFullyMinKernelVersion = utilversion.MustParseGeneric("3.13")
+
 // WaitMinVersion a minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
 
@@ -218,7 +223,7 @@ func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath string
 		exec:            exec,
 		protocol:        protocol,
 		hasCheck:        version.AtLeast(MinCheckVersion),
-		hasRandomFully:  version.AtLeast(RandomFullyMinVersion),
+		hasRandomFully:  version.AtLeast(RandomFullyMinVersion) && kernelSupportsRandomFully(),
 		waitFlag:        getIPTablesWaitFlag(version),
 		restoreWaitFlag: getIPTablesRestoreWaitFlag(version, exec, protocol),
 		lockfilePath:    lockfilePath,
@@ -662,6 +667,23 @@ func getIPTablesWaitFlag(version *utilversion.Version) []string {
 	default:
 		return nil
 	}
+}
+
+// kernelSupportsRandomFully checks if iptables "--random-fully" support by kernel
+func kernelSupportsRandomFully() bool {
+	kernelVersionStr, err := kernel.NewLinuxKernelHandler().GetKernelVersion()
+	if err != nil {
+		klog.Warningf("Error checking kernel version, assuming iptables --random-fully not support by current kernel")
+		return false
+	}
+
+	kernelVersion, err := utilversion.ParseGeneric(kernelVersionStr)
+	if err != nil {
+		klog.Warningf("Error parse kernel version, assuming iptables --random-fully not support by current kernel")
+		return false
+	}
+
+	return kernelVersion.AtLeast(RandomFullyMinKernelVersion)
 }
 
 // Checks if iptables-restore has a "wait" flag

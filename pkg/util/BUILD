@@ -28,6 +28,7 @@ filegroup(
         "//pkg/util/ipset:all-srcs",
         "//pkg/util/iptables:all-srcs",
         "//pkg/util/ipvs:all-srcs",
+        "//pkg/util/kernel:all-srcs",
         "//pkg/util/labels:all-srcs",
         "//pkg/util/maps:all-srcs",
         "//pkg/util/netsh:all-srcs",
