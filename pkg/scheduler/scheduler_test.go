@@ -92,9 +92,8 @@ func (fp fakePodPreemptor) removeNominatedNodeName(pod *v1.Pod) error {
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:     id,
-			UID:      types.UID(id),
-			SelfLink: fmt.Sprintf("/api/v1/%s/%s", string(v1.ResourcePods), id),
+			Name: id,
+			UID:  types.UID(id),
 		},
 		Spec: v1.PodSpec{
 			NodeName:      desiredHost,
@@ -110,7 +109,6 @@ func deletingPod(id string) *v1.Pod {
 			Name:              id,
 			UID:               types.UID(id),
 			DeletionTimestamp: &deletionTimestamp,
-			SelfLink:          fmt.Sprintf("/api/v1/%s/%s", string(v1.ResourcePods), id),
 		},
 		Spec: v1.PodSpec{
 			NodeName:      "",
