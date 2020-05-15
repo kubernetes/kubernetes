@@ -103,6 +103,22 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 		return err
 	}
 
+	members, err := etcdClient.ListMembers()
+	if err != nil {
+		return err
+	}
+	// If this is the only remaining stacked etcd member in the cluster, calling RemoveMember()
+	// is not needed.
+	if len(members) == 1 {
+		etcdClientAddress := etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)
+		for _, endpoint := range etcdClient.Endpoints {
+			if endpoint == etcdClientAddress {
+				klog.V(1).Info("[etcd] This is the only remaining etcd member in the etcd cluster, skip removing it")
+				return nil
+			}
+		}
+	}
+
 	// notifies the other members of the etcd cluster about the removing member
 	etcdPeerAddress := etcdutil.GetPeerURL(&cfg.LocalAPIEndpoint)
 
@@ -113,7 +129,7 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 	}
 
 	klog.V(1).Infof("[etcd] removing etcd member: %s, id: %d", etcdPeerAddress, id)
-	members, err := etcdClient.RemoveMember(id)
+	members, err = etcdClient.RemoveMember(id)
 	if err != nil {
 		return err
 	}
