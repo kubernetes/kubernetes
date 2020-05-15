@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -1314,5 +1315,229 @@ func TestInjectingPluginConfigForVolumeBinding(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error constructing: %v", err)
 		}
+	}
+}
+
+func TestSetNominatedNodeName(t *testing.T) {
+	tests := []struct {
+		name                     string
+		currentNominatedNodeName string
+		newNominatedNodeName     string
+		expectedPatchRequests    int
+		expectedPatchData        string
+	}{
+		{
+			name:                     "Should make patch request to set node name",
+			currentNominatedNodeName: "",
+			newNominatedNodeName:     "node1",
+			expectedPatchRequests:    1,
+			expectedPatchData:        `{"status":{"nominatedNodeName":"node1"}}`,
+		},
+		{
+			name:                     "Should make patch request to clear node name",
+			currentNominatedNodeName: "node1",
+			newNominatedNodeName:     "",
+			expectedPatchRequests:    1,
+			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
+		},
+		{
+			name:                     "Should not make patch request if nominated node is already set to the specified value",
+			currentNominatedNodeName: "node1",
+			newNominatedNodeName:     "node1",
+			expectedPatchRequests:    0,
+		},
+		{
+			name:                     "Should not make patch request if nominated node is already cleared",
+			currentNominatedNodeName: "",
+			newNominatedNodeName:     "",
+			expectedPatchRequests:    0,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualPatchRequests := 0
+			var actualPatchData string
+			cs := &clientsetfake.Clientset{}
+			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				actualPatchRequests++
+				patch := action.(clienttesting.PatchAction)
+				actualPatchData = string(patch.GetPatch())
+				// For this test, we don't care about the result of the patched pod, just that we got the expected
+				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
+				return true, &v1.Pod{}, nil
+			})
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
+			}
+
+			preemptor := &podPreemptorImpl{Client: cs}
+			if err := preemptor.setNominatedNodeName(pod, test.newNominatedNodeName); err != nil {
+				t.Fatalf("Error calling setNominatedNodeName: %v", err)
+			}
+
+			if actualPatchRequests != test.expectedPatchRequests {
+				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
+			}
+
+			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
+				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
+			}
+		})
+	}
+}
+
+func TestUpdatePodCondition(t *testing.T) {
+	tests := []struct {
+		name                     string
+		currentPodConditions     []v1.PodCondition
+		newPodCondition          *v1.PodCondition
+		expectedPatchRequests    int
+		expectedPatchDataPattern string
+	}{
+		{
+			name:                 "Should make patch request to add pod condition when there are none currently",
+			currentPodConditions: []v1.PodCondition{},
+			newPodCondition: &v1.PodCondition{
+				Type:               "newType",
+				Status:             "newStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 1, 1, 1, 1, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			expectedPatchRequests:    1,
+			expectedPatchDataPattern: `{"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+		},
+		{
+			name: "Should make patch request to add a new pod condition when there is already one with another type",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "someOtherType",
+					Status:             "someOtherTypeStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 11, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 10, 0, 0, 0, 0, time.UTC)),
+					Reason:             "someOtherTypeReason",
+					Message:            "someOtherTypeMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "newType",
+				Status:             "newStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 1, 1, 1, 1, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			expectedPatchRequests:    1,
+			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"someOtherType"},{"type":"newType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+		},
+		{
+			name: "Should make patch request to update an existing pod condition",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "newStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 1, 1, 1, 1, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			expectedPatchRequests:    1,
+			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+		},
+		{
+			name: "Should make patch request to update an existing pod condition, but the transition time should remain unchanged because the status is the same",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "currentStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			expectedPatchRequests:    1,
+			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
+		},
+		{
+			name: "Should not make patch request if pod condition already exists and is identical",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "currentStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+				Reason:             "currentReason",
+				Message:            "currentMessage",
+			},
+			expectedPatchRequests: 0,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualPatchRequests := 0
+			var actualPatchData string
+			cs := &clientsetfake.Clientset{}
+			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				actualPatchRequests++
+				patch := action.(clienttesting.PatchAction)
+				actualPatchData = string(patch.GetPatch())
+				// For this test, we don't care about the result of the patched pod, just that we got the expected
+				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
+				return true, &v1.Pod{}, nil
+			})
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status:     v1.PodStatus{Conditions: test.currentPodConditions},
+			}
+
+			updater := &podConditionUpdaterImpl{Client: cs}
+			if err := updater.update(pod, test.newPodCondition); err != nil {
+				t.Fatalf("Error calling update: %v", err)
+			}
+
+			if actualPatchRequests != test.expectedPatchRequests {
+				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
+			}
+
+			regex, err := regexp.Compile(test.expectedPatchDataPattern)
+			if err != nil {
+				t.Fatalf("Error compiling regexp for %v: %v", test.expectedPatchDataPattern, err)
+			}
+
+			if test.expectedPatchRequests > 0 && !regex.MatchString(actualPatchData) {
+				t.Fatalf("Patch data mismatch: Actual was %v, but expected to match regexp %v", actualPatchData, test.expectedPatchDataPattern)
+			}
+		})
 	}
 }

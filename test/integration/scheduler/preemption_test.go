@@ -45,7 +45,7 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	utils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils"
 )
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
@@ -629,8 +629,6 @@ func mkPriorityPodWithGrace(tc *testutils.TestContext, name string, priority int
 		Labels:    map[string]string{"pod": name},
 		Resources: defaultPodRes,
 	})
-	// Setting grace period to zero. Otherwise, we may never see the actual deletion
-	// of the pods in integration tests.
 	pod.Spec.TerminationGracePeriodSeconds = &grace
 	return pod
 }
@@ -924,7 +922,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	}
 	// Step 5. Check that nominated node name of the high priority pod is set.
 	if err := waitForNominatedNodeName(cs, highPriPod); err != nil {
-		t.Errorf("NominatedNodeName annotation was not set for pod %v/%v: %v", medPriPod.Namespace, medPriPod.Name, err)
+		t.Errorf("NominatedNodeName annotation was not set for pod %v/%v: %v", highPriPod.Namespace, highPriPod.Name, err)
 	}
 	// And the nominated node name of the medium priority pod is cleared.
 	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
