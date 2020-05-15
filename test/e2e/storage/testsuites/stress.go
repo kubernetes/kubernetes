@@ -144,8 +144,6 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 	}
 
 	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func() {
-		var err error
-
 		l := init()
 		defer func() {
 			cleanup(l)
@@ -181,7 +179,7 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 					default:
 						pod := l.pods[podIndex]
 						framework.Logf("Pod %v, Iteration %v/%v", podIndex, j, l.testOptions.NumRestarts-1)
-						_, err = cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+						_, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 						framework.ExpectNoError(err)
 
 						err = e2epod.WaitForPodRunningInNamespace(cs, pod)

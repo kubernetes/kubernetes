@@ -8,6 +8,7 @@ Building Kubernetes is easy if you take advantage of the containerized build env
   * **macOS** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
      **Note**: You will want to set the Docker VM to have at least 4.5GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
+  * **Windows with Docker Desktop WSL2 backend**  Install Docker according to the [instructions](https://docs.docker.com/docker-for-windows/wsl-tech-preview/). Be sure to store your sources in the local Linux file system, not the Windows remote mount at `/mnt/c`.
   * **Remote Docker engine** Use a big machine in the cloud to build faster. This is a little trickier so look at the section later on.
 2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
 
@@ -23,7 +24,7 @@ The following scripts are found in the [`build/`](.) directory. Note that all sc
 
 * [`build/run.sh`](run.sh): Run a command in a build docker container.  Common invocations:
   *  `build/run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
-  *  `build/run.sh make cross`: Build all binaries for all platforms
+  *  `build/run.sh make cross`: Build all binaries for all platforms. To build only a specific platform, add `KUBE_BUILD_PLATFORMS=<os>/<arch>`
   *  `build/run.sh make kubectl KUBE_BUILD_PLATFORMS=darwin/amd64`: Build the specific binary for the specific platform (`kubectl` and `darwin/amd64` respectively in this example)
   *  `build/run.sh make test`: Run all unit tests
   *  `build/run.sh make test-integration`: Run integration test

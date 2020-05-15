@@ -19,106 +19,73 @@ limitations under the License.
 package fileclient
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 
-	azs "github.com/Azure/azure-sdk-for-go/storage"
-	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 
 	"k8s.io/klog"
-	"k8s.io/legacy-cloud-providers/azure/retry"
+	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 )
 
-const (
-	useHTTPS = true
-)
-
-var (
-	// refer https://github.com/Azure/azure-sdk-for-go/blob/master/storage/client.go#L88.
-	defaultValidStatusCodes = []int{
-		http.StatusRequestTimeout,      // 408
-		http.StatusInternalServerError, // 500
-		http.StatusBadGateway,          // 502
-		http.StatusServiceUnavailable,  // 503
-		http.StatusGatewayTimeout,      // 504
-	}
-)
-
-// AzureFileClient implements the azure file client interface
-type AzureFileClient struct {
-	env     *azure.Environment
-	backoff *retry.Backoff
+// Client implements the azure file client interface
+type Client struct {
+	fileSharesClient storage.FileSharesClient
 }
 
-// NewAzureFileClient creates a azure file client
-func NewAzureFileClient(env *azure.Environment, backoff *retry.Backoff) *AzureFileClient {
-	return &AzureFileClient{
-		env:     env,
-		backoff: backoff,
+// New creates a azure file client
+func New(config *azclients.ClientConfig) *Client {
+	client := storage.NewFileSharesClientWithBaseURI(config.ResourceManagerEndpoint, config.SubscriptionID)
+	client.Authorizer = config.Authorizer
+
+	return &Client{
+		fileSharesClient: client,
 	}
 }
 
 // CreateFileShare creates a file share
-func (f *AzureFileClient) CreateFileShare(accountName, accountKey, name string, sizeGiB int) error {
-	fileClient, err := f.getFileSvcClient(accountName, accountKey)
-	if err != nil {
-		return err
+func (c *Client) CreateFileShare(resourceGroupName, accountName, name string, sizeGiB int) error {
+	quota := int32(sizeGiB)
+	fileShare := storage.FileShare{
+		Name: &name,
+		FileShareProperties: &storage.FileShareProperties{
+			ShareQuota: &quota,
+		},
 	}
-	share := fileClient.GetShareReference(name)
-	share.Properties.Quota = sizeGiB
-	newlyCreated, err := share.CreateIfNotExists(nil)
-	if err != nil {
-		return fmt.Errorf("failed to create file share, err: %v", err)
-	}
-	if !newlyCreated {
-		klog.V(2).Infof("file share(%s) under account(%s) already exists", name, accountName)
-	}
-	return nil
+	_, err := c.fileSharesClient.Create(context.Background(), resourceGroupName, accountName, name, fileShare)
+
+	return err
 }
 
 // DeleteFileShare deletes a file share
-func (f *AzureFileClient) DeleteFileShare(accountName, accountKey, name string) error {
-	fileClient, err := f.getFileSvcClient(accountName, accountKey)
-	if err != nil {
-		return err
-	}
-	return fileClient.GetShareReference(name).Delete(nil)
+func (c *Client) DeleteFileShare(resourceGroupName, accountName, name string) error {
+	_, err := c.fileSharesClient.Delete(context.Background(), resourceGroupName, accountName, name)
+
+	return err
 }
 
 // ResizeFileShare resizes a file share
-func (f *AzureFileClient) ResizeFileShare(accountName, accountKey, name string, sizeGiB int) error {
-	fileClient, err := f.getFileSvcClient(accountName, accountKey)
+func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, sizeGiB int) error {
+	quota := int32(sizeGiB)
+
+	share, err := c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get file share(%s), : %v", name, err)
 	}
-	share := fileClient.GetShareReference(name)
-	if share.Properties.Quota >= sizeGiB {
+	if *share.FileShareProperties.ShareQuota >= quota {
 		klog.Warningf("file share size(%dGi) is already greater or equal than requested size(%dGi), accountName: %s, shareName: %s",
-			share.Properties.Quota, sizeGiB, accountName, name)
+			share.FileShareProperties.ShareQuota, sizeGiB, accountName, name)
 		return nil
-	}
-	share.Properties.Quota = sizeGiB
-	if err = share.SetProperties(nil); err != nil {
-		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
-	}
-	klog.V(4).Infof("resize file share completed, accountName: %s, shareName: %s, sizeGiB: %d", accountName, name, sizeGiB)
-	return nil
-}
 
-func (f *AzureFileClient) getFileSvcClient(accountName, accountKey string) (*azs.FileServiceClient, error) {
-	fileClient, err := azs.NewClient(accountName, accountKey, f.env.StorageEndpointSuffix, azs.DefaultAPIVersion, useHTTPS)
+	}
+
+	share.FileShareProperties.ShareQuota = &quota
+	_, err = c.fileSharesClient.Update(context.Background(), resourceGroupName, accountName, name, share)
 	if err != nil {
-		return nil, fmt.Errorf("error creating azure client: %v", err)
+		return fmt.Errorf("failed to update quota on file share(%s), err: %v", name, err)
 	}
 
-	if f.backoff != nil {
-		fileClient.Sender = &azs.DefaultSender{
-			RetryAttempts:    f.backoff.Steps,
-			ValidStatusCodes: defaultValidStatusCodes,
-			RetryDuration:    f.backoff.Duration,
-		}
-	}
+	klog.V(4).Infof("resize file share completed, resourceGroupName(%s), accountName: %s, shareName: %s, sizeGiB: %d", resourceGroupName, accountName, name, sizeGiB)
 
-	fc := fileClient.GetFileService()
-	return &fc, nil
+	return nil
 }

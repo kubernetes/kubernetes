@@ -24,7 +24,7 @@ require (
 	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+	google.golang.org/api v0.15.1
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/warnings.v0 v0.1.1 // indirect
 	k8s.io/api v0.0.0

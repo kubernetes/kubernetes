@@ -452,7 +452,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
-	expectNoError(err)
+	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	return execPod
 }
 

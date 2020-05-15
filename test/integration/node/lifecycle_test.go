@@ -161,13 +161,14 @@ func TestTaintBasedEvictions(t *testing.T) {
 				return
 			}
 
-			go nc.Run(testCtx.Ctx.Done())
-
-			// Waiting for all controller sync.
+			// Waiting for all controllers to sync
 			externalInformers.Start(testCtx.Ctx.Done())
 			externalInformers.WaitForCacheSync(testCtx.Ctx.Done())
-			testCtx.InformerFactory.Start(testCtx.Ctx.Done())
-			testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+			testutils.SyncInformerFactory(testCtx)
+
+			// Run all controllers
+			go nc.Run(testCtx.Ctx.Done())
+			go testCtx.Scheduler.Run(testCtx.Ctx)
 
 			nodeRes := v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4000m"),

@@ -143,7 +143,11 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
+				"ReservePlugin":   {{Name: "VolumeBinding"}},
+				"UnreservePlugin": {{Name: "VolumeBinding"}},
+				"PreBindPlugin":   {{Name: "VolumeBinding"}},
+				"BindPlugin":      {{Name: "DefaultBinder"}},
+				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 		},
 		{
@@ -233,7 +237,11 @@ kind: Policy
 					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
+				"ReservePlugin":   {{Name: "VolumeBinding"}},
+				"UnreservePlugin": {{Name: "VolumeBinding"}},
+				"PreBindPlugin":   {{Name: "VolumeBinding"}},
+				"BindPlugin":      {{Name: "DefaultBinder"}},
+				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
 		},
 		{
@@ -539,6 +547,8 @@ func TestMultipleSchedulers(t *testing.T) {
 	// 5. create and start a scheduler with name "foo-scheduler"
 	fooProf := kubeschedulerconfig.KubeSchedulerProfile{SchedulerName: fooScheduler}
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, true, nil, time.Second, scheduler.WithProfiles(fooProf))
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled

@@ -77,19 +77,28 @@ func registerNode(registerTo, port string) {
 	}
 
 	hostPort := net.JoinHostPort(registerTo, backendPort)
-	_, err := net.ResolveTCPAddr("tcp", hostPort)
-	if err != nil {
-		log.Fatalf("--slaveof param and/or --backend-port param are invalid. %v", err)
-		return
-	}
 
-	request := fmt.Sprintf("register?host=%s", getIP(hostPort).String())
-	log.Printf("Registering to master: %s/%s", hostPort, request)
 	start := time.Now()
 	for time.Since(start) < timeout {
+		host, err := getIP(hostPort)
+		if err != nil {
+			log.Printf("unable to get IP %s: %v. Retrying in %s.", hostPort, err, sleep)
+			time.Sleep(sleep)
+			continue
+		}
+
+		request := fmt.Sprintf("register?host=%s", host.String())
+		log.Printf("Registering to master: %s/%s", hostPort, request)
+		_, err = net.ResolveTCPAddr("tcp", hostPort)
+		if err != nil {
+			log.Printf("unable to resolve %s, --slaveof param and/or --backend-port param are invalid: %v. Retrying in %s.", hostPort, err, sleep)
+			time.Sleep(sleep)
+			continue
+		}
+
 		response, err := dialHTTP(request, hostPort)
 		if err != nil {
-			log.Printf("encountered error while registering to master: %v. Retrying in 1 second.", err)
+			log.Printf("encountered error while registering to master: %v. Retrying in %s.", err, sleep)
 			time.Sleep(sleep)
 			continue
 		}
@@ -285,13 +294,13 @@ func createHTTPClient(transport *http.Transport) *http.Client {
 	return client
 }
 
-func getIP(hostPort string) net.IP {
+func getIP(hostPort string) (net.IP, error) {
 	conn, err := net.Dial("udp", hostPort)
 	if err != nil {
-		log.Fatal(err)
+		return []byte{}, err
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP
+	return localAddr.IP, nil
 }

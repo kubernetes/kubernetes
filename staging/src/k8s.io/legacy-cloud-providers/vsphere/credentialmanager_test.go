@@ -20,6 +20,7 @@ package vsphere
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +38,7 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 		testPassword        = "password"
 		testServer          = "0.0.0.0"
 		testServer2         = "0.0.1.1"
+		testServerFQIN      = "ExAmple.com"
 		testUserServer2     = "user1"
 		testPasswordServer2 = "password1"
 		testIncorrectServer = "1.1.1.1"
@@ -86,6 +88,14 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 			testServer + "." + passwordKey:  []byte(testPassword),
 			testServer2 + "." + userKey:     []byte(testUserServer2),
 			testServer2 + "." + passwordKey: []byte(testPasswordServer2),
+		},
+	}
+
+	fqinSecret := &corev1.Secret{
+		ObjectMeta: metaObj,
+		Data: map[string][]byte{
+			testServerFQIN + "." + userKey:     []byte(testUser),
+			testServerFQIN + "." + passwordKey: []byte(testPassword),
 		},
 	}
 
@@ -183,6 +193,20 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 				},
 			},
 		},
+		{
+			testName: "GetCredential for FQIN server name",
+			ops:      []string{addSecretOp, getCredentialsOp},
+			expectedValues: []interface{}{
+				OpSecretTest{
+					fqinSecret,
+				},
+				GetCredentialsTest{
+					username: testUser,
+					password: testPassword,
+					server:   testServerFQIN,
+				},
+			},
+		},
 	}
 
 	// TODO: replace 0 with NoResyncPeriodFunc() once it moved out pkg/controller/controller_utils.go in k/k.
@@ -254,9 +278,10 @@ func TestSecretCredentialManager_GetCredential(t *testing.T) {
 
 func TestParseSecretConfig(t *testing.T) {
 	var (
-		testUsername = "Admin"
-		testPassword = "Password"
-		testIP       = "10.20.30.40"
+		testUsername   = "Admin"
+		testPassword   = "Password"
+		testIP         = "10.20.30.40"
+		testServerFQIN = "ExAmple.com"
 	)
 	var testcases = []struct {
 		testName      string
@@ -310,6 +335,20 @@ func TestParseSecretConfig(t *testing.T) {
 				},
 			},
 			expectedError: ErrCredentialMissing,
+		},
+		{
+			testName: "FQIN stored as lowercase",
+			data: map[string][]byte{
+				testServerFQIN + ".username": []byte(testUsername),
+				testServerFQIN + ".password": []byte(testPassword),
+			},
+			config: map[string]*Credential{
+				strings.ToLower(testServerFQIN): {
+					User:     testUsername,
+					Password: testPassword,
+				},
+			},
+			expectedError: nil,
 		},
 		{
 			testName: "IP with unknown key",

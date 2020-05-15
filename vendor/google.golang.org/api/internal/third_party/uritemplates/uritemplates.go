@@ -191,7 +191,7 @@ func parseTerm(term string) (result templateTerm, err error) {
 		err = errors.New("not a valid name: " + result.name)
 	}
 	if result.explode && result.truncate > 0 {
-		err = errors.New("both explode and prefix modifers on same term")
+		err = errors.New("both explode and prefix modifiers on same term")
 	}
 	return result, err
 }

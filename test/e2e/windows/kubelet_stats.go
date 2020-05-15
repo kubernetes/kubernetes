@@ -146,7 +146,17 @@ func newKubeletStatsTestPods(numPods int, image imageutils.Config, nodeName stri
 						},
 					},
 				},
-
+				InitContainers: []v1.Container{
+					{
+						Image: image.GetE2EImage(),
+						Name:  podName,
+						Command: []string{
+							"powershell.exe",
+							"-Command",
+							"sleep -Seconds 1",
+						},
+					},
+				},
 				NodeName: nodeName,
 			},
 		}

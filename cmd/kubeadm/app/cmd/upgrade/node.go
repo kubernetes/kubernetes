@@ -23,8 +23,10 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -36,12 +38,13 @@ import (
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options
 // supported by this api will be exposed as a flag.
 type nodeOptions struct {
-	kubeConfigPath string
-	kubeletVersion string
-	etcdUpgrade    bool
-	renewCerts     bool
-	dryRun         bool
-	kustomizeDir   string
+	kubeConfigPath        string
+	kubeletVersion        string
+	etcdUpgrade           bool
+	renewCerts            bool
+	dryRun                bool
+	kustomizeDir          string
+	ignorePreflightErrors []string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -50,14 +53,15 @@ var _ phases.Data = &nodeData{}
 // nodeData defines all the runtime information used when running the kubeadm upgrade node worklow;
 // this data is shared across all the phases that are included in the workflow.
 type nodeData struct {
-	etcdUpgrade        bool
-	renewCerts         bool
-	dryRun             bool
-	kubeletVersion     string
-	cfg                *kubeadmapi.InitConfiguration
-	isControlPlaneNode bool
-	client             clientset.Interface
-	kustomizeDir       string
+	etcdUpgrade           bool
+	renewCerts            bool
+	dryRun                bool
+	kubeletVersion        string
+	cfg                   *kubeadmapi.InitConfiguration
+	isControlPlaneNode    bool
+	client                clientset.Interface
+	kustomizeDir          string
+	ignorePreflightErrors sets.String
 }
 
 // NewCmdNode returns the cobra command for `kubeadm upgrade node`
@@ -80,6 +84,7 @@ func NewCmdNode() *cobra.Command {
 	options.AddKustomizePodsFlag(cmd.Flags(), &nodeOptions.kustomizeDir)
 
 	// initialize the workflow runner with the list of phases
+	nodeRunner.AppendPhase(phases.NewPreflightPhase())
 	nodeRunner.AppendPhase(phases.NewControlPlane())
 	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
 
@@ -113,6 +118,7 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 	flagSet.MarkDeprecated(options.KubeletVersion, "This flag is deprecated and will be removed in a future version.")
 	flagSet.BoolVar(&nodeOptions.renewCerts, options.CertificateRenewal, nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	flagSet.BoolVar(&nodeOptions.etcdUpgrade, options.EtcdUpgrade, nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
+	flagSet.StringSliceVar(&nodeOptions.ignorePreflightErrors, options.IgnorePreflightErrors, nodeOptions.ignorePreflightErrors, "A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
 }
 
 // newNodeData returns a new nodeData struct to be used for the execution of the kubeadm upgrade node workflow.
@@ -140,15 +146,23 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
 
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, err
+	}
+	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+
 	return &nodeData{
-		etcdUpgrade:        options.etcdUpgrade,
-		renewCerts:         options.renewCerts,
-		dryRun:             options.dryRun,
-		kubeletVersion:     options.kubeletVersion,
-		cfg:                cfg,
-		client:             client,
-		isControlPlaneNode: isControlPlaneNode,
-		kustomizeDir:       options.kustomizeDir,
+		etcdUpgrade:           options.etcdUpgrade,
+		renewCerts:            options.renewCerts,
+		dryRun:                options.dryRun,
+		kubeletVersion:        options.kubeletVersion,
+		cfg:                   cfg,
+		client:                client,
+		isControlPlaneNode:    isControlPlaneNode,
+		kustomizeDir:          options.kustomizeDir,
+		ignorePreflightErrors: ignorePreflightErrorsSet,
 	}, nil
 }
 
@@ -190,4 +204,9 @@ func (d *nodeData) Client() clientset.Interface {
 // KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
 func (d *nodeData) KustomizeDir() string {
 	return d.kustomizeDir
+}
+
+// IgnorePreflightErrors returns the list of preflight errors to ignore.
+func (d *nodeData) IgnorePreflightErrors() sets.String {
+	return d.ignorePreflightErrors
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -93,6 +94,9 @@ func matchOutputFile(t *testing.T, actual []byte, expectedFilePath string) {
 	}
 	if needsUpdate {
 		if os.Getenv(updateEnvVar) == "true" {
+			if err := os.MkdirAll(filepath.Dir(expectedFilePath), 0755); err != nil {
+				t.Fatal(err)
+			}
 			if err := ioutil.WriteFile(expectedFilePath, actual, 0644); err != nil {
 				t.Fatal(err)
 			}

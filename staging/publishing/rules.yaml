@@ -966,6 +966,10 @@ rules:
       branch: master
     - repository: api
       branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kubelet

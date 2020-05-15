@@ -19,7 +19,6 @@ package validation
 import (
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -198,8 +197,6 @@ var ValidateIngressName = apimachineryvalidation.NameIsDNSSubdomain
 
 // IngressValidationOptions cover beta to GA transitions for HTTP PathType
 type IngressValidationOptions struct {
-	requireRegexPath     bool
-	allowResourceBackend bool
 }
 
 // ValidateIngress validates Ingresses on create and update.
@@ -213,12 +210,7 @@ func validateIngress(ingress *networking.Ingress, opts IngressValidationOptions,
 func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
 	var opts IngressValidationOptions
-	opts = IngressValidationOptions{
-		// TODO(robscott): Remove regex validation for 1.19.
-		requireRegexPath: true,
-		// TODO(cmluciano): Allow resource backend for 1.19.
-		allowResourceBackend: false,
-	}
+	opts = IngressValidationOptions{}
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
 	if annotationIsSet && ingress.Spec.IngressClassName != nil {
@@ -232,13 +224,7 @@ func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVe
 func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
 	var opts IngressValidationOptions
-	opts = IngressValidationOptions{
-		// TODO(robscott): Remove regex validation for 1.19.
-		// Only require regex path validation for this Ingress if the previous
-		// version of the Ingress also passed that validation.
-		requireRegexPath:     allPathsPassRegexValidation(oldIngress),
-		allowResourceBackend: resourceBackendPresent(oldIngress),
-	}
+	opts = IngressValidationOptions{}
 
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
 	return allErrs
@@ -377,14 +363,6 @@ func validateHTTPIngressPath(path *networking.HTTPIngressPath, fldPath *field.Pa
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("pathType"), *path.PathType, supportedPathTypes.List()))
 	}
 
-	// TODO(robscott): Remove regex validation for 1.19.
-	if opts.requireRegexPath {
-		_, err := regexp.CompilePOSIX(path.Path)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), path.Path, "must be a valid regex"))
-		}
-	}
-
 	allErrs = append(allErrs, validateIngressBackend(&path.Backend, fldPath.Child("backend"), opts)...)
 	return allErrs
 }
@@ -399,8 +377,6 @@ func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.P
 	switch {
 	case hasResourceBackend && hasServiceBackend:
 		return append(allErrs, field.Invalid(fldPath, "", "cannot set both resource and service backends"))
-	case hasResourceBackend && !opts.allowResourceBackend:
-		return append(allErrs, field.Forbidden(fldPath.Child("resource"), "not supported; only service backends are supported in this version"))
 	case hasResourceBackend:
 		allErrs = append(allErrs, validateIngressTypedLocalObjectReference(backend.Resource, fldPath.Child("resource"))...)
 	default:
@@ -483,40 +459,4 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	}
 
 	return allErrs
-}
-
-// allPathsPassRegexValidation returns true if the Ingress has paths that all
-// match the Ingress path validation with requireRegexPath enabled.
-func allPathsPassRegexValidation(ingress *networking.Ingress) bool {
-	for _, rule := range ingress.Spec.Rules {
-		if rule.HTTP == nil {
-			continue
-		}
-		for _, path := range rule.HTTP.Paths {
-			if len(path.Path) == 0 {
-				continue
-			}
-			if _, err := regexp.CompilePOSIX(path.Path); err != nil {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func resourceBackendPresent(ingress *networking.Ingress) bool {
-	if ingress.Spec.Backend != nil && ingress.Spec.Backend.Resource != nil {
-		return true
-	}
-	for _, rule := range ingress.Spec.Rules {
-		if rule.HTTP == nil {
-			continue
-		}
-		for _, path := range rule.HTTP.Paths {
-			if path.Backend.Resource != nil {
-				return true
-			}
-		}
-	}
-	return false
 }

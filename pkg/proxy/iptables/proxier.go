@@ -504,8 +504,8 @@ func (proxier *Proxier) probability(n int) string {
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.QueuedUpdate()
-		metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	}
+	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	proxier.syncRunner.Run()
 }
 
@@ -515,6 +515,9 @@ func (proxier *Proxier) SyncLoop() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.Updated()
 	}
+
+	// synthesize "last change queued" time as the informers are syncing.
+	metrics.SyncProxyRulesLastQueuedTimestamp.SetToCurrentTime()
 	proxier.syncRunner.Loop(wait.NeverStop)
 }
 

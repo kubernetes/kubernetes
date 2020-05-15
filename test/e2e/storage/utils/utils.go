@@ -703,3 +703,22 @@ func findMountPoints(hostExec HostExec, node *v1.Node, dir string) []string {
 func FindVolumeGlobalMountPoints(hostExec HostExec, node *v1.Node) sets.String {
 	return sets.NewString(findMountPoints(hostExec, node, "/var/lib/kubelet/plugins")...)
 }
+
+// CreateDriverNamespace creates a namespace for CSI driver installation.
+// The namespace is still tracked and ensured that gets deleted when test terminates.
+func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
+	ginkgo.By(fmt.Sprintf("Building a driver namespace object, basename %s", f.BaseName))
+	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
+		"e2e-framework": f.BaseName,
+	})
+	framework.ExpectNoError(err)
+
+	if framework.TestContext.VerifyServiceAccount {
+		ginkgo.By("Waiting for a default service account to be provisioned in namespace")
+		err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+		framework.ExpectNoError(err)
+	} else {
+		framework.Logf("Skipping waiting for service account")
+	}
+	return namespace
+}

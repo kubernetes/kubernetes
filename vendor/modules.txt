@@ -366,6 +366,8 @@ github.com/google/go-cmp/cmp/internal/value
 github.com/google/gofuzz
 # github.com/google/uuid v1.1.1 => github.com/google/uuid v1.1.1
 github.com/google/uuid
+# github.com/googleapis/gax-go/v2 v2.0.5 => github.com/googleapis/gax-go/v2 v2.0.5
+github.com/googleapis/gax-go/v2
 # github.com/googleapis/gnostic v0.4.1 => github.com/googleapis/gnostic v0.4.1
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
@@ -941,16 +943,16 @@ gonum.org/v1/gonum/lapack
 gonum.org/v1/gonum/lapack/gonum
 gonum.org/v1/gonum/lapack/lapack64
 gonum.org/v1/gonum/mat
-# google.golang.org/api v0.6.1-0.20190607001116-5213b8090861 => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
+# google.golang.org/api v0.15.1 => google.golang.org/api v0.15.1
 google.golang.org/api/compute/v0.alpha
 google.golang.org/api/compute/v0.beta
 google.golang.org/api/compute/v1
 google.golang.org/api/container/v1
-google.golang.org/api/gensupport
 google.golang.org/api/googleapi
-google.golang.org/api/googleapi/internal/uritemplates
 google.golang.org/api/googleapi/transport
 google.golang.org/api/internal
+google.golang.org/api/internal/gensupport
+google.golang.org/api/internal/third_party/uritemplates
 google.golang.org/api/logging/v2beta1
 google.golang.org/api/monitoring/v3
 google.golang.org/api/option

@@ -24,6 +24,7 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -58,8 +59,11 @@ type NodeAuthorizer struct {
 	features featuregate.FeatureGate
 }
 
+var _ = authorizer.Authorizer(&NodeAuthorizer{})
+var _ = authorizer.RuleResolver(&NodeAuthorizer{})
+
 // NewAuthorizer returns a new node authorizer
-func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacv1.PolicyRule) authorizer.Authorizer {
+func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacv1.PolicyRule) *NodeAuthorizer {
 	return &NodeAuthorizer{
 		graph:      graph,
 		identifier: identifier,
@@ -78,6 +82,14 @@ var (
 	leaseResource     = coordapi.Resource("leases")
 	csiNodeResource   = storageapi.Resource("csinodes")
 )
+
+func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	if _, isNode := r.identifier.NodeIdentity(user); isNode {
+		// indicate nodes do not have fully enumerated permissions
+		return nil, nil, true, fmt.Errorf("node authorizer does not support user rule resolution")
+	}
+	return nil, nil, false, nil
+}
 
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
