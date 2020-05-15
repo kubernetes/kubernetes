@@ -45,7 +45,9 @@ func (o *CSRSigningControllerOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.ClusterSigningCertFile, "cluster-signing-cert-file", o.ClusterSigningCertFile, "Filename containing a PEM-encoded X509 CA certificate used to issue cluster-scoped certificates")
 	fs.StringVar(&o.ClusterSigningKeyFile, "cluster-signing-key-file", o.ClusterSigningKeyFile, "Filename containing a PEM-encoded RSA or ECDSA private key used to sign cluster-scoped certificates")
+	fs.DurationVar(&o.ClusterSigningDuration.Duration, "cluster-signing-duration", o.ClusterSigningDuration.Duration, "The length of duration signed certificates will be given.")
 	fs.DurationVar(&o.ClusterSigningDuration.Duration, "experimental-cluster-signing-duration", o.ClusterSigningDuration.Duration, "The length of duration signed certificates will be given.")
+	fs.MarkDeprecated("experimental-cluster-signing-duration", "use --cluster-signing-duration")
 }
 
 // ApplyTo fills up CSRSigningController config with options.
