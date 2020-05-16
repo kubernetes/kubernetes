@@ -41,6 +41,8 @@ const (
 
 	secretNameTemplate     = "azure-storage-account-%s-secret"
 	defaultSecretNamespace = "default"
+
+	resourceGroupAnnotation = "kubernetes.io/azure-file-resource-group"
 )
 
 var _ InTreePlugin = &azureFileCSITranslator{}
@@ -116,7 +118,11 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
 		accountName = azureSource.SecretName
 	}
-	volumeID := fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, "")
+	resourceGroup := ""
+	if v, ok := pv.ObjectMeta.Annotations[resourceGroupAnnotation]; ok {
+		resourceGroup = v
+	}
+	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, "")
 
 	var (
 		// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
@@ -155,6 +161,7 @@ func (t *azureFileCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 		ReadOnly: csiSource.ReadOnly,
 	}
 
+	resourceGroup := ""
 	if csiSource.NodeStageSecretRef != nil && csiSource.NodeStageSecretRef.Name != "" {
 		azureSource.SecretName = csiSource.NodeStageSecretRef.Name
 		azureSource.SecretNamespace = &csiSource.NodeStageSecretRef.Namespace
@@ -164,16 +171,20 @@ func (t *azureFileCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 			}
 		}
 	} else {
-		_, storageAccount, fileShareName, _, err := getFileShareInfo(csiSource.VolumeHandle)
+		rg, storageAccount, fileShareName, _, err := getFileShareInfo(csiSource.VolumeHandle)
 		if err != nil {
 			return nil, err
 		}
 		azureSource.ShareName = fileShareName
 		azureSource.SecretName = fmt.Sprintf(secretNameTemplate, storageAccount)
+		resourceGroup = rg
 	}
 
 	pv.Spec.CSI = nil
 	pv.Spec.AzureFile = azureSource
+	if resourceGroup != "" {
+		pv.ObjectMeta.Annotations[resourceGroupAnnotation] = resourceGroup
+	}
 
 	return pv, nil
 }
