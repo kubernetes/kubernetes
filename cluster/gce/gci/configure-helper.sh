@@ -760,7 +760,7 @@ EOF
       IFS=',' read -r -a node_tags <<< "${NODE_TAGS}"
     else
       local -r node_tags
-      node_tags=${NODE_INSTANCE_PREFIX}
+      node_tags="${NODE_INSTANCE_PREFIX}"
     fi
     cat <<EOF >>/etc/gce.conf
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
