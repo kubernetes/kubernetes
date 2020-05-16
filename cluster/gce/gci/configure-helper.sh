@@ -420,7 +420,7 @@ function ensure-local-ssds() {
       # the existing Google images does not expose NVMe devices in /dev/disk/by-id
       if [[ $(udevadm info --query=property --name="${ssd}" | grep DEVTYPE | sed "s/DEVTYPE=//") == "disk" ]]; then
         local devicenum
-        devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/')
+        devicenum=$(echo "${ssd}" | sed -e 's@/dev/nvme0n\([0-9]*\)@\1@')
         if [[ "${i}" -lt "${nvmeblocknum}" ]]; then
           mount-ext "${ssd}" "${devicenum}" "nvme" "block"
         else
