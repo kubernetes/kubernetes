@@ -326,6 +326,17 @@ func (c *AvailableConditionController) sync(key string) error {
 					// we had trouble with slow dial and DNS responses causing us to wait too long.
 					// we added this as insurance
 				case <-time.After(6 * time.Second):
+        			defer func() {
+            			// errCh needs to have a reader since the above goroutine doing the work 
+            			// needs to send to it. This is defered to ensure it runs
+            			// even if the post timeout work itself panics.
+            			go func() {
+                			res := <-errch
+                			if res != nil {
+                    			fmt.Error("%v", res)
+                			}	   
+            			}() 
+        			}() 
 					results <- fmt.Errorf("timed out waiting for %v", discoveryURL)
 					return
 				}
