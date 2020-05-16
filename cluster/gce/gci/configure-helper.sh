@@ -302,7 +302,7 @@ function unique-uuid-bind-mount(){
 
   # grep the exact match of actual device, prevents substring matching
   local myuuid
-  myuuid=$(find -L /dev/disk/by-uuid -maxdepth 1 -samefile /dev/"${actual_device}" -printf "%P\n")
+  myuuid=$(find -L /dev/disk/by-uuid -maxdepth 1 -samefile /dev/"${actual_device}" -printf '%P\n')
   # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/
   if [[ -z "${myuuid}" ]]; then
     echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
@@ -389,7 +389,7 @@ function ensure-local-ssds() {
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
       local devicenum
-      devicenum=$(echo "${ssd}" | sed -e 's@/dev/disk/by-id/google-local-ssd-\([0-9]*\)@\1@')
+      devicenum="${ssd##*google-local-ssd-}"
       if [[ "${i}" -lt "${scsiblocknum}" ]]; then
         mount-ext "${ssd}" "${devicenum}" "scsi" "block"
       else
@@ -420,7 +420,7 @@ function ensure-local-ssds() {
       # the existing Google images does not expose NVMe devices in /dev/disk/by-id
       if [[ $(udevadm info --query=property --name="${ssd}" | grep DEVTYPE | sed "s/DEVTYPE=//") == "disk" ]]; then
         local devicenum
-        devicenum=$(echo "${ssd}" | sed -e 's@/dev/nvme0n\([0-9]*\)@\1@')
+        devicenum="${ssd##*nvme0n}"
         if [[ "${i}" -lt "${nvmeblocknum}" ]]; then
           mount-ext "${ssd}" "${devicenum}" "nvme" "block"
         else
@@ -515,7 +515,8 @@ function mount-master-pd {
   # locations.
 
   # Contains all the data stored in etcd.
-  install -d -m 700 "${mount_point}/var/etcd"
+  mkdir -p "${mount_point}/var/etcd"
+  chmod 700 "${mount_point}/var/etcd"
   ln -s -f "${mount_point}/var/etcd" /var/etcd
   mkdir -p /etc/srv
   # Contains the dynamically generated apiserver auth certs and keys.
@@ -2497,7 +2498,7 @@ EOF
   fi
   if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
       setup-addon-manifests "addons" "node-termination-handler"
-      setup-node-termination-handler-manifest "$@"
+      setup-node-termination-handler-manifest '' ''
   fi
   # Setting up the konnectivity-agent daemonset
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
@@ -2995,7 +2996,7 @@ function main() {
     start-kube-controller-manager
     start-kube-scheduler
     wait-till-apiserver-ready
-    start-kube-addons "$@"
+    start-kube-addons ''
     start-cluster-autoscaler
     start-lb-controller
     update-legacy-addon-node-labels &
