@@ -78,9 +78,8 @@ type KubeletFlags struct {
 	// Container-runtime-specific options.
 	config.ContainerRuntimeOptions
 
-	// certDirectory is the directory where the TLS certs are located (by
-	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
-	// are provided, this flag will be ignored.
+	// certDirectory is the directory where the TLS certs are located.
+	// If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.
 	CertDirectory string
 
 	// cloudProvider is the provider for cloud services.
