@@ -69,3 +69,31 @@ func DeletePodWithWaitByName(c clientset.Interface, podName, podNamespace string
 	}
 	return nil
 }
+
+// DeletePodWithGracePeriod deletes the passed-in pod. Resilient to the pod not existing.
+func DeletePodWithGracePeriod(c clientset.Interface, pod *v1.Pod, grace int64) error {
+	return DeletePodWithGracePeriodByName(c, pod.GetName(), pod.GetNamespace(), grace)
+}
+
+// DeletePodsWithGracePeriod deletes the passed-in pods. Resilient to the pods not existing.
+func DeletePodsWithGracePeriod(c clientset.Interface, pods []v1.Pod, grace int64) error {
+	for _, pod := range pods {
+		if err := DeletePodWithGracePeriod(c, &pod, grace); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DeletePodWithGracePeriodByName deletes a pod by name and namespace. Resilient to the pod not existing.
+func DeletePodWithGracePeriodByName(c clientset.Interface, podName, podNamespace string, grace int64) error {
+	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
+	err := c.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, *metav1.NewDeleteOptions(grace))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // assume pod was already deleted
+		}
+		return fmt.Errorf("pod Delete API error: %v", err)
+	}
+	return nil
+}
