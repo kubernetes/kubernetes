@@ -220,6 +220,15 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 
 // LivenessProbe creates a Probe object with a HTTPGet handler
 func LivenessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
+	return createHTTPProbe(host, path, port, scheme, 15, 15, 8, 10)
+}
+
+// ReadinessProbe creates a Probe object with a HTTPGet handler
+func ReadinessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
+	return createHTTPProbe(host, path, port, scheme, 0, 15, 3, 1)
+}
+
+func createHTTPProbe(host, path string, port int, scheme v1.URIScheme, initialDelaySeconds, timeoutSeconds, failureThreshold, periodSeconds int32) *v1.Probe {
 	return &v1.Probe{
 		Handler: v1.Handler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -229,9 +238,10 @@ func LivenessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
 				Scheme: scheme,
 			},
 		},
-		InitialDelaySeconds: 15,
-		TimeoutSeconds:      15,
-		FailureThreshold:    8,
+		InitialDelaySeconds: initialDelaySeconds,
+		TimeoutSeconds:      timeoutSeconds,
+		FailureThreshold:    failureThreshold,
+		PeriodSeconds:       periodSeconds,
 	}
 }
 
