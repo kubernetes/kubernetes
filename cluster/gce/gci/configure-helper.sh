@@ -389,7 +389,7 @@ function ensure-local-ssds() {
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
       local devicenum
-      devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/')
+      devicenum=$(echo "${ssd}" | sed -e 's@/dev/disk/by-id/google-local-ssd-\([0-9]*\)@\1@')
       if [[ "${i}" -lt "${scsiblocknum}" ]]; then
         mount-ext "${ssd}" "${devicenum}" "scsi" "block"
       else
