@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 // The two thresholds are used as bounds for the image score range. They correspond to a reasonable size range for
@@ -119,7 +118,7 @@ func scaledImageScore(imageState *framework.ImageStateSummary, totalNumNodes int
 // in node status; note that if users consistently use one registry format, this should not happen.
 func normalizedImageName(name string) string {
 	if strings.LastIndex(name, ":") <= strings.LastIndex(name, "/") {
-		name = name + ":" + parsers.DefaultImageTag
+		name = name + ":latest"
 	}
 	return name
 }
