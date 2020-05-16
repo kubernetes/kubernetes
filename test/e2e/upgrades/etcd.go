@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -106,7 +107,7 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 }
 
 func (t *EtcdUpgradeTest) listUsers() ([]string, error) {
-	r, err := http.Get(fmt.Sprintf("http://%s:8080/list", t.ip))
+	r, err := http.Get(fmt.Sprintf("http://%s/list", net.JoinHostPort(t.ip, "8080")))
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +128,7 @@ func (t *EtcdUpgradeTest) listUsers() ([]string, error) {
 
 func (t *EtcdUpgradeTest) addUser(name string) error {
 	val := map[string][]string{"name": {name}}
-	r, err := http.PostForm(fmt.Sprintf("http://%s:8080/add", t.ip), val)
+	r, err := http.PostForm(fmt.Sprintf("http://%s/add", net.JoinHostPort(t.ip, "8080")), val)
 	if err != nil {
 		return err
 	}

@@ -19,6 +19,8 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +62,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		pod := createNodeAuthTestPod(f)
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
-			result := framework.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s:%v/metrics", "%{http_code}", nodeIP, ports.KubeletPort))
+			result := framework.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s/metrics", "%{http_code}", net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))))
 			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
 		}
 	})
@@ -83,10 +85,10 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		for _, nodeIP := range nodeIPs {
 			result := framework.RunHostCmdOrDie(ns,
 				pod.Name,
-				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s:%v/metrics",
+				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s/metrics",
 					"%{http_code}",
 					"cat /var/run/secrets/kubernetes.io/serviceaccount/token",
-					nodeIP, ports.KubeletPort))
+					net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))))
 			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet can delegate ServiceAccount tokens to the API server")
 		}
 	})

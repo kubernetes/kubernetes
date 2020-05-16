@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -217,7 +218,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		// collect pod IPs
 		podIPs := []string{}
 		for _, pod := range pods.Items {
-			podIPs = append(podIPs, pod.Status.PodIP+":"+strconv.Itoa(testPodPort))
+			podIPs = append(podIPs, net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(testPodPort)))
 		}
 
 		// hit the /checknosnat endpoint on each Pod, tell each Pod to check all the other Pods

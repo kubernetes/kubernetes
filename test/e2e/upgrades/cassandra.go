@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -112,7 +113,7 @@ func (t *CassandraUpgradeTest) Setup(f *framework.Framework) {
 
 // listUsers gets a list of users from the db via the tester service.
 func (t *CassandraUpgradeTest) listUsers() ([]string, error) {
-	r, err := http.Get(fmt.Sprintf("http://%s:8080/list", t.ip))
+	r, err := http.Get(fmt.Sprintf("http://%s/list", net.JoinHostPort(t.ip, "8080")))
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +135,7 @@ func (t *CassandraUpgradeTest) listUsers() ([]string, error) {
 // addUser adds a user to the db via the tester services.
 func (t *CassandraUpgradeTest) addUser(name string) error {
 	val := map[string][]string{"name": {name}}
-	r, err := http.PostForm(fmt.Sprintf("http://%s:8080/add", t.ip), val)
+	r, err := http.PostForm(fmt.Sprintf("http://%s/add", net.JoinHostPort(t.ip, "8080")), val)
 	if err != nil {
 		return err
 	}

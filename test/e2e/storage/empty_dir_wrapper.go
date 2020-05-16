@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -258,7 +259,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 		framework.Failf("unable to create test git server service %s: %v", gitServerSvc.Name, err)
 	}
 
-	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
+	return "http://" + net.JoinHostPort(gitServerSvc.Spec.ClusterIP, strconv.Itoa(httpPort)), "test", func() {
 		ginkgo.By("Cleaning up the git server pod")
 		if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), gitServerPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
