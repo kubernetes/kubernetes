@@ -2245,15 +2245,6 @@
     able to start with Secret and ConfigMap volumes mounted into the container.
   release: v1.13
   file: test/e2e/storage/empty_dir_wrapper.go
-- testname: Host path, volume mode default
-  codename: '[sig-storage] HostPath should give a volume the correct mode [LinuxOnly]
-    [NodeConformance] [Conformance]'
-  description: Create a Pod with host volume mounted. The volume mounted MUST be a
-    directory with permissions mode -rwxrwxrwx and that is has the sticky bit (mode
-    flag t) set. This test is marked LinuxOnly since Windows does not support setting
-    the sticky bit (mode flag t).
-  release: v1.9
-  file: test/e2e/common/host_path.go
 - testname: Projected Volume, multiple projections
   codename: '[sig-storage] Projected combined should project all components that make
     up the projection API [Projection][NodeConformance] [Conformance]'
