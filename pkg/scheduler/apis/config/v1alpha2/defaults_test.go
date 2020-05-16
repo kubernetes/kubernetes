@@ -299,6 +299,52 @@ func TestPluginArgsDefaults(t *testing.T) {
 				HardPodAffinityWeight: pointer.Int32Ptr(5),
 			},
 		},
+		{
+			name: "NodeResourcesLeastAllocatedArgs resources empty",
+			in:   &v1alpha2.NodeResourcesLeastAllocatedArgs{},
+			want: &v1alpha2.NodeResourcesLeastAllocatedArgs{
+				Resources: []v1alpha2.ResourceSpec{
+					{Name: "cpu", Weight: 1},
+					{Name: "memory", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesLeastAllocatedArgs resources with value",
+			in: &v1alpha2.NodeResourcesLeastAllocatedArgs{
+				Resources: []v1alpha2.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+			want: &v1alpha2.NodeResourcesLeastAllocatedArgs{
+				Resources: []v1alpha2.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesMostAllocatedArgs resources empty",
+			in:   &v1alpha2.NodeResourcesMostAllocatedArgs{},
+			want: &v1alpha2.NodeResourcesMostAllocatedArgs{
+				Resources: []v1alpha2.ResourceSpec{
+					{Name: "cpu", Weight: 1},
+					{Name: "memory", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesMostAllocatedArgs resources with value",
+			in: &v1alpha2.NodeResourcesMostAllocatedArgs{
+				Resources: []v1alpha2.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+			want: &v1alpha2.NodeResourcesMostAllocatedArgs{
+				Resources: []v1alpha2.ResourceSpec{
+					{Name: "resource", Weight: 2},
+				},
+			},
+		},
 	}
 	for _, tc := range tests {
 		scheme := runtime.NewScheme()

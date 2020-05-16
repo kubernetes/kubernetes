@@ -82,7 +82,33 @@ type RequestedToCapacityRatioArgs struct {
 
 	// Points defining priority function shape
 	Shape []UtilizationShapePoint
-	// Resources to be managed
+	// Resources to be considered when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	Resources []ResourceSpec
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesLeastAllocatedArgs holds arguments used to configure NodeResourcesLeastAllocated plugin.
+type NodeResourcesLeastAllocatedArgs struct {
+	metav1.TypeMeta
+
+	// Resources to be considered when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	Resources []ResourceSpec
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesMostAllocatedArgs holds arguments used to configure NodeResourcesMostAllocated plugin.
+type NodeResourcesMostAllocatedArgs struct {
+	metav1.TypeMeta
+
+	// Resources to be considered when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
 	Resources []ResourceSpec
 }
 
@@ -94,9 +120,9 @@ type UtilizationShapePoint struct {
 	Score int32
 }
 
-// ResourceSpec represents single resource for bin packing of priority RequestedToCapacityRatioArgs.
+// ResourceSpec represents single resource.
 type ResourceSpec struct {
-	// Name of the resource to be managed by RequestedToCapacityRatio function.
+	// Name of the resource.
 	Name string
 	// Weight of the resource.
 	Weight int64

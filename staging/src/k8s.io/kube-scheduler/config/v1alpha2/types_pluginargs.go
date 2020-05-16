@@ -97,6 +97,32 @@ type RequestedToCapacityRatioArgs struct {
 	Resources []ResourceSpec `json:"resources,omitempty"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesLeastAllocatedArgs holds arguments used to configure NodeResourcesLeastAllocated plugin.
+type NodeResourcesLeastAllocatedArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Resources to be managed, if no resource is provided, default resource set with both
+	// the weight of "cpu" and "memory" set to "1" will be applied.
+	// Resource with "0" weight will not accountable for the final score.
+	// +listType=atomic
+	Resources []ResourceSpec `json:"resources,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesMostAllocatedArgs holds arguments used to configure NodeResourcesMostAllocated plugin.
+type NodeResourcesMostAllocatedArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Resources to be managed, if no resource is provided, default resource set with both
+	// the weight of "cpu" and "memory" set to "1" will be applied.
+	// Resource with "0" weight will not accountable for the final score.
+	// +listType=atomic
+	Resources []ResourceSpec `json:"resources,omitempty"`
+}
+
 // TODO add JSON tags and remove custom unmarshalling in v1beta1.
 // UtilizationShapePoint and ResourceSpec fields are not annotated with JSON tags in v1alpha2
 // to maintain backward compatibility with the args shipped with v1.18.

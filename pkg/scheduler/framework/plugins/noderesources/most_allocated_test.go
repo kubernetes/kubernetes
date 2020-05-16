@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -105,10 +106,16 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			},
 		},
 	}
+	defaultResourceMostAllocatedSet := []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+	}
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
 		nodes        []*v1.Node
+		args         config.NodeResourcesMostAllocatedArgs
+		wantErr      string
 		expectedList framework.NodeScoreList
 		name         string
 	}{
@@ -123,6 +130,7 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			// Node2 Score: (0 + 0) / 2 = 0
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: defaultResourceMostAllocatedSet},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "nothing scheduled, nothing requested",
 		},
@@ -137,6 +145,7 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			// Node2 Score: (50 + 50) / 2 = 50
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: defaultResourceMostAllocatedSet},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 62}, {Name: "machine2", Score: 50}},
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
@@ -151,6 +160,7 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			// Node2 Score: (60 + 25) / 2 = 42
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: defaultResourceMostAllocatedSet},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 30}, {Name: "machine2", Score: 42}},
 			name:         "no resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
@@ -171,6 +181,7 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			// Node2 Score: (60 + 50) / 2 = 55
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: defaultResourceMostAllocatedSet},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 42}, {Name: "machine2", Score: 55}},
 			name:         "resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
@@ -189,8 +200,46 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 			// Node2 Score: (50 + 0) / 2 = 25
 			pod:          &v1.Pod{Spec: bigCPUAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 10000, 8000)},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: defaultResourceMostAllocatedSet},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 45}, {Name: "machine2", Score: 25}},
 			name:         "resources requested with more than the node, pods scheduled with resources",
+		},
+		{
+			// CPU Score: (3000 *100) / 4000 = 75
+			// Memory Score: (5000 *100) / 10000 = 50
+			// Node1 Score: (75 * 1 + 50 * 2) / (1 + 2) = 58
+			// CPU Score: (3000 *100) / 6000 = 50
+			// Memory Score: (5000 *100) / 10000 = 50
+			// Node2 Score: (50 * 1 + 50 * 2) / (1 + 2) = 50
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+			args:         config.NodeResourcesMostAllocatedArgs{Resources: []config.ResourceSpec{{Name: "memory", Weight: 2}, {Name: "cpu", Weight: 1}}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 58}, {Name: "machine2", Score: 50}},
+			name:         "nothing scheduled, resources requested, differently sized machines",
+		},
+		{
+			// resource with negtive weight is not allowed
+			pod:     &v1.Pod{Spec: cpuAndMemory},
+			nodes:   []*v1.Node{makeNode("machine", 4000, 10000)},
+			args:    config.NodeResourcesMostAllocatedArgs{Resources: []config.ResourceSpec{{Name: "memory", Weight: -1}, {Name: "cpu", Weight: 1}}},
+			wantErr: "resource Weight of memory should be a positive value, got -1",
+			name:    "resource with negtive weight",
+		},
+		{
+			// resource with zero weight is not allowed
+			pod:     &v1.Pod{Spec: cpuAndMemory},
+			nodes:   []*v1.Node{makeNode("machine", 4000, 10000)},
+			args:    config.NodeResourcesMostAllocatedArgs{Resources: []config.ResourceSpec{{Name: "memory", Weight: 1}, {Name: "cpu", Weight: 0}}},
+			wantErr: "resource Weight of cpu should be a positive value, got 0",
+			name:    "resource with zero weight",
+		},
+		{
+			// resource weight should be less than MaxNodeScore
+			pod:     &v1.Pod{Spec: cpuAndMemory},
+			nodes:   []*v1.Node{makeNode("machine", 4000, 10000)},
+			args:    config.NodeResourcesMostAllocatedArgs{Resources: []config.ResourceSpec{{Name: "memory", Weight: 120}}},
+			wantErr: "resource Weight of memory should be less than 100, got 120",
+			name:    "resource weight larger than MaxNodeScore",
 		},
 	}
 
@@ -198,7 +247,21 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
-			p, _ := NewMostAllocated(nil, fh)
+			p, err := NewMostAllocated(&test.args, fh)
+
+			if len(test.wantErr) != 0 {
+				if err != nil && test.wantErr != err.Error() {
+					t.Fatalf("got err %w, want %w", err.Error(), test.wantErr)
+				} else if err == nil {
+					t.Fatal("no error produced, wanted %w", test.wantErr)
+				}
+				return
+			}
+
+			if err != nil && len(test.wantErr) == 0 {
+				t.Fatalf("failed to initialize plugin NodeResourcesMostAllocated, got error: %v", err)
+			}
+
 			for i := range test.nodes {
 				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), nil, test.pod, test.nodes[i].Name)
 				if err != nil {
