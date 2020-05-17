@@ -91,7 +91,12 @@ func TestVMSSVMCache(t *testing.T) {
 	ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
 	ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
 
-	expectedScaleSet := compute.VirtualMachineScaleSet{Name: &vmssName}
+	expectedScaleSet := compute.VirtualMachineScaleSet{
+		Name: &vmssName,
+		VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+			VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+		},
+	}
 	mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
 	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, "")
@@ -143,7 +148,10 @@ func TestVMSSVMCacheWithDeletingNodes(t *testing.T) {
 	ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
 	ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
 
-	expectedScaleSet := compute.VirtualMachineScaleSet{Name: &vmssName}
+	expectedScaleSet := compute.VirtualMachineScaleSet{
+		Name:                             &vmssName,
+		VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{},
+	}
 	mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
 	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, string(compute.ProvisioningStateDeleting))

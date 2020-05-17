@@ -277,7 +277,12 @@ func TestGetInstanceIDByNodeName(t *testing.T) {
 		ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
 		ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
 
-		expectedScaleSet := compute.VirtualMachineScaleSet{Name: &test.scaleSet}
+		expectedScaleSet := compute.VirtualMachineScaleSet{
+			Name: &test.scaleSet,
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
 		expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, "", 0, test.vmList, "")
@@ -362,7 +367,12 @@ func TestGetZoneByNodeName(t *testing.T) {
 		ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
 		ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
 
-		expectedScaleSet := compute.VirtualMachineScaleSet{Name: &test.scaleSet}
+		expectedScaleSet := compute.VirtualMachineScaleSet{
+			Name: &test.scaleSet,
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
 		expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, test.zone, test.faultDomain, test.vmList, "")
@@ -424,7 +434,12 @@ func TestGetIPByNodeName(t *testing.T) {
 		ss.cloud.InterfacesClient = mockInterfaceClient
 		ss.cloud.PublicIPAddressesClient = mockPIPClient
 
-		expectedScaleSet := compute.VirtualMachineScaleSet{Name: &test.scaleSet}
+		expectedScaleSet := compute.VirtualMachineScaleSet{
+			Name: &test.scaleSet,
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
 		expectedVMs, expectedInterface, expectedPIP := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, "", 0, test.vmList, "")
@@ -492,7 +507,12 @@ func TestGetNodeNameByIPConfigurationID(t *testing.T) {
 		ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
 		ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
 
-		expectedScaleSet := compute.VirtualMachineScaleSet{Name: &test.scaleSet}
+		expectedScaleSet := compute.VirtualMachineScaleSet{
+			Name: &test.scaleSet,
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
 		expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, "", 0, test.vmList, "")
@@ -585,7 +605,12 @@ func TestGetVMSS(t *testing.T) {
 		mockVMSSClient := mockvmssclient.NewMockInterface(ctrl)
 		ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
 
-		expected := compute.VirtualMachineScaleSet{Name: to.StringPtr(test.existedVMSSName)}
+		expected := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(test.existedVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expected}, test.vmssListError).AnyTimes()
 
 		actual, err := ss.getVMSS(test.vmssName, azcache.CacheReadTypeDefault)
@@ -626,7 +651,12 @@ func TestGetVmssVM(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, test.description)
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(test.existedVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(test.existedVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -677,7 +707,12 @@ func TestGetPowerStatusByNodeName(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -715,7 +750,12 @@ func TestGetVmssVMByInstanceID(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -758,7 +798,12 @@ func TestGetInstanceTypeByNodeName(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -911,7 +956,11 @@ func TestGetPrimaryInterface(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{}},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, test.vmssClientErr).AnyTimes()
 
@@ -1034,7 +1083,12 @@ func TestGetPrivateIPsByNodeName(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -1112,13 +1166,25 @@ func TestListScaleSets(t *testing.T) {
 				{
 					Name: to.StringPtr("vmss-0"),
 					Sku:  &compute.Sku{Capacity: to.Int64Ptr(1)},
+					VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+						VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+					},
 				},
 				{
 					Name: to.StringPtr("vmss-1"),
+					VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+						VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+					},
 				},
 				{
 					Name: to.StringPtr("vmss-2"),
 					Sku:  &compute.Sku{Capacity: to.Int64Ptr(0)},
+					VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+						VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+					},
+				},
+				{
+					Name: to.StringPtr("vmss-3"),
 				},
 			},
 			expectedVMSSNames: []string{"vmss-0", "vmss-1"},
@@ -1221,7 +1287,12 @@ func TestGetAgentPoolScaleSets(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -1317,7 +1388,12 @@ func TestGetVMSetNames(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -1596,7 +1672,12 @@ func TestEnsureHostInPool(t *testing.T) {
 			ss.LoadBalancerSku = loadBalancerSkuStandard
 		}
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
@@ -1917,7 +1998,12 @@ func TestEnsureBackendPoolDeletedFromNode(t *testing.T) {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, test.description)
 
-		expectedVMSS := compute.VirtualMachineScaleSet{Name: to.StringPtr(testVMSSName)}
+		expectedVMSS := compute.VirtualMachineScaleSet{
+			Name: to.StringPtr(testVMSSName),
+			VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
+				VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
+			},
+		}
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 
