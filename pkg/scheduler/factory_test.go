@@ -19,7 +19,6 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
@@ -29,10 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -284,134 +283,152 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	grace := int64(30)
-	testPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-		Spec: v1.PodSpec{
-			RestartPolicy:                 v1.RestartPolicyAlways,
-			DNSPolicy:                     v1.DNSClusterFirst,
-			TerminationGracePeriodSeconds: &grace,
-			SecurityContext:               &v1.PodSecurityContext{},
+	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}}
+	testPodUpdated := testPod.DeepCopy()
+	testPodUpdated.Labels = map[string]string{"foo": ""}
+
+	tests := []struct {
+		name                       string
+		injectErr                  error
+		podUpdatedDuringScheduling bool // pod is updated during a scheduling cycle
+		podDeletedDuringScheduling bool // pod is deleted during a scheduling cycle
+		expect                     *v1.Pod
+	}{
+		{
+			name:                       "pod is updated during a scheduling cycle",
+			injectErr:                  nil,
+			podUpdatedDuringScheduling: true,
+			expect:                     testPodUpdated,
+		},
+		{
+			name:      "pod is not updated during a scheduling cycle",
+			injectErr: nil,
+			expect:    testPod,
+		},
+		{
+			name:                       "pod is deleted during a scheduling cycle",
+			injectErr:                  nil,
+			podDeletedDuringScheduling: true,
+			expect:                     nil,
 		},
 	}
 
-	nodeBar, nodeFoo :=
-		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-		&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			defer close(stopCh)
 
-	testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
-	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{*nodeBar}})
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			podInformer := informerFactory.Core().V1().Pods()
+			// Need to add/update/delete testPod to the store.
+			podInformer.Informer().GetStore().Add(testPod)
 
-	timestamp := time.Now()
-	queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(timestamp)))
-	schedulerCache := internalcache.New(30*time.Second, stopCh)
-	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache)
+			queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
-	_ = schedulerCache.AddNode(nodeFoo)
+			queue.Add(testPod)
+			queue.Pop()
 
-	// assume nodeFoo was not found
-	err := apierrors.NewNotFound(apicore.Resource("node"), nodeFoo.Name)
-	errFunc(testPodInfo, err)
-	dump := schedulerCache.Dump()
-	for _, n := range dump.Nodes {
-		if e, a := nodeFoo, n.Node(); reflect.DeepEqual(e, a) {
-			t.Errorf("Node %s is still in schedulerCache", e.Name)
-			break
-		}
-	}
+			if tt.podUpdatedDuringScheduling {
+				podInformer.Informer().GetStore().Update(testPodUpdated)
+				queue.Update(testPod, testPodUpdated)
+			}
+			if tt.podDeletedDuringScheduling {
+				podInformer.Informer().GetStore().Delete(testPod)
+				queue.Delete(testPod)
+			}
 
-	// Try up to a minute to retrieve the error pod from priority queue
-	foundPodFlag := false
-	maxIterations := 10 * 60
-	for i := 0; i < maxIterations; i++ {
-		time.Sleep(100 * time.Millisecond)
-		got := getPodfromPriorityQueue(queue, testPod)
-		if got == nil {
-			continue
-		}
+			testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
+			errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
+			errFunc(testPodInfo, tt.injectErr)
 
-		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+			var got *v1.Pod
+			if tt.podUpdatedDuringScheduling {
+				head, e := queue.Pop()
+				if e != nil {
+					t.Fatalf("Cannot pop pod from the activeQ: %v", e)
+				}
+				got = head.Pod
+			} else {
+				got = getPodFromPriorityQueue(queue, testPod)
+			}
 
-		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-
-		foundPodFlag = true
-		break
-	}
-
-	if !foundPodFlag {
-		t.Errorf("Failed to get pod from the unschedulable queue after waiting for a minute: %v", testPod)
-	}
-
-	_ = queue.Delete(testPod)
-
-	// Trigger error handling again to put the pod in unschedulable queue
-	errFunc(testPodInfo, nil)
-
-	// Try up to a minute to retrieve the error pod from priority queue
-	foundPodFlag = false
-	maxIterations = 10 * 60
-	for i := 0; i < maxIterations; i++ {
-		time.Sleep(100 * time.Millisecond)
-		got := getPodfromPriorityQueue(queue, testPod)
-		if got == nil {
-			continue
-		}
-
-		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
-
-		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-
-		foundPodFlag = true
-		break
-	}
-
-	if !foundPodFlag {
-		t.Errorf("Failed to get pod from the unschedulable queue after waiting for a minute: %v", testPod)
-	}
-
-	// Remove the pod from priority queue to test putting error
-	// pod in backoff queue.
-	queue.Delete(testPod)
-
-	// Trigger a move request
-	queue.MoveAllToActiveOrBackoffQueue("test")
-
-	// Trigger error handling again to put the pod in backoff queue
-	errFunc(testPodInfo, nil)
-
-	foundPodFlag = false
-	for i := 0; i < maxIterations; i++ {
-		time.Sleep(100 * time.Millisecond)
-		// The pod should be found from backoff queue at this time
-		got := getPodfromPriorityQueue(queue, testPod)
-		if got == nil {
-			continue
-		}
-
-		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
-
-		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-
-		foundPodFlag = true
-		break
-	}
-
-	if !foundPodFlag {
-		t.Errorf("Failed to get pod from the backoff queue after waiting for a minute: %v", testPod)
+			if diff := cmp.Diff(tt.expect, got); diff != "" {
+				t.Errorf("Unexpected pod (-want, +got): %s", diff)
+			}
+		})
 	}
 }
 
-// getPodfromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
+func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
+	nodeFoo := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	nodeBar := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}}
+	tests := []struct {
+		name             string
+		nodes            []v1.Node
+		nodeNameToDelete string
+		injectErr        error
+		expectNodeNames  sets.String
+	}{
+		{
+			name:             "node is deleted during a scheduling cycle",
+			nodes:            []v1.Node{*nodeFoo, *nodeBar},
+			nodeNameToDelete: "foo",
+			injectErr:        apierrors.NewNotFound(apicore.Resource("node"), nodeFoo.Name),
+			expectNodeNames:  sets.NewString("bar"),
+		},
+		{
+			name:            "node is not deleted but NodeNotFound is received incorrectly",
+			nodes:           []v1.Node{*nodeFoo, *nodeBar},
+			injectErr:       apierrors.NewNotFound(apicore.Resource("node"), nodeFoo.Name),
+			expectNodeNames: sets.NewString("foo", "bar"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
+			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: tt.nodes})
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			podInformer := informerFactory.Core().V1().Pods()
+			// Need to add testPod to the store.
+			podInformer.Informer().GetStore().Add(testPod)
+
+			queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			schedulerCache := internalcache.New(30*time.Second, stopCh)
+
+			for i := range tt.nodes {
+				node := tt.nodes[i]
+				// Add node to schedulerCache no matter it's deleted in API server or not.
+				schedulerCache.AddNode(&node)
+				if node.Name == tt.nodeNameToDelete {
+					client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
+				}
+			}
+
+			testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
+			errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
+			errFunc(testPodInfo, tt.injectErr)
+
+			gotNodes := schedulerCache.Dump().Nodes
+			gotNodeNames := sets.NewString()
+			for _, nodeInfo := range gotNodes {
+				gotNodeNames.Insert(nodeInfo.Node().Name)
+			}
+			if diff := cmp.Diff(tt.expectNodeNames, gotNodeNames); diff != "" {
+				t.Errorf("Unexpected nodes (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+// getPodFromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
 // the specific pod from the given priority queue. It returns the found pod in the priority queue.
-func getPodfromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
+func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
 	podList := queue.PendingPods()
 	if len(podList) == 0 {
 		return nil
@@ -434,33 +451,6 @@ func getPodfromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 	}
 
 	return nil
-}
-
-// testClientGetPodRequest function provides a routine used by TestDefaultErrorFunc test.
-// It tests whether the fake client can receive request and correctly "get" the namespace
-// and name of the error pod.
-func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string, podName string) {
-	requestReceived := false
-	actions := client.Actions()
-	for _, a := range actions {
-		if a.GetVerb() == "get" && a.GetResource().Resource == "pods" {
-			getAction, ok := a.(clienttesting.GetAction)
-			if !ok {
-				t.Errorf("Can't cast action object to GetAction interface")
-				break
-			}
-			name := getAction.GetName()
-			ns := a.GetNamespace()
-			if name != podName || ns != podNs {
-				t.Errorf("Expected name %s namespace %s, got %s %s",
-					podName, podNs, name, ns)
-			}
-			requestReceived = true
-		}
-	}
-	if !requestReceived {
-		t.Errorf("Get pod request not received")
-	}
 }
 
 func newConfigFactoryWithFrameworkRegistry(
