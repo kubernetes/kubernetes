@@ -12,8 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+FROM BASEIMAGE as builder
+
+RUN apt-get update -y \
+	&& apt-get -yy -q install --no-install-recommends --no-install-suggests --fix-missing \
+		bash-static
+
+RUN cp /bin/bash-static /sh
+
+FROM RUNNERIMAGE
+WORKDIR /
+
+COPY --from=builder /sh /bin/
 
 EXPOSE 2379 2380 4001 7001
 COPY etcd* etcdctl* /usr/local/bin/
+COPY cp* /bin/
 COPY migrate-if-needed.sh migrate /usr/local/bin/
