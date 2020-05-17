@@ -122,7 +122,7 @@ var (
 			Help:           "Number of requests dropped with 'Try again later' response",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"requestKind"},
+		[]string{"request_kind"},
 	)
 	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
 	TLSHandshakeErrors = compbasemetrics.NewCounter(
@@ -166,7 +166,15 @@ var (
 			Help:           "Maximal number of currently used inflight request limit of this apiserver per request kind in last second.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"requestKind"},
+		[]string{"request_kind"},
+	)
+	currentInqueueRequests = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "apiserver_current_inqueue_requests",
+			Help:           "Maximal number of queued requests in this apiserver per request kind in last second.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"request_kind"},
 	)
 
 	requestTerminationsTotal = compbasemetrics.NewCounterVec(
@@ -191,6 +199,7 @@ var (
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
+		currentInqueueRequests,
 		requestTerminationsTotal,
 	}
 
@@ -231,6 +240,11 @@ const (
 	ReadOnlyKind = "readOnly"
 	// MutatingKind is a string identifying mutating request kind
 	MutatingKind = "mutating"
+
+	// WaitingPhase is the phase value for a request waiting in a queue
+	WaitingPhase = "waiting"
+	// ExecutingPhase is the phase value for an executing request
+	ExecutingPhase = "executing"
 )
 
 const (
@@ -261,9 +275,19 @@ func Reset() {
 	}
 }
 
-func UpdateInflightRequestMetrics(nonmutating, mutating int) {
-	currentInflightRequests.WithLabelValues(ReadOnlyKind).Set(float64(nonmutating))
-	currentInflightRequests.WithLabelValues(MutatingKind).Set(float64(mutating))
+// UpdateInflightRequestMetrics reports concurrency metrics classified by
+// mutating vs Readonly.
+func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
+	for _, kc := range []struct {
+		kind  string
+		count int
+	}{{ReadOnlyKind, nonmutating}, {MutatingKind, mutating}} {
+		if phase == ExecutingPhase {
+			currentInflightRequests.WithLabelValues(kc.kind).Set(float64(kc.count))
+		} else {
+			currentInqueueRequests.WithLabelValues(kc.kind).Set(float64(kc.count))
+		}
+	}
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
