@@ -307,6 +307,10 @@ func (s *server) kill() error {
 			// Success!
 			return nil
 		case <-time.After(timeout):
+			// waitChan needs a reader for the above goroutine to avoid leak
+			go func() {
+				<-waitChan
+			}()
 			// Continue.
 		}
 	}
