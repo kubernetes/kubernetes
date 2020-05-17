@@ -680,8 +680,9 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	resourceVersion := uint64(1000)
 	go func() {
 		deadline := time.Now().Add(time.Second)
+		var err error
 		for i := 0; time.Now().Before(deadline); i++ {
-			err := cacher.watchCache.Add(&examplev1.Pod{
+			err = cacher.watchCache.Add(&examplev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            fmt.Sprintf("pod-%d", i),
 					Namespace:       "ns",
