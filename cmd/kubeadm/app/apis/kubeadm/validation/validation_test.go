@@ -36,16 +36,14 @@ func TestValidateToken(t *testing.T) {
 		{"772ef5.6b6baab1d4a0a171", true},
 		{".6b6baab1d4a0a171", false},
 		{"772ef5.", false},
-		{"772ef5.6b6baab1d4a0a171", true},
-		{".6b6baab1d4a0a171", false},
-		{"772ef5.", false},
 		{"abcdef.1234567890123456@foobar", false},
 	}
 	for _, rt := range tests {
 		err := ValidateToken(rt.token, nil).ToAggregate()
 		if (err == nil) != rt.expected {
 			t.Errorf(
-				"failed ValidateToken:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateToken:\n\ttoken: %q\n\t  expected: %t, got: %t",
+				rt.token,
 				rt.expected,
 				(err == nil),
 			)
