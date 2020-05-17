@@ -50,7 +50,8 @@ func InitService(serviceName string) error {
 	service = h
 	var err error
 	go func() {
-		h.fromsvc <- svc.Run(serviceName, h)
+		err := svc.Run(serviceName, h)
+		h.fromsvc <- err
 	}()
 
 	// Wait for the first signal from the service handler.
