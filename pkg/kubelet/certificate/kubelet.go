@@ -142,7 +142,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		},
 		func() float64 {
 			if c := m.Current(); c != nil && c.Leaf != nil {
-				return c.Leaf.NotAfter.Sub(time.Now()).Seconds()
+				return math.Trunc(c.Leaf.NotAfter.Sub(time.Now()).Seconds())
 			}
 			return math.Inf(1)
 		},
@@ -210,16 +210,6 @@ func NewKubeletClientCertificateManager(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate store: %v", err)
 	}
-	var certificateExpiration = compbasemetrics.NewGauge(
-		&compbasemetrics.GaugeOpts{
-			Namespace:      metrics.KubeletSubsystem,
-			Subsystem:      "certificate_manager",
-			Name:           "client_expiration_seconds",
-			Help:           "Gauge of the lifetime of a certificate. The value is the date the certificate will expire in seconds since January 1, 1970 UTC.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-	)
-	legacyregistry.Register(certificateExpiration)
 	var certificateRenewFailure = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
 			Namespace:      metrics.KubeletSubsystem,
@@ -269,5 +259,6 @@ func NewKubeletClientCertificateManager(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
 	}
+
 	return m, nil
 }
