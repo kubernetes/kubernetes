@@ -32,7 +32,7 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 
 	"github.com/davecgh/go-spew/spew"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -984,7 +984,7 @@ func endpointsToEndpointsMap(endpoints *v1.Endpoints, hostname string, hns HostN
 				epInfo := newEndpointInfo(addr.IP, uint16(port.Port), isLocal, hns)
 				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
 			}
-			if klog.V(3) {
+			if klog.V(3).Enabled() {
 				newEPList := []*endpointsInfo{}
 				for _, ep := range endpointsMap[svcPortName] {
 					newEPList = append(newEPList, ep)

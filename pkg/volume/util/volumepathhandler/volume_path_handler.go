@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 

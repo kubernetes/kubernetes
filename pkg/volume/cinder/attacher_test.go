@@ -34,7 +34,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

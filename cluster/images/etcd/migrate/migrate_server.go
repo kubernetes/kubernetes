@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // EtcdMigrateServer manages starting and stopping a versioned etcd server binary.

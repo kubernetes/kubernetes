@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/events"

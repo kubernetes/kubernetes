@@ -19,7 +19,7 @@ package noderesources
 import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -66,7 +66,7 @@ func (r *resourceAllocationScorer) score(
 	} else {
 		score = r.scorer(requested, allocatable, false, 0, 0)
 	}
-	if klog.V(10) {
+	if klog.V(10).Enabled() {
 		if len(pod.Spec.Volumes) >= 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
 			klog.Infof(
 				"%v -> %v: %v, map of allocatable resources %v, map of requested resources %v , allocatable volumes %d, requested volumes %d, score %d",
@@ -104,7 +104,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
 		}
 	}
-	if klog.V(10) {
+	if klog.V(10).Enabled() {
 		klog.Infof("requested resource %v not considered for node score calculation",
 			resource,
 		)

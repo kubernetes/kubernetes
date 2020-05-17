@@ -34,7 +34,7 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"

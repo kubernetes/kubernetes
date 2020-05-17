@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 
 	"k8s.io/component-base/featuregate"

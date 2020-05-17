@@ -11,7 +11,7 @@ require (
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gogo/protobuf v1.3.1
-	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
+	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 	github.com/golang/protobuf v1.3.3
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
@@ -29,8 +29,8 @@ require (
 	golang.org/x/text v0.3.2 // indirect
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/yaml.v2 v2.2.8
-	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
+	k8s.io/klog/v2 v2.0.0
+	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
 	sigs.k8s.io/structured-merge-diff/v3 v3.0.0
 	sigs.k8s.io/yaml v1.2.0
 )

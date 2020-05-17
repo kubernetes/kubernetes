@@ -38,7 +38,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.

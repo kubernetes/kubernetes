@@ -17,7 +17,7 @@ go_library(
         "//pkg/kubelet/cm/containermap:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

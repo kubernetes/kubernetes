@@ -1,4 +1,4 @@
-// +build !libipmctl !cgo
+// +build !libpfm !cgo
 
 // Copyright 2020 Google Inc. All Rights Reserved.
 //
@@ -14,12 +14,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package machine
+// Collector of perf events for a container.
+package perf
 
-import info "github.com/google/cadvisor/info/v1"
+import (
+	"github.com/google/cadvisor/stats"
 
-// GetNVMInfo returns information specific for non-volatile memory modules.
-// When libipmct is not available zero value is returned.
-func GetNVMInfo() (info.NVMInfo, error) {
-	return info.NVMInfo{}, nil
+	"k8s.io/klog/v2"
+)
+
+func NewCollector(cgroupPath string, events Events, numCores int) stats.Collector {
+	return &stats.NoopCollector{}
+}
+
+// Finalize terminates libpfm4 to free resources.
+func Finalize() {
+	klog.V(1).Info("cAdvisor is build without cgo and/or libpfm support. Nothing to be finalized")
 }

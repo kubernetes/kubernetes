@@ -25,7 +25,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/utils/exec"

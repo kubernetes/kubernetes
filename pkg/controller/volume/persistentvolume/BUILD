@@ -55,7 +55,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
     ],
@@ -105,7 +105,7 @@ go_test(
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

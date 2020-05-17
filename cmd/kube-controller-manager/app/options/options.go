@@ -46,7 +46,7 @@ import (
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

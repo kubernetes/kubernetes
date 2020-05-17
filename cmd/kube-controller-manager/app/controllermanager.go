@@ -59,7 +59,7 @@ import (
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"

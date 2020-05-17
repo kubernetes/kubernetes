@@ -27,7 +27,7 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // VirtualMachine extends the govmomi VirtualMachine object

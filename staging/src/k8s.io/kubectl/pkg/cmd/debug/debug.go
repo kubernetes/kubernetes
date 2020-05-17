@@ -37,7 +37,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/attach"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/logs"

@@ -26,7 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudvolume "k8s.io/cloud-provider/volume"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set

@@ -56,7 +56,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"

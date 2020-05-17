@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilsexec "k8s.io/utils/exec"

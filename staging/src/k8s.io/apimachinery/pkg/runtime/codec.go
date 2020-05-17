@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // codec binds an encoder and decoder.

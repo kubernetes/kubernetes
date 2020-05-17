@@ -28,7 +28,7 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"

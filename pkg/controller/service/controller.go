@@ -41,7 +41,7 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

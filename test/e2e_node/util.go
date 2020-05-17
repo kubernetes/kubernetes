@@ -36,7 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"

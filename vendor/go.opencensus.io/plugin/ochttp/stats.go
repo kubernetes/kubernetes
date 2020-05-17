@@ -92,38 +92,38 @@ var (
 	// The value of this tag can be controlled by the HTTP client, so you need
 	// to watch out for potentially generating high-cardinality labels in your
 	// metrics backend if you use this tag in views.
-	Host, _ = tag.NewKey("http.host")
+	Host = tag.MustNewKey("http.host")
 
 	// StatusCode is the numeric HTTP response status code,
 	// or "error" if a transport error occurred and no status code was read.
-	StatusCode, _ = tag.NewKey("http.status")
+	StatusCode = tag.MustNewKey("http.status")
 
 	// Path is the URL path (not including query string) in the request.
 	//
 	// The value of this tag can be controlled by the HTTP client, so you need
 	// to watch out for potentially generating high-cardinality labels in your
 	// metrics backend if you use this tag in views.
-	Path, _ = tag.NewKey("http.path")
+	Path = tag.MustNewKey("http.path")
 
 	// Method is the HTTP method of the request, capitalized (GET, POST, etc.).
-	Method, _ = tag.NewKey("http.method")
+	Method = tag.MustNewKey("http.method")
 
 	// KeyServerRoute is a low cardinality string representing the logical
 	// handler of the request. This is usually the pattern registered on the a
 	// ServeMux (or similar string).
-	KeyServerRoute, _ = tag.NewKey("http_server_route")
+	KeyServerRoute = tag.MustNewKey("http_server_route")
 )
 
 // Client tag keys.
 var (
 	// KeyClientMethod is the HTTP method, capitalized (i.e. GET, POST, PUT, DELETE, etc.).
-	KeyClientMethod, _ = tag.NewKey("http_client_method")
+	KeyClientMethod = tag.MustNewKey("http_client_method")
 	// KeyClientPath is the URL path (not including query string).
-	KeyClientPath, _ = tag.NewKey("http_client_path")
+	KeyClientPath = tag.MustNewKey("http_client_path")
 	// KeyClientStatus is the HTTP status code as an integer (e.g. 200, 404, 500.), or "error" if no response status line was received.
-	KeyClientStatus, _ = tag.NewKey("http_client_status")
+	KeyClientStatus = tag.MustNewKey("http_client_status")
 	// KeyClientHost is the value of the request Host header.
-	KeyClientHost, _ = tag.NewKey("http_client_host")
+	KeyClientHost = tag.MustNewKey("http_client_host")
 )
 
 // Default distributions used by views in this package.

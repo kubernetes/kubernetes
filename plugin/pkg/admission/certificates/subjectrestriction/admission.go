@@ -23,7 +23,7 @@ import (
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 )
 

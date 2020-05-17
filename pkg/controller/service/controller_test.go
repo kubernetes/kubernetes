@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const region = "us-central"

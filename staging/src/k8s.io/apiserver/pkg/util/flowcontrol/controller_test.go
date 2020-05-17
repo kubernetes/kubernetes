@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func TestMain(m *testing.M) {

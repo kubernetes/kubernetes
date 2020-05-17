@@ -21,7 +21,7 @@ package gce
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"

@@ -26,7 +26,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type priorityAndFairnessKeyType int

@@ -24,7 +24,7 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/client-go/tools/remotecommand"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"

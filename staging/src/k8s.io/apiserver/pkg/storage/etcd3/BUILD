@@ -82,7 +82,7 @@ go_library(
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/go.etcd.io/etcd/mvcc/mvccpb:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
     ],
 )

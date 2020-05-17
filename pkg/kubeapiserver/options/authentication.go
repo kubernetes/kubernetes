@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"

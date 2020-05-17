@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func Test_NodesDeleted(t *testing.T) {

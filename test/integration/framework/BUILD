@@ -78,7 +78,7 @@ go_library(
         "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )

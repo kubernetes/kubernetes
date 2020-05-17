@@ -24,7 +24,7 @@ import (
 
 	"github.com/munnerz/goautoneg"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"

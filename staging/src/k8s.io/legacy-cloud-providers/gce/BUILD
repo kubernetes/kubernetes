@@ -84,7 +84,7 @@ go_library(
         "//vendor/google.golang.org/api/option:go_default_library",
         "//vendor/google.golang.org/api/tpu/v1:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )

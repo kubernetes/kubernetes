@@ -37,7 +37,7 @@ require (
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
-	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb // indirect
+	google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba // indirect
 	google.golang.org/grpc v1.26.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
@@ -46,10 +46,10 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
-	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7
+	k8s.io/klog/v2 v2.0.0
+	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
+	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9-0.20200513220823-33b997865007
 	sigs.k8s.io/structured-merge-diff/v3 v3.0.0
 	sigs.k8s.io/yaml v1.2.0
 )

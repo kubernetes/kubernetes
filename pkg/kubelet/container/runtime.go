@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 

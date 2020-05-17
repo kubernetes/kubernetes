@@ -32,7 +32,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

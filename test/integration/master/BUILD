@@ -149,7 +149,7 @@ go_library(
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

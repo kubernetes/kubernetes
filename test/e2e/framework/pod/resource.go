@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/podutils"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"

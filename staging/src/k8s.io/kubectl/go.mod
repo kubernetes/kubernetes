@@ -39,10 +39,10 @@ require (
 	k8s.io/cli-runtime v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
+	k8s.io/klog/v2 v2.0.0
+	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
 	k8s.io/metrics v0.0.0
-	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.2.0
 	vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc

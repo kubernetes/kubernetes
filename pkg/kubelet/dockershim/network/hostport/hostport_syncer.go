@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"

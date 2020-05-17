@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // HealthChecker is a named healthz checker.

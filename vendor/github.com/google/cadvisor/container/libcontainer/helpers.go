@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/cadvisor/container"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type CgroupSubsystems struct {
@@ -104,15 +104,16 @@ func getCgroupSubsystemsHelper(allCgroups []cgroups.Mount, disableCgroups map[st
 
 // Cgroup subsystems we support listing (should be the minimal set we need stats from).
 var supportedSubsystems map[string]struct{} = map[string]struct{}{
-	"cpu":     {},
-	"cpuacct": {},
-	"memory":  {},
-	"hugetlb": {},
-	"pids":    {},
-	"cpuset":  {},
-	"blkio":   {},
-	"io":      {},
-	"devices": {},
+	"cpu":        {},
+	"cpuacct":    {},
+	"memory":     {},
+	"hugetlb":    {},
+	"pids":       {},
+	"cpuset":     {},
+	"blkio":      {},
+	"io":         {},
+	"devices":    {},
+	"perf_event": {},
 }
 
 func DiskStatsCopy0(major, minor uint64) *info.PerDiskStats {
@@ -129,38 +130,38 @@ type DiskKey struct {
 	Minor uint64
 }
 
-func DiskStatsCopy1(disk_stat map[DiskKey]*info.PerDiskStats) []info.PerDiskStats {
+func DiskStatsCopy1(diskStat map[DiskKey]*info.PerDiskStats) []info.PerDiskStats {
 	i := 0
-	stat := make([]info.PerDiskStats, len(disk_stat))
-	for _, disk := range disk_stat {
+	stat := make([]info.PerDiskStats, len(diskStat))
+	for _, disk := range diskStat {
 		stat[i] = *disk
 		i++
 	}
 	return stat
 }
 
-func DiskStatsCopy(blkio_stats []cgroups.BlkioStatEntry) (stat []info.PerDiskStats) {
-	if len(blkio_stats) == 0 {
+func DiskStatsCopy(blkioStats []cgroups.BlkioStatEntry) (stat []info.PerDiskStats) {
+	if len(blkioStats) == 0 {
 		return
 	}
-	disk_stat := make(map[DiskKey]*info.PerDiskStats)
-	for i := range blkio_stats {
-		major := blkio_stats[i].Major
-		minor := blkio_stats[i].Minor
-		disk_key := DiskKey{
+	diskStat := make(map[DiskKey]*info.PerDiskStats)
+	for i := range blkioStats {
+		major := blkioStats[i].Major
+		minor := blkioStats[i].Minor
+		key := DiskKey{
 			Major: major,
 			Minor: minor,
 		}
-		diskp, ok := disk_stat[disk_key]
+		diskp, ok := diskStat[key]
 		if !ok {
 			diskp = DiskStatsCopy0(major, minor)
-			disk_stat[disk_key] = diskp
+			diskStat[key] = diskp
 		}
-		op := blkio_stats[i].Op
+		op := blkioStats[i].Op
 		if op == "" {
 			op = "Count"
 		}
-		diskp.Stats[op] = blkio_stats[i].Value
+		diskp.Stats[op] = blkioStats[i].Value
 	}
-	return DiskStatsCopy1(disk_stat)
+	return DiskStatsCopy1(diskStat)
 }

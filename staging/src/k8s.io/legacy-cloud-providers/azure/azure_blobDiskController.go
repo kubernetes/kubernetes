@@ -37,7 +37,7 @@ import (
 
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

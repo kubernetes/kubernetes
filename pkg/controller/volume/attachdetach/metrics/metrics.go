@@ -24,7 +24,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"

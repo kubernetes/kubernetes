@@ -77,7 +77,7 @@ type Interface interface {
 var _ Interface = &Mounter{}
 
 // MountPoint represents a single line in /proc/mounts or /etc/fstab.
-type MountPoint struct {
+type MountPoint struct { // nolint: golint
 	Device string
 	Path   string
 	Type   string
@@ -86,7 +86,7 @@ type MountPoint struct {
 	Pass   int
 }
 
-type MountErrorType string
+type MountErrorType string // nolint: golint
 
 const (
 	FilesystemMismatch  MountErrorType = "FilesystemMismatch"
@@ -97,7 +97,7 @@ const (
 	UnknownMountError   MountErrorType = "UnknownMountError"
 )
 
-type MountError struct {
+type MountError struct { // nolint: golint
 	Type    MountErrorType
 	Message string
 }
@@ -346,14 +346,14 @@ func StartsWithBackstep(rel string) bool {
 	return rel == ".." || strings.HasPrefix(filepath.ToSlash(rel), "../")
 }
 
-// sanitizedOptionsForLogging will return a comma seperated string containing
+// sanitizedOptionsForLogging will return a comma separated string containing
 // options and sensitiveOptions. Each entry in sensitiveOptions will be
 // replaced with the string sensitiveOptionsRemoved
 // e.g. o1,o2,<masked>,<masked>
 func sanitizedOptionsForLogging(options []string, sensitiveOptions []string) string {
-	seperator := ""
+	separator := ""
 	if len(options) > 0 && len(sensitiveOptions) > 0 {
-		seperator = ","
+		separator = ","
 	}
 
 	sensitiveOptionsStart := ""
@@ -364,7 +364,7 @@ func sanitizedOptionsForLogging(options []string, sensitiveOptions []string) str
 	}
 
 	return strings.Join(options, ",") +
-		seperator +
+		separator +
 		sensitiveOptionsStart +
 		sensitiveOptionsEnd
 }

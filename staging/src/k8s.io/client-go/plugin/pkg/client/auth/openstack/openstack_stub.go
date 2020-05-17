@@ -20,7 +20,7 @@ import (
 	"errors"
 
 	"k8s.io/client-go/rest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {

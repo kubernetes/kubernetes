@@ -16,7 +16,7 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/oomparser:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
@@ -34,7 +34,7 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/oomparser:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",

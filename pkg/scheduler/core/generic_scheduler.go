@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -644,7 +644,7 @@ func (g *genericScheduler) prioritizeNodes(
 		return nil, scoreStatus.AsError()
 	}
 
-	if klog.V(10) {
+	if klog.V(10).Enabled() {
 		for plugin, nodeScoreList := range scoresMap {
 			klog.Infof("Plugin %s scores on %v/%v => %v", plugin, pod.Namespace, pod.Name, nodeScoreList)
 		}
@@ -683,7 +683,7 @@ func (g *genericScheduler) prioritizeNodes(
 				mu.Lock()
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					if klog.V(10) {
+					if klog.V(10).Enabled() {
 						klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, g.extenders[extIndex].Name(), score)
 					}
 					combinedScores[host] += score * weight
@@ -700,7 +700,7 @@ func (g *genericScheduler) prioritizeNodes(
 		}
 	}
 
-	if klog.V(10) {
+	if klog.V(10).Enabled() {
 		for i := range result {
 			klog.Infof("Host %s => Score %d", result[i].Name, result[i].Score)
 		}

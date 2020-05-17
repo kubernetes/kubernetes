@@ -38,7 +38,7 @@ import (
 
 	docker "github.com/docker/docker/client"
 	"golang.org/x/net/context"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
@@ -103,6 +103,7 @@ const (
 	overlayStorageDriver      storageDriver = "overlay"
 	overlay2StorageDriver     storageDriver = "overlay2"
 	zfsStorageDriver          storageDriver = "zfs"
+	vfsStorageDriver          storageDriver = "vfs"
 )
 
 type dockerFactory struct {
@@ -131,11 +132,11 @@ type dockerFactory struct {
 	zfsWatcher *zfs.ZfsWatcher
 }
 
-func (self *dockerFactory) String() string {
+func (f *dockerFactory) String() string {
 	return DockerNamespace
 }
 
-func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
+func (f *dockerFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
 	client, err := Client()
 	if err != nil {
 		return
@@ -146,18 +147,18 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 	handler, err = newDockerContainerHandler(
 		client,
 		name,
-		self.machineInfoFactory,
-		self.fsInfo,
-		self.storageDriver,
-		self.storageDir,
-		&self.cgroupSubsystems,
+		f.machineInfoFactory,
+		f.fsInfo,
+		f.storageDriver,
+		f.storageDir,
+		&f.cgroupSubsystems,
 		inHostNamespace,
 		metadataEnvs,
-		self.dockerVersion,
-		self.includedMetrics,
-		self.thinPoolName,
-		self.thinPoolWatcher,
-		self.zfsWatcher,
+		f.dockerVersion,
+		f.includedMetrics,
+		f.thinPoolName,
+		f.thinPoolWatcher,
+		f.zfsWatcher,
 	)
 	return
 }
@@ -184,7 +185,7 @@ func isContainerName(name string) bool {
 }
 
 // Docker handles all containers under /docker
-func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
+func (f *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	// if the container is not associated with docker, we can't handle it or accept it.
 	if !isContainerName(name) {
 		return false, false, nil
@@ -194,7 +195,7 @@ func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	id := ContainerNameToDockerId(name)
 
 	// We assume that if Inspect fails then the container is not known to docker.
-	ctnr, err := self.client.ContainerInspect(context.Background(), id)
+	ctnr, err := f.client.ContainerInspect(context.Background(), id)
 	if err != nil || !ctnr.State.Running {
 		return false, true, fmt.Errorf("error inspecting container: %v", err)
 	}
@@ -202,15 +203,15 @@ func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	return true, true, nil
 }
 
-func (self *dockerFactory) DebugInfo() map[string][]string {
+func (f *dockerFactory) DebugInfo() map[string][]string {
 	return map[string][]string{}
 }
 
 var (
-	version_regexp_string    = `(\d+)\.(\d+)\.(\d+)`
-	version_re               = regexp.MustCompile(version_regexp_string)
-	apiversion_regexp_string = `(\d+)\.(\d+)`
-	apiversion_re            = regexp.MustCompile(apiversion_regexp_string)
+	versionRegexpString    = `(\d+)\.(\d+)\.(\d+)`
+	versionRe              = regexp.MustCompile(versionRegexpString)
+	apiVersionRegexpString = `(\d+)\.(\d+)`
+	apiVersionRe           = regexp.MustCompile(apiVersionRegexpString)
 )
 
 func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolWatcher, error) {
@@ -268,7 +269,7 @@ func ensureThinLsKernelVersion(kernelVersion string) error {
 	// thin_ls to work without corrupting the thin pool
 	minRhel7KernelVersion := semver.MustParse("3.10.0")
 
-	matches := version_re.FindStringSubmatch(kernelVersion)
+	matches := versionRe.FindStringSubmatch(kernelVersion)
 	if len(matches) < 4 {
 		return fmt.Errorf("error parsing kernel version: %q is not a semver", kernelVersion)
 	}
@@ -334,7 +335,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 	}
 
 	// Version already validated above, assume no error here.
-	dockerVersion, _ := parseVersion(dockerInfo.ServerVersion, version_re, 3)
+	dockerVersion, _ := parseVersion(dockerInfo.ServerVersion, versionRe, 3)
 
 	dockerAPIVersion, _ := APIVersion()
 

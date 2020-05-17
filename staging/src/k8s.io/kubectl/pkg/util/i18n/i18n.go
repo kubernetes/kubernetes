@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubectl/pkg/generated"
 
 	"github.com/chai2010/gettext-go/gettext"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var knownTranslations = map[string][]string{

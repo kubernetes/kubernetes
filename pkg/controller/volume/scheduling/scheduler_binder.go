@@ -37,7 +37,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"

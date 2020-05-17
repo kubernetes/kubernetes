@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1alpha2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"

@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	"k8s.io/api/core/v1"

@@ -72,7 +72,7 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/k8s.io/gengo/examples/set-gen/sets:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

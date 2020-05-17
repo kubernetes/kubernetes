@@ -29,7 +29,7 @@ import (
 	libipvs "github.com/moby/ipvs"
 	"github.com/pkg/errors"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"

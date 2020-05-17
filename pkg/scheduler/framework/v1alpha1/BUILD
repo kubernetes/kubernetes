@@ -38,7 +38,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha2:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

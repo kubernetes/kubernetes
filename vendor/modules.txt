@@ -1,6 +1,6 @@
 # bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690 => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 bitbucket.org/bertimus9/systemstat
-# cloud.google.com/go v0.38.0 => cloud.google.com/go v0.38.0
+# cloud.google.com/go v0.51.0 => cloud.google.com/go v0.51.0
 cloud.google.com/go/compute/metadata
 # github.com/Azure/azure-sdk-for-go v40.2.0+incompatible => github.com/Azure/azure-sdk-for-go v40.2.0+incompatible
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
@@ -29,7 +29,7 @@ github.com/Azure/go-autorest/autorest/validation
 github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.5.0 => github.com/Azure/go-autorest/tracing v0.5.0
 github.com/Azure/go-autorest/tracing
-# github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534 => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
+# github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317 => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta
@@ -240,6 +240,8 @@ github.com/ghodss/yaml
 # github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
 github.com/go-bindata/go-bindata
 github.com/go-bindata/go-bindata/go-bindata
+# github.com/go-logr/logr v0.1.0 => github.com/go-logr/logr v0.1.0
+github.com/go-logr/logr
 # github.com/go-openapi/analysis v0.19.5 => github.com/go-openapi/analysis v0.19.5
 github.com/go-openapi/analysis
 github.com/go-openapi/analysis/internal
@@ -296,7 +298,7 @@ github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
-# github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef => github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
+# github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 => github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 github.com/golang/groupcache/lru
 # github.com/golang/mock v1.3.1 => github.com/golang/mock v1.3.1
 github.com/golang/mock/gomock
@@ -315,7 +317,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
-# github.com/google/cadvisor v0.36.1-0.20200323171535-8af10c683a96 => github.com/google/cadvisor v0.36.1-0.20200323171535-8af10c683a96
+# github.com/google/cadvisor v0.36.1-0.20200513160741-6a8d61401ea9 => github.com/google/cadvisor v0.36.1-0.20200513160741-6a8d61401ea9
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -341,6 +343,8 @@ github.com/google/cadvisor/info/v2
 github.com/google/cadvisor/machine
 github.com/google/cadvisor/manager
 github.com/google/cadvisor/metrics
+github.com/google/cadvisor/nvm
+github.com/google/cadvisor/perf
 github.com/google/cadvisor/stats
 github.com/google/cadvisor/storage
 github.com/google/cadvisor/summary
@@ -795,7 +799,7 @@ go.mongodb.org/mongo-driver/bson/bsonrw
 go.mongodb.org/mongo-driver/bson/bsontype
 go.mongodb.org/mongo-driver/bson/primitive
 go.mongodb.org/mongo-driver/x/bsonx/bsoncore
-# go.opencensus.io v0.21.0 => go.opencensus.io v0.21.0
+# go.opencensus.io v0.22.2 => go.opencensus.io v0.22.2
 go.opencensus.io
 go.opencensus.io/internal
 go.opencensus.io/internal/tagencoding
@@ -862,7 +866,7 @@ golang.org/x/net/ipv6
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+# golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 => golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
@@ -901,7 +905,7 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20191024005414-555d28b269f0 => golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
+# golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4 => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/go/ast/astutil
@@ -966,7 +970,7 @@ google.golang.org/api/pubsub/v1
 google.golang.org/api/tpu/v1
 google.golang.org/api/transport/http
 google.golang.org/api/transport/http/internal/propagation
-# google.golang.org/appengine v1.5.0 => google.golang.org/appengine v1.5.0
+# google.golang.org/appengine v1.6.5 => google.golang.org/appengine v1.6.5
 google.golang.org/appengine
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/app_identity
@@ -977,7 +981,7 @@ google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb => google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
+# google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba => google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
@@ -1644,7 +1648,7 @@ k8s.io/cri-api/pkg/apis/testing
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
-# k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12 => k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12
+# k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14 => k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
 k8s.io/gengo/examples/defaulter-gen/generators
@@ -1657,8 +1661,8 @@ k8s.io/gengo/parser
 k8s.io/gengo/types
 # k8s.io/heapster v1.2.0-beta.1 => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog v1.0.0 => k8s.io/klog v1.0.0
-k8s.io/klog
+# k8s.io/klog/v2 v2.0.0 => k8s.io/klog/v2 v2.0.0
+k8s.io/klog/v2
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/install
@@ -1689,7 +1693,7 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35 => k8s.io/kube-openapi v0.0.0-20200403204345-e1beb1bd0f35
+# k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9 => k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
 k8s.io/kube-openapi/pkg/aggregator
@@ -1882,7 +1886,7 @@ k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/system-validators v1.1.2 => k8s.io/system-validators v1.1.2
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89 => k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+# k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 => k8s.io/utils v0.0.0-20200414100711-2df71ebbae66
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec
@@ -1898,7 +1902,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings
 k8s.io/utils/trace
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9-0.20200513220823-33b997865007 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9-0.20200513220823-33b997865007
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 # sigs.k8s.io/kustomize v2.0.3+incompatible => sigs.k8s.io/kustomize v2.0.3+incompatible

@@ -2,7 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["prometheus.go"],
+    srcs = [
+        "metrics.go",
+        "prometheus.go",
+        "prometheus_fake.go",
+        "prometheus_machine.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/metrics",
     importpath = "github.com/google/cadvisor/metrics",
     visibility = ["//visibility:public"],
@@ -10,7 +15,8 @@ go_library(
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/k8s.io/utils/clock:go_default_library",
     ],
 )
 

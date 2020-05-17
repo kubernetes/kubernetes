@@ -31,7 +31,7 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status

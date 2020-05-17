@@ -88,7 +88,7 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"

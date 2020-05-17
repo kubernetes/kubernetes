@@ -32,7 +32,7 @@ import (
 	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

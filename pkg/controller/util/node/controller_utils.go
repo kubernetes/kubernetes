@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DeletePods will delete all pods from master running on given node,

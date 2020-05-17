@@ -53,7 +53,7 @@ import (
 	morereporters "github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var e2es *services.E2EServices

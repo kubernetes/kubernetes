@@ -37,19 +37,18 @@ func getOperatingSystem() (string, error) {
 			return "", err
 		}
 		return string(osName), nil
-	} else {
-		bytes, err := ioutil.ReadFile("/etc/os-release")
-		if err != nil && os.IsNotExist(err) {
-			// /usr/lib/os-release in stateless systems like Clear Linux
-			bytes, err = ioutil.ReadFile("/usr/lib/os-release")
-		}
-		if err != nil {
-			return "", fmt.Errorf("error opening file : %v", err)
-		}
-		line := rex.FindAllStringSubmatch(string(bytes), -1)
-		if len(line) > 0 {
-			return strings.Trim(line[0][2], "\""), nil
-		}
-		return "Linux", nil
 	}
+	bytes, err := ioutil.ReadFile("/etc/os-release")
+	if err != nil && os.IsNotExist(err) {
+		// /usr/lib/os-release in stateless systems like Clear Linux
+		bytes, err = ioutil.ReadFile("/usr/lib/os-release")
+	}
+	if err != nil {
+		return "", fmt.Errorf("error opening file : %v", err)
+	}
+	line := rex.FindAllStringSubmatch(string(bytes), -1)
+	if len(line) > 0 {
+		return strings.Trim(line[0][2], "\""), nil
+	}
+	return "Linux", nil
 }

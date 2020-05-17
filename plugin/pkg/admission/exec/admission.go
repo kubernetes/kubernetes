@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 

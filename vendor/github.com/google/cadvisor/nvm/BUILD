@@ -2,13 +2,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "klog.go",
-        "klog_file.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/klog",
-    importpath = "k8s.io/klog",
+    srcs = ["machine_no_libipmctl.go"],
+    cgo = True,
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/nvm",
+    importpath = "github.com/google/cadvisor/nvm",
     visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
+    ],
 )
 
 filegroup(

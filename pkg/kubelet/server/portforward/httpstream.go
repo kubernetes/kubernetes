@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {

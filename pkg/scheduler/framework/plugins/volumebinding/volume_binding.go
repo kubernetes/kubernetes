@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"

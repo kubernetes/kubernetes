@@ -34,7 +34,7 @@ go_library(
             "//vendor/github.com/Microsoft/hcsshim:go_default_library",
             "//vendor/github.com/Microsoft/hcsshim/hcn:go_default_library",
             "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "//conditions:default": [],
     }),

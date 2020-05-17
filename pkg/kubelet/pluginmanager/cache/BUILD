@@ -9,7 +9,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/klog:go_default_library"],
+    deps = ["//vendor/k8s.io/klog/v2:go_default_library"],
 )
 
 go_test(

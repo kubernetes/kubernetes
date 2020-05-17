@@ -59,7 +59,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"

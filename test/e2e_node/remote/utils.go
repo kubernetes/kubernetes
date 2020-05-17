@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // utils.go contains functions used across test suites.

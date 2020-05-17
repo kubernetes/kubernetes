@@ -24,7 +24,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Interface manages the allocation of ports out of a range. Interface

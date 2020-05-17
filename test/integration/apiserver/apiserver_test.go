@@ -58,7 +58,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )

@@ -43,7 +43,7 @@ import (
 	"go.etcd.io/etcd/pkg/transport"
 	"go.etcd.io/etcd/pkg/types"
 	"go.uber.org/zap"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
