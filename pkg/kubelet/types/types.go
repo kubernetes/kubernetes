@@ -61,7 +61,7 @@ func (t *Timestamp) GetString() string {
 	return t.time.Format(time.RFC3339Nano)
 }
 
-// A type to help sort container statuses based on container names.
+// SortedContainerStatuses is a type to help sort container statuses based on container names.
 type SortedContainerStatuses []v1.ContainerStatus
 
 func (s SortedContainerStatuses) Len() int      { return len(s) }
@@ -95,8 +95,8 @@ type Reservation struct {
 	Kubernetes v1.ResourceList
 }
 
-// A pod UID which has been translated/resolved to the representation known to kubelets.
+// ResolvedPodUID is a pod UID which has been translated/resolved to the representation known to kubelets.
 type ResolvedPodUID types.UID
 
-// A pod UID for a mirror pod.
+// MirrorPodUID is a pod UID for a mirror pod.
 type MirrorPodUID types.UID

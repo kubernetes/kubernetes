@@ -25,42 +25,47 @@ import (
 )
 
 const (
-	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
-	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
+	// ConfigSourceAnnotationKey specifies a annotation key for config source
+	ConfigSourceAnnotationKey = "kubernetes.io/config.source"
+	// ConfigMirrorAnnotationKey specifies a annotation key for config mirror
+	ConfigMirrorAnnotationKey = v1.MirrorPodAnnotationKey
+	// ConfigFirstSeenAnnotationKey specifies a annotation key for config first seen
 	ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
-	ConfigHashAnnotationKey      = "kubernetes.io/config.hash"
+	// ConfigHashAnnotationKey specifies a annotation key for config hash
+	ConfigHashAnnotationKey = "kubernetes.io/config.hash"
 )
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
 
 const (
-	// This is the current pod configuration
+	// SET is the current pod configuration
 	SET PodOperation = iota
-	// Pods with the given ids are new to this source
+	// ADD pods with the given ids are new to this source
 	ADD
-	// Pods with the given ids are gracefully deleted from this source
+	// DELETE pods with the given ids are gracefully deleted from this source
 	DELETE
-	// Pods with the given ids have been removed from this source
+	// REMOVE pods with the given ids have been removed from this source
 	REMOVE
-	// Pods with the given ids have been updated in this source
+	// UPDATE pods with the given ids have been updated in this source
 	UPDATE
-	// Pods with the given ids have unexpected status in this source,
+	// RECONCILE pods with the given ids have unexpected status in this source,
 	// kubelet should reconcile status with this source
 	RECONCILE
-	// Pods with the given ids have been restored from a checkpoint.
+	// RESTORE pods with the given ids have been restored from a checkpoint.
 	RESTORE
 
-	// These constants identify the sources of pods
+	// FileSource constants identify the sources of pods
 	// Updates from a file
 	FileSource = "file"
-	// Updates from querying a web page
+	// HTTPSource updates from querying a web page
 	HTTPSource = "http"
-	// Updates from Kubernetes API Server
+	// ApiserverSource updates from Kubernetes API Server
 	ApiserverSource = "api"
-	// Updates from all sources
+	// AllSource updates from all sources
 	AllSource = "*"
 
+	// NamespaceDefault default namespace
 	NamespaceDefault = metav1.NamespaceDefault
 )
 
@@ -79,7 +84,7 @@ type PodUpdate struct {
 	Source string
 }
 
-// Gets all validated sources from the specified sources.
+// GetValidatedSources gets all validated sources from the specified sources.
 func GetValidatedSources(sources []string) ([]string, error) {
 	validated := make([]string, 0, len(sources))
 	for _, source := range sources {

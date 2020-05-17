@@ -116,7 +116,6 @@ pkg/kubelet/preemption
 pkg/kubelet/remote
 pkg/kubelet/stats
 pkg/kubelet/sysctl
-pkg/kubelet/types
 pkg/kubemark
 pkg/master/controller/crdregistration
 pkg/master/tunneler
