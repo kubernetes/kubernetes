@@ -189,7 +189,7 @@ Ngid:	0
 Pid:	26231
 PPid:	1
 TracerPid:	0
-Uid:	0	0	0	0
+Uid:	1000	1000	1000	0
 Gid:	0	0	0	0
 FDSize:	128
 Groups:
@@ -289,6 +289,19 @@ Max realtime priority     0                    0
 Max realtime timeout      unlimited            unlimited            us
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/26232/maps
+Lines: 9
+55680ae1e000-55680ae20000 r--p 00000000 fd:01 47316994                   /bin/cat
+55680ae29000-55680ae2a000 rwxs 0000a000 fd:01 47316994                   /bin/cat
+55680bed6000-55680bef7000 rw-p 00000000 00:00 0                          [heap]
+7fdf964fc000-7fdf973f2000 r--p 00000000 fd:01 17432624                   /usr/lib/locale/locale-archive
+7fdf973f2000-7fdf97417000 r--p 00000000 fd:01 60571062                   /lib/x86_64-linux-gnu/libc-2.29.so
+7ffe9215c000-7ffe9217f000 rw-p 00000000 00:00 0                          [stack]
+7ffe921da000-7ffe921dd000 r--p 00000000 00:00 0                          [vvar]
+7ffe921dd000-7ffe921de000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/proc/26232/root
 SymlinkTo: /does/not/exist
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -315,6 +328,17 @@ Lines: 8
             (__)\       )\/\
                 ||----w |
                 ||     ||
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/proc/26234
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/26234/maps
+Lines: 4
+08048000-08089000 r-xp 00000000 03:01 104219 /bin/tcsh
+08089000-0808c000 rw-p 00041000 03:01 104219 /bin/tcsh
+0808c000-08146000 rwxp 00000000 00:00 0
+40000000-40015000 r-xp 00000000 03:01 61874 /lib/ld-2.3.2.so
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Directory: fixtures/proc/584
@@ -554,7 +578,7 @@ power management:
 Mode: 444
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/proc/crypto
-Lines: 971
+Lines: 972
 name         : ccm(aes)
 driver       : ccm_base(ctr(aes-aesni),cbcmac(aes-aesni))
 module       : ccm
@@ -588,6 +612,7 @@ refcnt       : 1
 selftest     : passed
 internal     : no
 type         : kpp
+async        : yes
 
 name         : ecb(arc4)
 driver       : ecb(arc4)-generic
@@ -1614,6 +1639,11 @@ xpc 399724544 92823103 86219234
 debug 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/loadavg
+Lines: 1
+0.02 0.04 0.05 1/497 11947
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/proc/mdstat
 Lines: 56
 Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
@@ -1673,6 +1703,52 @@ md101 : active (read-only) raid0 sdb[2] sdd[1] sdc[0]
 
 unused devices: <none>
 Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/meminfo
+Lines: 42
+MemTotal:       15666184 kB
+MemFree:          440324 kB
+Buffers:         1020128 kB
+Cached:         12007640 kB
+SwapCached:            0 kB
+Active:          6761276 kB
+Inactive:        6532708 kB
+Active(anon):     267256 kB
+Inactive(anon):      268 kB
+Active(file):    6494020 kB
+Inactive(file):  6532440 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+Dirty:               768 kB
+Writeback:             0 kB
+AnonPages:        266216 kB
+Mapped:            44204 kB
+Shmem:              1308 kB
+Slab:            1807264 kB
+SReclaimable:    1738124 kB
+SUnreclaim:        69140 kB
+KernelStack:        1616 kB
+PageTables:         5288 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:     7833092 kB
+Committed_AS:     530844 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:       36596 kB
+VmallocChunk:   34359637840 kB
+HardwareCorrupted:     0 kB
+AnonHugePages:     12288 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+DirectMap4k:       91136 kB
+DirectMap2M:    16039936 kB
+Mode: 664
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Directory: fixtures/proc/net
 Mode: 755
@@ -1755,9 +1831,55 @@ proc4 2 2 10853
 proc4ops 72 0 0 0 1098 2 0 0 0 0 8179 5896 0 0 0 0 5900 0 0 2 0 2 0 9609 0 2 150 1272 0 0 0 1236 0 0 0 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/sockstat
+Lines: 6
+sockets: used 1602
+TCP: inuse 35 orphan 0 tw 4 alloc 59 mem 22
+UDP: inuse 12 mem 62
+UDPLITE: inuse 0
+RAW: inuse 0
+FRAG: inuse 0 memory 0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/sockstat6
+Lines: 5
+TCP6: inuse 17
+UDP6: inuse 9
+UDPLITE6: inuse 0
+RAW6: inuse 1
+FRAG6: inuse 0 memory 0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/proc/net/softnet_stat
-Lines: 1
+Lines: 2
 00015c73 00020e76 F0000769 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+01663fb2 00000000 000109a4 00000000 00000000 00000000 00000000 00000000 00000000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/softnet_stat.broken
+Lines: 1
+00015c73 00020e76 F0000769 00000000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/udp
+Lines: 4
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 0A000005:0016 00000000:0000 0A 00000000:00000001 00:00000000 00000000     0        0 2740 1 ffff88003d3af3c0 100 0 0 10 0
+   1: 00000000:0016 00000000:0000 0A 00000001:00000000 00:00000000 00000000     0        0 2740 1 ffff88003d3af3c0 100 0 0 10 0
+   2: 00000000:0016 00000000:0000 0A 00000001:00000001 00:00000000 00000000     0        0 2740 1 ffff88003d3af3c0 100 0 0 10 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/udp6
+Lines: 3
+  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops
+ 1315: 00000000000000000000000000000000:14EB 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000   981        0 21040 2 0000000013726323 0
+ 6073: 000080FE00000000FFADE15609667CFE:C781 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000  1000        0 11337031 2 00000000b9256fdd 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/udp_broken
+Lines: 2
+  sl  local_address rem_address   st
+   1: 00000000:0016 00000000:0000 0A
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/proc/net/unix
@@ -1864,6 +1986,12 @@ procs_running 2
 procs_blocked 1
 softirq 5057579 250191 1481983 1647 211099 186066 0 1783454 622196 12499 508444
 Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/swaps
+Lines: 2
+Filename				Type		Size	Used	Priority
+/dev/dm-2                               partition	131068	176	-2
+Mode: 444
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Directory: fixtures/proc/symlinktargets
 Mode: 755
@@ -2775,6 +2903,134 @@ SymlinkTo: ../../devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/device:00/PNP0C09:00
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/sys/class/power_supply/BAT0
 SymlinkTo: ../../devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/device:00/PNP0C09:00/PNP0C0A:00/power_supply/BAT0
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/powercap
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/powercap/intel-rapl
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl/enabled
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl/uevent
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/powercap/intel-rapl:0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_0_max_power_uw
+Lines: 1
+95000000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_0_name
+Lines: 1
+long_term
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_0_power_limit_uw
+Lines: 1
+4090000000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_0_time_window_us
+Lines: 1
+999424
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_1_max_power_uw
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_1_name
+Lines: 1
+short_term
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_1_power_limit_uw
+Lines: 1
+4090000000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/constraint_1_time_window_us
+Lines: 1
+2440
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/enabled
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/energy_uj
+Lines: 1
+240422366267
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/max_energy_range_uj
+Lines: 1
+262143328850
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/name
+Lines: 1
+package-0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0/uevent
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/powercap/intel-rapl:0:0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/constraint_0_max_power_uw
+Lines: 0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/constraint_0_name
+Lines: 1
+long_term
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/constraint_0_power_limit_uw
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/constraint_0_time_window_us
+Lines: 1
+976
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/enabled
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/energy_uj
+Lines: 1
+118821284256
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/max_energy_range_uj
+Lines: 1
+262143328850
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/name
+Lines: 1
+core
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:0:0/uevent
+Lines: 0
+Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Directory: fixtures/sys/class/thermal
 Mode: 775
@@ -4277,6 +4533,581 @@ Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/tree_depth
 Lines: 1
 0
 Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/bytes_may_use
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/bytes_readonly
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/bytes_reserved
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/bytes_used
+Lines: 1
+808189952
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/disk_total
+Lines: 1
+2147483648
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/disk_used
+Lines: 1
+808189952
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/flags
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/raid0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/raid0/total_bytes
+Lines: 1
+2147483648
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/raid0/used_bytes
+Lines: 1
+808189952
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/total_bytes
+Lines: 1
+2147483648
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/data/total_bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/global_rsv_reserved
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/global_rsv_size
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/bytes_may_use
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/bytes_readonly
+Lines: 1
+131072
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/bytes_reserved
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/bytes_used
+Lines: 1
+933888
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/disk_total
+Lines: 1
+2147483648
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/disk_used
+Lines: 1
+1867776
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/flags
+Lines: 1
+4
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/raid1
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/raid1/total_bytes
+Lines: 1
+1073741824
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/raid1/used_bytes
+Lines: 1
+933888
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/total_bytes
+Lines: 1
+1073741824
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/metadata/total_bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/bytes_may_use
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/bytes_readonly
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/bytes_reserved
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/bytes_used
+Lines: 1
+16384
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/disk_total
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/disk_used
+Lines: 1
+32768
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/flags
+Lines: 1
+2
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/raid1
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/raid1/total_bytes
+Lines: 1
+8388608
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/raid1/used_bytes
+Lines: 1
+16384
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/total_bytes
+Lines: 1
+8388608
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/allocation/system/total_bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/clone_alignment
+Lines: 1
+4096
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/devices
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/devices/loop25
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/devices/loop25/size
+Lines: 1
+20971520
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/devices/loop26
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/devices/loop26/size
+Lines: 1
+20971520
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/features
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/features/big_metadata
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/features/extended_iref
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/features/mixed_backref
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/features/skinny_metadata
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/label
+Lines: 1
+fixture
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/metadata_uuid
+Lines: 1
+0abb23a9-579b-43e6-ad30-227ef47fcb9d
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/nodesize
+Lines: 1
+16384
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/quota_override
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/0abb23a9-579b-43e6-ad30-227ef47fcb9d/sectorsize
+Lines: 1
+4096
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/bytes_may_use
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/bytes_readonly
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/bytes_reserved
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/bytes_used
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/disk_total
+Lines: 1
+644087808
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/disk_used
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/flags
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/raid5
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/raid5/total_bytes
+Lines: 1
+644087808
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/raid5/used_bytes
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/total_bytes
+Lines: 1
+644087808
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/data/total_bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/global_rsv_reserved
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/global_rsv_size
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/bytes_may_use
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/bytes_readonly
+Lines: 1
+262144
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/bytes_reserved
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/bytes_used
+Lines: 1
+114688
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/disk_total
+Lines: 1
+429391872
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/disk_used
+Lines: 1
+114688
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/flags
+Lines: 1
+4
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/raid6
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/raid6/total_bytes
+Lines: 1
+429391872
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/raid6/used_bytes
+Lines: 1
+114688
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/total_bytes
+Lines: 1
+429391872
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/metadata/total_bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/bytes_may_use
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/bytes_readonly
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/bytes_reserved
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/bytes_used
+Lines: 1
+16384
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/disk_total
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/disk_used
+Lines: 1
+16384
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/flags
+Lines: 1
+2
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/raid6
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/raid6/total_bytes
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/raid6/used_bytes
+Lines: 1
+16384
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/total_bytes
+Lines: 1
+16777216
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/allocation/system/total_bytes_pinned
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/clone_alignment
+Lines: 1
+4096
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/devices
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/devices/loop22
+SymlinkTo: ../../../../devices/virtual/block/loop22
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/devices/loop23
+SymlinkTo: ../../../../devices/virtual/block/loop23
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/devices/loop24
+SymlinkTo: ../../../../devices/virtual/block/loop24
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/devices/loop25
+SymlinkTo: ../../../../devices/virtual/block/loop25
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/features
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/features/big_metadata
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/features/extended_iref
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/features/mixed_backref
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/features/raid56
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/features/skinny_metadata
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/label
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/metadata_uuid
+Lines: 1
+7f07c59f-6136-449c-ab87-e1cf2328731b
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/nodesize
+Lines: 1
+16384
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/quota_override
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/btrfs/7f07c59f-6136-449c-ab87-e1cf2328731b/sectorsize
+Lines: 1
+4096
+Mode: 444
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Directory: fixtures/sys/fs/xfs
 Mode: 755

@@ -14,78 +14,89 @@
 package procfs
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs/internal/util"
 )
 
 // For the proc file format details,
-// see https://elixir.bootlin.com/linux/v4.17/source/net/core/net-procfs.c#L162
+// See:
+// * Linux 2.6.23 https://elixir.bootlin.com/linux/v2.6.23/source/net/core/dev.c#L2343
+// * Linux 4.17 https://elixir.bootlin.com/linux/v4.17/source/net/core/net-procfs.c#L162
 // and https://elixir.bootlin.com/linux/v4.17/source/include/linux/netdevice.h#L2810.
 
-// SoftnetEntry contains a single row of data from /proc/net/softnet_stat
-type SoftnetEntry struct {
+// SoftnetStat contains a single row of data from /proc/net/softnet_stat
+type SoftnetStat struct {
 	// Number of processed packets
-	Processed uint
+	Processed uint32
 	// Number of dropped packets
-	Dropped uint
+	Dropped uint32
 	// Number of times processing packets ran out of quota
-	TimeSqueezed uint
+	TimeSqueezed uint32
 }
 
-// GatherSoftnetStats reads /proc/net/softnet_stat, parse the relevant columns,
-// and then return a slice of SoftnetEntry's.
-func (fs FS) GatherSoftnetStats() ([]SoftnetEntry, error) {
-	data, err := ioutil.ReadFile(fs.proc.Path("net/softnet_stat"))
+var softNetProcFile = "net/softnet_stat"
+
+// NetSoftnetStat reads data from /proc/net/softnet_stat.
+func (fs FS) NetSoftnetStat() ([]SoftnetStat, error) {
+	b, err := util.ReadFileNoStat(fs.proc.Path(softNetProcFile))
 	if err != nil {
-		return nil, fmt.Errorf("error reading softnet %s: %s", fs.proc.Path("net/softnet_stat"), err)
+		return nil, err
 	}
 
-	return parseSoftnetEntries(data)
-}
-
-func parseSoftnetEntries(data []byte) ([]SoftnetEntry, error) {
-	lines := strings.Split(string(data), "\n")
-	entries := make([]SoftnetEntry, 0)
-	var err error
-	const (
-		expectedColumns = 11
-	)
-	for _, line := range lines {
-		columns := strings.Fields(line)
-		width := len(columns)
-		if width == 0 {
-			continue
-		}
-		if width != expectedColumns {
-			return []SoftnetEntry{}, fmt.Errorf("%d columns were detected, but %d were expected", width, expectedColumns)
-		}
-		var entry SoftnetEntry
-		if entry, err = parseSoftnetEntry(columns); err != nil {
-			return []SoftnetEntry{}, err
-		}
-		entries = append(entries, entry)
+	entries, err := parseSoftnet(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse /proc/net/softnet_stat: %v", err)
 	}
 
 	return entries, nil
 }
 
-func parseSoftnetEntry(columns []string) (SoftnetEntry, error) {
-	var err error
-	var processed, dropped, timeSqueezed uint64
-	if processed, err = strconv.ParseUint(columns[0], 16, 32); err != nil {
-		return SoftnetEntry{}, fmt.Errorf("Unable to parse column 0: %s", err)
+func parseSoftnet(r io.Reader) ([]SoftnetStat, error) {
+	const minColumns = 9
+
+	s := bufio.NewScanner(r)
+
+	var stats []SoftnetStat
+	for s.Scan() {
+		columns := strings.Fields(s.Text())
+		width := len(columns)
+
+		if width < minColumns {
+			return nil, fmt.Errorf("%d columns were detected, but at least %d were expected", width, minColumns)
+		}
+
+		// We only parse the first three columns at the moment.
+		us, err := parseHexUint32s(columns[0:3])
+		if err != nil {
+			return nil, err
+		}
+
+		stats = append(stats, SoftnetStat{
+			Processed:    us[0],
+			Dropped:      us[1],
+			TimeSqueezed: us[2],
+		})
 	}
-	if dropped, err = strconv.ParseUint(columns[1], 16, 32); err != nil {
-		return SoftnetEntry{}, fmt.Errorf("Unable to parse column 1: %s", err)
+
+	return stats, nil
+}
+
+func parseHexUint32s(ss []string) ([]uint32, error) {
+	us := make([]uint32, 0, len(ss))
+	for _, s := range ss {
+		u, err := strconv.ParseUint(s, 16, 32)
+		if err != nil {
+			return nil, err
+		}
+
+		us = append(us, uint32(u))
 	}
-	if timeSqueezed, err = strconv.ParseUint(columns[2], 16, 32); err != nil {
-		return SoftnetEntry{}, fmt.Errorf("Unable to parse column 2: %s", err)
-	}
-	return SoftnetEntry{
-		Processed:    uint(processed),
-		Dropped:      uint(dropped),
-		TimeSqueezed: uint(timeSqueezed),
-	}, nil
+
+	return us, nil
 }
