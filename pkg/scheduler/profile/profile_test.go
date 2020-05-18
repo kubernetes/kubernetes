@@ -308,8 +308,8 @@ func newFakePlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plu
 	return &fakePlugin{}, nil
 }
 
-func fakeFrameworkFactory(cfg config.KubeSchedulerProfile) (framework.Framework, error) {
-	return framework.NewFramework(fakeRegistry, cfg.Plugins, cfg.PluginConfig)
+func fakeFrameworkFactory(cfg config.KubeSchedulerProfile, opts ...framework.Option) (framework.Framework, error) {
+	return framework.NewFramework(fakeRegistry, cfg.Plugins, cfg.PluginConfig, opts...)
 }
 
 func nilRecorderFactory(_ string) events.EventRecorder {

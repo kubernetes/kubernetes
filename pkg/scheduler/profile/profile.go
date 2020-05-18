@@ -33,7 +33,7 @@ import (
 type RecorderFactory func(string) events.EventRecorder
 
 // FrameworkFactory builds a Framework for a given profile configuration.
-type FrameworkFactory func(config.KubeSchedulerProfile) (framework.Framework, error)
+type FrameworkFactory func(config.KubeSchedulerProfile, ...framework.Option) (framework.Framework, error)
 
 // Profile is a scheduling profile.
 type Profile struct {
@@ -42,8 +42,9 @@ type Profile struct {
 }
 
 // NewProfile builds a Profile for the given configuration.
-func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory) (*Profile, error) {
-	f, err := frameworkFact(cfg)
+func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
+	opts ...framework.Option) (*Profile, error) {
+	f, err := frameworkFact(cfg, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +59,8 @@ func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory,
 type Map map[string]*Profile
 
 // NewMap builds the profiles given by the configuration, indexed by name.
-func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory) (Map, error) {
+func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
+	opts ...framework.Option) (Map, error) {
 	m := make(Map)
 	v := cfgValidator{m: m}
 
@@ -66,7 +68,7 @@ func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory, 
 		if err := v.validate(cfg); err != nil {
 			return nil, err
 		}
-		p, err := NewProfile(cfg, frameworkFact, recorderFact)
+		p, err := NewProfile(cfg, frameworkFact, recorderFact, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("creating profile for scheduler name %s: %v", cfg.SchedulerName, err)
 		}
