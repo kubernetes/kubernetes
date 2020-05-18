@@ -282,7 +282,7 @@ func (s *server) kill() error {
 	}
 
 	// Attempt to shut down the process in a friendly manner before forcing it.
-	waitChan := make(chan error)
+	waitChan := make(chan error, 1)
 	go func() {
 		_, err := cmd.Process.Wait()
 		waitChan <- err
@@ -307,10 +307,6 @@ func (s *server) kill() error {
 			// Success!
 			return nil
 		case <-time.After(timeout):
-			// waitChan needs a reader for the above goroutine to avoid leak
-			go func() {
-				<-waitChan
-			}()
 			// Continue.
 		}
 	}
