@@ -32,7 +32,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -49,6 +49,11 @@ require (
 )
 
 replace (
+	github.com/beorn7/perks => github.com/beorn7/perks v1.0.0
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
+	github.com/json-iterator/go => github.com/json-iterator/go v1.1.8
+	github.com/prometheus/common => github.com/prometheus/common v0.4.1
+	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.5
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	k8s.io/api => ../api
