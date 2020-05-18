@@ -46,6 +46,9 @@ type Manager interface {
 	// update the node capacity to reflect the currently available devices.
 	UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
 
+	// Deallocate devices allocated to containers.
+	Deallocate(podUID string, containerName string)
+
 	// Stop stops the manager.
 	Stop() error
 
@@ -54,8 +57,11 @@ type Manager interface {
 	// for the found one. An empty struct is returned in case no cached state is found.
 	GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error)
 
-    // PreStartContainer calls the preStartContainer gRPC call if necessary for all devices
-    PreStartContainer(pod *v1.Pod, container *v1.Container) error
+	// PreStartContainer calls the preStartContainer gRPC call if necessary for all devices
+	PreStartContainer(pod *v1.Pod, container *v1.Container) error
+
+	// PostStopContainer calls the postStopContainer gRPC call if necessary for all devices
+	PostStopContainer(podUID string, containerName string)
 
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.

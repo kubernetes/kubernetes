@@ -29,13 +29,13 @@ import (
 type InternalContainerLifecycle interface {
 	PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error
 	PreStopContainer(containerID string) error
-	PostStopContainer(containerID string) error
+	PostStopContainer(podUID string, containerName string, containerID string) error
 }
 
 // Implements InternalContainerLifecycle interface.
 type internalContainerLifecycleImpl struct {
 	cpuManager      cpumanager.Manager
-    deviceManager   devicemanager.Manager
+	deviceManager   devicemanager.Manager
 	topologyManager topologymanager.Manager
 }
 
@@ -46,12 +46,12 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 			return err
 		}
 	}
-    if i.deviceManager != nil {
-        err := i.deviceManager.PreStartContainer(pod, container)
-        if err != nil {
+	if i.deviceManager != nil {
+		err := i.deviceManager.PreStartContainer(pod, container)
+		if err != nil {
 			return err
 		}
-    }
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		err := i.topologyManager.AddContainer(pod, containerID)
 		if err != nil {
@@ -65,7 +65,8 @@ func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) er
 	return nil
 }
 
-func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
+func (i *internalContainerLifecycleImpl) PostStopContainer(podUID string, containerName string, containerID string) error {
+	i.deviceManager.PostStopContainer(podUID, containerName)
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		err := i.topologyManager.RemoveContainer(containerID)
 		if err != nil {

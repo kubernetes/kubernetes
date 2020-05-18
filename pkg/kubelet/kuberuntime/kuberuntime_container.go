@@ -700,7 +700,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 			}
 			// prune all other init containers that match this container name
 			klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
-			if err := m.removeContainer(status.ID.ID); err != nil {
+			if err := m.removeContainer(string(pod.UID), status.Name, status.ID.ID); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
@@ -725,7 +725,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 			count++
 			// Purge all init containers that match this container name
 			klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
-			if err := m.removeContainer(status.ID.ID); err != nil {
+			if err := m.removeContainer(string(pod.UID), status.Name, status.ID.ID); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
@@ -837,10 +837,10 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 // that container logs to be removed with the container.
 // Notice that we assume that the container should only be removed in non-running state, and
 // it will not write container logs anymore in that state.
-func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
+func (m *kubeGenericRuntimeManager) removeContainer(podUID string, containerName string, containerID string) error {
 	klog.V(4).Infof("Removing container %q", containerID)
 	// Call internal container post-stop lifecycle hook.
-	if err := m.internalLifecycle.PostStopContainer(containerID); err != nil {
+	if err := m.internalLifecycle.PostStopContainer(podUID, containerName, containerID); err != nil {
 		return err
 	}
 
@@ -878,6 +878,6 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 }
 
 // DeleteContainer removes a container.
-func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
-	return m.removeContainer(containerID.ID)
+func (m *kubeGenericRuntimeManager) DeleteContainer(podUID string, containerName string, containerID kubecontainer.ContainerID) error {
+	return m.removeContainer(podUID, containerName, containerID.ID)
 }

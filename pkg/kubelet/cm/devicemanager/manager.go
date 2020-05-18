@@ -371,6 +371,22 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 
 }
 
+// Deallocate is the call that you can use to deallocate a set of devices
+// from the registered device plugins.
+func (m *ManagerImpl) Deallocate(podUID string, containerName string) {
+	m.mutex.Lock()
+	for resource, devices := range m.podDevices[podUID][containerName] {
+		eI, _ := m.endpoints[resource]
+		if eI.opts == nil || !eI.opts.DeallocateRequired {
+			klog.V(4).Infof("Plugin options indicate to skip Deallocate for resource: %s", resource)
+			continue
+		}
+		eI.e.deallocate(devices.deviceIds.UnsortedList())
+	}
+	m.allocatedDevices = m.podDevices.devices()
+	m.mutex.Unlock()
+}
+
 // UpdatePluginResources updates node resources based on devices already allocated to pods.
 func (m *ManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	pod := attrs.Pod
@@ -611,6 +627,20 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 		return
 	}
 	klog.V(3).Infof("pods to be removed: %v", podsToBeRemoved.List())
+	for _, pod := range podsToBeRemoved.List() {
+		for _, resourceInfo := range m.podDevices[pod] {
+			for resourceName, devs := range resourceInfo {
+				eI, ok := m.endpoints[resourceName]
+				if ok {
+					if eI.opts == nil || !eI.opts.DeallocateRequired {
+						klog.V(4).Infof("Plugin options indicate to skip Deallocate for resource: %s", resourceName)
+						continue
+					}
+					eI.e.deallocate(devs.deviceIds.UnsortedList())
+				}
+			}
+		}
+	}
 	m.podDevices.delete(podsToBeRemoved.List())
 	// Regenerated allocatedDevices after we update pod allocation information.
 	m.allocatedDevices = m.podDevices.devices()
@@ -806,6 +836,11 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		if err != nil {
 			// In case of allocation failure, we want to restore m.allocatedDevices
 			// to the actual allocated state from m.podDevices.
+			if eI.opts == nil || !eI.opts.DeallocateRequired {
+				klog.V(4).Infof("Plugin options indicate to skip Deallocate for resource: %s", resource)
+			} else {
+				eI.e.deallocate(devs)
+			}
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
 			m.mutex.Unlock()
@@ -838,7 +873,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 // PreStartContainer loops over all the devices of this container and issued grpc for
 // each of them if needed
 func (m *ManagerImpl) PreStartContainer(pod *v1.Pod, container *v1.Container) error {
-    podUID := string(pod.UID)
+	podUID := string(pod.UID)
 	contName := container.Name
 	needsReAllocate := false
 	for k := range container.Resources.Limits {
@@ -863,7 +898,7 @@ func (m *ManagerImpl) PreStartContainer(pod *v1.Pod, container *v1.Container) er
 			return err
 		}
 	}
-    return nil
+	return nil
 }
 
 // callPreStartContainerIfNeeded issues PreStartContainer grpc call for device plugin resource
@@ -897,6 +932,44 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 	}
 	// TODO: Add metrics support for init RPC
 	return nil
+}
+
+// PostStopContainer loops over all the devices of this container and issued grpc for
+// each of them if needed
+func (m *ManagerImpl) PostStopContainer(podUID string, containerName string) {
+	for resource := range m.podDevices[podUID][containerName] {
+		m.callPostStopContainerIfNeeded(podUID, containerName, resource)
+	}
+}
+
+// callPostStopContainerIfNeeded issues PostStopContainer grpc call for device plugin resource
+// with PostStopRequired option set.
+func (m *ManagerImpl) callPostStopContainerIfNeeded(podUID, containerName, resource string) {
+	m.mutex.Lock()
+	eI, ok := m.endpoints[resource]
+	if !ok {
+		m.mutex.Unlock()
+		klog.V(4).Infof("endpoint not found in cache for a registered resource: %s", resource)
+		return
+	}
+
+	if eI.opts == nil || !eI.opts.PostStopRequired {
+		m.mutex.Unlock()
+		klog.V(4).Infof("Plugin options indicate to skip PostStopContainer for resource: %s", resource)
+		return
+	}
+
+	devices := m.podDevices.containerDevices(podUID, containerName, resource)
+	if devices == nil {
+		m.mutex.Unlock()
+		klog.V(4).Infof("no devices found allocated in local cache for pod %s, container %s, resource %s", podUID, containerName, resource)
+		return
+	}
+
+	m.mutex.Unlock()
+	devs := devices.UnsortedList()
+	klog.V(4).Infof("Issuing a PostStopContainer call for container, %s, of pod %s", containerName, podUID)
+	eI.e.postStopContainer(devs)
 }
 
 // sanitizeNodeAllocatable scans through allocatedDevices in the device manager

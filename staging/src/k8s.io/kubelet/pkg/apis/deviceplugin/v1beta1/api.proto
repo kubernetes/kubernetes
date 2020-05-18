@@ -25,8 +25,12 @@ service Registration {
 }
 
 message DevicePluginOptions {
-        // Indicates if PreStartContainer call is required before each container start
+    // Indicates if PreStartContainer call is required before each container start
 	bool pre_start_required = 1;
+    // Indicates if PostStopContainer call is required before each container start
+	bool post_stop_required = 2;
+    // Indicates if the Deallocate call is required before after each container death
+    bool deallocate_required = 3;
 }
 
 message RegisterRequest {
@@ -37,8 +41,8 @@ message RegisterRequest {
 	string endpoint = 2;
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	string resource_name = 3;
-        // Options to be communicated with Device Manager
-        DevicePluginOptions options = 4;
+    // Options to be communicated with Device Manager
+    DevicePluginOptions options = 4;
 }
 
 message Empty {
@@ -60,10 +64,20 @@ service DevicePlugin {
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
 
-        // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
-        // before each container start. Device plugin can run device specific operations
-        // such as resetting the device before making devices available to the container
+    // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+    // before each container start. Device plugin can run device specific operations
+    // such as resetting the device before making devices available to the container
 	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
+
+    // PostStopContainer is called, if indicated by Device Plugin during registeration phase,
+    // before each container start. Device plugin can run device specific operations
+    // such as resetting/clearing up the device after its use by the container
+	rpc PostStopContainer(PostStopContainerRequest) returns (Empty) {}
+    
+    // Deallocate is called during container deletion so that the Device
+	// Plugin can run device specific operations or keep track of the 
+    // released devices
+	rpc Deallocate(DeallocateRequest) returns (Empty) {}
 }
 
 // ListAndWatch returns a stream of List of Devices
@@ -112,6 +126,13 @@ message PreStartContainerRequest {
 message PreStartContainerResponse {
 }
 
+// - PostStopContainer is expected to be called after each container death if indicated by plugin during registration phase.
+// - PostStopContainer allows Device Plugin to run device specific operations on
+//   the Devices requested to clear/reset them
+message PostStopContainerRequest {
+        repeated string devicesIDs = 1;
+}
+
 // - Allocate is expected to be called during pod creation since allocation
 //   failures for any container would result in pod startup failure.
 // - Allocate allows kubelet to exposes additional artifacts in a pod's
@@ -147,6 +168,19 @@ message ContainerAllocateResponse {
 	repeated DeviceSpec devices = 3;
 	// Container annotations to pass to the container runtime
 	map<string, string> annotations = 4;
+}
+
+// - Deallocate allows Device Plugin to run device specific operations on
+//   the Devices requested
+// - Deallocate is useful for complex device plugins that need to track
+//   the allocation of their devices
+// - Deallocated 
+message DeallocateRequest {
+	repeated ContainerDeallocateRequest container_requests = 1;
+}
+
+message ContainerDeallocateRequest {
+	repeated string devicesIDs = 1;
 }
 
 // Mount specifies a host volume to mount into a container.

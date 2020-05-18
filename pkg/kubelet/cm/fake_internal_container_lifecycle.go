@@ -34,6 +34,6 @@ func (f *fakeInternalContainerLifecycle) PreStopContainer(containerID string) er
 	return nil
 }
 
-func (f *fakeInternalContainerLifecycle) PostStopContainer(containerID string) error {
+func (f *fakeInternalContainerLifecycle) PostStopContainer(podUID string, containerName string, containerID string) error {
 	return nil
 }

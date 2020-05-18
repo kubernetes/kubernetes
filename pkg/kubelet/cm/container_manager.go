@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
 	"fmt"
@@ -73,6 +74,9 @@ type ContainerManager interface {
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
 	GetCapacity() v1.ResourceList
 
+    // GetDevicePlugin returns the device plugin assoctiated with this container manager
+    GetDevicePluginManager() devicemanager.Manager
+
 	// GetDevicePluginResourceCapacity returns the node capacity (amount of total device plugin resources),
 	// node allocatable (amount of total healthy resources reported by device plugin),
 	// and inactive device plugin resources previously registered on the node.
@@ -92,6 +96,9 @@ type ContainerManager interface {
 	// to make sure it is at least equal to the pod's requested capacity for
 	// any registered device plugin resource
 	UpdatePluginResources(*schedulerframework.NodeInfo, *lifecycle.PodAdmitAttributes) error
+
+	// DeletePluginResources release devices that device plugin allcated.
+	DeletePluginResources(podUID string, containerName string)
 
 	InternalContainerLifecycle() InternalContainerLifecycle
 

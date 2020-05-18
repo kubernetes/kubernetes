@@ -50,6 +50,8 @@ func newContainerGC(client internalapi.RuntimeService, podStateProvider podState
 
 // containerGCInfo is the internal information kept for containers being considered for GC.
 type containerGCInfo struct {
+	// The pod UID
+	uid types.UID
 	// The ID of the container.
 	id string
 	// The name of the container.
@@ -142,7 +144,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 				continue
 			}
 		}
-		if err := cgc.manager.removeContainer(containers[i].id); err != nil {
+		if err := cgc.manager.removeContainer(string(containers[i].uid), containers[i].name, containers[i].id); err != nil {
 			klog.Errorf("Failed to remove container %q: %v", containers[i].id, err)
 		}
 	}
@@ -204,6 +206,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 
 		labeledInfo := getContainerInfoFromLabels(container.Labels)
 		containerInfo := containerGCInfo{
+			uid:        labeledInfo.PodUID,
 			id:         container.Id,
 			name:       container.Metadata.Name,
 			createTime: createdAt,

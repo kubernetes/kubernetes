@@ -680,6 +680,10 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
+func (cm *containerManagerImpl) DeletePluginResources(podUID string, containerName string) {
+	cm.deviceManager.Deallocate(podUID, containerName)
+}
+
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		return cm.topologyManager
@@ -985,6 +989,10 @@ func isKernelPid(pid int) bool {
 
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 	return cm.capacity
+}
+
+func (cm *containerManagerImpl) GetDevicePluginManager() devicemanager.Manager {
+    return cm.deviceManager
 }
 
 func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

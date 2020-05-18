@@ -48,7 +48,11 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type DevicePluginOptions struct {
 	// Indicates if PreStartContainer call is required before each container start
-	PreStartRequired     bool     `protobuf:"varint,1,opt,name=pre_start_required,json=preStartRequired,proto3" json:"pre_start_required,omitempty"`
+	PreStartRequired bool `protobuf:"varint,1,opt,name=pre_start_required,json=preStartRequired,proto3" json:"pre_start_required,omitempty"`
+	// Indicates if PostStopContainer call is required before each container start
+	PostStopRequired bool `protobuf:"varint,2,opt,name=post_stop_required,json=postStopRequired,proto3" json:"post_stop_required,omitempty"`
+	// Indicates if the Deallocate call is required before after each container death
+	DeallocateRequired   bool     `protobuf:"varint,3,opt,name=deallocate_required,json=deallocateRequired,proto3" json:"deallocate_required,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
@@ -88,6 +92,20 @@ var xxx_messageInfo_DevicePluginOptions proto.InternalMessageInfo
 func (m *DevicePluginOptions) GetPreStartRequired() bool {
 	if m != nil {
 		return m.PreStartRequired
+	}
+	return false
+}
+
+func (m *DevicePluginOptions) GetPostStopRequired() bool {
+	if m != nil {
+		return m.PostStopRequired
+	}
+	return false
+}
+
+func (m *DevicePluginOptions) GetDeallocateRequired() bool {
+	if m != nil {
+		return m.DeallocateRequired
 	}
 	return false
 }
@@ -502,6 +520,54 @@ func (m *PreStartContainerResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_PreStartContainerResponse proto.InternalMessageInfo
 
+// - PostStopContainer is expected to be called after each container death if indicated by plugin during registration phase.
+// - PostStopContainer allows Device Plugin to run device specific operations on
+//   the Devices requested to clear/reset them
+type PostStopContainerRequest struct {
+	DevicesIDs           []string `protobuf:"bytes,1,rep,name=devicesIDs,proto3" json:"devicesIDs,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *PostStopContainerRequest) Reset()      { *m = PostStopContainerRequest{} }
+func (*PostStopContainerRequest) ProtoMessage() {}
+func (*PostStopContainerRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{9}
+}
+func (m *PostStopContainerRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PostStopContainerRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PostStopContainerRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PostStopContainerRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PostStopContainerRequest.Merge(m, src)
+}
+func (m *PostStopContainerRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *PostStopContainerRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PostStopContainerRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PostStopContainerRequest proto.InternalMessageInfo
+
+func (m *PostStopContainerRequest) GetDevicesIDs() []string {
+	if m != nil {
+		return m.DevicesIDs
+	}
+	return nil
+}
+
 // - Allocate is expected to be called during pod creation since allocation
 //   failures for any container would result in pod startup failure.
 // - Allocate allows kubelet to exposes additional artifacts in a pod's
@@ -517,7 +583,7 @@ type AllocateRequest struct {
 func (m *AllocateRequest) Reset()      { *m = AllocateRequest{} }
 func (*AllocateRequest) ProtoMessage() {}
 func (*AllocateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{9}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{10}
 }
 func (m *AllocateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -562,7 +628,7 @@ type ContainerAllocateRequest struct {
 func (m *ContainerAllocateRequest) Reset()      { *m = ContainerAllocateRequest{} }
 func (*ContainerAllocateRequest) ProtoMessage() {}
 func (*ContainerAllocateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{10}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{11}
 }
 func (m *ContainerAllocateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -615,7 +681,7 @@ type AllocateResponse struct {
 func (m *AllocateResponse) Reset()      { *m = AllocateResponse{} }
 func (*AllocateResponse) ProtoMessage() {}
 func (*AllocateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{11}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{12}
 }
 func (m *AllocateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -667,7 +733,7 @@ type ContainerAllocateResponse struct {
 func (m *ContainerAllocateResponse) Reset()      { *m = ContainerAllocateResponse{} }
 func (*ContainerAllocateResponse) ProtoMessage() {}
 func (*ContainerAllocateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{12}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{13}
 }
 func (m *ContainerAllocateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -724,6 +790,101 @@ func (m *ContainerAllocateResponse) GetAnnotations() map[string]string {
 	return nil
 }
 
+// - Deallocate allows Device Plugin to run device specific operations on
+//   the Devices requested
+// - Deallocate is useful for complex device plugins that need to track
+//   the allocation of their devices
+// - Deallocated
+type DeallocateRequest struct {
+	ContainerRequests    []*ContainerDeallocateRequest `protobuf:"bytes,1,rep,name=container_requests,json=containerRequests,proto3" json:"container_requests,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                      `json:"-"`
+	XXX_sizecache        int32                         `json:"-"`
+}
+
+func (m *DeallocateRequest) Reset()      { *m = DeallocateRequest{} }
+func (*DeallocateRequest) ProtoMessage() {}
+func (*DeallocateRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{14}
+}
+func (m *DeallocateRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeallocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeallocateRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *DeallocateRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeallocateRequest.Merge(m, src)
+}
+func (m *DeallocateRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeallocateRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeallocateRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeallocateRequest proto.InternalMessageInfo
+
+func (m *DeallocateRequest) GetContainerRequests() []*ContainerDeallocateRequest {
+	if m != nil {
+		return m.ContainerRequests
+	}
+	return nil
+}
+
+type ContainerDeallocateRequest struct {
+	DevicesIDs           []string `protobuf:"bytes,1,rep,name=devicesIDs,proto3" json:"devicesIDs,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ContainerDeallocateRequest) Reset()      { *m = ContainerDeallocateRequest{} }
+func (*ContainerDeallocateRequest) ProtoMessage() {}
+func (*ContainerDeallocateRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{15}
+}
+func (m *ContainerDeallocateRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ContainerDeallocateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ContainerDeallocateRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ContainerDeallocateRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ContainerDeallocateRequest.Merge(m, src)
+}
+func (m *ContainerDeallocateRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *ContainerDeallocateRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ContainerDeallocateRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ContainerDeallocateRequest proto.InternalMessageInfo
+
+func (m *ContainerDeallocateRequest) GetDevicesIDs() []string {
+	if m != nil {
+		return m.DevicesIDs
+	}
+	return nil
+}
+
 // Mount specifies a host volume to mount into a container.
 // where device library or tools are installed on host and container
 type Mount struct {
@@ -740,7 +901,7 @@ type Mount struct {
 func (m *Mount) Reset()      { *m = Mount{} }
 func (*Mount) ProtoMessage() {}
 func (*Mount) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{13}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{16}
 }
 func (m *Mount) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -808,7 +969,7 @@ type DeviceSpec struct {
 func (m *DeviceSpec) Reset()      { *m = DeviceSpec{} }
 func (*DeviceSpec) ProtoMessage() {}
 func (*DeviceSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{14}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{17}
 }
 func (m *DeviceSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -868,12 +1029,15 @@ func init() {
 	proto.RegisterType((*Device)(nil), "v1beta1.Device")
 	proto.RegisterType((*PreStartContainerRequest)(nil), "v1beta1.PreStartContainerRequest")
 	proto.RegisterType((*PreStartContainerResponse)(nil), "v1beta1.PreStartContainerResponse")
+	proto.RegisterType((*PostStopContainerRequest)(nil), "v1beta1.PostStopContainerRequest")
 	proto.RegisterType((*AllocateRequest)(nil), "v1beta1.AllocateRequest")
 	proto.RegisterType((*ContainerAllocateRequest)(nil), "v1beta1.ContainerAllocateRequest")
 	proto.RegisterType((*AllocateResponse)(nil), "v1beta1.AllocateResponse")
 	proto.RegisterType((*ContainerAllocateResponse)(nil), "v1beta1.ContainerAllocateResponse")
 	proto.RegisterMapType((map[string]string)(nil), "v1beta1.ContainerAllocateResponse.AnnotationsEntry")
 	proto.RegisterMapType((map[string]string)(nil), "v1beta1.ContainerAllocateResponse.EnvsEntry")
+	proto.RegisterType((*DeallocateRequest)(nil), "v1beta1.DeallocateRequest")
+	proto.RegisterType((*ContainerDeallocateRequest)(nil), "v1beta1.ContainerDeallocateRequest")
 	proto.RegisterType((*Mount)(nil), "v1beta1.Mount")
 	proto.RegisterType((*DeviceSpec)(nil), "v1beta1.DeviceSpec")
 }
@@ -881,59 +1045,65 @@ func init() {
 func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 822 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0xdd, 0x8e, 0xdb, 0x44,
-	0x14, 0x8e, 0x93, 0x6e, 0xe2, 0x9c, 0xa4, 0xbb, 0xd9, 0xd9, 0x52, 0x79, 0xdd, 0x62, 0x85, 0x41,
-	0xc0, 0x22, 0xb5, 0x29, 0x9b, 0x4a, 0x2d, 0xea, 0x05, 0x22, 0x34, 0x0b, 0xac, 0x44, 0xb7, 0xd1,
-	0x2c, 0x15, 0x37, 0x48, 0x91, 0xe3, 0x4c, 0x63, 0x0b, 0x67, 0xc6, 0x78, 0x26, 0x91, 0x72, 0xc7,
-	0x05, 0x0f, 0xc0, 0x43, 0xf0, 0x18, 0x3c, 0x40, 0x2f, 0xb9, 0xe4, 0x92, 0x86, 0x17, 0x41, 0x1e,
-	0x7b, 0x6c, 0xcb, 0xcd, 0x6e, 0x41, 0xea, 0x9d, 0xcf, 0xcf, 0x77, 0xe6, 0x9b, 0x73, 0xce, 0x7c,
-	0x86, 0xb6, 0x1b, 0x05, 0x83, 0x28, 0xe6, 0x92, 0xa3, 0xd6, 0xfa, 0x74, 0x46, 0xa5, 0x7b, 0x6a,
-	0xdf, 0x5f, 0x04, 0xd2, 0x5f, 0xcd, 0x06, 0x1e, 0x5f, 0x3e, 0x58, 0xf0, 0x05, 0x7f, 0xa0, 0xe2,
-	0xb3, 0xd5, 0x4b, 0x65, 0x29, 0x43, 0x7d, 0xa5, 0x38, 0xfc, 0x14, 0x8e, 0xc6, 0x74, 0x1d, 0x78,
-	0x74, 0x12, 0xae, 0x16, 0x01, 0x7b, 0x1e, 0xc9, 0x80, 0x33, 0x81, 0xee, 0x01, 0x8a, 0x62, 0x3a,
-	0x15, 0xd2, 0x8d, 0xe5, 0x34, 0xa6, 0x3f, 0xaf, 0x82, 0x98, 0xce, 0x2d, 0xa3, 0x6f, 0x9c, 0x98,
-	0xa4, 0x17, 0xc5, 0xf4, 0x32, 0x09, 0x90, 0xcc, 0x8f, 0x7f, 0x37, 0xe0, 0x80, 0xd0, 0x45, 0x20,
-	0x24, 0x8d, 0x13, 0x27, 0x15, 0x12, 0x59, 0xd0, 0x5a, 0xd3, 0x58, 0x04, 0x9c, 0x29, 0x58, 0x9b,
-	0x68, 0x13, 0xd9, 0x60, 0x52, 0x36, 0x8f, 0x78, 0xc0, 0xa4, 0x55, 0x57, 0xa1, 0xdc, 0x46, 0x1f,
-	0xc2, 0xcd, 0x98, 0x0a, 0xbe, 0x8a, 0x3d, 0x3a, 0x65, 0xee, 0x92, 0x5a, 0x0d, 0x95, 0xd0, 0xd5,
-	0xce, 0x0b, 0x77, 0x49, 0xd1, 0x23, 0x68, 0xf1, 0x94, 0xa7, 0x75, 0xa3, 0x6f, 0x9c, 0x74, 0x86,
-	0x77, 0x07, 0xd9, 0xed, 0x07, 0x3b, 0xee, 0x42, 0x74, 0x32, 0x6e, 0xc1, 0xde, 0xd9, 0x32, 0x92,
-	0x1b, 0x3c, 0x82, 0x5b, 0xdf, 0x05, 0x42, 0x8e, 0xd8, 0xfc, 0x07, 0x57, 0x7a, 0x3e, 0xa1, 0x22,
-	0xe2, 0x4c, 0x50, 0xf4, 0x29, 0xb4, 0xe6, 0xaa, 0x80, 0xb0, 0x8c, 0x7e, 0xe3, 0xa4, 0x33, 0x3c,
-	0xa8, 0x14, 0x26, 0x3a, 0x8e, 0x1f, 0x43, 0xf7, 0x7b, 0x1e, 0xf1, 0x90, 0x2f, 0x36, 0xe7, 0xec,
-	0x25, 0x47, 0x9f, 0xc0, 0x1e, 0xe3, 0xf3, 0x1c, 0x78, 0x98, 0x03, 0x2f, 0x5e, 0x3c, 0x1b, 0x5d,
-	0xf0, 0x39, 0x25, 0x69, 0x1c, 0xdb, 0x60, 0x6a, 0x17, 0xda, 0x87, 0xfa, 0xf9, 0x58, 0xb5, 0xa7,
-	0x41, 0xea, 0xc1, 0x18, 0x7b, 0xd0, 0x4c, 0xcf, 0x29, 0x45, 0xda, 0x49, 0x04, 0xdd, 0x86, 0xa6,
-	0x4f, 0xdd, 0x50, 0xfa, 0x59, 0xc7, 0x32, 0x0b, 0x9d, 0x82, 0x29, 0x33, 0x1a, 0xaa, 0x55, 0x9d,
-	0xe1, 0x7b, 0xf9, 0xc9, 0x65, 0x7e, 0x24, 0x4f, 0xc3, 0x4f, 0xc0, 0x9a, 0x64, 0x03, 0x7c, 0xca,
-	0x99, 0x74, 0x03, 0x56, 0x0c, 0xcd, 0x01, 0xc8, 0x2e, 0x78, 0x3e, 0x4e, 0xaf, 0xd2, 0x26, 0x25,
-	0x0f, 0xbe, 0x03, 0xc7, 0x3b, 0xb0, 0x69, 0xf7, 0xb0, 0x07, 0x07, 0xa3, 0x30, 0xe4, 0x9e, 0x2b,
-	0xa9, 0xae, 0x37, 0x01, 0xe4, 0xe9, 0x3c, 0xb5, 0x46, 0x54, 0x48, 0xdd, 0xa2, 0x0f, 0x72, 0xa2,
-	0x79, 0xa9, 0x0a, 0x9c, 0x1c, 0x7a, 0x15, 0x82, 0x22, 0x61, 0x7f, 0x55, 0xfa, 0x5b, 0xd9, 0x2f,
-	0xa0, 0x57, 0x40, 0xb2, 0x91, 0x5f, 0xc2, 0x51, 0x99, 0x61, 0xea, 0xd5, 0x14, 0xf1, 0x75, 0x14,
-	0xd3, 0x54, 0x82, 0xbc, 0x6a, 0x23, 0x04, 0xfe, 0xb5, 0x01, 0xc7, 0x57, 0x22, 0xd0, 0x97, 0x70,
-	0x83, 0xb2, 0xb5, 0x3e, 0xe3, 0xde, 0xdb, 0xcf, 0x18, 0x9c, 0xb1, 0xb5, 0x38, 0x63, 0x32, 0xde,
-	0x10, 0x85, 0x44, 0x1f, 0x43, 0x73, 0xc9, 0x57, 0x4c, 0x0a, 0xab, 0xae, 0x6a, 0xec, 0xe7, 0x35,
-	0x9e, 0x25, 0x6e, 0x92, 0x45, 0xd1, 0xfd, 0x62, 0x9f, 0x1b, 0x2a, 0xf1, 0xa8, 0xb2, 0xcf, 0x97,
-	0x11, 0xf5, 0xf2, 0x9d, 0x46, 0x2f, 0xa0, 0xe3, 0x32, 0xc6, 0xa5, 0xab, 0xdf, 0x56, 0x02, 0x79,
-	0xf8, 0x1f, 0xf8, 0x8d, 0x0a, 0x54, 0x4a, 0xb3, 0x5c, 0xc7, 0x7e, 0x0c, 0xed, 0xfc, 0x02, 0xa8,
-	0x07, 0x8d, 0x9f, 0xe8, 0x26, 0xdb, 0xec, 0xe4, 0x13, 0xdd, 0x82, 0xbd, 0xb5, 0x1b, 0xae, 0x68,
-	0xb6, 0xd9, 0xa9, 0xf1, 0xa4, 0xfe, 0xb9, 0x61, 0x7f, 0x01, 0xbd, 0x6a, 0xe5, 0xff, 0x83, 0xc7,
-	0x3e, 0xec, 0xa9, 0x7e, 0xa0, 0x8f, 0x60, 0xbf, 0x18, 0x72, 0xe4, 0x4a, 0x3f, 0xc3, 0xdf, 0xcc,
-	0xbd, 0x13, 0x57, 0xfa, 0xe8, 0x0e, 0xb4, 0x7d, 0x2e, 0x64, 0x9a, 0x91, 0x29, 0x53, 0xe2, 0xd0,
-	0xc1, 0x98, 0xba, 0xf3, 0x29, 0x67, 0x61, 0xfa, 0xd4, 0x4c, 0x62, 0x26, 0x8e, 0xe7, 0x2c, 0xdc,
-	0xe0, 0x18, 0xa0, 0x68, 0xe8, 0x3b, 0x39, 0xae, 0x0f, 0x9d, 0x88, 0xc6, 0xcb, 0x40, 0x08, 0x35,
-	0x8b, 0x54, 0x06, 0xcb, 0xae, 0xe1, 0xd7, 0xd0, 0x4d, 0x35, 0x37, 0x56, 0xfd, 0x41, 0x8f, 0xc0,
-	0xd4, 0x1a, 0x8c, 0xac, 0x7c, 0x68, 0x15, 0x59, 0xb6, 0x8b, 0x55, 0x49, 0xa5, 0xb0, 0x36, 0xfc,
-	0xa3, 0x0e, 0xdd, 0xb2, 0x6c, 0xa2, 0x6f, 0xe1, 0xf6, 0x37, 0x54, 0xee, 0xfa, 0x2b, 0x54, 0xc0,
-	0xf6, 0xb5, 0xba, 0x8b, 0x6b, 0x68, 0x04, 0xdd, 0xb2, 0xce, 0xbe, 0x81, 0x7f, 0x3f, 0xb7, 0x77,
-	0xc9, 0x31, 0xae, 0x7d, 0x66, 0xa0, 0x11, 0x98, 0x7a, 0xdd, 0x4a, 0xb7, 0xaa, 0xbc, 0x7c, 0xfb,
-	0x78, 0x47, 0x44, 0x17, 0x41, 0x3f, 0xc2, 0xe1, 0x1b, 0xa2, 0x85, 0x0a, 0xf5, 0xb9, 0x4a, 0x0c,
-	0x6d, 0x7c, 0x5d, 0x8a, 0xae, 0xfe, 0xd5, 0xdd, 0x57, 0xaf, 0x1d, 0xe3, 0xaf, 0xd7, 0x4e, 0xed,
-	0x97, 0xad, 0x63, 0xbc, 0xda, 0x3a, 0xc6, 0x9f, 0x5b, 0xc7, 0xf8, 0x7b, 0xeb, 0x18, 0xbf, 0xfd,
-	0xe3, 0xd4, 0x66, 0x4d, 0xf5, 0x97, 0x7d, 0xf8, 0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x63, 0x60,
-	0xe7, 0xf8, 0xaa, 0x07, 0x00, 0x00,
+	// 920 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x56, 0x51, 0x6f, 0x1b, 0x45,
+	0x10, 0xf6, 0xd9, 0x4d, 0x6c, 0x8f, 0xdd, 0x24, 0x9e, 0x94, 0xca, 0xb9, 0x16, 0x2b, 0x5c, 0x05,
+	0x04, 0xa9, 0x75, 0x88, 0x2b, 0xb5, 0x28, 0x42, 0x08, 0x83, 0x03, 0x8d, 0x44, 0xd3, 0x68, 0x43,
+	0xc5, 0x0b, 0x92, 0x75, 0x39, 0x6f, 0xed, 0x13, 0xe7, 0xdd, 0xe3, 0x76, 0x6d, 0xc9, 0x6f, 0x3c,
+	0xf0, 0x03, 0xf8, 0x0d, 0x88, 0x5f, 0xc2, 0x53, 0x1f, 0x79, 0xe4, 0x91, 0x86, 0x3f, 0x82, 0x6e,
+	0x6f, 0xf7, 0xee, 0x38, 0xdb, 0x09, 0x95, 0x78, 0xbb, 0x9d, 0x99, 0x6f, 0x76, 0x66, 0xf6, 0x9b,
+	0x99, 0x83, 0xba, 0x1b, 0xfa, 0xdd, 0x30, 0xe2, 0x92, 0x63, 0x75, 0x7e, 0x74, 0x49, 0xa5, 0x7b,
+	0x64, 0x3f, 0x1a, 0xfb, 0x72, 0x32, 0xbb, 0xec, 0x7a, 0x7c, 0x7a, 0x38, 0xe6, 0x63, 0x7e, 0xa8,
+	0xf4, 0x97, 0xb3, 0x57, 0xea, 0xa4, 0x0e, 0xea, 0x2b, 0xc1, 0x39, 0xbf, 0x5a, 0xb0, 0x3b, 0xa0,
+	0x73, 0xdf, 0xa3, 0xe7, 0xc1, 0x6c, 0xec, 0xb3, 0x17, 0xa1, 0xf4, 0x39, 0x13, 0xf8, 0x10, 0x30,
+	0x8c, 0xe8, 0x50, 0x48, 0x37, 0x92, 0xc3, 0x88, 0xfe, 0x38, 0xf3, 0x23, 0x3a, 0x6a, 0x5b, 0xfb,
+	0xd6, 0x41, 0x8d, 0xec, 0x84, 0x11, 0xbd, 0x88, 0x15, 0x44, 0xcb, 0x95, 0x35, 0x17, 0x72, 0x28,
+	0x24, 0x0f, 0x33, 0xeb, 0xb2, 0xb6, 0xe6, 0x42, 0x5e, 0x48, 0x1e, 0xa6, 0xd6, 0x87, 0xb0, 0x3b,
+	0xa2, 0x6e, 0x10, 0x70, 0xcf, 0x95, 0x34, 0x33, 0xaf, 0x28, 0x73, 0xcc, 0x54, 0x06, 0xe0, 0xfc,
+	0x66, 0xc1, 0x36, 0xa1, 0x63, 0x5f, 0x48, 0x1a, 0xc5, 0x42, 0x2a, 0x24, 0xb6, 0xa1, 0x3a, 0xa7,
+	0x91, 0xf0, 0x39, 0x53, 0x51, 0xd5, 0x89, 0x39, 0xa2, 0x0d, 0x35, 0xca, 0x46, 0x21, 0xf7, 0x99,
+	0x54, 0x21, 0xd4, 0x49, 0x7a, 0xc6, 0x07, 0x70, 0x3b, 0xa2, 0x82, 0xcf, 0x22, 0x8f, 0x0e, 0x99,
+	0x3b, 0xa5, 0xea, 0xd2, 0x3a, 0x69, 0x1a, 0xe1, 0x99, 0x3b, 0xa5, 0xf8, 0x04, 0xaa, 0x3c, 0x29,
+	0x43, 0xfb, 0xd6, 0xbe, 0x75, 0xd0, 0xe8, 0xdd, 0xef, 0xea, 0xea, 0x76, 0x57, 0x94, 0x8a, 0x18,
+	0x63, 0xa7, 0x0a, 0x1b, 0x27, 0xd3, 0x50, 0x2e, 0x9c, 0x3e, 0xdc, 0xf9, 0xc6, 0x17, 0xb2, 0xcf,
+	0x46, 0xdf, 0xb9, 0xd2, 0x9b, 0x10, 0x2a, 0x42, 0xce, 0x04, 0xc5, 0x8f, 0xa0, 0x3a, 0x52, 0x0e,
+	0x44, 0xdb, 0xda, 0xaf, 0x1c, 0x34, 0x7a, 0xdb, 0x05, 0xc7, 0xc4, 0xe8, 0x9d, 0xa7, 0xd0, 0xfc,
+	0x96, 0x87, 0x3c, 0xe0, 0xe3, 0xc5, 0x29, 0x7b, 0xc5, 0xf1, 0x43, 0xd8, 0x60, 0x7c, 0x94, 0x02,
+	0x5b, 0x29, 0xf0, 0xec, 0xe5, 0xf3, 0xfe, 0x19, 0x1f, 0x51, 0x92, 0xe8, 0x1d, 0x1b, 0x6a, 0x46,
+	0x84, 0x5b, 0x50, 0x3e, 0x1d, 0xa8, 0xf2, 0x54, 0x48, 0xd9, 0x1f, 0x38, 0x1e, 0x6c, 0x26, 0xf7,
+	0xe4, 0x34, 0xf5, 0x58, 0x83, 0x77, 0x61, 0x73, 0x42, 0xdd, 0x40, 0x4e, 0x74, 0xc5, 0xf4, 0x09,
+	0x8f, 0xa0, 0x26, 0x75, 0x18, 0xaa, 0x54, 0x8d, 0xde, 0x3b, 0xe9, 0xcd, 0xf9, 0xf8, 0x48, 0x6a,
+	0xe6, 0x1c, 0x43, 0xfb, 0x5c, 0xf3, 0xe3, 0x4b, 0xce, 0xa4, 0xeb, 0xb3, 0xec, 0xd1, 0x3a, 0x00,
+	0x3a, 0xc1, 0xd3, 0x41, 0x92, 0x4a, 0x9d, 0xe4, 0x24, 0xce, 0x3d, 0xd8, 0x5b, 0x81, 0x4d, 0xaa,
+	0xa7, 0x1c, 0x6b, 0x2a, 0xbd, 0xb5, 0x63, 0x0f, 0xb6, 0xfb, 0x39, 0x56, 0xc5, 0x90, 0x73, 0x40,
+	0xcf, 0xb8, 0x51, 0x24, 0xa4, 0x42, 0x9a, 0xf2, 0xbe, 0x97, 0x26, 0x99, 0xde, 0x54, 0x80, 0x93,
+	0x96, 0x57, 0x88, 0x41, 0xc4, 0x01, 0xae, 0x33, 0xbf, 0x31, 0xc0, 0x31, 0xec, 0x64, 0x10, 0x4d,
+	0x97, 0x0b, 0xd8, 0xcd, 0x47, 0x98, 0x48, 0x4d, 0x88, 0xce, 0x75, 0x21, 0x26, 0xa6, 0x04, 0xbd,
+	0x62, 0x11, 0x85, 0xf3, 0x73, 0x05, 0xf6, 0xd6, 0x22, 0xf0, 0x73, 0xb8, 0x45, 0xd9, 0xdc, 0xdc,
+	0xf1, 0xf0, 0xe6, 0x3b, 0xba, 0x27, 0x6c, 0x2e, 0x4e, 0x98, 0x8c, 0x16, 0x44, 0x21, 0xf1, 0x03,
+	0xd8, 0x9c, 0xf2, 0x19, 0x93, 0xa2, 0x5d, 0x56, 0x3e, 0xb6, 0x52, 0x1f, 0xcf, 0x63, 0x31, 0xd1,
+	0x5a, 0x7c, 0x94, 0xf5, 0x42, 0x45, 0x19, 0xee, 0x16, 0x7a, 0xe1, 0x22, 0xa4, 0x5e, 0xda, 0x0f,
+	0xf8, 0x12, 0x1a, 0x2e, 0x63, 0x5c, 0xba, 0xa6, 0x2f, 0x63, 0xc8, 0xe3, 0xff, 0x10, 0x5f, 0x3f,
+	0x43, 0x25, 0x61, 0xe6, 0xfd, 0xd8, 0x4f, 0xa1, 0x9e, 0x26, 0x80, 0x3b, 0x50, 0xf9, 0x81, 0x2e,
+	0x74, 0x57, 0xc4, 0x9f, 0x78, 0x07, 0x36, 0xe6, 0x6e, 0x30, 0xa3, 0xba, 0x2b, 0x92, 0xc3, 0x71,
+	0xf9, 0x13, 0xcb, 0xfe, 0x0c, 0x76, 0x8a, 0x9e, 0xdf, 0x06, 0xef, 0x8c, 0xa1, 0x35, 0xf8, 0xd7,
+	0xa0, 0x8b, 0x49, 0x42, 0xae, 0xa1, 0xe4, 0x83, 0xe5, 0x5c, 0x97, 0x1c, 0xac, 0x22, 0xe5, 0xa7,
+	0x60, 0xaf, 0x07, 0xdc, 0x48, 0xcb, 0x09, 0x6c, 0xa8, 0x67, 0xc3, 0xf7, 0x61, 0x2b, 0x0b, 0x2d,
+	0x74, 0xe5, 0x44, 0xa7, 0x79, 0x3b, 0x95, 0x9e, 0xbb, 0x72, 0x82, 0xf7, 0xa0, 0x3e, 0x89, 0x17,
+	0x81, 0xb2, 0xd0, 0xc3, 0x37, 0x16, 0x18, 0x65, 0x44, 0xdd, 0xd1, 0x90, 0xb3, 0x60, 0xa1, 0xa7,
+	0x7d, 0x2d, 0x16, 0xbc, 0x60, 0xc1, 0xc2, 0x89, 0x00, 0xb2, 0x77, 0xff, 0x5f, 0xae, 0xdb, 0x87,
+	0x46, 0x48, 0xa3, 0xa9, 0x2f, 0x84, 0xa2, 0x4c, 0x32, 0xe9, 0xf3, 0xa2, 0xde, 0x57, 0xd0, 0x4c,
+	0xd6, 0x4a, 0xa4, 0x9e, 0x11, 0x9f, 0x40, 0xcd, 0xac, 0x19, 0x6c, 0xa7, 0xf5, 0x2e, 0x6c, 0x1e,
+	0x3b, 0x63, 0x74, 0x32, 0xed, 0x4b, 0xbd, 0xdf, 0x2b, 0xd0, 0xcc, 0x6f, 0x06, 0x7c, 0x06, 0x77,
+	0xbf, 0xa6, 0x72, 0xd5, 0x5e, 0x2d, 0x80, 0xed, 0x6b, 0x57, 0x8b, 0x53, 0xc2, 0x3e, 0x34, 0xf3,
+	0xab, 0x64, 0x09, 0xff, 0x6e, 0x7a, 0x5e, 0xb5, 0x71, 0x9c, 0xd2, 0xc7, 0x16, 0xf6, 0xa1, 0x66,
+	0xba, 0x22, 0x97, 0x55, 0x61, 0x40, 0xd9, 0x7b, 0x2b, 0x34, 0xc6, 0x09, 0x7e, 0x0f, 0xad, 0xa5,
+	0xb9, 0x8c, 0xd9, 0x90, 0x5c, 0x37, 0xef, 0x6d, 0xe7, 0x3a, 0x93, 0xd4, 0xfb, 0x33, 0x68, 0x2d,
+	0x0d, 0xf6, 0xbc, 0xf7, 0x35, 0x43, 0x7f, 0xf9, 0x21, 0xf0, 0x38, 0x26, 0x91, 0xe1, 0x38, 0xda,
+	0xb9, 0xda, 0x16, 0x88, 0xbf, 0x8c, 0xfd, 0xe2, 0xfe, 0xeb, 0x37, 0x1d, 0xeb, 0xcf, 0x37, 0x9d,
+	0xd2, 0x4f, 0x57, 0x1d, 0xeb, 0xf5, 0x55, 0xc7, 0xfa, 0xe3, 0xaa, 0x63, 0xfd, 0x75, 0xd5, 0xb1,
+	0x7e, 0xf9, 0xbb, 0x53, 0xba, 0xdc, 0x54, 0xbf, 0x4b, 0x8f, 0xff, 0x09, 0x00, 0x00, 0xff, 0xff,
+	0x2f, 0x42, 0x8f, 0x63, 0x73, 0x09, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1035,6 +1205,14 @@ type DevicePluginClient interface {
 	// before each container start. Device plugin can run device specific operations
 	// such as resetting the device before making devices available to the container
 	PreStartContainer(ctx context.Context, in *PreStartContainerRequest, opts ...grpc.CallOption) (*PreStartContainerResponse, error)
+	// PostStopContainer is called, if indicated by Device Plugin during registeration phase,
+	// before each container start. Device plugin can run device specific operations
+	// such as resetting/clearing up the device after its use by the container
+	PostStopContainer(ctx context.Context, in *PostStopContainerRequest, opts ...grpc.CallOption) (*Empty, error)
+	// Deallocate is called during container deletion so that the Device
+	// Plugin can run device specific operations or keep track of the
+	// released devices
+	Deallocate(ctx context.Context, in *DeallocateRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type devicePluginClient struct {
@@ -1104,6 +1282,24 @@ func (c *devicePluginClient) PreStartContainer(ctx context.Context, in *PreStart
 	return out, nil
 }
 
+func (c *devicePluginClient) PostStopContainer(ctx context.Context, in *PostStopContainerRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/v1beta1.DevicePlugin/PostStopContainer", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *devicePluginClient) Deallocate(ctx context.Context, in *DeallocateRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/v1beta1.DevicePlugin/Deallocate", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DevicePluginServer is the server API for DevicePlugin service.
 type DevicePluginServer interface {
 	// GetDevicePluginOptions returns options to be communicated with Device
@@ -1121,6 +1317,14 @@ type DevicePluginServer interface {
 	// before each container start. Device plugin can run device specific operations
 	// such as resetting the device before making devices available to the container
 	PreStartContainer(context.Context, *PreStartContainerRequest) (*PreStartContainerResponse, error)
+	// PostStopContainer is called, if indicated by Device Plugin during registeration phase,
+	// before each container start. Device plugin can run device specific operations
+	// such as resetting/clearing up the device after its use by the container
+	PostStopContainer(context.Context, *PostStopContainerRequest) (*Empty, error)
+	// Deallocate is called during container deletion so that the Device
+	// Plugin can run device specific operations or keep track of the
+	// released devices
+	Deallocate(context.Context, *DeallocateRequest) (*Empty, error)
 }
 
 // UnimplementedDevicePluginServer can be embedded to have forward compatible implementations.
@@ -1138,6 +1342,12 @@ func (*UnimplementedDevicePluginServer) Allocate(ctx context.Context, req *Alloc
 }
 func (*UnimplementedDevicePluginServer) PreStartContainer(ctx context.Context, req *PreStartContainerRequest) (*PreStartContainerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PreStartContainer not implemented")
+}
+func (*UnimplementedDevicePluginServer) PostStopContainer(ctx context.Context, req *PostStopContainerRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PostStopContainer not implemented")
+}
+func (*UnimplementedDevicePluginServer) Deallocate(ctx context.Context, req *DeallocateRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Deallocate not implemented")
 }
 
 func RegisterDevicePluginServer(s *grpc.Server, srv DevicePluginServer) {
@@ -1219,6 +1429,42 @@ func _DevicePlugin_PreStartContainer_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DevicePlugin_PostStopContainer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PostStopContainerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevicePluginServer).PostStopContainer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1beta1.DevicePlugin/PostStopContainer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevicePluginServer).PostStopContainer(ctx, req.(*PostStopContainerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DevicePlugin_Deallocate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeallocateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevicePluginServer).Deallocate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1beta1.DevicePlugin/Deallocate",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevicePluginServer).Deallocate(ctx, req.(*DeallocateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _DevicePlugin_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1beta1.DevicePlugin",
 	HandlerType: (*DevicePluginServer)(nil),
@@ -1234,6 +1480,14 @@ var _DevicePlugin_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PreStartContainer",
 			Handler:    _DevicePlugin_PreStartContainer_Handler,
+		},
+		{
+			MethodName: "PostStopContainer",
+			Handler:    _DevicePlugin_PostStopContainer_Handler,
+		},
+		{
+			MethodName: "Deallocate",
+			Handler:    _DevicePlugin_Deallocate_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -1266,6 +1520,26 @@ func (m *DevicePluginOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DeallocateRequired {
+		i--
+		if m.DeallocateRequired {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.PostStopRequired {
+		i--
+		if m.PostStopRequired {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x10
+	}
 	if m.PreStartRequired {
 		i--
 		if m.PreStartRequired {
@@ -1564,6 +1838,38 @@ func (m *PreStartContainerResponse) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 
+func (m *PostStopContainerRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PostStopContainerRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PostStopContainerRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.DevicesIDs) > 0 {
+		for iNdEx := len(m.DevicesIDs) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.DevicesIDs[iNdEx])
+			copy(dAtA[i:], m.DevicesIDs[iNdEx])
+			i = encodeVarintApi(dAtA, i, uint64(len(m.DevicesIDs[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *AllocateRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1759,6 +2065,75 @@ func (m *ContainerAllocateResponse) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 
+func (m *DeallocateRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeallocateRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeallocateRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerRequests) > 0 {
+		for iNdEx := len(m.ContainerRequests) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ContainerRequests[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ContainerDeallocateRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerDeallocateRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ContainerDeallocateRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.DevicesIDs) > 0 {
+		for iNdEx := len(m.DevicesIDs) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.DevicesIDs[iNdEx])
+			copy(dAtA[i:], m.DevicesIDs[iNdEx])
+			i = encodeVarintApi(dAtA, i, uint64(len(m.DevicesIDs[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *Mount) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1868,6 +2243,12 @@ func (m *DevicePluginOptions) Size() (n int) {
 	var l int
 	_ = l
 	if m.PreStartRequired {
+		n += 2
+	}
+	if m.PostStopRequired {
+		n += 2
+	}
+	if m.DeallocateRequired {
 		n += 2
 	}
 	return n
@@ -1994,6 +2375,21 @@ func (m *PreStartContainerResponse) Size() (n int) {
 	return n
 }
 
+func (m *PostStopContainerRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.DevicesIDs) > 0 {
+		for _, s := range m.DevicesIDs {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *AllocateRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2076,6 +2472,36 @@ func (m *ContainerAllocateResponse) Size() (n int) {
 	return n
 }
 
+func (m *DeallocateRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.ContainerRequests) > 0 {
+		for _, e := range m.ContainerRequests {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ContainerDeallocateRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.DevicesIDs) > 0 {
+		for _, s := range m.DevicesIDs {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *Mount) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2129,6 +2555,8 @@ func (this *DevicePluginOptions) String() string {
 	}
 	s := strings.Join([]string{`&DevicePluginOptions{`,
 		`PreStartRequired:` + fmt.Sprintf("%v", this.PreStartRequired) + `,`,
+		`PostStopRequired:` + fmt.Sprintf("%v", this.PostStopRequired) + `,`,
+		`DeallocateRequired:` + fmt.Sprintf("%v", this.DeallocateRequired) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2226,6 +2654,16 @@ func (this *PreStartContainerResponse) String() string {
 	}, "")
 	return s
 }
+func (this *PostStopContainerRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PostStopContainerRequest{`,
+		`DevicesIDs:` + fmt.Sprintf("%v", this.DevicesIDs) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *AllocateRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -2305,6 +2743,31 @@ func (this *ContainerAllocateResponse) String() string {
 		`Mounts:` + repeatedStringForMounts + `,`,
 		`Devices:` + repeatedStringForDevices + `,`,
 		`Annotations:` + mapStringForAnnotations + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeallocateRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForContainerRequests := "[]*ContainerDeallocateRequest{"
+	for _, f := range this.ContainerRequests {
+		repeatedStringForContainerRequests += strings.Replace(f.String(), "ContainerDeallocateRequest", "ContainerDeallocateRequest", 1) + ","
+	}
+	repeatedStringForContainerRequests += "}"
+	s := strings.Join([]string{`&DeallocateRequest{`,
+		`ContainerRequests:` + repeatedStringForContainerRequests + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerDeallocateRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerDeallocateRequest{`,
+		`DevicesIDs:` + fmt.Sprintf("%v", this.DevicesIDs) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2390,6 +2853,46 @@ func (m *DevicePluginOptions) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.PreStartRequired = bool(v != 0)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PostStopRequired", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.PostStopRequired = bool(v != 0)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DeallocateRequired", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.DeallocateRequired = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -3189,6 +3692,91 @@ func (m *PreStartContainerResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *PostStopContainerRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PostStopContainerRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PostStopContainerRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DevicesIDs", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DevicesIDs = append(m.DevicesIDs, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *AllocateRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3798,6 +4386,178 @@ func (m *ContainerAllocateResponse) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Annotations[mapkey] = mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeallocateRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeallocateRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeallocateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerRequests", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerRequests = append(m.ContainerRequests, &ContainerDeallocateRequest{})
+			if err := m.ContainerRequests[len(m.ContainerRequests)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerDeallocateRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerDeallocateRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerDeallocateRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DevicesIDs", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DevicesIDs = append(m.DevicesIDs, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

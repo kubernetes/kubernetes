@@ -37,6 +37,8 @@ type endpoint interface {
 	stop()
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
 	preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error)
+	postStopContainer(devs []string)
+	deallocate(devs []string)
 	callback(resourceName string, devices []pluginapi.Device)
 	isStopped() bool
 	stopGracePeriodExpired() bool
@@ -159,6 +161,34 @@ func (e *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartCont
 	defer cancel()
 	return e.client.PreStartContainer(ctx, &pluginapi.PreStartContainerRequest{
 		DevicesIDs: devs,
+	})
+}
+
+// postStopContainer issues PostStopContainer gRPC call to the device plugin.
+func (e *endpointImpl) postStopContainer(devs []string) {
+	if e.isStopped() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second)
+	defer cancel()
+	e.client.PostStopContainer(ctx, &pluginapi.PostStopContainerRequest{
+		DevicesIDs: devs,
+	})
+}
+
+// deallocate issues Deallocate gRPC call to the device plugin.
+// Deallocate is not expected to return anything, if deallocation fails the device
+// plugin should mark the device unhealthy
+func (e *endpointImpl) deallocate(devs []string) {
+	if e.isStopped() {
+		return
+	}
+	_, cancel := context.WithTimeout(context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second)
+	defer cancel()
+	e.client.Deallocate(context.Background(), &pluginapi.DeallocateRequest{
+		ContainerRequests: []*pluginapi.ContainerDeallocateRequest{
+			{DevicesIDs: devs},
+		},
 	})
 }
 

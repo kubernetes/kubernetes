@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -123,16 +124,18 @@ type basicManager struct {
 	secretManager     secret.Manager
 	configMapManager  configmap.Manager
 	checkpointManager checkpointmanager.CheckpointManager
+    deviceManager     devicemanager.Manager
 
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager, cpm checkpointmanager.CheckpointManager) Manager {
+func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager, deviceManager devicemanager.Manager, cpm checkpointmanager.CheckpointManager) Manager {
 	pm := &basicManager{}
 	pm.secretManager = secretManager
 	pm.configMapManager = configMapManager
+    pm.deviceManager = deviceManager
 	pm.checkpointManager = cpm
 	pm.MirrorClient = client
 	pm.SetPods(nil)
@@ -177,6 +180,11 @@ func isPodInTerminatedState(pod *v1.Pod) bool {
 // lock.
 func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
+        if isPodInTerminatedState(pod) {
+            for _, containerStatus := range pod.Status.ContainerStatuses {
+				pm.deviceManager.Deallocate(string(pod.UID), containerStatus.Name)
+		    }
+        }
 		if pm.secretManager != nil {
 			if isPodInTerminatedState(pod) {
 				// Pods that are in terminated state and no longer running can be
@@ -227,6 +235,9 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
+    for _, containerStatus := range pod.Status.ContainerStatuses {
+        pm.deviceManager.Deallocate(string(pod.UID), containerStatus.Name)
+    }
 	if pm.secretManager != nil {
 		pm.secretManager.UnregisterPod(pod)
 	}

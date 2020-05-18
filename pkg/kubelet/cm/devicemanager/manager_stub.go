@@ -49,6 +49,9 @@ func (h *ManagerStub) Allocate(pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
+// Deallocate does not do anything
+func (h *ManagerStub) Deallocate(podUID string, containerName string) {}
+
 // UpdatePluginResources simply returns nil.
 func (h *ManagerStub) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	return nil
@@ -59,9 +62,13 @@ func (h *ManagerStub) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	return nil, nil
 }
 
-func (m *ManagerStub) PreStartContainer(pod *v1.Pod, container *v1.Container) error {
-    return nil
+// PreStartContainer simply returns nil.
+func (h *ManagerStub) PreStartContainer(pod *v1.Pod, container *v1.Container) error {
+	return nil
 }
+
+// PostStopContainer does nothing
+func (h *ManagerStub) PostStopContainer(podUID string, containerName string) {}
 
 // GetCapacity simply returns nil capacity and empty removed resource list.
 func (h *ManagerStub) GetCapacity() (v1.ResourceList, v1.ResourceList, []string) {

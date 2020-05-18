@@ -142,8 +142,8 @@ func (r *Mock) GarbageCollect(gcPolicy kubecontainer.GCPolicy, ready bool, evict
 	return args.Error(0)
 }
 
-func (r *Mock) DeleteContainer(containerID kubecontainer.ContainerID) error {
-	args := r.Called(containerID)
+func (r *Mock) DeleteContainer(podUID string, containerName string, containerID kubecontainer.ContainerID) error {
+	args := r.Called(podUID, containerName, containerID)
 	return args.Error(0)
 }
 

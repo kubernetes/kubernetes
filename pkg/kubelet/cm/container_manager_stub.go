@@ -86,6 +86,10 @@ func (cm *containerManagerStub) GetPluginRegistrationHandler() cache.PluginHandl
 	return nil
 }
 
+func (cm *containerManagerStub) GetDevicePluginManager() devicemanager.Manager {
+    return nil
+}
+
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
 	return nil, nil, []string{}
 }
@@ -102,8 +106,10 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 	return nil
 }
 
+func (cm *containerManagerStub) DeletePluginResources(podUID string, containerName string) {}
+
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-    dm, _ := devicemanager.NewManagerStub()
+	dm, _ := devicemanager.NewManagerStub()
 	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), dm, topologymanager.NewFakeManager()}
 }
 

@@ -195,6 +195,12 @@ func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartConta
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
+// PostStopContainer resets the devices received
+func (m *Stub) PostStopContainer(ctx context.Context, r *pluginapi.PostStopContainerRequest) (*pluginapi.Empty, error) {
+	klog.Infof("PostStopContainer, %+v", r)
+	return nil, nil
+}
+
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	klog.Info("ListAndWatch")
@@ -227,6 +233,12 @@ func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*plu
 	}
 
 	return m.allocFunc(r, devs)
+}
+
+// Deallocate does a mock allocation
+func (m *Stub) Deallocate(ctx context.Context, r *pluginapi.DeallocateRequest) (*pluginapi.Empty, error) {
+	klog.Infof("Deallocate, %+v", r)
+	return nil, nil
 }
 
 func (m *Stub) cleanup() error {

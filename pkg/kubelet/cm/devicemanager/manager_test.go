@@ -563,12 +563,18 @@ func (m *MockEndpoint) preStartContainer(devs []string) (*pluginapi.PreStartCont
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
+func (m *MockEndpoint) postStopContainer(devs []string) {
+	m.initChan <- devs
+}
+
 func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	if m.allocateFunc != nil {
 		return m.allocateFunc(devs)
 	}
 	return nil, nil
 }
+
+func (m *MockEndpoint) deallocate(devs []string) {}
 
 func (m *MockEndpoint) isStopped() bool { return false }
 
@@ -733,8 +739,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 				testCase.description, testCase.expErr, err)
 		}
 		runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
-        as.Nil(err)
-        err = testManager.PreStartContainer(pod, &pod.Spec.Containers[0])
+		as.Nil(err)
+		err = testManager.PreStartContainer(pod, &pod.Spec.Containers[0])
 		if testCase.expErr == nil {
 			as.Nil(err)
 		}
@@ -838,8 +844,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 	podsStub.updateActivePods(activePods)
 	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
-    err = testManager.PreStartContainer(pod, &pod.Spec.Containers[0])
-    as.Nil(err)
+	err = testManager.PreStartContainer(pod, &pod.Spec.Containers[0])
+	as.Nil(err)
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
 	var initializedDevs []string
