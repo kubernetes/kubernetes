@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "finalizer_test.go",
         "meta_test.go",
         "multirestmapper_test.go",
         "priority_test.go",
@@ -18,6 +19,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
@@ -29,6 +31,7 @@ go_library(
     srcs = [
         "doc.go",
         "errors.go",
+        "finalizer.go",
         "firsthit_restmapper.go",
         "help.go",
         "interfaces.go",
