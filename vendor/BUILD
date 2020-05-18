@@ -50,6 +50,7 @@ filegroup(
         "//vendor/github.com/beorn7/perks/quantile:all-srcs",
         "//vendor/github.com/blang/semver:all-srcs",
         "//vendor/github.com/caddyserver/caddy/caddyfile:all-srcs",
+        "//vendor/github.com/cespare/xxhash/v2:all-srcs",
         "//vendor/github.com/chai2010/gettext-go/gettext:all-srcs",
         "//vendor/github.com/checkpoint-restore/go-criu/rpc:all-srcs",
         "//vendor/github.com/cilium/ebpf:all-srcs",

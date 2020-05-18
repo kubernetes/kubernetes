@@ -36,7 +36,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
 	google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba // indirect
 	google.golang.org/grpc v1.26.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -55,6 +55,11 @@ require (
 )
 
 replace (
+	github.com/beorn7/perks => github.com/beorn7/perks v1.0.0
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
+	github.com/json-iterator/go => github.com/json-iterator/go v1.1.8
+	github.com/prometheus/common => github.com/prometheus/common v0.4.1
+	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.5
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	k8s.io/api => ../api
