@@ -707,7 +707,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
 				ErrReasonAffinityNotMatch,
-				ErrReasonExistingAntiAffinityRulesNotMatch,
+				ErrReasonAntiAffinityRulesNotMatch,
 			),
 			name: "PodAntiAffinity symmetry check b1: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
@@ -768,7 +768,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
 				ErrReasonAffinityNotMatch,
-				ErrReasonExistingAntiAffinityRulesNotMatch,
+				ErrReasonAntiAffinityRulesNotMatch,
 			),
 			name: "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
@@ -887,6 +887,53 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{nil, nil},
 			name: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
 				"should not be blocked from being scheduled onto any node, even there's no existing pod that matches the rule anywhere.",
+		},
+		{
+			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"foo": "bar", "service": "securityscan"},
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "foo",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"bar"},
+								},
+							},
+						},
+						TopologyKey: "zone",
+					},
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"securityscan"},
+								},
+							},
+						},
+						TopologyKey: "zone",
+					},
+				}, nil),
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: map[string]string{"foo": "bar"}}}},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zoneLabel": "az1", "hostname": "h1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zoneLabel": "az2", "hostname": "h2"}}},
+			},
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.UnschedulableAndUnresolvable,
+					ErrReasonAffinityNotMatch,
+					ErrReasonAffinityRulesNotMatch,
+				),
+				framework.NewStatus(
+					framework.UnschedulableAndUnresolvable,
+					ErrReasonAffinityNotMatch,
+					ErrReasonAffinityRulesNotMatch,
+				),
+			},
+			name: "The first pod of the collection can only be scheduled on nodes labelled with the requested topology keys",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
