@@ -282,7 +282,7 @@ func CreateKubeAPIServerConfig(
 		return nil, nil, nil, nil, err
 	}
 
-	if _, port, err := net.SplitHostPort(s.Etcd.StorageConfig.Transport.ServerList[0]); err == nil && port != "0" && len(port) != 0 {
+	if _, port, err := net.SplitHostPort(removeSchemePrefix(s.Etcd.StorageConfig.Transport.ServerList[0])); err == nil && port != "0" && len(port) != 0 {
 		if err := utilwait.PollImmediate(etcdRetryInterval, etcdRetryLimit*etcdRetryInterval, preflight.EtcdConnection{ServerList: s.Etcd.StorageConfig.Transport.ServerList}.CheckEtcdServers); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("error waiting for etcd connection: %v", err)
 		}
@@ -756,4 +756,13 @@ func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, ne
 		secondaryServiceIPRange = *secondaryServiceClusterCIDR
 	}
 	return apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, nil
+}
+
+func removeSchemePrefix(url string) string {
+	pattern := "://"
+	index := strings.Index(url, pattern)
+	if index == -1 {
+		return url
+	}
+	return url[index+len(pattern):]
 }
