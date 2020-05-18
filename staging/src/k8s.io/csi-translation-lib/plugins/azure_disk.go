@@ -29,6 +29,8 @@ import (
 const (
 	// AzureDiskDriverName is the name of the CSI driver for Azure Disk
 	AzureDiskDriverName = "disk.csi.azure.com"
+	// AzureDiskTopologyKey is the topology key of Azure Disk CSI driver
+	AzureDiskTopologyKey = "topology.disk.csi.azure.com/zone"
 	// AzureDiskInTreePluginName is the name of the intree plugin for Azure Disk
 	AzureDiskInTreePluginName = "kubernetes.io/azure-disk"
 
@@ -57,6 +59,35 @@ func NewAzureDiskCSITranslator() InTreePlugin {
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree Azure Disk storage class parameters to CSI storage class
 func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	var (
+		generatedTopologies []v1.TopologySelectorTerm
+		params              = map[string]string{}
+	)
+	for k, v := range sc.Parameters {
+		switch strings.ToLower(k) {
+		case zoneKey:
+			generatedTopologies = generateToplogySelectors(AzureDiskTopologyKey, []string{v})
+		case zonesKey:
+			generatedTopologies = generateToplogySelectors(AzureDiskTopologyKey, strings.Split(v, ","))
+		default:
+			params[k] = v
+		}
+	}
+
+	if len(generatedTopologies) > 0 && len(sc.AllowedTopologies) > 0 {
+		return nil, fmt.Errorf("cannot simultaneously set allowed topologies and zone/zones parameters")
+	} else if len(generatedTopologies) > 0 {
+		sc.AllowedTopologies = generatedTopologies
+	} else if len(sc.AllowedTopologies) > 0 {
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies, AzureDiskTopologyKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
+		}
+		sc.AllowedTopologies = newTopologies
+	}
+
+	sc.Parameters = params
+
 	return sc, nil
 }
 
