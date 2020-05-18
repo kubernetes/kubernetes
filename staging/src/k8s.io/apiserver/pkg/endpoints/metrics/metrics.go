@@ -18,8 +18,6 @@ package metrics
 
 import (
 	"bufio"
-	"fmt"
-	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -30,8 +28,6 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
-	"golang.org/x/text/encoding/ianaindex"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
@@ -51,8 +47,6 @@ type resettableCollector interface {
 
 const (
 	APIServerComponent string = "apiserver"
-	InvalidContentType string = "invalid-content-type"
-	InvalidIanaCharset string = "invalid-iana-charset"
 	OtherContentType   string = "other"
 	OtherRequestMethod string = "other"
 )
@@ -184,45 +178,15 @@ var (
 	// request metrics. Any other RFC compliant content types will be aggregated under 'unknown'
 	knownMetricContentTypes = utilsets.NewString(
 		"application/apply-patch+yaml",
-		"application/font-ttf",
-		"application/font-woff",
-		"application/font-woff2",
-		"application/javascript",
 		"application/json",
 		"application/json-patch+json",
 		"application/merge-patch+json",
-		"application/octet-stream",
-		"application/pdf",
 		"application/strategic-merge-patch+json",
-		"application/vnd.google.protobuf",
 		"application/vnd.kubernetes.protobuf",
-		"application/vnd.ms-fontobject",
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-		"application/vnd.schemaregistry.v1+json",
-		"application/x-font-woff",
-		"application/x-gzip",
-		"application/x-javascript",
-		"application/x-pem-file",
-		"application/xml",
+		"application/vnd.kubernetes.protobuf;stream=watch",
 		"application/yaml",
-		"cluster",
-		"font/ttf",
-		"font/woff",
-		"font/woff2",
-		"image/gif",
-		"image/jpeg",
-		"image/png",
-		"image/svg+xml",
-		"image/vnd.microsoft.icon",
-		"image/x-icon",
-		"namespace",
-		"resource",
-		"text/css",
-		"text/event-stream",
-		"text/html",
-		"text/javascript",
 		"text/plain",
-		"text/xml")
+		"text/plain;charset=utf-8")
 	// these are the valid request methods which we report in our metrics. Any other request methods
 	// will be aggregated under 'unknown'
 	validRequestMethods = utilsets.NewString(
@@ -385,25 +349,15 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 }
 
 // cleanContentType binds the contentType (for metrics related purposes) to a
-// bounded set of known/expected content-types. We retain the charset param only if it is
-// RFC compliant (e.g. https://www.iana.org/assignments/character-sets/character-sets.xhtml)
+// bounded set of known/expected content-types.
 func cleanContentType(contentType string) string {
-	parsedContentType, params, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		return InvalidContentType
+	normalizedContentType := strings.ToLower(contentType)
+	if strings.HasSuffix(contentType, " stream=watch") || strings.HasSuffix(contentType, " charset=utf-8") {
+		normalizedContentType = strings.ReplaceAll(contentType, " ", "")
 	}
-	if knownMetricContentTypes.Has(parsedContentType) {
-		cs, ok := params["charset"]
-		if ok {
-			_, err := ianaindex.MIME.Encoding(cs)
-			if err != nil {
-				cs = InvalidIanaCharset
-			}
-			return fmt.Sprintf("%s; charset=%s", parsedContentType, cs)
-		}
-		return parsedContentType
+	if knownMetricContentTypes.Has(normalizedContentType) {
+		return normalizedContentType
 	}
-	// valid according to our parser but not in our well-defined whitelist of content-types
 	return OtherContentType
 }
 

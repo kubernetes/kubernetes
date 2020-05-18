@@ -122,27 +122,19 @@ func TestContentType(t *testing.T) {
 		},
 		{
 			rawContentType:      "image/svg+xml",
-			expectedContentType: "image/svg+xml",
+			expectedContentType: "other",
 		},
 		{
-			rawContentType:      "application/json;charset=utf-8",
-			expectedContentType: "application/json; charset=utf-8",
+			rawContentType:      "text/plain; charset=utf-8",
+			expectedContentType: "text/plain;charset=utf-8",
 		},
 		{
 			rawContentType:      "application/json;foo=bar",
-			expectedContentType: "application/json",
+			expectedContentType: "other",
 		},
 		{
 			rawContentType:      "application/json;charset=hancoding",
-			expectedContentType: "application/json; charset=invalid-iana-charset",
-		},
-		{
-			rawContentType:      "",
-			expectedContentType: "invalid-content-type",
-		},
-		{
-			rawContentType:      "///",
-			expectedContentType: "invalid-content-type",
+			expectedContentType: "other",
 		},
 		{
 			rawContentType:      "unknownbutvalidtype",
