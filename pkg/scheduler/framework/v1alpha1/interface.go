@@ -495,3 +495,19 @@ type FrameworkHandle interface {
 	// VolumeBinder returns the volume binder used by scheduler.
 	VolumeBinder() scheduling.SchedulerVolumeBinder
 }
+
+// PreemptHandle incorporates all needed logic to run preemption logic.
+type PreemptHandle interface {
+	PodNominator
+}
+
+// PodNominator abstracts operations to maintain nominated Pods.
+type PodNominator interface {
+	// AddNominatedPod adds the given pod to the nominated pod map or
+	// updates it if it already exists.
+	AddNominatedPod(pod *v1.Pod, nodeName string)
+	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
+	DeleteNominatedPodIfExists(pod *v1.Pod)
+	// UpdateNominatedPod updates the <oldPod> with <newPod>.
+	UpdateNominatedPod(oldPod, newPod *v1.Pod)
+}

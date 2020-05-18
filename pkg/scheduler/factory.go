@@ -99,18 +99,21 @@ type Configurator struct {
 	frameworkCapturer FrameworkCapturer
 }
 
-func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
+func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts ...framework.Option) (framework.Framework, error) {
 	if c.frameworkCapturer != nil {
 		c.frameworkCapturer(p)
 	}
-	return framework.NewFramework(
-		c.registry,
-		p.Plugins,
-		p.PluginConfig,
+	opts = append([]framework.Option{
 		framework.WithClientSet(c.client),
 		framework.WithInformerFactory(c.informerFactory),
 		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 		framework.WithRunAllFilters(c.alwaysCheckAllPredicates),
+	}, opts...)
+	return framework.NewFramework(
+		c.registry,
+		p.Plugins,
+		p.PluginConfig,
+		opts...,
 	)
 }
 
@@ -159,7 +162,10 @@ func (c *Configurator) create() (*Scheduler, error) {
 		}
 	}
 
-	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory)
+	// The nominator will be passed all the way to framework instantiation.
+	nominator := internalqueue.NewPodNominator()
+	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory,
+		framework.WithPodNominator(nominator))
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
 	}
@@ -172,6 +178,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		lessFn,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
+		internalqueue.WithPodNominator(nominator),
 	)
 
 	// Setup cache debugger.
