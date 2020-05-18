@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -123,6 +124,82 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 		}
 		framework.ExpectEqual(foundCreatedEvent, false, "should not have found test event after deletion")
 	})
+
+	ginkgo.It("should delete a collection of events", func() {
+		eventTestNames := []string{"test-event-1", "test-event-2", "test-event-3"}
+		eventTestNamesCount := len(eventTestNames)
+
+		ginkgo.By("Create set of events")
+		// create a test event in test namespace
+		for _, eventTestName := range eventTestNames {
+			eventMessage := "This is " + eventTestName
+			_, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Create(context.TODO(), &v1.Event{
+
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   eventTestName,
+					Labels: map[string]string{"testevent-set": "true"},
+				},
+				Message: eventMessage,
+				Reason:  "Test",
+				Type:    "Normal",
+				Count:   1,
+				InvolvedObject: v1.ObjectReference{
+					Namespace: f.Namespace.Name,
+				},
+			}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create event")
+			framework.Logf("created %v", eventTestName)
+		}
+
+		ginkgo.By("get a list of Events with a label in the current namespace")
+		// get a list of events
+		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "testevent-set=true",
+		})
+		framework.ExpectNoError(err, "failed to get a list of events")
+
+		// check that we find all the events created
+		eventListItemsCount := len(eventList.Items)
+		errMsg := "found " + strconv.Itoa(eventListItemsCount) + " events when " + strconv.Itoa(eventTestNamesCount) + " events where expected"
+		logMsg := "found " + strconv.Itoa(eventListItemsCount) + " events"
+
+		foundCreatedEventSet := true
+		if eventListItemsCount != eventTestNamesCount {
+			foundCreatedEventSet = false
+		} else {
+			framework.Logf(logMsg)
+		}
+		framework.ExpectEqual(foundCreatedEventSet, true, errMsg)
+
+		ginkgo.By("delete collection of events")
+		// delete collection
+
+		framework.Logf("requesting DeleteCollection of events")
+		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "testevent-set=true"})
+		framework.ExpectNoError(err, "failed to delete the test event")
+
+		ginkgo.By("get a list of Events with a label in the current namespace")
+		// get list of events
+		eventList, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: "testevent-set=true",
+		})
+		framework.ExpectNoError(err, "failed to get a list of events")
+
+		// check that we don't find any created events
+		eventListItemsCount = len(eventList.Items)
+		errMsg = "found " + strconv.Itoa(eventListItemsCount) + " events when zero events where expected"
+		logMsg = "found " + strconv.Itoa(eventListItemsCount) + " events"
+
+		foundCreatedEventSet = false
+		if eventListItemsCount != 0 {
+			foundCreatedEventSet = true
+		} else {
+			framework.Logf(logMsg)
+		}
+		framework.ExpectEqual(foundCreatedEventSet, false, errMsg)
+	})
+
 })
 
 // WaitTimeoutForEvent waits the given timeout duration for an event to occur.
