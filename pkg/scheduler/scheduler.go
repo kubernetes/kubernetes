@@ -635,6 +635,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// succeeds, the pod should get counted as a success the next time we try to
 			// schedule it. (hopefully)
 			metrics.PodScheduleFailures.Inc()
+		} else if err == core.ErrNoNodesAvailable {
+			// No nodes available is counted as unschedulable rather than an error.
+			metrics.PodScheduleFailures.Inc()
 		} else {
 			klog.Errorf("error selecting node for pod: %v", err)
 			metrics.PodScheduleErrors.Inc()
