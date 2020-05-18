@@ -613,7 +613,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			m.healthyDevices[tc.resource].Insert(d.ID)
 		}
 
-		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.NewString())
+		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue

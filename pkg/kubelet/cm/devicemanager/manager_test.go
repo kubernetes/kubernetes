@@ -605,7 +605,6 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		allocatedDevices:      make(map[string]sets.String),
 		endpoints:             make(map[string]endpointInfo),
 		podDevices:            make(podDevices),
-		devicesToReuse:        make(PodReusableDevices),
 		topologyAffinityStore: topologymanager.NewFakeManager(),
 		activePods:            activePods,
 		sourcesReady:          &sourcesReadyStub{},
@@ -748,105 +747,6 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
 	}
 
-}
-
-func TestInitContainerDeviceAllocation(t *testing.T) {
-	// Requesting to create a pod that requests resourceName1 in init containers and normal containers
-	// should succeed with devices allocated to init containers reallocated to normal containers.
-	res1 := TestResource{
-		resourceName:     "domain1.com/resource1",
-		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
-		devs:             []string{"dev1", "dev2"},
-	}
-	res2 := TestResource{
-		resourceName:     "domain2.com/resource2",
-		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
-		devs:             []string{"dev3", "dev4"},
-	}
-	testResources := make([]TestResource, 2)
-	testResources = append(testResources, res1)
-	testResources = append(testResources, res2)
-	as := require.New(t)
-	podsStub := activePodsStub{
-		activePods: []*v1.Pod{},
-	}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
-	as.Nil(err)
-	defer os.RemoveAll(tmpDir)
-
-	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
-	as.Nil(err)
-
-	podWithPluginResourcesInInitContainers := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: uuid.NewUUID(),
-		},
-		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
-						},
-					},
-				},
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): res1.resourceQuantity,
-						},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
-							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
-						},
-					},
-				},
-				{
-					Name: string(uuid.NewUUID()),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							v1.ResourceName(res1.resourceName): res2.resourceQuantity,
-							v1.ResourceName(res2.resourceName): res2.resourceQuantity,
-						},
-					},
-				},
-			},
-		},
-	}
-	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
-	for _, container := range podWithPluginResourcesInInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
-	}
-	for _, container := range podWithPluginResourcesInInitContainers.Spec.Containers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
-	}
-	as.Nil(err)
-	podUID := string(podWithPluginResourcesInInitContainers.UID)
-	initCont1 := podWithPluginResourcesInInitContainers.Spec.InitContainers[0].Name
-	initCont2 := podWithPluginResourcesInInitContainers.Spec.InitContainers[1].Name
-	normalCont1 := podWithPluginResourcesInInitContainers.Spec.Containers[0].Name
-	normalCont2 := podWithPluginResourcesInInitContainers.Spec.Containers[1].Name
-	initCont1Devices := testManager.podDevices.containerDevices(podUID, initCont1, res1.resourceName)
-	initCont2Devices := testManager.podDevices.containerDevices(podUID, initCont2, res1.resourceName)
-	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
-	normalCont2Devices := testManager.podDevices.containerDevices(podUID, normalCont2, res1.resourceName)
-	as.Equal(1, initCont1Devices.Len())
-	as.Equal(2, initCont2Devices.Len())
-	as.Equal(1, normalCont1Devices.Len())
-	as.Equal(1, normalCont2Devices.Len())
-	as.True(initCont2Devices.IsSuperset(initCont1Devices))
-	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
-	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
-	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
 }
 
 func TestUpdatePluginResources(t *testing.T) {

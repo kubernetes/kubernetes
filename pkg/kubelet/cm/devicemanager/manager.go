@@ -105,10 +105,6 @@ type ManagerImpl struct {
 
 	// Store of Topology Affinties that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
-
-	// devicesToReuse contains devices that can be reused as they have been allocated to
-	// init containers.
-	devicesToReuse PodReusableDevices
 }
 
 type endpointInfo struct {
@@ -117,9 +113,6 @@ type endpointInfo struct {
 }
 
 type sourcesReadyStub struct{}
-
-// PodReusableDevices is a map by pod name of devices to reuse.
-type PodReusableDevices map[string]map[string]sets.String
 
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
@@ -154,7 +147,6 @@ func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, to
 		podDevices:            make(podDevices),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
-		devicesToReuse:        make(PodReusableDevices),
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
@@ -361,31 +353,20 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
-		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.String)
-	}
-	// If pod entries to m.devicesToReuse other than the current pod exist, delete them.
-	for podUID := range m.devicesToReuse {
-		if podUID != string(pod.UID) {
-			delete(m.devicesToReuse, podUID)
-		}
-	}
 	// Allocate resources for init containers first as we know the caller always loops
 	// through init containers before looping through app containers. Should the caller
 	// ever change those semantics, this logic will need to be amended.
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
-			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+			if err := m.allocateContainerResources(pod, container); err != nil {
 				return err
 			}
-			m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
 			return nil
 		}
 	}
-	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+	if err := m.allocateContainerResources(pod, container); err != nil {
 		return err
 	}
-	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
 	return nil
 
 }
@@ -637,7 +618,7 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.String) (sets.String, error) {
+func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int) (sets.String, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	needed := required
@@ -663,14 +644,6 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
 	}
 	devices = sets.NewString()
-	// Allocates from reusableDevices list first.
-	for device := range reusableDevices {
-		devices.Insert(device)
-		needed--
-		if needed == 0 {
-			return devices, nil
-		}
-	}
 	// Needs to allocate additional devices.
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
@@ -772,7 +745,7 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.String) error {
+func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
@@ -793,7 +766,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.UpdateAllocatedDevices()
 			allocatedDevicesUpdated = true
 		}
-		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
+		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed)
 		if err != nil {
 			return err
 		}
