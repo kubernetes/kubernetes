@@ -85,21 +85,9 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 		if err != nil {
 			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later", owner.identity, err)
 		}
-		accessor, err := meta.Accessor(ownerObject)
-		if err != nil {
-			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later", ownerObject, err)
-		}
-		finalizers := accessor.GetFinalizers()
-		var newFinalizers []string
-		found := false
-		for _, f := range finalizers {
-			if f == targetFinalizer {
-				found = true
-				continue
-			}
-			newFinalizers = append(newFinalizers, f)
-		}
-		if !found {
+
+		ownerObjectWithoutFinalizer := meta.RemoveFinalizer(ownerObject, targetFinalizer).(*metav1.PartialObjectMetadata)
+		if meta.FinalizersEqual(ownerObjectWithoutFinalizer, ownerObject) {
 			klog.V(5).Infof("the %s finalizer is already removed from object %s", targetFinalizer, owner.identity)
 			return nil
 		}
@@ -107,8 +95,8 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 		// remove the owner from dependent's OwnerReferences
 		patch, err := json.Marshal(&objectForFinalizersPatch{
 			ObjectMetaForFinalizersPatch: ObjectMetaForFinalizersPatch{
-				ResourceVersion: accessor.GetResourceVersion(),
-				Finalizers:      newFinalizers,
+				ResourceVersion: ownerObject.GetResourceVersion(),
+				Finalizers:      ownerObjectWithoutFinalizer.GetFinalizers(),
 			},
 		})
 		if err != nil {

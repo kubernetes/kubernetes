@@ -423,7 +423,7 @@ func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (
 
 func deletionStartsWithFinalizer(oldObj interface{}, newAccessor metav1.Object, matchingFinalizer string) bool {
 	// if the new object isn't being deleted, or doesn't have the finalizer we're interested in, return false
-	if !beingDeleted(newAccessor) || !hasFinalizer(newAccessor, matchingFinalizer) {
+	if !beingDeleted(newAccessor) || !meta.HasFinalizer(newAccessor, matchingFinalizer) {
 		return false
 	}
 
@@ -436,7 +436,7 @@ func deletionStartsWithFinalizer(oldObj interface{}, newAccessor metav1.Object, 
 		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
 		return false
 	}
-	return !beingDeleted(oldAccessor) || !hasFinalizer(oldAccessor, matchingFinalizer)
+	return !beingDeleted(oldAccessor) || !meta.HasFinalizer(oldAccessor, matchingFinalizer)
 }
 
 func beingDeleted(accessor metav1.Object) bool {
@@ -444,21 +444,11 @@ func beingDeleted(accessor metav1.Object) bool {
 }
 
 func hasDeleteDependentsFinalizer(accessor metav1.Object) bool {
-	return hasFinalizer(accessor, metav1.FinalizerDeleteDependents)
+	return meta.HasFinalizer(accessor, metav1.FinalizerDeleteDependents)
 }
 
 func hasOrphanFinalizer(accessor metav1.Object) bool {
-	return hasFinalizer(accessor, metav1.FinalizerOrphanDependents)
-}
-
-func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
-	finalizers := accessor.GetFinalizers()
-	for _, finalizer := range finalizers {
-		if finalizer == matchingFinalizer {
-			return true
-		}
-	}
-	return false
+	return meta.HasFinalizer(accessor, metav1.FinalizerOrphanDependents)
 }
 
 // this function takes newAccessor directly because the caller already
