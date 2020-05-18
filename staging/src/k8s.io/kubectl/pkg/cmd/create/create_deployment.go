@@ -146,32 +146,7 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 // Run performs the execution of 'create deployment' sub command
 func (o *DeploymentOpts) Run() error {
-	one := int32(1)
-	labels := map[string]string{"app": o.Name}
-	selector := metav1.LabelSelector{MatchLabels: labels}
-	namespace := ""
-	if o.EnforceNamespace {
-		namespace = o.Namespace
-	}
-
-	deploy := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      o.Name,
-			Labels:    labels,
-			Namespace: namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &one,
-			Selector: &selector,
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: o.buildPodSpec(),
-			},
-		},
-	}
+	deploy := o.createDeployment()
 
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
@@ -192,6 +167,35 @@ func (o *DeploymentOpts) Run() error {
 	}
 
 	return o.PrintObj(deploy)
+}
+
+func (o *DeploymentOpts) createDeployment() *appsv1.Deployment {
+	one := int32(1)
+	labels := map[string]string{"app": o.Name}
+	selector := metav1.LabelSelector{MatchLabels: labels}
+	namespace := ""
+	if o.EnforceNamespace {
+		namespace = o.Namespace
+	}
+
+	return &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      o.Name,
+			Labels:    labels,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &one,
+			Selector: &selector,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: o.buildPodSpec(),
+			},
+		},
+	}
 }
 
 // buildPodSpec parses the image strings and assemble them into the Containers
