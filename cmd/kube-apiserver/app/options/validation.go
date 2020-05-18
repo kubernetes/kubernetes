@@ -35,6 +35,8 @@ import (
 // validateClusterIPFlags is expected to be called after Complete()
 func validateClusterIPFlags(options *ServerRunOptions) []error {
 	var errs []error
+	// maxCIDRBits is used to define the maximum CIDR size for the cluster ip(s)
+	const maxCIDRBits = 20
 
 	// validate that primary has been processed by user provided values or it has been defaulted
 	if options.PrimaryServiceClusterIPRange.IP == nil {
@@ -48,9 +50,8 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 
 	// Complete() expected to have set Primary* and Secondary*
 	// primary CIDR validation
-	var ones, bits = options.PrimaryServiceClusterIPRange.Mask.Size()
-	if bits-ones > 20 {
-		errs = append(errs, errors.New("specified --service-cluster-ip-range is too large"))
+	if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
+		errs = append(errs, err)
 	}
 
 	// Secondary IP validation
@@ -74,16 +75,24 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 			errs = append(errs, errors.New("--service-cluster-ip-range and --secondary-service-cluster-ip-range must be of different IP family"))
 		}
 
-		// Should be smallish sized cidr, this thing is kept in etcd
-		// bigger cidr (specially those offered by IPv6) will add no value
-		// significantly increase snapshotting time.
-		var ones, bits = options.SecondaryServiceClusterIPRange.Mask.Size()
-		if bits-ones > 20 {
-			errs = append(errs, errors.New("specified --secondary-service-cluster-ip-range is too large"))
+		if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--secondary-service-cluster-ip-range"); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
 	return errs
+}
+
+func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) error {
+	// Should be smallish sized cidr, this thing is kept in etcd
+	// bigger cidr (specially those offered by IPv6) will add no value
+	// significantly increase snapshotting time.
+	var ones, bits = cidr.Mask.Size()
+	if bits-ones > maxCIDRBits {
+		return fmt.Errorf("specified %s is too large; for %d-bit addresses, the mask must be >= %d", cidrFlag, bits, bits-maxCIDRBits)
+	}
+
+	return nil
 }
 
 func validateServiceNodePort(options *ServerRunOptions) []error {
