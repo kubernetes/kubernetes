@@ -38,7 +38,8 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	kmeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
@@ -341,13 +342,10 @@ func getLocationName(project, zoneOrRegion string) string {
 }
 
 func addFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key string) error {
-	if hasFinalizer(service, key) {
+	updated := kmeta.AddFinalizer(service, key).(*v1.Service)
+	if kmeta.FinalizersEqual(updated, service) {
 		return nil
 	}
-
-	// Make a copy so we don't mutate the shared informer cache.
-	updated := service.DeepCopy()
-	updated.ObjectMeta.Finalizers = append(updated.ObjectMeta.Finalizers, key)
 
 	_, err := servicehelper.PatchService(kubeClient, service, updated)
 	return err
@@ -355,36 +353,11 @@ func addFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key st
 
 // removeFinalizer patches the service to remove finalizer.
 func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key string) error {
-	if !hasFinalizer(service, key) {
+	updated := kmeta.RemoveFinalizer(service, key).(*v1.Service)
+	if kmeta.FinalizersEqual(updated, service) {
 		return nil
 	}
 
-	// Make a copy so we don't mutate the shared informer cache.
-	updated := service.DeepCopy()
-	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, key)
-
 	_, err := servicehelper.PatchService(kubeClient, service, updated)
 	return err
-}
-
-//hasFinalizer returns if the given service has the specified key in its list of finalizers.
-func hasFinalizer(service *v1.Service, key string) bool {
-	for _, finalizer := range service.ObjectMeta.Finalizers {
-		if finalizer == key {
-			return true
-		}
-	}
-	return false
-}
-
-// removeString returns a newly created []string that contains all items from slice that
-// are not equal to s.
-func removeString(slice []string, s string) []string {
-	var newSlice []string
-	for _, item := range slice {
-		if item != s {
-			newSlice = append(newSlice, item)
-		}
-	}
-	return newSlice
 }

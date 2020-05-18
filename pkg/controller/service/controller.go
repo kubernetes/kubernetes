@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -848,13 +849,10 @@ func (s *Controller) processLoadBalancerDelete(service *v1.Service, key string) 
 
 // addFinalizer patches the service to add finalizer.
 func (s *Controller) addFinalizer(service *v1.Service) error {
-	if servicehelper.HasLBFinalizer(service) {
+	updated := meta.AddFinalizer(service, servicehelper.LoadBalancerCleanupFinalizer).(*v1.Service)
+	if meta.FinalizersEqual(updated, service) {
 		return nil
 	}
-
-	// Make a copy so we don't mutate the shared informer cache.
-	updated := service.DeepCopy()
-	updated.ObjectMeta.Finalizers = append(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer)
 
 	klog.V(2).Infof("Adding finalizer to service %s/%s", updated.Namespace, updated.Name)
 	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)
@@ -863,29 +861,14 @@ func (s *Controller) addFinalizer(service *v1.Service) error {
 
 // removeFinalizer patches the service to remove finalizer.
 func (s *Controller) removeFinalizer(service *v1.Service) error {
-	if !servicehelper.HasLBFinalizer(service) {
+	updated := meta.RemoveFinalizer(service, servicehelper.LoadBalancerCleanupFinalizer).(*v1.Service)
+	if meta.FinalizersEqual(updated, service) {
 		return nil
 	}
-
-	// Make a copy so we don't mutate the shared informer cache.
-	updated := service.DeepCopy()
-	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer)
 
 	klog.V(2).Infof("Removing finalizer from service %s/%s", updated.Namespace, updated.Name)
 	_, err := servicehelper.PatchService(s.kubeClient.CoreV1(), service, updated)
 	return err
-}
-
-// removeString returns a newly created []string that contains all items from slice that
-// are not equal to s.
-func removeString(slice []string, s string) []string {
-	var newSlice []string
-	for _, item := range slice {
-		if item != s {
-			newSlice = append(newSlice, item)
-		}
-	}
-	return newSlice
 }
 
 // patchStatus patches the service with the given LoadBalancerStatus.

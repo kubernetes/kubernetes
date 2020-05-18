@@ -32,11 +32,12 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
 	"google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	kmeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 )
 
@@ -1549,7 +1550,7 @@ func TestEnsureInternalLoadBalancerFinalizer(t *testing.T) {
 	assertInternalLbResources(t, gce, svc, vals, nodeNames)
 	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	require.NoError(t, err)
-	if !hasFinalizer(svc, ILBFinalizerV1) {
+	if !kmeta.HasFinalizer(svc, ILBFinalizerV1) {
 		t.Errorf("Expected finalizer '%s' not found in Finalizer list - %v", ILBFinalizerV1, svc.Finalizers)
 	}
 
@@ -1559,7 +1560,7 @@ func TestEnsureInternalLoadBalancerFinalizer(t *testing.T) {
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
 	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 	require.NoError(t, err)
-	if hasFinalizer(svc, ILBFinalizerV1) {
+	if kmeta.HasFinalizer(svc, ILBFinalizerV1) {
 		t.Errorf("Finalizer '%s' not deleted as part of ILB delete", ILBFinalizerV1)
 	}
 }

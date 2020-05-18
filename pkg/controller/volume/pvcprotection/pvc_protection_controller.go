@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
-	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -187,8 +187,12 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	if !c.storageObjectInUseProtectionEnabled {
 		return nil
 	}
-	claimClone := pvc.DeepCopy()
-	claimClone.ObjectMeta.Finalizers = append(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
+
+	claimClone := meta.AddFinalizer(pvc, volumeutil.PVCProtectionFinalizer).(*v1.PersistentVolumeClaim)
+	if meta.FinalizersEqual(claimClone, pvc) {
+		return nil
+	}
+
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(3).Infof("Error adding protection finalizer to PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
@@ -199,8 +203,11 @@ func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
 }
 
 func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
-	claimClone := pvc.DeepCopy()
-	claimClone.ObjectMeta.Finalizers = slice.RemoveString(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
+	claimClone := meta.RemoveFinalizer(pvc, volumeutil.PVCProtectionFinalizer).(*v1.PersistentVolumeClaim)
+	if meta.FinalizersEqual(claimClone, pvc) {
+		return nil
+	}
+
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		klog.V(3).Infof("Error removing protection finalizer from PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)

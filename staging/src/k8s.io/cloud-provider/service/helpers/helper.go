@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -114,12 +115,7 @@ func NeedsHealthCheck(service *v1.Service) bool {
 
 // HasLBFinalizer checks if service contains LoadBalancerCleanupFinalizer.
 func HasLBFinalizer(service *v1.Service) bool {
-	for _, finalizer := range service.ObjectMeta.Finalizers {
-		if finalizer == LoadBalancerCleanupFinalizer {
-			return true
-		}
-	}
-	return false
+	return meta.HasFinalizer(service, LoadBalancerCleanupFinalizer)
 }
 
 // LoadBalancerStatusEqual checks if load balancer status are equal

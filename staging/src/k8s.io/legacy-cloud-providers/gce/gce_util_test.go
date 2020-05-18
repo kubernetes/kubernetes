@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	compute "google.golang.org/api/compute/v1"
+	kmeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -141,7 +142,7 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get service, err %v", err)
 	}
-	if !hasFinalizer(svc, ILBFinalizerV1) {
+	if !kmeta.HasFinalizer(svc, ILBFinalizerV1) {
 		t.Errorf("Unable to find finalizer '%s' in service %s", ILBFinalizerV1, svc.Name)
 	}
 	err = removeFinalizer(svc, gce.client.CoreV1(), ILBFinalizerV1)
@@ -152,7 +153,7 @@ func TestAddRemoveFinalizer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get service, err %v", err)
 	}
-	if hasFinalizer(svc, ILBFinalizerV1) {
+	if kmeta.HasFinalizer(svc, ILBFinalizerV1) {
 		t.Errorf("Failed to remove finalizer '%s' in service %s", ILBFinalizerV1, svc.Name)
 	}
 }
