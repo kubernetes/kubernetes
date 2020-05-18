@@ -41,10 +41,10 @@ func NewTimestamp() *Timestamp {
 	return &Timestamp{time.Now()}
 }
 
-// ConvertToTimestamp takes a string, parses it using the RFC3339Nano layout,
+// ConvertToTimestamp takes a string, parses it using the RFC3339NanoLenient layout,
 // and converts it to a Timestamp object.
 func ConvertToTimestamp(timeString string) *Timestamp {
-	parsed, _ := time.Parse(time.RFC3339Nano, timeString)
+	parsed, _ := time.Parse(RFC3339NanoLenient, timeString)
 	return &Timestamp{parsed}
 }
 
@@ -53,10 +53,10 @@ func (t *Timestamp) Get() time.Time {
 	return t.time
 }
 
-// GetString returns the time in the string format using the RFC3339Nano
+// GetString returns the time in the string format using the RFC3339NanoFixed
 // layout.
 func (t *Timestamp) GetString() string {
-	return t.time.Format(time.RFC3339Nano)
+	return t.time.Format(RFC3339NanoFixed)
 }
 
 // A type to help sort container statuses based on container names.
