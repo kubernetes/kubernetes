@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "parse.go",
+        "readfile.go",
         "sysreadfile.go",
         "sysreadfile_compat.go",
         "valueparser.go",

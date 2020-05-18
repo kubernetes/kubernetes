@@ -24,11 +24,13 @@ package procfs
 // > full avg10=0.00 avg60=0.13 avg300=0.96 total=8183134
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
 	"strings"
+
+	"github.com/prometheus/procfs/internal/util"
 )
 
 const lineFormat = "avg10=%f avg60=%f avg300=%f total=%d"
@@ -55,24 +57,21 @@ type PSIStats struct {
 // resource from /proc/pressure/<resource>. At time of writing this can be
 // either "cpu", "memory" or "io".
 func (fs FS) PSIStatsForResource(resource string) (PSIStats, error) {
-	file, err := os.Open(fs.proc.Path(fmt.Sprintf("%s/%s", "pressure", resource)))
+	data, err := util.ReadFileNoStat(fs.proc.Path(fmt.Sprintf("%s/%s", "pressure", resource)))
 	if err != nil {
 		return PSIStats{}, fmt.Errorf("psi_stats: unavailable for %s", resource)
 	}
 
-	defer file.Close()
-	return parsePSIStats(resource, file)
+	return parsePSIStats(resource, bytes.NewReader(data))
 }
 
 // parsePSIStats parses the specified file for pressure stall information
-func parsePSIStats(resource string, file io.Reader) (PSIStats, error) {
+func parsePSIStats(resource string, r io.Reader) (PSIStats, error) {
 	psiStats := PSIStats{}
-	stats, err := ioutil.ReadAll(file)
-	if err != nil {
-		return psiStats, fmt.Errorf("psi_stats: unable to read data for %s", resource)
-	}
 
-	for _, l := range strings.Split(string(stats), "\n") {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		l := scanner.Text()
 		prefix := strings.Split(l, " ")[0]
 		switch prefix {
 		case "some":

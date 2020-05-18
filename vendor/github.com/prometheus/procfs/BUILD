@@ -10,23 +10,30 @@ go_library(
         "doc.go",
         "fs.go",
         "ipvs.go",
+        "loadavg.go",
         "mdstat.go",
+        "meminfo.go",
         "mountinfo.go",
         "mountstats.go",
+        "net_conntrackstat.go",
         "net_dev.go",
+        "net_sockstat.go",
         "net_softnet.go",
+        "net_udp.go",
         "net_unix.go",
         "proc.go",
         "proc_environ.go",
         "proc_fdinfo.go",
         "proc_io.go",
         "proc_limits.go",
+        "proc_maps.go",
         "proc_ns.go",
         "proc_psi.go",
         "proc_stat.go",
         "proc_status.go",
         "schedstat.go",
         "stat.go",
+        "swaps.go",
         "vm.go",
         "xfrm.go",
         "zoneinfo.go",
@@ -37,7 +44,42 @@ go_library(
     deps = [
         "//vendor/github.com/prometheus/procfs/internal/fs:go_default_library",
         "//vendor/github.com/prometheus/procfs/internal/util:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
