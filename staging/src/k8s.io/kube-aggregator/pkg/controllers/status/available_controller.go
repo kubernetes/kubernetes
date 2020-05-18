@@ -292,7 +292,7 @@ func (c *AvailableConditionController) sync(key string) error {
 					discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
 				}
 
-				errCh := make(chan error)
+				errCh := make(chan error, 1)
 				go func() {
 					// be sure to check a URL that the aggregated API server is required to serve
 					newReq, err := http.NewRequest("GET", discoveryURL.String(), nil)
@@ -326,13 +326,6 @@ func (c *AvailableConditionController) sync(key string) error {
 					// we had trouble with slow dial and DNS responses causing us to wait too long.
 					// we added this as insurance
 				case <-time.After(6 * time.Second):
-					// errCh needs to have a reader since the above goroutine doing the work 
-					// needs to send to it. 
-					go func() {
-						if res := <-errch; res != nil {
-							fmt.Errorf("timed out response from %v: %v", discoveryURL, res)
-						}
-					}()
 					results <- fmt.Errorf("timed out waiting for %v", discoveryURL)
 					return
 				}
