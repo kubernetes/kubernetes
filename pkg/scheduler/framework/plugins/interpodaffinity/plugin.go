@@ -20,19 +20,14 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = "InterPodAffinity"
-
-	// MinHardPodAffinityWeight is the minimum HardPodAffinityWeight.
-	MinHardPodAffinityWeight int32 = 0
-	// MaxHardPodAffinityWeight is the maximum HardPodAffinityWeight.
-	MaxHardPodAffinityWeight int32 = 100
 )
 
 var _ framework.PreFilterPlugin = &InterPodAffinity{}
@@ -65,7 +60,7 @@ func New(plArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, 
 	if err != nil {
 		return nil, err
 	}
-	if err := ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinityWeight"), args.HardPodAffinityWeight); err != nil {
+	if err := validation.ValidateInterPodAffinityArgs(args); err != nil {
 		return nil, err
 	}
 	return &InterPodAffinity{
@@ -80,13 +75,4 @@ func getArgs(obj runtime.Object) (config.InterPodAffinityArgs, error) {
 		return config.InterPodAffinityArgs{}, fmt.Errorf("want args to be of type InterPodAffinityArgs, got %T", obj)
 	}
 	return *ptr, nil
-}
-
-// ValidateHardPodAffinityWeight validates that weight is within allowed range.
-func ValidateHardPodAffinityWeight(path *field.Path, w int32) error {
-	if w < MinHardPodAffinityWeight || w > MaxHardPodAffinityWeight {
-		msg := fmt.Sprintf("not in valid range [%d-%d]", MinHardPodAffinityWeight, MaxHardPodAffinityWeight)
-		return field.Invalid(path, w, msg)
-	}
-	return nil
 }

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 )
 
@@ -79,7 +80,7 @@ func (o *DeprecatedOptions) Validate() []error {
 		errs = append(errs, field.Required(field.NewPath("policyConfigFile"), "required when --use-legacy-policy-config is true"))
 	}
 
-	if err := interpodaffinity.ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinitySymmetricWeight"), o.HardPodAffinitySymmetricWeight); err != nil {
+	if err := validation.ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinitySymmetricWeight"), o.HardPodAffinitySymmetricWeight); err != nil {
 		errs = append(errs, err)
 	}
 

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -35,32 +36,17 @@ const (
 	ErrReasonPresenceViolated = "node(s) didn't have the requested labels"
 )
 
-// validateArgs validates that presentLabels and absentLabels do not conflict.
-func validateNoConflict(presentLabels []string, absentLabels []string) error {
-	m := make(map[string]struct{}, len(presentLabels))
-	for _, l := range presentLabels {
-		m[l] = struct{}{}
-	}
-	for _, l := range absentLabels {
-		if _, ok := m[l]; ok {
-			return fmt.Errorf("detecting at least one label (e.g., %q) that exist in both the present(%+v) and absent(%+v) label list", l, presentLabels, absentLabels)
-		}
-	}
-	return nil
-}
-
 // New initializes a new plugin and returns it.
 func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	args, err := getArgs(plArgs)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
+
+	if err := validation.ValidateNodeLabelArgs(args); err != nil {
 		return nil, err
 	}
-	if err := validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference); err != nil {
-		return nil, err
-	}
+
 	return &NodeLabel{
 		handle: handle,
 		args:   args,
