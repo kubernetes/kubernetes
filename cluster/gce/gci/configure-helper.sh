@@ -1338,7 +1338,7 @@ function assemble-docker-flags {
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
     docker_opts+=" --log-level=debug"
   else
-    docker_opts+=" --log-level=warn"
+    docker_opts+=" --log-level=info"
   fi
   local use_net_plugin="true"
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
