@@ -564,6 +564,13 @@ function create-master-pki {
     SERVICEACCOUNT_KEY="${MASTER_KEY}"
   fi
 
+  if [[ -n "${OLD_MASTER_CERT:-}" && -n "${OLD_MASTER_KEY:-}" ]]; then
+    OLD_MASTER_CERT_PATH="${pki_dir}/oldapiserver.crt"
+    echo "${OLD_MASTER_CERT}" | base64 --decode > "${OLD_MASTER_CERT_PATH}"
+    OLD_MASTER_KEY_PATH="${pki_dir}/oldapiserver.key"
+    echo "${OLD_MASTER_KEY}" | base64 --decode > "${OLD_MASTER_KEY_PATH}"
+  fi
+
   SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
   write-pki-data "${SERVICEACCOUNT_CERT}" "${SERVICEACCOUNT_CERT_PATH}"
 
