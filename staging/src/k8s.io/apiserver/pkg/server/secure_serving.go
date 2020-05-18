@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+	"k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -56,6 +57,14 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 	}
 	if len(s.CipherSuites) > 0 {
 		tlsConfig.CipherSuites = s.CipherSuites
+		insecureCiphers := flag.InsecureTLSCiphers()
+		for i := 0; i < len(s.CipherSuites); i++ {
+			for cipherName, cipherID := range insecureCiphers {
+				if s.CipherSuites[i] == cipherID {
+					klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
+				}
+			}
+		}
 	}
 
 	if s.ClientCA != nil {
