@@ -29,63 +29,8 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 )
-
-func Test_generatorFromName(t *testing.T) {
-	const (
-		nonsenseName         = "not-a-real-generator-name"
-		basicName            = generateversioned.DeploymentBasicV1Beta1GeneratorName
-		basicAppsV1Beta1Name = generateversioned.DeploymentBasicAppsV1Beta1GeneratorName
-		basicAppsV1Name      = generateversioned.DeploymentBasicAppsV1GeneratorName
-		deploymentName       = "deployment-name"
-	)
-	imageNames := []string{"image-1", "image-2"}
-
-	generator, ok := generatorFromName(nonsenseName, imageNames, deploymentName)
-	assert.Nil(t, generator)
-	assert.False(t, ok)
-
-	generator, ok = generatorFromName(basicName, imageNames, deploymentName)
-	assert.True(t, ok)
-
-	{
-		expectedGenerator := &generateversioned.DeploymentBasicGeneratorV1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		assert.Equal(t, expectedGenerator, generator)
-	}
-
-	generator, ok = generatorFromName(basicAppsV1Beta1Name, imageNames, deploymentName)
-	assert.True(t, ok)
-
-	{
-		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1Beta1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		assert.Equal(t, expectedGenerator, generator)
-	}
-
-	generator, ok = generatorFromName(basicAppsV1Name, imageNames, deploymentName)
-	assert.True(t, ok)
-
-	{
-		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1{
-			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
-				Name:   deploymentName,
-				Images: imageNames,
-			},
-		}
-		assert.Equal(t, expectedGenerator, generator)
-	}
-}
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
@@ -139,11 +84,9 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	cmd := NewCmdCreateDeployment(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	options := &DeploymentOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-			DryRunStrategy: cmdutil.DryRunClient,
-			IOStreams:      ioStreams,
-		},
+		PrintFlags:     genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		DryRunStrategy: cmdutil.DryRunClient,
+		IOStreams:      ioStreams,
 	}
 
 	err := options.Complete(tf, cmd, []string{depName})
