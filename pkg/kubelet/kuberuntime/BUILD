@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "convert.go",
         "doc.go",
         "fake_kuberuntime_manager.go",
         "helpers.go",
@@ -91,6 +92,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "convert_test.go",
         "helpers_linux_test.go",
         "helpers_test.go",
         "instrumented_services_test.go",

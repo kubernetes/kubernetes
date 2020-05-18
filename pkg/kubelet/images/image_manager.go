@@ -100,7 +100,18 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		return "", msg, ErrInvalidImageName
 	}
 
-	spec := kubecontainer.ImageSpec{Image: image}
+	var podAnnotations []kubecontainer.Annotation
+	for k, v := range pod.GetAnnotations() {
+		podAnnotations = append(podAnnotations, kubecontainer.Annotation{
+			Name:  k,
+			Value: v,
+		})
+	}
+
+	spec := kubecontainer.ImageSpec{
+		Image:       image,
+		Annotations: podAnnotations,
+	}
 	imageRef, err := m.imageService.GetImageRef(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)

@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
@@ -47,7 +47,11 @@ type Version interface {
 // value of a Container's Image field, but in the future it will include more detailed
 // information about the different image types.
 type ImageSpec struct {
+	// ID of the image.
 	Image string
+	// The annotations for the image.
+	// This should be passed to CRI during image pulls and returned when images are listed.
+	Annotations []Annotation
 }
 
 // ImageStats contains statistics about all the images currently available.
@@ -349,6 +353,8 @@ type Image struct {
 	RepoDigests []string
 	// The size of the image in bytes.
 	Size int64
+	// ImageSpec for the image which include annotations.
+	Spec ImageSpec
 }
 
 type EnvVar struct {
