@@ -79,7 +79,6 @@ function get-master-disk-size() {
 
 function get-node-ip-range {
   if [[ -n "${NODE_IP_RANGE:-}" ]]; then
-    >&2 echo "Using user provided NODE_IP_RANGE: ${NODE_IP_RANGE}"
     echo "${NODE_IP_RANGE}"
     return
   fi
