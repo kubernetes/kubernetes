@@ -32,8 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -95,7 +97,8 @@ type Manager interface {
 	Start()
 
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
-	SetPodStatus(pod *v1.Pod, status v1.PodStatus)
+	// Returns whether an update was triggered.
+	SetPodStatus(pod *v1.Pod, status v1.PodStatus) bool
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
@@ -185,7 +188,7 @@ func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	return status.status, ok
 }
 
-func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
+func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) bool {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
@@ -201,7 +204,7 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
-	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
+	return m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
 }
 
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
@@ -405,6 +408,12 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
 		klog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
 		return false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		if err := checkContainerStateTransition(oldStatus.EphemeralContainerStatuses, status.EphemeralContainerStatuses, pod.Spec.RestartPolicy); err != nil {
+			klog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+			return false
+		}
 	}
 
 	// Set ContainersReadyCondition.LastTransitionTime.
@@ -712,6 +721,14 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	}
 	// Sort the container statuses, so that the order won't affect the result of comparison
 	kubetypes.SortInitContainerStatuses(pod, status.InitContainerStatuses)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for i := range status.EphemeralContainerStatuses {
+			cstatus := &status.EphemeralContainerStatuses[i]
+			normalizeContainerState(&cstatus.State)
+			normalizeContainerState(&cstatus.LastTerminationState)
+		}
+		sort.Sort(kubetypes.SortedContainerStatuses(status.EphemeralContainerStatuses))
+	}
 	return status
 }
 
