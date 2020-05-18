@@ -109,10 +109,11 @@ export CONTAINER_RUNTIME_NAME
 export LOAD_IMAGE_COMMAND
 
 # Ability to inject custom versions (Ubuntu OS images ONLY)
-# if KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION or KUBE_UBUNTU_INSTALL_RUNC_VERSION
-# is set to empty then we do not override the version(s) and just
-# use whatever is in the default installation of containerd package
+# if KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION, KUBE_UBUNTU_INSTALL_CRIO_VERSION or
+# KUBE_UBUNTU_INSTALL_RUNC_VERSION is set to empty then we do not override the
+# version(s) and just use whatever is in the default
 export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
+export UBUNTU_INSTALL_CRIO_VERSION=${KUBE_UBUNTU_INSTALL_CRIO_VERSION:-}
 export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
 
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.

@@ -496,7 +496,31 @@ function install-containerd-ubuntu {
   if [[ ! -z "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
     curl -fsSL "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.amd64" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
   fi
-  sudo systemctl start containerd
+  systemctl start containerd
+}
+
+function install-crio-ubuntu {
+  # bailout if we are not on ubuntu
+  if [[ -z "$(command -v lsb_release)" || $(lsb_release -si) != "Ubuntu" ]]; then
+    echo "Unable to automatically install CRI-O in non-ubuntu image. Bailing out..."
+    exit 2
+  fi
+
+  if [[ $(dpkg --print-architecture) != "amd64" ]]; then
+    echo "Unable to automatically install CRI-O in non-amd64 image. Bailing out..."
+    exit 2
+  fi
+
+  # Install dependencies
+  apt-get update
+  apt-get install -y curl make socat
+
+  # Install CRI-O
+  curl -fsSL "https://github.com/cri-o/cri-o/releases/download/$UBUNTU_INSTALL_CRIO_VERSION/crio-$UBUNTU_INSTALL_CRIO_VERSION.tar.gz" | tar -xvz
+  make install -C "crio-$UBUNTU_INSTALL_CRIO_VERSION"
+
+  systemctl daemon-reload
+  systemctl start crio
 }
 
 function ensure-container-runtime {
@@ -527,6 +551,22 @@ function ensure-container-runtime {
       exit 2
     fi
     containerd --version
+
+    if ! command -v runc >/dev/null 2>&1; then
+      echo "ERROR runc not found. Aborting."
+      exit 2
+    fi
+    runc --version
+  elif [[ "${container_runtime}" == "cri-o" ]]; then
+    if [[ -n "${UBUNTU_INSTALL_CRIO_VERSION:-}" ]]; then
+      install-crio-ubuntu
+    fi
+
+    if ! command -v crio >/dev/null 2>&1; then
+      echo "ERROR crio not found. Aborting."
+      exit 2
+    fi
+    crio --version
 
     if ! command -v runc >/dev/null 2>&1; then
       echo "ERROR runc not found. Aborting."
