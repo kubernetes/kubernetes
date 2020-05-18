@@ -17,13 +17,21 @@ limitations under the License.
 package versioned
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 	"reflect"
 	"testing"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utiltesting "k8s.io/client-go/util/testing"
 )
@@ -109,6 +117,50 @@ func writeKeyPair(tmpDirPath, key, cert string, t *testing.T) (keyPath, certPath
 	return
 }
 
+func generateCLR() (*bytes.Buffer, error) {
+	caPrivateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, err
+	}
+	ca := &x509.Certificate{
+		SerialNumber: big.NewInt(1111),
+		Subject: pkix.Name{
+			Organization:  []string{"K8s Tests"},
+			Country:       []string{"IW"},
+			Province:      []string{""},
+			Locality:      []string{"Rocks"},
+			StreetAddress: []string{"Big Street"},
+			PostalCode:    []string{"56"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(1, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+
+	revokedCert := []pkix.RevokedCertificate{
+		{
+			SerialNumber:   big.NewInt(2222),
+			RevocationTime: time.Now(),
+		},
+	}
+
+	crlBytes, err := ca.CreateCRL(rand.Reader, caPrivateKey, revokedCert, time.Now(), time.Now().Add(time.Minute*5))
+	if err != nil {
+		return nil, err
+	}
+
+	crlPEM := new(bytes.Buffer)
+	pem.Encode(crlPEM, &pem.Block{
+		Type:  "X509 CRL",
+		Bytes: crlBytes,
+	})
+	return crlPEM, nil
+
+}
+
 func TestSecretForTLSGenerate(t *testing.T) {
 	invalidCertTmpDir := utiltesting.MkTmpdirOrDie("tls-test")
 	defer tearDown(invalidCertTmpDir)
@@ -121,6 +173,18 @@ func TestSecretForTLSGenerate(t *testing.T) {
 	mismatchCertTmpDir := utiltesting.MkTmpdirOrDie("tls-mismatch-test")
 	defer tearDown(mismatchCertTmpDir)
 	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, mismatchRSAKeyPEM, rsaCertPEM, t)
+
+	crl, err := generateCLR()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	validCRLTmpDir := utiltesting.MkTmpdirOrDie("tls-test")
+	defer tearDown(validCRLTmpDir)
+	validCRLPath := path.Join(validCRLTmpDir, "ca.crl")
+	write(validCRLPath, crl.String(), t)
+
+	invalidCRLPath := path.Join(validCRLTmpDir, "test")
+	write(invalidCRLPath, "test", t)
 
 	tests := []struct {
 		name      string
@@ -211,6 +275,70 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"name": "foo",
 				"key":  "/tmp/foo.key",
 			},
+			expectErr: true,
+		},
+		{
+			name: "test-valid-ca-cert",
+			params: map[string]interface{}{
+				"name":   "foo",
+				"key":    validKeyPath,
+				"cert":   validCertPath,
+				"cacert": validCertPath,
+			},
+			expected: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					v1.TLSCertKey:       []byte(rsaCertPEM),
+					v1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
+					v1.TLSCACertKey:     []byte(rsaCertPEM),
+				},
+				Type: v1.SecretTypeTLS,
+			},
+			expectErr: false,
+		},
+		{
+			name: "test-invalid-ca-cert",
+			params: map[string]interface{}{
+				"name":   "foo",
+				"key":    validKeyPath,
+				"cert":   validCertPath,
+				"cacert": invalidCertPath,
+			},
+			expected:  &v1.Secret{},
+			expectErr: true,
+		},
+		{
+			name: "test-valid-crl",
+			params: map[string]interface{}{
+				"name":  "foo",
+				"key":   validKeyPath,
+				"cert":  validCertPath,
+				"cacrl": validCRLPath,
+			},
+			expected: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					v1.TLSCertKey:       []byte(rsaCertPEM),
+					v1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
+					v1.TLSCACRLKey:      []byte(crl.String()),
+				},
+				Type: v1.SecretTypeTLS,
+			},
+			expectErr: false,
+		},
+		{
+			name: "test-invalid-crl",
+			params: map[string]interface{}{
+				"name":  "foo",
+				"key":   validKeyPath,
+				"cert":  validCertPath,
+				"cacrl": invalidCRLPath,
+			},
+			expected:  &v1.Secret{},
 			expectErr: true,
 		},
 	}

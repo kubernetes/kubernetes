@@ -5596,6 +5596,13 @@ const (
 	TLSCertKey = "tls.crt"
 	// TLSPrivateKeyKey is the key for the private key field in a TLS secret.
 	TLSPrivateKeyKey = "tls.key"
+	// TLSCACertKey is the intermediate CA Certificate chain for client authentication in a TLS secret
+	TLSCACertKey = "ca.crt"
+	// TLSCACRLKey is the CA Certificate Revocation List in a TLS secret
+	TLSCACRLKey = "ca.crl"
+	// SecretTypeBootstrapToken is used during the automated bootstrap process (first
+	// implemented by kubeadm). It stores tokens that are used to sign well known
+	// ConfigMaps. They are used for authn.
 	// SecretTypeBootstrapToken is used during the automated bootstrap process (first
 	// implemented by kubeadm). It stores tokens that are used to sign well known
 	// ConfigMaps. They are used for authn.

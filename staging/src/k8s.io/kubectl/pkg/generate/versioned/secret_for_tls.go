@@ -18,10 +18,12 @@ package versioned
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/util/hash"
@@ -37,6 +39,10 @@ type SecretForTLSGeneratorV1 struct {
 	Cert string
 	// AppendHash; if true, derive a hash from the Secret and append it to the name
 	AppendHash bool
+	// CACert is the path to the intermediate CA Cert chain used for client authentication.
+	CACert string
+	// CACRL is the path to the CA Certificate Revocation List used for client authentication.
+	CACRL string
 }
 
 // Ensure it supports the generator pattern that uses parameter injection
@@ -44,6 +50,27 @@ var _ generate.Generator = &SecretForTLSGeneratorV1{}
 
 // Ensure it supports the generator pattern that uses parameters specified during construction
 var _ generate.StructuredGenerator = &SecretForTLSGeneratorV1{}
+
+func verifyCACertChain(input []byte) error {
+	var derBlock *pem.Block
+	certFound := false
+	for {
+		derBlock, input = pem.Decode(input)
+		if derBlock == nil {
+			break
+		}
+		if derBlock.Type != "CERTIFICATE" {
+			return fmt.Errorf("invalid pem type in cert chain")
+		} else if _, err := x509.ParseCertificate(derBlock.Bytes); err != nil {
+			return fmt.Errorf("invalid cert in cert chain")
+		}
+		certFound = true
+	}
+	if !certFound {
+		return fmt.Errorf("invalid cert chain")
+	}
+	return nil
+}
 
 // Generate returns a secret using the specified parameters
 func (s SecretForTLSGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
@@ -72,6 +99,8 @@ func (s SecretForTLSGeneratorV1) Generate(genericParams map[string]interface{}) 
 	delegate.Name = params["name"]
 	delegate.Key = params["key"]
 	delegate.Cert = params["cert"]
+	delegate.CACert = params["cacert"]
+	delegate.CACRL = params["cacrl"]
 	return delegate.StructuredGenerate()
 }
 
@@ -102,6 +131,29 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	secret.Data = map[string][]byte{}
 	secret.Data[v1.TLSCertKey] = []byte(tlsCrt)
 	secret.Data[v1.TLSPrivateKeyKey] = []byte(tlsKey)
+
+	if s.CACert != "" {
+		caCrt, err := readFile(s.CACert)
+		if err != nil {
+			return nil, err
+		}
+		if err = verifyCACertChain(caCrt); err != nil {
+			return nil, err
+		}
+		secret.Data[v1.TLSCACertKey] = caCrt
+	}
+
+	if s.CACRL != "" {
+		caCRL, err := readFile(s.CACRL)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = x509.ParseCRL(caCRL); err != nil {
+			return nil, err
+		}
+		secret.Data[v1.TLSCACRLKey] = caCRL
+	}
+
 	if s.AppendHash {
 		h, err := hash.SecretHash(secret)
 		if err != nil {
@@ -109,6 +161,7 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		}
 		secret.Name = fmt.Sprintf("%s-%s", secret.Name, h)
 	}
+
 	return secret, nil
 }
 
@@ -128,6 +181,8 @@ func (s SecretForTLSGeneratorV1) ParamNames() []generate.GeneratorParam {
 		{Name: "key", Required: true},
 		{Name: "cert", Required: true},
 		{Name: "append-hash", Required: false},
+		{Name: "cacert", Required: false},
+		{Name: "cacrl", Required: false},
 	}
 }
 
