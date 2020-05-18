@@ -17,78 +17,11 @@ limitations under the License.
 package apiextensions
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func TestCRDHasFinalizer(t *testing.T) {
-	tests := []struct {
-		name             string
-		crd              *CustomResourceDefinition
-		finalizerToCheck string
-
-		expected bool
-	}{
-		{
-			name: "missing",
-			crd: &CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         false,
-		},
-		{
-			name: "present",
-			crd: &CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it", "it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         true,
-		},
-	}
-	for _, tc := range tests {
-		actual := CRDHasFinalizer(tc.crd, tc.finalizerToCheck)
-		if tc.expected != actual {
-			t.Errorf("%v expected %v, got %v", tc.name, tc.expected, actual)
-		}
-	}
-}
-
-func TestCRDRemoveFinalizer(t *testing.T) {
-	tests := []struct {
-		name             string
-		crd              *CustomResourceDefinition
-		finalizerToCheck string
-
-		expected []string
-	}{
-		{
-			name: "missing",
-			crd: &CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         []string{"not-it"},
-		},
-		{
-			name: "present",
-			crd: &CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it", "it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         []string{"not-it"},
-		},
-	}
-	for _, tc := range tests {
-		CRDRemoveFinalizer(tc.crd, tc.finalizerToCheck)
-		if !reflect.DeepEqual(tc.expected, tc.crd.Finalizers) {
-			t.Errorf("%v expected %v, got %v", tc.name, tc.expected, tc.crd.Finalizers)
-		}
-	}
-}
 
 func TestSetCRDCondition(t *testing.T) {
 	tests := []struct {
@@ -271,7 +204,7 @@ func TestSetCRDCondition(t *testing.T) {
 			t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition, crd.Status.Conditions)
 		}
 		for i := range tc.expectedcrdCondition {
-			if !IsCRDConditionEquivalent(&tc.expectedcrdCondition[i], &crd.Status.Conditions[i]) {
+			if !isCRDConditionEquivalent(&tc.expectedcrdCondition[i], &crd.Status.Conditions[i]) {
 				t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition[i], crd.Status.Conditions[i])
 			}
 			if crd.Status.Conditions[i].LastTransitionTime.IsZero() {
@@ -281,91 +214,16 @@ func TestSetCRDCondition(t *testing.T) {
 	}
 }
 
-func TestRemoveCRDCondition(t *testing.T) {
-	tests := []struct {
-		name                 string
-		crdCondition         []CustomResourceDefinitionCondition
-		conditionType        CustomResourceDefinitionConditionType
-		expectedcrdCondition []CustomResourceDefinitionCondition
-	}{
-		{
-			name: "test remove CRDCondition when the conditionType meets",
-			crdCondition: []CustomResourceDefinitionCondition{
-				{
-					Type:               Established,
-					Status:             ConditionTrue,
-					Reason:             "Accepted",
-					Message:            "the initial names have been accepted",
-					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
-					Reason:             "NoConflicts",
-					Message:            "no conflicts found",
-					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-			},
-			conditionType: NamesAccepted,
-			expectedcrdCondition: []CustomResourceDefinitionCondition{
-				{
-					Type:               Established,
-					Status:             ConditionTrue,
-					Reason:             "Accepted",
-					Message:            "the initial names have been accepted",
-					LastTransitionTime: metav1.Date(2011, 1, 2, 0, 0, 0, 0, time.UTC),
-				},
-			},
-		},
-		{
-			name: "test remove CRDCondition when the conditionType not meets",
-			crdCondition: []CustomResourceDefinitionCondition{
-				{
-					Type:               Established,
-					Status:             ConditionTrue,
-					Reason:             "Accepted",
-					Message:            "the initial names have been accepted",
-					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
-					Reason:             "NoConflicts",
-					Message:            "no conflicts found",
-					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-			},
-			conditionType: Terminating,
-			expectedcrdCondition: []CustomResourceDefinitionCondition{
-				{
-					Type:               Established,
-					Status:             ConditionTrue,
-					Reason:             "Accepted",
-					Message:            "the initial names have been accepted",
-					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				{
-					Type:               NamesAccepted,
-					Status:             ConditionTrue,
-					Reason:             "NoConflicts",
-					Message:            "no conflicts found",
-					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-			},
-		},
+// isCRDConditionEquivalent returns true if the lhs and rhs are equivalent except for times.
+func isCRDConditionEquivalent(lhs, rhs *CustomResourceDefinitionCondition) bool {
+	if lhs == nil && rhs == nil {
+		return true
 	}
-	for _, tc := range tests {
-		crd := generateCRDwithCondition(tc.crdCondition)
-		RemoveCRDCondition(crd, tc.conditionType)
-		if len(tc.expectedcrdCondition) != len(crd.Status.Conditions) {
-			t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition, crd.Status.Conditions)
-		}
-		for i := range tc.expectedcrdCondition {
-			if !IsCRDConditionEquivalent(&tc.expectedcrdCondition[i], &crd.Status.Conditions[i]) {
-				t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition, crd.Status.Conditions)
-			}
-		}
+	if lhs == nil || rhs == nil {
+		return false
 	}
+
+	return lhs.Message == rhs.Message && lhs.Reason == rhs.Reason && lhs.Status == rhs.Status && lhs.Type == rhs.Type
 }
 
 func TestIsCRDConditionPresentAndEqual(t *testing.T) {

@@ -145,28 +145,6 @@ func IsCRDConditionEquivalent(lhs, rhs *apiextensionsv1.CustomResourceDefinition
 	return lhs.Message == rhs.Message && lhs.Reason == rhs.Reason && lhs.Status == rhs.Status && lhs.Type == rhs.Type
 }
 
-// CRDHasFinalizer returns true if the finalizer is in the list.
-func CRDHasFinalizer(crd *apiextensionsv1.CustomResourceDefinition, needle string) bool {
-	for _, finalizer := range crd.Finalizers {
-		if finalizer == needle {
-			return true
-		}
-	}
-
-	return false
-}
-
-// CRDRemoveFinalizer removes the finalizer if present.
-func CRDRemoveFinalizer(crd *apiextensionsv1.CustomResourceDefinition, needle string) {
-	newFinalizers := []string{}
-	for _, finalizer := range crd.Finalizers {
-		if finalizer != needle {
-			newFinalizers = append(newFinalizers, finalizer)
-		}
-	}
-	crd.Finalizers = newFinalizers
-}
-
 // HasServedCRDVersion returns true if the given version is in the list of CRD's versions and the Served flag is set.
 func HasServedCRDVersion(crd *apiextensionsv1.CustomResourceDefinition, version string) bool {
 	for _, v := range crd.Spec.Versions {

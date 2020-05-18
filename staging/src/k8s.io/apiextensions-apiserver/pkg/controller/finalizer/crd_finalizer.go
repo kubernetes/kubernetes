@@ -116,7 +116,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	// no work to do
-	if cachedCRD.DeletionTimestamp.IsZero() || !apiextensionshelpers.CRDHasFinalizer(cachedCRD, apiextensionsv1.CustomResourceCleanupFinalizer) {
+	if cachedCRD.DeletionTimestamp.IsZero() || !meta.HasFinalizer(cachedCRD, apiextensionsv1.CustomResourceCleanupFinalizer) {
 		return nil
 	}
 
@@ -166,7 +166,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		})
 	}
 
-	apiextensionshelpers.CRDRemoveFinalizer(crd, apiextensionsv1.CustomResourceCleanupFinalizer)
+	crd = meta.RemoveFinalizer(crd, apiextensionsv1.CustomResourceCleanupFinalizer).(*apiextensionsv1.CustomResourceDefinition)
 	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
@@ -315,7 +315,7 @@ func (c *CRDFinalizer) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
 func (c *CRDFinalizer) addCustomResourceDefinition(obj interface{}) {
 	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	// only queue deleted things
-	if !castObj.DeletionTimestamp.IsZero() && apiextensionshelpers.CRDHasFinalizer(castObj, apiextensionsv1.CustomResourceCleanupFinalizer) {
+	if !castObj.DeletionTimestamp.IsZero() && meta.HasFinalizer(castObj, apiextensionsv1.CustomResourceCleanupFinalizer) {
 		c.enqueue(castObj)
 	}
 }
@@ -324,7 +324,7 @@ func (c *CRDFinalizer) updateCustomResourceDefinition(oldObj, newObj interface{}
 	oldCRD := oldObj.(*apiextensionsv1.CustomResourceDefinition)
 	newCRD := newObj.(*apiextensionsv1.CustomResourceDefinition)
 	// only queue deleted things that haven't been finalized by us
-	if newCRD.DeletionTimestamp.IsZero() || !apiextensionshelpers.CRDHasFinalizer(newCRD, apiextensionsv1.CustomResourceCleanupFinalizer) {
+	if newCRD.DeletionTimestamp.IsZero() || !meta.HasFinalizer(newCRD, apiextensionsv1.CustomResourceCleanupFinalizer) {
 		return
 	}
 

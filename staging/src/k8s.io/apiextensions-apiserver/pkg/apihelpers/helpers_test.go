@@ -17,7 +17,6 @@ limitations under the License.
 package apihelpers
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
@@ -137,72 +136,6 @@ func TestGetAPIApprovalState(t *testing.T) {
 				t.Fatalf("expected %v, got %v", test.expected, actual)
 			}
 		})
-	}
-}
-
-func TestCRDHasFinalizer(t *testing.T) {
-	tests := []struct {
-		name             string
-		crd              *apiextensionsv1.CustomResourceDefinition
-		finalizerToCheck string
-
-		expected bool
-	}{
-		{
-			name: "missing",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         false,
-		},
-		{
-			name: "present",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it", "it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         true,
-		},
-	}
-	for _, tc := range tests {
-		actual := CRDHasFinalizer(tc.crd, tc.finalizerToCheck)
-		if tc.expected != actual {
-			t.Errorf("%v expected %v, got %v", tc.name, tc.expected, actual)
-		}
-	}
-}
-
-func TestCRDRemoveFinalizer(t *testing.T) {
-	tests := []struct {
-		name             string
-		crd              *apiextensionsv1.CustomResourceDefinition
-		finalizerToCheck string
-
-		expected []string
-	}{
-		{
-			name: "missing",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         []string{"not-it"},
-		},
-		{
-			name: "present",
-			crd: &apiextensionsv1.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"not-it", "it"}},
-			},
-			finalizerToCheck: "it",
-			expected:         []string{"not-it"},
-		},
-	}
-	for _, tc := range tests {
-		CRDRemoveFinalizer(tc.crd, tc.finalizerToCheck)
-		if !reflect.DeepEqual(tc.expected, tc.crd.Finalizers) {
-			t.Errorf("%v expected %v, got %v", tc.name, tc.expected, tc.crd.Finalizers)
-		}
 	}
 }
 

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -132,7 +133,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 					existingCRD.DeletionTimestamp = &now
 				}
 
-				if !apiextensions.CRDHasFinalizer(existingCRD, apiextensions.CustomResourceCleanupFinalizer) {
+				if !meta.HasFinalizer(existingCRD, apiextensions.CustomResourceCleanupFinalizer) {
 					existingCRD.Finalizers = append(existingCRD.Finalizers, apiextensions.CustomResourceCleanupFinalizer)
 				}
 				// update the status condition too
