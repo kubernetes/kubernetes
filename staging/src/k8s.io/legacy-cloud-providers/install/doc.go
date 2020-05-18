@@ -1,7 +1,5 @@
-// +build !providerless
-
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,13 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
-
-import (
-	// Cloud providers
-	_ "k8s.io/legacy-cloud-providers/aws"
-	_ "k8s.io/legacy-cloud-providers/azure"
-	_ "k8s.io/legacy-cloud-providers/gce"
-	_ "k8s.io/legacy-cloud-providers/openstack"
-	_ "k8s.io/legacy-cloud-providers/vsphere"
-)
+// Package install should not be added new reference
+package install

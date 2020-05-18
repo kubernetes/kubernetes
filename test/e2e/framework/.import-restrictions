@@ -28,7 +28,6 @@ rules:
       - k8s.io/kubernetes/pkg/apis/storage/v1/util
       - k8s.io/kubernetes/pkg/capabilities
       - k8s.io/kubernetes/pkg/client/conditions
-      - k8s.io/kubernetes/pkg/cloudprovider/providers
       - k8s.io/kubernetes/pkg/controller
       - k8s.io/kubernetes/pkg/controller/deployment/util
       - k8s.io/kubernetes/pkg/controller/nodelifecycle

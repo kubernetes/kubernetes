@@ -24,7 +24,6 @@ rules:
       - k8s.io/kubernetes/pkg/apis/scheduling
       - k8s.io/kubernetes/pkg/capabilities
       - k8s.io/kubernetes/pkg/client/leaderelectionconfig
-      - k8s.io/kubernetes/pkg/cloudprovider/providers
       - k8s.io/kubernetes/pkg/controller
       - k8s.io/kubernetes/pkg/controller/apis/config
       - k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package cloudprovider supplies interfaces and implementations for cloud service providers.
-// To use: import cloudprovider "k8s.io/cloud-provider"
-package cloudprovider
+package install
+
+import (
+	// transitive test dependencies are not vendored by go modules
+	// so we have to explicitly import them here
+	_ "k8s.io/legacy-cloud-providers/vsphere/testing"
+)

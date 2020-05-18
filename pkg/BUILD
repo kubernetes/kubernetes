@@ -53,7 +53,6 @@ filegroup(
         "//pkg/client/conditions:all-srcs",
         "//pkg/client/testdata:all-srcs",
         "//pkg/client/tests:all-srcs",
-        "//pkg/cloudprovider:all-srcs",
         "//pkg/controller:all-srcs",
         "//pkg/credentialprovider:all-srcs",
         "//pkg/features:all-srcs",

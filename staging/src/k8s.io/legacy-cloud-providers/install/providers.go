@@ -1,5 +1,7 @@
+// +build !providerless
+
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+// Deprecation warning
+//
+// Kubernetes core binaries such as Kubelet should not be linking in cloud providers and
+// non core binaries should explicitly specify which cloud provider they are linking with.
+
+package install
 
 import (
-	// transitive test dependencies are not vendored by go modules
-	// so we have to explicitly import them here
-	_ "k8s.io/legacy-cloud-providers/vsphere/testing"
+	// Cloud providers
+	_ "k8s.io/legacy-cloud-providers/aws"
+	_ "k8s.io/legacy-cloud-providers/azure"
+	_ "k8s.io/legacy-cloud-providers/gce"
+	_ "k8s.io/legacy-cloud-providers/openstack"
+	_ "k8s.io/legacy-cloud-providers/vsphere"
 )
