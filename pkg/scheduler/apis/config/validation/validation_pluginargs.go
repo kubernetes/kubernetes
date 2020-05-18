@@ -133,3 +133,82 @@ func validateConstraintNotRepeat(path *field.Path, constraints []v1.TopologySpre
 	}
 	return nil
 }
+
+// ValidateRequestedToCapacityRatioArgs validates that RequestedToCapacityRatioArgs are correct.
+func ValidateRequestedToCapacityRatioArgs(args config.RequestedToCapacityRatioArgs) error {
+	if err := validateFunctionShape(args.Shape); err != nil {
+		return err
+	}
+	if err := validateResourcesNoMax(args.Resources); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateFunctionShape(shape []config.UtilizationShapePoint) error {
+	const (
+		minUtilization = 0
+		maxUtilization = 100
+		minScore       = 0
+		maxScore       = int32(config.MaxCustomPriorityScore)
+	)
+
+	if len(shape) == 0 {
+		return fmt.Errorf("at least one point must be specified")
+	}
+
+	for i := 1; i < len(shape); i++ {
+		if shape[i-1].Utilization >= shape[i].Utilization {
+			return fmt.Errorf("utilization values must be sorted. Utilization[%d]==%d >= Utilization[%d]==%d", i-1, shape[i-1].Utilization, i, shape[i].Utilization)
+		}
+	}
+
+	for i, point := range shape {
+		if point.Utilization < minUtilization {
+			return fmt.Errorf("utilization values must not be less than %d. Utilization[%d]==%d", minUtilization, i, point.Utilization)
+		}
+		if point.Utilization > maxUtilization {
+			return fmt.Errorf("utilization values must not be greater than %d. Utilization[%d]==%d", maxUtilization, i, point.Utilization)
+		}
+		if point.Score < minScore {
+			return fmt.Errorf("score values must not be less than %d. Score[%d]==%d", minScore, i, point.Score)
+		}
+		if point.Score > maxScore {
+			return fmt.Errorf("score values must not be greater than %d. Score[%d]==%d", maxScore, i, point.Score)
+		}
+	}
+
+	return nil
+}
+
+// TODO potentially replace with validateResources
+func validateResourcesNoMax(resources []config.ResourceSpec) error {
+	for _, r := range resources {
+		if r.Weight < 1 {
+			return fmt.Errorf("resource %s weight %d must not be less than 1", string(r.Name), r.Weight)
+		}
+	}
+	return nil
+}
+
+// ValidateNodeResourcesLeastAllocatedArgs validates that NodeResourcesLeastAllocatedArgs are correct.
+func ValidateNodeResourcesLeastAllocatedArgs(args *config.NodeResourcesLeastAllocatedArgs) error {
+	return validateResources(args.Resources)
+}
+
+// ValidateNodeResourcesMostAllocatedArgs validates that NodeResourcesMostAllocatedArgs are correct.
+func ValidateNodeResourcesMostAllocatedArgs(args *config.NodeResourcesMostAllocatedArgs) error {
+	return validateResources(args.Resources)
+}
+
+func validateResources(resources []config.ResourceSpec) error {
+	for _, resource := range resources {
+		if resource.Weight <= 0 {
+			return fmt.Errorf("resource Weight of %v should be a positive value, got %v", resource.Name, resource.Weight)
+		}
+		if resource.Weight > 100 {
+			return fmt.Errorf("resource Weight of %v should be less than 100, got %v", resource.Name, resource.Weight)
+		}
+	}
+	return nil
+}
