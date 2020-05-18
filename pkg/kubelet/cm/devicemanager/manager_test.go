@@ -733,6 +733,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 				testCase.description, testCase.expErr, err)
 		}
 		runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+        as.Nil(err)
+        err = testManager.PreStartContainer(pod, &pod.Spec.Containers[0])
 		if testCase.expErr == nil {
 			as.Nil(err)
 		}
@@ -836,6 +838,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 	podsStub.updateActivePods(activePods)
 	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
+    err = testManager.PreStartContainer(pod, &pod.Spec.Containers[0])
+    as.Nil(err)
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
 	as.Nil(err)
 	var initializedDevs []string

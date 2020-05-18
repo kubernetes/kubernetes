@@ -59,6 +59,10 @@ func (h *ManagerStub) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	return nil, nil
 }
 
+func (m *ManagerStub) PreStartContainer(pod *v1.Pod, container *v1.Container) error {
+    return nil
+}
+
 // GetCapacity simply returns nil capacity and empty removed resource list.
 func (h *ManagerStub) GetCapacity() (v1.ResourceList, v1.ResourceList, []string) {
 	return nil, nil, []string{}

@@ -22,6 +22,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
@@ -34,6 +35,7 @@ type InternalContainerLifecycle interface {
 // Implements InternalContainerLifecycle interface.
 type internalContainerLifecycleImpl struct {
 	cpuManager      cpumanager.Manager
+    deviceManager   devicemanager.Manager
 	topologyManager topologymanager.Manager
 }
 
@@ -44,6 +46,12 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 			return err
 		}
 	}
+    if i.deviceManager != nil {
+        err := i.deviceManager.PreStartContainer(pod, container)
+        if err != nil {
+			return err
+		}
+    }
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		err := i.topologyManager.AddContainer(pod, containerID)
 		if err != nil {

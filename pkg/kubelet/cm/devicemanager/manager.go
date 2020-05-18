@@ -830,7 +830,15 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 // for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 // for the found one. An empty struct is returned in case no cached state is found.
 func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
-	podUID := string(pod.UID)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name), nil
+}
+
+// PreStartContainer loops over all the devices of this container and issued grpc for
+// each of them if needed
+func (m *ManagerImpl) PreStartContainer(pod *v1.Pod, container *v1.Container) error {
+    podUID := string(pod.UID)
 	contName := container.Name
 	needsReAllocate := false
 	for k := range container.Resources.Limits {
@@ -840,7 +848,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 		}
 		err := m.callPreStartContainerIfNeeded(podUID, contName, resource)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		// This is a device plugin resource yet we don't have cached
 		// resource state. This is likely due to a race during node
@@ -852,12 +860,10 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	if needsReAllocate {
 		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s, container %s", podUID, container.Name)
 		if err := m.Allocate(pod, container); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name), nil
+    return nil
 }
 
 // callPreStartContainerIfNeeded issues PreStartContainer grpc call for device plugin resource
