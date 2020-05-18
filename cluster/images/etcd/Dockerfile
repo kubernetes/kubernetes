@@ -14,6 +14,9 @@
 
 FROM BASEIMAGE as builder
 
+# This image needs bash for running "migrate-if-needed.sh". Instead of a full debian image
+# we use just the bash-static and we wrap bash-static into a distroless image instead of
+# a full debian image
 RUN apt-get update -y \
 	&& apt-get -yy -q install --no-install-recommends --no-install-suggests --fix-missing \
 		bash-static
