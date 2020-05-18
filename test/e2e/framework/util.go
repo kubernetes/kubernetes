@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
@@ -1301,4 +1302,37 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 		}
 	}
 	return false
+}
+
+// WatchEventEnsurerAndManager
+// manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
+func WatchEventEnsurerAndManager(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watch.Interface) []watch.Event) {
+	retries := 3
+retriesLoop:
+	for try := 1; try <= retries; try++ {
+		var watchEvents []watch.Event
+		resourceWatch := &watch.Interface{}
+		// TODO consider watch deaths
+		&resourceWatch, err = dc.Resource(resourceType).Namespace(namespace).Watch(testContext, listOptions)
+		framework.ExpectNoError(err, "Failed to set a resource watch up for resourceType %v in namespace %s", resourceType, namespace)
+
+		actualWatchEvents := scenario(resourceWatch)
+		framework.ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Amount of actual watch events to be equal to or greater than the amount of expected watch events")
+
+	expectedWatchEventsLoop:
+		for expectedWatchEventIndex, expectedWatchEvent := range expectedWatchEvents {
+			for actualWatchEventIndex, _ := range actualWatchEvents {
+				if actualWatchEvents[expectedWatchEventIndex].Type == expectedWatchEvents[actualWatchEventIndex].Type {
+					watchEvents = append(watchEvents, expectedWatchEvent)
+					continue expectedWatchEventsLoop
+				}
+			}
+		}
+
+		// TODO clean up resources, based on watchEvent.Object, using DynamicClient
+
+		if len(watchEvents) != len(actualWatchEvents) {
+			continue retriesLoop
+		}
+	}
 }
