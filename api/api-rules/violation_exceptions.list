@@ -136,7 +136,6 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,PodSecurityContext,Sysc
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,Containers
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,EphemeralContainers
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,HostAliases
-API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,ImagePullSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,InitContainers
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,ReadinessGates
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,Tolerations
@@ -156,7 +155,6 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,ScopeSelector,MatchExpr
 API rule violation: list_type_missing,k8s.io/api/core/v1,ScopedResourceSelectorRequirement,Values
 API rule violation: list_type_missing,k8s.io/api/core/v1,SecretProjection,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,SecretVolumeSource,Items
-API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccount,ImagePullSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccount,Secrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,ExternalIPs
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,LoadBalancerSourceRanges

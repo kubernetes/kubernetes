@@ -6086,7 +6086,9 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.LocalObjectReference
-          elementRelationship: atomic
+          elementRelationship: associative
+          keys:
+          - name
     - name: kind
       type:
         scalar: string
