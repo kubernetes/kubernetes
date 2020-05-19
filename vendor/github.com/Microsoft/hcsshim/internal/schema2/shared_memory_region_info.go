@@ -10,7 +10,6 @@
 package hcsschema
 
 type SharedMemoryRegionInfo struct {
-
 	SectionName string `json:"SectionName,omitempty"`
 
 	GuestPhysicalAddress int32 `json:"GuestPhysicalAddress,omitempty"`

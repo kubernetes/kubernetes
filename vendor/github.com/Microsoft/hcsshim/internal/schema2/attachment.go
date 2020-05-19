@@ -10,7 +10,6 @@
 package hcsschema
 
 type Attachment struct {
-
 	Type_ string `json:"Type,omitempty"`
 
 	Path string `json:"Path,omitempty"`
