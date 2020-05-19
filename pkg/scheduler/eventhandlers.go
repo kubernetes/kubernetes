@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
 func (sched *Scheduler) onPvAdd(obj interface{}) {
@@ -306,8 +306,8 @@ func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
 // skipPodUpdate checks whether the specified pod update should be ignored.
 // This function will return true if
 //   - The pod has already been assumed, AND
-//   - The pod has only its ResourceVersion, Spec.NodeName, Annotations, ManagedFields and/or Finalizers
-//     updated.
+//   - The pod has only its ResourceVersion, Spec.NodeName, Annotations,
+//     ManagedFields, Finalizers and/or Conditions updated.
 func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	// Non-assumed pods should never be skipped.
 	isAssumed, err := sched.SchedulerCache.IsAssumedPod(pod)
@@ -343,8 +343,10 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 		// Same as above, when annotations are modified with ServerSideApply,
 		// ManagedFields may also change and must be excluded
 		p.ManagedFields = nil
-		// Finalizers must be excluded because scheduled result can not be affected
+		// The following might be changed by external controllers, but they don't
+		// affect scheduling decisions.
 		p.Finalizers = nil
+		p.Status.Conditions = nil
 		return p
 	}
 	assumedPodCopy, podCopy := f(assumedPod), f(pod)
