@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"strconv"
 
 	"github.com/onsi/ginkgo"
@@ -116,7 +117,7 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{
-							{Name: "nginx", Image: "nginx"},
+							{Name: "token-test", Image: imageutils.GetE2EImage(imageutils.Agnhost)},
 						},
 					},
 				},
