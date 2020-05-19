@@ -6,6 +6,7 @@ go_library(
         "decode.go",
         "encode.go",
         "expfmt.go",
+        "openmetrics_create.go",
         "text_create.go",
         "text_parse.go",
     ],
@@ -14,6 +15,7 @@ go_library(
     visibility = ["//build/visible_to:vendor_githubcom_prometheus_CONSUMERS"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes:go_default_library",
         "//vendor/github.com/matttproud/golang_protobuf_extensions/pbutil:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg:go_default_library",

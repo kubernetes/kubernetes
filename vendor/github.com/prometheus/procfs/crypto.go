@@ -14,10 +14,10 @@
 package procfs
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"strconv"
+	"io"
 	"strings"
 
 	"github.com/prometheus/procfs/internal/util"
@@ -52,80 +52,102 @@ type Crypto struct {
 // structs containing the relevant info.  More information available here:
 // https://kernel.readthedocs.io/en/sphinx-samples/crypto-API.html
 func (fs FS) Crypto() ([]Crypto, error) {
-	data, err := ioutil.ReadFile(fs.proc.Path("crypto"))
+	path := fs.proc.Path("crypto")
+	b, err := util.ReadFileNoStat(path)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing crypto %s: %s", fs.proc.Path("crypto"), err)
+		return nil, fmt.Errorf("error reading crypto %s: %s", path, err)
 	}
-	crypto, err := parseCrypto(data)
+
+	crypto, err := parseCrypto(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing crypto %s: %s", fs.proc.Path("crypto"), err)
+		return nil, fmt.Errorf("error parsing crypto %s: %s", path, err)
 	}
+
 	return crypto, nil
 }
 
-func parseCrypto(cryptoData []byte) ([]Crypto, error) {
-	crypto := []Crypto{}
+// parseCrypto parses a /proc/crypto stream into Crypto elements.
+func parseCrypto(r io.Reader) ([]Crypto, error) {
+	var out []Crypto
 
-	cryptoBlocks := bytes.Split(cryptoData, []byte("\n\n"))
-
-	for _, block := range cryptoBlocks {
-		var newCryptoElem Crypto
-
-		lines := strings.Split(string(block), "\n")
-		for _, line := range lines {
-			if strings.TrimSpace(line) == "" || line[0] == ' ' {
-				continue
-			}
-			fields := strings.Split(line, ":")
-			key := strings.TrimSpace(fields[0])
-			value := strings.TrimSpace(fields[1])
-			vp := util.NewValueParser(value)
-
-			switch strings.TrimSpace(key) {
-			case "async":
-				b, err := strconv.ParseBool(value)
-				if err == nil {
-					newCryptoElem.Async = b
-				}
-			case "blocksize":
-				newCryptoElem.Blocksize = vp.PUInt64()
-			case "chunksize":
-				newCryptoElem.Chunksize = vp.PUInt64()
-			case "digestsize":
-				newCryptoElem.Digestsize = vp.PUInt64()
-			case "driver":
-				newCryptoElem.Driver = value
-			case "geniv":
-				newCryptoElem.Geniv = value
-			case "internal":
-				newCryptoElem.Internal = value
-			case "ivsize":
-				newCryptoElem.Ivsize = vp.PUInt64()
-			case "maxauthsize":
-				newCryptoElem.Maxauthsize = vp.PUInt64()
-			case "max keysize":
-				newCryptoElem.MaxKeysize = vp.PUInt64()
-			case "min keysize":
-				newCryptoElem.MinKeysize = vp.PUInt64()
-			case "module":
-				newCryptoElem.Module = value
-			case "name":
-				newCryptoElem.Name = value
-			case "priority":
-				newCryptoElem.Priority = vp.PInt64()
-			case "refcnt":
-				newCryptoElem.Refcnt = vp.PInt64()
-			case "seedsize":
-				newCryptoElem.Seedsize = vp.PUInt64()
-			case "selftest":
-				newCryptoElem.Selftest = value
-			case "type":
-				newCryptoElem.Type = value
-			case "walksize":
-				newCryptoElem.Walksize = vp.PUInt64()
-			}
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		text := s.Text()
+		switch {
+		case strings.HasPrefix(text, "name"):
+			// Each crypto element begins with its name.
+			out = append(out, Crypto{})
+		case text == "":
+			continue
 		}
-		crypto = append(crypto, newCryptoElem)
+
+		kv := strings.Split(text, ":")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("malformed crypto line: %q", text)
+		}
+
+		k := strings.TrimSpace(kv[0])
+		v := strings.TrimSpace(kv[1])
+
+		// Parse the key/value pair into the currently focused element.
+		c := &out[len(out)-1]
+		if err := c.parseKV(k, v); err != nil {
+			return nil, err
+		}
 	}
-	return crypto, nil
+
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+// parseKV parses a key/value pair into the appropriate field of c.
+func (c *Crypto) parseKV(k, v string) error {
+	vp := util.NewValueParser(v)
+
+	switch k {
+	case "async":
+		// Interpret literal yes as true.
+		c.Async = v == "yes"
+	case "blocksize":
+		c.Blocksize = vp.PUInt64()
+	case "chunksize":
+		c.Chunksize = vp.PUInt64()
+	case "digestsize":
+		c.Digestsize = vp.PUInt64()
+	case "driver":
+		c.Driver = v
+	case "geniv":
+		c.Geniv = v
+	case "internal":
+		c.Internal = v
+	case "ivsize":
+		c.Ivsize = vp.PUInt64()
+	case "maxauthsize":
+		c.Maxauthsize = vp.PUInt64()
+	case "max keysize":
+		c.MaxKeysize = vp.PUInt64()
+	case "min keysize":
+		c.MinKeysize = vp.PUInt64()
+	case "module":
+		c.Module = v
+	case "name":
+		c.Name = v
+	case "priority":
+		c.Priority = vp.PInt64()
+	case "refcnt":
+		c.Refcnt = vp.PInt64()
+	case "seedsize":
+		c.Seedsize = vp.PUInt64()
+	case "selftest":
+		c.Selftest = v
+	case "type":
+		c.Type = v
+	case "walksize":
+		c.Walksize = vp.PUInt64()
+	}
+
+	return vp.Err()
 }

@@ -23,6 +23,8 @@ import (
 
 // SysReadFile is a simplified ioutil.ReadFile that invokes syscall.Read directly.
 // https://github.com/prometheus/node_exporter/pull/728/files
+//
+// Note that this function will not read files larger than 128 bytes.
 func SysReadFile(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -35,7 +37,8 @@ func SysReadFile(file string) (string, error) {
 	//
 	// Since we either want to read data or bail immediately, do the simplest
 	// possible read using syscall directly.
-	b := make([]byte, 128)
+	const sysFileBufferSize = 128
+	b := make([]byte, sysFileBufferSize)
 	n, err := syscall.Read(int(f.Fd()), b)
 	if err != nil {
 		return "", err

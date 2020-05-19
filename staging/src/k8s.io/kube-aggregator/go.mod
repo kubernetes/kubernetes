@@ -9,7 +9,7 @@ require (
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/go-openapi/spec v0.19.3
 	github.com/gogo/protobuf v1.3.1
-	github.com/json-iterator/go v1.1.8
+	github.com/json-iterator/go v1.1.9
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0

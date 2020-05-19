@@ -32,7 +32,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

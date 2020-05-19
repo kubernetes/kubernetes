@@ -62,7 +62,7 @@ require (
 	github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
-	github.com/json-iterator/go v1.1.8
+	github.com/json-iterator/go v1.1.9
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
@@ -80,9 +80,9 @@ require (
 	github.com/opencontainers/selinux v1.3.3
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/prometheus/client_golang v1.0.0
+	github.com/prometheus/client_golang v1.6.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.4.1
+	github.com/prometheus/common v0.9.1
 	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v1.1.0
 	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
@@ -101,7 +101,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools v0.0.0-20191227053925-7b8e75db28f4
 	gonum.org/v1/gonum v0.6.2
@@ -172,15 +172,15 @@ replace (
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 	github.com/agnivade/levenshtein => github.com/agnivade/levenshtein v1.0.1
 	github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
-	github.com/alecthomas/template => github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
-	github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf
+	github.com/alecthomas/template => github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
+	github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4
 	github.com/andreyvit/diff => github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 	github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/consul-api => github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6
 	github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/auth0/go-jwt-middleware => github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7
 	github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.28.2
-	github.com/beorn7/perks => github.com/beorn7/perks v1.0.0
+	github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 	github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
 	github.com/bifurcation/mint => github.com/bifurcation/mint v0.0.0-20180715133206-93c51c6ce115
 	github.com/blang/semver => github.com/blang/semver v3.5.0+incompatible
@@ -188,6 +188,7 @@ replace (
 	github.com/caddyserver/caddy => github.com/caddyserver/caddy v1.0.3
 	github.com/cenkalti/backoff => github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
+	github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/checkpoint-restore/go-criu => github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b
 	github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
@@ -243,8 +244,8 @@ replace (
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72
 	github.com/go-ini/ini => github.com/go-ini/ini v1.9.0
-	github.com/go-kit/kit => github.com/go-kit/kit v0.8.0
-	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.3.0
+	github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
+	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
 	github.com/go-logr/logr => github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
 	github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
@@ -264,7 +265,7 @@ replace (
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 	github.com/golang/mock => github.com/golang/mock v1.3.1
-	github.com/golang/protobuf => github.com/golang/protobuf v1.3.3
+	github.com/golang/protobuf => github.com/golang/protobuf v1.4.2
 	github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
 	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
@@ -300,7 +301,7 @@ replace (
 	github.com/jimstudt/http-authentication => github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
-	github.com/json-iterator/go => github.com/json-iterator/go v1.1.8
+	github.com/json-iterator/go => github.com/json-iterator/go v1.1.9
 	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.9.1
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 	github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.2.0
@@ -363,10 +364,10 @@ replace (
 	github.com/pkg/errors => github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.0.0
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.6.0
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common => github.com/prometheus/common v0.4.1
-	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.5
+	github.com/prometheus/common => github.com/prometheus/common v0.9.1
+	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.11
 	github.com/quobyte/api => github.com/quobyte/api v0.1.2
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0
@@ -434,6 +435,7 @@ replace (
 	google.golang.org/appengine => google.golang.org/appengine v1.6.5
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba
 	google.golang.org/grpc => google.golang.org/grpc v1.26.0
+	google.golang.org/protobuf => google.golang.org/protobuf v1.23.0
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/cheggaaa/pb.v1 => gopkg.in/cheggaaa/pb.v1 v1.0.25

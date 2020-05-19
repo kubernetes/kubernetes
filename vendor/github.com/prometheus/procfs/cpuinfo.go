@@ -16,9 +16,10 @@ package procfs
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs/internal/util"
 )
 
 // CPUInfo contains general information about a system CPU found in /proc/cpuinfo
@@ -54,7 +55,7 @@ type CPUInfo struct {
 // CPUInfo returns information about current system CPUs.
 // See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 func (fs FS) CPUInfo() ([]CPUInfo, error) {
-	data, err := ioutil.ReadFile(fs.proc.Path("cpuinfo"))
+	data, err := util.ReadFileNoStat(fs.proc.Path("cpuinfo"))
 	if err != nil {
 		return nil, err
 	}

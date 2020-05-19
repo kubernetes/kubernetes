@@ -15,19 +15,20 @@ package procfs
 
 import (
 	"bufio"
-	"fmt"
-	"io/ioutil"
-	"os"
+	"bytes"
+	"errors"
 	"regexp"
-	"strings"
+
+	"github.com/prometheus/procfs/internal/util"
 )
 
 // Regexp variables
 var (
-	rPos     = regexp.MustCompile(`^pos:\s+(\d+)$`)
-	rFlags   = regexp.MustCompile(`^flags:\s+(\d+)$`)
-	rMntID   = regexp.MustCompile(`^mnt_id:\s+(\d+)$`)
-	rInotify = regexp.MustCompile(`^inotify`)
+	rPos          = regexp.MustCompile(`^pos:\s+(\d+)$`)
+	rFlags        = regexp.MustCompile(`^flags:\s+(\d+)$`)
+	rMntID        = regexp.MustCompile(`^mnt_id:\s+(\d+)$`)
+	rInotify      = regexp.MustCompile(`^inotify`)
+	rInotifyParts = regexp.MustCompile(`^inotify\s+wd:([0-9a-f]+)\s+ino:([0-9a-f]+)\s+sdev:([0-9a-f]+)(?:\s+mask:([0-9a-f]+))?`)
 )
 
 // ProcFDInfo contains represents file descriptor information.
@@ -46,21 +47,15 @@ type ProcFDInfo struct {
 
 // FDInfo constructor. On kernels older than 3.8, InotifyInfos will always be empty.
 func (p Proc) FDInfo(fd string) (*ProcFDInfo, error) {
-	f, err := os.Open(p.path("fdinfo", fd))
+	data, err := util.ReadFileNoStat(p.path("fdinfo", fd))
 	if err != nil {
 		return nil, err
-	}
-	defer f.Close()
-
-	fdinfo, err := ioutil.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("could not read %s: %s", f.Name(), err)
 	}
 
 	var text, pos, flags, mntid string
 	var inotify []InotifyInfo
 
-	scanner := bufio.NewScanner(strings.NewReader(string(fdinfo)))
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		text = scanner.Text()
 		if rPos.MatchString(text) {
@@ -103,15 +98,21 @@ type InotifyInfo struct {
 
 // InotifyInfo constructor. Only available on kernel 3.8+.
 func parseInotifyInfo(line string) (*InotifyInfo, error) {
-	r := regexp.MustCompile(`^inotify\s+wd:([0-9a-f]+)\s+ino:([0-9a-f]+)\s+sdev:([0-9a-f]+)\s+mask:([0-9a-f]+)`)
-	m := r.FindStringSubmatch(line)
-	i := &InotifyInfo{
-		WD:   m[1],
-		Ino:  m[2],
-		Sdev: m[3],
-		Mask: m[4],
+	m := rInotifyParts.FindStringSubmatch(line)
+	if len(m) >= 4 {
+		var mask string
+		if len(m) == 5 {
+			mask = m[4]
+		}
+		i := &InotifyInfo{
+			WD:   m[1],
+			Ino:  m[2],
+			Sdev: m[3],
+			Mask: mask,
+		}
+		return i, nil
 	}
-	return i, nil
+	return nil, errors.New("invalid inode entry: " + line)
 }
 
 // ProcFDInfos represents a list of ProcFDInfo structs.

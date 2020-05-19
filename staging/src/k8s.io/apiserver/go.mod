@@ -36,7 +36,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
 	google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba // indirect
 	google.golang.org/grpc v1.26.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

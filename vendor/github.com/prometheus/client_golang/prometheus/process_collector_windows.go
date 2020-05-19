@@ -33,18 +33,22 @@ var (
 )
 
 type processMemoryCounters struct {
-	// https://docs.microsoft.com/en-us/windows/desktop/api/psapi/ns-psapi-_process_memory_counters_ex
+	// System interface description
+	// https://docs.microsoft.com/en-us/windows/desktop/api/psapi/ns-psapi-process_memory_counters_ex
+
+	// Refer to the Golang internal implementation
+	// https://golang.org/src/internal/syscall/windows/psapi_windows.go
 	_                          uint32
 	PageFaultCount             uint32
-	PeakWorkingSetSize         uint64
-	WorkingSetSize             uint64
-	QuotaPeakPagedPoolUsage    uint64
-	QuotaPagedPoolUsage        uint64
-	QuotaPeakNonPagedPoolUsage uint64
-	QuotaNonPagedPoolUsage     uint64
-	PagefileUsage              uint64
-	PeakPagefileUsage          uint64
-	PrivateUsage               uint64
+	PeakWorkingSetSize         uintptr
+	WorkingSetSize             uintptr
+	QuotaPeakPagedPoolUsage    uintptr
+	QuotaPagedPoolUsage        uintptr
+	QuotaPeakNonPagedPoolUsage uintptr
+	QuotaNonPagedPoolUsage     uintptr
+	PagefileUsage              uintptr
+	PeakPagefileUsage          uintptr
+	PrivateUsage               uintptr
 }
 
 func getProcessMemoryInfo(handle windows.Handle) (processMemoryCounters, error) {

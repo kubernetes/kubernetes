@@ -73,7 +73,7 @@ func NewGoCollector() Collector {
 			nil, nil),
 		gcDesc: NewDesc(
 			"go_gc_duration_seconds",
-			"A summary of the GC invocation durations.",
+			"A summary of the pause duration of garbage collection cycles.",
 			nil, nil),
 		goInfoDesc: NewDesc(
 			"go_info",
