@@ -66,8 +66,7 @@ GOLANG_VERSION?=1.12.9
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
-
-BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):v1.0.1
+BASEIMAGE?=us.gcr.io/k8s-artifacts-prod/build-image/debian-base-$(ARCH):v2.1.0
 
 build:
 	# Explicitly copy files to the temp directory
