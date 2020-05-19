@@ -83,6 +83,8 @@ type framework struct {
 
 	metricsRecorder *metricsRecorder
 
+	preemptHandle PreemptHandle
+
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
 	runAllFilters bool
@@ -121,6 +123,7 @@ type frameworkOptions struct {
 	snapshotSharedLister SharedLister
 	metricsRecorder      *metricsRecorder
 	volumeBinder         scheduling.SchedulerVolumeBinder
+	podNominator         PodNominator
 	runAllFilters        bool
 }
 
@@ -170,6 +173,13 @@ func WithVolumeBinder(binder scheduling.SchedulerVolumeBinder) Option {
 	}
 }
 
+// WithPodNominator sets podNominator for the scheduling framework.
+func WithPodNominator(nominator PodNominator) Option {
+	return func(o *frameworkOptions) {
+		o.podNominator = nominator
+	}
+}
+
 var defaultFrameworkOptions = frameworkOptions{
 	metricsRecorder: newMetricsRecorder(1000, time.Second),
 }
@@ -192,6 +202,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		informerFactory:       options.informerFactory,
 		volumeBinder:          options.volumeBinder,
 		metricsRecorder:       options.metricsRecorder,
+		preemptHandle:         options.podNominator,
 		runAllFilters:         options.runAllFilters,
 	}
 	if plugins == nil {

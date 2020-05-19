@@ -402,7 +402,7 @@ func (sched *Scheduler) preempt(ctx context.Context, prof *profile.Profile, stat
 		// Update the scheduling queue with the nominated pod information. Without
 		// this, there would be a race condition between the next scheduling cycle
 		// and the time the scheduler receives a Pod Update for the nominated pod.
-		sched.SchedulingQueue.UpdateNominatedPodForNode(preemptor, nodeName)
+		sched.SchedulingQueue.AddNominatedPod(preemptor, nodeName)
 
 		// Make a call to update nominated node name of the pod on the API server.
 		err = sched.podPreemptor.setNominatedNodeName(preemptor, nodeName)
