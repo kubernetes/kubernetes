@@ -770,17 +770,23 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		createVolume := "CreateVolume"
 		deleteVolume := "DeleteVolume"
-		publishVolume := "NodePublishVolume"
+		// publishVolume := "NodePublishVolume"
 		unpublishVolume := "NodeUnpublishVolume"
-		stageVolume := "NodeStageVolume"
+		// stageVolume := "NodeStageVolume"
 		unstageVolume := "NodeUnstageVolume"
 
 		// These calls are assumed to occur in this order for
-		// each test run.
+		// each test run. NodeStageVolume and
+		// NodePublishVolume should also be deterministic and
+		// only get called once, but sometimes kubelet calls
+		// both multiple times, which breaks this test
+		// (https://github.com/kubernetes/kubernetes/issues/90250).
+		// Therefore they are temporarily commented out until
+		// that issue is resolved.
 		deterministicCalls := []string{
 			createVolume,
-			stageVolume,
-			publishVolume,
+			// stageVolume,
+			// publishVolume,
 			unpublishVolume,
 			unstageVolume,
 			deleteVolume,
@@ -794,8 +800,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					lateBinding:    test.lateBinding,
 					enableTopology: test.topology,
 
-					// Not strictly necessary, but without it, the external-attacher takes two minutes to detach
-					// the volume?! Looks like a bug.
+					// Not strictly necessary, but runs a bit faster this way
+					// and for a while there also was a problem with a two minuted delay
+					// due to a bug (https://github.com/kubernetes-csi/csi-test/pull/250).
 					disableAttach:  true,
 					registerDriver: true,
 				}
