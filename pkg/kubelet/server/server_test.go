@@ -1510,8 +1510,8 @@ func TestMetricBuckets(t *testing.T) {
 		"stats summary sub":               {url: "/stats/summary", bucket: "stats"},
 		"stats containerName with uid":    {url: "/stats/namespace/podName/uid/containerName", bucket: "stats"},
 		"stats containerName":             {url: "/stats/podName/containerName", bucket: "stats"},
-		"invalid path":                    {url: "/junk", bucket: "Invalid path"},
-		"invalid path starting with good": {url: "/healthzjunk", bucket: "Invalid path"},
+		"invalid path":                    {url: "/junk", bucket: "other"},
+		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
 	}
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -1520,6 +1520,26 @@ func TestMetricBuckets(t *testing.T) {
 		path := test.url
 		bucket := test.bucket
 		require.Equal(t, fw.serverUnderTest.getMetricBucket(path), bucket)
+	}
+}
+
+func TestMetricMethodBuckets(t *testing.T) {
+	tests := map[string]struct {
+		method string
+		bucket string
+	}{
+		"normal GET":     {method: "GET", bucket: "GET"},
+		"normal POST":    {method: "POST", bucket: "POST"},
+		"invalid method": {method: "WEIRD", bucket: "other"},
+	}
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	for _, test := range tests {
+		method := test.method
+		bucket := test.bucket
+		require.Equal(t, fw.serverUnderTest.getMetricMethodBucket(method), bucket)
 	}
 }
 
