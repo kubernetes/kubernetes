@@ -39,7 +39,6 @@ type RegistryList struct {
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 	K8sCSI                  string `yaml:"k8sCSI"`
-	QuayIncubator           string `yaml:"quayIncubator"`
 }
 
 // Config holds an images registry, name, and version
@@ -79,7 +78,6 @@ func initReg() RegistryList {
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 		K8sCSI:                  "gcr.io/k8s-staging-csi",
-		QuayIncubator:           "quay.io/kubernetes_incubator",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -110,7 +108,6 @@ var (
 	googleContainerRegistry = registry.GoogleContainerRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	k8sCSI                  = registry.K8sCSI
-	quayIncubator           = registry.QuayIncubator
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
 	sampleRegistry  = registry.SampleRegistry
@@ -227,7 +224,7 @@ func initImageConfigs() map[int]Config {
 	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
 	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
-	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.2"}
+	configs[NFSProvisioner] = Config{k8sCSI, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
