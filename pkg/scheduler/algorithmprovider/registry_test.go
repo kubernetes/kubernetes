@@ -96,7 +96,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodepreferavoidpods.Name, Weight: 10000},
 				{Name: defaultpodtopologyspread.Name, Weight: 1},
 				{Name: tainttoleration.Name, Weight: 1},
-				{Name: podtopologyspread.Name, Weight: 1},
+				{Name: podtopologyspread.Name, Weight: 2},
 			},
 		},
 		Reserve: &schedulerapi.PluginSet{
@@ -274,7 +274,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodepreferavoidpods.Name, Weight: 10000},
 						{Name: defaultpodtopologyspread.Name, Weight: 1},
 						{Name: tainttoleration.Name, Weight: 1},
-						{Name: podtopologyspread.Name, Weight: 1},
+						{Name: podtopologyspread.Name, Weight: 2},
 						{Name: noderesources.ResourceLimitsName, Weight: 1},
 					},
 				},
