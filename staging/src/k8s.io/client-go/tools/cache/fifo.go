@@ -71,8 +71,8 @@ type Queue interface {
 
 	// HasSynced returns true if the first batch of keys have all been
 	// popped.  The first batch of keys are those of the first Replace
-	// operation if that happened before any Add, Update, or Delete;
-	// otherwise the first batch is empty.
+	// operation if that happened before any Add, AddIfNotPresent,
+	// Update, or Delete; otherwise the first batch is empty.
 	HasSynced() bool
 
 	// Close the queue
@@ -145,7 +145,7 @@ func (f *FIFO) Close() {
 }
 
 // HasSynced returns true if an Add/Update/Delete/AddIfNotPresent are called first,
-// or an Update called first but the first batch of items inserted by Replace() has been popped
+// or the first batch of items inserted by Replace() has been popped.
 func (f *FIFO) HasSynced() bool {
 	f.lock.Lock()
 	defer f.lock.Unlock()
