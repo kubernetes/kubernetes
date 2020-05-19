@@ -40,7 +40,7 @@ type RegistryList struct {
 	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
-	QuayK8sCSI              string `yaml:"quayK8sCSI"`
+	K8sCSI                  string `yaml:"k8sCSI"`
 	QuayIncubator           string `yaml:"quayIncubator"`
 }
 
@@ -82,7 +82,7 @@ func initReg() RegistryList {
 		GoogleContainerRegistry: "gcr.io/google-containers",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
-		QuayK8sCSI:              "quay.io/k8scsi",
+		K8sCSI:                  "gcr.io/k8s-staging-csi",
 		QuayIncubator:           "quay.io/kubernetes_incubator",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
@@ -113,7 +113,7 @@ var (
 	gcRegistry              = registry.GcRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	invalidRegistry         = registry.InvalidRegistry
-	quayK8sCSI              = registry.QuayK8sCSI
+	k8sCSI                  = registry.K8sCSI
 	quayIncubator           = registry.QuayIncubator
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
@@ -291,8 +291,8 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 		registryAndUser = gcrReleaseRegistry
 	case "docker.io/library":
 		registryAndUser = dockerLibraryRegistry
-	case "quay.io/k8scsi":
-		registryAndUser = quayK8sCSI
+	case "gcr.io/k8s-staging-csi":
+		registryAndUser = k8sCSI
 	default:
 		if countParts == 1 {
 			// We assume we found an image from docker hub library
