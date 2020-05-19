@@ -236,7 +236,11 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	labels := map[string]string{}
 	labels["app"] = s.Name
 	selector := map[string]string{}
-	selector["app"] = s.Name
+	// The selector will be ignored if the type is ExternalName
+	// So we only add the selector to services with a type != ExternalName
+	if s.Type != v1.ServiceTypeExternalName {
+		selector["app"] = s.Name
+	}
 
 	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
