@@ -25,11 +25,11 @@ import (
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
+	dockerutil "github.com/google/cadvisor/container/docker/utils"
 	containerlibcontainer "github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	dockerutil "github.com/google/cadvisor/utils/docker"
 	"github.com/google/cadvisor/zfs"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -37,7 +37,7 @@ import (
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"golang.org/x/net/context"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -51,7 +51,6 @@ const (
 )
 
 type dockerContainerHandler struct {
-
 	// machineInfoFactory provides info.MachineInfo
 	machineInfoFactory info.MachineInfoFactory
 
@@ -175,6 +174,8 @@ func newDockerContainerHandler(
 		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlayRWLayer)
 	case overlay2StorageDriver:
 		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlay2RWLayer)
+	case vfsStorageDriver:
+		rootfsStorageDir = path.Join(storageDir)
 	case zfsStorageDriver:
 		status, err := Status()
 		if err != nil {
@@ -231,8 +232,8 @@ func newDockerContainerHandler(
 	ipAddress := ctnr.NetworkSettings.IPAddress
 	networkMode := string(ctnr.HostConfig.NetworkMode)
 	if ipAddress == "" && strings.HasPrefix(networkMode, "container:") {
-		containerId := strings.TrimPrefix(networkMode, "container:")
-		c, err := client.ContainerInspect(context.Background(), containerId)
+		containerID := strings.TrimPrefix(networkMode, "container:")
+		c, err := client.ContainerInspect(context.Background(), containerID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to inspect container %q: %v", id, err)
 		}
@@ -253,11 +254,16 @@ func newDockerContainerHandler(
 
 	// split env vars to get metadata map.
 	for _, exposedEnv := range metadataEnvs {
+		if exposedEnv == "" {
+			// if no dockerEnvWhitelist provided, len(metadataEnvs) == 1, metadataEnvs[0] == ""
+			continue
+		}
+
 		for _, envVar := range ctnr.Config.Env {
 			if envVar != "" {
 				splits := strings.SplitN(envVar, "=", 2)
-				if len(splits) == 2 && splits[0] == exposedEnv {
-					handler.envs[strings.ToLower(exposedEnv)] = splits[1]
+				if len(splits) == 2 && strings.HasPrefix(splits[0], exposedEnv) {
+					handler.envs[strings.ToLower(splits[0])] = splits[1]
 				}
 			}
 		}
@@ -325,68 +331,68 @@ func (h *dockerFsHandler) Usage() common.FsUsage {
 	return usage
 }
 
-func (self *dockerContainerHandler) Start() {
-	if self.fsHandler != nil {
-		self.fsHandler.Start()
+func (h *dockerContainerHandler) Start() {
+	if h.fsHandler != nil {
+		h.fsHandler.Start()
 	}
 }
 
-func (self *dockerContainerHandler) Cleanup() {
-	if self.fsHandler != nil {
-		self.fsHandler.Stop()
+func (h *dockerContainerHandler) Cleanup() {
+	if h.fsHandler != nil {
+		h.fsHandler.Stop()
 	}
 }
 
-func (self *dockerContainerHandler) ContainerReference() (info.ContainerReference, error) {
-	return self.reference, nil
+func (h *dockerContainerHandler) ContainerReference() (info.ContainerReference, error) {
+	return h.reference, nil
 }
 
-func (self *dockerContainerHandler) needNet() bool {
-	if self.includedMetrics.Has(container.NetworkUsageMetrics) {
-		return !self.networkMode.IsContainer()
+func (h *dockerContainerHandler) needNet() bool {
+	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
+		return !h.networkMode.IsContainer()
 	}
 	return false
 }
 
-func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
-	hasFilesystem := self.includedMetrics.Has(container.DiskUsageMetrics)
-	spec, err := common.GetSpec(self.cgroupPaths, self.machineInfoFactory, self.needNet(), hasFilesystem)
+func (h *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
+	hasFilesystem := h.includedMetrics.Has(container.DiskUsageMetrics)
+	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, h.needNet(), hasFilesystem)
 
-	spec.Labels = self.labels
-	spec.Envs = self.envs
-	spec.Image = self.image
-	spec.CreationTime = self.creationTime
+	spec.Labels = h.labels
+	spec.Envs = h.envs
+	spec.Image = h.image
+	spec.CreationTime = h.creationTime
 
 	return spec, err
 }
 
-func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
-	mi, err := self.machineInfoFactory.GetMachineInfo()
+func (h *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
+	mi, err := h.machineInfoFactory.GetMachineInfo()
 	if err != nil {
 		return err
 	}
 
-	if self.includedMetrics.Has(container.DiskIOMetrics) {
+	if h.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
 
-	if !self.includedMetrics.Has(container.DiskUsageMetrics) {
+	if !h.includedMetrics.Has(container.DiskUsageMetrics) {
 		return nil
 	}
 	var device string
-	switch self.storageDriver {
+	switch h.storageDriver {
 	case devicemapperStorageDriver:
 		// Device has to be the pool name to correlate with the device name as
 		// set in the machine info filesystems.
-		device = self.poolName
-	case aufsStorageDriver, overlayStorageDriver, overlay2StorageDriver:
-		deviceInfo, err := self.fsInfo.GetDirFsDevice(self.rootfsStorageDir)
+		device = h.poolName
+	case aufsStorageDriver, overlayStorageDriver, overlay2StorageDriver, vfsStorageDriver:
+		deviceInfo, err := h.fsInfo.GetDirFsDevice(h.rootfsStorageDir)
 		if err != nil {
-			return fmt.Errorf("unable to determine device info for dir: %v: %v", self.rootfsStorageDir, err)
+			return fmt.Errorf("unable to determine device info for dir: %v: %v", h.rootfsStorageDir, err)
 		}
 		device = deviceInfo.Device
 	case zfsStorageDriver:
-		device = self.zfsParent
+		device = h.zfsParent
 	default:
 		return nil
 	}
@@ -406,7 +412,7 @@ func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error
 	}
 
 	fsStat := info.FsStats{Device: device, Type: fsType, Limit: limit}
-	usage := self.fsHandler.Usage()
+	usage := h.fsHandler.Usage()
 	fsStat.BaseUsage = usage.BaseUsageBytes
 	fsStat.Usage = usage.TotalUsageBytes
 	fsStat.Inodes = usage.InodeUsage
@@ -417,8 +423,8 @@ func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error
 }
 
 // TODO(vmarmol): Get from libcontainer API instead of cgroup manager when we don't have to support older Dockers.
-func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := self.libcontainerHandler.GetStats()
+func (h *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
+	stats, err := h.libcontainerHandler.GetStats()
 	if err != nil {
 		return stats, err
 	}
@@ -426,12 +432,12 @@ func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 	// includes containers running in Kubernetes pods that use the network of the
 	// infrastructure container. This stops metrics being reported multiple times
 	// for each container in a pod.
-	if !self.needNet() {
+	if !h.needNet() {
 		stats.Network = info.NetworkStats{}
 	}
 
 	// Get filesystem stats.
-	err = self.getFsStats(stats)
+	err = h.getFsStats(stats)
 	if err != nil {
 		return stats, err
 	}
@@ -439,35 +445,35 @@ func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 	return stats, nil
 }
 
-func (self *dockerContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
+func (h *dockerContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
 	// No-op for Docker driver.
 	return []info.ContainerReference{}, nil
 }
 
-func (self *dockerContainerHandler) GetCgroupPath(resource string) (string, error) {
-	path, ok := self.cgroupPaths[resource]
+func (h *dockerContainerHandler) GetCgroupPath(resource string) (string, error) {
+	path, ok := h.cgroupPaths[resource]
 	if !ok {
-		return "", fmt.Errorf("could not find path for resource %q for container %q\n", resource, self.reference.Name)
+		return "", fmt.Errorf("could not find path for resource %q for container %q", resource, h.reference.Name)
 	}
 	return path, nil
 }
 
-func (self *dockerContainerHandler) GetContainerLabels() map[string]string {
-	return self.labels
+func (h *dockerContainerHandler) GetContainerLabels() map[string]string {
+	return h.labels
 }
 
-func (self *dockerContainerHandler) GetContainerIPAddress() string {
-	return self.ipAddress
+func (h *dockerContainerHandler) GetContainerIPAddress() string {
+	return h.ipAddress
 }
 
-func (self *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return self.libcontainerHandler.GetProcesses()
+func (h *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
+	return h.libcontainerHandler.GetProcesses()
 }
 
-func (self *dockerContainerHandler) Exists() bool {
-	return common.CgroupExists(self.cgroupPaths)
+func (h *dockerContainerHandler) Exists() bool {
+	return common.CgroupExists(h.cgroupPaths)
 }
 
-func (self *dockerContainerHandler) Type() container.ContainerType {
+func (h *dockerContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeDocker
 }

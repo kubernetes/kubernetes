@@ -16,6 +16,7 @@ limitations under the License.
 
 package config
 
+// Defines sane defaults for the kubelet config.
 const (
 	DefaultKubeletPodsDirName                = "pods"
 	DefaultKubeletVolumesDirName             = "volumes"
@@ -26,4 +27,5 @@ const (
 	DefaultKubeletContainersDirName          = "containers"
 	DefaultKubeletPluginContainersDirName    = "plugin-containers"
 	DefaultKubeletPodResourcesDirName        = "pod-resources"
+	KubeletPluginsDirSELinuxLabel            = "system_u:object_r:container_file_t:s0"
 )

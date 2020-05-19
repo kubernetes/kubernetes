@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -295,7 +295,7 @@ func isInUse(l string, logs []string) bool {
 	if strings.HasSuffix(l, tmpSuffix) {
 		return false
 	}
-	// All compresed logs are in use.
+	// All compressed logs are in use.
 	if strings.HasSuffix(l, compressSuffix) {
 		return true
 	}

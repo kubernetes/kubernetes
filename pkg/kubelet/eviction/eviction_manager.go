@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -37,16 +37,23 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
 	podCleanupTimeout  = 30 * time.Second
 	podCleanupPollFreq = time.Second
+)
+
+const (
+	// signalEphemeralContainerFsLimit is amount of storage available on filesystem requested by the container
+	signalEphemeralContainerFsLimit string = "ephemeralcontainerfs.limit"
+	// signalEphemeralPodFsLimit is amount of storage available on filesystem requested by the pod
+	signalEphemeralPodFsLimit string = "ephemeralpodfs.limit"
+	// signalEmptyDirFsLimit is amount of storage available on filesystem requested by an emptyDir
+	signalEmptyDirFsLimit string = "emptydirfs.limit"
 )
 
 // managerImpl implements Manager
@@ -138,20 +145,21 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if kubelettypes.IsCriticalPod(attrs.Pod) {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
-	// the node has memory pressure, admit if not best-effort
-	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
+
+	// Conditions other than memory pressure reject all pods
+	nodeOnlyHasMemoryPressureCondition := hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) && len(m.nodeConditions) == 1
+	if nodeOnlyHasMemoryPressureCondition {
 		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 
-		// When node has memory pressure and TaintNodesByCondition is enabled, check BestEffort Pod's toleration:
-		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. OutOfDisk.
-		if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) &&
-			v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
-				Key:    schedulerapi.TaintNodeMemoryPressure,
-				Effect: v1.TaintEffectNoSchedule,
-			}) {
+		// When node has memory pressure, check BestEffort Pod's toleration:
+		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. DiskPressure.
+		if v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
+			Key:    v1.TaintNodeMemoryPressure,
+			Effect: v1.TaintEffectNoSchedule,
+		}) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
@@ -293,7 +301,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// determine the set of thresholds we need to drive eviction behavior (i.e. all grace periods are met)
 	thresholds = thresholdsMetGracePeriod(thresholdsFirstObservedAt, now)
-	debugLogThresholdsWithObservation("thresholds - grace periods satisified", thresholds, observations)
+	debugLogThresholdsWithObservation("thresholds - grace periods satisfied", thresholds, observations)
 
 	// update internal state
 	m.Lock()
@@ -312,7 +320,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// evict pods if there is a resource usage violation from local volume temporary storage
 	// If eviction happens in localStorageEviction function, skip the rest of eviction action
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		if evictedPods := m.localStorageEviction(summary, activePods); len(evictedPods) > 0 {
+		if evictedPods := m.localStorageEviction(activePods, statsFunc); len(evictedPods) > 0 {
 			return evictedPods
 		}
 	}
@@ -324,10 +332,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// rank the thresholds by eviction priority
 	sort.Sort(byEvictionPriority(thresholds))
-	thresholdToReclaim := thresholds[0]
-	resourceToReclaim, found := signalToResource[thresholdToReclaim.Signal]
-	if !found {
-		klog.V(3).Infof("eviction manager: threshold %s was crossed, but reclaim is not implemented for this threshold.", thresholdToReclaim.Signal)
+	thresholdToReclaim, resourceToReclaim, foundAny := getReclaimableThreshold(thresholds)
+	if !foundAny {
 		return nil
 	}
 	klog.Warningf("eviction manager: attempting to reclaim %v", resourceToReclaim)
@@ -366,7 +372,6 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		timeObserved := observations[t.Signal].time
 		if !timeObserved.IsZero() {
 			metrics.EvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInSeconds(timeObserved.Time))
-			metrics.DeprecatedEvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInMicroseconds(timeObserved.Time))
 		}
 	}
 
@@ -379,6 +384,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc)
 		if m.evictPod(pod, gracePeriodOverride, message, annotations) {
+			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
 			return []*v1.Pod{pod}
 		}
 	}
@@ -444,8 +450,7 @@ func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Sign
 
 // localStorageEviction checks the EmptyDir volume usage for each pod and determine whether it exceeds the specified limit and needs
 // to be evicted. It also checks every container in the pod, if the container overlay usage exceeds the limit, the pod will be evicted too.
-func (m *managerImpl) localStorageEviction(summary *statsapi.Summary, pods []*v1.Pod) []*v1.Pod {
-	statsFunc := cachedStatsFunc(summary.Pods)
+func (m *managerImpl) localStorageEviction(pods []*v1.Pod, statsFunc statsFunc) []*v1.Pod {
 	evicted := []*v1.Pod{}
 	for _, pod := range pods {
 		podStats, ok := statsFunc(pod)
@@ -483,7 +488,11 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				return m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil)
+				if m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil) {
+					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
+					return true
+				}
+				return false
 			}
 		}
 	}
@@ -499,7 +508,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	}
 
 	podEphemeralStorageTotalUsage := &resource.Quantity{}
-	fsStatsSet := []fsStatsType{}
+	var fsStatsSet []fsStatsType
 	if *m.dedicatedImageFs {
 		fsStatsSet = []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}
 	} else {
@@ -515,7 +524,11 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
-		return m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil)
+		if m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil) {
+			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
+			return true
+		}
+		return false
 	}
 	return false
 }
@@ -537,8 +550,11 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				return m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil)
-
+				if m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil) {
+					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
+					return true
+				}
+				return false
 			}
 		}
 	}
@@ -549,19 +565,9 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if kubepod.IsStaticPod(pod) {
-		// need mirrorPod to check its "priority" value; static pod doesn't carry it
-		if mirrorPod, ok := m.mirrorPodFunc(pod); ok && mirrorPod != nil {
-			// skip only when it's a static and critical pod
-			if kubelettypes.IsCriticalPod(mirrorPod) {
-				klog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
-				return false
-			}
-		} else {
-			// we should never hit this
-			klog.Errorf("eviction manager: cannot get mirror pod from static pod %s, so cannot evict it", format.Pod(pod))
-			return false
-		}
+	if kubelettypes.IsCriticalPod(pod) {
+		klog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
+		return false
 	}
 	status := v1.PodStatus{
 		Phase:   v1.PodFailed,

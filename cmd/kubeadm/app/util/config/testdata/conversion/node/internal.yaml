@@ -1,5 +1,6 @@
 CACertPath: /etc/kubernetes/pki/ca.crt
 ControlPlane:
+  CertificateKey: ""
   LocalAPIEndpoint:
     AdvertiseAddress: 192.168.2.2
     BindPort: 6443
@@ -14,6 +15,7 @@ Discovery:
   Timeout: 5m0s
 NodeRegistration:
   CRISocket: /var/run/dockershim.sock
+  IgnorePreflightErrors: null
   KubeletExtraArgs: null
   Name: control-plane-1
   Taints:

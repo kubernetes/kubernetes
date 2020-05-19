@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,10 +35,9 @@ import (
 	v1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	cloudproviderapi "k8s.io/cloud-provider/api"
+	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -45,7 +45,7 @@ const (
 )
 
 var ShutdownTaint = &v1.Taint{
-	Key:    schedulerapi.TaintNodeShutdown,
+	Key:    cloudproviderapi.TaintNodeShutdown,
 	Effect: v1.TaintEffectNoSchedule,
 }
 
@@ -115,7 +115,7 @@ func (c *CloudNodeLifecycleController) Run(stopCh <-chan struct{}) {
 }
 
 // MonitorNodes checks to see if nodes in the cluster have been deleted
-// or shutdown. If deleeted, it deletes the node resource. If shutdown it
+// or shutdown. If deleted, it deletes the node resource. If shutdown it
 // applies a shutdown taint to the node
 func (c *CloudNodeLifecycleController) MonitorNodes() {
 	instances, ok := c.cloud.Instances()
@@ -133,65 +133,62 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 	for _, node := range nodes {
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
-		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
+		if _, c := cloudnodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
 			status = c.Status
 		}
 
 		if status == v1.ConditionTrue {
 			// if taint exist remove taint
-			err = controller.RemoveTaintOffNode(c.kubeClient, node.Name, node, ShutdownTaint)
+			err = cloudnodeutil.RemoveTaintOffNode(c.kubeClient, node.Name, node, ShutdownTaint)
 			if err != nil {
 				klog.Errorf("error patching node taints: %v", err)
 			}
 			continue
 		}
 
-		// we need to check this first to get taint working in similar in all cloudproviders
-		// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
-		// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
-		shutdown, err := shutdownInCloudProvider(context.TODO(), c.cloud, node)
-		if err != nil {
-			klog.Errorf("error checking if node %s is shutdown: %v", node.Name, err)
-		}
-
-		if shutdown && err == nil {
-			// if node is shutdown add shutdown taint
-			err = controller.AddOrUpdateTaintOnNode(c.kubeClient, node.Name, ShutdownTaint)
-			if err != nil {
-				klog.Errorf("failed to apply shutdown taint to node %s, it may have been deleted.", node.Name)
-			}
-			// Continue checking the remaining nodes since the current one is shutdown.
-			continue
-		}
-
 		// At this point the node has NotReady status, we need to check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node
-		exists, err := ensureNodeExistsByProviderID(instances, node)
+		exists, err := ensureNodeExistsByProviderID(context.TODO(), instances, node)
 		if err != nil {
 			klog.Errorf("error checking if node %s exists: %v", node.Name, err)
 			continue
 		}
 
-		if exists {
-			// Continue checking the remaining nodes since the current one is fine.
-			continue
-		}
+		if !exists {
+			// Current node does not exist, we should delete it, its taints do not matter anymore
 
-		klog.V(2).Infof("deleting node since it is no longer present in cloud provider: %s", node.Name)
+			klog.V(2).Infof("deleting node since it is no longer present in cloud provider: %s", node.Name)
 
-		ref := &v1.ObjectReference{
-			Kind:      "Node",
-			Name:      node.Name,
-			UID:       types.UID(node.UID),
-			Namespace: "",
-		}
+			ref := &v1.ObjectReference{
+				Kind:      "Node",
+				Name:      node.Name,
+				UID:       types.UID(node.UID),
+				Namespace: "",
+			}
 
-		c.recorder.Eventf(ref, v1.EventTypeNormal,
-			fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
-			"Node %s event: %s", node.Name, deleteNodeEvent)
+			c.recorder.Eventf(ref, v1.EventTypeNormal,
+				fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
+				"Node %s event: %s", node.Name, deleteNodeEvent)
 
-		if err := c.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
-			klog.Errorf("unable to delete node %q: %v", node.Name, err)
+			if err := c.kubeClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
+				klog.Errorf("unable to delete node %q: %v", node.Name, err)
+			}
+		} else {
+			// Node exists. We need to check this to get taint working in similar in all cloudproviders
+			// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
+			// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
+			shutdown, err := shutdownInCloudProvider(context.TODO(), c.cloud, node)
+			if err != nil {
+				klog.Errorf("error checking if node %s is shutdown: %v", node.Name, err)
+			}
+
+			if shutdown && err == nil {
+				// if node is shutdown add shutdown taint
+				err = cloudnodeutil.AddOrUpdateTaintOnNode(c.kubeClient, node.Name, ShutdownTaint)
+				if err != nil {
+					klog.Errorf("failed to apply shutdown taint to node %s, it may have been deleted.", node.Name)
+				}
+			}
 		}
 	}
 }

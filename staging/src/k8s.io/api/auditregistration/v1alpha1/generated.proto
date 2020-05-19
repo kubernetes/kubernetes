@@ -83,6 +83,12 @@ message ServiceReference {
   // this service.
   // +optional
   optional string path = 3;
+
+  // If specified, the port on the service that hosting webhook.
+  // Default to 443 for backward compatibility.
+  // `port` should be a valid port number (1-65535, inclusive).
+  // +optional
+  optional int32 port = 4;
 }
 
 // Webhook holds the configuration of the webhook
@@ -131,8 +137,6 @@ message WebhookClientConfig {
   // `service` or `url` must be specified.
   //
   // If the webhook is running within the cluster, then you should use `service`.
-  //
-  // Port 443 will be used if it is open, otherwise it is an error.
   //
   // +optional
   optional ServiceReference service = 2;

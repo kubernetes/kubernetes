@@ -135,7 +135,7 @@ resource := "https://management.core.windows.net/"
 applicationSecret := "APPLICATION_SECRET"
 
 spt, err := adal.NewServicePrincipalToken(
-	oauthConfig,
+	*oauthConfig,
 	appliationID,
 	applicationSecret,
 	resource,
@@ -170,7 +170,7 @@ if err != nil {
 }
 
 spt, err := adal.NewServicePrincipalTokenFromCertificate(
-	oauthConfig,
+	*oauthConfig,
 	applicationID,
 	certificate,
 	rsaPrivateKey,
@@ -195,7 +195,7 @@ oauthClient := &http.Client{}
 // Acquire the device code
 deviceCode, err := adal.InitiateDeviceAuth(
 	oauthClient,
-	oauthConfig,
+	*oauthConfig,
 	applicationID,
 	resource)
 if err != nil {
@@ -212,7 +212,7 @@ if err != nil {
 }
 
 spt, err := adal.NewServicePrincipalTokenFromManualToken(
-	oauthConfig,
+	*oauthConfig,
 	applicationID,
 	resource,
 	*token,
@@ -227,7 +227,7 @@ if (err == nil) {
 
 ```Go
 spt, err := adal.NewServicePrincipalTokenFromUsernamePassword(
-	oauthConfig,
+	*oauthConfig,
 	applicationID,
 	username,
 	password,
@@ -243,11 +243,11 @@ if (err == nil) {
 
 ``` Go
 spt, err := adal.NewServicePrincipalTokenFromAuthorizationCode(
-	oauthConfig,
+	*oauthConfig,
 	applicationID,
 	clientSecret,
-      authorizationCode,
-      redirectURI,
+        authorizationCode,
+        redirectURI,
 	resource,
 	callbacks...)
 

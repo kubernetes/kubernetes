@@ -17,11 +17,11 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -29,13 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
@@ -104,7 +102,6 @@ func newTableInstance(name string) *unstructured.Unstructured {
 }
 
 func TestTableGet(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -127,14 +124,14 @@ func TestTableGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("table crd created: %#v", crd)
 
 	crClient := newNamespacedCustomResourceVersionedClient("", dynamicClient, crd, "v1")
-	foo, err := crClient.Create(newTableInstance("foo"), metav1.CreateOptions{})
+	foo, err := crClient.Create(context.TODO(), newTableInstance("foo"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
 	}
@@ -148,109 +145,212 @@ func TestTableGet(t *testing.T) {
 		codecs := serializer.NewCodecFactory(scheme)
 		parameterCodec := runtime.NewParameterCodec(scheme)
 		metav1.AddToGroupVersion(scheme, gv)
-		scheme.AddKnownTypes(gv, &metav1beta1.Table{}, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(gv, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(gv, &metav1.TableOptions{})
 		scheme.AddKnownTypes(metav1beta1.SchemeGroupVersion, &metav1beta1.Table{}, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(metav1.SchemeGroupVersion, &metav1.Table{}, &metav1.TableOptions{})
 
 		crConfig := *config
 		crConfig.GroupVersion = &gv
 		crConfig.APIPath = "/apis"
-		crConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: codecs}
+		crConfig.NegotiatedSerializer = codecs.WithoutConversion()
 		crRestClient, err := rest.RESTClientFor(&crConfig)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		ret, err := crRestClient.Get().
-			Resource(crd.Spec.Names.Plural).
-			SetHeader("Accept", fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", metav1beta1.SchemeGroupVersion.Version, metav1beta1.GroupName)).
-			VersionedParams(&metav1beta1.TableOptions{}, parameterCodec).
-			Do().
-			Get()
-		if err != nil {
-			t.Fatalf("failed to list %v resources: %v", gvk, err)
-		}
-
-		tbl, ok := ret.(*metav1beta1.Table)
-		if !ok {
-			t.Fatalf("expected metav1beta1.Table, got %T", ret)
-		}
-		t.Logf("%v table list: %#v", gvk, tbl)
-
-		columns, err := getColumnsForVersion(crd, v.Name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		expectColumnNum := len(columns) + 1
-		if got, expected := len(tbl.ColumnDefinitions), expectColumnNum; got != expected {
-			t.Errorf("expected %d headers, got %d", expected, got)
-		} else {
-			age := metav1beta1.TableColumnDefinition{Name: "Age", Type: "date", Format: "", Description: "Custom resource definition column (in JSONPath format): .metadata.creationTimestamp", Priority: 0}
-			if got, expected := tbl.ColumnDefinitions[1], age; got != expected {
-				t.Errorf("expected column definition %#v, got %#v", expected, got)
+		// metav1beta1 table
+		{
+			ret, err := crRestClient.Get().
+				Resource(crd.Spec.Names.Plural).
+				SetHeader("Accept", fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", metav1beta1.SchemeGroupVersion.Version, metav1beta1.GroupName)).
+				VersionedParams(&metav1beta1.TableOptions{}, parameterCodec).
+				Do(context.TODO()).
+				Get()
+			if err != nil {
+				t.Fatalf("failed to list %v resources: %v", gvk, err)
 			}
 
-			alpha := metav1beta1.TableColumnDefinition{Name: "Alpha", Type: "string", Format: "", Description: "Custom resource definition column (in JSONPath format): .spec.alpha", Priority: 0}
-			if got, expected := tbl.ColumnDefinitions[2], alpha; got != expected {
-				t.Errorf("expected column definition %#v, got %#v", expected, got)
+			tbl, ok := ret.(*metav1beta1.Table)
+			if !ok {
+				t.Fatalf("expected metav1beta1.Table, got %T", ret)
 			}
+			t.Logf("%v table list: %#v", gvk, tbl)
 
-			beta := metav1beta1.TableColumnDefinition{Name: "Beta", Type: "integer", Format: "int64", Description: "the beta field", Priority: 42}
-			if got, expected := tbl.ColumnDefinitions[3], beta; got != expected {
-				t.Errorf("expected column definition %#v, got %#v", expected, got)
+			columns, err := getColumnsForVersion(crd, v.Name)
+			if err != nil {
+				t.Fatal(err)
 			}
-
-			gamma := metav1beta1.TableColumnDefinition{Name: "Gamma", Type: "integer", Description: "a column with wrongly typed values"}
-			if got, expected := tbl.ColumnDefinitions[4], gamma; got != expected {
-				t.Errorf("expected column definition %#v, got %#v", expected, got)
-			}
-
-			epsilon := metav1beta1.TableColumnDefinition{Name: "Epsilon", Type: "string", Description: "an array of integers as string"}
-			if got, expected := tbl.ColumnDefinitions[5], epsilon; got != expected {
-				t.Errorf("expected column definition %#v, got %#v", expected, got)
-			}
-
-			// Validate extra column for v1
-			if i == 1 {
-				zeta := metav1beta1.TableColumnDefinition{Name: "Zeta", Type: "integer", Format: "int64", Description: "the zeta field", Priority: 42}
-				if got, expected := tbl.ColumnDefinitions[6], zeta; got != expected {
+			expectColumnNum := len(columns) + 1
+			if got, expected := len(tbl.ColumnDefinitions), expectColumnNum; got != expected {
+				t.Errorf("expected %d headers, got %d", expected, got)
+			} else {
+				age := metav1beta1.TableColumnDefinition{Name: "Age", Type: "date", Format: "", Description: "Custom resource definition column (in JSONPath format): .metadata.creationTimestamp", Priority: 0}
+				if got, expected := tbl.ColumnDefinitions[1], age; got != expected {
 					t.Errorf("expected column definition %#v, got %#v", expected, got)
 				}
-			}
-		}
-		if got, expected := len(tbl.Rows), 1; got != expected {
-			t.Errorf("expected %d rows, got %d", expected, got)
-		} else if got, expected := len(tbl.Rows[0].Cells), expectColumnNum; got != expected {
-			t.Errorf("expected %d cells, got %d", expected, got)
-		} else {
-			if got, expected := tbl.Rows[0].Cells[0], "foo"; got != expected {
-				t.Errorf("expected cell[0] to equal %q, got %q", expected, got)
-			}
-			if s, ok := tbl.Rows[0].Cells[1].(string); !ok {
-				t.Errorf("expected cell[1] to be a string, got: %#v", tbl.Rows[0].Cells[1])
-			} else {
-				dur, err := time.ParseDuration(s)
-				if err != nil {
-					t.Errorf("expected cell[1] to be a duration: %v", err)
-				} else if abs(dur.Seconds()) > 30.0 {
-					t.Errorf("expected cell[1] to be a small age, but got: %v", dur)
+
+				alpha := metav1beta1.TableColumnDefinition{Name: "Alpha", Type: "string", Format: "", Description: "Custom resource definition column (in JSONPath format): .spec.alpha", Priority: 0}
+				if got, expected := tbl.ColumnDefinitions[2], alpha; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				beta := metav1beta1.TableColumnDefinition{Name: "Beta", Type: "integer", Format: "int64", Description: "the beta field", Priority: 42}
+				if got, expected := tbl.ColumnDefinitions[3], beta; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				gamma := metav1beta1.TableColumnDefinition{Name: "Gamma", Type: "integer", Description: "a column with wrongly typed values"}
+				if got, expected := tbl.ColumnDefinitions[4], gamma; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				epsilon := metav1beta1.TableColumnDefinition{Name: "Epsilon", Type: "string", Description: "an array of integers as string"}
+				if got, expected := tbl.ColumnDefinitions[5], epsilon; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				// Validate extra column for v1
+				if i == 1 {
+					zeta := metav1beta1.TableColumnDefinition{Name: "Zeta", Type: "integer", Format: "int64", Description: "the zeta field", Priority: 42}
+					if got, expected := tbl.ColumnDefinitions[6], zeta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
 				}
 			}
-			if got, expected := tbl.Rows[0].Cells[2], "foo_123"; got != expected {
-				t.Errorf("expected cell[2] to equal %q, got %q", expected, got)
+			if got, expected := len(tbl.Rows), 1; got != expected {
+				t.Errorf("expected %d rows, got %d", expected, got)
+			} else if got, expected := len(tbl.Rows[0].Cells), expectColumnNum; got != expected {
+				t.Errorf("expected %d cells, got %d", expected, got)
+			} else {
+				if got, expected := tbl.Rows[0].Cells[0], "foo"; got != expected {
+					t.Errorf("expected cell[0] to equal %q, got %q", expected, got)
+				}
+				if s, ok := tbl.Rows[0].Cells[1].(string); !ok {
+					t.Errorf("expected cell[1] to be a string, got: %#v", tbl.Rows[0].Cells[1])
+				} else {
+					dur, err := time.ParseDuration(s)
+					if err != nil {
+						t.Errorf("expected cell[1] to be a duration: %v", err)
+					} else if abs(dur.Seconds()) > 30.0 {
+						t.Errorf("expected cell[1] to be a small age, but got: %v", dur)
+					}
+				}
+				if got, expected := tbl.Rows[0].Cells[2], "foo_123"; got != expected {
+					t.Errorf("expected cell[2] to equal %q, got %q", expected, got)
+				}
+				if got, expected := tbl.Rows[0].Cells[3], int64(10); got != expected {
+					t.Errorf("expected cell[3] to equal %#v, got %#v", expected, got)
+				}
+				if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
+					t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
+				}
+				if got, expected := tbl.Rows[0].Cells[5], "[1,2,3]"; got != expected {
+					t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
+				}
+				// Validate extra column for v1
+				if i == 1 {
+					if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
+						t.Errorf("expected cell[6] to equal %q, got %q", expected, got)
+					}
+				}
 			}
-			if got, expected := tbl.Rows[0].Cells[3], int64(10); got != expected {
-				t.Errorf("expected cell[3] to equal %#v, got %#v", expected, got)
+		}
+
+		// metav1 table
+		{
+			ret, err := crRestClient.Get().
+				Resource(crd.Spec.Names.Plural).
+				SetHeader("Accept", fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", metav1.SchemeGroupVersion.Version, metav1.GroupName)).
+				VersionedParams(&metav1.TableOptions{}, parameterCodec).
+				Do(context.TODO()).
+				Get()
+			if err != nil {
+				t.Fatalf("failed to list %v resources: %v", gvk, err)
 			}
-			if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
-				t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
+
+			tbl, ok := ret.(*metav1.Table)
+			if !ok {
+				t.Fatalf("expected metav1.Table, got %T", ret)
 			}
-			if got, expected := tbl.Rows[0].Cells[5], "[1 2 3]"; got != expected {
-				t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
+			t.Logf("%v table list: %#v", gvk, tbl)
+
+			columns, err := getColumnsForVersion(crd, v.Name)
+			if err != nil {
+				t.Fatal(err)
 			}
-			// Validate extra column for v1
-			if i == 1 {
-				if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
-					t.Errorf("expected cell[6] to equal %q, got %q", expected, got)
+			expectColumnNum := len(columns) + 1
+			if got, expected := len(tbl.ColumnDefinitions), expectColumnNum; got != expected {
+				t.Errorf("expected %d headers, got %d", expected, got)
+			} else {
+				age := metav1.TableColumnDefinition{Name: "Age", Type: "date", Format: "", Description: "Custom resource definition column (in JSONPath format): .metadata.creationTimestamp", Priority: 0}
+				if got, expected := tbl.ColumnDefinitions[1], age; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				alpha := metav1.TableColumnDefinition{Name: "Alpha", Type: "string", Format: "", Description: "Custom resource definition column (in JSONPath format): .spec.alpha", Priority: 0}
+				if got, expected := tbl.ColumnDefinitions[2], alpha; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				beta := metav1.TableColumnDefinition{Name: "Beta", Type: "integer", Format: "int64", Description: "the beta field", Priority: 42}
+				if got, expected := tbl.ColumnDefinitions[3], beta; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				gamma := metav1.TableColumnDefinition{Name: "Gamma", Type: "integer", Description: "a column with wrongly typed values"}
+				if got, expected := tbl.ColumnDefinitions[4], gamma; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				epsilon := metav1.TableColumnDefinition{Name: "Epsilon", Type: "string", Description: "an array of integers as string"}
+				if got, expected := tbl.ColumnDefinitions[5], epsilon; got != expected {
+					t.Errorf("expected column definition %#v, got %#v", expected, got)
+				}
+
+				// Validate extra column for v1
+				if i == 1 {
+					zeta := metav1.TableColumnDefinition{Name: "Zeta", Type: "integer", Format: "int64", Description: "the zeta field", Priority: 42}
+					if got, expected := tbl.ColumnDefinitions[6], zeta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
+				}
+			}
+			if got, expected := len(tbl.Rows), 1; got != expected {
+				t.Errorf("expected %d rows, got %d", expected, got)
+			} else if got, expected := len(tbl.Rows[0].Cells), expectColumnNum; got != expected {
+				t.Errorf("expected %d cells, got %d", expected, got)
+			} else {
+				if got, expected := tbl.Rows[0].Cells[0], "foo"; got != expected {
+					t.Errorf("expected cell[0] to equal %q, got %q", expected, got)
+				}
+				if s, ok := tbl.Rows[0].Cells[1].(string); !ok {
+					t.Errorf("expected cell[1] to be a string, got: %#v", tbl.Rows[0].Cells[1])
+				} else {
+					dur, err := time.ParseDuration(s)
+					if err != nil {
+						t.Errorf("expected cell[1] to be a duration: %v", err)
+					} else if abs(dur.Seconds()) > 30.0 {
+						t.Errorf("expected cell[1] to be a small age, but got: %v", dur)
+					}
+				}
+				if got, expected := tbl.Rows[0].Cells[2], "foo_123"; got != expected {
+					t.Errorf("expected cell[2] to equal %q, got %q", expected, got)
+				}
+				if got, expected := tbl.Rows[0].Cells[3], int64(10); got != expected {
+					t.Errorf("expected cell[3] to equal %#v, got %#v", expected, got)
+				}
+				if got, expected := tbl.Rows[0].Cells[4], interface{}(nil); got != expected {
+					t.Errorf("expected cell[4] to equal %#v although the type does not match the column, got %#v", expected, got)
+				}
+				if got, expected := tbl.Rows[0].Cells[5], "[1,2,3]"; got != expected {
+					t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
+				}
+				// Validate extra column for v1
+				if i == 1 {
+					if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
+						t.Errorf("expected cell[6] to equal %q, got %q", expected, got)
+					}
 				}
 			}
 		}
@@ -260,7 +360,6 @@ func TestTableGet(t *testing.T) {
 // TestColumnsPatch tests the case that a CRD was created with no top-level or
 // per-version columns. One should be able to PATCH the CRD setting per-version columns.
 func TestColumnsPatch(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -289,12 +388,12 @@ func TestColumnsPatch(t *testing.T) {
 	// error about top-level and per-version columns being mutual exclusive.
 	patch := []byte(`{"spec":{"versions":[{"name":"v1beta1","served":true,"storage":true,"additionalPrinterColumns":[{"name":"Age","type":"date","JSONPath":".metadata.creationTimestamp"}]},{"name":"v1","served":true,"storage":false,"additionalPrinterColumns":[{"name":"Age2","type":"date","JSONPath":".metadata.creationTimestamp"}]}]}}`)
 
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crd.Name, types.MergePatchType, patch)
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +404,6 @@ func TestColumnsPatch(t *testing.T) {
 // One should be able to PATCH the CRD cleaning the top-level columns and setting per-version
 // columns.
 func TestPatchCleanTopLevelColumns(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -336,12 +434,12 @@ func TestPatchCleanTopLevelColumns(t *testing.T) {
 	// the top-level columns.
 	patch := []byte(`{"spec":{"additionalPrinterColumns":null,"versions":[{"name":"v1beta1","served":true,"storage":true,"additionalPrinterColumns":[{"name":"Age","type":"date","JSONPath":".metadata.creationTimestamp"}]},{"name":"v1","served":true,"storage":false,"additionalPrinterColumns":[{"name":"Age2","type":"date","JSONPath":".metadata.creationTimestamp"}]}]}}`)
 
-	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crd.Name, types.MergePatchType, patch)
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(context.TODO(), crd.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

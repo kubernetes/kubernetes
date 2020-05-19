@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
@@ -35,9 +36,6 @@ const (
 	// considered acceptable. Once per hour is fine for now, as long as it
 	// doesn't loose too much logs.
 	maxAllowedRestartsPerHour = 1.0
-	// lastPodIngestionSlack is the amount of time to wait for the last pod's
-	// logs to be ingested by the logging agent.
-	lastPodIngestionSlack = 5 * time.Minute
 )
 
 var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackdriver [Feature:StackdriverLogging] [Soak]", func() {
@@ -45,7 +43,8 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 
 	ginkgo.It("should ingest logs from applications running for a prolonged amount of time", func() {
 		withLogProviderForScope(f, podsScope, func(p *sdLogProvider) {
-			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items
+			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+			framework.ExpectNoError(err)
 			maxPodCount := 10
 			jobDuration := 30 * time.Minute
 			linesPerPodPerSecond := 100
@@ -68,7 +67,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			podsByRun := [][]utils.FiniteLoggingPod{}
 			for runIdx := 0; runIdx < podRunCount; runIdx++ {
 				podsInRun := []utils.FiniteLoggingPod{}
-				for nodeIdx, node := range nodes {
+				for nodeIdx, node := range nodes.Items {
 					podName := fmt.Sprintf("job-logs-generator-%d-%d-%d-%d", maxPodCount, linesPerPod, runIdx, nodeIdx)
 					pod := utils.NewLoadLoggingPod(podName, node.Name, linesPerPod, jobDuration)
 					pods = append(pods, pod)
@@ -93,7 +92,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			}()
 
 			checker := utils.NewFullIngestionPodLogChecker(p, maxAllowedLostFraction, pods...)
-			err := utils.WaitForLogs(checker, ingestionInterval, ingestionTimeout)
+			err = utils.WaitForLogs(checker, ingestionInterval, ingestionTimeout)
 			framework.ExpectNoError(err)
 
 			utils.EnsureLoggingAgentRestartsCount(f, p.LoggingAgentName(), allowedRestarts)

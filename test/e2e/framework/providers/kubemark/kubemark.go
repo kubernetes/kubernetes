@@ -25,8 +25,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	"github.com/onsi/gomega"
 )
 
 var (
@@ -77,7 +75,7 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
 		framework.ExpectNoError(err)
 		externalInformerFactory.Start(p.closeChannel)
-		gomega.Expect(p.controller.WaitForCacheSync(p.closeChannel)).To(gomega.BeTrue())
+		framework.ExpectEqual(p.controller.WaitForCacheSync(p.closeChannel), true)
 		go p.controller.Run(p.closeChannel)
 	}
 }

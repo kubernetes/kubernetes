@@ -2,18 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "dns_resolver.go",
-        "go17.go",
-        "go18.go",
-    ],
+    srcs = ["dns_resolver.go"],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/resolver/dns",
     importpath = "google.golang.org/grpc/resolver/dns",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/google.golang.org/grpc/grpclog:go_default_library",
-        "//vendor/google.golang.org/grpc/internal/grpcrand:go_default_library",
+        "//vendor/google.golang.org/grpc/internal/resolver/dns:go_default_library",
         "//vendor/google.golang.org/grpc/resolver:go_default_library",
     ],
 )

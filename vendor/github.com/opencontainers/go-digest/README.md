@@ -1,10 +1,10 @@
 # go-digest
 
-[![GoDoc](https://godoc.org/github.com/docker/go-digest?status.svg)](https://godoc.org/github.com/docker/go-digest) [![Go Report Card](https://goreportcard.com/badge/github.com/docker/go-digest)](https://goreportcard.com/report/github.com/docker/go-digest) [![Build Status](https://travis-ci.org/docker/go-digest.svg?branch=master)](https://travis-ci.org/docker/go-digest)
+[![GoDoc](https://godoc.org/github.com/opencontainers/go-digest?status.svg)](https://godoc.org/github.com/opencontainers/go-digest) [![Go Report Card](https://goreportcard.com/badge/github.com/opencontainers/go-digest)](https://goreportcard.com/report/github.com/opencontainers/go-digest) [![Build Status](https://travis-ci.org/opencontainers/go-digest.svg?branch=master)](https://travis-ci.org/opencontainers/go-digest)
 
 Common digest package used across the container ecosystem.
 
-Please see the [godoc](https://godoc.org/github.com/docker/go-digest) for more information.
+Please see the [godoc](https://godoc.org/github.com/opencontainers/go-digest) for more information.
 
 # What is a digest?
 
@@ -49,7 +49,7 @@ can power a rich, safe, content distribution system.
 
 # Usage
 
-While the [godoc](https://godoc.org/github.com/docker/go-digest) is 
+While the [godoc](https://godoc.org/github.com/opencontainers/go-digest) is
 considered the best resource, a few important items need to be called 
 out when using this package.
 
@@ -76,7 +76,7 @@ out when using this package.
 
 The Go API, at this stage, is considered stable, unless otherwise noted.
 
-As always, before using a package export, read the [godoc](https://godoc.org/github.com/docker/go-digest).
+As always, before using a package export, read the [godoc](https://godoc.org/github.com/opencontainers/go-digest).
 
 # Contributing
 
@@ -88,16 +88,16 @@ the alternatives you tried before submitting a PR.
 
 # Reporting security issues
 
-The maintainers take security seriously. If you discover a security 
-issue, please bring it to their attention right away!
+Please DO NOT file a public issue, instead send your report privately to
+security@opencontainers.org.
 
-Please DO NOT file a public issue, instead send your report privately
-to security@docker.com.
+The maintainers take security seriously. If you discover a security issue,
+please bring it to their attention right away!
 
-Security reports are greatly appreciated and we will publicly thank you 
-for it. We also like to send gifts—if you're into Docker schwag, make 
-sure to let us know. We currently do not offer a paid security bounty 
-program, but are not ruling it out in the future.
+If you are reporting a security issue, do not create an issue or file a pull
+request on GitHub. Instead, disclose the issue responsibly by sending an email
+to security@opencontainers.org (which is inhabited only by the maintainers of
+the various OCI projects).
 
 # Copyright and license
 

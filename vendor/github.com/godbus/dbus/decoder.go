@@ -188,10 +188,23 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 		if depth >= 64 {
 			panic(FormatError("input exceeds container depth limit"))
 		}
+		sig := s[1:]
 		length := dec.decode("u", depth).(uint32)
-		v := reflect.MakeSlice(reflect.SliceOf(typeFor(s[1:])), 0, int(length))
+		// capacity can be determined only for fixed-size element types
+		var capacity int
+		if s := sigByteSize(sig); s != 0 {
+			capacity = int(length) / s
+		}
+		v := reflect.MakeSlice(reflect.SliceOf(typeFor(sig)), 0, capacity)
 		// Even for empty arrays, the correct padding must be included
-		dec.align(alignment(typeFor(s[1:])))
+		align := alignment(typeFor(s[1:]))
+		if len(s) > 1 && s[1] == '(' {
+			//Special case for arrays of structs
+			//structs decode as a slice of interface{} values
+			//but the dbus alignment does not match this
+			align = 8
+		}
+		dec.align(align)
 		spos := dec.pos
 		for dec.pos < spos+int(length) {
 			ev := dec.decode(s[1:], depth+1)
@@ -218,6 +231,51 @@ func (dec *decoder) decode(s string, depth int) interface{} {
 	default:
 		panic(SignatureError{Sig: s})
 	}
+}
+
+// sigByteSize tries to calculates size of the given signature in bytes.
+//
+// It returns zero when it can't, for example when it contains non-fixed size
+// types such as strings, maps and arrays that require reading of the transmitted
+// data, for that we would need to implement the unread method for Decoder first.
+func sigByteSize(sig string) int {
+	var total int
+	for offset := 0; offset < len(sig); {
+		switch sig[offset] {
+		case 'y':
+			total += 1
+			offset += 1
+		case 'n', 'q':
+			total += 2
+			offset += 1
+		case 'b', 'i', 'u', 'h':
+			total += 4
+			offset += 1
+		case 'x', 't', 'd':
+			total += 8
+			offset += 1
+		case '(':
+			i := 1
+			depth := 1
+			for i < len(sig[offset:]) && depth != 0 {
+				if sig[offset+i] == '(' {
+					depth++
+				} else if sig[offset+i] == ')' {
+					depth--
+				}
+				i++
+			}
+			s := sigByteSize(sig[offset+1 : offset+i-1])
+			if s == 0 {
+				return 0
+			}
+			total += s
+			offset += i
+		default:
+			return 0
+		}
+	}
+	return total
 }
 
 // A FormatError is an error in the wire format.

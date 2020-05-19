@@ -22,15 +22,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 )
 
-// CreateObj will create a single object using the storage interface
+// CreateObj will create a single object using the storage interface.
 func CreateObj(helper storage.Interface, name string, obj, out runtime.Object, ttl uint64) error {
 	return helper.Create(context.TODO(), name, obj, out, ttl)
 }
 
-//CreateObjList will create a list from the array of objects
+// CreateObjList will create a list from the array of objects.
 func CreateObjList(prefix string, helper storage.Interface, items []runtime.Object) error {
 	for i := range items {
 		obj := items[i]
@@ -47,7 +48,7 @@ func CreateObjList(prefix string, helper storage.Interface, items []runtime.Obje
 	return nil
 }
 
-// CreateList will properly create a list using the storage interface
+// CreateList will properly create a list using the storage interface.
 func CreateList(prefix string, helper storage.Interface, list runtime.Object) error {
 	items, err := meta.ExtractList(list)
 	if err != nil {
@@ -58,4 +59,14 @@ func CreateList(prefix string, helper storage.Interface, list runtime.Object) er
 		return err
 	}
 	return meta.SetList(list, items)
+}
+
+// DeepEqualSafePodSpec returns an example.PodSpec safe for deep-equal operations.
+func DeepEqualSafePodSpec() example.PodSpec {
+	grace := int64(30)
+	return example.PodSpec{
+		RestartPolicy:                 "Always",
+		TerminationGracePeriodSeconds: &grace,
+		SchedulerName:                 "default-scheduler",
+	}
 }

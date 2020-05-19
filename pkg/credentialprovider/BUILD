@@ -18,7 +18,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/credentialprovider",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -46,7 +46,6 @@ filegroup(
         "//pkg/credentialprovider/aws:all-srcs",
         "//pkg/credentialprovider/azure:all-srcs",
         "//pkg/credentialprovider/gcp:all-srcs",
-        "//pkg/credentialprovider/rancher:all-srcs",
         "//pkg/credentialprovider/secrets:all-srcs",
     ],
     tags = ["automanaged"],

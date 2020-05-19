@@ -1,3 +1,46 @@
+## 1.7.0
+
+### Features
+- export format property variables (#347) [642e5ba]
+
+### Fixes
+- minor fix in the documentation of ExpectWithOffset (#358) [beea727]
+
+## 1.6.0
+
+### Features
+
+- Display special chars on error [41e1b26]
+- Add BeElementOf matcher [6a48b48]
+
+### Fixes
+
+- Remove duplication in XML matcher tests [cc1a6cb]
+- Remove unnecessary conversions (#357) [7bf756a]
+- Fixed import order (#353) [2e3b965]
+- Added missing error handling in test (#355) [c98d3eb]
+- Simplify code (#356) [0001ed9]
+- Simplify code (#354) [0d9100e]
+- Fixed typos (#352) [3f647c4]
+- Add failure message tests to BeElementOf matcher [efe19c3]
+- Update go-testcov untested sections [37ee382]
+- Mark all uncovered files so go-testcov ./... works [53b150e]
+- Reenable gotip in travis [5c249dc]
+- Fix the typo of comment (#345) [f0e010e]
+- Optimize contain_element_matcher [abeb93d]
+
+
+## 1.5.0
+
+### Features
+
+- Added MatchKeys matchers [8b909fc]
+
+### Fixes and Minor Improvements
+
+- Add type aliases to remove stuttering [03b0461]
+- Don't run session_test.go on windows (#324) [5533ce8]
+
 ## 1.4.3
 
 ### Fixes:

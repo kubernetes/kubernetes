@@ -31,14 +31,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/apps/daemonset"
 )
 
-// rest implements a RESTStorage for DaemonSets
+// REST implements a RESTStorage for DaemonSets
 type REST struct {
 	*genericregistry.Store
 	categories []string
 }
 
 // NewREST returns a RESTStorage object that will work against DaemonSets.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apps.DaemonSet{} },
 		NewListFunc:              func() runtime.Object { return &apps.DaemonSetList{} },
@@ -48,17 +48,17 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: daemonset.Strategy,
 		DeleteStrategy: daemonset.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = daemonset.StatusStrategy
 
-	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -76,6 +76,7 @@ func (r *REST) Categories() []string {
 	return r.categories
 }
 
+// WithCategories sets categories for REST.
 func (r *REST) WithCategories(categories []string) *REST {
 	r.categories = categories
 	return r
@@ -86,6 +87,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new DaemonSet object.
 func (r *StatusREST) New() runtime.Object {
 	return &apps.DaemonSet{}
 }

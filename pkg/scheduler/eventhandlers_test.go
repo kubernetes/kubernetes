@@ -19,17 +19,18 @@ package scheduler
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
-
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
 func TestSkipPodUpdate(t *testing.T) {
-	table := []struct {
+	for _, test := range []struct {
 		pod              *v1.Pod
 		isAssumedPodFunc func(*v1.Pod) bool
 		getPodFunc       func(*v1.Pod) *v1.Pod
@@ -83,6 +84,85 @@ func TestSkipPodUpdate(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "with ServerSideApply changes on Annotations",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod-0",
+					Annotations:     map[string]string{"a": "b"},
+					ResourceVersion: "0",
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    "some-actor",
+							Operation:  metav1.ManagedFieldsOperationApply,
+							APIVersion: "v1",
+							FieldsType: "FieldsV1",
+							FieldsV1: &metav1.FieldsV1{
+								Raw: []byte(`
+									"f:metadata": {
+									  "f:annotations": {
+										"f:a: {}
+									  }
+									}
+								`),
+							},
+						},
+					},
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-0",
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "pod-0",
+						Annotations:     map[string]string{"a": "c", "d": "e"},
+						ResourceVersion: "1",
+						ManagedFields: []metav1.ManagedFieldsEntry{
+							{
+								Manager:    "some-actor",
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: "v1",
+								FieldsType: "FieldsV1",
+								FieldsV1: &metav1.FieldsV1{
+									Raw: []byte(`
+										"f:metadata": {
+										  "f:annotations": {
+											"f:a: {}
+											"f:d: {}
+										  }
+										}
+									`),
+								},
+							},
+							{
+								Manager:    "some-actor",
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: "v1",
+								FieldsType: "FieldsV1",
+								FieldsV1: &metav1.FieldsV1{
+									Raw: []byte(`
+										"f:metadata": {
+										  "f:annotations": {
+											"f:a: {}
+										  }
+										}
+									`),
+								},
+							},
+						},
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-1",
+					},
+				}
+			},
+			expected: true,
+		},
+		{
 			name: "with changes on Labels",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -103,16 +183,35 @@ func TestSkipPodUpdate(t *testing.T) {
 			},
 			expected: false,
 		},
-	}
-	for _, test := range table {
+		{
+			name: "with changes on Finalizers",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-0",
+					Finalizers: []string{"a", "b"},
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "pod-0",
+						Finalizers: []string{"c", "d"},
+					},
+				}
+			},
+			expected: true,
+		},
+	} {
 		t.Run(test.name, func(t *testing.T) {
-			c := NewFromConfig(&factory.Config{
+			c := &Scheduler{
 				SchedulerCache: &fakecache.Cache{
 					IsAssumedPodFunc: test.isAssumedPodFunc,
 					GetPodFunc:       test.getPodFunc,
 				},
-			},
-			)
+			}
 			got := c.skipPodUpdate(test.pod)
 			if got != test.expected {
 				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
@@ -125,7 +224,7 @@ func TestNodeAllocatableChanged(t *testing.T) {
 	newQuantity := func(value int64) resource.Quantity {
 		return *resource.NewQuantity(value, resource.BinarySI)
 	}
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name           string
 		Changed        bool
 		OldAllocatable v1.ResourceList
@@ -144,17 +243,19 @@ func TestNodeAllocatableChanged(t *testing.T) {
 			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
 		},
 	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.OldAllocatable}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.NewAllocatable}}
-		changed := nodeAllocatableChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("nodeAllocatableChanged should be %t, got %t", c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.OldAllocatable}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.NewAllocatable}}
+			changed := nodeAllocatableChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("nodeAllocatableChanged should be %t, got %t", test.Changed, changed)
+			}
+		})
 	}
 }
 
 func TestNodeLabelsChanged(t *testing.T) {
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name      string
 		Changed   bool
 		OldLabels map[string]string
@@ -174,17 +275,19 @@ func TestNodeLabelsChanged(t *testing.T) {
 			NewLabels: map[string]string{"foo": "bar", "test": "value"},
 		},
 	} {
-		oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.OldLabels}}
-		newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.NewLabels}}
-		changed := nodeLabelsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.OldLabels}}
+			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.NewLabels}}
+			changed := nodeLabelsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
 }
 
 func TestNodeTaintsChanged(t *testing.T) {
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name      string
 		Changed   bool
 		OldTaints []v1.Taint
@@ -203,12 +306,14 @@ func TestNodeTaintsChanged(t *testing.T) {
 			NewTaints: []v1.Taint{{Key: "key", Value: "value2"}},
 		},
 	} {
-		oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.OldTaints}}
-		newNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.NewTaints}}
-		changed := nodeTaintsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, not %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.OldTaints}}
+			newNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.NewTaints}}
+			changed := nodeTaintsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, not %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
 }
 
@@ -218,7 +323,7 @@ func TestNodeConditionsChanged(t *testing.T) {
 		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
 	}
 
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name          string
 		Changed       bool
 		OldConditions []v1.NodeCondition
@@ -227,14 +332,14 @@ func TestNodeConditionsChanged(t *testing.T) {
 		{
 			Name:          "no condition changed",
 			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
 		},
 		{
 			Name:          "only LastHeartbeatTime changed",
 			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
 		},
 		{
 			Name:          "new node has more healthy conditions",
@@ -245,7 +350,7 @@ func TestNodeConditionsChanged(t *testing.T) {
 		{
 			Name:          "new node has less unhealthy conditions",
 			Changed:       true,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
 			NewConditions: []v1.NodeCondition{},
 		},
 		{
@@ -255,11 +360,61 @@ func TestNodeConditionsChanged(t *testing.T) {
 			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
 		},
 	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.OldConditions}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.NewConditions}}
-		changed := nodeConditionsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.OldConditions}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.NewConditions}}
+			changed := nodeConditionsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
+}
+
+func TestUpdatePodInCache(t *testing.T) {
+	ttl := 10 * time.Second
+	nodeName := "node"
+
+	tests := []struct {
+		name   string
+		oldObj interface{}
+		newObj interface{}
+	}{
+		{
+			name:   "pod updated with the same UID",
+			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newObj: withPodName(podWithPort("oldUID", nodeName, 8080), "pod"),
+		},
+		{
+			name:   "pod updated with different UIDs",
+			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newObj: withPodName(podWithPort("newUID", nodeName, 8080), "pod"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			schedulerCache := cache.New(ttl, stopCh)
+			schedulerQueue := queue.NewPriorityQueue(nil)
+			sched := &Scheduler{
+				SchedulerCache:  schedulerCache,
+				SchedulingQueue: schedulerQueue,
+			}
+			sched.addPodToCache(tt.oldObj)
+			sched.updatePodInCache(tt.oldObj, tt.newObj)
+			pod, err := sched.SchedulerCache.GetPod(tt.newObj.(*v1.Pod))
+			if err != nil {
+				t.Errorf("Failed to get pod from scheduler: %v", err)
+			}
+			if pod.UID != tt.newObj.(*v1.Pod).UID {
+				t.Errorf("Want pod UID %v, got %v", tt.newObj.(*v1.Pod).UID, pod.UID)
+			}
+		})
+	}
+}
+
+func withPodName(pod *v1.Pod, name string) *v1.Pod {
+	pod.Name = name
+	return pod
 }

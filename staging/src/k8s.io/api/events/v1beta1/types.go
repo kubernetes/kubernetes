@@ -23,6 +23,8 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // Event is a report of an event somewhere in the cluster. It generally denotes some state change in the system.
 type Event struct {
@@ -43,11 +45,11 @@ type Event struct {
 
 	// ID of the controller instance, e.g. `kubelet-xyzf`.
 	// +optional
-	ReportingInstance string `json:"reportingInstance,omitemtpy" protobuf:"bytes,5,opt,name=reportingInstance"`
+	ReportingInstance string `json:"reportingInstance,omitempty" protobuf:"bytes,5,opt,name=reportingInstance"`
 
 	// What action was taken/failed regarding to the regarding object.
 	// +optional
-	Action string `json:"action,omitemtpy" protobuf:"bytes,6,name=action"`
+	Action string `json:"action,omitempty" protobuf:"bytes,6,name=action"`
 
 	// Why the action was taken.
 	Reason string `json:"reason,omitempty" protobuf:"bytes,7,name=reason"`
@@ -95,25 +97,19 @@ type EventSeries struct {
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`
 	// Time when last Event from the series was seen before last heartbeat.
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime" protobuf:"bytes,2,opt,name=lastObservedTime"`
-	// Information whether this series is ongoing or finished.
-	State EventSeriesState `json:"state" protobuf:"bytes,3,opt,name=state"`
+
+	// +k8s:deprecated=state,protobuf=3
 }
 
-type EventSeriesState string
-
-const (
-	EventSeriesStateOngoing  EventSeriesState = "Ongoing"
-	EventSeriesStateFinished EventSeriesState = "Finished"
-	EventSeriesStateUnknown  EventSeriesState = "Unknown"
-)
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // EventList is a list of Event objects.
 type EventList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

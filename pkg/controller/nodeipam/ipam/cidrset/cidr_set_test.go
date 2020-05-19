@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func TestCIDRSetFullyAllocated(t *testing.T) {
@@ -700,34 +700,39 @@ func TestCIDRSetv6(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		_, clusterCIDR, _ := net.ParseCIDR(tc.clusterCIDRStr)
-		a, err := NewCIDRSet(clusterCIDR, tc.subNetMaskSize)
-		if err != nil {
-			if tc.expectErr {
-				continue
+		t.Run(tc.description, func(t *testing.T) {
+			_, clusterCIDR, _ := net.ParseCIDR(tc.clusterCIDRStr)
+			a, err := NewCIDRSet(clusterCIDR, tc.subNetMaskSize)
+			if gotErr := err != nil; gotErr != tc.expectErr {
+				t.Fatalf("NewCIDRSet(%v, %v) = %v, %v; gotErr = %t, want %t", clusterCIDR, tc.subNetMaskSize, a, err, gotErr, tc.expectErr)
 			}
-			t.Fatalf("Error allocating CIDRSet for %v", tc.description)
-		}
-
-		p, err := a.AllocateNext()
-		if err == nil && tc.expectErr {
-			t.Errorf("expected error but got none for %v", tc.description)
-			continue
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("unexpected error: %v for %v", err, tc.description)
-			continue
-		}
-		if !tc.expectErr {
-			if p.String() != tc.expectedCIDR {
-				t.Fatalf("unexpected allocated cidr: %s for %v", p.String(), tc.description)
+			if a == nil {
+				return
 			}
-		}
-		p2, err := a.AllocateNext()
-		if !tc.expectErr {
-			if p2.String() != tc.expectedCIDR2 {
-				t.Fatalf("unexpected allocated cidr: %s for %v", p2.String(), tc.description)
+			p, err := a.AllocateNext()
+			if err == nil && tc.expectErr {
+				t.Errorf("a.AllocateNext() = nil, want error")
 			}
-		}
+			if err != nil && !tc.expectErr {
+				t.Errorf("a.AllocateNext() = %+v, want no error", err)
+			}
+			if !tc.expectErr {
+				if p != nil && p.String() != tc.expectedCIDR {
+					t.Fatalf("a.AllocateNext() got %+v, want %+v", p.String(), tc.expectedCIDR)
+				}
+			}
+			p2, err := a.AllocateNext()
+			if err == nil && tc.expectErr {
+				t.Errorf("a.AllocateNext() = nil, want error")
+			}
+			if err != nil && !tc.expectErr {
+				t.Errorf("a.AllocateNext() = %+v, want no error", err)
+			}
+			if !tc.expectErr {
+				if p2 != nil && p2.String() != tc.expectedCIDR2 {
+					t.Fatalf("a.AllocateNext() got %+v, want %+v", p2.String(), tc.expectedCIDR)
+				}
+			}
+		})
 	}
 }

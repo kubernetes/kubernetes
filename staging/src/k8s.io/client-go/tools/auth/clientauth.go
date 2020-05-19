@@ -105,7 +105,7 @@ func LoadFromFile(path string) (*Info, error) {
 // The fields of client.Config with a corresponding field in the Info are set
 // with the value from the Info.
 func (info Info) MergeWithConfig(c restclient.Config) (restclient.Config, error) {
-	var config restclient.Config = c
+	var config = c
 	config.Username = info.User
 	config.Password = info.Password
 	config.CAFile = info.CAFile
@@ -118,6 +118,7 @@ func (info Info) MergeWithConfig(c restclient.Config) (restclient.Config, error)
 	return config, nil
 }
 
+// Complete returns true if the Kubernetes API authorization info is complete.
 func (info Info) Complete() bool {
 	return len(info.User) > 0 ||
 		len(info.CertFile) > 0 ||

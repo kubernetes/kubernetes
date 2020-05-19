@@ -11,29 +11,34 @@ import (
 	"gonum.org/v1/gonum/lapack"
 )
 
-// Dlansy computes the specified norm of an n×n symmetric matrix. If
-// norm == lapack.MaxColumnSum or norm == lapackMaxRowSum work must have length
+// Dlansy returns the value of the specified norm of an n×n symmetric matrix. If
+// norm == lapack.MaxColumnSum or norm == lapack.MaxRowSum, work must have length
 // at least n, otherwise work is unused.
 func (impl Implementation) Dlansy(norm lapack.MatrixNorm, uplo blas.Uplo, n int, a []float64, lda int, work []float64) float64 {
-	checkMatrix(n, n, a, lda)
-	switch norm {
-	case lapack.MaxRowSum, lapack.MaxColumnSum, lapack.NormFrob, lapack.MaxAbs:
-	default:
+	switch {
+	case norm != lapack.MaxRowSum && norm != lapack.MaxColumnSum && norm != lapack.Frobenius && norm != lapack.MaxAbs:
 		panic(badNorm)
-	}
-	if (norm == lapack.MaxColumnSum || norm == lapack.MaxRowSum) && len(work) < n {
-		panic(badWork)
-	}
-	if uplo != blas.Upper && uplo != blas.Lower {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
 
+	// Quick return if possible.
 	if n == 0 {
 		return 0
 	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case (norm == lapack.MaxColumnSum || norm == lapack.MaxRowSum) && len(work) < n:
+		panic(shortWork)
+	}
+
 	switch norm {
-	default:
-		panic("unreachable")
 	case lapack.MaxAbs:
 		if uplo == blas.Upper {
 			var max float64
@@ -98,28 +103,26 @@ func (impl Implementation) Dlansy(norm lapack.MatrixNorm, uplo blas.Uplo, n int,
 			}
 		}
 		return max
-	case lapack.NormFrob:
+	default:
+		// lapack.Frobenius:
+		scale := 0.0
+		ssq := 1.0
+		// Sum off-diagonals.
 		if uplo == blas.Upper {
-			var sum float64
-			for i := 0; i < n; i++ {
-				v := a[i*lda+i]
-				sum += v * v
-				for j := i + 1; j < n; j++ {
-					v := a[i*lda+j]
-					sum += 2 * v * v
-				}
+			for i := 0; i < n-1; i++ {
+				rowscale, rowssq := impl.Dlassq(n-i-1, a[i*lda+i+1:], 1, 0, 1)
+				scale, ssq = impl.Dcombssq(scale, ssq, rowscale, rowssq)
 			}
-			return math.Sqrt(sum)
-		}
-		var sum float64
-		for i := 0; i < n; i++ {
-			for j := 0; j < i; j++ {
-				v := a[i*lda+j]
-				sum += 2 * v * v
+		} else {
+			for i := 1; i < n; i++ {
+				rowscale, rowssq := impl.Dlassq(i, a[i*lda:], 1, 0, 1)
+				scale, ssq = impl.Dcombssq(scale, ssq, rowscale, rowssq)
 			}
-			v := a[i*lda+i]
-			sum += v * v
 		}
-		return math.Sqrt(sum)
+		ssq *= 2
+		// Sum diagonal.
+		dscale, dssq := impl.Dlassq(n, a, lda+1, 0, 1)
+		scale, ssq = impl.Dcombssq(scale, ssq, dscale, dssq)
+		return scale * math.Sqrt(ssq)
 	}
 }

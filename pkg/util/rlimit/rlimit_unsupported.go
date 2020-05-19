@@ -22,6 +22,7 @@ import (
 	"errors"
 )
 
-func RlimitNumFiles(maxOpenFiles uint64) error {
+// SetNumFiles sets the rlimit for the maximum open files.
+func SetNumFiles(maxOpenFiles uint64) error {
 	return errors.New("SetRLimit unsupported in this platform")
 }

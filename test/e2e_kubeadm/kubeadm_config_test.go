@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	yaml "gopkg.in/yaml.v2"
@@ -23,8 +23,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -47,7 +47,7 @@ var (
 // Define container for all the test specification aimed at verifying
 // that kubeadm creates the cluster-info ConfigMap, that it is properly configured
 // and that all the related RBAC rules are in place
-var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
+var _ = Describe("kubeadm-config ConfigMap", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubeadm-config")
@@ -56,11 +56,11 @@ var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func() {
 		cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeadmConfigName)
 
-		Expect(cm.Data).To(HaveKey(kubeadmConfigClusterConfigurationConfigMapKey))
-		Expect(cm.Data).To(HaveKey(kubeadmConfigClusterStatusConfigMapKey))
+		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeadmConfigClusterConfigurationConfigMapKey))
+		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeadmConfigClusterStatusConfigMapKey))
 
 		m := unmarshalYaml(cm.Data[kubeadmConfigClusterStatusConfigMapKey])
 		if _, ok := m["apiEndpoints"]; ok {
@@ -79,19 +79,19 @@ var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
 		}
 	})
 
-	It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func() {
 		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeadmConfigRoleName)
 		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeadmConfigRoleBindingName)
 	})
 
-	It("should be accessible for bootstrap tokens", func() {
+	ginkgo.It("should be accessible for bootstrap tokens", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			kubeadmConfigConfigMapResource,
 		)
 	})
 
-	It("should be accessible for for nodes", func() {
+	ginkgo.It("should be accessible for nodes", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, nodesGroup,
 			kubeadmConfigConfigMapResource,
@@ -102,7 +102,7 @@ var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
 func getClusterConfiguration(c clientset.Interface) map[interface{}]interface{} {
 	cm := GetConfigMap(c, kubeSystemNamespace, kubeadmConfigName)
 
-	Expect(cm.Data).To(HaveKey(kubeadmConfigClusterConfigurationConfigMapKey))
+	gomega.Expect(cm.Data).To(gomega.HaveKey(kubeadmConfigClusterConfigurationConfigMapKey))
 
 	return unmarshalYaml(cm.Data[kubeadmConfigClusterConfigurationConfigMapKey])
 }

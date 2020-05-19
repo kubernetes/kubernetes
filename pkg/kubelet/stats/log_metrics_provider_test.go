@@ -17,6 +17,8 @@ limitations under the License.
 package stats
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -41,5 +43,8 @@ func NewFakeMetricsDu(path string, stats *volume.Metrics) volume.MetricsProvider
 }
 
 func (f *fakeMetricsDu) GetMetrics() (*volume.Metrics, error) {
+	if f.fakeStats == nil {
+		return nil, fmt.Errorf("no stats provided")
+	}
 	return f.fakeStats, nil
 }

@@ -21,11 +21,6 @@ import (
 	"time"
 )
 
-const (
-	resizeNodeReadyTimeout    = 2 * time.Minute
-	resizeNodeNotReadyTimeout = 2 * time.Minute
-)
-
 // ResizeGroup resizes an instance group
 func ResizeGroup(group string, size int32) error {
 	if TestContext.ReportDir != "" {

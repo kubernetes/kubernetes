@@ -26,7 +26,8 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,22 +109,29 @@ type handler struct {
 }
 
 // CreateHandlers creates the REST handlers for the stats.
-func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider) *restful.WebService {
+func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider, enableCAdvisorJSONEndpoints bool) *restful.WebService {
 	h := &handler{provider, summaryProvider}
 
 	ws := &restful.WebService{}
 	ws.Path(rootPath).
 		Produces(restful.MIME_JSON)
 
-	endpoints := []struct {
+	type endpoint struct {
 		path    string
 		handler restful.RouteFunction
-	}{
-		{"", h.handleStats},
+	}
+
+	endpoints := []endpoint{
 		{"/summary", h.handleSummary},
-		{"/container", h.handleSystemContainer},
-		{"/{podName}/{containerName}", h.handlePodContainer},
-		{"/{namespace}/{podName}/{uid}/{containerName}", h.handlePodContainer},
+	}
+
+	if enableCAdvisorJSONEndpoints {
+		endpoints = append(endpoints,
+			endpoint{"", h.handleStats},
+			endpoint{"/container", h.handleSystemContainer},
+			endpoint{"/{podName}/{containerName}", h.handlePodContainer},
+			endpoint{"/{namespace}/{podName}/{uid}/{containerName}", h.handlePodContainer},
+		)
 	}
 
 	for _, e := range endpoints {
@@ -208,13 +216,16 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 // If "only_cpu_and_memory" GET param is true then only cpu and memory is returned in response.
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	onlyCPUAndMemory := false
-	request.Request.ParseForm()
+	err := request.Request.ParseForm()
+	if err != nil {
+		handleError(response, "/stats/summary", errors.Wrapf(err, "parse form failed"))
+		return
+	}
 	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
 		len(onlyCluAndMemoryParam) == 1 && onlyCluAndMemoryParam[0] == "true" {
 		onlyCPUAndMemory = true
 	}
 	var summary *statsapi.Summary
-	var err error
 	if onlyCPUAndMemory {
 		summary, err = h.summaryProvider.GetCPUAndMemoryStats()
 	} else {

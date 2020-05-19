@@ -17,7 +17,7 @@ limitations under the License.
 package certs
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 
 	"github.com/pkg/errors"
@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
-type configMutatorsFunc func(*kubeadmapi.InitConfiguration, *certutil.Config) error
+type configMutatorsFunc func(*kubeadmapi.InitConfiguration, *pkiutil.CertConfig) error
 
 // KubeadmCert represents a certificate that Kubeadm will create to function properly.
 type KubeadmCert struct {
@@ -39,22 +39,23 @@ type KubeadmCert struct {
 	// Some attributes will depend on the InitConfiguration, only known at runtime.
 	// These functions will be run in series, passed both the InitConfiguration and a cert Config.
 	configMutators []configMutatorsFunc
-	config         certutil.Config
+	config         pkiutil.CertConfig
 }
 
 // GetConfig returns the definition for the given cert given the provided InitConfiguration
-func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*certutil.Config, error) {
+func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*pkiutil.CertConfig, error) {
 	for _, f := range k.configMutators {
 		if err := f(ic, &k.config); err != nil {
 			return nil, err
 		}
 	}
 
+	k.config.PublicKeyAlgorithm = ic.ClusterConfiguration.PublicKeyAlgorithm()
 	return &k.config, nil
 }
 
 // CreateFromCA makes and writes a certificate using the given CA cert and key.
-func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
+func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey crypto.Signer) error {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't create %q certificate", k.Name)
@@ -80,17 +81,17 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 }
 
 // CreateAsCA creates a certificate authority, writing the files to disk and also returning the created CA so it can be used to sign child certs.
-func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, *rsa.PrivateKey, error) {
+func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, crypto.Signer, error) {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't get configuration for %q CA certificate", k.Name)
 	}
-	caCert, caKey, err := NewCACertAndKey(cfg)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(cfg)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't generate %q CA certificate", k.Name)
 	}
 
-	err = writeCertificateAuthorithyFilesIfNotExist(
+	err = writeCertificateAuthorityFilesIfNotExist(
 		ic.CertificatesDir,
 		k.BaseName,
 		caCert,
@@ -114,7 +115,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 			return err
 		}
 
-		var caKey *rsa.PrivateKey
+		var caKey crypto.Signer
 
 		caCert, err := pkiutil.TryLoadCertFromDisk(ic.CertificatesDir, ca.BaseName)
 		if err == nil {
@@ -141,12 +142,12 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 			// CA key exists; just use that to create new certificates.
 		} else {
 			// CACert doesn't already exist, create a new cert and key.
-			caCert, caKey, err = NewCACertAndKey(cfg)
+			caCert, caKey, err = pkiutil.NewCertificateAuthority(cfg)
 			if err != nil {
 				return err
 			}
 
-			err = writeCertificateAuthorithyFilesIfNotExist(
+			err = writeCertificateAuthorityFilesIfNotExist(
 				ic.CertificatesDir,
 				ca.BaseName,
 				caCert,
@@ -239,8 +240,10 @@ var (
 		Name:     "ca",
 		LongName: "self-signed Kubernetes CA to provision identities for other Kubernetes components",
 		BaseName: kubeadmconstants.CACertAndKeyBaseName,
-		config: certutil.Config{
-			CommonName: "kubernetes",
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "kubernetes",
+			},
 		},
 	}
 	// KubeadmCertAPIServer is the definition of the cert used to serve the Kubernetes API.
@@ -249,9 +252,11 @@ var (
 		LongName: "certificate for serving the Kubernetes API",
 		BaseName: kubeadmconstants.APIServerCertAndKeyBaseName,
 		CAName:   "ca",
-		config: certutil.Config{
-			CommonName: kubeadmconstants.APIServerCertCommonName,
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: kubeadmconstants.APIServerCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			},
 		},
 		configMutators: []configMutatorsFunc{
 			makeAltNamesMutator(pkiutil.GetAPIServerAltNames),
@@ -260,13 +265,15 @@ var (
 	// KubeadmCertKubeletClient is the definition of the cert used by the API server to access the kubelet.
 	KubeadmCertKubeletClient = KubeadmCert{
 		Name:     "apiserver-kubelet-client",
-		LongName: "Client certificate for the API server to connect to kubelet",
+		LongName: "certificate for the API server to connect to kubelet",
 		BaseName: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
 		CAName:   "ca",
-		config: certutil.Config{
-			CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
+				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 
@@ -275,8 +282,10 @@ var (
 		Name:     "front-proxy-ca",
 		LongName: "self-signed CA to provision identities for front proxy",
 		BaseName: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
-		config: certutil.Config{
-			CommonName: "front-proxy-ca",
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "front-proxy-ca",
+			},
 		},
 	}
 
@@ -284,11 +293,13 @@ var (
 	KubeadmCertFrontProxyClient = KubeadmCert{
 		Name:     "front-proxy-client",
 		BaseName: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
-		LongName: "client for the front proxy",
+		LongName: "certificate for the front proxy client",
 		CAName:   "front-proxy-ca",
-		config: certutil.Config{
-			CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 
@@ -297,8 +308,10 @@ var (
 		Name:     "etcd-ca",
 		LongName: "self-signed CA to provision identities for etcd",
 		BaseName: kubeadmconstants.EtcdCACertAndKeyBaseName,
-		config: certutil.Config{
-			CommonName: "etcd-ca",
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "etcd-ca",
+			},
 		},
 	}
 	// KubeadmCertEtcdServer is the definition of the cert used to serve etcd to clients.
@@ -307,12 +320,14 @@ var (
 		LongName: "certificate for serving etcd",
 		BaseName: kubeadmconstants.EtcdServerCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
-			// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
-			// Once the upstream issue is resolved, this should be returned to only allowing
-			// ServerAuth usage.
-			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
+				// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
+				// Once the upstream issue is resolved, this should be returned to only allowing
+				// ServerAuth usage.
+				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			},
 		},
 		configMutators: []configMutatorsFunc{
 			makeAltNamesMutator(pkiutil.GetEtcdAltNames),
@@ -322,11 +337,13 @@ var (
 	// KubeadmCertEtcdPeer is the definition of the cert used by etcd peers to access each other.
 	KubeadmCertEtcdPeer = KubeadmCert{
 		Name:     "etcd-peer",
-		LongName: "credentials for etcd nodes to communicate with each other",
+		LongName: "certificate for etcd nodes to communicate with each other",
 		BaseName: kubeadmconstants.EtcdPeerCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			},
 		},
 		configMutators: []configMutatorsFunc{
 			makeAltNamesMutator(pkiutil.GetEtcdPeerAltNames),
@@ -336,31 +353,35 @@ var (
 	// KubeadmCertEtcdHealthcheck is the definition of the cert used by Kubernetes to check the health of the etcd server.
 	KubeadmCertEtcdHealthcheck = KubeadmCert{
 		Name:     "etcd-healthcheck-client",
-		LongName: "client certificate for liveness probes to healtcheck etcd",
+		LongName: "certificate for liveness probes to healthcheck etcd",
 		BaseName: kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
+				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 	// KubeadmCertEtcdAPIClient is the definition of the cert used by the API server to access etcd.
 	KubeadmCertEtcdAPIClient = KubeadmCert{
 		Name:     "apiserver-etcd-client",
-		LongName: "client apiserver uses to access etcd",
+		LongName: "certificate the apiserver uses to access etcd",
 		BaseName: kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
 		CAName:   "etcd-ca",
-		config: certutil.Config{
-			CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-			Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
+				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
 		},
 	}
 )
 
 func makeAltNamesMutator(f func(*kubeadmapi.InitConfiguration) (*certutil.AltNames, error)) configMutatorsFunc {
-	return func(mc *kubeadmapi.InitConfiguration, cc *certutil.Config) error {
+	return func(mc *kubeadmapi.InitConfiguration, cc *pkiutil.CertConfig) error {
 		altNames, err := f(mc)
 		if err != nil {
 			return err
@@ -371,7 +392,7 @@ func makeAltNamesMutator(f func(*kubeadmapi.InitConfiguration) (*certutil.AltNam
 }
 
 func setCommonNameToNodeName() configMutatorsFunc {
-	return func(mc *kubeadmapi.InitConfiguration, cc *certutil.Config) error {
+	return func(mc *kubeadmapi.InitConfiguration, cc *pkiutil.CertConfig) error {
 		cc.CommonName = mc.NodeRegistration.Name
 		return nil
 	}

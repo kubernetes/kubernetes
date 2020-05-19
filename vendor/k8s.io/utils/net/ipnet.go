@@ -17,6 +17,7 @@ limitations under the License.
 package net
 
 import (
+	"fmt"
 	"net"
 	"strings"
 )
@@ -117,5 +118,104 @@ func (s IPNetSet) Equal(s2 IPNetSet) bool {
 
 // Len returns the size of the set.
 func (s IPNetSet) Len() int {
+	return len(s)
+}
+
+// IPSet maps string to net.IP
+type IPSet map[string]net.IP
+
+// ParseIPSet parses string slice to IPSet
+func ParseIPSet(items ...string) (IPSet, error) {
+	ipset := make(IPSet)
+	for _, item := range items {
+		ip := net.ParseIP(strings.TrimSpace(item))
+		if ip == nil {
+			return nil, fmt.Errorf("error parsing IP %q", item)
+		}
+
+		ipset[ip.String()] = ip
+	}
+
+	return ipset, nil
+}
+
+// Insert adds items to the set.
+func (s IPSet) Insert(items ...net.IP) {
+	for _, item := range items {
+		s[item.String()] = item
+	}
+}
+
+// Delete removes all items from the set.
+func (s IPSet) Delete(items ...net.IP) {
+	for _, item := range items {
+		delete(s, item.String())
+	}
+}
+
+// Has returns true if and only if item is contained in the set.
+func (s IPSet) Has(item net.IP) bool {
+	_, contained := s[item.String()]
+	return contained
+}
+
+// HasAll returns true if and only if all items are contained in the set.
+func (s IPSet) HasAll(items ...net.IP) bool {
+	for _, item := range items {
+		if !s.Has(item) {
+			return false
+		}
+	}
+	return true
+}
+
+// Difference returns a set of objects that are not in s2
+// For example:
+// s1 = {a1, a2, a3}
+// s2 = {a1, a2, a4, a5}
+// s1.Difference(s2) = {a3}
+// s2.Difference(s1) = {a4, a5}
+func (s IPSet) Difference(s2 IPSet) IPSet {
+	result := make(IPSet)
+	for k, i := range s {
+		_, found := s2[k]
+		if found {
+			continue
+		}
+		result[k] = i
+	}
+	return result
+}
+
+// StringSlice returns a []string with the String representation of each element in the set.
+// Order is undefined.
+func (s IPSet) StringSlice() []string {
+	a := make([]string, 0, len(s))
+	for k := range s {
+		a = append(a, k)
+	}
+	return a
+}
+
+// IsSuperset returns true if and only if s1 is a superset of s2.
+func (s IPSet) IsSuperset(s2 IPSet) bool {
+	for k := range s2 {
+		_, found := s[k]
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// Equal returns true if and only if s1 is equal (as a set) to s2.
+// Two sets are equal if their membership is identical.
+// (In practice, this means same elements, order doesn't matter)
+func (s IPSet) Equal(s2 IPSet) bool {
+	return len(s) == len(s2) && s.IsSuperset(s2)
+}
+
+// Len returns the size of the set.
+func (s IPSet) Len() int {
 	return len(s)
 }

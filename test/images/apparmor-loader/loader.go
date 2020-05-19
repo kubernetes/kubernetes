@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -44,6 +44,7 @@ const (
 )
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [FLAG]... [PROFILE_DIR]...\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Load the AppArmor profiles specified in the PROFILE_DIR directories.\n")

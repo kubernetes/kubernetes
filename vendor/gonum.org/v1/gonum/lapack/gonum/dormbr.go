@@ -15,15 +15,15 @@ import (
 // Dormbr overwrites the m×n matrix C with
 //  Q * C   if vect == lapack.ApplyQ, side == blas.Left, and trans == blas.NoTrans
 //  C * Q   if vect == lapack.ApplyQ, side == blas.Right, and trans == blas.NoTrans
-//  Q^T * C if vect == lapack.ApplyQ, side == blas.Left, and trans == blas.Trans
-//  C * Q^T if vect == lapack.ApplyQ, side == blas.Right, and trans == blas.Trans
+//  Qᵀ * C  if vect == lapack.ApplyQ, side == blas.Left, and trans == blas.Trans
+//  C * Qᵀ  if vect == lapack.ApplyQ, side == blas.Right, and trans == blas.Trans
 //
 //  P * C   if vect == lapack.ApplyP, side == blas.Left, and trans == blas.NoTrans
 //  C * P   if vect == lapack.ApplyP, side == blas.Right, and trans == blas.NoTrans
-//  P^T * C if vect == lapack.ApplyP, side == blas.Left, and trans == blas.Trans
-//  C * P^T if vect == lapack.ApplyP, side == blas.Right, and trans == blas.Trans
+//  Pᵀ * C  if vect == lapack.ApplyP, side == blas.Left, and trans == blas.Trans
+//  C * Pᵀ  if vect == lapack.ApplyP, side == blas.Right, and trans == blas.Trans
 // where P and Q are the orthogonal matrices determined by Dgebrd when reducing
-// a matrix A to bidiagonal form: A = Q * B * P^T. See Dgebrd for the
+// a matrix A to bidiagonal form: A = Q * B * Pᵀ. See Dgebrd for the
 // definitions of Q and P.
 //
 // If vect == lapack.ApplyQ, A is assumed to have been an nq×k matrix, while if
@@ -44,41 +44,44 @@ import (
 // returns it in work[0].
 //
 // Dormbr is an internal routine. It is exported for testing purposes.
-func (impl Implementation) Dormbr(vect lapack.DecompUpdate, side blas.Side, trans blas.Transpose, m, n, k int, a []float64, lda int, tau, c []float64, ldc int, work []float64, lwork int) {
-	if side != blas.Left && side != blas.Right {
-		panic(badSide)
-	}
-	if trans != blas.NoTrans && trans != blas.Trans {
-		panic(badTrans)
-	}
-	if vect != lapack.ApplyP && vect != lapack.ApplyQ {
-		panic(badDecompUpdate)
-	}
+func (impl Implementation) Dormbr(vect lapack.ApplyOrtho, side blas.Side, trans blas.Transpose, m, n, k int, a []float64, lda int, tau, c []float64, ldc int, work []float64, lwork int) {
 	nq := n
 	nw := m
 	if side == blas.Left {
 		nq = m
 		nw = n
 	}
-	if vect == lapack.ApplyQ {
-		checkMatrix(nq, min(nq, k), a, lda)
-	} else {
-		checkMatrix(min(nq, k), nq, a, lda)
-	}
-	if len(tau) < min(nq, k) {
-		panic(badTau)
-	}
-	checkMatrix(m, n, c, ldc)
-	if len(work) < lwork {
+	applyQ := vect == lapack.ApplyQ
+	switch {
+	case !applyQ && vect != lapack.ApplyP:
+		panic(badApplyOrtho)
+	case side != blas.Left && side != blas.Right:
+		panic(badSide)
+	case trans != blas.NoTrans && trans != blas.Trans:
+		panic(badTrans)
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case k < 0:
+		panic(kLT0)
+	case applyQ && lda < max(1, min(nq, k)):
+		panic(badLdA)
+	case !applyQ && lda < max(1, nq):
+		panic(badLdA)
+	case ldc < max(1, n):
+		panic(badLdC)
+	case lwork < max(1, nw) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
 		panic(shortWork)
 	}
-	if lwork < max(1, nw) && lwork != -1 {
-		panic(badWork)
-	}
 
-	applyQ := vect == lapack.ApplyQ
-	left := side == blas.Left
-	var nb int
+	// Quick return if possible.
+	if m == 0 || n == 0 {
+		work[0] = 1
+		return
+	}
 
 	// The current implementation does not use opts, but a future change may
 	// use these options so construct them.
@@ -93,14 +96,15 @@ func (impl Implementation) Dormbr(vect lapack.DecompUpdate, side blas.Side, tran
 	} else {
 		opts += "N"
 	}
+	var nb int
 	if applyQ {
-		if left {
+		if side == blas.Left {
 			nb = impl.Ilaenv(1, "DORMQR", opts, m-1, n, m-1, -1)
 		} else {
 			nb = impl.Ilaenv(1, "DORMQR", opts, m, n-1, n-1, -1)
 		}
 	} else {
-		if left {
+		if side == blas.Left {
 			nb = impl.Ilaenv(1, "DORMLQ", opts, m-1, n, m-1, -1)
 		} else {
 			nb = impl.Ilaenv(1, "DORMLQ", opts, m, n-1, n-1, -1)
@@ -109,19 +113,33 @@ func (impl Implementation) Dormbr(vect lapack.DecompUpdate, side blas.Side, tran
 	lworkopt := max(1, nw) * nb
 	if lwork == -1 {
 		work[0] = float64(lworkopt)
+		return
 	}
+
+	minnqk := min(nq, k)
+	switch {
+	case applyQ && len(a) < (nq-1)*lda+minnqk:
+		panic(shortA)
+	case !applyQ && len(a) < (minnqk-1)*lda+nq:
+		panic(shortA)
+	case len(tau) < minnqk:
+		panic(shortTau)
+	case len(c) < (m-1)*ldc+n:
+		panic(shortC)
+	}
+
 	if applyQ {
 		// Change the operation to get Q depending on the size of the initial
 		// matrix to Dgebrd. The size matters due to the storage location of
 		// the off-diagonal elements.
 		if nq >= k {
-			impl.Dormqr(side, trans, m, n, k, a, lda, tau, c, ldc, work, lwork)
+			impl.Dormqr(side, trans, m, n, k, a, lda, tau[:k], c, ldc, work, lwork)
 		} else if nq > 1 {
 			mi := m
 			ni := n - 1
 			i1 := 0
 			i2 := 1
-			if left {
+			if side == blas.Left {
 				mi = m - 1
 				ni = n
 				i1 = 1
@@ -132,10 +150,12 @@ func (impl Implementation) Dormbr(vect lapack.DecompUpdate, side blas.Side, tran
 		work[0] = float64(lworkopt)
 		return
 	}
+
 	transt := blas.Trans
 	if trans == blas.Trans {
 		transt = blas.NoTrans
 	}
+
 	// Change the operation to get P depending on the size of the initial
 	// matrix to Dgebrd. The size matters due to the storage location of
 	// the off-diagonal elements.
@@ -146,7 +166,7 @@ func (impl Implementation) Dormbr(vect lapack.DecompUpdate, side blas.Side, tran
 		ni := n - 1
 		i1 := 0
 		i2 := 1
-		if left {
+		if side == blas.Left {
 			mi = m - 1
 			ni = n
 			i1 = 1

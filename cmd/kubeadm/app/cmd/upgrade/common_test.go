@@ -23,16 +23,15 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-)
-
-const (
-	validConfig = `apiVersion: kubeadm.k8s.io/v1beta1
-kind: ClusterConfiguration
-kubernetesVersion: 1.13.0
-`
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestGetK8sVersionFromUserInput(t *testing.T) {
+	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
+	validConfig := "apiVersion: kubeadm.k8s.io/v1beta2\n" +
+		"kind: ClusterConfiguration\n" +
+		"kubernetesVersion: " + currentVersion
+
 	var tcases = []struct {
 		name               string
 		isVersionMandatory bool
@@ -62,7 +61,7 @@ func TestGetK8sVersionFromUserInput(t *testing.T) {
 			name:               "Valid config, but no version specified",
 			isVersionMandatory: true,
 			clusterConfig:      validConfig,
-			expectedVersion:    "v1.13.0",
+			expectedVersion:    currentVersion,
 		},
 		{
 			name:               "Valid config and different version specified",
@@ -105,7 +104,7 @@ func TestGetK8sVersionFromUserInput(t *testing.T) {
 				t.Errorf("Unexpected error: %+v", err)
 			}
 			if userVersion != tt.expectedVersion {
-				t.Errorf("Expected '%s', but got '%s'", tt.expectedVersion, userVersion)
+				t.Errorf("Expected %q, but got %q", tt.expectedVersion, userVersion)
 			}
 		})
 	}
@@ -179,22 +178,16 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
-	certificatesDir: ""
-	controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1beta2
 	controllerManager: {}
 	dns:
 	  type: CoreDNS
 	etcd:
 	  local:
 	    dataDir: /some/path
-	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
-	networking:
-	  dnsDomain: ""
-	  podSubnet: ""
-	  serviceSubnet: ""
+	networking: {}
 	scheduler: {}
 `),
 		},
@@ -216,9 +209,7 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
-	certificatesDir: ""
-	controlPlaneEndpoint: ""
+	apiVersion: kubeadm.k8s.io/v1beta2
 	controllerManager: {}
 	dns:
 	  type: CoreDNS
@@ -229,12 +220,9 @@ func TestPrintConfiguration(t *testing.T) {
 	    endpoints:
 	    - https://one-etcd-instance:2379
 	    keyFile: ""
-	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
 	networking:
-	  dnsDomain: ""
-	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
 	scheduler: {}
 `),

@@ -7,6 +7,7 @@ go_test(
         "ciphers_test.go",
         "main_test.go",
     ],
+    rundir = ".",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",

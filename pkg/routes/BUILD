@@ -10,9 +10,14 @@ go_library(
     srcs = [
         "doc.go",
         "logs.go",
+        "openidmetadata.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/routes",
-    deps = ["//vendor/github.com/emicklei/go-restful:go_default_library"],
+    deps = [
+        "//pkg/serviceaccount:go_default_library",
+        "//vendor/github.com/emicklei/go-restful:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
+    ],
 )
 
 filegroup(

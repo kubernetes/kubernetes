@@ -14,23 +14,32 @@ import (
 // a real elementary reflector of order n such that
 //  H * (alpha) = (beta)
 //      (    x)   (   0)
-//  H^T * H = I
+//  Hᵀ * H = I
 // H is represented in the form
-//  H = 1 - tau * (1; v) * (1 v^T)
+//  H = 1 - tau * (1; v) * (1 vᵀ)
 // where tau is a real scalar.
 //
 // On entry, x contains the vector x, on exit it contains v.
 //
 // Dlarfg is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlarfg(n int, alpha float64, x []float64, incX int) (beta, tau float64) {
-	if n < 0 {
+	switch {
+	case n < 0:
 		panic(nLT0)
+	case incX <= 0:
+		panic(badIncX)
 	}
+
 	if n <= 1 {
 		return alpha, 0
 	}
-	checkVector(n-1, x, incX)
+
+	if len(x) < 1+(n-2)*abs(incX) {
+		panic(shortX)
+	}
+
 	bi := blas64.Implementation()
+
 	xnorm := bi.Dnrm2(n-1, x, incX)
 	if xnorm == 0 {
 		return alpha, 0

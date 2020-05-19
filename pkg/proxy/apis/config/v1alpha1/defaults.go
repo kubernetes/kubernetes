@@ -18,14 +18,16 @@ package v1alpha1
 
 import (
 	"fmt"
-	"strings"
+	"net"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/utils/pointer"
 )
 
@@ -34,25 +36,27 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyConfiguration) {
+
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}
+
+	defaultHealthzAddress, defaultMetricsAddress := getDefaultAddresses(obj.BindAddress)
+
 	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = fmt.Sprintf("0.0.0.0:%v", ports.ProxyHealthzPort)
-	} else if !strings.Contains(obj.HealthzBindAddress, ":") {
-		obj.HealthzBindAddress += fmt.Sprintf(":%v", ports.ProxyHealthzPort)
+		obj.HealthzBindAddress = fmt.Sprintf("%s:%v", defaultHealthzAddress, ports.ProxyHealthzPort)
+	} else {
+		obj.HealthzBindAddress = proxyutil.AppendPortIfNeeded(obj.HealthzBindAddress, ports.ProxyHealthzPort)
 	}
 	if obj.MetricsBindAddress == "" {
-		obj.MetricsBindAddress = fmt.Sprintf("127.0.0.1:%v", ports.ProxyStatusPort)
-	} else if !strings.Contains(obj.MetricsBindAddress, ":") {
-		obj.MetricsBindAddress += fmt.Sprintf(":%v", ports.ProxyStatusPort)
+		obj.MetricsBindAddress = fmt.Sprintf("%s:%v", defaultMetricsAddress, ports.ProxyStatusPort)
+	} else {
+		obj.MetricsBindAddress = proxyutil.AppendPortIfNeeded(obj.MetricsBindAddress, ports.ProxyStatusPort)
 	}
+
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeProxyOOMScoreAdj)
 		obj.OOMScoreAdj = &temp
-	}
-	if obj.ResourceContainer == "" {
-		obj.ResourceContainer = "/kube-proxy"
 	}
 	if obj.IPTables.SyncPeriod.Duration == 0 {
 		obj.IPTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
@@ -64,16 +68,14 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.UDPIdleTimeout == zero {
 		obj.UDPIdleTimeout = metav1.Duration{Duration: 250 * time.Millisecond}
 	}
-	// If ConntrackMax is set, respect it.
-	if obj.Conntrack.Max == nil {
-		// If ConntrackMax is *not* set, use per-core scaling.
-		if obj.Conntrack.MaxPerCore == nil {
-			obj.Conntrack.MaxPerCore = pointer.Int32Ptr(32 * 1024)
-		}
-		if obj.Conntrack.Min == nil {
-			obj.Conntrack.Min = pointer.Int32Ptr(128 * 1024)
-		}
+
+	if obj.Conntrack.MaxPerCore == nil {
+		obj.Conntrack.MaxPerCore = pointer.Int32Ptr(32 * 1024)
 	}
+	if obj.Conntrack.Min == nil {
+		obj.Conntrack.Min = pointer.Int32Ptr(128 * 1024)
+	}
+
 	if obj.IPTables.MasqueradeBit == nil {
 		temp := int32(14)
 		obj.IPTables.MasqueradeBit = &temp
@@ -120,4 +122,14 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.FeatureGates == nil {
 		obj.FeatureGates = make(map[string]bool)
 	}
+}
+
+// getDefaultAddresses returns default address of healthz and metrics server
+// based on the given bind address. IPv6 addresses are enclosed in square
+// brackets for appending port.
+func getDefaultAddresses(bindAddress string) (defaultHealthzAddress, defaultMetricsAddress string) {
+	if net.ParseIP(bindAddress).To4() != nil {
+		return "0.0.0.0", "127.0.0.1"
+	}
+	return "[::]", "[::1]"
 }

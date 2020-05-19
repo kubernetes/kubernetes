@@ -39,6 +39,9 @@ kube::version::get_version_vars() {
 
   # If the kubernetes source was exported through git archive, then
   # we likely don't have a git tree, but these magic values may be filled in.
+  # shellcheck disable=SC2016,SC2050
+  # Disabled as we're not expanding these at runtime, but rather expecting
+  # that another tool may have expanded these and rewritten the source (!)
   if [[ '$Format:%%$' == "%" ]]; then
     KUBE_GIT_COMMIT='$Format:%H$'
     KUBE_GIT_TREE_STATE="archive"
@@ -63,18 +66,24 @@ kube::version::get_version_vars() {
     fi
 
     # Use git describe to find the version based on tags.
-    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --match='v*' --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
       # This translates the "git describe" to an actual semver.org
       # compatible semantic version that looks something like this:
       #   v1.1.0-alpha.0.6+84c76d1142ea4d
       #
       # TODO: We continue calling this "git version" because so many
       # downstream consumers are expecting it there.
+      #
+      # These regexes are painful enough in sed...
+      # We don't want to do them in pure shell, so disable SC2001
+      # shellcheck disable=SC2001
       DASHES_IN_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/[^-]//g")
       if [[ "${DASHES_IN_VERSION}" == "---" ]] ; then
+        # shellcheck disable=SC2001
         # We have distance to subversion (v1.1.0-subversion-1-gCommitHash)
         KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{14\}\)$/.\1\+\2/")
       elif [[ "${DASHES_IN_VERSION}" == "--" ]] ; then
+        # shellcheck disable=SC2001
         # We have distance to base tag (v1.1.0-1-gCommitHash)
         KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-g\([0-9a-f]\{14\}\)$/+\1/")
       fi
@@ -135,15 +144,6 @@ kube::version::load_version_vars() {
   source "${version_file}"
 }
 
-kube::version::ldflag() {
-  local key=${1}
-  local val=${2}
-
-  # If you update these, also update the list pkg/version/def.bzl.
-  echo "-X '${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}'"
-  echo "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
-}
-
 # Prints the value that needs to be passed to the -ldflags parameter of go build
 # in order to set the Kubernetes based on the git tree status.
 # IMPORTANT: if you update any of these, also update the lists in
@@ -151,23 +151,30 @@ kube::version::ldflag() {
 kube::version::ldflags() {
   kube::version::get_version_vars
 
-  local buildDate=
-  [[ -z ${SOURCE_DATE_EPOCH-} ]] || buildDate="--date=@${SOURCE_DATE_EPOCH}"
-  local -a ldflags=($(kube::version::ldflag "buildDate" "$(date ${buildDate} -u +'%Y-%m-%dT%H:%M:%SZ')"))
+  local -a ldflags
+  function add_ldflag() {
+    local key=${1}
+    local val=${2}
+    # If you update these, also update the list component-base/version/def.bzl.
+    ldflags+=(
+      "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
+      "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/component-base/version.${key}=${val}'"
+    )
+  }
+
+  add_ldflag "buildDate" "$(date ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} -u +'%Y-%m-%dT%H:%M:%SZ')"
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
-    ldflags+=($(kube::version::ldflag "gitCommit" "${KUBE_GIT_COMMIT}"))
-    ldflags+=($(kube::version::ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"))
+    add_ldflag "gitCommit" "${KUBE_GIT_COMMIT}"
+    add_ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"
   fi
 
   if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-    ldflags+=($(kube::version::ldflag "gitVersion" "${KUBE_GIT_VERSION}"))
+    add_ldflag "gitVersion" "${KUBE_GIT_VERSION}"
   fi
 
   if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
-    ldflags+=(
-      $(kube::version::ldflag "gitMajor" "${KUBE_GIT_MAJOR}")
-      $(kube::version::ldflag "gitMinor" "${KUBE_GIT_MINOR}")
-    )
+    add_ldflag "gitMajor" "${KUBE_GIT_MAJOR}"
+    add_ldflag "gitMinor" "${KUBE_GIT_MINOR}"
   fi
 
   # The -ldflags parameter takes a single string, so join the output.

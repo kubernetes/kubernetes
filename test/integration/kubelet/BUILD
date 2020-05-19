@@ -6,6 +6,7 @@ go_test(
         "main_test.go",
         "watch_manager_test.go",
     ],
+    rundir = ".",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",

@@ -17,19 +17,20 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Events", func() {
@@ -44,7 +45,7 @@ var _ = SIGDescribe("Events", func() {
 
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		name := "send-events-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
@@ -60,47 +61,48 @@ var _ = SIGDescribe("Events", func() {
 					{
 						Name:  "p",
 						Image: framework.ServeHostnameImage,
+						Args:  []string{"serve-hostname"},
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					},
 				},
 			},
 		}
 
-		By("submitting the pod to kubernetes")
+		ginkgo.By("submitting the pod to kubernetes")
 		defer func() {
-			By("deleting the pod")
-			podClient.Delete(pod.Name, nil)
+			ginkgo.By("deleting the pod")
+			podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 		}()
-		if _, err := podClient.Create(pod); err != nil {
+		if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
 
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
-		By("verifying the pod is in kubernetes")
+		ginkgo.By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err := podClient.List(options)
-		Expect(len(pods.Items)).To(Equal(1))
+		pods, err := podClient.List(context.TODO(), options)
+		framework.ExpectEqual(len(pods.Items), 1)
 
-		By("retrieving the pod")
-		podWithUid, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		ginkgo.By("retrieving the pod")
+		podWithUID, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
-		framework.Logf("%+v\n", podWithUid)
+		framework.Logf("%+v\n", podWithUID)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
-		By("checking for scheduler event about the pod")
+		ginkgo.By("checking for scheduler event about the pod")
 		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
-				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   v1.DefaultSchedulerName,
 			}.AsSelector().String()
 			options := metav1.ListOptions{FieldSelector: selector}
-			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
+			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
 			if err != nil {
 				return false, err
 			}
@@ -111,16 +113,16 @@ var _ = SIGDescribe("Events", func() {
 			return false, nil
 		}))
 		// Check for kubelet event about the pod.
-		By("checking for kubelet event about the pod")
+		ginkgo.By("checking for kubelet event about the pod")
 		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
-				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
 			}.AsSelector().String()
 			options := metav1.ListOptions{FieldSelector: selector}
-			events, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
+			events, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
 			if err != nil {
 				return false, err
 			}

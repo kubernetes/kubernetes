@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -26,9 +27,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
@@ -38,7 +39,7 @@ import (
 )
 
 func TestDynamicClientBuilder(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequest, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequest, true)()
 
 	tmpfile, err := ioutil.TempFile("/tmp", "key")
 	if err != nil {
@@ -106,7 +107,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 
 	// We want to trigger token rotation here by deleting service account
 	// the dynamic client was using.
-	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(saName, nil); err != nil {
+	if err = dymClient.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), saName, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("delete service account %s failed: %v", saName, err)
 	}
 	time.Sleep(time.Second * 10)
@@ -117,12 +118,12 @@ func TestDynamicClientBuilder(t *testing.T) {
 }
 
 func testClientBuilder(dymClient clientset.Interface, ns, saName string) error {
-	_, err := dymClient.CoreV1().Namespaces().Get(ns, metav1.GetOptions{})
+	_, err := dymClient.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	_, err = dymClient.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
+	_, err = dymClient.CoreV1().ServiceAccounts(ns).Get(context.TODO(), saName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

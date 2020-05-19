@@ -6,10 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/util",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/util",
     visibility = ["//visibility:public"],
-    deps = [
-        "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
-    ],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library"],
 )
 
 filegroup(

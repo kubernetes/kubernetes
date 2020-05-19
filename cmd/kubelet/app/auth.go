@@ -26,58 +26,77 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	clientset "k8s.io/client-go/kubernetes"
-	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 )
 
 // BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs
-func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, error) {
+// It returns AuthInterface, a run method to start internal controllers (like cert reloading) and error.
+func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, func(<-chan struct{}), error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.TokenReviewInterface
 		sarClient   authorizationclient.SubjectAccessReviewInterface
 	)
 	if client != nil && !reflect.ValueOf(client).IsNil() {
-		tokenClient = client.AuthenticationV1beta1().TokenReviews()
-		sarClient = client.AuthorizationV1beta1().SubjectAccessReviews()
+		tokenClient = client.AuthenticationV1().TokenReviews()
+		sarClient = client.AuthorizationV1().SubjectAccessReviews()
 	}
 
-	authenticator, err := BuildAuthn(tokenClient, config.Authentication)
+	authenticator, runAuthenticatorCAReload, err := BuildAuthn(tokenClient, config.Authentication)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	attributes := server.NewNodeAuthorizerAttributesGetter(nodeName)
 
 	authorizer, err := BuildAuthz(sarClient, config.Authorization)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return server.NewKubeletAuth(authenticator, attributes, authorizer), nil
+	return server.NewKubeletAuth(authenticator, attributes, authorizer), runAuthenticatorCAReload, nil
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, error) {
+func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, func(<-chan struct{}), error) {
+	var dynamicCAContentFromFile *dynamiccertificates.DynamicFileCAContent
+	var err error
+	if len(authn.X509.ClientCAFile) > 0 {
+		dynamicCAContentFromFile, err = dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", authn.X509.ClientCAFile)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:    authn.Anonymous.Enabled,
-		CacheTTL:     authn.Webhook.CacheTTL.Duration,
-		ClientCAFile: authn.X509.ClientCAFile,
+		Anonymous:                          authn.Anonymous.Enabled,
+		CacheTTL:                           authn.Webhook.CacheTTL.Duration,
+		ClientCertificateCAContentProvider: dynamicCAContentFromFile,
 	}
 
 	if authn.Webhook.Enabled {
 		if client == nil {
-			return nil, errors.New("no client provided, cannot use webhook authentication")
+			return nil, nil, errors.New("no client provided, cannot use webhook authentication")
 		}
 		authenticatorConfig.TokenAccessReviewClient = client
 	}
 
 	authenticator, _, err := authenticatorConfig.New()
-	return authenticator, err
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return authenticator, func(stopCh <-chan struct{}) {
+		if dynamicCAContentFromFile != nil {
+			go dynamicCAContentFromFile.Run(1, stopCh)
+		}
+	}, err
 }
 
 // BuildAuthz creates an authorizer compatible with the kubelet's needs
@@ -98,10 +117,10 @@ func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz k
 		return authorizerConfig.New()
 
 	case "":
-		return nil, fmt.Errorf("No authorization mode specified")
+		return nil, fmt.Errorf("no authorization mode specified")
 
 	default:
-		return nil, fmt.Errorf("Unknown authorization mode %s", authz.Mode)
+		return nil, fmt.Errorf("unknown authorization mode %s", authz.Mode)
 
 	}
 }

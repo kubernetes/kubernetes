@@ -18,7 +18,9 @@ package bandwidth
 
 import "k8s.io/apimachinery/pkg/api/resource"
 
-type BandwidthShaper interface {
+// Shaper is designed so that the shaper structs created
+// satisfy the Shaper interface.
+type Shaper interface {
 	// Limit the bandwidth for a particular CIDR on a particular interface
 	//   * ingress and egress are in bits/second
 	//   * cidr is expected to be a valid network CIDR (e.g. '1.2.3.4/32' or '10.20.0.1/16')

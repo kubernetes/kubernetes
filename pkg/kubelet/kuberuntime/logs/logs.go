@@ -26,11 +26,11 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog"
 	"github.com/fsnotify/fsnotify"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -49,13 +49,6 @@ import (
 const (
 	// timeFormat is the time format used in the log.
 	timeFormat = time.RFC3339Nano
-	// blockSize is the block size used in tail.
-	blockSize = 1024
-
-	// stateCheckPeriod is the period to check container state while following
-	// the container log. Kubelet should not keep following the log when the
-	// container is not running.
-	stateCheckPeriod = 5 * time.Second
 
 	// logForceCheckPeriod is the period to check for a new read
 	logForceCheckPeriod = 1 * time.Second
@@ -171,13 +164,24 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	return nil
 }
 
+// jsonLog is a log message, typically a single entry from a given log stream.
+// since the data structure is originally from docker, we should be careful to
+// with any changes to jsonLog
+type jsonLog struct {
+	// Log is the log message
+	Log string `json:"log,omitempty"`
+	// Stream is the log source
+	Stream string `json:"stream,omitempty"`
+	// Created is the created timestamp of log
+	Created time.Time `json:"time"`
+}
+
 // parseDockerJSONLog parses logs in Docker JSON log format. Docker JSON log format
 // example:
 //   {"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
 //   {"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
 func parseDockerJSONLog(log []byte, msg *logMessage) error {
-	var l = &jsonlog.JSONLog{}
-	l.Reset()
+	var l = &jsonLog{}
 
 	// TODO: JSON decoding is fairly expensive, we should evaluate this.
 	if err := json.Unmarshal(log, l); err != nil {
@@ -271,6 +275,16 @@ func (w *logWriter) write(msg *logMessage) error {
 // Note that containerID is only needed when following the log, or else
 // just pass in empty string "".
 func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
+	// fsnotify has different behavior for symlinks in different platform,
+	// for example it follows symlink on Linux, but not on Windows,
+	// so we explicitly resolve symlinks before reading the logs.
+	// There shouldn't be security issue because the container log
+	// path is owned by kubelet and the container runtime.
+	evaluated, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return fmt.Errorf("failed to try resolving symlinks in path %q: %v", path, err)
+	}
+	path = evaluated
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
@@ -438,10 +452,6 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 			errRetry--
 		case <-time.After(logForceCheckPeriod):
 			return true, false, nil
-		case <-time.After(stateCheckPeriod):
-			if running, err := isContainerRunning(id, runtimeService); !running {
-				return false, false, err
-			}
 		}
 	}
 }

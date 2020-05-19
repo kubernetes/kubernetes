@@ -20,16 +20,17 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
-	"github.com/imdario/mergo"
-	"k8s.io/klog"
-
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
+
+	"github.com/imdario/mergo"
 )
 
 var (
@@ -150,6 +151,13 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	if configClusterInfo.ProxyURL != "" {
+		u, err := parseProxyURL(configClusterInfo.ProxyURL)
+		if err != nil {
+			return nil, err
+		}
+		clientConfig.Proxy = http.ProxyURL(u)
+	}
 
 	if len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)
@@ -210,6 +218,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
+	configClientConfig.ServerName = configClusterInfo.TLSServerName
 	mergo.MergeWithOverwrite(mergedConfig, configClientConfig)
 
 	return mergedConfig, nil
@@ -228,6 +237,7 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	// blindly overwrite existing values based on precedence
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
+		mergedConfig.BearerTokenFile = configAuthInfo.TokenFile
 	} else if len(configAuthInfo.TokenFile) > 0 {
 		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
@@ -293,16 +303,6 @@ func makeUserIdentificationConfig(info clientauth.Info) *restclient.Config {
 	config.CertFile = info.CertFile
 	config.KeyFile = info.KeyFile
 	config.BearerToken = info.BearerToken
-	return config
-}
-
-// makeUserIdentificationFieldsConfig returns a client.Config capable of being merged using mergo for only server identification information
-func makeServerIdentificationConfig(info clientauth.Info) restclient.Config {
-	config := restclient.Config{}
-	config.CAFile = info.CAFile
-	if info.Insecure != nil {
-		config.Insecure = *info.Insecure
-	}
 	return config
 }
 
@@ -458,13 +458,23 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 		return clientcmdapi.Cluster{}, fmt.Errorf("cluster %q does not exist", clusterInfoName)
 	}
 	mergo.MergeWithOverwrite(mergedClusterInfo, config.overrides.ClusterInfo)
-	// An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
-	// otherwise, a kubeconfig containing a CA reference would return an error that "CA and insecure-skip-tls-verify couldn't both be set"
+	// * An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
+	// otherwise, a kubeconfig containing a CA reference would return an error that "CA and insecure-skip-tls-verify couldn't both be set".
+	// * An override of --certificate-authority should also override TLS skip settings and CA data, otherwise existing CA data will take precedence.
 	caLen := len(config.overrides.ClusterInfo.CertificateAuthority)
 	caDataLen := len(config.overrides.ClusterInfo.CertificateAuthorityData)
-	if config.overrides.ClusterInfo.InsecureSkipTLSVerify && caLen == 0 && caDataLen == 0 {
-		mergedClusterInfo.CertificateAuthority = ""
-		mergedClusterInfo.CertificateAuthorityData = nil
+	if config.overrides.ClusterInfo.InsecureSkipTLSVerify || caLen > 0 || caDataLen > 0 {
+		mergedClusterInfo.InsecureSkipTLSVerify = config.overrides.ClusterInfo.InsecureSkipTLSVerify
+		mergedClusterInfo.CertificateAuthority = config.overrides.ClusterInfo.CertificateAuthority
+		mergedClusterInfo.CertificateAuthorityData = config.overrides.ClusterInfo.CertificateAuthorityData
+	}
+
+	// if the --tls-server-name has been set in overrides, use that value.
+	// if the --server has been set in overrides, then use the value of --tls-server-name specified on the CLI too.  This gives the property
+	// that setting a --server will effectively clear the KUBECONFIG value of tls-server-name if it is specified on the command line which is
+	// usually correct.
+	if config.overrides.ClusterInfo.TLSServerName != "" || config.overrides.ClusterInfo.Server != "" {
+		mergedClusterInfo.TLSServerName = config.overrides.ClusterInfo.TLSServerName
 	}
 
 	return *mergedClusterInfo, nil
@@ -499,8 +509,9 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		if server := config.overrides.ClusterInfo.Server; len(server) > 0 {
 			icc.Host = server
 		}
-		if token := config.overrides.AuthInfo.Token; len(token) > 0 {
-			icc.BearerToken = token
+		if len(config.overrides.AuthInfo.Token) > 0 || len(config.overrides.AuthInfo.TokenFile) > 0 {
+			icc.BearerToken = config.overrides.AuthInfo.Token
+			icc.BearerTokenFile = config.overrides.AuthInfo.TokenFile
 		}
 		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
 			icc.TLSClientConfig.CAFile = certificateAuthorityFile

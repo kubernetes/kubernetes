@@ -37,5 +37,7 @@ func init() {
 
 // AddToScheme builds the kubeadm ComponentConfig scheme using all known ComponentConfig versions.
 func AddToScheme(scheme *runtime.Scheme) {
-	utilruntime.Must(Known.AddToScheme(scheme))
+	for _, handler := range known {
+		utilruntime.Must(handler.AddToScheme(scheme))
+	}
 }

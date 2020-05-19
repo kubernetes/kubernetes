@@ -20,5 +20,8 @@ package constants
 
 const (
 	// DefaultDockerCRISocket defines the default Docker CRI socket
-	DefaultDockerCRISocket = "tcp://localhost:2375"
+	DefaultDockerCRISocket = "npipe:////./pipe/docker_engine"
+
+	// PauseVersion indicates the default pause image version for kubeadm
+	PauseVersion = "1.3.0"
 )

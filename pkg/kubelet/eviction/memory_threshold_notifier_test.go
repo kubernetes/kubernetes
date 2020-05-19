@@ -135,8 +135,7 @@ func TestUpdateThreshold(t *testing.T) {
 			notifier := &MockCgroupNotifier{}
 			m := newTestMemoryThresholdNotifier(tc.evictionThreshold, notifierFactory, nil)
 			notifierFactory.On("NewCgroupNotifier", testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr)
-			var events chan<- struct{}
-			events = m.events
+			var events chan<- struct{} = m.events
 			notifier.On("Start", events).Return()
 			err := m.UpdateThreshold(nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
 			if err != nil && !tc.expectErr {
@@ -169,8 +168,7 @@ func TestStart(t *testing.T) {
 		wg.Done()
 	})
 	notifierFactory.On("NewCgroupNotifier", testCgroupPath, memoryUsageAttribute, int64(0)).Return(notifier, nil)
-	var events chan<- struct{}
-	events = m.events
+	var events chan<- struct{} = m.events
 	notifier.On("Start", events).Return()
 	notifier.On("Stop").Return()
 

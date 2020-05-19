@@ -19,7 +19,7 @@ package results
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -40,11 +40,17 @@ type Manager interface {
 }
 
 // Result is the type for probe results.
-type Result bool
+type Result int
 
 const (
-	Success Result = true
-	Failure Result = false
+	// Unknown is encoded as -1 (type Result)
+	Unknown Result = iota - 1
+
+	// Success is encoded as 0 (type Result)
+	Success
+
+	// Failure is encoded as 1 (type Result)
+	Failure
 )
 
 func (r Result) String() string {

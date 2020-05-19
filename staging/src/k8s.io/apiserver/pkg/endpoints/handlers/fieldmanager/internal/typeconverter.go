@@ -21,18 +21,17 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/typed"
-	"sigs.k8s.io/structured-merge-diff/value"
-	"sigs.k8s.io/yaml"
+	"sigs.k8s.io/structured-merge-diff/v3/typed"
+	"sigs.k8s.io/structured-merge-diff/v3/value"
 )
 
 // TypeConverter allows you to convert from runtime.Object to
 // typed.TypedValue and the other way around.
 type TypeConverter interface {
-	ObjectToTyped(runtime.Object) (typed.TypedValue, error)
-	YAMLToTyped([]byte) (typed.TypedValue, error)
-	TypedToObject(typed.TypedValue) (runtime.Object, error)
+	ObjectToTyped(runtime.Object) (*typed.TypedValue, error)
+	TypedToObject(*typed.TypedValue) (runtime.Object, error)
 }
 
 // DeducedTypeConverter is a TypeConverter for CRDs that don't have a
@@ -49,22 +48,18 @@ type DeducedTypeConverter struct{}
 var _ TypeConverter = DeducedTypeConverter{}
 
 // ObjectToTyped converts an object into a TypedValue with a "deduced type".
-func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
+func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
+	switch o := obj.(type) {
+	case *unstructured.Unstructured:
+		return typed.DeducedParseableType.FromUnstructured(o.UnstructuredContent())
+	default:
+		return typed.DeducedParseableType.FromStructured(obj)
 	}
-	return typed.DeducedParseableType{}.FromUnstructured(u)
-}
-
-// YAMLToTyped parses a yaml object into a TypedValue with a "deduced type".
-func (DeducedTypeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
-	return typed.DeducedParseableType{}.FromYAML(typed.YAMLObject(from))
 }
 
 // TypedToObject transforms the typed value into a runtime.Object. That
 // is not specific to deduced type.
-func (DeducedTypeConverter) TypedToObject(value typed.TypedValue) (runtime.Object, error) {
+func (DeducedTypeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
 	return valueToObject(value.AsValue())
 }
 
@@ -77,51 +72,58 @@ var _ TypeConverter = &typeConverter{}
 // NewTypeConverter builds a TypeConverter from a proto.Models. This
 // will automatically find the proper version of the object, and the
 // corresponding schema information.
-func NewTypeConverter(models proto.Models) (TypeConverter, error) {
-	parser, err := newGVKParser(models)
+func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConverter, error) {
+	parser, err := newGVKParser(models, preserveUnknownFields)
 	if err != nil {
 		return nil, err
 	}
 	return &typeConverter{parser: parser}, nil
 }
 
-func (c *typeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
+func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	t := c.parser.Type(gvk)
 	if t == nil {
-		return nil, fmt.Errorf("no corresponding type for %v", gvk)
+		return nil, newNoCorrespondingTypeError(gvk)
 	}
-	return t.FromUnstructured(u)
+	switch o := obj.(type) {
+	case *unstructured.Unstructured:
+		return t.FromUnstructured(o.UnstructuredContent())
+	default:
+		return t.FromStructured(obj)
+	}
 }
 
-func (c *typeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
-	unstructured := &unstructured.Unstructured{Object: map[string]interface{}{}}
-
-	if err := yaml.Unmarshal(from, &unstructured.Object); err != nil {
-		return nil, fmt.Errorf("error decoding YAML: %v", err)
-	}
-
-	gvk := unstructured.GetObjectKind().GroupVersionKind()
-	t := c.parser.Type(gvk)
-	if t == nil {
-		return nil, fmt.Errorf("no corresponding type for %v", gvk)
-	}
-	return t.FromYAML(typed.YAMLObject(string(from)))
-}
-
-func (c *typeConverter) TypedToObject(value typed.TypedValue) (runtime.Object, error) {
+func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
 	return valueToObject(value.AsValue())
 }
 
-func valueToObject(value *value.Value) (runtime.Object, error) {
-	vu := value.ToUnstructured(false)
-	u, ok := vu.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to convert typed to unstructured: want map, got %T", vu)
+func valueToObject(val value.Value) (runtime.Object, error) {
+	vu := val.Unstructured()
+	switch o := vu.(type) {
+	case map[string]interface{}:
+		return &unstructured.Unstructured{Object: o}, nil
+	default:
+		return nil, fmt.Errorf("failed to convert value to unstructured for type %T", vu)
 	}
-	return &unstructured.Unstructured{Object: u}, nil
+}
+
+type noCorrespondingTypeErr struct {
+	gvk schema.GroupVersionKind
+}
+
+func newNoCorrespondingTypeError(gvk schema.GroupVersionKind) error {
+	return &noCorrespondingTypeErr{gvk: gvk}
+}
+
+func (k *noCorrespondingTypeErr) Error() string {
+	return fmt.Sprintf("no corresponding type for %v", k.gvk)
+}
+
+func isNoCorrespondingTypeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*noCorrespondingTypeErr)
+	return ok
 }

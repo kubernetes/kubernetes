@@ -17,43 +17,50 @@ limitations under the License.
 package collectors
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
-
+	"k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
 var (
-	descLogSize = prometheus.NewDesc(
+	descLogSize = metrics.NewDesc(
 		"kubelet_container_log_filesystem_used_bytes",
 		"Bytes used by the container's logs on the filesystem.",
 		[]string{
+			"uid",
 			"namespace",
 			"pod",
 			"container",
 		}, nil,
+		metrics.ALPHA,
+		"",
 	)
 )
 
 type logMetricsCollector struct {
+	metrics.BaseStableCollector
+
 	podStats func() ([]statsapi.PodStats, error)
 }
 
-// NewLogMetricsCollector implements the prometheus.Collector interface and
+// Check if logMetricsCollector implements necessary interface
+var _ metrics.StableCollector = &logMetricsCollector{}
+
+// NewLogMetricsCollector implements the metrics.StableCollector interface and
 // exposes metrics about container's log volume size.
-func NewLogMetricsCollector(podStats func() ([]statsapi.PodStats, error)) prometheus.Collector {
+func NewLogMetricsCollector(podStats func() ([]statsapi.PodStats, error)) metrics.StableCollector {
 	return &logMetricsCollector{
 		podStats: podStats,
 	}
 }
 
-// Describe implements the prometheus.Collector interface.
-func (c *logMetricsCollector) Describe(ch chan<- *prometheus.Desc) {
+// DescribeWithStability implements the metrics.StableCollector interface.
+func (c *logMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- descLogSize
 }
 
-// Collect implements the prometheus.Collector interface.
-func (c *logMetricsCollector) Collect(ch chan<- prometheus.Metric) {
+// CollectWithStability implements the metrics.StableCollector interface.
+func (c *logMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	podStats, err := c.podStats()
 	if err != nil {
 		klog.Errorf("failed to get pod stats: %v", err)
@@ -63,10 +70,11 @@ func (c *logMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, ps := range podStats {
 		for _, c := range ps.Containers {
 			if c.Logs != nil && c.Logs.UsedBytes != nil {
-				ch <- prometheus.MustNewConstMetric(
+				ch <- metrics.NewLazyConstMetric(
 					descLogSize,
-					prometheus.GaugeValue,
+					metrics.GaugeValue,
 					float64(*c.Logs.UsedBytes),
+					ps.PodRef.UID,
 					ps.PodRef.Namespace,
 					ps.PodRef.Name,
 					c.Name,

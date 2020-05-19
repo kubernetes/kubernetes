@@ -23,10 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/imdario/mergo"
-
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/imdario/mergo"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -148,12 +148,72 @@ func TestInsecureOverridesCA(t *testing.T) {
 
 	actualCfg, err := clientBuilder.ClientConfig()
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	matchBoolArg(true, actualCfg.Insecure, t)
 	matchStringArg("", actualCfg.TLSClientConfig.CAFile, t)
 	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
+}
+
+func TestCAOverridesCAData(t *testing.T) {
+	file, err := ioutil.TempFile("", "my.ca")
+	if err != nil {
+		t.Fatalf("could not create tempfile: %v", err)
+	}
+	defer os.Remove(file.Name())
+
+	config := createCAValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			CertificateAuthority: file.Name(),
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchBoolArg(false, actualCfg.Insecure, t)
+	matchStringArg(file.Name(), actualCfg.TLSClientConfig.CAFile, t)
+	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
+}
+
+func TestTLSServerName(t *testing.T) {
+	config := createValidTestConfig()
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			TLSServerName: "overridden-server-name",
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchStringArg("overridden-server-name", actualCfg.ServerName, t)
+	matchStringArg("", actualCfg.TLSClientConfig.CAFile, t)
+	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
+}
+
+func TestTLSServerNameClearsWhenServerNameSet(t *testing.T) {
+	config := createValidTestConfig()
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "http://something",
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchStringArg("", actualCfg.ServerName, t)
 }
 
 func TestMergeContext(t *testing.T) {
@@ -270,9 +330,87 @@ func TestCertificateData(t *testing.T) {
 	matchByteArg(keyData, clientConfig.TLSClientConfig.KeyData, t)
 }
 
+func TestProxyURL(t *testing.T) {
+	tests := []struct {
+		desc      string
+		proxyURL  string
+		expectErr bool
+	}{
+		{
+			desc: "no proxy-url",
+		},
+		{
+			desc:     "socks5 proxy-url",
+			proxyURL: "socks5://example.com",
+		},
+		{
+			desc:     "https proxy-url",
+			proxyURL: "https://example.com",
+		},
+		{
+			desc:     "http proxy-url",
+			proxyURL: "http://example.com",
+		},
+		{
+			desc:      "bad scheme proxy-url",
+			proxyURL:  "socks6://example.com",
+			expectErr: true,
+		},
+		{
+			desc:      "no scheme proxy-url",
+			proxyURL:  "example.com",
+			expectErr: true,
+		},
+		{
+			desc:      "not a url proxy-url",
+			proxyURL:  "chewbacca@example.com",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.proxyURL, func(t *testing.T) {
+
+			config := clientcmdapi.NewConfig()
+			config.Clusters["clean"] = &clientcmdapi.Cluster{
+				Server:   "https://localhost:8443",
+				ProxyURL: test.proxyURL,
+			}
+			config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{}
+			config.Contexts["clean"] = &clientcmdapi.Context{
+				Cluster:  "clean",
+				AuthInfo: "clean",
+			}
+			config.CurrentContext = "clean"
+
+			clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil)
+
+			clientConfig, err := clientBuilder.ClientConfig()
+			if test.expectErr {
+				if err == nil {
+					t.Fatal("Expected error constructing config")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error constructing config: %v", err)
+			}
+
+			if test.proxyURL == "" {
+				return
+			}
+			gotURL, err := clientConfig.Proxy(nil)
+			if err != nil {
+				t.Fatalf("Unexpected error from proxier: %v", err)
+			}
+			matchStringArg(test.proxyURL, gotURL.String(), t)
+		})
+	}
+}
+
 func TestBasicAuthData(t *testing.T) {
 	username := "myuser"
-	password := "mypass"
+	password := "mypass" // Fake value for testing.
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
@@ -387,6 +525,7 @@ func TestCreateClean(t *testing.T) {
 	matchStringArg("", clientConfig.APIPath, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 }
 
 func TestCreateCleanWithPrefix(t *testing.T) {
@@ -437,6 +576,7 @@ func TestCreateCleanDefault(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -453,12 +593,12 @@ func TestCreateCleanDefaultCluster(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
 
 func TestCreateMissingContextNoDefault(t *testing.T) {
-	const expectedErrorContains = "Context was not found for specified context"
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{}, nil)
 
@@ -549,6 +689,30 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 			},
 		},
 		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server:               "https://host-from-overrides.com",
+					CertificateAuthority: "/path/to/ca-from-overrides.crt",
+				},
+				AuthInfo: clientcmdapi.AuthInfo{
+					Token:     "token-from-override",
+					TokenFile: "tokenfile-from-override",
+				},
+			},
+		},
+		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					Server:               "https://host-from-overrides.com",
+					CertificateAuthority: "/path/to/ca-from-overrides.crt",
+				},
+				AuthInfo: clientcmdapi.AuthInfo{
+					Token:     "",
+					TokenFile: "tokenfile-from-override",
+				},
+			},
+		},
+		{
 			overrides: &ConfigOverrides{},
 		},
 	}
@@ -556,13 +720,15 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 	for _, tc := range tt {
 		expectedServer := "https://host-from-cluster.com"
 		expectedToken := "token-from-cluster"
+		expectedTokenFile := "tokenfile-from-cluster"
 		expectedCAFile := "/path/to/ca-from-cluster.crt"
 
 		icc := &inClusterClientConfig{
 			inClusterConfigProvider: func() (*restclient.Config, error) {
 				return &restclient.Config{
-					Host:        expectedServer,
-					BearerToken: expectedToken,
+					Host:            expectedServer,
+					BearerToken:     expectedToken,
+					BearerTokenFile: expectedTokenFile,
 					TLSClientConfig: restclient.TLSClientConfig{
 						CAFile: expectedCAFile,
 					},
@@ -579,8 +745,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if overridenServer := tc.overrides.ClusterInfo.Server; len(overridenServer) > 0 {
 			expectedServer = overridenServer
 		}
-		if overridenToken := tc.overrides.AuthInfo.Token; len(overridenToken) > 0 {
-			expectedToken = overridenToken
+		if len(tc.overrides.AuthInfo.Token) > 0 || len(tc.overrides.AuthInfo.TokenFile) > 0 {
+			expectedToken = tc.overrides.AuthInfo.Token
+			expectedTokenFile = tc.overrides.AuthInfo.TokenFile
 		}
 		if overridenCAFile := tc.overrides.ClusterInfo.CertificateAuthority; len(overridenCAFile) > 0 {
 			expectedCAFile = overridenCAFile
@@ -591,6 +758,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		}
 		if clientConfig.BearerToken != expectedToken {
 			t.Errorf("Expected token %v, got %v", expectedToken, clientConfig.BearerToken)
+		}
+		if clientConfig.BearerTokenFile != expectedTokenFile {
+			t.Errorf("Expected tokenfile %v, got %v", expectedTokenFile, clientConfig.BearerTokenFile)
 		}
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)

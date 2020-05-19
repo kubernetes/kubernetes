@@ -148,7 +148,7 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (r Create
 	return
 }
 
-// Get retrieves details of a single flavor. Use ExtractFlavor to convert its
+// Get retrieves details of a single flavor. Use Extract to convert its
 // result into a Flavor.
 func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {
 	_, r.Err = client.Get(getURL(client, id), &r.Body, nil)

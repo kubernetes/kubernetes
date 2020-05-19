@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
 )
 
 const (
@@ -77,6 +78,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		cpuCFSQuota:         false,
 		cpuCFSQuotaPeriod:   metav1.Duration{Duration: time.Microsecond * 100},
 		livenessManager:     proberesults.NewManager(),
+		startupManager:      proberesults.NewManager(),
 		containerRefManager: kubecontainer.NewRefManager(),
 		machineInfo:         machineInfo,
 		osInterface:         osInterface,
@@ -86,6 +88,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		keyring:             keyring,
 		seccompProfileRoot:  fakeSeccompProfileRoot,
 		internalLifecycle:   cm.NewFakeInternalContainerLifecycle(),
+		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)

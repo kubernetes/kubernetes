@@ -49,11 +49,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
-	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/apiserver/pkg/storage/etcd3"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 var scheme = runtime.NewScheme()
@@ -249,7 +250,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	versioner := etcdstorage.APIObjectVersioner{}
+	versioner := etcd3.APIObjectVersioner{}
 	rev, err := versioner.ObjectResourceVersion(obj)
 	if err != nil {
 		t.Fatal(err)
@@ -316,13 +317,13 @@ func TestStoreCreate(t *testing.T) {
 	}
 
 	// create the object with denying admission
-	objA, err := registry.Create(testContext, podA, denyCreateValidation, &metav1.CreateOptions{})
+	_, err := registry.Create(testContext, podA, denyCreateValidation, &metav1.CreateOptions{})
 	if err == nil {
 		t.Errorf("Expected admission error: %v", err)
 	}
 
 	// create the object
-	objA, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	objA, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -357,7 +358,7 @@ func TestStoreCreate(t *testing.T) {
 
 	// now delete pod with graceful period set
 	delOpts := &metav1.DeleteOptions{GracePeriodSeconds: &gracefulPeriod}
-	_, _, err = registry.Delete(testContext, podA.Name, delOpts)
+	_, _, err = registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, delOpts)
 	if err != nil {
 		t.Fatalf("Failed to delete pod gracefully. Unexpected error: %v", err)
 	}
@@ -660,7 +661,7 @@ func TestStoreDelete(t *testing.T) {
 	defer destroyFunc()
 
 	// test failure condition
-	_, _, err := registry.Delete(testContext, podA.Name, nil)
+	_, _, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -672,7 +673,64 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	// delete object
-	_, wasDeleted, err := registry.Delete(testContext, podA.Name, nil)
+	_, wasDeleted, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("unexpected, pod %s should have been deleted immediately", podA.Name)
+	}
+
+	// try to get a item which should be deleted
+	_, err = registry.Get(testContext, podA.Name, &metav1.GetOptions{})
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestStoreGracefulDeleteWithResourceVersion(t *testing.T) {
+	podA := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+
+	// test failure condition
+	_, _, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// create pod
+	_, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// try to get a item which should be deleted
+	obj, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	resourceVersion := accessor.GetResourceVersion()
+
+	options := metav1.NewDeleteOptions(0)
+	options.Preconditions = &metav1.Preconditions{ResourceVersion: &resourceVersion}
+
+	// delete object
+	_, wasDeleted, err := registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, options)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -749,7 +807,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 		}
 
 		// delete the pod with grace period=0, the pod should still exist because it has a finalizer
-		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, metav1.NewDeleteOptions(0))
+		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(0))
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -815,7 +873,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 		}
 
 		// delete object with nil delete options doesn't delete the object
-		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, nil)
+		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, rest.ValidateAllObjectFunc, nil)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -1115,7 +1173,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		_, _, err = registry.Delete(testContext, tc.pod.Name, tc.options)
+		_, _, err = registry.Delete(testContext, tc.pod.Name, rest.ValidateAllObjectFunc, tc.options)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -1334,7 +1392,10 @@ func TestStoreDeletionPropagation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		_, _, err = registry.Delete(testContext, pod.Name, tc.options)
+		_, _, err = registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, tc.options)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 		obj, err := registry.Get(testContext, pod.Name, &metav1.GetOptions{})
 		if tc.expectedNotFound {
 			if err == nil || !errors.IsNotFound(err) {
@@ -1382,7 +1443,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 	}
 
 	// Delete all pods.
-	deleted, err := registry.DeleteCollection(testContext, nil, &metainternalversion.ListOptions{})
+	deleted, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1423,7 +1484,7 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, err := registry.DeleteCollection(testContext, nil, &metainternalversion.ListOptions{})
+				_, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{})
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -1461,7 +1522,7 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	defer watcher.Stop()
 
-	if _, err := registry.DeleteCollection(testContext, nil, &metainternalversion.ListOptions{}); err != nil {
+	if _, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -1537,7 +1598,7 @@ func TestStoreWatch(t *testing.T) {
 
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
-	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
@@ -1553,7 +1614,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		config := cacherstorage.Config{
 			CacheCapacity:  10,
 			Storage:        s,
-			Versioner:      etcdstorage.APIObjectVersioner{},
+			Versioner:      etcd3.APIObjectVersioner{},
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
 			GetAttrsFunc:   getPodAttrs,
@@ -1561,7 +1622,10 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			NewListFunc:    func() runtime.Object { return &example.PodList{} },
 			Codec:          sc.Codec,
 		}
-		cacher := cacherstorage.NewCacherFromConfig(config)
+		cacher, err := cacherstorage.NewCacherFromConfig(config)
+		if err != nil {
+			t.Fatalf("Couldn't create cacher: %v", err)
+		}
 		d := destroyFunc
 		s = cacher
 		destroyFunc = func() {
@@ -1683,7 +1747,7 @@ func TestQualifiedResource(t *testing.T) {
 	}
 
 	// delete a non-exist object
-	_, _, err = registry.Delete(testContext, podA.Name, nil)
+	_, _, err = registry.Delete(testContext, podA.Name, rest.ValidateAllObjectFunc, nil)
 
 	if !errors.IsNotFound(err) {
 		t.Fatalf("Unexpected error: %v", err)
@@ -1710,11 +1774,11 @@ func TestQualifiedResource(t *testing.T) {
 	}
 }
 
-func denyCreateValidation(obj runtime.Object) error {
+func denyCreateValidation(ctx context.Context, obj runtime.Object) error {
 	return fmt.Errorf("admission denied")
 }
 
-func denyUpdateValidation(obj, old runtime.Object) error {
+func denyUpdateValidation(ctx context.Context, obj, old runtime.Object) error {
 	return fmt.Errorf("admission denied")
 }
 
@@ -1849,5 +1913,231 @@ func TestMarkAsDeleting(t *testing.T) {
 				t.Errorf("expected %v, got %v", tc.expectDeletionTimestamp, *rs.DeletionTimestamp)
 			}
 		})
+	}
+}
+
+type staleGuaranteedUpdateStorage struct {
+	storage.Interface
+	cachedObj runtime.Object
+}
+
+// GuaranteedUpdate overwrites the method with one that always suggests the cachedObj.
+func (s *staleGuaranteedUpdateStorage) GuaranteedUpdate(
+	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ ...runtime.Object) error {
+	return s.Interface.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, s.cachedObj)
+}
+
+func TestDeleteWithCachedObject(t *testing.T) {
+	podName := "foo"
+	podWithFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Finalizers: []string{"foo.com/x"}},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	podWithNoFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	defer destroyFunc()
+	// cached object does not have any finalizer.
+	registry.Storage.Storage = &staleGuaranteedUpdateStorage{Interface: registry.Storage.Storage, cachedObj: podWithNoFinalizer}
+	// created object with pending finalizer.
+	_, err := registry.Create(ctx, podWithFinalizer, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The object shouldn't be deleted, because the persisted object has pending finalizers.
+	_, _, err = registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The object should still be there
+	_, err = registry.Get(ctx, podName, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPreconditionalUpdateWithCachedObject(t *testing.T) {
+	podName := "foo"
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	defer destroyFunc()
+
+	// cached object has old UID
+	oldPod, err := registry.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry.Storage.Storage = &staleGuaranteedUpdateStorage{Interface: registry.Storage.Storage, cachedObj: oldPod}
+
+	// delete and re-create the same object with new UID
+	_, _, err = registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := registry.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newPod, ok := obj.(*example.Pod)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+
+	// update the object should not fail precondition
+	newPod.Spec.NodeName = "machine2"
+	res, _, err := registry.Update(ctx, podName, rest.DefaultUpdatedObjectInfo(newPod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the update should have succeeded
+	r, ok := res.(*example.Pod)
+	if !ok {
+		t.Fatalf("unexpected update result: %#v", res)
+	}
+	if r.Spec.NodeName != "machine2" {
+		t.Fatalf("unexpected, update didn't take effect: %#v", r)
+	}
+}
+
+// TestRetryDeleteValidation checks if the deleteValidation is called again if
+// the GuaranteedUpdate in the Delete handler conflicts with a simultaneous
+// Update.
+func TestRetryDeleteValidation(t *testing.T) {
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	tests := []struct {
+		pod     *example.Pod
+		deleted bool
+	}{
+		{
+			pod: &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", Finalizers: []string{"pending"}},
+				Spec:       example.PodSpec{NodeName: "machine"},
+			},
+			deleted: false,
+		},
+
+		{
+			pod: &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test"},
+				Spec:       example.PodSpec{NodeName: "machine"},
+			},
+			deleted: true,
+		},
+	}
+
+	for _, test := range tests {
+		ready := make(chan struct{})
+		updated := make(chan struct{})
+		var readyOnce, updatedOnce sync.Once
+		var called int
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			readyOnce.Do(func() {
+				close(ready)
+			})
+			// wait for the update completes
+			<-updated
+			called++
+			return nil
+		}
+
+		if _, err := registry.Create(testContext, test.pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		transformer := func(ctx context.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error) {
+			<-ready
+			pod, ok := newObj.(*example.Pod)
+			if !ok {
+				t.Fatalf("unexpected object %v", newObj)
+			}
+			pod.Labels = map[string]string{
+				"modified": "true",
+			}
+			return pod, nil
+		}
+
+		go func() {
+			// This update will cause the Delete to retry due to conflict.
+			_, _, err := registry.Update(testContext, test.pod.Name, rest.DefaultUpdatedObjectInfo(test.pod, transformer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			updatedOnce.Do(func() {
+				close(updated)
+			})
+		}()
+
+		_, deleted, err := registry.Delete(testContext, test.pod.Name, deleteValidation, &metav1.DeleteOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a, e := deleted, test.deleted; a != e {
+			t.Fatalf("expected deleted to be %v, got %v", e, a)
+		}
+		if called != 2 {
+			t.Fatalf("expected deleteValidation to be called twice")
+		}
+	}
+}
+
+func emptyIndexFunc(obj interface{}) ([]string, error) {
+	return []string{}, nil
+}
+
+func TestValidateIndexers(t *testing.T) {
+	testcases := []struct {
+		name          string
+		indexers      *cache.Indexers
+		expectedError bool
+	}{
+		{
+			name:          "nil indexers",
+			indexers:      nil,
+			expectedError: false,
+		},
+		{
+			name: "normal indexers",
+			indexers: &cache.Indexers{
+				"f:spec.nodeName":            emptyIndexFunc,
+				"l:controller-revision-hash": emptyIndexFunc,
+			},
+			expectedError: false,
+		},
+		{
+			name: "too short indexers",
+			indexers: &cache.Indexers{
+				"f": emptyIndexFunc,
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid indexers",
+			indexers: &cache.Indexers{
+				"spec.nodeName": emptyIndexFunc,
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		err := validateIndexers(tc.indexers)
+		if tc.expectedError && err == nil {
+			t.Errorf("%v: expected error, but got nil", tc.name)
+		}
+		if !tc.expectedError && err != nil {
+			t.Errorf("%v: expected no error, but got %v", tc.name, err)
+		}
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -56,7 +57,7 @@ func noObjectTTL() (time.Duration, bool) {
 
 func getSecret(fakeClient clientset.Interface) GetObjectFunc {
 	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().Secrets(namespace).Get(name, opts)
+		return fakeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, opts)
 	}
 }
 
@@ -389,7 +390,7 @@ func TestCacheInvalidation(t *testing.T) {
 		},
 	}
 	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
-	// Fetch both secrets - this should triggger get operations.
+	// Fetch both secrets - this should trigger get operations.
 	store.Get("ns1", "s1")
 	store.Get("ns1", "s10")
 	store.Get("ns1", "s2")

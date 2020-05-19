@@ -32,6 +32,7 @@ func JSONConsumer() Consumer {
 func JSONProducer() Producer {
 	return ProducerFunc(func(writer io.Writer, data interface{}) error {
 		enc := json.NewEncoder(writer)
+		enc.SetEscapeHTML(false)
 		return enc.Encode(data)
 	})
 }

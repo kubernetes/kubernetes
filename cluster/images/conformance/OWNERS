@@ -19,4 +19,5 @@ approvers:
   - bentheelder
 labels:
 - sig/release
+- sig/testing
 - area/conformance

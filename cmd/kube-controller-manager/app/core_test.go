@@ -123,10 +123,10 @@ func TestController_DiscoveryError(t *testing.T) {
 		testClientBuilder := TestClientBuilder{clientset: testClientset}
 		testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, time.Duration(1))
 		ctx := ControllerContext{
-			ClientBuilder:          testClientBuilder,
-			InformerFactory:        testInformerFactory,
-			GenericInformerFactory: testInformerFactory,
-			InformersStarted:       make(chan struct{}),
+			ClientBuilder:                   testClientBuilder,
+			InformerFactory:                 testInformerFactory,
+			ObjectOrMetadataInformerFactory: testInformerFactory,
+			InformersStarted:                make(chan struct{}),
 		}
 		for funcName, controllerInit := range controllerInitFuncMap {
 			_, _, err := controllerInit(ctx)

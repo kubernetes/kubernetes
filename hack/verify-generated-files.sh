@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks whether updating of generated code is needed or not. We
+# should run `make generated_files` if generated code is out of date.
+# Usage: `hack/verify-generated-files.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -39,11 +43,11 @@ git clean -ffxd
 # regenerate any generated code
 make generated_files
 
-diff=$(git diff --name-only)
+changed_files=$(git status --porcelain)
 
-if [[ -n "${diff}" ]]; then
+if [[ -n "${changed_files}" ]]; then
   echo "!!! Generated code is out of date:" >&2
-  echo "${diff}" >&2
+  echo "${changed_files}" >&2
   echo >&2
   echo "Please run make generated_files." >&2
   exit 1

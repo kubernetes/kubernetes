@@ -61,6 +61,7 @@ type AuthorizerAdapter struct {
 	Registry Registry
 }
 
+// GetRole returns the corresponding Role by name in specified namespace
 func (a AuthorizerAdapter) GetRole(namespace, name string) (*rbacv1.Role, error) {
 	return a.Registry.GetRole(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), name, &metav1.GetOptions{})
 }

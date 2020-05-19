@@ -91,6 +91,13 @@ const (
 	SystemContainerPods = "pods"
 )
 
+// ProcessStats are stats pertaining to processes.
+type ProcessStats struct {
+	// Number of processes
+	// +optional
+	ProcessCount *uint64 `json:"process_count,omitempty"`
+}
+
 // PodStats holds pod-level unprocessed sample stats.
 type PodStats struct {
 	// Reference to the measured Pod.
@@ -119,6 +126,9 @@ type PodStats struct {
 	// EphemeralStorage reports the total filesystem usage for the containers and emptyDir-backed volumes in the measured Pod.
 	// +optional
 	EphemeralStorage *FsStats `json:"ephemeral-storage,omitempty"`
+	// ProcessStats pertaining to processes.
+	// +optional
+	ProcessStats *ProcessStats `json:"process_stats,omitempty"`
 }
 
 // ContainerStats holds container-level unprocessed sample stats.
@@ -146,7 +156,7 @@ type ContainerStats struct {
 	// User defined metrics that are exposed by containers in the pod. Typically, we expect only one container in the pod to be exposing user defined metrics. In the event of multiple containers exposing metrics, they will be combined here.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
-	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitmepty" patchStrategy:"merge" patchMergeKey:"name"`
+	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // PodReference contains enough information to locate the referenced pod.
@@ -252,7 +262,7 @@ type AcceleratorStats struct {
 // VolumeStats contains data about Volume filesystem usage.
 type VolumeStats struct {
 	// Embedded FsStats
-	FsStats
+	FsStats `json:",inline"`
 	// Name is the name given to the Volume
 	// +optional
 	Name string `json:"name,omitempty"`

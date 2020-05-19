@@ -17,6 +17,8 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -149,5 +151,23 @@ func TestNeverFake(t *testing.T) {
 	wg.Wait()
 	if !finished {
 		t.Error("Stop should make Accept unblock in NeverFake.")
+	}
+}
+
+func TestWait(t *testing.T) {
+	r := NewTokenBucketRateLimiter(0.0001, 1)
+
+	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second)
+	defer cancelFn()
+	if err := r.Wait(ctx); err != nil {
+		t.Errorf("unexpected wait failed, err: %v", err)
+	}
+
+	ctx2, cancelFn2 := context.WithTimeout(context.Background(), time.Second)
+	defer cancelFn2()
+	if err := r.Wait(ctx2); err == nil {
+		t.Errorf("unexpected wait success")
+	} else {
+		t.Log(fmt.Sprintf("wait err: %v", err))
 	}
 }

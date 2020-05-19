@@ -1,6 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load(":code_generation_test.bzl", "code_generation_test_suite")
 load(":container.bzl", "multi_arch_container", "multi_arch_container_push")
 load(":platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
@@ -19,9 +20,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//build/debs:all-srcs",
+        "//build/go-runner:all-srcs",
         "//build/release-tars:all-srcs",
-        "//build/rpms:all-srcs",
         "//build/visible_to:all-srcs",
     ],
     tags = ["automanaged"],
@@ -30,12 +30,8 @@ filegroup(
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
-    "cloud-controller-manager": {
-        "base": "@debian-base-{ARCH}//image",
-        "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
-    },
     "kube-apiserver": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
@@ -43,7 +39,7 @@ DOCKERIZED_BINARIES = {
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
@@ -52,29 +48,26 @@ DOCKERIZED_BINARIES = {
     },
 }
 
-# In the bash-based build (build/lib/release.sh), the images built for amd64 do not use
-# an arch in their name (but other arches do), and the GCE cluster scripts
-# (which sideload the images via tarfiles) expect there not to be an arch.
+[pkg_tar(
+    name = "%s-data-%s.tar" % (binary, arch),
+    srcs = select({"@io_bazel_rules_go//go/platform:" + arch: ["//cmd/" + binary]}),
+    mode = "0755",
+    package_dir = "/usr/bin",
+    tags = ["manual"],
+    visibility = ["//visibility:private"],
+) for binary in DOCKERIZED_BINARIES.keys() for arch in SERVER_PLATFORMS["linux"]]
+
 # When pushing to gcr.io, we want to use an arch, since the archless name is now used for a
 # manifest list. Bazel doesn't support manifest lists (yet), so we can't do that either.
-# For now, we use the archless name for the image tars saved in the server tarball,
-# to satisfy GCE and other similar providers. (If one were to pull the images via the manifest
-# list, the arch wouldn't appear in the name either.)
 [multi_arch_container(
     name = binary,
     architectures = SERVER_PLATFORMS["linux"],
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
-    debs = select(for_platforms(
-        for_server = ["//build/debs:%s-{ARCH}.deb" % binary],
-        only_os = "linux",
-    )),
     # Since the multi_arch_container macro replaces the {ARCH} format string,
     # we need to escape the stamping vars.
-    # Also see comment above about why the push tags use ARCH while the
-    # non-push tags do not.
     docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
-    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s:{{STABLE_DOCKER_TAG}}" % binary],
+    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
     stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
@@ -82,6 +75,10 @@ DOCKERIZED_BINARIES = {
         "/usr/local/bin/" + binary: "/usr/bin/" + binary,
     },
     tags = ["manual"],
+    tars = select(for_platforms(
+        for_server = [":%s-data-{ARCH}.tar" % binary],
+        only_os = "linux",
+    )),
     visibility = ["//visibility:private"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 
@@ -147,8 +144,6 @@ release_filegroup(
     name = "server-targets",
     conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
-        "//cmd/cloud-controller-manager",
-        "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",
@@ -172,6 +167,7 @@ filegroup(
             "//cmd/linkcheck",
             "//test/e2e:e2e.test_binary",
             "//vendor/github.com/onsi/ginkgo/ginkgo",
+            "//cluster/images/conformance/go-runner",
         ],
     )),
 )
@@ -180,7 +176,6 @@ filegroup(
 filegroup(
     name = "test-portable-targets",
     srcs = [
-        "//hack:e2e.go",
         "//hack:get-build.sh",
         "//hack:ginkgo-e2e.sh",
         "//hack/e2e-internal:all-srcs",

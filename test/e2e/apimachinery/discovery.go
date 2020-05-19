@@ -20,9 +20,10 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/crd"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
@@ -31,16 +32,16 @@ var _ = SIGDescribe("Discovery", func() {
 
 	var namespaceName string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		namespaceName = f.Namespace.Name
 
-		framework.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
+		e2eskipper.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
 
-		By("Setting up server cert")
+		ginkgo.By("Setting up server cert")
 		setupServerCert(namespaceName, serviceName)
 	})
 
-	It("[Feature:StorageVersionHash] Custom resource should have storage version hash", func() {
+	ginkgo.It("Custom resource should have storage version hash", func() {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return

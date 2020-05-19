@@ -17,16 +17,8 @@ limitations under the License.
 package leaderelectionconfig
 
 import (
-	"time"
-
 	"github.com/spf13/pflag"
 	componentbaseconfig "k8s.io/component-base/config"
-)
-
-const (
-	// DefaultLeaseDuration defines a default duration of lease.
-	// TODO: This constant should move to the k8s.io/component-base/config package
-	DefaultLeaseDuration = 15 * time.Second
 )
 
 // BindFlags binds the LeaderElectionConfiguration struct fields to a flagset
@@ -50,5 +42,12 @@ func BindFlags(l *componentbaseconfig.LeaderElectionConfiguration, fs *pflag.Fla
 		"of a leadership. This is only applicable if leader election is enabled.")
 	fs.StringVar(&l.ResourceLock, "leader-elect-resource-lock", l.ResourceLock, ""+
 		"The type of resource object that is used for locking during "+
-		"leader election. Supported options are `endpoints` (default) and `configmaps`.")
+		"leader election. Supported options are 'endpoints', 'configmaps', "+
+		"'leases', 'endpointsleases' and 'configmapsleases'.")
+	fs.StringVar(&l.ResourceName, "leader-elect-resource-name", l.ResourceName, ""+
+		"The name of resource object that is used for locking during "+
+		"leader election.")
+	fs.StringVar(&l.ResourceNamespace, "leader-elect-resource-namespace", l.ResourceNamespace, ""+
+		"The namespace of resource object that is used for locking during "+
+		"leader election.")
 }

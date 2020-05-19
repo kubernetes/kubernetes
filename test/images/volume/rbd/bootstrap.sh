@@ -25,10 +25,10 @@
 
 
 # Create /etc/ceph/ceph.conf
-sh ./ceph.conf.sh `hostname -i`
+sh ./ceph.conf.sh "$(hostname -i)"
 
 # Configure and start ceph-mon
-sh ./mon.sh `hostname -i`
+sh ./mon.sh "$(hostname -i)"
 
 # Configure and start 2x ceph-osd
 mkdir -p /var/lib/ceph/osd/ceph-0 /var/lib/ceph/osd/ceph-1
@@ -51,7 +51,7 @@ ceph fs new cephfs cephfs_metadata cephfs_data
 # It takes a while until the volume created above is mountable,
 # 1 second is usually enough, but try indefinetily.
 sleep 1
-while ! ceph-fuse -m `hostname -i`:6789 /mnt; do
+while ! ceph-fuse -m "$(hostname -i):6789" /mnt; do
     echo "Waiting for cephfs to be up"
     sleep 1
 done

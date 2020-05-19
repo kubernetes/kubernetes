@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package unicode provides Unicode encodings such as UTF-16.
-package unicode
+package unicode // import "golang.org/x/text/encoding/unicode"
 
 import (
 	"errors"
@@ -145,7 +145,7 @@ func (utf8Decoder) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err e
 // and consumed in a greater context that implies a certain endianness, use
 // IgnoreBOM. Otherwise, use ExpectBOM and always produce and consume a BOM.
 //
-// In the language of http://www.unicode.org/faq/utf_bom.html#bom10, IgnoreBOM
+// In the language of https://www.unicode.org/faq/utf_bom.html#bom10, IgnoreBOM
 // corresponds to "Where the precise type of the data stream is known... the
 // BOM should not be used" and ExpectBOM corresponds to "A particular
 // protocol... may require use of the BOM".

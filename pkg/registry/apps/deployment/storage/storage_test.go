@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -35,7 +36,7 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -44,10 +45,13 @@ import (
 
 const defaultReplicas = 100
 
-func newStorage(t *testing.T) (*DeploymentStorage, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*DeploymentStorage, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, apps.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "deployments"}
-	deploymentStorage := NewStorage(restOptions)
+	deploymentStorage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return &deploymentStorage, server
 }
 
@@ -351,7 +355,7 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 		if _, err := storage.Deployment.Create(ctx, validNewDeployment(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		rollbackRespStatus, err := rollbackStorage.Create(ctx, &test.rollback, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		rollbackRespStatus, err := rollbackStorage.Create(ctx, test.rollback.Name, &test.rollback, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
@@ -391,8 +395,8 @@ func TestCreateDeploymentRollbackValidation(t *testing.T) {
 	}
 
 	validationError := fmt.Errorf("admission deny")
-	alwaysDenyValidationFunc := func(obj runtime.Object) error { return validationError }
-	_, err := rollbackStorage.Create(ctx, &rollback, alwaysDenyValidationFunc, &metav1.CreateOptions{})
+	alwaysDenyValidationFunc := func(ctx context.Context, obj runtime.Object) error { return validationError }
+	_, err := rollbackStorage.Create(ctx, rollback.Name, &rollback, alwaysDenyValidationFunc, &metav1.CreateOptions{})
 
 	if err == nil || validationError != err {
 		t.Errorf("expected: %v, got: %v", validationError, err)
@@ -411,7 +415,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 	rollbackStorage := storage.Rollback
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 
-	_, err := rollbackStorage.Create(ctx, &apps.DeploymentRollback{
+	_, err := rollbackStorage.Create(ctx, name, &apps.DeploymentRollback{
 		Name:               name,
 		UpdatedAnnotations: map[string]string{},
 		RollbackTo:         apps.RollbackConfig{Revision: 1},

@@ -39,7 +39,11 @@ func encoderOfMap(ctx *ctx, typ reflect2.Type) ValEncoder {
 }
 
 func decoderOfMapKey(ctx *ctx, typ reflect2.Type) ValDecoder {
-	for _, extension := range ctx.extensions {
+	decoder := ctx.decoderExtension.CreateMapKeyDecoder(typ)
+	if decoder != nil {
+		return decoder
+	}
+	for _, extension := range ctx.extraExtensions {
 		decoder := extension.CreateMapKeyDecoder(typ)
 		if decoder != nil {
 			return decoder
@@ -60,14 +64,26 @@ func decoderOfMapKey(ctx *ctx, typ reflect2.Type) ValDecoder {
 		return &numericMapKeyDecoder{decoderOfType(ctx, typ)}
 	default:
 		ptrType := reflect2.PtrTo(typ)
-		if ptrType.Implements(textMarshalerType) {
+		if ptrType.Implements(unmarshalerType) {
+			return &referenceDecoder{
+				&unmarshalerDecoder{
+					valType: ptrType,
+				},
+			}
+		}
+		if typ.Implements(unmarshalerType) {
+			return &unmarshalerDecoder{
+				valType: typ,
+			}
+		}
+		if ptrType.Implements(textUnmarshalerType) {
 			return &referenceDecoder{
 				&textUnmarshalerDecoder{
 					valType: ptrType,
 				},
 			}
 		}
-		if typ.Implements(textMarshalerType) {
+		if typ.Implements(textUnmarshalerType) {
 			return &textUnmarshalerDecoder{
 				valType: typ,
 			}
@@ -77,7 +93,11 @@ func decoderOfMapKey(ctx *ctx, typ reflect2.Type) ValDecoder {
 }
 
 func encoderOfMapKey(ctx *ctx, typ reflect2.Type) ValEncoder {
-	for _, extension := range ctx.extensions {
+	encoder := ctx.encoderExtension.CreateMapKeyEncoder(typ)
+	if encoder != nil {
+		return encoder
+	}
+	for _, extension := range ctx.extraExtensions {
 		encoder := extension.CreateMapKeyEncoder(typ)
 		if encoder != nil {
 			return encoder
@@ -229,6 +249,10 @@ type mapEncoder struct {
 }
 
 func (encoder *mapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
+	if *(*unsafe.Pointer)(ptr) == nil {
+		stream.WriteNil()
+		return
+	}
 	stream.WriteObjectStart()
 	iter := encoder.mapType.UnsafeIterate(ptr)
 	for i := 0; iter.HasNext(); i++ {
@@ -266,16 +290,17 @@ func (encoder *sortKeysMapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	stream.WriteObjectStart()
 	mapIter := encoder.mapType.UnsafeIterate(ptr)
 	subStream := stream.cfg.BorrowStream(nil)
+	subStream.Attachment = stream.Attachment
 	subIter := stream.cfg.BorrowIterator(nil)
 	keyValues := encodedKeyValues{}
 	for mapIter.HasNext() {
-		subStream.buf = make([]byte, 0, 64)
 		key, elem := mapIter.UnsafeNext()
+		subStreamIndex := subStream.Buffered()
 		encoder.keyEncoder.Encode(key, subStream)
 		if subStream.Error != nil && subStream.Error != io.EOF && stream.Error == nil {
 			stream.Error = subStream.Error
 		}
-		encodedKey := subStream.Buffer()
+		encodedKey := subStream.Buffer()[subStreamIndex:]
 		subIter.ResetBytes(encodedKey)
 		decodedKey := subIter.ReadString()
 		if stream.indention > 0 {
@@ -286,7 +311,7 @@ func (encoder *sortKeysMapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 		encoder.elemEncoder.Encode(elem, subStream)
 		keyValues = append(keyValues, encodedKV{
 			key:      decodedKey,
-			keyValue: subStream.Buffer(),
+			keyValue: subStream.Buffer()[subStreamIndex:],
 		})
 	}
 	sort.Sort(keyValues)
@@ -295,6 +320,9 @@ func (encoder *sortKeysMapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 			stream.WriteMore()
 		}
 		stream.Write(keyValue.keyValue)
+	}
+	if subStream.Error != nil && stream.Error == nil {
+		stream.Error = subStream.Error
 	}
 	stream.WriteObjectEnd()
 	stream.cfg.ReturnStream(subStream)

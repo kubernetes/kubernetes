@@ -20,6 +20,7 @@ package ipvs
 
 import (
 	"fmt"
+	"time"
 
 	utilexec "k8s.io/utils/exec"
 )
@@ -69,6 +70,10 @@ func (runner *runner) DeleteRealServer(*VirtualServer, *RealServer) error {
 }
 
 func (runner *runner) UpdateRealServer(*VirtualServer, *RealServer) error {
+	return fmt.Errorf("IPVS not supported for this platform")
+}
+
+func (runner *runner) ConfigureTimeouts(time.Duration, time.Duration, time.Duration) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 

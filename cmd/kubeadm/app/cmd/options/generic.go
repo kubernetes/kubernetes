@@ -80,3 +80,16 @@ func AddKubernetesVersionFlag(fs *pflag.FlagSet, kubernetesVersion *string) {
 		`Choose a specific Kubernetes version for the control plane.`,
 	)
 }
+
+// AddKubeadmOtherFlags adds flags that are not bound to a configuration file to the given flagset
+func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
+	flagSet.StringVar(
+		rootfsPath, "rootfs", *rootfsPath,
+		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
+	)
+}
+
+// AddKustomizePodsFlag adds the --kustomize flag to the given flagset
+func AddKustomizePodsFlag(fs *pflag.FlagSet, kustomizeDir *string) {
+	fs.StringVarP(kustomizeDir, Kustomize, "k", *kustomizeDir, "The path where kustomize patches for static pod manifests are stored.")
+}

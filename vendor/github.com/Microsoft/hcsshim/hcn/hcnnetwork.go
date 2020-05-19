@@ -2,7 +2,7 @@ package hcn
 
 import (
 	"encoding/json"
-
+	"errors"
 	"github.com/Microsoft/hcsshim/internal/guid"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
@@ -62,6 +62,15 @@ const (
 	Overlay     NetworkType = "Overlay"
 )
 
+// NetworkFlags are various network flags.
+type NetworkFlags uint32
+
+// NetworkFlags const
+const (
+	None                NetworkFlags = 0
+	EnableNonPersistent NetworkFlags = 8
+)
+
 // HostComputeNetwork represents a network
 type HostComputeNetwork struct {
 	Id            string          `json:"ID,omitempty"`
@@ -71,7 +80,7 @@ type HostComputeNetwork struct {
 	MacPool       MacPool         `json:",omitempty"`
 	Dns           Dns             `json:",omitempty"`
 	Ipams         []Ipam          `json:",omitempty"`
-	Flags         uint32          `json:",omitempty"` // 0: None
+	Flags         NetworkFlags    `json:",omitempty"` // 0: None
 	SchemaVersion SchemaVersion   `json:",omitempty"`
 }
 
@@ -311,6 +320,24 @@ func GetNetworkByName(networkName string) (*HostComputeNetwork, error) {
 // Create Network.
 func (network *HostComputeNetwork) Create() (*HostComputeNetwork, error) {
 	logrus.Debugf("hcn::HostComputeNetwork::Create id=%s", network.Id)
+	for _, ipam := range network.Ipams {
+		for _, subnet := range ipam.Subnets {
+			if subnet.IpAddressPrefix != "" {
+				hasDefault := false
+				for _, route := range subnet.Routes {
+					if route.NextHop == "" {
+						return nil, errors.New("network create error, subnet has address prefix but no gateway specified")
+					}
+					if route.DestinationPrefix == "0.0.0.0/0" || route.DestinationPrefix == "::/0" {
+						hasDefault = true
+					}
+				}
+				if !hasDefault {
+					return nil, errors.New("network create error, no default gateway")
+				}
+			}
+		}
+	}
 
 	jsonString, err := json.Marshal(network)
 	if err != nil {

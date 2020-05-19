@@ -26,6 +26,8 @@ type DefaultPackage struct {
 	PackageName string
 	// Import path of the package, and the location on disk of the package.
 	PackagePath string
+	// The location of the package on disk.
+	Source string
 
 	// Emitted at the top of every file.
 	HeaderText []byte
@@ -43,8 +45,9 @@ type DefaultPackage struct {
 	FilterFunc func(*Context, *types.Type) bool
 }
 
-func (d *DefaultPackage) Name() string { return d.PackageName }
-func (d *DefaultPackage) Path() string { return d.PackagePath }
+func (d *DefaultPackage) Name() string       { return d.PackageName }
+func (d *DefaultPackage) Path() string       { return d.PackagePath }
+func (d *DefaultPackage) SourcePath() string { return d.Source }
 
 func (d *DefaultPackage) Filter(c *Context, t *types.Type) bool {
 	if d.FilterFunc != nil {

@@ -6,6 +6,7 @@ fmt: generate
 	go fmt ./...
 
 test: generate
+	go get -t ./...
 	go test $(TEST) $(TESTARGS)
 
 generate:

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -20,18 +22,18 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/aws"
 )
 
 func TestGetVolumeName_Volume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := aws.KubernetesVolumeID("my-aws-volume")
 	spec := createVolSpec(name, false)
 
@@ -45,7 +47,7 @@ func TestGetVolumeName_Volume(t *testing.T) {
 }
 
 func TestGetVolumeName_PersistentVolume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := aws.KubernetesVolumeID("my-aws-pv")
 	spec := createPVSpec(name, true)
 
@@ -140,8 +142,8 @@ func TestAttachDetach(t *testing.T) {
 
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *awsElasticBlockStorePlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
+func newPlugin(t *testing.T) *awsElasticBlockStorePlugin {
+	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
@@ -203,13 +205,6 @@ type detachCall struct {
 	nodeName      types.NodeName
 	retDeviceName string
 	ret           error
-}
-
-type diskIsAttachedCall struct {
-	diskName   aws.KubernetesVolumeID
-	nodeName   types.NodeName
-	isAttached bool
-	ret        error
 }
 
 func (testcase *testcase) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {

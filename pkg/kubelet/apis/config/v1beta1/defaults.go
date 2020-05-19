@@ -33,6 +33,7 @@ const (
 	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 	DefaultIPTablesMasqueradeBit = 14
 	DefaultIPTablesDropBit       = 15
+	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 )
 
 var (
@@ -112,7 +113,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		// set to NodeStatusUpdateFrequency if NodeStatusUpdateFrequency is set
 		// explicitly.
 		if obj.NodeStatusUpdateFrequency == zeroDuration {
-			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
+			obj.NodeStatusReportFrequency = metav1.Duration{Duration: 5 * time.Minute}
 		} else {
 			obj.NodeStatusReportFrequency = obj.NodeStatusUpdateFrequency
 		}
@@ -148,6 +149,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.CPUManagerReconcilePeriod == zeroDuration {
 		// Keep the same as default NodeStatusUpdateFrequency
 		obj.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Second}
+	}
+	if obj.TopologyManagerPolicy == "" {
+		obj.TopologyManagerPolicy = kubeletconfigv1beta1.NoneTopologyManagerPolicy
 	}
 	if obj.RuntimeRequestTimeout == zeroDuration {
 		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
@@ -219,5 +223,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
+	}
+	if obj.VolumePluginDir == "" {
+		obj.VolumePluginDir = DefaultVolumePluginDir
 	}
 }

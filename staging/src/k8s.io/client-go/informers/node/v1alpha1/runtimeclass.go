@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -60,13 +61,13 @@ func NewFilteredRuntimeClassInformer(client kubernetes.Interface, resyncPeriod t
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NodeV1alpha1().RuntimeClasses().List(options)
+				return client.NodeV1alpha1().RuntimeClasses().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NodeV1alpha1().RuntimeClasses().Watch(options)
+				return client.NodeV1alpha1().RuntimeClasses().Watch(context.TODO(), options)
 			},
 		},
 		&nodev1alpha1.RuntimeClass{},

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +43,7 @@ import (
 // Evaluator is used to see if quota constraints are satisfied.
 type Evaluator interface {
 	// Evaluate takes an operation and checks to see if quota constraints are satisfied.  It returns an error if they are not.
-	// The default implementation process related operations in chunks when possible.
+	// The default implementation processes related operations in chunks when possible.
 	Evaluate(a admission.Attributes) error
 }
 
@@ -468,29 +468,6 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		restrictedResourcesSet.Insert(localRestrictedResourcesSet.List()...)
 	}
 
-	// verify that for every resource that had limited by default consumption
-	// enabled that there was a corresponding quota that covered its use.
-	// if not, we reject the request.
-	hasNoCoveringQuota := limitedResourceNamesSet.Difference(restrictedResourcesSet)
-	if len(hasNoCoveringQuota) > 0 {
-		return quotas, admission.NewForbidden(a, fmt.Errorf("insufficient quota to consume: %v", strings.Join(hasNoCoveringQuota.List(), ",")))
-	}
-
-	// verify that for every scope that had limited access enabled
-	// that there was a corresponding quota that covered it.
-	// if not, we reject the request.
-	scopesHasNoCoveringQuota, err := evaluator.UncoveredQuotaScopes(limitedScopes, restrictedScopes)
-	if err != nil {
-		return quotas, err
-	}
-	if len(scopesHasNoCoveringQuota) > 0 {
-		return quotas, fmt.Errorf("insufficient quota to match these scopes: %v", scopesHasNoCoveringQuota)
-	}
-
-	if len(interestingQuotaIndexes) == 0 {
-		return quotas, nil
-	}
-
 	// Usage of some resources cannot be counted in isolation. For example, when
 	// the resource represents a number of unique references to external
 	// resource. In such a case an evaluator needs to process other objects in
@@ -534,6 +511,29 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	}
 
 	if quota.IsZero(deltaUsage) {
+		return quotas, nil
+	}
+
+	// verify that for every resource that had limited by default consumption
+	// enabled that there was a corresponding quota that covered its use.
+	// if not, we reject the request.
+	hasNoCoveringQuota := limitedResourceNamesSet.Difference(restrictedResourcesSet)
+	if len(hasNoCoveringQuota) > 0 {
+		return quotas, admission.NewForbidden(a, fmt.Errorf("insufficient quota to consume: %v", strings.Join(hasNoCoveringQuota.List(), ",")))
+	}
+
+	// verify that for every scope that had limited access enabled
+	// that there was a corresponding quota that covered it.
+	// if not, we reject the request.
+	scopesHasNoCoveringQuota, err := evaluator.UncoveredQuotaScopes(limitedScopes, restrictedScopes)
+	if err != nil {
+		return quotas, err
+	}
+	if len(scopesHasNoCoveringQuota) > 0 {
+		return quotas, fmt.Errorf("insufficient quota to match these scopes: %v", scopesHasNoCoveringQuota)
+	}
+
+	if len(interestingQuotaIndexes) == 0 {
 		return quotas, nil
 	}
 
@@ -618,7 +618,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	select {
 	case <-waiter.finished:
 	case <-time.After(10 * time.Second):
-		return apierrors.NewInternalError(fmt.Errorf("resource quota evaluates timeout"))
+		return apierrors.NewInternalError(fmt.Errorf("resource quota evaluation timed out"))
 	}
 
 	return waiter.result

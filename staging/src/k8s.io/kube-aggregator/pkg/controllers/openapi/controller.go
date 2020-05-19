@@ -24,8 +24,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/klog/v2"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
 
@@ -102,9 +102,9 @@ func (c *AggregationController) processNextWorkItem() bool {
 	if aggregator.IsLocalAPIService(key.(string)) {
 		// for local delegation targets that are aggregated once per second, log at
 		// higher level to avoid flooding the log
-		klog.V(5).Infof("OpenAPI AggregationController: Processing item %s", key)
+		klog.V(6).Infof("OpenAPI AggregationController: Processing item %s", key)
 	} else {
-		klog.Infof("OpenAPI AggregationController: Processing item %s", key)
+		klog.V(4).Infof("OpenAPI AggregationController: Processing item %s", key)
 	}
 
 	action, err := c.syncHandler(key.(string))
@@ -154,7 +154,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 }
 
 // AddAPIService adds a new API Service to OpenAPI Aggregation.
-func (c *AggregationController) AddAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) AddAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}
@@ -165,7 +165,7 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 }
 
 // UpdateAPIService updates API Service's info and handler.
-func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}

@@ -18,11 +18,11 @@ package dynamic
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 )
 
 var watchScheme = runtime.NewScheme()
@@ -41,37 +41,6 @@ func init() {
 	metav1.AddToGroupVersion(deleteScheme, versionV1)
 }
 
-var watchJsonSerializerInfo = runtime.SerializerInfo{
-	MediaType:        "application/json",
-	MediaTypeType:    "application",
-	MediaTypeSubType: "json",
-	EncodesAsText:    true,
-	Serializer:       json.NewSerializer(json.DefaultMetaFactory, watchScheme, watchScheme, false),
-	PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, watchScheme, watchScheme, true),
-	StreamSerializer: &runtime.StreamSerializerInfo{
-		EncodesAsText: true,
-		Serializer:    json.NewSerializer(json.DefaultMetaFactory, watchScheme, watchScheme, false),
-		Framer:        json.Framer,
-	},
-}
-
-// watchNegotiatedSerializer is used to read the wrapper of the watch stream
-type watchNegotiatedSerializer struct{}
-
-var watchNegotiatedSerializerInstance = watchNegotiatedSerializer{}
-
-func (s watchNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
-	return []runtime.SerializerInfo{watchJsonSerializerInfo}
-}
-
-func (s watchNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return versioning.NewDefaultingCodecForScheme(watchScheme, encoder, nil, gv, nil)
-}
-
-func (s watchNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return versioning.NewDefaultingCodecForScheme(watchScheme, nil, decoder, nil, gv)
-}
-
 // basicNegotiatedSerializer is used to handle discovery and error handling serialization
 type basicNegotiatedSerializer struct{}
 
@@ -82,8 +51,8 @@ func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInf
 			MediaTypeType:    "application",
 			MediaTypeSubType: "json",
 			EncodesAsText:    true,
-			Serializer:       json.NewSerializer(json.DefaultMetaFactory, basicScheme, basicScheme, false),
-			PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, basicScheme, basicScheme, true),
+			Serializer:       json.NewSerializer(json.DefaultMetaFactory, unstructuredCreater{basicScheme}, unstructuredTyper{basicScheme}, false),
+			PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, unstructuredCreater{basicScheme}, unstructuredTyper{basicScheme}, true),
 			StreamSerializer: &runtime.StreamSerializerInfo{
 				EncodesAsText: true,
 				Serializer:    json.NewSerializer(json.DefaultMetaFactory, basicScheme, basicScheme, false),
@@ -94,9 +63,46 @@ func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInf
 }
 
 func (s basicNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return versioning.NewDefaultingCodecForScheme(watchScheme, encoder, nil, gv, nil)
+	return runtime.WithVersionEncoder{
+		Version:     gv,
+		Encoder:     encoder,
+		ObjectTyper: unstructuredTyper{basicScheme},
+	}
 }
 
 func (s basicNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return versioning.NewDefaultingCodecForScheme(watchScheme, nil, decoder, nil, gv)
+	return decoder
+}
+
+type unstructuredCreater struct {
+	nested runtime.ObjectCreater
+}
+
+func (c unstructuredCreater) New(kind schema.GroupVersionKind) (runtime.Object, error) {
+	out, err := c.nested.New(kind)
+	if err == nil {
+		return out, nil
+	}
+	out = &unstructured.Unstructured{}
+	out.GetObjectKind().SetGroupVersionKind(kind)
+	return out, nil
+}
+
+type unstructuredTyper struct {
+	nested runtime.ObjectTyper
+}
+
+func (t unstructuredTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
+	kinds, unversioned, err := t.nested.ObjectKinds(obj)
+	if err == nil {
+		return kinds, unversioned, nil
+	}
+	if _, ok := obj.(runtime.Unstructured); ok && !obj.GetObjectKind().GroupVersionKind().Empty() {
+		return []schema.GroupVersionKind{obj.GetObjectKind().GroupVersionKind()}, false, nil
+	}
+	return nil, false, err
+}
+
+func (t unstructuredTyper) Recognizes(gvk schema.GroupVersionKind) bool {
+	return true
 }

@@ -253,7 +253,7 @@ type mockListener struct {
 	port    int
 }
 
-func createMockListener(network, addr string) (net.Listener, int, error) {
+func createMockListener(network, addr string, config net.ListenConfig) (net.Listener, int, error) {
 	host, portInt, err := splitHostIntPort(addr)
 	if err != nil {
 		return nil, 0, err

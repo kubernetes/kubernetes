@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -107,7 +107,7 @@ func TestPVProtectionController(t *testing.T) {
 		// Optional client reactors.
 		reactors []reaction
 		// PV event to simulate. This PV will be automatically added to
-		// initalObjects.
+		// initialObjects.
 		updatedPV *v1.PersistentVolume
 		// List of expected kubeclient actions that should happen during the
 		// test.
@@ -220,7 +220,7 @@ func TestPVProtectionController(t *testing.T) {
 			case *v1.PersistentVolume:
 				pvInformer.Informer().GetStore().Add(obj)
 			default:
-				t.Fatalf("Unknown initalObject type: %+v", obj)
+				t.Fatalf("Unknown initialObject type: %+v", obj)
 			}
 		}
 

@@ -9,10 +9,22 @@ package gonum
 //
 // Iladlc is an internal routine. It is exported for testing purposes.
 func (Implementation) Iladlc(m, n int, a []float64, lda int) int {
-	if n == 0 || m == 0 {
-		return n - 1
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	checkMatrix(m, n, a, lda)
+
+	if n == 0 || m == 0 {
+		return -1
+	}
+
+	if len(a) < (m-1)*lda+n {
+		panic(shortA)
+	}
 
 	// Test common case where corner is non-zero.
 	if a[n-1] != 0 || a[(m-1)*lda+(n-1)] != 0 {

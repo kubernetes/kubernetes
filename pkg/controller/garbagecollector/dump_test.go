@@ -439,8 +439,8 @@ func TestToGonumGraphObj(t *testing.T) {
 func compareGraphs(expected, actual graph.Directed, t *testing.T) {
 	// sort the edges by from ID, then to ID
 	// (the slices we get back are from map iteration, where order is not guaranteed)
-	expectedNodes := expected.Nodes()
-	actualNodes := actual.Nodes()
+	expectedNodes := expected.Nodes().(graph.NodeSlicer).NodeSlice()
+	actualNodes := actual.Nodes().(graph.NodeSlicer).NodeSlice()
 	sort.Sort(gonumByUID(expectedNodes))
 	sort.Sort(gonumByUID(actualNodes))
 
@@ -455,8 +455,8 @@ func compareGraphs(expected, actual graph.Directed, t *testing.T) {
 			t.Errorf("expected %v, got %v", spew.Sdump(currExpected), spew.Sdump(currActual))
 		}
 
-		expectedFrom := append([]graph.Node{}, expected.From(expectedNodes[i].ID())...)
-		actualFrom := append([]graph.Node{}, actual.From(actualNodes[i].ID())...)
+		expectedFrom := append([]graph.Node{}, expected.From(expectedNodes[i].ID()).(graph.NodeSlicer).NodeSlice()...)
+		actualFrom := append([]graph.Node{}, actual.From(actualNodes[i].ID()).(graph.NodeSlicer).NodeSlice()...)
 		sort.Sort(gonumByUID(expectedFrom))
 		sort.Sort(gonumByUID(actualFrom))
 		if len(expectedFrom) != len(actualFrom) {

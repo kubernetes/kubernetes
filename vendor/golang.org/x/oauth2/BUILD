@@ -10,10 +10,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/oauth2",
     importpath = "golang.org/x/oauth2",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/golang.org/x/oauth2/internal:go_default_library",
-    ],
+    deps = ["//vendor/golang.org/x/oauth2/internal:go_default_library"],
 )
 
 filegroup(

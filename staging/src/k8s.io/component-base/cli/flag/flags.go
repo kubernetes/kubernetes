@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // WordSepNormalizeFunc changes all flags that contain "_" separators
@@ -50,5 +50,12 @@ func InitFlags() {
 	pflag.Parse()
 	pflag.VisitAll(func(flag *pflag.Flag) {
 		klog.V(2).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+	})
+}
+
+// PrintFlags logs the flags in the flagset
+func PrintFlags(flags *pflag.FlagSet) {
+	flags.VisitAll(func(flag *pflag.Flag) {
+		klog.V(1).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
 	})
 }

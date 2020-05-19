@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -48,12 +48,12 @@ var _ CgroupNotifier = &linuxCgroupNotifier{}
 func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
 	var watchfd, eventfd, epfd, controlfd int
 	var err error
-	watchfd, err = unix.Open(fmt.Sprintf("%s/%s", path, attribute), unix.O_RDONLY, 0)
+	watchfd, err = unix.Open(fmt.Sprintf("%s/%s", path, attribute), unix.O_RDONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
 	defer unix.Close(watchfd)
-	controlfd, err = unix.Open(fmt.Sprintf("%s/cgroup.event_control", path), unix.O_WRONLY, 0)
+	controlfd, err = unix.Open(fmt.Sprintf("%s/cgroup.event_control", path), unix.O_WRONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier,
 			unix.Close(eventfd)
 		}
 	}()
-	epfd, err = unix.EpollCreate1(0)
+	epfd, err = unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (n *linuxCgroupNotifier) Start(eventCh chan<- struct{}) {
 }
 
 // wait waits up to notifierRefreshInterval for an event on the Epoll FD for the
-// eventfd we are concerned about.  It returns an error if one occurrs, and true
+// eventfd we are concerned about.  It returns an error if one occurs, and true
 // if the consumer should read from the eventfd.
 func wait(epfd, eventfd int, timeout time.Duration) (bool, error) {
 	events := make([]unix.EpollEvent, numFdEvents+1)

@@ -18,24 +18,10 @@ package v1beta1
 
 import (
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
-
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps,
-		Convert_apiextensions_JSON_To_v1beta1_JSON,
-		Convert_v1beta1_JSON_To_apiextensions_JSON,
-	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 func Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *JSONSchemaProps, s conversion.Scope) error {
 	if err := autoConvert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in, out, s); err != nil {

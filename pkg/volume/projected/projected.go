@@ -20,13 +20,13 @@ import (
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
@@ -93,10 +93,6 @@ func (plugin *projectedPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 
 func (plugin *projectedPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Projected != nil
-}
-
-func (plugin *projectedPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *projectedPlugin) RequiresRemount() bool {
@@ -188,11 +184,11 @@ func (s *projectedVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (s *projectedVolumeMounter) SetUp(fsGroup *int64) error {
-	return s.SetUpAt(s.GetPath(), fsGroup)
+func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return s.SetUpAt(s.GetPath(), mounterArgs)
 }
 
-func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
 	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod, *s.opts)
@@ -200,14 +196,14 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	data, err := s.collectData()
+	data, err := s.collectData(mounterArgs)
 	if err != nil {
 		klog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err
 	}
 
@@ -243,16 +239,16 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(s, fsGroup)
+	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
 	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err
 	}
 	setupSuccess = true
 	return nil
 }
 
-func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjection, error) {
+func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
@@ -332,6 +328,13 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 			}
 			tp := source.ServiceAccountToken
 
+			// When FsGroup is set, we depend on SetVolumeOwnership to
+			// change from 0600 to 0640.
+			mode := *s.source.DefaultMode
+			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+				mode = 0600
+			}
+
 			var auds []string
 			if len(tp.Audience) != 0 {
 				auds = []string{tp.Audience}
@@ -353,8 +356,9 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 				continue
 			}
 			payload[tp.Path] = volumeutil.FileProjection{
-				Data: []byte(tr.Status.Token),
-				Mode: 0600,
+				Data:   []byte(tr.Status.Token),
+				Mode:   mode,
+				FsUser: mounterArgs.FsUser,
 			}
 		}
 	}

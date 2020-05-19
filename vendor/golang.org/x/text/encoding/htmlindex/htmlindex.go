@@ -50,7 +50,7 @@ func LanguageDefault(tag language.Tag) string {
 		for _, t := range strings.Split(locales, " ") {
 			tags = append(tags, language.MustParse(t))
 		}
-		matcher = language.NewMatcher(tags)
+		matcher = language.NewMatcher(tags, language.PreferSameScript(true))
 	})
 	_, i, _ := matcher.Match(tag)
 	return canonical[localeMap[i]] // Default is Windows-1252.

@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -47,7 +47,11 @@ type Version interface {
 // value of a Container's Image field, but in the future it will include more detailed
 // information about the different image types.
 type ImageSpec struct {
+	// ID of the image.
 	Image string
+	// The annotations for the image.
+	// This should be passed to CRI during image pulls and returned when images are listed.
+	Annotations []Annotation
 }
 
 // ImageStats contains statistics about all the images currently available.
@@ -62,6 +66,9 @@ type ImageStats struct {
 type Runtime interface {
 	// Type returns the type of the container runtime.
 	Type() string
+
+	//SupportsSingleFileMapping returns whether the container runtime supports single file mappings or not.
+	SupportsSingleFileMapping() bool
 
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
@@ -273,8 +280,8 @@ type PodStatus struct {
 	Name string
 	// Namespace of the pod.
 	Namespace string
-	// IP of the pod.
-	IP string
+	// All IPs assigned to this pod
+	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*ContainerStatus
 	// Status of the pod sandbox.
@@ -346,6 +353,8 @@ type Image struct {
 	RepoDigests []string
 	// The size of the image in bytes.
 	Size int64
+	// ImageSpec for the image which include annotations.
+	Spec ImageSpec
 }
 
 type EnvVar struct {

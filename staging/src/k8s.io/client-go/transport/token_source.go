@@ -25,7 +25,8 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"k8s.io/klog"
+
+	"k8s.io/klog/v2"
 )
 
 // TokenSourceWrapTransport returns a WrapTransport that injects bearer tokens
@@ -79,6 +80,14 @@ func (tst *tokenSourceTransport) RoundTrip(req *http.Request) (*http.Response, e
 		return tst.base.RoundTrip(req)
 	}
 	return tst.ort.RoundTrip(req)
+}
+
+func (tst *tokenSourceTransport) CancelRequest(req *http.Request) {
+	if req.Header.Get("Authorization") != "" {
+		tryCancelRequest(tst.base, req)
+		return
+	}
+	tryCancelRequest(tst.ort, req)
 }
 
 type fileTokenSource struct {

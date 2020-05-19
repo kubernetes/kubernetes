@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +42,7 @@ var replicationcontrollersResource = schema.GroupVersionResource{Group: "", Vers
 var replicationcontrollersKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ReplicationController"}
 
 // Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
-func (c *FakeReplicationControllers) Get(name string, options v1.GetOptions) (result *corev1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Get(ctx context.Context, name string, options v1.GetOptions) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(replicationcontrollersResource, c.ns, name), &corev1.ReplicationController{})
 
@@ -51,7 +53,7 @@ func (c *FakeReplicationControllers) Get(name string, options v1.GetOptions) (re
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *FakeReplicationControllers) List(opts v1.ListOptions) (result *corev1.ReplicationControllerList, err error) {
+func (c *FakeReplicationControllers) List(ctx context.Context, opts v1.ListOptions) (result *corev1.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(replicationcontrollersResource, replicationcontrollersKind, c.ns, opts), &corev1.ReplicationControllerList{})
 
@@ -73,14 +75,14 @@ func (c *FakeReplicationControllers) List(opts v1.ListOptions) (result *corev1.R
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *FakeReplicationControllers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeReplicationControllers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(replicationcontrollersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
-func (c *FakeReplicationControllers) Create(replicationController *corev1.ReplicationController) (result *corev1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Create(ctx context.Context, replicationController *corev1.ReplicationController, opts v1.CreateOptions) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &corev1.ReplicationController{})
 
@@ -91,7 +93,7 @@ func (c *FakeReplicationControllers) Create(replicationController *corev1.Replic
 }
 
 // Update takes the representation of a replicationController and updates it. Returns the server's representation of the replicationController, and an error, if there is any.
-func (c *FakeReplicationControllers) Update(replicationController *corev1.ReplicationController) (result *corev1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Update(ctx context.Context, replicationController *corev1.ReplicationController, opts v1.UpdateOptions) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &corev1.ReplicationController{})
 
@@ -103,7 +105,7 @@ func (c *FakeReplicationControllers) Update(replicationController *corev1.Replic
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeReplicationControllers) UpdateStatus(replicationController *corev1.ReplicationController) (*corev1.ReplicationController, error) {
+func (c *FakeReplicationControllers) UpdateStatus(ctx context.Context, replicationController *corev1.ReplicationController, opts v1.UpdateOptions) (*corev1.ReplicationController, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &corev1.ReplicationController{})
 
@@ -114,7 +116,7 @@ func (c *FakeReplicationControllers) UpdateStatus(replicationController *corev1.
 }
 
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
-func (c *FakeReplicationControllers) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeReplicationControllers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(replicationcontrollersResource, c.ns, name), &corev1.ReplicationController{})
 
@@ -122,15 +124,15 @@ func (c *FakeReplicationControllers) Delete(name string, options *v1.DeleteOptio
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeReplicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
+func (c *FakeReplicationControllers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &corev1.ReplicationControllerList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, pt, data, subresources...), &corev1.ReplicationController{})
 
@@ -141,7 +143,7 @@ func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data
 }
 
 // GetScale takes name of the replicationController, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeReplicationControllers) GetScale(replicationControllerName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+func (c *FakeReplicationControllers) GetScale(ctx context.Context, replicationControllerName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), &autoscalingv1.Scale{})
 
@@ -152,7 +154,7 @@ func (c *FakeReplicationControllers) GetScale(replicationControllerName string, 
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeReplicationControllers) UpdateScale(replicationControllerName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+func (c *FakeReplicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
 

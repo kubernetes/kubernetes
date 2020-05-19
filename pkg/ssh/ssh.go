@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// WARNING: DO NOT add new use-caes to this package as it is deprecated and slated for deletion.
+
 package ssh
 
 import (
@@ -36,33 +38,44 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
 var (
-	tunnelOpenCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "ssh_tunnel_open_count",
-			Help: "Counter of ssh tunnel total open attempts",
+	tunnelOpenCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "ssh_tunnel_open_count",
+			Help:           "Counter of ssh tunnel total open attempts",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	tunnelOpenFailCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "ssh_tunnel_open_fail_count",
-			Help: "Counter of ssh tunnel failed open attempts",
+	tunnelOpenFailCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "ssh_tunnel_open_fail_count",
+			Help:           "Counter of ssh tunnel failed open attempts",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(tunnelOpenCounter)
-	prometheus.MustRegister(tunnelOpenFailCounter)
+	legacyregistry.MustRegister(tunnelOpenCounter)
+	legacyregistry.MustRegister(tunnelOpenFailCounter)
 }
 
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:
@@ -190,6 +203,7 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
 	}
+	defer client.Close()
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)
@@ -383,7 +397,6 @@ func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 		return nil, fmt.Errorf("No SSH tunnels currently open. Were the targets able to accept an ssh-key for user %q?", l.user)
 	}
 	// Prefer same tunnel as kubelet
-	// TODO: Change l.entries to a map of address->tunnel
 	for _, entry := range l.entries {
 		if entry.Address == addr {
 			return entry.Tunnel, nil

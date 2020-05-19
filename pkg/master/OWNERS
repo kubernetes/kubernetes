@@ -30,7 +30,6 @@ reviewers:
 - luxas
 - janetkuo
 - justinsb
-- roberthbailey
 - ncdc
 - tallclair
 - mwielgus
@@ -39,7 +38,6 @@ reviewers:
 - piosz
 - madhusudancs
 - hongchaodeng
-- jszczepkowski
 - enj
 labels:
 - sig/api-machinery

@@ -5,7 +5,7 @@ load(
     "go_binary",
     "go_library",
 )
-load("//pkg/version:def.bzl", "version_x_defs")
+load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kube-controller-manager",
@@ -20,9 +20,9 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager",
     deps = [
         "//cmd/kube-controller-manager/app:go_default_library",
-        "//pkg/util/prometheusclientgo:go_default_library",
-        "//pkg/version/prometheus:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/version:go_default_library",
     ],
 )
 

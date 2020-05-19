@@ -44,7 +44,8 @@ func (u *Msg) RRsetUsed(rr []RR) {
 		u.Answer = make([]RR, 0, len(rr))
 	}
 	for _, r := range rr {
-		u.Answer = append(u.Answer, &ANY{Hdr: RR_Header{Name: r.Header().Name, Ttl: 0, Rrtype: r.Header().Rrtype, Class: ClassANY}})
+		h := r.Header()
+		u.Answer = append(u.Answer, &ANY{Hdr: RR_Header{Name: h.Name, Ttl: 0, Rrtype: h.Rrtype, Class: ClassANY}})
 	}
 }
 
@@ -55,7 +56,8 @@ func (u *Msg) RRsetNotUsed(rr []RR) {
 		u.Answer = make([]RR, 0, len(rr))
 	}
 	for _, r := range rr {
-		u.Answer = append(u.Answer, &ANY{Hdr: RR_Header{Name: r.Header().Name, Ttl: 0, Rrtype: r.Header().Rrtype, Class: ClassNONE}})
+		h := r.Header()
+		u.Answer = append(u.Answer, &ANY{Hdr: RR_Header{Name: h.Name, Ttl: 0, Rrtype: h.Rrtype, Class: ClassNONE}})
 	}
 }
 
@@ -79,7 +81,8 @@ func (u *Msg) RemoveRRset(rr []RR) {
 		u.Ns = make([]RR, 0, len(rr))
 	}
 	for _, r := range rr {
-		u.Ns = append(u.Ns, &ANY{Hdr: RR_Header{Name: r.Header().Name, Ttl: 0, Rrtype: r.Header().Rrtype, Class: ClassANY}})
+		h := r.Header()
+		u.Ns = append(u.Ns, &ANY{Hdr: RR_Header{Name: h.Name, Ttl: 0, Rrtype: h.Rrtype, Class: ClassANY}})
 	}
 }
 
@@ -99,8 +102,9 @@ func (u *Msg) Remove(rr []RR) {
 		u.Ns = make([]RR, 0, len(rr))
 	}
 	for _, r := range rr {
-		r.Header().Class = ClassNONE
-		r.Header().Ttl = 0
+		h := r.Header()
+		h.Class = ClassNONE
+		h.Ttl = 0
 		u.Ns = append(u.Ns, r)
 	}
 }

@@ -31,11 +31,11 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/fake"
 	cloudctrlmgrtesting "k8s.io/kubernetes/cmd/cloud-controller-manager/app/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -89,7 +89,7 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 	}
 
 	// authenticate to apiserver via bearer token
-	token := "flwqkenfjasasdfmwerasd"
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
 	tokenFile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
@@ -292,6 +292,9 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 				}
 
 				body, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
 					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
@@ -307,6 +310,9 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 				body, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantInsecureCode; got != expected {
 					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
@@ -321,5 +327,5 @@ func intPtr(x int) *int {
 }
 
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
-	return &fake.FakeCloud{}, nil
+	return &fake.Cloud{}, nil
 }

@@ -47,6 +47,7 @@ type Unstructured struct {
 
 var _ metav1.Object = &Unstructured{}
 var _ runtime.Unstructured = &Unstructured{}
+var _ metav1.ListInterface = &Unstructured{}
 
 func (obj *Unstructured) GetObjectKind() schema.ObjectKind { return obj }
 
@@ -124,6 +125,16 @@ func (u *Unstructured) MarshalJSON() ([]byte, error) {
 func (u *Unstructured) UnmarshalJSON(b []byte) error {
 	_, _, err := UnstructuredJSONScheme.Decode(b, nil, u)
 	return err
+}
+
+// NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
+// This should be called instead of reflect.New() for unstructured types because the go type alone does not preserve kind/apiVersion info.
+func (in *Unstructured) NewEmptyInstance() runtime.Unstructured {
+	out := new(Unstructured)
+	if in != nil {
+		out.GetObjectKind().SetGroupVersionKind(in.GetObjectKind().GroupVersionKind())
+	}
+	return out
 }
 
 func (in *Unstructured) DeepCopy() *Unstructured {
@@ -319,6 +330,18 @@ func (u *Unstructured) SetContinue(c string) {
 	u.setNestedField(c, "metadata", "continue")
 }
 
+func (u *Unstructured) GetRemainingItemCount() *int64 {
+	return getNestedInt64Pointer(u.Object, "metadata", "remainingItemCount")
+}
+
+func (u *Unstructured) SetRemainingItemCount(c *int64) {
+	if c == nil {
+		RemoveNestedField(u.Object, "metadata", "remainingItemCount")
+	} else {
+		u.setNestedField(*c, "metadata", "remainingItemCount")
+	}
+}
+
 func (u *Unstructured) GetCreationTimestamp() metav1.Time {
 	var timestamp metav1.Time
 	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "creationTimestamp"))
@@ -406,31 +429,6 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 	}
 	gvk := gv.WithKind(u.GetKind())
 	return gvk
-}
-
-func (u *Unstructured) GetInitializers() *metav1.Initializers {
-	m, found, err := nestedMapNoCopy(u.Object, "metadata", "initializers")
-	if !found || err != nil {
-		return nil
-	}
-	out := &metav1.Initializers{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m, out); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
-		return nil
-	}
-	return out
-}
-
-func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
-	if initializers == nil {
-		RemoveNestedField(u.Object, "metadata", "initializers")
-		return
-	}
-	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(initializers)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
-	}
-	u.setNestedField(out, "metadata", "initializers")
 }
 
 func (u *Unstructured) GetFinalizers() []string {

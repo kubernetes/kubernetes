@@ -10,10 +10,10 @@ import (
 )
 
 // Dormqr multiplies an m×n matrix C by an orthogonal matrix Q as
-//  C = Q * C,    if side == blas.Left  and trans == blas.NoTrans,
-//  C = Q^T * C,  if side == blas.Left  and trans == blas.Trans,
-//  C = C * Q,    if side == blas.Right and trans == blas.NoTrans,
-//  C = C * Q^T,  if side == blas.Right and trans == blas.Trans,
+//  C = Q * C   if side == blas.Left  and trans == blas.NoTrans,
+//  C = Qᵀ * C  if side == blas.Left  and trans == blas.Trans,
+//  C = C * Q   if side == blas.Right and trans == blas.NoTrans,
+//  C = C * Qᵀ  if side == blas.Right and trans == blas.Trans,
 // where Q is defined as the product of k elementary reflectors
 //  Q = H_0 * H_1 * ... * H_{k-1}.
 //
@@ -37,37 +37,39 @@ import (
 // If lwork is -1, instead of performing Dormqr, the optimal workspace size will
 // be stored into work[0].
 func (impl Implementation) Dormqr(side blas.Side, trans blas.Transpose, m, n, k int, a []float64, lda int, tau, c []float64, ldc int, work []float64, lwork int) {
-	var nq, nw int
-	switch side {
-	default:
-		panic(badSide)
-	case blas.Left:
+	left := side == blas.Left
+	nq := n
+	nw := m
+	if left {
 		nq = m
 		nw = n
-	case blas.Right:
-		nq = n
-		nw = m
 	}
 	switch {
+	case !left && side != blas.Right:
+		panic(badSide)
 	case trans != blas.NoTrans && trans != blas.Trans:
 		panic(badTrans)
-	case m < 0 || n < 0:
-		panic(negDimension)
-	case k < 0 || nq < k:
-		panic("lapack: invalid value of k")
-	case len(work) < lwork:
-		panic(shortWork)
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case k < 0:
+		panic(kLT0)
+	case left && k > m:
+		panic(kGTM)
+	case !left && k > n:
+		panic(kGTN)
+	case lda < max(1, k):
+		panic(badLdA)
+	case ldc < max(1, n):
+		panic(badLdC)
 	case lwork < max(1, nw) && lwork != -1:
-		panic(badWork)
-	}
-	if lwork != -1 {
-		checkMatrix(nq, k, a, lda)
-		checkMatrix(m, n, c, ldc)
-		if len(tau) != k {
-			panic(badTau)
-		}
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
 
+	// Quick return if possible.
 	if m == 0 || n == 0 || k == 0 {
 		work[0] = 1
 		return
@@ -86,6 +88,15 @@ func (impl Implementation) Dormqr(side blas.Side, trans blas.Transpose, m, n, k 
 		return
 	}
 
+	switch {
+	case len(a) < (nq-1)*lda+k:
+		panic(shortA)
+	case len(tau) != k:
+		panic(badLenTau)
+	case len(c) < (m-1)*ldc+n:
+		panic(shortC)
+	}
+
 	nbmin := 2
 	if 1 < nb && nb < k {
 		if lwork < nw*nb+tsize {
@@ -102,12 +113,11 @@ func (impl Implementation) Dormqr(side blas.Side, trans blas.Transpose, m, n, k 
 	}
 
 	var (
-		ldwork = nb
-		left   = side == blas.Left
-		notran = trans == blas.NoTrans
+		ldwork  = nb
+		notrans = trans == blas.NoTrans
 	)
 	switch {
-	case left && notran:
+	case left && notrans:
 		for i := ((k - 1) / nb) * nb; i >= 0; i -= nb {
 			ib := min(nb, k-i)
 			impl.Dlarft(lapack.Forward, lapack.ColumnWise, m-i, ib,
@@ -121,7 +131,7 @@ func (impl Implementation) Dormqr(side blas.Side, trans blas.Transpose, m, n, k 
 				work[tsize:], ldwork)
 		}
 
-	case left && !notran:
+	case left && !notrans:
 		for i := 0; i < k; i += nb {
 			ib := min(nb, k-i)
 			impl.Dlarft(lapack.Forward, lapack.ColumnWise, m-i, ib,
@@ -135,7 +145,7 @@ func (impl Implementation) Dormqr(side blas.Side, trans blas.Transpose, m, n, k 
 				work[tsize:], ldwork)
 		}
 
-	case !left && notran:
+	case !left && notrans:
 		for i := 0; i < k; i += nb {
 			ib := min(nb, k-i)
 			impl.Dlarft(lapack.Forward, lapack.ColumnWise, n-i, ib,
@@ -149,7 +159,7 @@ func (impl Implementation) Dormqr(side blas.Side, trans blas.Transpose, m, n, k 
 				work[tsize:], ldwork)
 		}
 
-	case !left && !notran:
+	case !left && !notrans:
 		for i := ((k - 1) / nb) * nb; i >= 0; i -= nb {
 			ib := min(nb, k-i)
 			impl.Dlarft(lapack.Forward, lapack.ColumnWise, n-i, ib,

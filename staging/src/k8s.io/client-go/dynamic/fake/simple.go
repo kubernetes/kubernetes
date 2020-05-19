@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"context"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -86,7 +87,7 @@ func (c *dynamicResourceClient) Namespace(ns string) dynamic.ResourceInterface {
 	return &ret
 }
 
-func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {
@@ -132,7 +133,7 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, opts meta
 	return ret, err
 }
 
-func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {
@@ -168,7 +169,7 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts meta
 	return ret, err
 }
 
-func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {
@@ -196,7 +197,7 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 	return ret, err
 }
 
-func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, subresources ...string) error {
+func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions, subresources ...string) error {
 	var err error
 	switch {
 	case len(c.namespace) == 0 && len(subresources) == 0:
@@ -219,7 +220,7 @@ func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, 
 	return err
 }
 
-func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *dynamicResourceClient) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	var err error
 	switch {
 	case len(c.namespace) == 0:
@@ -235,7 +236,7 @@ func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, lis
 	return err
 }
 
-func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {
@@ -270,7 +271,7 @@ func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions, subreso
 	return ret, err
 }
 
-func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	var obj runtime.Object
 	var err error
 	switch {
@@ -317,7 +318,7 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 	return list, nil
 }
 
-func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	switch {
 	case len(c.namespace) == 0:
 		return c.client.Fake.
@@ -333,7 +334,7 @@ func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 }
 
 // TODO: opts are currently ignored.
-func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {

@@ -29,7 +29,7 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -106,7 +106,7 @@ func (s *server) start() error {
 	var stopRestartingCh, ackStopRestartingCh chan bool
 	if s.restartOnExit {
 		if len(s.healthCheckUrls) == 0 {
-			return fmt.Errorf("Tried to start %s which has s.restartOnExit == true, but no health check urls provided.", s)
+			return fmt.Errorf("tried to start %s which has s.restartOnExit == true, but no health check urls provided", s)
 		}
 
 		stopRestartingCh = make(chan bool)
@@ -124,11 +124,10 @@ func (s *server) start() error {
 		outPath := path.Join(framework.TestContext.ReportDir, s.outFilename)
 		outfile, err := os.Create(outPath)
 		if err != nil {
-			errCh <- fmt.Errorf("failed to create file %q for `%s` %v.", outPath, s, err)
+			errCh <- fmt.Errorf("failed to create file %q for `%s` %v", outPath, s, err)
 			return
-		} else {
-			klog.Infof("Output file for server %q: %v", s.name, outfile.Name())
 		}
+		klog.Infof("Output file for server %q: %v", s.name, outfile.Name())
 		defer outfile.Close()
 		defer outfile.Sync()
 

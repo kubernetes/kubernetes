@@ -34,22 +34,38 @@ import (
 //
 // Dlaqp2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlaqp2(m, n, offset int, a []float64, lda int, jpvt []int, tau, vn1, vn2, work []float64) {
-	checkMatrix(m, n, a, lda)
-	if len(jpvt) != n {
-		panic(badIpiv)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case offset < 0:
+		panic(offsetLT0)
+	case offset > m:
+		panic(offsetGTM)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
+
+	// Quick return if possible.
+	if m == 0 || n == 0 {
+		return
+	}
+
 	mn := min(m-offset, n)
-	if len(tau) < mn {
-		panic(badTau)
-	}
-	if len(vn1) < n {
-		panic(badVn1)
-	}
-	if len(vn2) < n {
-		panic(badVn2)
-	}
-	if len(work) < n {
-		panic(badWork)
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(jpvt) != n:
+		panic(badLenJpvt)
+	case len(tau) < mn:
+		panic(shortTau)
+	case len(vn1) < n:
+		panic(shortVn1)
+	case len(vn2) < n:
+		panic(shortVn2)
+	case len(work) < n:
+		panic(shortWork)
 	}
 
 	tol3z := math.Sqrt(dlamchE)
@@ -77,7 +93,7 @@ func (impl Implementation) Dlaqp2(m, n, offset int, a []float64, lda int, jpvt [
 		}
 
 		if i < n-1 {
-			// Apply H_i^T to A[offset+i:m, i:n] from the left.
+			// Apply H_iᵀ to A[offset+i:m, i:n] from the left.
 			aii := a[offpi*lda+i]
 			a[offpi*lda+i] = 1
 			impl.Dlarf(blas.Left, m-offpi, n-i-1, a[offpi*lda+i:], lda, tau[i], a[offpi*lda+i+1:], lda, work)

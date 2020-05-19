@@ -17,11 +17,12 @@ limitations under the License.
 package clusterroleaggregation
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -126,7 +127,7 @@ func (c *ClusterRoleAggregationController) syncClusterRole(key string) error {
 	for _, rule := range newPolicyRules {
 		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
 	}
-	_, err = c.clusterRoleClient.ClusterRoles().Update(clusterRole)
+	_, err = c.clusterRoleClient.ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{})
 
 	return err
 }
@@ -148,7 +149,7 @@ func (c *ClusterRoleAggregationController) Run(workers int, stopCh <-chan struct
 	klog.Infof("Starting ClusterRoleAggregator")
 	defer klog.Infof("Shutting down ClusterRoleAggregator")
 
-	if !controller.WaitForCacheSync("ClusterRoleAggregator", stopCh, c.clusterRolesSynced) {
+	if !cache.WaitForNamedCacheSync("ClusterRoleAggregator", stopCh, c.clusterRolesSynced) {
 		return
 	}
 

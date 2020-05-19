@@ -18,7 +18,6 @@ filegroup(
         "//cluster/images/conformance:all-srcs",
         "//cluster/images/etcd-version-monitor:all-srcs",
         "//cluster/images/etcd/migrate:all-srcs",
-        "//cluster/images/hyperkube:all-srcs",
         "//cluster/images/kubemark:all-srcs",
     ],
     tags = ["automanaged"],
@@ -40,14 +39,6 @@ pkg_tar(
 sh_test(
     name = "common_test",
     srcs = ["common.sh"],
-    deps = [
-        "//hack/lib",
-    ],
-)
-
-sh_test(
-    name = "clientbin_test",
-    srcs = ["clientbin.sh"],
     deps = [
         "//hack/lib",
     ],

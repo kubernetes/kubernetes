@@ -18,6 +18,7 @@ package scale
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,10 +26,11 @@ import (
 	"net/http"
 	"testing"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	fakedisco "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/dynamic"
 	fakerest "k8s.io/client-go/rest/fake"
@@ -179,7 +181,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			if err != nil {
 				return nil, err
 			}
-			return &http.Response{StatusCode: 200, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
 		case "PUT":
 			decoder := codecs.UniversalDeserializer()
 			body, err := ioutil.ReadAll(req.Body)
@@ -197,29 +199,58 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			if err != nil {
 				return nil, err
 			}
-			return &http.Response{StatusCode: 200, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+		case "PATCH":
+			body, err := ioutil.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			originScale, err := json.Marshal(scale)
+			if err != nil {
+				return nil, err
+			}
+			var res []byte
+			contentType := req.Header.Get("Content-Type")
+			pt := types.PatchType(contentType)
+			switch pt {
+			case types.MergePatchType:
+				res, err = jsonpatch.MergePatch(originScale, body)
+				if err != nil {
+					return nil, err
+				}
+			case types.JSONPatchType:
+				patch, err := jsonpatch.DecodePatch(body)
+				if err != nil {
+					return nil, err
+				}
+				res, err = patch.Apply(originScale)
+				if err != nil {
+					return nil, err
+				}
+			default:
+				return nil, fmt.Errorf("invalid patch type")
+			}
+			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
 		default:
 			return nil, fmt.Errorf("unexpected request for URL %q with method %q", req.URL.String(), req.Method)
 		}
 	}
 
 	fakeClient := &fakerest.RESTClient{
-		Client: fakerest.CreateHTTPClient(fakeReqHandler),
-		NegotiatedSerializer: serializer.DirectCodecFactory{
-			CodecFactory: codecs,
-		},
-		GroupVersion:     schema.GroupVersion{},
-		VersionedAPIPath: "/not/a/real/path",
+		Client:               fakerest.CreateHTTPClient(fakeReqHandler),
+		NegotiatedSerializer: codecs.WithoutConversion(),
+		GroupVersion:         schema.GroupVersion{},
+		VersionedAPIPath:     "/not/a/real/path",
 	}
 
 	resolver := NewDiscoveryScaleKindResolver(fakeDiscoveryClient)
 	client := New(fakeClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 
 	groupResources := []schema.GroupResource{
-		{Group: corev1.GroupName, Resource: "replicationcontroller"},
-		{Group: extv1beta1.GroupName, Resource: "replicaset"},
-		{Group: appsv1beta2.GroupName, Resource: "deployment"},
-		{Group: "cheese.testing.k8s.io", Resource: "cheddar"},
+		{Group: corev1.GroupName, Resource: "replicationcontrollers"},
+		{Group: extv1beta1.GroupName, Resource: "replicasets"},
+		{Group: appsv1beta2.GroupName, Resource: "deployments"},
+		{Group: "cheese.testing.k8s.io", Resource: "cheddars"},
 	}
 
 	return client, groupResources
@@ -243,7 +274,7 @@ func TestGetScale(t *testing.T) {
 	}
 
 	for _, groupResource := range groupResources {
-		scale, err := scaleClient.Scales("default").Get(groupResource, "foo")
+		scale, err := scaleClient.Scales("default").Get(context.TODO(), groupResource, "foo", metav1.GetOptions{})
 		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", groupResource.String()) {
 			continue
 		}
@@ -271,12 +302,64 @@ func TestUpdateScale(t *testing.T) {
 	}
 
 	for _, groupResource := range groupResources {
-		scale, err := scaleClient.Scales("default").Update(groupResource, expectedScale)
+		scale, err := scaleClient.Scales("default").Update(context.TODO(), groupResource, expectedScale, metav1.UpdateOptions{})
 		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", groupResource.String()) {
 			continue
 		}
 		assert.NotNil(t, scale, "should have returned a non-nil scale for %s", groupResource.String())
 
 		assert.Equal(t, expectedScale, scale, "should have returned the expected scale for %s", groupResource.String())
+	}
+}
+
+func TestPatchScale(t *testing.T) {
+	scaleClient, groupResources := fakeScaleClient(t)
+	expectedScale := &autoscalingv1.Scale{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Scale",
+			APIVersion: autoscalingv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: autoscalingv1.ScaleSpec{Replicas: 5},
+		Status: autoscalingv1.ScaleStatus{
+			Replicas: 10,
+			Selector: "foo=bar",
+		},
+	}
+	gvrs := make([]schema.GroupVersionResource, 0, len(groupResources))
+	for _, gr := range groupResources {
+		switch gr.Group {
+		case corev1.GroupName:
+			gvrs = append(gvrs, gr.WithVersion(corev1.SchemeGroupVersion.Version))
+		case extv1beta1.GroupName:
+			gvrs = append(gvrs, gr.WithVersion(extv1beta1.SchemeGroupVersion.Version))
+		case appsv1beta2.GroupName:
+			gvrs = append(gvrs, gr.WithVersion(appsv1beta2.SchemeGroupVersion.Version))
+		default:
+			// Group cheese.testing.k8s.io
+			gvrs = append(gvrs, gr.WithVersion("v27alpha15"))
+		}
+	}
+
+	patch := []byte(`{"spec":{"replicas":5}}`)
+	for _, gvr := range gvrs {
+		scale, err := scaleClient.Scales("default").Patch(context.TODO(), gvr, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
+		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", gvr.String()) {
+			continue
+		}
+		assert.NotNil(t, scale, "should have returned a non-nil scale for %s", gvr.String())
+		assert.Equal(t, expectedScale, scale, "should have returned the expected scale for %s", gvr.String())
+	}
+
+	patch = []byte(`[{"op":"replace","path":"/spec/replicas","value":5}]`)
+	for _, gvr := range gvrs {
+		scale, err := scaleClient.Scales("default").Patch(context.TODO(), gvr, "foo", types.JSONPatchType, patch, metav1.PatchOptions{})
+		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", gvr.String()) {
+			continue
+		}
+		assert.NotNil(t, scale, "should have returned a non-nil scale for %s", gvr.String())
+		assert.Equal(t, expectedScale, scale, "should have returned the expected scale for %s", gvr.String())
 	}
 }

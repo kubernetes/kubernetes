@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ReplicationControllerConfiguration)(nil), (*config.ReplicationControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ReplicationControllerConfiguration_To_config_ReplicationControllerConfiguration(a.(*v1alpha1.ReplicationControllerConfiguration), b.(*config.ReplicationControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.ReplicationControllerConfiguration)(nil), (*v1alpha1.ReplicationControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration(a.(*config.ReplicationControllerConfiguration), b.(*v1alpha1.ReplicationControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.ReplicationControllerConfiguration)(nil), (*v1alpha1.ReplicationControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration(a.(*config.ReplicationControllerConfiguration), b.(*v1alpha1.ReplicationControllerConfiguration), scope)
 	}); err != nil {

@@ -19,11 +19,15 @@ package webhook
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	egressselector "k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -36,28 +40,55 @@ type AuthenticationInfoResolverWrapper func(AuthenticationInfoResolver) Authenti
 // NewDefaultAuthenticationInfoResolverWrapper builds a default authn resolver wrapper
 func NewDefaultAuthenticationInfoResolverWrapper(
 	proxyTransport *http.Transport,
+	egressSelector *egressselector.EgressSelector,
 	kubeapiserverClientConfig *rest.Config) AuthenticationInfoResolverWrapper {
 
 	webhookAuthResolverWrapper := func(delegate AuthenticationInfoResolver) AuthenticationInfoResolver {
 		return &AuthenticationInfoResolverDelegator{
-			ClientConfigForFunc: func(server string) (*rest.Config, error) {
-				if server == "kubernetes.default.svc" {
+			ClientConfigForFunc: func(hostPort string) (*rest.Config, error) {
+				if hostPort == "kubernetes.default.svc:443" {
 					return kubeapiserverClientConfig, nil
 				}
-				return delegate.ClientConfigFor(server)
-			},
-			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string) (*rest.Config, error) {
-				if serviceName == "kubernetes" && serviceNamespace == corev1.NamespaceDefault {
-					return kubeapiserverClientConfig, nil
-				}
-				ret, err := delegate.ClientConfigForService(serviceName, serviceNamespace)
+				ret, err := delegate.ClientConfigFor(hostPort)
 				if err != nil {
 					return nil, err
 				}
-				if proxyTransport != nil && proxyTransport.DialContext != nil {
+
+				if egressSelector != nil {
+					networkContext := egressselector.Master.AsNetworkContext()
+					var egressDialer utilnet.DialFunc
+					egressDialer, err = egressSelector.Lookup(networkContext)
+
+					if err != nil {
+						return nil, err
+					}
+
+					ret.Dial = egressDialer
+				}
+				return ret, nil
+			},
+			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error) {
+				if serviceName == "kubernetes" && serviceNamespace == corev1.NamespaceDefault && servicePort == 443 {
+					return kubeapiserverClientConfig, nil
+				}
+				ret, err := delegate.ClientConfigForService(serviceName, serviceNamespace, servicePort)
+				if err != nil {
+					return nil, err
+				}
+
+				if egressSelector != nil {
+					networkContext := egressselector.Cluster.AsNetworkContext()
+					var egressDialer utilnet.DialFunc
+					egressDialer, err = egressSelector.Lookup(networkContext)
+					if err != nil {
+						return nil, err
+					}
+
+					ret.Dial = egressDialer
+				} else if proxyTransport != nil && proxyTransport.DialContext != nil {
 					ret.Dial = proxyTransport.DialContext
 				}
-				return ret, err
+				return ret, nil
 			},
 		}
 	}
@@ -67,27 +98,27 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 // AuthenticationInfoResolver builds rest.Config base on the server or service
 // name and service namespace.
 type AuthenticationInfoResolver interface {
-	// ClientConfigFor builds rest.Config based on the server.
-	ClientConfigFor(server string) (*rest.Config, error)
+	// ClientConfigFor builds rest.Config based on the hostPort.
+	ClientConfigFor(hostPort string) (*rest.Config, error)
 	// ClientConfigForService builds rest.Config based on the serviceName and
 	// serviceNamespace.
-	ClientConfigForService(serviceName, serviceNamespace string) (*rest.Config, error)
+	ClientConfigForService(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error)
 }
 
 // AuthenticationInfoResolverDelegator implements AuthenticationInfoResolver.
 type AuthenticationInfoResolverDelegator struct {
-	ClientConfigForFunc        func(server string) (*rest.Config, error)
-	ClientConfigForServiceFunc func(serviceName, serviceNamespace string) (*rest.Config, error)
+	ClientConfigForFunc        func(hostPort string) (*rest.Config, error)
+	ClientConfigForServiceFunc func(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error)
 }
 
-// ClientConfigFor returns client config for given server.
-func (a *AuthenticationInfoResolverDelegator) ClientConfigFor(server string) (*rest.Config, error) {
-	return a.ClientConfigForFunc(server)
+// ClientConfigFor returns client config for given hostPort.
+func (a *AuthenticationInfoResolverDelegator) ClientConfigFor(hostPort string) (*rest.Config, error) {
+	return a.ClientConfigForFunc(hostPort)
 }
 
 // ClientConfigForService returns client config for given service.
-func (a *AuthenticationInfoResolverDelegator) ClientConfigForService(serviceName, serviceNamespace string) (*rest.Config, error) {
-	return a.ClientConfigForServiceFunc(serviceName, serviceNamespace)
+func (a *AuthenticationInfoResolverDelegator) ClientConfigForService(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error) {
+	return a.ClientConfigForServiceFunc(serviceName, serviceNamespace, servicePort)
 }
 
 type defaultAuthenticationInfoResolver struct {
@@ -113,12 +144,12 @@ func NewDefaultAuthenticationInfoResolver(kubeconfigFile string) (Authentication
 	return &defaultAuthenticationInfoResolver{kubeconfig: clientConfig}, nil
 }
 
-func (c *defaultAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
-	return c.clientConfig(server)
+func (c *defaultAuthenticationInfoResolver) ClientConfigFor(hostPort string) (*rest.Config, error) {
+	return c.clientConfig(hostPort)
 }
 
-func (c *defaultAuthenticationInfoResolver) ClientConfigForService(serviceName, serviceNamespace string) (*rest.Config, error) {
-	return c.clientConfig(serviceName + "." + serviceNamespace + ".svc")
+func (c *defaultAuthenticationInfoResolver) ClientConfigForService(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error) {
+	return c.clientConfig(net.JoinHostPort(serviceName+"."+serviceNamespace+".svc", strconv.Itoa(servicePort)))
 }
 
 func (c *defaultAuthenticationInfoResolver) clientConfig(target string) (*rest.Config, error) {
@@ -136,8 +167,25 @@ func (c *defaultAuthenticationInfoResolver) clientConfig(target string) (*rest.C
 		}
 	}
 
+	// If target included the default https port (443), search again without the port
+	if target, port, err := net.SplitHostPort(target); err == nil && port == "443" {
+		// exact match without port
+		if authConfig, ok := c.kubeconfig.AuthInfos[target]; ok {
+			return restConfigFromKubeconfig(authConfig)
+		}
+
+		// star prefixed match without port
+		serverSteps := strings.Split(target, ".")
+		for i := 1; i < len(serverSteps); i++ {
+			nickName := "*." + strings.Join(serverSteps[i:], ".")
+			if authConfig, ok := c.kubeconfig.AuthInfos[nickName]; ok {
+				return restConfigFromKubeconfig(authConfig)
+			}
+		}
+	}
+
 	// if we're trying to hit the kube-apiserver and there wasn't an explicit config, use the in-cluster config
-	if target == "kubernetes.default.svc" {
+	if target == "kubernetes.default.svc:443" {
 		// if we can find an in-cluster-config use that.  If we can't, fall through.
 		inClusterConfig, err := rest.InClusterConfig()
 		if err == nil {
@@ -171,6 +219,7 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 	// blindly overwrite existing values based on precedence
 	if len(configAuthInfo.Token) > 0 {
 		config.BearerToken = configAuthInfo.Token
+		config.BearerTokenFile = configAuthInfo.TokenFile
 	} else if len(configAuthInfo.TokenFile) > 0 {
 		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
@@ -195,6 +244,9 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 	if len(configAuthInfo.Username) > 0 || len(configAuthInfo.Password) > 0 {
 		config.Username = configAuthInfo.Username
 		config.Password = configAuthInfo.Password
+	}
+	if configAuthInfo.Exec != nil {
+		config.ExecProvider = configAuthInfo.Exec.DeepCopy()
 	}
 	if configAuthInfo.AuthProvider != nil {
 		return nil, fmt.Errorf("auth provider not supported")

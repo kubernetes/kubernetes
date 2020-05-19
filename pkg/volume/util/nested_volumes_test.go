@@ -19,7 +19,7 @@ package util
 import (
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -206,7 +206,7 @@ func TestGetNestedMountpoints(t *testing.T) {
 		}
 		defer os.RemoveAll(dir)
 
-		rootdir := path.Join(dir, "vol")
+		rootdir := filepath.Join(dir, "vol")
 		err = os.Mkdir(rootdir, 0755)
 		if err != nil {
 			t.Errorf("Unexpected error trying to create temp root directory: %v", err)

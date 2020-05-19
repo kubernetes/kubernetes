@@ -14,15 +14,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks import restrictions. The script looks for a file called
+# `.import-restrictions` in each directory, then all imports of the package are
+# checked against each "rule" in the file.
+# Usage: `hack/verify-import-boss.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=vendor/k8s.io/code-generator/cmd/import-boss
 
-$(kube::util::find-binary "import-boss") --verify-only
+packages=(
+  "k8s.io/kubernetes/pkg/..."
+  "k8s.io/kubernetes/cmd/..."
+  "k8s.io/kubernetes/plugin/..."
+  "k8s.io/kubernetes/test/e2e/framework/..."
+  "k8s.io/kubernetes/test/integration/..."
+)
+for d in staging/src/k8s.io/*/; do
+  if [ -d "$d" ]; then
+    packages+=("./vendor/${d#"staging/src/"}...")
+  fi
+done
+
+$(kube::util::find-binary "import-boss") --include-test-files=true --verify-only --input-dirs "$(IFS=, ; echo "${packages[*]}")"

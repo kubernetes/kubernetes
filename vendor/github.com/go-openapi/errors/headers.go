@@ -54,7 +54,7 @@ const (
 
 // InvalidContentType error for an invalid content type
 func InvalidContentType(value string, allowed []string) *Validation {
-	var values []interface{}
+	values := make([]interface{}, 0, len(allowed))
 	for _, v := range allowed {
 		values = append(values, v)
 	}
@@ -70,7 +70,7 @@ func InvalidContentType(value string, allowed []string) *Validation {
 
 // InvalidResponseFormat error for an unacceptable response format request
 func InvalidResponseFormat(value string, allowed []string) *Validation {
-	var values []interface{}
+	values := make([]interface{}, 0, len(allowed))
 	for _, v := range allowed {
 		values = append(values, v)
 	}

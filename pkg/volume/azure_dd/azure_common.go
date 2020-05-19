@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -22,23 +24,22 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	libstrings "strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
 	utilstrings "k8s.io/utils/strings"
 )
 
 const (
-	defaultStorageAccountType       = compute.StandardLRS
+	defaultStorageAccountType       = compute.StandardSSDLRS
 	defaultAzureDiskKind            = v1.AzureManagedDisk
 	defaultAzureDataDiskCachingMode = v1.AzureDataDiskCachingReadOnly
 )
@@ -62,7 +63,8 @@ var (
 		string(api.AzureDedicatedBlobDisk),
 		string(api.AzureManagedDisk))
 
-	lunPathRE = regexp.MustCompile(`/dev/disk/azure/scsi(?:.*)/lun(.+)`)
+	// only for Windows node
+	winDiskNumRE = regexp.MustCompile(`/dev/disk(.+)`)
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -70,17 +72,17 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 // creates a unique path for disks (even if they share the same *.vhd name)
-func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (string, error) {
-	diskUri = libstrings.ToLower(diskUri) // always lower uri because users may enter it in caps.
+func makeGlobalPDPath(host volume.VolumeHost, diskURI string, isManaged bool) (string, error) {
+	diskURI = libstrings.ToLower(diskURI) // always lower uri because users may enter it in caps.
 	uniqueDiskNameTemplate := "%s%s"
-	hashedDiskUri := azure.MakeCRC32(diskUri)
+	hashedDiskURI := azure.MakeCRC32(diskURI)
 	prefix := "b"
 	if isManaged {
 		prefix = "m"
 	}
-	// "{m for managed b for blob}{hashed diskUri or DiskId depending on disk kind }"
-	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
-	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, diskName)
+	// "{m for managed b for blob}{hashed diskURI or DiskId depending on disk kind }"
+	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskURI)
+	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), util.MountsInGlobalPDPath, diskName)
 
 	return pdPath, nil
 }
@@ -206,24 +208,12 @@ func strFirstLetterToUpper(str string) string {
 	return libstrings.ToUpper(string(str[0])) + str[1:]
 }
 
-// getDiskLUN : deviceInfo could be a LUN number or a device path, e.g. /dev/disk/azure/scsi1/lun2
-func getDiskLUN(deviceInfo string) (int32, error) {
-	var diskLUN string
-	if len(deviceInfo) <= 2 {
-		diskLUN = deviceInfo
-	} else {
-		// extract the LUN num from a device path
-		matches := lunPathRE.FindStringSubmatch(deviceInfo)
-		if len(matches) == 2 {
-			diskLUN = matches[1]
-		} else {
-			return -1, fmt.Errorf("cannot parse deviceInfo: %s", deviceInfo)
-		}
+// getDiskNum : extract the disk num from a device path,
+// deviceInfo format could be like this: e.g. /dev/disk2
+func getDiskNum(deviceInfo string) (string, error) {
+	matches := winDiskNumRE.FindStringSubmatch(deviceInfo)
+	if len(matches) == 2 {
+		return matches[1], nil
 	}
-
-	lun, err := strconv.Atoi(diskLUN)
-	if err != nil {
-		return -1, err
-	}
-	return int32(lun), nil
+	return "", fmt.Errorf("cannot parse deviceInfo: %s, correct format: /dev/disk?", deviceInfo)
 }

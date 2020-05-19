@@ -24,7 +24,7 @@ import (
 	"path"
 	"strconv"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -76,13 +76,12 @@ var (
 	sdcGUIDLabelName = "scaleio.sdcGUID"
 	sdcRootPath      = "/opt/emc/scaleio/sdc/bin"
 
-	secretNotFoundErr              = errors.New("secret not found")
-	configMapNotFoundErr           = errors.New("configMap not found")
-	gatewayNotProvidedErr          = errors.New("ScaleIO gateway not provided")
-	secretRefNotProvidedErr        = errors.New("secret ref not provided")
-	systemNotProvidedErr           = errors.New("ScaleIO system not provided")
-	storagePoolNotProvidedErr      = errors.New("ScaleIO storage pool not provided")
-	protectionDomainNotProvidedErr = errors.New("ScaleIO protection domain not provided")
+	errSecretNotFound              = errors.New("secret not found")
+	errGatewayNotProvided          = errors.New("ScaleIO gateway not provided")
+	errSecretRefNotProvided        = errors.New("secret ref not provided")
+	errSystemNotProvided           = errors.New("ScaleIO system not provided")
+	errStoragePoolNotProvided      = errors.New("ScaleIO storage pool not provided")
+	errProtectionDomainNotProvided = errors.New("ScaleIO protection domain not provided")
 )
 
 // mapVolumeSpec maps attributes from either ScaleIOVolumeSource  or ScaleIOPersistentVolumeSource to config
@@ -118,19 +117,19 @@ func mapVolumeSpec(config map[string]string, spec *volume.Spec) {
 
 func validateConfigs(config map[string]string) error {
 	if config[confKey.gateway] == "" {
-		return gatewayNotProvidedErr
+		return errGatewayNotProvided
 	}
 	if config[confKey.secretName] == "" {
-		return secretRefNotProvidedErr
+		return errSecretRefNotProvided
 	}
 	if config[confKey.system] == "" {
-		return systemNotProvidedErr
+		return errSystemNotProvided
 	}
 	if config[confKey.storagePool] == "" {
-		return storagePoolNotProvidedErr
+		return errStoragePoolNotProvided
 	}
 	if config[confKey.protectionDomain] == "" {
-		return protectionDomainNotProvidedErr
+		return errProtectionDomainNotProvided
 	}
 
 	return nil
@@ -222,7 +221,7 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, kubeClient)
 	if err != nil {
 		klog.Error(log("failed to get secret: %v", err))
-		return secretNotFoundErr
+		return errSecretNotFound
 	}
 	// merge secret data
 	for key, val := range secretMap {

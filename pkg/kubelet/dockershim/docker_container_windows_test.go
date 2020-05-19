@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -73,7 +75,11 @@ func TestApplyGMSAConfig(t *testing.T) {
 	expectedValueName := "k8s-cred-spec-" + expectedHex
 
 	containerConfigWithGMSAAnnotation := &runtimeapi.ContainerConfig{
-		Annotations: map[string]string{"container.alpha.windows.kubernetes.io/gmsa-credential-spec": dummyCredSpec},
+		Windows: &runtimeapi.WindowsContainerConfig{
+			SecurityContext: &runtimeapi.WindowsContainerSecurityContext{
+				CredentialSpec: dummyCredSpec,
+			},
+		},
 	}
 
 	t.Run("happy path", func(t *testing.T) {

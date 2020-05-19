@@ -15,40 +15,16 @@
 // the targets.
 //
 // Elastic Load Balancing supports the following types of load balancers: Application
-// Load Balancers, Network Load Balancers, and Classic Load Balancers.
+// Load Balancers, Network Load Balancers, and Classic Load Balancers. This
+// reference covers Application Load Balancers and Network Load Balancers.
 //
 // An Application Load Balancer makes routing and load balancing decisions at
 // the application layer (HTTP/HTTPS). A Network Load Balancer makes routing
 // and load balancing decisions at the transport layer (TCP/TLS). Both Application
 // Load Balancers and Network Load Balancers can route requests to one or more
 // ports on each EC2 instance or container instance in your virtual private
-// cloud (VPC).
-//
-// A Classic Load Balancer makes routing and load balancing decisions either
-// at the transport layer (TCP/SSL) or the application layer (HTTP/HTTPS), and
-// supports either EC2-Classic or a VPC. For more information, see the Elastic
-// Load Balancing User Guide (http://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/).
-//
-// This reference covers the 2015-12-01 API, which supports Application Load
-// Balancers and Network Load Balancers. The 2012-06-01 API supports Classic
-// Load Balancers.
-//
-// To get started, complete the following tasks:
-//
-// Create a load balancer using CreateLoadBalancer.
-//
-// Create a target group using CreateTargetGroup.
-//
-// Register targets for the target group using RegisterTargets.
-//
-// Create one or more listeners for your load balancer using CreateListener.
-//
-// To delete a load balancer and its related resources, complete the following
-// tasks:
-//
-// Delete the load balancer using DeleteLoadBalancer.
-//
-// Delete the target group using DeleteTargetGroup.
+// cloud (VPC). For more information, see the Elastic Load Balancing User Guide
+// (https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/).
 //
 // All Elastic Load Balancing operations are idempotent, which means that they
 // complete at most one time. If you repeat an operation, it succeeds.

@@ -43,6 +43,8 @@ const (
 	// The subnet mask size cannot be greater than 16 more than the cluster mask size
 	// TODO: https://github.com/kubernetes/kubernetes/issues/44918
 	// clusterSubnetMaxDiff limited to 16 due to the uncompressed bitmap
+	// Due to this limitation the subnet mask for IPv6 cluster cidr needs to be >= 48
+	// as default mask size for IPv6 is 64.
 	clusterSubnetMaxDiff = 16
 	// halfIPv6Len is the half of the IPv6 length
 	halfIPv6Len = net.IPv6len / 2
@@ -156,14 +158,13 @@ func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 }
 
 func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
+	if cidr == nil {
+		return -1, -1, fmt.Errorf("error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
+	}
 	begin, end = 0, s.maxCIDRs-1
 	cidrMask := cidr.Mask
 	maskSize, _ := cidrMask.Size()
 	var ipSize int
-
-	if cidr == nil {
-		return -1, -1, fmt.Errorf("Error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
-	}
 
 	if !s.clusterCIDR.Contains(cidr.IP.Mask(s.clusterCIDR.Mask)) && !cidr.Contains(s.clusterCIDR.IP.Mask(cidr.Mask)) {
 		return -1, -1, fmt.Errorf("cidr %v is out the range of cluster cidr %v", cidr, s.clusterCIDR)

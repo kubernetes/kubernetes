@@ -15,6 +15,7 @@ go_library(
         "rexp.go",
         "schema.go",
         "schema_messages.go",
+        "schema_option.go",
         "schema_props.go",
         "slice_validator.go",
         "spec.go",

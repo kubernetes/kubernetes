@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -50,10 +50,9 @@ const (
 )
 
 type APIInstaller struct {
-	group                        *APIGroupVersion
-	prefix                       string // Path prefix where API resources are to be registered.
-	minRequestTimeout            time.Duration
-	enableAPIResponseCompression bool
+	group             *APIGroupVersion
+	prefix            string // Path prefix where API resources are to be registered.
+	minRequestTimeout time.Duration
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", "PROXY", etc).
@@ -293,12 +292,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var versionedDeleteOptions runtime.Object
 	var versionedDeleterObject interface{}
+	deleteReturnsDeletedObject := false
 	if isGracefulDeleter {
 		versionedDeleteOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, err
 		}
 		versionedDeleterObject = indirectArbitraryPointer(versionedDeleteOptions)
+
+		if mayReturnFullObjectDeleter, ok := storage.(rest.MayReturnFullObjectDeleter); ok {
+			deleteReturnsDeletedObject = mayReturnFullObjectDeleter.DeleteReturnsDeletedObject()
+		}
 	}
 
 	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
@@ -378,7 +382,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resourceKind = kind
 	}
 
-	tableProvider, _ := storage.(rest.TableConvertor)
+	tableProvider, isTableProvider := storage.(rest.TableConvertor)
+	if isLister && !isTableProvider {
+		// All listers must implement TableProvider
+		return nil, fmt.Errorf("%q must implement TableConvertor", resource)
+	}
 
 	var apiResource metav1.APIResource
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
@@ -532,6 +540,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		UnsafeConvertor: a.group.UnsafeConvertor,
 		Authorizer:      a.group.Authorizer,
 
+		EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
+
 		// TODO: Check for the interface on storage
 		TableConvertor: tableProvider,
 
@@ -550,17 +560,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
 	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		fm, err := fieldmanager.NewFieldManager(
+		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
 			a.group.OpenAPIModels,
 			a.group.UnsafeConvertor,
 			a.group.Defaulter,
-			fqKindToRegister.GroupVersion(),
+			a.group.Creater,
+			fqKindToRegister,
 			reqScope.HubGroupVersion,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)
 		}
-		reqScope.FieldManager = fm
 	}
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
@@ -628,9 +638,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			}
 
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
 			doc := "read the specified " + kind
 			if isSubresource {
 				doc = "read " + subresource + " of the specified " + kind
@@ -660,9 +667,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -775,15 +779,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
+			deleteReturnType := versionedStatus
+			if deleteReturnsDeletedObject {
+				deleteReturnType = producedObject
+			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus).
-				Returns(http.StatusAccepted, "Accepted", versionedStatus)
+				Writes(deleteReturnType).
+				Returns(http.StatusOK, "OK", deleteReturnType).
+				Returns(http.StatusAccepted, "Accepted", deleteReturnType)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 				route.ParameterNamed("body").Required(false)
@@ -806,7 +814,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
-			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
+			if isCollectionDeleter {
+				route.Reads(versionedDeleterObject)
+				route.ParameterNamed("body").Required(false)
+				if err := AddObjectParams(ws, route, versionedDeleteOptions); err != nil {
+					return nil, err
+				}
+			}
+			if err := AddObjectParams(ws, route, versionedListOptions, "watch", "allowWatchBookmarks"); err != nil {
 				return nil, err
 			}
 			addParams(route, action.Params)
@@ -918,6 +933,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Kind = gvk.Kind
 	}
 
+	// Record the existence of the GVR and the corresponding GVK
+	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
+
 	return &apiResource, nil
 }
 
@@ -945,12 +963,13 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 // Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
 // the JSON field name. If a description struct tag is set on the field, that description is used on the
 // query parameter. In essence, it converts a standard JSON top level object into a query param schema.
-func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}) error {
+func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}, excludedNames ...string) error {
 	sv, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return err
 	}
 	st := sv.Type()
+	excludedNameSet := sets.NewString(excludedNames...)
 	switch st.Kind() {
 	case reflect.Struct:
 		for i := 0; i < st.NumField(); i++ {
@@ -976,7 +995,9 @@ func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 				if len(jsonName) == 0 {
 					continue
 				}
-
+				if excludedNameSet.Has(jsonName) {
+					continue
+				}
 				var desc string
 				if docable, ok := obj.(documentable); ok {
 					desc = docable.SwaggerDoc()[jsonName]

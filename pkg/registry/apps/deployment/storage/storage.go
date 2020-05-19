@@ -53,24 +53,29 @@ type DeploymentStorage struct {
 	Rollback   *RollbackREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) DeploymentStorage {
-	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(optsGetter)
+// NewStorage returns new instance of DeploymentStorage.
+func NewStorage(optsGetter generic.RESTOptionsGetter) (DeploymentStorage, error) {
+	deploymentRest, deploymentStatusRest, deploymentRollbackRest, err := NewREST(optsGetter)
+	if err != nil {
+		return DeploymentStorage{}, err
+	}
 
 	return DeploymentStorage{
 		Deployment: deploymentRest,
 		Status:     deploymentStatusRest,
 		Scale:      &ScaleREST{store: deploymentRest.Store},
 		Rollback:   deploymentRollbackRest,
-	}
+	}, nil
 }
 
+// REST implements a RESTStorage for Deployments.
 type REST struct {
 	*genericregistry.Store
 	categories []string
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
 		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
@@ -80,16 +85,16 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 		UpdateStrategy: deployment.Strategy,
 		DeleteStrategy: deployment.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = deployment.StatusStrategy
-	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}, nil
 }
 
 // Implement ShortNamesProvider
@@ -108,6 +113,7 @@ func (r *REST) Categories() []string {
 	return r.categories
 }
 
+// WithCategories sets categories for REST.
 func (r *REST) WithCategories(categories []string) *REST {
 	r.categories = categories
 	return r
@@ -118,6 +124,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New returns empty Deployment object.
 func (r *StatusREST) New() runtime.Object {
 	return &apps.Deployment{}
 }
@@ -158,22 +165,26 @@ func (r *RollbackREST) New() runtime.Object {
 	return &apps.DeploymentRollback{}
 }
 
-var _ = rest.Creater(&RollbackREST{})
+var _ = rest.NamedCreater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+// Create runs rollback for deployment
+func (r *RollbackREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	rollback, ok := obj.(*apps.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
 	}
 
-	if createValidation != nil {
-		if err := createValidation(obj.DeepCopyObject()); err != nil {
-			return nil, err
-		}
-	}
-
 	if errs := appsvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
 		return nil, errors.NewInvalid(apps.Kind("DeploymentRollback"), rollback.Name, errs)
+	}
+	if name != rollback.Name {
+		return nil, errors.NewBadRequest("name in URL does not match name in DeploymentRollback object")
+	}
+
+	if createValidation != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
 	}
 
 	// Update the Deployment with information in DeploymentRollback to trigger rollback
@@ -224,6 +235,7 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 	return finalDeployment, err
 }
 
+// ScaleREST implements a Scale for Deployment.
 type ScaleREST struct {
 	store *genericregistry.Store
 }
@@ -232,6 +244,7 @@ type ScaleREST struct {
 var _ = rest.Patcher(&ScaleREST{})
 var _ = rest.GroupVersionKindProvider(&ScaleREST{})
 
+// GroupVersionKind returns GroupVersionKind for Deployment Scale object
 func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	switch containingGV {
 	case extensionsv1beta1.SchemeGroupVersion:
@@ -250,6 +263,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
 
+// Get retrieves object from Scale storage.
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
@@ -263,6 +277,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, nil
 }
 
+// Update alters scale subset of Deployment object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
@@ -293,7 +308,15 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
-	obj, _, err = r.store.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation, false, options)
+	obj, _, err = r.store.Update(
+		ctx,
+		deployment.Name,
+		rest.DefaultUpdatedObjectInfo(deployment),
+		toScaleCreateValidation(createValidation),
+		toScaleUpdateValidation(updateValidation),
+		false,
+		options,
+	)
 	if err != nil {
 		return nil, false, err
 	}
@@ -303,6 +326,30 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
 	}
 	return newScale, false, nil
+}
+
+func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
+	return func(ctx context.Context, obj runtime.Object) error {
+		scale, err := scaleFromDeployment(obj.(*apps.Deployment))
+		if err != nil {
+			return err
+		}
+		return f(ctx, scale)
+	}
+}
+
+func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		newScale, err := scaleFromDeployment(obj.(*apps.Deployment))
+		if err != nil {
+			return err
+		}
+		oldScale, err := scaleFromDeployment(old.(*apps.Deployment))
+		if err != nil {
+			return err
+		}
+		return f(ctx, newScale, oldScale)
+	}
 }
 
 // scaleFromDeployment returns a scale subresource for a deployment.

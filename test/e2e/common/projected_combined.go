@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -25,10 +26,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
-var _ = Describe("[sig-storage] Projected combined", func() {
+var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	// Test multiple projections
@@ -61,12 +62,12 @@ var _ = Describe("[sig-storage] Projected combined", func() {
 			},
 		}
 
-		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
-		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -86,7 +87,7 @@ var _ = Describe("[sig-storage] Projected combined", func() {
 			},
 		}
 		f.TestContainerOutput("Check all projections for projected volume plugin", pod, 0, []string{
-			fmt.Sprintf("%s", podName),
+			podName,
 			"secret-value-1",
 			"configmap-value-1",
 		})

@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/gengo/args"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators"
@@ -57,7 +57,7 @@ func main() {
 	}
 
 	if err := genericArgs.Execute(
-		generators.NameSystems(),
+		generators.NameSystems(util.PluralExceptionListToMapOrDie(customArgs.PluralExceptions)),
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {

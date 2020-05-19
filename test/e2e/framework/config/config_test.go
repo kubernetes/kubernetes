@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"bytes"
 	"flag"
 	"testing"
 	"time"
@@ -26,12 +27,12 @@ import (
 )
 
 func TestInt(t *testing.T) {
-	CommandLine = flag.NewFlagSet("test", 0)
+	flags := flag.NewFlagSet("test", 0)
 	var context struct {
 		Number int `default:"5" usage:"some number"`
 	}
 	require.NotPanics(t, func() {
-		AddOptions(&context, "")
+		AddOptionsToSet(flags, &context, "")
 	})
 	require.Equal(t, []simpleFlag{
 		{
@@ -39,37 +40,37 @@ func TestInt(t *testing.T) {
 			usage:    "some number",
 			defValue: "5",
 		}},
-		allFlags(CommandLine))
+		allFlags(flags))
 	assert.Equal(t, 5, context.Number)
 }
 
 func TestLower(t *testing.T) {
-	CommandLine = flag.NewFlagSet("test", 0)
+	flags := flag.NewFlagSet("test", 0)
 	var context struct {
-		Ähem      string
+		Ahem      string
 		MixedCase string
 	}
 	require.NotPanics(t, func() {
-		AddOptions(&context, "")
+		AddOptionsToSet(flags, &context, "")
 	})
 	require.Equal(t, []simpleFlag{
 		{
-			name: "mixedCase",
+			name: "ahem",
 		},
 		{
-			name: "ähem",
+			name: "mixedCase",
 		},
 	},
-		allFlags(CommandLine))
+		allFlags(flags))
 }
 
 func TestPrefix(t *testing.T) {
-	CommandLine = flag.NewFlagSet("test", 0)
+	flags := flag.NewFlagSet("test", 0)
 	var context struct {
 		Number int `usage:"some number"`
 	}
 	require.NotPanics(t, func() {
-		AddOptions(&context, "some.prefix")
+		AddOptionsToSet(flags, &context, "some.prefix")
 	})
 	require.Equal(t, []simpleFlag{
 		{
@@ -77,11 +78,11 @@ func TestPrefix(t *testing.T) {
 			usage:    "some number",
 			defValue: "0",
 		}},
-		allFlags(CommandLine))
+		allFlags(flags))
 }
 
 func TestRecursion(t *testing.T) {
-	CommandLine = flag.NewFlagSet("test", 0)
+	flags := flag.NewFlagSet("test", 0)
 	type Nested struct {
 		Number1 int `usage:"embedded number"`
 	}
@@ -96,7 +97,7 @@ func TestRecursion(t *testing.T) {
 		}
 	}
 	require.NotPanics(t, func() {
-		AddOptions(&context, "")
+		AddOptionsToSet(flags, &context, "")
 	})
 	require.Equal(t, []simpleFlag{
 		{
@@ -110,38 +111,39 @@ func TestRecursion(t *testing.T) {
 			defValue: "0",
 		},
 	},
-		allFlags(CommandLine))
+		allFlags(flags))
 }
 
 func TestPanics(t *testing.T) {
+	flags := flag.NewFlagSet("test", 0)
 	assert.PanicsWithValue(t, `invalid default "a" for int entry prefix.number: strconv.Atoi: parsing "a": invalid syntax`, func() {
 		var context struct {
 			Number int `default:"a"`
 		}
-		AddOptions(&context, "prefix")
+		AddOptionsToSet(flags, &context, "prefix")
 	})
 
 	assert.PanicsWithValue(t, `invalid default "10000000000000000000" for int entry prefix.number: strconv.Atoi: parsing "10000000000000000000": value out of range`, func() {
 		var context struct {
 			Number int `default:"10000000000000000000"`
 		}
-		AddOptions(&context, "prefix")
+		AddOptionsToSet(flags, &context, "prefix")
 	})
 
 	assert.PanicsWithValue(t, `options parameter without a type - nil?!`, func() {
-		AddOptions(nil, "")
+		AddOptionsToSet(flags, nil, "")
 	})
 
 	assert.PanicsWithValue(t, `need a pointer to a struct, got instead: *int`, func() {
 		number := 0
-		AddOptions(&number, "")
+		AddOptionsToSet(flags, &number, "")
 	})
 
 	assert.PanicsWithValue(t, `struct entry "prefix.number" not exported`, func() {
 		var context struct {
 			number int
 		}
-		AddOptions(&context, "prefix")
+		AddOptionsToSet(flags, &context, "prefix")
 	})
 
 	assert.PanicsWithValue(t, `unsupported struct entry type "prefix.someNumber": config.MyInt`, func() {
@@ -149,12 +151,28 @@ func TestPanics(t *testing.T) {
 		var context struct {
 			SomeNumber MyInt
 		}
-		AddOptions(&context, "prefix")
+		AddOptionsToSet(flags, &context, "prefix")
 	})
 }
 
+type TypesTestCase struct {
+	name      string
+	copyFlags bool
+}
+
 func TestTypes(t *testing.T) {
-	CommandLine = flag.NewFlagSet("test", 0)
+	testcases := []TypesTestCase{
+		{name: "directly"},
+		{name: "CopyFlags", copyFlags: true},
+	}
+
+	for _, testcase := range testcases {
+		testTypes(t, testcase)
+	}
+}
+
+func testTypes(t *testing.T, testcase TypesTestCase) {
+	flags := flag.NewFlagSet("test", 0)
 	type Context struct {
 		Bool     bool          `default:"true"`
 		Duration time.Duration `default:"1ms"`
@@ -167,8 +185,25 @@ func TestTypes(t *testing.T) {
 	}
 	var context Context
 	require.NotPanics(t, func() {
-		AddOptions(&context, "")
+		AddOptionsToSet(flags, &context, "")
 	})
+
+	if testcase.copyFlags {
+		original := bytes.Buffer{}
+		flags.SetOutput(&original)
+		flags.PrintDefaults()
+
+		flags2 := flag.NewFlagSet("test", 0)
+		CopyFlags(flags, flags2)
+		flags = flags2
+
+		copy := bytes.Buffer{}
+		flags.SetOutput(&copy)
+		flags.PrintDefaults()
+		assert.Equal(t, original.String(), copy.String(), testcase.name+": help messages equal")
+		assert.Contains(t, copy.String(), "some number", testcase.name+": copied help message contains defaults")
+	}
+
 	require.Equal(t, []simpleFlag{
 		{
 			name:     "bool",
@@ -205,14 +240,14 @@ func TestTypes(t *testing.T) {
 			defValue: "1234567890123456789",
 		},
 	},
-		allFlags(CommandLine))
+		allFlags(flags), testcase.name)
 	assert.Equal(t,
 		Context{true, time.Millisecond, 1.23456789, "hello world",
 			-1, -1234567890123456789, 1, 1234567890123456789,
 		},
 		context,
 		"default values must match")
-	require.NoError(t, CommandLine.Parse([]string{
+	require.NoError(t, flags.Parse([]string{
 		"-int", "-2",
 		"-int64", "-9123456789012345678",
 		"-uint", "2",
@@ -221,13 +256,13 @@ func TestTypes(t *testing.T) {
 		"-float64", "-1.23456789",
 		"-bool=false",
 		"-duration=1s",
-	}))
+	}), testcase.name)
 	assert.Equal(t,
 		Context{false, time.Second, -1.23456789, "pong",
 			-2, -9123456789012345678, 2, 9123456789012345678,
 		},
 		context,
-		"parsed values must match")
+		testcase.name+": parsed values must match")
 }
 
 func allFlags(fs *flag.FlagSet) []simpleFlag {

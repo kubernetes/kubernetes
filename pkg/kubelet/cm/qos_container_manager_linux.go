@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -49,7 +49,6 @@ type QOSContainerManager interface {
 
 type qosContainerManagerImpl struct {
 	sync.Mutex
-	nodeInfo           *v1.Node
 	qosContainersInfo  QOSContainersInfo
 	subsystems         *CgroupSubsystems
 	cgroupManager      CgroupManager

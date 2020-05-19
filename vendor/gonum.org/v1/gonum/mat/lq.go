@@ -13,6 +13,8 @@ import (
 	"gonum.org/v1/gonum/lapack/lapack64"
 )
 
+const badLQ = "mat: invalid LQ factorization"
+
 // LQ is a type for creating and using the LQ factorization of a matrix.
 type LQ struct {
 	lq   *Dense
@@ -22,9 +24,9 @@ type LQ struct {
 
 func (lq *LQ) updateCond(norm lapack.MatrixNorm) {
 	// Since A = L*Q, and Q is orthogonal, we get for the condition number κ
-	//  κ(A) := |A| |A^-1| = |L*Q| |(L*Q)^-1| = |L| |Q^T * L^-1|
+	//  κ(A) := |A| |A^-1| = |L*Q| |(L*Q)^-1| = |L| |Qᵀ * L^-1|
 	//        = |L| |L^-1| = κ(L),
-	// where we used that fact that Q^-1 = Q^T. However, this assumes that
+	// where we used that fact that Q^-1 = Qᵀ. However, this assumes that
 	// the matrix norm is invariant under orthogonal transformations which
 	// is not the case for CondNorm. Hopefully the error is negligible: κ
 	// is only a qualitative measure anyway.
@@ -38,12 +40,12 @@ func (lq *LQ) updateCond(norm lapack.MatrixNorm) {
 	putInts(iwork)
 }
 
-// Factorize computes the LQ factorization of an m×n matrix a where n <= m. The LQ
+// Factorize computes the LQ factorization of an m×n matrix a where m <= n. The LQ
 // factorization always exists even if A is singular.
 //
 // The LQ decomposition is a factorization of the matrix A such that A = L * Q.
-// The matrix Q is an orthonormal n×n matrix, and L is an m×n upper triangular matrix.
-// L and Q can be extracted from the LTo and QTo methods.
+// The matrix Q is an orthonormal n×n matrix, and L is an m×n lower triangular matrix.
+// L and Q can be extracted using the LTo and QTo methods.
 func (lq *LQ) Factorize(a Matrix) {
 	lq.factorize(a, CondNorm)
 }
@@ -57,7 +59,7 @@ func (lq *LQ) factorize(a Matrix, norm lapack.MatrixNorm) {
 	if lq.lq == nil {
 		lq.lq = &Dense{}
 	}
-	lq.lq.Clone(a)
+	lq.lq.CloneFrom(a)
 	work := []float64{0}
 	lq.tau = make([]float64, k)
 	lapack64.Gelqf(lq.lq.mat, lq.tau, work, -1)
@@ -67,11 +69,16 @@ func (lq *LQ) factorize(a Matrix, norm lapack.MatrixNorm) {
 	lq.updateCond(norm)
 }
 
+// isValid returns whether the receiver contains a factorization.
+func (lq *LQ) isValid() bool {
+	return lq.lq != nil && !lq.lq.IsEmpty()
+}
+
 // Cond returns the condition number for the factorized matrix.
-// Cond will panic if the receiver does not contain a successful factorization.
+// Cond will panic if the receiver does not contain a factorization.
 func (lq *LQ) Cond() float64 {
-	if lq.lq == nil || lq.lq.IsZero() {
-		panic("lq: no decomposition computed")
+	if !lq.isValid() {
+		panic(badLQ)
 	}
 	return lq.cond
 }
@@ -80,13 +87,23 @@ func (lq *LQ) Cond() float64 {
 // and upper triangular matrices.
 
 // LTo extracts the m×n lower trapezoidal matrix from a LQ decomposition.
-// If dst is nil, a new matrix is allocated. The resulting L matrix is returned.
-func (lq *LQ) LTo(dst *Dense) *Dense {
+//
+// If dst is empty, LTo will resize dst to be r×c. When dst is
+// non-empty, LTo will panic if dst is not r×c. LTo will also panic
+// if the receiver does not contain a successful factorization.
+func (lq *LQ) LTo(dst *Dense) {
+	if !lq.isValid() {
+		panic(badLQ)
+	}
+
 	r, c := lq.lq.Dims()
-	if dst == nil {
-		dst = NewDense(r, c, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(r, c)
 	} else {
-		dst.reuseAs(r, c)
+		r2, c2 := dst.Dims()
+		if r != r2 || c != c2 {
+			panic(ErrShape)
+		}
 	}
 
 	// Disguise the LQ as a lower triangular.
@@ -103,24 +120,33 @@ func (lq *LQ) LTo(dst *Dense) *Dense {
 	dst.Copy(t)
 
 	if r == c {
-		return dst
+		return
 	}
 	// Zero right of the triangular.
 	for i := 0; i < r; i++ {
 		zero(dst.mat.Data[i*dst.mat.Stride+r : i*dst.mat.Stride+c])
 	}
-
-	return dst
 }
 
 // QTo extracts the n×n orthonormal matrix Q from an LQ decomposition.
-// If dst is nil, a new matrix is allocated. The resulting Q matrix is returned.
-func (lq *LQ) QTo(dst *Dense) *Dense {
+//
+// If dst is empty, QTo will resize dst to be c×c. When dst is
+// non-empty, QTo will panic if dst is not c×c. QTo will also panic
+// if the receiver does not contain a successful factorization.
+func (lq *LQ) QTo(dst *Dense) {
+	if !lq.isValid() {
+		panic(badLQ)
+	}
+
 	_, c := lq.lq.Dims()
-	if dst == nil {
-		dst = NewDense(c, c, nil)
+	if dst.IsEmpty() {
+		dst.ReuseAs(c, c)
 	} else {
-		dst.reuseAsZeroed(c, c)
+		r2, c2 := dst.Dims()
+		if c != r2 || c != c2 {
+			panic(ErrShape)
+		}
+		dst.Zero()
 	}
 	q := dst.mat
 
@@ -136,11 +162,9 @@ func (lq *LQ) QTo(dst *Dense) *Dense {
 	work = getFloats(int(work[0]), false)
 	lapack64.Ormlq(blas.Left, blas.NoTrans, lq.lq.mat, lq.tau, q, work, len(work))
 	putFloats(work)
-
-	return dst
 }
 
-// Solve finds a minimum-norm solution to a system of linear equations defined
+// SolveTo finds a minimum-norm solution to a system of linear equations defined
 // by the matrices A and b, where A is an m×n matrix represented in its LQ factorized
 // form. If A is singular or near-singular a Condition error is returned.
 // See the documentation for Condition for more information.
@@ -148,8 +172,13 @@ func (lq *LQ) QTo(dst *Dense) *Dense {
 // The minimization problem solved depends on the input parameters.
 //  If trans == false, find the minimum norm solution of A * X = B.
 //  If trans == true, find X such that ||A*X - B||_2 is minimized.
-// The solution matrix, X, is stored in place into x.
-func (lq *LQ) Solve(x *Dense, trans bool, b Matrix) error {
+// The solution matrix, X, is stored in place into dst.
+// SolveTo will panic if the receiver does not contain a factorization.
+func (lq *LQ) SolveTo(dst *Dense, trans bool, b Matrix) error {
+	if !lq.isValid() {
+		panic(badLQ)
+	}
+
 	r, c := lq.lq.Dims()
 	br, bc := b.Dims()
 
@@ -161,12 +190,12 @@ func (lq *LQ) Solve(x *Dense, trans bool, b Matrix) error {
 		if c != br {
 			panic(ErrShape)
 		}
-		x.reuseAs(r, bc)
+		dst.reuseAsNonZeroed(r, bc)
 	} else {
 		if r != br {
 			panic(ErrShape)
 		}
-		x.reuseAs(c, bc)
+		dst.reuseAsNonZeroed(c, bc)
 	}
 	// Do not need to worry about overlap between x and b because w has its own
 	// independent storage.
@@ -199,7 +228,7 @@ func (lq *LQ) Solve(x *Dense, trans bool, b Matrix) error {
 		putFloats(work)
 	}
 	// x was set above to be the correct size for the result.
-	x.Copy(w)
+	dst.Copy(w)
 	putWorkspace(w)
 	if lq.cond > ConditionTolerance {
 		return Condition(lq.cond)
@@ -207,9 +236,14 @@ func (lq *LQ) Solve(x *Dense, trans bool, b Matrix) error {
 	return nil
 }
 
-// SolveVec finds a minimum-norm solution to a system of linear equations.
-// See LQ.Solve for the full documentation.
-func (lq *LQ) SolveVec(x *VecDense, trans bool, b Vector) error {
+// SolveVecTo finds a minimum-norm solution to a system of linear equations.
+// See LQ.SolveTo for the full documentation.
+// SolveToVec will panic if the receiver does not contain a factorization.
+func (lq *LQ) SolveVecTo(dst *VecDense, trans bool, b Vector) error {
+	if !lq.isValid() {
+		panic(badLQ)
+	}
+
 	r, c := lq.lq.Dims()
 	if _, bc := b.Dims(); bc != 1 {
 		panic(ErrShape)
@@ -220,16 +254,16 @@ func (lq *LQ) SolveVec(x *VecDense, trans bool, b Vector) error {
 	bm := Matrix(b)
 	if rv, ok := b.(RawVectorer); ok {
 		bmat := rv.RawVector()
-		if x != b {
-			x.checkOverlap(bmat)
+		if dst != b {
+			dst.checkOverlap(bmat)
 		}
-		b := VecDense{mat: bmat, n: b.Len()}
+		b := VecDense{mat: bmat}
 		bm = b.asDense()
 	}
 	if trans {
-		x.reuseAs(r)
+		dst.reuseAsNonZeroed(r)
 	} else {
-		x.reuseAs(c)
+		dst.reuseAsNonZeroed(c)
 	}
-	return lq.Solve(x.asDense(), trans, bm)
+	return lq.SolveTo(dst.asDense(), trans, bm)
 }

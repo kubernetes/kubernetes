@@ -46,17 +46,19 @@ func Int64KeySet(theMap interface{}) Int64 {
 }
 
 // Insert adds items to the set.
-func (s Int64) Insert(items ...int64) {
+func (s Int64) Insert(items ...int64) Int64 {
 	for _, item := range items {
 		s[item] = Empty{}
 	}
+	return s
 }
 
 // Delete removes all items from the set.
-func (s Int64) Delete(items ...int64) {
+func (s Int64) Delete(items ...int64) Int64 {
 	for _, item := range items {
 		delete(s, item)
 	}
+	return s
 }
 
 // Has returns true if and only if item is contained in the set.

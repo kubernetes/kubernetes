@@ -17,9 +17,13 @@ limitations under the License.
 package fixtures
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"k8s.io/utils/pointer"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -39,6 +43,38 @@ import (
 const (
 	noxuInstanceNum int64 = 9223372036854775807
 )
+
+// NewRandomNameV1CustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
+func NewRandomNameV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	// ensure the singular doesn't end in an s for now
+	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							XPreserveUnknownFields: pointer.BoolPtr(true),
+							Type:                   "object",
+						},
+					},
+				},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   gName + "s",
+				Singular: gName,
+				Kind:     gName,
+				ListKind: gName + "List",
+			},
+			Scope: scope,
+		},
+	}
+}
 
 // NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
 func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
@@ -68,6 +104,36 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *
 			Group:   "mygroup.example.com",
 			Version: "v1beta1",
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:     "noxus",
+				Singular:   "nonenglishnoxu",
+				Kind:       "WishIHadChosenNoxu",
+				ShortNames: []string{"foo", "bar", "abc", "def"},
+				ListKind:   "NoxuItemList",
+				Categories: []string{"all"},
+			},
+			Scope: scope,
+		},
+	}
+}
+
+// NewNoxuV1CustomResourceDefinition returns a WishIHadChosenNoxu CRD.
+func NewNoxuV1CustomResourceDefinition(scope apiextensionsv1.ResourceScope) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+				Name:    "v1beta1",
+				Served:  true,
+				Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						XPreserveUnknownFields: pointer.BoolPtr(true),
+						Type:                   "object",
+					},
+				},
+			}},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:     "noxus",
 				Singular:   "nonenglishnoxu",
 				Kind:       "WishIHadChosenNoxu",
@@ -210,7 +276,36 @@ func servedVersions(crd *apiextensionsv1beta1.CustomResourceDefinition) []string
 	return versions
 }
 
+func servedV1Versions(crd *apiextensionsv1.CustomResourceDefinition) []string {
+	if len(crd.Spec.Versions) == 0 {
+		return []string{}
+	}
+	var versions []string
+	for _, v := range crd.Spec.Versions {
+		if v.Served {
+			versions = append(versions, v.Name)
+		}
+	}
+	return versions
+}
+
 func existsInDiscovery(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, version string) (bool, error) {
+	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, g := range groupResource.APIResources {
+		if g.Name == crd.Spec.Names.Plural {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func existsInDiscoveryV1(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, version string) (bool, error) {
 	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -231,7 +326,7 @@ func existsInDiscovery(crd *apiextensionsv1beta1.CustomResourceDefinition, apiEx
 // the created CR. Please call CreateNewCustomResourceDefinition if you need to
 // watch the CR.
 func CreateNewCustomResourceDefinitionWatchUnsafe(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -256,6 +351,11 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 		return nil, err
 	}
 
+	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	// This is only for a test.  We need the watch cache to have a resource version that works for the test.
 	// When new REST storage is created, the storage cacher for the CR starts asynchronously.
 	// REST API operations return like list use the RV of etcd, but the storage cacher's reflector's list
@@ -267,7 +367,7 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
 	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
-		return isWatchCachePrimed(crd, dynamicClientSet)
+		return isWatchCachePrimed(v1CRD, dynamicClientSet)
 	})
 	if err != nil {
 		return nil, err
@@ -275,22 +375,71 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 	return crd, nil
 }
 
-func resourceClientForVersion(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClientSet dynamic.Interface, namespace, version string) dynamic.ResourceInterface {
+// CreateNewV1CustomResourceDefinitionWatchUnsafe creates the CRD and makes sure
+// the apiextension apiserver has installed the CRD. But it's not safe to watch
+// the created CR. Please call CreateNewV1CustomResourceDefinition if you need to
+// watch the CR.
+func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	v1CRD, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), v1CRD, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// wait until all resources appears in discovery
+	for _, version := range servedV1Versions(v1CRD) {
+		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			return existsInDiscoveryV1(v1CRD, apiExtensionsClient, version)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return v1CRD, err
+}
+
+// CreateNewV1CustomResourceDefinition creates the given CRD and makes sure its watch cache is primed on the server.
+func CreateNewV1CustomResourceDefinition(v1CRD *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	v1CRD, err := CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD, apiExtensionsClient)
+	if err != nil {
+		return nil, err
+	}
+
+	// This is only for a test.  We need the watch cache to have a resource version that works for the test.
+	// When new REST storage is created, the storage cacher for the CR starts asynchronously.
+	// REST API operations return like list use the RV of etcd, but the storage cacher's reflector's list
+	// can get a different RV because etcd can be touched in between the initial list operation (if that's what you're doing first)
+	// and the storage cache reflector starting.
+	// Later, you can issue a watch with the REST apis list.RV and end up earlier than the storage cacher.
+	// The general working model is that if you get a "resourceVersion too old" message, you re-list and rewatch.
+	// For this test, we'll actually cycle, "list/watch/create/delete" until we get an RV from list that observes the create and not an error.
+	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
+	// before like the created RV could be too old to watch.
+	err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+		return isWatchCachePrimed(v1CRD, dynamicClientSet)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v1CRD, nil
+}
+
+func resourceClientForVersion(crd *apiextensionsv1.CustomResourceDefinition, dynamicClientSet dynamic.Interface, namespace, version string) dynamic.ResourceInterface {
 	gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: version, Resource: crd.Spec.Names.Plural}
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
+	if crd.Spec.Scope != apiextensionsv1.ClusterScoped {
 		return dynamicClientSet.Resource(gvr).Namespace(namespace)
 	}
 	return dynamicClientSet.Resource(gvr)
 }
 
 // isWatchCachePrimed returns true if the watch is primed for an specified version of CRD watch
-func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClientSet dynamic.Interface) (bool, error) {
+func isWatchCachePrimed(crd *apiextensionsv1.CustomResourceDefinition, dynamicClientSet dynamic.Interface) (bool, error) {
 	ns := ""
-	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
+	if crd.Spec.Scope != apiextensionsv1.ClusterScoped {
 		ns = "aval"
 	}
 
-	versions := servedVersions(crd)
+	versions := servedV1Versions(crd)
 	if len(versions) == 0 {
 		return true, nil
 	}
@@ -313,11 +462,11 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 			"spec":    map[string]interface{}{},
 		},
 	}
-	createdInstance, err := resourceClient.Create(instance, metav1.CreateOptions{})
+	createdInstance, err := resourceClient.Create(context.TODO(), instance, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
-	err = resourceClient.Delete(createdInstance.GetName(), nil)
+	err = resourceClient.Delete(context.TODO(), createdInstance.GetName(), metav1.DeleteOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -331,6 +480,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 	// delivered to any future watch with resourceVersion=0.
 	for _, v := range versions {
 		noxuWatch, err := resourceClientForVersion(crd, dynamicClientSet, ns, v).Watch(
+			context.TODO(),
 			metav1.ListOptions{ResourceVersion: createdInstance.GetResourceVersion()})
 		if err != nil {
 			return false, err
@@ -355,7 +505,7 @@ func isWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dyna
 
 // DeleteCustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
 func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
-	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, nil); err != nil {
+	if err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	for _, version := range servedVersions(crd) {
@@ -365,6 +515,46 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 		})
 		if err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// DeleteV1CustomResourceDefinition deletes a CRD and waits until it disappears from discovery.
+func DeleteV1CustomResourceDefinition(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) error {
+	if err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.TODO(), crd.Name, metav1.DeleteOptions{}); err != nil {
+		return err
+	}
+	for _, version := range servedV1Versions(crd) {
+		err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			exists, err := existsInDiscoveryV1(crd, apiExtensionsClient, version)
+			return !exists, err
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DeleteV1CustomResourceDefinitions deletes all CRD matching the provided deleteListOpts and waits until all the CRDs disappear from discovery.
+func DeleteV1CustomResourceDefinitions(deleteListOpts metav1.ListOptions, apiExtensionsClient clientset.Interface) error {
+	list, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(context.TODO(), deleteListOpts)
+	if err != nil {
+		return err
+	}
+	if err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, deleteListOpts); err != nil {
+		return err
+	}
+	for _, crd := range list.Items {
+		for _, version := range servedV1Versions(&crd) {
+			err := wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+				exists, err := existsInDiscoveryV1(&crd, apiExtensionsClient, version)
+				return !exists, err
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

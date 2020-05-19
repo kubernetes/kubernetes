@@ -117,11 +117,8 @@ func autoConvert_v1_Event_To_audit_Event(in *Event, out *audit.Event, s conversi
 	out.Stage = audit.Stage(in.Stage)
 	out.RequestURI = in.RequestURI
 	out.Verb = in.Verb
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.User, &out.User, 0); err != nil {
-		return err
-	}
-	out.ImpersonatedUser = (*audit.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
+	out.User = in.User
+	out.ImpersonatedUser = (*authenticationv1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
 	out.UserAgent = in.UserAgent
 	out.ObjectRef = (*audit.ObjectReference)(unsafe.Pointer(in.ObjectRef))
@@ -145,10 +142,7 @@ func autoConvert_audit_Event_To_v1_Event(in *audit.Event, out *Event, s conversi
 	out.Stage = Stage(in.Stage)
 	out.RequestURI = in.RequestURI
 	out.Verb = in.Verb
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.User, &out.User, 0); err != nil {
-		return err
-	}
+	out.User = in.User
 	out.ImpersonatedUser = (*authenticationv1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
 	out.UserAgent = in.UserAgent

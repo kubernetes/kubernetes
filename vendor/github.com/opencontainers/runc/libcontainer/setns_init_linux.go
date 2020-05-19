@@ -34,6 +34,10 @@ func (l *linuxSetnsInit) Init() error {
 	defer runtime.UnlockOSThread()
 
 	if !l.config.Config.NoNewKeyring {
+		if err := label.SetKeyLabel(l.config.ProcessLabel); err != nil {
+			return err
+		}
+		defer label.SetKeyLabel("")
 		// Do not inherit the parent's session keyring.
 		if _, err := keys.JoinSessionKeyring(l.getSessionRingName()); err != nil {
 			// Same justification as in standart_init_linux.go as to why we

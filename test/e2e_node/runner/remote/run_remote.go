@@ -21,6 +21,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -38,11 +39,11 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/remote"
 	"k8s.io/kubernetes/test/e2e_node/system"
 
-	"github.com/pborman/uuid"
-	"golang.org/x/oauth2"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
-	"k8s.io/klog"
+	"google.golang.org/api/option"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 )
 
@@ -55,6 +56,7 @@ var imageConfigFile = flag.String("image-config-file", "", "yaml file describing
 var imageConfigDir = flag.String("image-config-dir", "", "(optional)path to image config files")
 var imageProject = flag.String("image-project", "", "gce project the hosts live in")
 var images = flag.String("images", "", "images to test")
+var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible")
 var hosts = flag.String("hosts", "", "hosts to test")
 var cleanup = flag.Bool("cleanup", true, "If true remove files from remote hosts and delete temporary instances")
 var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any instances created")
@@ -103,12 +105,14 @@ var (
 	suite          remote.TestSuite
 )
 
+// Archive contains path info in the archive.
 type Archive struct {
 	sync.Once
 	path string
 	err  error
 }
 
+// TestResult contains some information about the test results.
 type TestResult struct {
 	output string
 	err    error
@@ -127,22 +131,24 @@ type TestResult struct {
 //         project: gce-image-project
 //         machine: for benchmark only, the machine type (GCE instance) to run test
 //         tests: for benchmark only, a list of ginkgo focus strings to match tests
-
 // TODO(coufon): replace 'image' with 'node' in configurations
 // and we plan to support testing custom machines other than GCE by specifying host
 type ImageConfig struct {
 	Images map[string]GCEImage `json:"images"`
 }
 
+// Accelerator contains type and count about resource.
 type Accelerator struct {
 	Type  string `json:"type,omitempty"`
 	Count int64  `json:"count,omitempty"`
 }
 
+// Resources contains accelerators array.
 type Resources struct {
 	Accelerators []Accelerator `json:"accelerators,omitempty"`
 }
 
+// GCEImage contains some information about CGE Image.
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageDesc  string `json:"image_description,omitempty"`
@@ -152,6 +158,8 @@ type GCEImage struct {
 	// Defaults to using only the latest image. Acceptable values are [0, # of images that match the regex).
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
 	PreviousImages int `json:"previous_images,omitempty"`
+	// ImageFamily is the image family to use. The latest image from the image family will be used.
+	ImageFamily string `json:"image_family,omitempty"`
 
 	Machine   string    `json:"machine,omitempty"`
 	Resources Resources `json:"resources,omitempty"`
@@ -229,11 +237,12 @@ func main() {
 		for shortName, imageConfig := range externalImageConfig.Images {
 			var images []string
 			isRegex, name := false, shortName
-			if imageConfig.ImageRegex != "" && imageConfig.Image == "" {
+			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
 				isRegex = true
-				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
+				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project, imageConfig.PreviousImages)
 				if err != nil {
-					klog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
+					klog.Fatalf("Could not retrieve list of images based on image prefix %q and family %q: %v",
+						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
 				images = []string{imageConfig.Image}
@@ -295,7 +304,7 @@ func main() {
 		}
 	}
 	if *instanceNamePrefix == "" {
-		*instanceNamePrefix = "tmp-node-e2e-" + uuid.NewUUID().String()[:8]
+		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
 	}
 
 	// Setup coloring
@@ -423,23 +432,23 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 		}
 	}
 	if strings.ToUpper(instance.Status) != "RUNNING" {
-		err = fmt.Errorf("instance %s not in state RUNNING, was %s.", host, instance.Status)
+		err = fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
 		return &TestResult{
 			err:    err,
 			host:   host,
 			exitOk: false,
 		}
 	}
-	externalIp := getExternalIp(instance)
-	if len(externalIp) > 0 {
-		remote.AddHostnameIp(host, externalIp)
+	externalIP := getExternalIP(instance)
+	if len(externalIP) > 0 {
+		remote.AddHostnameIP(host, externalIP)
 	}
 
 	path, err := arc.getArchive()
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
 		return &TestResult{
-			err: fmt.Errorf("unable to create test archive: %v.", err),
+			err: fmt.Errorf("unable to create test archive: %v", err),
 		}
 	}
 
@@ -468,26 +477,33 @@ func (a byCreationTime) Less(i, j int) bool { return a[i].creationTime.After(a[j
 func (a byCreationTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 // Returns a list of image names based on regex and number of previous images requested.
-func getGCEImages(imageRegex, project string, previousImages int) ([]string, error) {
-	ilc, err := computeService.Images.List(project).Do()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to list images in project %q: %v", project, err)
-	}
+func getGCEImages(imageRegex, imageFamily string, project string, previousImages int) ([]string, error) {
 	imageObjs := []imageObj{}
 	imageRe := regexp.MustCompile(imageRegex)
-	for _, instance := range ilc.Items {
-		if imageRe.MatchString(instance.Name) {
-			creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
-			if err != nil {
-				return nil, fmt.Errorf("Failed to parse instance creation timestamp %q: %v", instance.CreationTimestamp, err)
+	if err := computeService.Images.List(project).Pages(context.Background(),
+		func(ilc *compute.ImageList) error {
+			for _, instance := range ilc.Items {
+				if imageRegex != "" && !imageRe.MatchString(instance.Name) {
+					continue
+				}
+				if imageFamily != "" && instance.Family != imageFamily {
+					continue
+				}
+				creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
+				if err != nil {
+					return fmt.Errorf("failed to parse instance creation timestamp %q: %v", instance.CreationTimestamp, err)
+				}
+				io := imageObj{
+					creationTime: creationTime,
+					name:         instance.Name,
+				}
+				klog.V(4).Infof("Found image %q based on regex %q and family %q in project %q", io.string(), imageRegex, imageFamily, project)
+				imageObjs = append(imageObjs, io)
 			}
-			io := imageObj{
-				creationTime: creationTime,
-				name:         instance.Name,
-			}
-			klog.V(4).Infof("Found image %q based on regex %q in project %q", io.string(), imageRegex, project)
-			imageObjs = append(imageObjs, io)
-		}
+			return nil
+		},
+	); err != nil {
+		return nil, fmt.Errorf("failed to list images in project %q: %v", project, err)
 	}
 	sort.Sort(byCreationTime(imageObjs))
 	images := []string{}
@@ -547,7 +563,13 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 
 // Provision a gce instance using image
 func createInstance(imageConfig *internalGCEImage) (string, error) {
-	klog.V(1).Infof("Creating instance %+v", *imageConfig)
+	p, err := computeService.Projects.Get(*project).Do()
+	if err != nil {
+		return "", fmt.Errorf("failed to get project info %q", *project)
+	}
+	// Use default service account
+	serviceAccount := p.DefaultServiceAccount
+	klog.V(1).Infof("Creating instance %+v with service account %q", *imageConfig, serviceAccount)
 	name := imageToInstanceName(imageConfig)
 	i := &compute.Instance{
 		Name:        name,
@@ -572,16 +594,25 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				},
 			},
 		},
+		ServiceAccounts: []*compute.ServiceAccount{
+			{
+				Email: serviceAccount,
+				Scopes: []string{
+					"https://www.googleapis.com/auth/cloud-platform",
+				},
+			},
+		},
 	}
 
+	scheduling := compute.Scheduling{
+		Preemptible: *preemptibleInstances,
+	}
 	for _, accelerator := range imageConfig.resources.Accelerators {
 		if i.GuestAccelerators == nil {
 			autoRestart := true
 			i.GuestAccelerators = []*compute.AcceleratorConfig{}
-			i.Scheduling = &compute.Scheduling{
-				OnHostMaintenance: "TERMINATE",
-				AutomaticRestart:  &autoRestart,
-			}
+			scheduling.OnHostMaintenance = "TERMINATE"
+			scheduling.AutomaticRestart = &autoRestart
 		}
 		aType := fmt.Sprintf(acceleratorTypeResourceFormat, *project, *zone, accelerator.Type)
 		ac := &compute.AcceleratorConfig{
@@ -590,11 +621,12 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		}
 		i.GuestAccelerators = append(i.GuestAccelerators, ac)
 	}
-
-	var err error
+	i.Scheduling = &scheduling
 	i.Metadata = imageConfig.metadata
+	var insertionOperationName string
 	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
 		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
+
 		if err != nil {
 			ret := fmt.Sprintf("could not create instance %s: API error: %v", name, err)
 			if op != nil {
@@ -602,27 +634,49 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			}
 			return "", fmt.Errorf(ret)
 		} else if op.Error != nil {
-			return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
-		}
-	}
+			var errs []string
+			for _, insertErr := range op.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return "", fmt.Errorf("could not create instance %s: %+v", name, errs)
 
+		}
+		insertionOperationName = op.Name
+	}
 	instanceRunning := false
 	for i := 0; i < 30 && !instanceRunning; i++ {
 		if i > 0 {
 			time.Sleep(time.Second * 20)
 		}
+		var insertionOperation *compute.Operation
+		insertionOperation, err = computeService.ZoneOperations.Get(*project, *zone, insertionOperationName).Do()
+		if err != nil {
+			continue
+		}
+		if strings.ToUpper(insertionOperation.Status) != "DONE" {
+			err = fmt.Errorf("instance insert operation %s not in state DONE, was %s", name, insertionOperation.Status)
+			continue
+		}
+		if insertionOperation.Error != nil {
+			var errs []string
+			for _, insertErr := range insertionOperation.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return name, fmt.Errorf("could not create instance %s: %+v", name, errs)
+		}
+
 		var instance *compute.Instance
 		instance, err = computeService.Instances.Get(*project, *zone, name).Do()
 		if err != nil {
 			continue
 		}
 		if strings.ToUpper(instance.Status) != "RUNNING" {
-			err = fmt.Errorf("instance %s not in state RUNNING, was %s.", name, instance.Status)
+			err = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
 			continue
 		}
-		externalIp := getExternalIp(instance)
-		if len(externalIp) > 0 {
-			remote.AddHostnameIp(name, externalIp)
+		externalIP := getExternalIP(instance)
+		if len(externalIP) > 0 {
+			remote.AddHostnameIP(name, externalIP)
 		}
 		// TODO(random-liu): Remove the docker version check. Use some other command to check
 		// instance readiness.
@@ -673,7 +727,7 @@ func isCloudInitUsed(metadata *compute.Metadata) bool {
 	return false
 }
 
-func getExternalIp(instance *compute.Instance) string {
+func getExternalIP(instance *compute.Instance) string {
 	for i := range instance.NetworkInterfaces {
 		ni := instance.NetworkInterfaces[i]
 		for j := range ni.AccessConfigs {
@@ -700,12 +754,12 @@ func getComputeClient() (*compute.Service, error) {
 		}
 
 		var client *http.Client
-		client, err = google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+		client, err = google.DefaultClient(context.Background(), compute.ComputeScope)
 		if err != nil {
 			continue
 		}
 
-		cs, err = compute.New(client)
+		cs, err = compute.NewService(context.Background(), option.WithHTTPClient(client))
 		if err != nil {
 			continue
 		}
@@ -759,7 +813,7 @@ func imageToInstanceName(imageConfig *internalGCEImage) string {
 	}
 	// For benchmark test, node name has the format 'machine-image-uuid' to run
 	// different machine types with the same image in parallel
-	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
+	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.New().String()[:8]
 }
 
 func sourceImage(image, imageProject string) string {

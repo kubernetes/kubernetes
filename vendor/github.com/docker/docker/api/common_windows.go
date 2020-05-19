@@ -1,4 +1,4 @@
-package api
+package api // import "github.com/docker/docker/api"
 
 // MinVersion represents Minimum REST API version supported
 // Technically the first daemon API version released on Windows is v1.25 in

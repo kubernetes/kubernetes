@@ -19,6 +19,8 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/config:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/util/ipconfig:go_default_library",
         "//pkg/util/netsh:go_default_library",
         "//pkg/util/slice:go_default_library",
@@ -27,7 +29,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/github.com/miekg/dns:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
@@ -43,6 +45,7 @@ go_test(
         "//pkg/proxy:go_default_library",
         "//pkg/util/netsh/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",

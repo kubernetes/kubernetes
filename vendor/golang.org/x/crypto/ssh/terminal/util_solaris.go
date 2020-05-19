@@ -4,7 +4,7 @@
 
 // +build solaris
 
-package terminal
+package terminal // import "golang.org/x/crypto/ssh/terminal"
 
 import (
 	"golang.org/x/sys/unix"
@@ -17,7 +17,7 @@ type State struct {
 	termios unix.Termios
 }
 
-// IsTerminal returns true if the given file descriptor is a terminal.
+// IsTerminal returns whether the given file descriptor is a terminal.
 func IsTerminal(fd int) bool {
 	_, err := unix.IoctlGetTermio(fd, unix.TCGETA)
 	return err == nil

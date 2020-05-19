@@ -26,8 +26,10 @@ import (
 )
 
 // DeploymentLister helps list Deployments.
+// All objects returned here must be treated as read-only.
 type DeploymentLister interface {
 	// List lists all Deployments in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.Deployment, err error)
 	// Deployments returns an object that can list and get Deployments.
 	Deployments(namespace string) DeploymentNamespaceLister
@@ -58,10 +60,13 @@ func (s *deploymentLister) Deployments(namespace string) DeploymentNamespaceList
 }
 
 // DeploymentNamespaceLister helps list and get Deployments.
+// All objects returned here must be treated as read-only.
 type DeploymentNamespaceLister interface {
 	// List lists all Deployments in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.Deployment, err error)
 	// Get retrieves the Deployment from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.Deployment, error)
 	DeploymentNamespaceListerExpansion
 }

@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -63,8 +63,16 @@ func TestDecodeSinglePod(t *testing.T) {
 			SchedulerName:      core.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
 		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
 	}
-	json, err := runtime.Encode(testapi.Default.Codec(), pod)
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -128,11 +136,19 @@ func TestDecodePodList(t *testing.T) {
 			SchedulerName:      core.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
 		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
 	}
 	podList := &v1.PodList{
 		Items: []v1.Pod{*pod},
 	}
-	json, err := runtime.Encode(testapi.Default.Codec(), podList)
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), podList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -235,7 +251,7 @@ func TestStaticPodNameGenerate(t *testing.T) {
 		if c.overwrite != "" {
 			pod.Name = c.overwrite
 		}
-		errs := validation.ValidatePod(pod)
+		errs := validation.ValidatePodCreate(pod, validation.PodValidationOptions{})
 		if c.shouldErr {
 			specNameErrored := false
 			for _, err := range errs {

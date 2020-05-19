@@ -48,6 +48,10 @@ func (l *linuxStandardInit) Init() error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	if !l.config.Config.NoNewKeyring {
+		if err := label.SetKeyLabel(l.config.ProcessLabel); err != nil {
+			return err
+		}
+		defer label.SetKeyLabel("")
 		ringname, keepperms, newperms := l.getSessionRingParams()
 
 		// Do not inherit the parent's session keyring.

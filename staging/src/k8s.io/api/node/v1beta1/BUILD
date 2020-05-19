@@ -9,15 +9,19 @@ go_library(
         "types.go",
         "types_swagger_doc_generated.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.prerelease-lifecycle.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/api/node/v1beta1",
     importpath = "k8s.io/api/node/v1beta1",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
     ],
 )
 

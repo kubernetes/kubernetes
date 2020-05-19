@@ -43,11 +43,14 @@ func NewAPIEnablementOptions() *APIEnablementOptions {
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *APIEnablementOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
-		"A set of key=value pairs that describe runtime configuration that may be passed "+
-		"to apiserver. <group>/<version> (or <version> for the core group) key can be used to "+
-		"turn on/off specific api versions. api/all is special key to control all api versions, "+
-		"be careful setting it false, unless you know what you do. api/legacy is deprecated, "+
-		"we will remove it in the future, so stop using it.")
+		"A set of key=value pairs that enable or disable built-in APIs. Supported options are:\n"+
+		"v1=true|false for the core API group\n"+
+		"<group>/<version>=true|false for a specific API group and version (e.g. apps/v1=true)\n"+
+		"api/all=true|false controls all API versions\n"+
+		"api/ga=true|false controls all API versions of the form v[0-9]+\n"+
+		"api/beta=true|false controls all API versions of the form v[0-9]+beta[0-9]+\n"+
+		"api/alpha=true|false controls all API versions of the form v[0-9]+alpha[0-9]+\n"+
+		"api/legacy is deprecated, and will be removed in a future version")
 }
 
 // Validate validates RuntimeConfig with a list of registries.
@@ -61,9 +64,9 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 	}
 
 	errors := []error{}
-	if s.RuntimeConfig["api/all"] == "false" && len(s.RuntimeConfig) == 1 {
+	if s.RuntimeConfig[resourceconfig.APIAll] == "false" && len(s.RuntimeConfig) == 1 {
 		// Do not allow only set api/all=false, in such case apiserver startup has no meaning.
-		return append(errors, fmt.Errorf("invalid key with only api/all=false"))
+		return append(errors, fmt.Errorf("invalid key with only %v=false", resourceconfig.APIAll))
 	}
 
 	groups, err := resourceconfig.ParseGroups(s.RuntimeConfig)

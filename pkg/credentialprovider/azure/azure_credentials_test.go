@@ -21,7 +21,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry"
+	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
@@ -91,6 +92,71 @@ func Test(t *testing.T) {
 		registryName := getLoginServer(val)
 		if _, found := creds[registryName]; !found {
 			t.Errorf("Missing expected registry: %s", registryName)
+		}
+	}
+}
+
+func TestParseACRLoginServerFromImage(t *testing.T) {
+	configStr := `
+    {
+        "aadClientId": "foo",
+        "aadClientSecret": "bar"
+    }`
+	result := []containerregistry.Registry{
+		{
+			Name: to.StringPtr("foo"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.io"),
+			},
+		},
+	}
+	fakeClient := &fakeClient{
+		results: result,
+	}
+
+	provider := &acrProvider{
+		registryClient: fakeClient,
+	}
+	provider.loadConfig(bytes.NewBufferString(configStr))
+	provider.environment = &azure.Environment{
+		ContainerRegistryDNSSuffix: ".azurecr.my.cloud",
+	}
+	tests := []struct {
+		image    string
+		expected string
+	}{
+		{
+			image:    "invalidImage",
+			expected: "",
+		},
+		{
+			image:    "docker.io/library/busybox:latest",
+			expected: "",
+		},
+		{
+			image:    "foo.azurecr.io/bar/image:version",
+			expected: "foo.azurecr.io",
+		},
+		{
+			image:    "foo.azurecr.cn/bar/image:version",
+			expected: "foo.azurecr.cn",
+		},
+		{
+			image:    "foo.azurecr.de/bar/image:version",
+			expected: "foo.azurecr.de",
+		},
+		{
+			image:    "foo.azurecr.us/bar/image:version",
+			expected: "foo.azurecr.us",
+		},
+		{
+			image:    "foo.azurecr.my.cloud/bar/image:version",
+			expected: "foo.azurecr.my.cloud",
+		},
+	}
+	for _, test := range tests {
+		if loginServer := provider.parseACRLoginServerFromImage(test.image); loginServer != test.expected {
+			t.Errorf("function parseACRLoginServerFromImage returns \"%s\" for image %s, expected \"%s\"", loginServer, test.image, test.expected)
 		}
 	}
 }

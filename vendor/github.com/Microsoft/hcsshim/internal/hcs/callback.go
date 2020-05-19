@@ -1,10 +1,12 @@
 package hcs
 
 import (
+	"fmt"
 	"sync"
 	"syscall"
 
 	"github.com/Microsoft/hcsshim/internal/interop"
+	"github.com/Microsoft/hcsshim/internal/logfields"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,16 +42,61 @@ var (
 )
 
 type hcsNotification uint32
+
+func (hn hcsNotification) String() string {
+	switch hn {
+	case hcsNotificationSystemExited:
+		return "SystemExited"
+	case hcsNotificationSystemCreateCompleted:
+		return "SystemCreateCompleted"
+	case hcsNotificationSystemStartCompleted:
+		return "SystemStartCompleted"
+	case hcsNotificationSystemPauseCompleted:
+		return "SystemPauseCompleted"
+	case hcsNotificationSystemResumeCompleted:
+		return "SystemResumeCompleted"
+	case hcsNotificationSystemCrashReport:
+		return "SystemCrashReport"
+	case hcsNotificationSystemSiloJobCreated:
+		return "SystemSiloJobCreated"
+	case hcsNotificationSystemSaveCompleted:
+		return "SystemSaveCompleted"
+	case hcsNotificationSystemRdpEnhancedModeStateChanged:
+		return "SystemRdpEnhancedModeStateChanged"
+	case hcsNotificationSystemShutdownFailed:
+		return "SystemShutdownFailed"
+	case hcsNotificationSystemGetPropertiesCompleted:
+		return "SystemGetPropertiesCompleted"
+	case hcsNotificationSystemModifyCompleted:
+		return "SystemModifyCompleted"
+	case hcsNotificationSystemCrashInitiated:
+		return "SystemCrashInitiated"
+	case hcsNotificationSystemGuestConnectionClosed:
+		return "SystemGuestConnectionClosed"
+	case hcsNotificationProcessExited:
+		return "ProcessExited"
+	case hcsNotificationInvalid:
+		return "Invalid"
+	case hcsNotificationServiceDisconnect:
+		return "ServiceDisconnect"
+	default:
+		return fmt.Sprintf("Unknown: %d", hn)
+	}
+}
+
 type notificationChannel chan error
 
 type notifcationWatcherContext struct {
 	channels notificationChannels
 	handle   hcsCallback
+
+	systemID  string
+	processID int
 }
 
 type notificationChannels map[hcsNotification]notificationChannel
 
-func newChannels() notificationChannels {
+func newSystemChannels() notificationChannels {
 	channels := make(notificationChannels)
 
 	channels[hcsNotificationSystemExited] = make(notificationChannel, 1)
@@ -57,17 +104,14 @@ func newChannels() notificationChannels {
 	channels[hcsNotificationSystemStartCompleted] = make(notificationChannel, 1)
 	channels[hcsNotificationSystemPauseCompleted] = make(notificationChannel, 1)
 	channels[hcsNotificationSystemResumeCompleted] = make(notificationChannel, 1)
+
+	return channels
+}
+
+func newProcessChannels() notificationChannels {
+	channels := make(notificationChannels)
+
 	channels[hcsNotificationProcessExited] = make(notificationChannel, 1)
-	channels[hcsNotificationServiceDisconnect] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemCrashReport] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemSiloJobCreated] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemSaveCompleted] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemRdpEnhancedModeStateChanged] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemShutdownFailed] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemGetPropertiesCompleted] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemModifyCompleted] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemCrashInitiated] = make(notificationChannel, 1)
-	channels[hcsNotificationSystemGuestConnectionClosed] = make(notificationChannel, 1)
 
 	return channels
 }
@@ -92,12 +136,28 @@ func notificationWatcher(notificationType hcsNotification, callbackNumber uintpt
 		return 0
 	}
 
+	log := logrus.WithFields(logrus.Fields{
+		"notification-type": notificationType.String(),
+		"system-id":         context.systemID,
+	})
+	if context.processID != 0 {
+		log.Data[logfields.ProcessID] = context.processID
+	}
+	log.Debug("")
+
+	// The HCS notification system can grow overtime. We explicitly opt-in to
+	// the notifications we would like to handle, all others we simply return.
+	// This means that as it grows we don't have issues associated with new
+	// notification types the code didn't know about.
+	switch notificationType {
+	case hcsNotificationSystemExited, hcsNotificationSystemCreateCompleted, hcsNotificationSystemStartCompleted, hcsNotificationSystemPauseCompleted, hcsNotificationSystemResumeCompleted:
+	case hcsNotificationProcessExited:
+	default:
+		return 0
+	}
+
 	if channel, ok := context.channels[notificationType]; ok {
 		channel <- result
-	} else {
-		logrus.WithFields(logrus.Fields{
-			"notification-type": notificationType,
-		}).Warn("Received a callback of an unsupported type")
 	}
 
 	return 0

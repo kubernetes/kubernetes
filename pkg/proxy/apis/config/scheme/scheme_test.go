@@ -20,9 +20,18 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	componentconfigtesting "k8s.io/component-base/config/testing"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/fuzzer"
 )
 
-func TestRoundTripTypes(t *testing.T) {
+func TestRoundTripFuzzing(t *testing.T) {
 	roundtrip.RoundTripTestForScheme(t, Scheme, fuzzer.Funcs)
+}
+
+func TestRoundTripYAML(t *testing.T) {
+	componentconfigtesting.RoundTripTest(t, Scheme, Codecs)
+}
+
+func TestDefaults(t *testing.T) {
+	componentconfigtesting.DefaultingTest(t, Scheme, Codecs)
 }

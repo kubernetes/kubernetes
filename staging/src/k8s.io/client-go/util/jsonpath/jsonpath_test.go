@@ -49,7 +49,7 @@ func testJSONPath(tests []jsonpathTest, allowMissingKeys bool, t *testing.T) {
 		err = j.Execute(buf, test.input)
 		if test.expectError {
 			if err == nil {
-				t.Errorf("in %s, expected execute error", test.name)
+				t.Errorf(`in %s, expected execute error, got %q`, test.name, buf)
 			}
 			continue
 		} else if err != nil {
@@ -108,6 +108,94 @@ func testFailJSONPath(tests []jsonpathTest, t *testing.T) {
 	}
 }
 
+func TestTypesInput(t *testing.T) {
+	types := map[string]interface{}{
+		"bools":      []bool{true, false, true, false},
+		"integers":   []int{1, 2, 3, 4},
+		"floats":     []float64{1.0, 2.2, 3.3, 4.0},
+		"strings":    []string{"one", "two", "three", "four"},
+		"interfaces": []interface{}{true, "one", 1, 1.1},
+		"maps": []map[string]interface{}{
+			{"name": "one", "value": 1},
+			{"name": "two", "value": 2.02},
+			{"name": "three", "value": 3.03},
+			{"name": "four", "value": 4.04},
+		},
+		"structs": []struct {
+			Name  string      `json:"name"`
+			Value interface{} `json:"value"`
+			Type  string      `json:"type"`
+		}{
+			{Name: "one", Value: 1, Type: "integer"},
+			{Name: "two", Value: 2.002, Type: "float"},
+			{Name: "three", Value: 3, Type: "integer"},
+			{Name: "four", Value: 4.004, Type: "float"},
+		},
+	}
+
+	sliceTests := []jsonpathTest{
+		// boolean slice tests
+		{"boolSlice", `{ .bools }`, types, `[true,false,true,false]`, false},
+		{"boolSliceIndex", `{ .bools[0] }`, types, `true`, false},
+		{"boolSliceIndex", `{ .bools[-1] }`, types, `false`, false},
+		{"boolSubSlice", `{ .bools[0:2] }`, types, `true false`, false},
+		{"boolSubSliceFirst2", `{ .bools[:2] }`, types, `true false`, false},
+		{"boolSubSliceStep2", `{ .bools[:4:2] }`, types, `true true`, false},
+		// integer slice tests
+		{"integerSlice", `{ .integers }`, types, `[1,2,3,4]`, false},
+		{"integerSliceIndex", `{ .integers[0] }`, types, `1`, false},
+		{"integerSliceIndexReverse", `{ .integers[-2] }`, types, `3`, false},
+		{"integerSubSliceFirst2", `{ .integers[0:2] }`, types, `1 2`, false},
+		{"integerSubSliceFirst2Alt", `{ .integers[:2] }`, types, `1 2`, false},
+		{"integerSubSliceStep2", `{ .integers[:4:2] }`, types, `1 3`, false},
+		// float slice tests
+		{"floatSlice", `{ .floats }`, types, `[1,2.2,3.3,4]`, false},
+		{"floatSliceIndex", `{ .floats[0] }`, types, `1`, false},
+		{"floatSliceIndexReverse", `{ .floats[-2] }`, types, `3.3`, false},
+		{"floatSubSliceFirst2", `{ .floats[0:2] }`, types, `1 2.2`, false},
+		{"floatSubSliceFirst2Alt", `{ .floats[:2] }`, types, `1 2.2`, false},
+		{"floatSubSliceStep2", `{ .floats[:4:2] }`, types, `1 3.3`, false},
+		// strings slice tests
+		{"stringSlice", `{ .strings }`, types, `["one","two","three","four"]`, false},
+		{"stringSliceIndex", `{ .strings[0] }`, types, `one`, false},
+		{"stringSliceIndexReverse", `{ .strings[-2] }`, types, `three`, false},
+		{"stringSubSliceFirst2", `{ .strings[0:2] }`, types, `one two`, false},
+		{"stringSubSliceFirst2Alt", `{ .strings[:2] }`, types, `one two`, false},
+		{"stringSubSliceStep2", `{ .strings[:4:2] }`, types, `one three`, false},
+		// interfaces slice tests
+		{"interfaceSlice", `{ .interfaces }`, types, `[true,"one",1,1.1]`, false},
+		{"interfaceSliceIndex", `{ .interfaces[0] }`, types, `true`, false},
+		{"interfaceSliceIndexReverse", `{ .interfaces[-2] }`, types, `1`, false},
+		{"interfaceSubSliceFirst2", `{ .interfaces[0:2] }`, types, `true one`, false},
+		{"interfaceSubSliceFirst2Alt", `{ .interfaces[:2] }`, types, `true one`, false},
+		{"interfaceSubSliceStep2", `{ .interfaces[:4:2] }`, types, `true 1`, false},
+		// maps slice tests
+		{"mapSlice", `{ .maps }`, types,
+			`[{"name":"one","value":1},{"name":"two","value":2.02},{"name":"three","value":3.03},{"name":"four","value":4.04}]`, false},
+		{"mapSliceIndex", `{ .maps[0] }`, types, `{"name":"one","value":1}`, false},
+		{"mapSliceIndexReverse", `{ .maps[-2] }`, types, `{"name":"three","value":3.03}`, false},
+		{"mapSubSliceFirst2", `{ .maps[0:2] }`, types, `{"name":"one","value":1} {"name":"two","value":2.02}`, false},
+		{"mapSubSliceFirst2Alt", `{ .maps[:2] }`, types, `{"name":"one","value":1} {"name":"two","value":2.02}`, false},
+		{"mapSubSliceStepOdd", `{ .maps[::2] }`, types, `{"name":"one","value":1} {"name":"three","value":3.03}`, false},
+		{"mapSubSliceStepEven", `{ .maps[1::2] }`, types, `{"name":"two","value":2.02} {"name":"four","value":4.04}`, false},
+		// structs slice tests
+		{"structSlice", `{ .structs }`, types,
+			`[{"name":"one","value":1,"type":"integer"},{"name":"two","value":2.002,"type":"float"},{"name":"three","value":3,"type":"integer"},{"name":"four","value":4.004,"type":"float"}]`, false},
+		{"structSliceIndex", `{ .structs[0] }`, types, `{"name":"one","value":1,"type":"integer"}`, false},
+		{"structSliceIndexReverse", `{ .structs[-2] }`, types, `{"name":"three","value":3,"type":"integer"}`, false},
+		{"structSubSliceFirst2", `{ .structs[0:2] }`, types,
+			`{"name":"one","value":1,"type":"integer"} {"name":"two","value":2.002,"type":"float"}`, false},
+		{"structSubSliceFirst2Alt", `{ .structs[:2] }`, types,
+			`{"name":"one","value":1,"type":"integer"} {"name":"two","value":2.002,"type":"float"}`, false},
+		{"structSubSliceStepOdd", `{ .structs[::2] }`, types,
+			`{"name":"one","value":1,"type":"integer"} {"name":"three","value":3,"type":"integer"}`, false},
+		{"structSubSliceStepEven", `{ .structs[1::2] }`, types,
+			`{"name":"two","value":2.002,"type":"float"} {"name":"four","value":4.004,"type":"float"}`, false},
+	}
+
+	testJSONPath(sliceTests, false, t)
+}
+
 type book struct {
 	Category string
 	Author   string
@@ -161,7 +249,7 @@ func TestStructInput(t *testing.T) {
 
 	storeTests := []jsonpathTest{
 		{"plain", "hello jsonpath", nil, "hello jsonpath", false},
-		{"recursive", "{..}", []int{1, 2, 3}, "[1 2 3]", false},
+		{"recursive", "{..}", []int{1, 2, 3}, "[1,2,3]", false},
 		{"filter", "{[?(@<5)]}", []int{2, 6, 3, 7}, "2 3", false},
 		{"quote", `{"{"}`, nil, "{", false},
 		{"union", "{[1,3,4]}", []int{0, 1, 2, 3, 4}, "1 3 4", false},
@@ -173,14 +261,19 @@ func TestStructInput(t *testing.T) {
 		{"dict-", "{.Labels.k8s-app}", storeData, "20", false},
 		{"nest", "{.Bicycle[*].Color}", storeData, "red green", false},
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville", false},
-		{"allfileds", "{.Bicycle.*}", storeData, "{red 19.95 true} {green 20.01 false}", false},
-		{"recurfileds", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
+		{"allfields", `{range .Bicycle[*]}{ "{" }{ @.* }{ "} " }{end}`, storeData, "{red 19.95 true} {green 20.01 false} ", false},
+		{"recurfields", "{..Price}", storeData, "8.95 12.99 8.99 19.95 20.01", false},
+		{"allstructsSlice", "{.Bicycle}", storeData,
+			`[{"Color":"red","Price":19.95,"IsNew":true},{"Color":"green","Price":20.01,"IsNew":false}]`, false},
+		{"allstructs", `{range .Bicycle[*]}{ @ }{ " " }{end}`, storeData,
+			`{"Color":"red","Price":19.95,"IsNew":true} {"Color":"green","Price":20.01,"IsNew":false} `, false},
 		{"lastarray", "{.Book[-1:]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}", false},
+			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false},
 		{"recurarray", "{..Book[2]}", storeData,
-			"{Category: fiction, Author: Herman Melville, Title: Moby Dick, Price: 8.99}", false},
-		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, "{red 19.95 true}", false},
+			`{"Category":"fiction","Author":"Herman Melville","Title":"Moby Dick","Price":8.99}`, false},
+		{"bool", "{.Bicycle[?(@.IsNew==true)]}", storeData, `{"Color":"red","Price":19.95,"IsNew":true}`, false},
 	}
+
 	testJSONPath(storeTests, false, t)
 
 	missingKeyTests := []jsonpathTest{
@@ -282,9 +375,9 @@ func TestKubernetes(t *testing.T) {
 			"127.0.0.1, 127.0.0.2, 127.0.0.3, ", false},
 		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2", false},
 		{"union nodes capacity", `{.items[*]['metadata.name', 'status.capacity']}`, nodesData,
-			"127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]", false},
+			`127.0.0.1 127.0.0.2 {"cpu":"4"} {"cpu":"8"}`, false},
 		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
-			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] ", false},
+			`[127.0.0.1, {"cpu":"4"}] [127.0.0.2, {"cpu":"8"}] `, false},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret", false},
 		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1", false},
 		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None", false},
@@ -296,6 +389,133 @@ func TestKubernetes(t *testing.T) {
 		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`, false},
 	}
 	testJSONPathSortOutput(randomPrintOrderTests, t)
+}
+
+func TestNestedRanges(t *testing.T) {
+	var input = []byte(`{
+		"items": [
+			{
+				"metadata": {
+					"name": "pod1"
+				},
+				"spec": {
+					"containers": [
+						{
+							"name": "foo",
+							"another": [
+								{ "name": "value1" },
+								{ "name": "value2" }
+							]
+						},
+						{
+							"name": "bar",
+							"another": [
+								{ "name": "value1" },
+								{ "name": "value2" }
+							]
+						}
+					]
+                }
+			},
+			{
+				"metadata": {
+					"name": "pod2"
+				},
+				"spec": {
+					"containers": [
+						{
+							"name": "baz",
+							"another": [
+								{ "name": "value1" },
+								{ "name": "value2" }
+							]
+						}
+					]
+                }
+			}
+		]
+	}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"nested range with a trailing newline",
+				`{range .items[*]}` +
+					`{.metadata.name}` +
+					`{":"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{","}` +
+					`{end}` +
+					`{"+"}` +
+					`{end}`,
+				data,
+				"pod1:foo,bar,+pod2:baz,+",
+				false,
+			},
+		},
+		false,
+		t,
+	)
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"nested range with a trailing character within another nested range with a trailing newline",
+				`{range .items[*]}` +
+					`{.metadata.name}` +
+					`{"~"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{":"}` +
+					`{range @.another[*]}` +
+					`{.name}` +
+					`{","}` +
+					`{end}` +
+					`{"+"}` +
+					`{end}` +
+					`{"#"}` +
+					`{end}`,
+				data,
+				"pod1~foo:value1,value2,+bar:value1,value2,+#pod2~baz:value1,value2,+#",
+				false,
+			},
+		},
+		false,
+		t,
+	)
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
+				"two nested ranges at the same level with a trailing newline",
+				`{range .items[*]}` +
+					`{.metadata.name}` +
+					`{"\t"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{" "}` +
+					`{end}` +
+					`{"\t"}` +
+					`{range @.spec.containers[*]}` +
+					`{.name}` +
+					`{" "}` +
+					`{end}` +
+					`{"\n"}` +
+					`{end}`,
+				data,
+				"pod1\tfoo bar \tfoo bar \npod2\tbaz \tbaz \n",
+				false,
+			},
+		},
+		false,
+		t,
+	)
 }
 
 func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {

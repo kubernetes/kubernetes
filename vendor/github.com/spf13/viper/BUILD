@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/hashicorp/hcl:go_default_library",
+        "//vendor/github.com/hashicorp/hcl/hcl/printer:go_default_library",
         "//vendor/github.com/magiconair/properties:go_default_library",
         "//vendor/github.com/mitchellh/mapstructure:go_default_library",
         "//vendor/github.com/pelletier/go-toml:go_default_library",

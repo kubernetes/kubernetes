@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Factory is a function that returns an Interface for admission decisions.
@@ -160,7 +160,7 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 	if len(validationPlugins) != 0 {
 		klog.Infof("Loaded %d validating admission controller(s) successfully in the following order: %s.", len(validationPlugins), strings.Join(validationPlugins, ","))
 	}
-	return chainAdmissionHandler(handlers), nil
+	return newReinvocationHandler(chainAdmissionHandler(handlers)), nil
 }
 
 // InitPlugin creates an instance of the named interface.

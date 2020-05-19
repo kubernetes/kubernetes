@@ -17,20 +17,23 @@ limitations under the License.
 package establish
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 )
 
 // EstablishingController controls how and when CRD is established.
@@ -119,22 +122,22 @@ func (ec *EstablishingController) sync(key string) error {
 		return err
 	}
 
-	if !apiextensions.IsCRDConditionTrue(cachedCRD, apiextensions.NamesAccepted) ||
-		apiextensions.IsCRDConditionTrue(cachedCRD, apiextensions.Established) {
+	if !apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensionsv1.NamesAccepted) ||
+		apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensionsv1.Established) {
 		return nil
 	}
 
 	crd := cachedCRD.DeepCopy()
-	establishedCondition := apiextensions.CustomResourceDefinitionCondition{
-		Type:    apiextensions.Established,
-		Status:  apiextensions.ConditionTrue,
+	establishedCondition := apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:    apiextensionsv1.Established,
+		Status:  apiextensionsv1.ConditionTrue,
 		Reason:  "InitialNamesAccepted",
 		Message: "the initial names have been accepted",
 	}
-	apiextensions.SetCRDCondition(crd, establishedCondition)
+	apiextensionshelpers.SetCRDCondition(crd, establishedCondition)
 
 	// Update server with new CRD condition.
-	_, err = ec.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	_, err = ec.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil

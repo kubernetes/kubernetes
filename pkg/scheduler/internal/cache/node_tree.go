@@ -18,22 +18,21 @@ package cache
 
 import (
 	"fmt"
-	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-
-	"k8s.io/klog"
 )
 
-// NodeTree is a tree-like data structure that holds node names in each zone. Zone names are
+// nodeTree is a tree-like data structure that holds node names in each zone. Zone names are
 // keys to "NodeTree.tree" and values of "NodeTree.tree" are arrays of node names.
-type NodeTree struct {
+// NodeTree is NOT thread-safe, any concurrent updates/reads from it must be synchronized by the caller.
+// It is used only by schedulerCache, and should stay as such.
+type nodeTree struct {
 	tree      map[string]*nodeArray // a map from zone (region-zone) to an array of nodes in the zone.
 	zones     []string              // a list of all the zones in the tree (keys)
 	zoneIndex int
 	numNodes  int
-	mu        sync.RWMutex
 }
 
 // nodeArray is a struct that has nodes that are in a zone.
@@ -58,30 +57,24 @@ func (na *nodeArray) next() (nodeName string, exhausted bool) {
 }
 
 // newNodeTree creates a NodeTree from nodes.
-func newNodeTree(nodes []*v1.Node) *NodeTree {
-	nt := &NodeTree{
+func newNodeTree(nodes []*v1.Node) *nodeTree {
+	nt := &nodeTree{
 		tree: make(map[string]*nodeArray),
 	}
 	for _, n := range nodes {
-		nt.AddNode(n)
+		nt.addNode(n)
 	}
 	return nt
 }
 
-// AddNode adds a node and its corresponding zone to the tree. If the zone already exists, the node
+// addNode adds a node and its corresponding zone to the tree. If the zone already exists, the node
 // is added to the array of nodes in that zone.
-func (nt *NodeTree) AddNode(n *v1.Node) {
-	nt.mu.Lock()
-	defer nt.mu.Unlock()
-	nt.addNode(n)
-}
-
-func (nt *NodeTree) addNode(n *v1.Node) {
+func (nt *nodeTree) addNode(n *v1.Node) {
 	zone := utilnode.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na.nodes {
 			if nodeName == n.Name {
-				klog.Warningf("node %v already exist in the NodeTree", n.Name)
+				klog.Warningf("node %q already exist in the NodeTree", n.Name)
 				return
 			}
 		}
@@ -90,18 +83,12 @@ func (nt *NodeTree) addNode(n *v1.Node) {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = &nodeArray{nodes: []string{n.Name}, lastIndex: 0}
 	}
-	klog.V(5).Infof("Added node %v in group %v to NodeTree", n.Name, zone)
+	klog.V(2).Infof("Added node %q in group %q to NodeTree", n.Name, zone)
 	nt.numNodes++
 }
 
-// RemoveNode removes a node from the NodeTree.
-func (nt *NodeTree) RemoveNode(n *v1.Node) error {
-	nt.mu.Lock()
-	defer nt.mu.Unlock()
-	return nt.removeNode(n)
-}
-
-func (nt *NodeTree) removeNode(n *v1.Node) error {
+// removeNode removes a node from the NodeTree.
+func (nt *nodeTree) removeNode(n *v1.Node) error {
 	zone := utilnode.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for i, nodeName := range na.nodes {
@@ -110,29 +97,30 @@ func (nt *NodeTree) removeNode(n *v1.Node) error {
 				if len(na.nodes) == 0 {
 					nt.removeZone(zone)
 				}
-				klog.V(5).Infof("Removed node %v in group %v from NodeTree", n.Name, zone)
+				klog.V(2).Infof("Removed node %q in group %q from NodeTree", n.Name, zone)
 				nt.numNodes--
 				return nil
 			}
 		}
 	}
-	klog.Errorf("Node %v in group %v was not found", n.Name, zone)
-	return fmt.Errorf("node %v in group %v was not found", n.Name, zone)
+	klog.Errorf("Node %q in group %q was not found", n.Name, zone)
+	return fmt.Errorf("node %q in group %q was not found", n.Name, zone)
 }
 
 // removeZone removes a zone from tree.
 // This function must be called while writer locks are hold.
-func (nt *NodeTree) removeZone(zone string) {
+func (nt *nodeTree) removeZone(zone string) {
 	delete(nt.tree, zone)
 	for i, z := range nt.zones {
 		if z == zone {
 			nt.zones = append(nt.zones[:i], nt.zones[i+1:]...)
+			return
 		}
 	}
 }
 
-// UpdateNode updates a node in the NodeTree.
-func (nt *NodeTree) UpdateNode(old, new *v1.Node) {
+// updateNode updates a node in the NodeTree.
+func (nt *nodeTree) updateNode(old, new *v1.Node) {
 	var oldZone string
 	if old != nil {
 		oldZone = utilnode.GetZoneKey(old)
@@ -143,24 +131,20 @@ func (nt *NodeTree) UpdateNode(old, new *v1.Node) {
 	if oldZone == newZone {
 		return
 	}
-	nt.mu.Lock()
-	defer nt.mu.Unlock()
 	nt.removeNode(old) // No error checking. We ignore whether the old node exists or not.
 	nt.addNode(new)
 }
 
-func (nt *NodeTree) resetExhausted() {
+func (nt *nodeTree) resetExhausted() {
 	for _, na := range nt.tree {
 		na.lastIndex = 0
 	}
 	nt.zoneIndex = 0
 }
 
-// Next returns the name of the next node. NodeTree iterates over zones and in each zone iterates
+// next returns the name of the next node. NodeTree iterates over zones and in each zone iterates
 // over nodes in a round robin fashion.
-func (nt *NodeTree) Next() string {
-	nt.mu.Lock()
-	defer nt.mu.Unlock()
+func (nt *nodeTree) next() string {
 	if len(nt.zones) == 0 {
 		return ""
 	}
@@ -183,11 +167,4 @@ func (nt *NodeTree) Next() string {
 			return nodeName
 		}
 	}
-}
-
-// NumNodes returns the number of nodes.
-func (nt *NodeTree) NumNodes() int {
-	nt.mu.RLock()
-	defer nt.mu.RUnlock()
-	return nt.numNodes
 }

@@ -20,13 +20,17 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -132,7 +136,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -152,7 +156,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -201,7 +205,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	var resumeRV string
 	stopWatch := make(chan struct{}, 1)
 	stopWatch <- struct{}{}
-	err := g.watchHandler(fw, &resumeRV, nevererrc, stopWatch)
+	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, stopWatch)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
@@ -385,5 +389,382 @@ func TestReflectorResync(t *testing.T) {
 	}
 	if iteration != 2 {
 		t.Errorf("exactly 2 iterations were expected, got: %v", iteration)
+	}
+}
+
+func TestReflectorWatchListPageSize(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			if options.Limit != 4 {
+				t.Fatalf("Expected list Limit of 4 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			switch options.Continue {
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C1"}, Items: pods[0:4]}, nil
+			case "C1":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C2"}, Items: pods[4:8]}, nil
+			case "C2":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[8:10]}, nil
+			default:
+				t.Fatalf("Unrecognized continue: %s", options.Continue)
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	// Set resource version to test pagination also for not consistent reads.
+	r.setLastSyncResourceVersion("10")
+	// Set the reflector to paginate the list request in 4 item chunks.
+	r.WatchListPageSize = 4
+	r.ListAndWatch(stopCh)
+
+	results := s.List()
+	if len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
+func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			if options.ResourceVersion != "10" {
+				t.Fatalf("Expected ResourceVersion: \"10\", got: %s", options.ResourceVersion)
+			}
+			if options.Limit != 0 {
+				t.Fatalf("Expected list Limit of 0 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods}, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r.setLastSyncResourceVersion("10")
+	r.ListAndWatch(stopCh)
+
+	results := s.List()
+	if len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
+func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T) {
+	var stopCh chan struct{}
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			// Check that default pager limit is set.
+			if options.Limit != 500 {
+				t.Fatalf("Expected list Limit of 500 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			switch options.Continue {
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C1"}, Items: pods[0:4]}, nil
+			case "C1":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C2"}, Items: pods[4:8]}, nil
+			case "C2":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[8:10]}, nil
+			default:
+				t.Fatalf("Unrecognized continue: %s", options.Continue)
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	// Initial list should initialize paginatedResult in the reflector.
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+	if results := s.List(); len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+
+	// Since initial list for ResourceVersion="0" was paginated, the subsequent
+	// ones should also be paginated.
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+	if results := s.List(); len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
+// TestReflectorResyncWithResourceVersion ensures that a reflector keeps track of the ResourceVersion and sends
+// it in relist requests to prevent the reflector from traveling back in time if the relist is to a api-server or
+// etcd that is partitioned and serving older data than the reflector has already processed.
+func TestReflectorResyncWithResourceVersion(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+	listCallRVs := []string{}
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			listCallRVs = append(listCallRVs, options.ResourceVersion)
+			pods := make([]v1.Pod, 8)
+			for i := 0; i < 8; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			switch options.ResourceVersion {
+			case "0":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[0:4]}, nil
+			case "10":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "11"}, Items: pods[0:8]}, nil
+			default:
+				t.Fatalf("Unrecognized ResourceVersion: %s", options.ResourceVersion)
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	// Initial list should use RV=0
+	r.ListAndWatch(stopCh)
+
+	results := s.List()
+	if len(results) != 4 {
+		t.Errorf("Expected 4 results, got %d", len(results))
+	}
+
+	// relist should use lastSyncResourceVersions (RV=10)
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+
+	results = s.List()
+	if len(results) != 8 {
+		t.Errorf("Expected 8 results, got %d", len(results))
+	}
+
+	expectedRVs := []string{"0", "10"}
+	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
+		t.Errorf("Expected series of list calls with resource versiosn of %v but got: %v", expectedRVs, listCallRVs)
+	}
+}
+
+// TestReflectorExpiredExactResourceVersion tests that a reflector handles the behavior of kubernetes 1.16 an earlier
+// where if the exact ResourceVersion requested is not available for a List request for a non-zero ResourceVersion,
+// an "Expired" error is returned if the ResourceVersion has expired (etcd has compacted it).
+// (In kubernetes 1.17, or when the watch cache is enabled, the List will instead return the list that is no older than
+// the requested ResourceVersion).
+func TestReflectorExpiredExactResourceVersion(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+	listCallRVs := []string{}
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			listCallRVs = append(listCallRVs, options.ResourceVersion)
+			pods := make([]v1.Pod, 8)
+			for i := 0; i < 8; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			switch options.ResourceVersion {
+			case "0":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[0:4]}, nil
+			case "10":
+				// When watch cache is disabled, if the exact ResourceVersion requested is not available, a "Expired" error is returned.
+				return nil, apierrors.NewResourceExpired("The resourceVersion for the provided watch is too old.")
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "11"}, Items: pods[0:8]}, nil
+			default:
+				t.Fatalf("Unrecognized ResourceVersion: %s", options.ResourceVersion)
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	// Initial list should use RV=0
+	r.ListAndWatch(stopCh)
+
+	results := s.List()
+	if len(results) != 4 {
+		t.Errorf("Expected 4 results, got %d", len(results))
+	}
+
+	// relist should use lastSyncResourceVersions (RV=10) and since RV=10 is expired, it should retry with RV="".
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+
+	results = s.List()
+	if len(results) != 8 {
+		t.Errorf("Expected 8 results, got %d", len(results))
+	}
+
+	expectedRVs := []string{"0", "10", ""}
+	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
+		t.Errorf("Expected series of list calls with resource versiosn of %v but got: %v", expectedRVs, listCallRVs)
+	}
+}
+
+func TestReflectorFullListIfExpired(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+	listCallRVs := []string{}
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			listCallRVs = append(listCallRVs, options.ResourceVersion)
+			pods := make([]v1.Pod, 8)
+			for i := 0; i < 8; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			rvContinueLimit := func(rv, c string, l int64) metav1.ListOptions {
+				return metav1.ListOptions{ResourceVersion: rv, Continue: c, Limit: l}
+			}
+			switch rvContinueLimit(options.ResourceVersion, options.Continue, options.Limit) {
+			// initial limited list
+			case rvContinueLimit("0", "", 4):
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[0:4]}, nil
+			// first page of the rv=10 list
+			case rvContinueLimit("10", "", 4):
+				return &v1.PodList{ListMeta: metav1.ListMeta{Continue: "C1", ResourceVersion: "11"}, Items: pods[0:4]}, nil
+			// second page of the above list
+			case rvContinueLimit("", "C1", 4):
+				return nil, apierrors.NewResourceExpired("The resourceVersion for the provided watch is too old.")
+			// rv=10 unlimited list
+			case rvContinueLimit("10", "", 0):
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "11"}, Items: pods[0:8]}, nil
+			default:
+				err := fmt.Errorf("unexpected list options: %#v", options)
+				t.Error(err)
+				return nil, err
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r.WatchListPageSize = 4
+
+	// Initial list should use RV=0
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	results := s.List()
+	if len(results) != 4 {
+		t.Errorf("Expected 4 results, got %d", len(results))
+	}
+
+	// relist should use lastSyncResourceVersions (RV=10) and since second page of that expired, it should full list with RV=10
+	stopCh = make(chan struct{})
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	results = s.List()
+	if len(results) != 8 {
+		t.Errorf("Expected 8 results, got %d", len(results))
+	}
+
+	expectedRVs := []string{"0", "10", "", "10"}
+	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
+		t.Errorf("Expected series of list calls with resource versiosn of %#v but got: %#v", expectedRVs, listCallRVs)
+	}
+}
+
+func TestReflectorSetExpectedType(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	gvk := schema.GroupVersionKind{
+		Group:   "mygroup",
+		Version: "v1",
+		Kind:    "MyKind",
+	}
+	obj.SetGroupVersionKind(gvk)
+	testCases := map[string]struct {
+		inputType        interface{}
+		expectedTypeName string
+		expectedType     reflect.Type
+		expectedGVK      *schema.GroupVersionKind
+	}{
+		"Nil type": {
+			expectedTypeName: defaultExpectedTypeName,
+		},
+		"Normal type": {
+			inputType:        &v1.Pod{},
+			expectedTypeName: "*v1.Pod",
+			expectedType:     reflect.TypeOf(&v1.Pod{}),
+		},
+		"Unstructured type without GVK": {
+			inputType:        &unstructured.Unstructured{},
+			expectedTypeName: "*unstructured.Unstructured",
+			expectedType:     reflect.TypeOf(&unstructured.Unstructured{}),
+		},
+		"Unstructured type with GVK": {
+			inputType:        obj,
+			expectedTypeName: gvk.String(),
+			expectedType:     reflect.TypeOf(&unstructured.Unstructured{}),
+			expectedGVK:      &gvk,
+		},
+	}
+	for testName, tc := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			r := &Reflector{}
+			r.setExpectedType(tc.inputType)
+			if tc.expectedType != r.expectedType {
+				t.Fatalf("Expected expectedType %v, got %v", tc.expectedType, r.expectedType)
+			}
+			if tc.expectedTypeName != r.expectedTypeName {
+				t.Fatalf("Expected expectedTypeName %v, got %v", tc.expectedTypeName, r.expectedTypeName)
+			}
+			gvkNotEqual := (tc.expectedGVK == nil) != (r.expectedGVK == nil)
+			if tc.expectedGVK != nil && r.expectedGVK != nil {
+				gvkNotEqual = *tc.expectedGVK != *r.expectedGVK
+			}
+			if gvkNotEqual {
+				t.Fatalf("Expected expectedGVK %v, got %v", tc.expectedGVK, r.expectedGVK)
+			}
+		})
 	}
 }

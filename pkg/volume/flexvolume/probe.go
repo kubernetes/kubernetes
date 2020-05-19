@@ -25,7 +25,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/utils/exec"
@@ -40,7 +40,7 @@ type flexVolumeProber struct {
 	factory        PluginFactory
 	fs             utilfs.Filesystem
 	probeAllNeeded bool
-	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the coresponding operation
+	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the corresponding operation
 }
 
 // GetDynamicPluginProber creates dynamic plugin prober
@@ -140,7 +140,7 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 		probeEvent.PluginName = plugin.GetPluginName()
 	} else if op == volume.ProbeRemove {
 		driverName := utilstrings.UnescapeQualifiedName(driverDirName)
-		probeEvent.PluginName = flexVolumePluginNamePrefix + driverName
+		probeEvent.PluginName = driverName
 
 	} else {
 		return probeEvent, fmt.Errorf("Unknown Operation on directory: %s. ", driverDirName)

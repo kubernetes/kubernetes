@@ -19,11 +19,16 @@ package container
 import (
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestEnvVarsToMap(t *testing.T) {
@@ -320,6 +325,74 @@ func TestExpandVolumeMountsWithSubpath(t *testing.T) {
 
 }
 
+func TestGetContainerSpec(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	for _, tc := range []struct {
+		name          string
+		havePod       *v1.Pod
+		haveName      string
+		wantContainer *v1.Container
+	}{
+		{
+			name: "regular container",
+			havePod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "plain-ole-container"},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container"},
+					},
+				},
+			},
+			haveName:      "plain-ole-container",
+			wantContainer: &v1.Container{Name: "plain-ole-container"},
+		},
+		{
+			name: "init container",
+			havePod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "plain-ole-container"},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container"},
+					},
+				},
+			},
+			haveName:      "init-container",
+			wantContainer: &v1.Container{Name: "init-container"},
+		},
+		{
+			name: "ephemeral container",
+			havePod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "plain-ole-container"},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container"},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+							Name: "debug-container",
+						}},
+					},
+				},
+			},
+			haveName:      "debug-container",
+			wantContainer: &v1.Container{Name: "debug-container"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gotContainer := GetContainerSpec(tc.havePod, tc.haveName)
+			if diff := cmp.Diff(tc.wantContainer, gotContainer); diff != "" {
+				t.Fatalf("GetContainerSpec for %q returned diff (-want +got):%v", tc.name, diff)
+			}
+		})
+	}
+}
+
 func TestShouldContainerBeRestarted(t *testing.T) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -377,12 +450,35 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		v1.RestartPolicyOnFailure,
 		v1.RestartPolicyAlways,
 	}
+
+	// test policies
 	expected := map[string][]bool{
 		"no-history": {true, true, true},
 		"alive":      {false, false, false},
 		"succeed":    {false, false, true},
 		"failed":     {false, true, true},
 		"unknown":    {true, true, true},
+	}
+	for _, c := range pod.Spec.Containers {
+		for i, policy := range policies {
+			pod.Spec.RestartPolicy = policy
+			e := expected[c.Name][i]
+			r := ShouldContainerBeRestarted(&c, pod, podStatus)
+			if r != e {
+				t.Errorf("Restart for container %q with restart policy %q expected %t, got %t",
+					c.Name, policy, e, r)
+			}
+		}
+	}
+
+	// test deleted pod
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	expected = map[string][]bool{
+		"no-history": {false, false, false},
+		"alive":      {false, false, false},
+		"succeed":    {false, false, false},
+		"failed":     {false, false, false},
+		"unknown":    {false, false, false},
 	}
 	for _, c := range pod.Spec.Containers {
 		for i, policy := range policies {
@@ -486,13 +582,19 @@ func TestMakePortMappings(t *testing.T) {
 					// Duplicated, should be ignored.
 					port("foo", v1.ProtocolUDP, 888, 8888, ""),
 					// Duplicated, should be ignored.
-					port("", v1.ProtocolTCP, 80, 8888, ""),
+					port("", v1.ProtocolTCP, 80, 8888, "127.0.0.1"),
+					// Duplicated with different address family, shouldn't be ignored
+					port("", v1.ProtocolTCP, 80, 8080, "::"),
+					// No address family specified
+					port("", v1.ProtocolTCP, 1234, 5678, ""),
 				},
 			},
 			[]PortMapping{
-				portMapping("fooContainer-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-				portMapping("fooContainer-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+				portMapping("fooContainer-v4-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
+				portMapping("fooContainer-v4-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
 				portMapping("fooContainer-foo", v1.ProtocolUDP, 555, 5555, ""),
+				portMapping("fooContainer-v6-TCP:80", v1.ProtocolTCP, 80, 8080, "::"),
+				portMapping("fooContainer-any-TCP:1234", v1.ProtocolTCP, 1234, 5678, ""),
 			},
 		},
 	}
@@ -500,5 +602,39 @@ func TestMakePortMappings(t *testing.T) {
 	for i, tt := range tests {
 		actual := MakePortMappings(tt.container)
 		assert.Equal(t, tt.expectedPortMappings, actual, "[%d]", i)
+	}
+}
+
+func TestHashContainer(t *testing.T) {
+	testCases := []struct {
+		name          string
+		image         string
+		args          []string
+		containerPort int32
+		expectedHash  uint64
+	}{
+		{
+			name:  "test_container",
+			image: "foo/image:v1",
+			args: []string{
+				"/bin/sh",
+				"-c",
+				"echo abc",
+			},
+			containerPort: int32(8001),
+			expectedHash:  uint64(0x3c42280f),
+		},
+	}
+
+	for _, tc := range testCases {
+		container := v1.Container{
+			Name:  tc.name,
+			Image: tc.image,
+			Args:  tc.args,
+			Ports: []v1.ContainerPort{{ContainerPort: tc.containerPort}},
+		}
+
+		hashVal := HashContainer(&container)
+		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
 	}
 }

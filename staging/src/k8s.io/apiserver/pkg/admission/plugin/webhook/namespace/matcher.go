@@ -17,15 +17,16 @@ limitations under the License.
 package namespace
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 )
@@ -76,7 +77,7 @@ func (m *Matcher) GetNamespaceLabels(attr admission.Attributes) (map[string]stri
 	}
 	if apierrors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = m.Client.CoreV1().Namespaces().Get(namespaceName, metav1.GetOptions{})
+		namespace, err = m.Client.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +87,7 @@ func (m *Matcher) GetNamespaceLabels(attr admission.Attributes) (map[string]stri
 
 // MatchNamespaceSelector decideds whether the request matches the
 // namespaceSelctor of the webhook. Only when they match, the webhook is called.
-func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
+func (m *Matcher) MatchNamespaceSelector(h webhook.WebhookAccessor, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	namespaceName := attr.GetNamespace()
 	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {
 		// If the request is about a cluster scoped resource, and it is not a
@@ -95,6 +96,14 @@ func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attr
 		// Also update the comment in types.go
 		return true, nil
 	}
+	selector, err := h.GetParsedNamespaceSelector()
+	if err != nil {
+		return false, apierrors.NewInternalError(err)
+	}
+	if selector.Empty() {
+		return true, nil
+	}
+
 	namespaceLabels, err := m.GetNamespaceLabels(attr)
 	// this means the namespace is not found, for backwards compatibility,
 	// return a 404
@@ -105,11 +114,6 @@ func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attr
 		}
 		return false, &apierrors.StatusError{status.Status()}
 	}
-	if err != nil {
-		return false, apierrors.NewInternalError(err)
-	}
-	// TODO: adding an LRU cache to cache the translation
-	selector, err := metav1.LabelSelectorAsSelector(h.NamespaceSelector)
 	if err != nil {
 		return false, apierrors.NewInternalError(err)
 	}

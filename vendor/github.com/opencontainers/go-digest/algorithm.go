@@ -1,3 +1,17 @@
+// Copyright 2017 Docker, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package digest
 
 import (
@@ -5,6 +19,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"regexp"
 )
 
 // Algorithm identifies and implementation of a digester by an identifier.
@@ -14,9 +29,9 @@ type Algorithm string
 
 // supported digest types
 const (
-	SHA256 Algorithm = "sha256" // sha256 with hex encoding
-	SHA384 Algorithm = "sha384" // sha384 with hex encoding
-	SHA512 Algorithm = "sha512" // sha512 with hex encoding
+	SHA256 Algorithm = "sha256" // sha256 with hex encoding (lower case only)
+	SHA384 Algorithm = "sha384" // sha384 with hex encoding (lower case only)
+	SHA512 Algorithm = "sha512" // sha512 with hex encoding (lower case only)
 
 	// Canonical is the primary digest algorithm used with the distribution
 	// project. Other digests may be used but this one is the primary storage
@@ -35,6 +50,14 @@ var (
 		SHA256: crypto.SHA256,
 		SHA384: crypto.SHA384,
 		SHA512: crypto.SHA512,
+	}
+
+	// anchoredEncodedRegexps contains anchored regular expressions for hex-encoded digests.
+	// Note that /A-F/ disallowed.
+	anchoredEncodedRegexps = map[Algorithm]*regexp.Regexp{
+		SHA256: regexp.MustCompile(`^[a-f0-9]{64}$`),
+		SHA384: regexp.MustCompile(`^[a-f0-9]{96}$`),
+		SHA512: regexp.MustCompile(`^[a-f0-9]{128}$`),
 	}
 )
 
@@ -111,6 +134,14 @@ func (a Algorithm) Hash() hash.Hash {
 	return algorithms[a].New()
 }
 
+// Encode encodes the raw bytes of a digest, typically from a hash.Hash, into
+// the encoded portion of the digest.
+func (a Algorithm) Encode(d []byte) string {
+	// TODO(stevvooe): Currently, all algorithms use a hex encoding. When we
+	// add support for back registration, we can modify this accordingly.
+	return fmt.Sprintf("%x", d)
+}
+
 // FromReader returns the digest of the reader using the algorithm.
 func (a Algorithm) FromReader(rd io.Reader) (Digest, error) {
 	digester := a.Digester()
@@ -141,4 +172,21 @@ func (a Algorithm) FromBytes(p []byte) Digest {
 // FromString digests the string input and returns a Digest.
 func (a Algorithm) FromString(s string) Digest {
 	return a.FromBytes([]byte(s))
+}
+
+// Validate validates the encoded portion string
+func (a Algorithm) Validate(encoded string) error {
+	r, ok := anchoredEncodedRegexps[a]
+	if !ok {
+		return ErrDigestUnsupported
+	}
+	// Digests much always be hex-encoded, ensuring that their hex portion will
+	// always be size*2
+	if a.Size()*2 != len(encoded) {
+		return ErrDigestInvalidLength
+	}
+	if r.MatchString(encoded) {
+		return nil
+	}
+	return ErrDigestInvalidFormat
 }

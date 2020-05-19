@@ -20,28 +20,19 @@ import (
 	"errors"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog/v2"
+	utilexec "k8s.io/utils/exec"
 
-	"k8s.io/klog"
-
-	siotypes "github.com/codedellemc/goscaleio/types/v1"
+	siotypes "github.com/thecodeteam/goscaleio/types/v1"
 )
-
-type storageInterface interface {
-	CreateVolume(string, int64) (*siotypes.Volume, error)
-	AttachVolume(string, bool) (string, error)
-	IsAttached(string) (bool, error)
-	DetachVolume(string) error
-	DeleteVolume(string) error
-}
 
 type sioMgr struct {
 	client     sioInterface
 	configData map[string]string
-	exec       mount.Exec
+	exec       utilexec.Interface
 }
 
-func newSioMgr(configs map[string]string, exec mount.Exec) (*sioMgr, error) {
+func newSioMgr(configs map[string]string, exec utilexec.Interface) (*sioMgr, error) {
 	if configs == nil {
 		return nil, errors.New("missing configuration data")
 	}
@@ -138,7 +129,7 @@ func (m *sioMgr) AttachVolume(volName string, multipleMappings bool) (string, er
 	// handle vol if already attached
 	if len(vol.MappedSdcInfo) > 0 {
 		if m.isSdcMappedToVol(iid, vol) {
-			klog.V(4).Info(log("skippping attachment, volume %s already attached to sdc %s", volName, iid))
+			klog.V(4).Info(log("skipping attachment, volume %s already attached to sdc %s", volName, iid))
 			return devs[vol.ID], nil
 		}
 	}

@@ -19,6 +19,7 @@
 function get-windows-node-instance-metadata-from-file {
   local metadata=""
   metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt,"
+  metadata+="cluster-location=${KUBE_TEMP}/cluster-location.txt,"
   metadata+="kube-env=${KUBE_TEMP}/windows-node-kube-env.yaml,"
   metadata+="kubelet-config=${KUBE_TEMP}/windows-node-kubelet-config.yaml,"
   # To get startup script output run "gcloud compute instances
@@ -53,5 +54,5 @@ function get-windows-node-instance-metadata {
 function create-windows-node-instance-template {
   local template_name="$1"
   local scopes_flag="$2"
-  create-node-template "${template_name}" "${scopes_flag}" "$(get-windows-node-instance-metadata-from-file)" "$(get-windows-node-instance-metadata)" "windows"
+  create-node-template "${template_name}" "${scopes_flag}" "$(get-windows-node-instance-metadata-from-file)" "$(get-windows-node-instance-metadata)" "windows" "${NODE_SIZE}"
 }

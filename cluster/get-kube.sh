@@ -122,6 +122,10 @@ function create_cluster {
   )
 }
 
+function valid-storage-scope {
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
+}
+
 if [[ -n "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   create_cluster
   exit 0
@@ -228,7 +232,13 @@ fi
 
 if "${need_download}"; then
   if [[ $(which curl) ]]; then
-    curl -fL --retry 5 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
+    # if the url belongs to GCS API we should use oauth2_token in the headers
+    curl_headers=""
+    if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
+       [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com.* ]] ; then
+      curl_headers="Authorization: Bearer $(gcloud auth print-access-token)"
+    fi
+    curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
   elif [[ $(which wget) ]]; then
     wget "${kubernetes_tar_url}"
   else

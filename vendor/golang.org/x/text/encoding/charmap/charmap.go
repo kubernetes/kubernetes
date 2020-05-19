@@ -6,7 +6,7 @@
 
 // Package charmap provides simple character encodings such as IBM Code Page 437
 // and Windows 1252.
-package charmap
+package charmap // import "golang.org/x/text/encoding/charmap"
 
 import (
 	"unicode/utf8"

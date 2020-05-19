@@ -20,27 +20,146 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
+
+func recordEvents(events []watch.Event, f func(watch.Event) (bool, error)) func(watch.Event) (bool, error) {
+	return func(e watch.Event) (bool, error) {
+		events = append(events, e)
+		return f(e)
+	}
+}
+
+// invariantFunc is a func that checks for invariant.
+type invariantFunc func(older, newer runtime.Object) error
+
+// checkInvariants checks for invariant of the each events.
+func checkInvariants(events []watch.Event, fns ...invariantFunc) error {
+	errs := sets.NewString()
+	for i := range events {
+		j := i + 1
+		if j >= len(events) {
+			continue
+		}
+		for _, fn := range fns {
+			if err := fn(events[i].Object, events[j].Object); err != nil {
+				errs.Insert(err.Error())
+			}
+		}
+	}
+	if errs.Len() > 0 {
+		return fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* "))
+	}
+	return nil
+}
+
+// containerInitInvariant checks for an init containers are initialized and invariant on both older and newer.
+func containerInitInvariant(older, newer runtime.Object) error {
+	oldPod := older.(*v1.Pod)
+	newPod := newer.(*v1.Pod)
+	if len(oldPod.Spec.InitContainers) == 0 {
+		return nil
+	}
+	if len(oldPod.Spec.InitContainers) != len(newPod.Spec.InitContainers) {
+		return fmt.Errorf("init container list changed")
+	}
+	if oldPod.UID != newPod.UID {
+		return fmt.Errorf("two different pods exist in the condition: %s vs %s", oldPod.UID, newPod.UID)
+	}
+	if err := initContainersInvariants(oldPod); err != nil {
+		return err
+	}
+	if err := initContainersInvariants(newPod); err != nil {
+		return err
+	}
+	oldInit, _, _ := initialized(oldPod)
+	newInit, _, _ := initialized(newPod)
+	if oldInit && !newInit {
+		// TODO: we may in the future enable resetting initialized = false if the kubelet needs to restart it
+		// from scratch
+		return fmt.Errorf("pod cannot be initialized and then regress to not being initialized")
+	}
+	return nil
+}
+
+// initialized checks the state of all init containers in the pod.
+func initialized(pod *v1.Pod) (ok bool, failed bool, err error) {
+	allInit := true
+	initFailed := false
+	for _, s := range pod.Status.InitContainerStatuses {
+		switch {
+		case initFailed && s.State.Waiting == nil:
+			return allInit, initFailed, fmt.Errorf("container %s is after a failed container but isn't waiting", s.Name)
+		case allInit && s.State.Waiting == nil:
+			return allInit, initFailed, fmt.Errorf("container %s is after an initializing container but isn't waiting", s.Name)
+		case s.State.Terminated == nil:
+			allInit = false
+		case s.State.Terminated.ExitCode != 0:
+			allInit = false
+			initFailed = true
+		case !s.Ready:
+			return allInit, initFailed, fmt.Errorf("container %s initialized but isn't marked as ready", s.Name)
+		}
+	}
+	return allInit, initFailed, nil
+}
+
+func initContainersInvariants(pod *v1.Pod) error {
+	allInit, initFailed, err := initialized(pod)
+	if err != nil {
+		return err
+	}
+	if !allInit || initFailed {
+		for _, s := range pod.Status.ContainerStatuses {
+			if s.State.Waiting == nil || s.RestartCount != 0 {
+				return fmt.Errorf("container %s is not waiting but initialization not complete", s.Name)
+			}
+			if s.State.Waiting.Reason != "PodInitializing" {
+				return fmt.Errorf("container %s should have reason PodInitializing: %s", s.Name, s.State.Waiting.Reason)
+			}
+		}
+	}
+	_, c := podutil.GetPodCondition(&pod.Status, v1.PodInitialized)
+	if c == nil {
+		return fmt.Errorf("pod does not have initialized condition")
+	}
+	if c.LastTransitionTime.IsZero() {
+		return fmt.Errorf("PodInitialized condition should always have a transition time")
+	}
+	switch {
+	case c.Status == v1.ConditionUnknown:
+		return fmt.Errorf("PodInitialized condition should never be Unknown")
+	case c.Status == v1.ConditionTrue && (initFailed || !allInit):
+		return fmt.Errorf("PodInitialized condition was True but all not all containers initialized")
+	case c.Status == v1.ConditionFalse && (!initFailed && allInit):
+		return fmt.Errorf("PodInitialized condition was False but all containers initialized")
+	}
+	return nil
+}
 
 var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
 	var podClient *framework.PodClient
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
 
@@ -53,7 +172,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		when Pod has restart policy as RestartNever.
 	*/
 	framework.ConformanceIt("should invoke init containers on a RestartNever pod", func() {
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
@@ -89,25 +208,34 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		}
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
-		wr := watch.NewRecorder(w)
+
+		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+				options.FieldSelector = fieldSelector
+				return podClient.Watch(context.TODO(), options)
+			},
+		}
+		var events []watch.Event
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
 		defer cancel()
-		event, err := watchtools.UntilWithoutRetry(ctx, wr, conditions.PodCompleted)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
-		endPod := event.Object.(*v1.Pod)
-		Expect(endPod.Status.Phase).To(Equal(v1.PodSucceeded))
-		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionTrue))
+		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w,
+			recordEvents(events, conditions.PodCompleted),
+		)
+		gomega.Expect(err).To(gomega.BeNil())
 
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+		checkInvariants(events, containerInitInvariant)
+		endPod := event.Object.(*v1.Pod)
+		framework.ExpectEqual(endPod.Status.Phase, v1.PodSucceeded)
+		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
+		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectEqual(init.Status, v1.ConditionTrue)
+
+		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			Expect(status.Ready).To(BeTrue())
-			Expect(status.State.Terminated).NotTo(BeNil())
-			Expect(status.State.Terminated.ExitCode).To(BeZero())
+			framework.ExpectEqual(status.Ready, true)
+			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
+			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
 	})
 
@@ -120,7 +248,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		when Pod has restart policy as RestartAlways.
 	*/
 	framework.ConformanceIt("should invoke init containers on a RestartAlways pod", func() {
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
@@ -150,8 +278,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
+								v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
 					},
@@ -160,25 +287,32 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		}
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
-		wr := watch.NewRecorder(w)
+
+		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+				options.FieldSelector = fieldSelector
+				return podClient.Watch(context.TODO(), options)
+			},
+		}
+		var events []watch.Event
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
 		defer cancel()
-		event, err := watchtools.UntilWithoutRetry(ctx, wr, conditions.PodRunning)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
-		endPod := event.Object.(*v1.Pod)
-		Expect(endPod.Status.Phase).To(Equal(v1.PodRunning))
-		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionTrue))
+		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w, recordEvents(events, conditions.PodRunning))
+		gomega.Expect(err).To(gomega.BeNil())
 
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+		checkInvariants(events, containerInitInvariant)
+		endPod := event.Object.(*v1.Pod)
+		framework.ExpectEqual(endPod.Status.Phase, v1.PodRunning)
+		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
+		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectEqual(init.Status, v1.ConditionTrue)
+
+		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			Expect(status.Ready).To(BeTrue())
-			Expect(status.State.Terminated).NotTo(BeNil())
-			Expect(status.State.Terminated.ExitCode).To(BeZero())
+			framework.ExpectEqual(status.Ready, true)
+			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
+			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
 	})
 
@@ -191,7 +325,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		and pod has restart policy as RestartAlways.
 	*/
 	framework.ConformanceIt("should not start app containers if init containers fail on a RestartAlways pod", func() {
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 
@@ -222,8 +356,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
+								v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
 					},
@@ -232,14 +365,22 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		}
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
-		wr := watch.NewRecorder(w)
+		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+				options.FieldSelector = fieldSelector
+				return podClient.Watch(context.TODO(), options)
+			},
+		}
+
+		var events []watch.Event
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
 		defer cancel()
-		event, err := watchtools.UntilWithoutRetry(
-			ctx, wr,
+		event, err := watchtools.Until(
+			ctx,
+			startedPod.ResourceVersion,
+			w,
 			// check for the first container to fail at least once
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
@@ -288,16 +429,17 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				}
 			},
 		)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
+		gomega.Expect(err).To(gomega.BeNil())
+
+		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
-		Expect(endPod.Status.Phase).To(Equal(v1.PodPending))
+		framework.ExpectEqual(endPod.Status.Phase, v1.PodPending)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionFalse))
-		Expect(init.Reason).To(Equal("ContainersNotInitialized"))
-		Expect(init.Message).To(Equal("containers with incomplete status: [init1 init2]"))
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
+		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectEqual(init.Status, v1.ConditionFalse)
+		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")
+		framework.ExpectEqual(init.Message, "containers with incomplete status: [init1 init2]")
+		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 	})
 
 	/*
@@ -307,7 +449,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		when at least one InitContainer fails to start and Pod has restart policy as RestartNever.
 	*/
 	framework.ConformanceIt("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
@@ -339,8 +481,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Command: []string{"/bin/true"},
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
+								v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
 					},
@@ -350,64 +491,71 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
 		startedPod := podClient.Create(pod)
 
-		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
-		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
+		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
+		w := &cache.ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+				options.FieldSelector = fieldSelector
+				return podClient.Watch(context.TODO(), options)
+			},
+		}
 
-		wr := watch.NewRecorder(w)
+		var events []watch.Event
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
 		defer cancel()
-		event, err := watchtools.UntilWithoutRetry(
-			ctx, wr,
-			// check for the second container to fail at least once
-			func(evt watch.Event) (bool, error) {
-				switch t := evt.Object.(type) {
-				case *v1.Pod:
-					for _, status := range t.Status.ContainerStatuses {
-						if status.State.Waiting == nil {
-							return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
+		event, err := watchtools.Until(
+			ctx, startedPod.ResourceVersion, w,
+			recordEvents(events,
+				// check for the second container to fail at least once
+				func(evt watch.Event) (bool, error) {
+					switch t := evt.Object.(type) {
+					case *v1.Pod:
+						for _, status := range t.Status.ContainerStatuses {
+							if status.State.Waiting == nil {
+								return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
+							}
+							if status.State.Waiting.Reason != "PodInitializing" {
+								return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
+							}
 						}
-						if status.State.Waiting.Reason != "PodInitializing" {
-							return false, fmt.Errorf("container %q should have reason PodInitializing: %#v", status.Name, status)
+						if len(t.Status.InitContainerStatuses) != 2 {
+							return false, nil
 						}
-					}
-					if len(t.Status.InitContainerStatuses) != 2 {
-						return false, nil
-					}
-					status := t.Status.InitContainerStatuses[0]
-					if status.State.Terminated == nil {
-						if status.State.Waiting != nil && status.State.Waiting.Reason != "PodInitializing" {
-							return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
+						status := t.Status.InitContainerStatuses[0]
+						if status.State.Terminated == nil {
+							if status.State.Waiting != nil && status.State.Waiting.Reason != "PodInitializing" {
+								return false, fmt.Errorf("second init container should have reason PodInitializing: %#v", status)
+							}
+							return false, nil
 						}
-						return false, nil
+						if status.State.Terminated != nil && status.State.Terminated.ExitCode != 0 {
+							return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
+						}
+						status = t.Status.InitContainerStatuses[1]
+						if status.State.Terminated == nil {
+							return false, nil
+						}
+						if status.State.Terminated.ExitCode == 0 {
+							return false, fmt.Errorf("second init container should have failed: %#v", status)
+						}
+						return true, nil
+					default:
+						return false, fmt.Errorf("unexpected object: %#v", t)
 					}
-					if status.State.Terminated != nil && status.State.Terminated.ExitCode != 0 {
-						return false, fmt.Errorf("first init container should have exitCode != 0: %#v", status)
-					}
-					status = t.Status.InitContainerStatuses[1]
-					if status.State.Terminated == nil {
-						return false, nil
-					}
-					if status.State.Terminated.ExitCode == 0 {
-						return false, fmt.Errorf("second init container should have failed: %#v", status)
-					}
-					return true, nil
-				default:
-					return false, fmt.Errorf("unexpected object: %#v", t)
-				}
-			},
-			conditions.PodCompleted,
+				}),
+			recordEvents(events, conditions.PodCompleted),
 		)
-		Expect(err).To(BeNil())
-		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
+		gomega.Expect(err).To(gomega.BeNil())
+
+		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
 
-		Expect(endPod.Status.Phase).To(Equal(v1.PodFailed))
+		framework.ExpectEqual(endPod.Status.Phase, v1.PodFailed)
 		_, init := podutil.GetPodCondition(&endPod.Status, v1.PodInitialized)
-		Expect(init).NotTo(BeNil())
-		Expect(init.Status).To(Equal(v1.ConditionFalse))
-		Expect(init.Reason).To(Equal("ContainersNotInitialized"))
-		Expect(init.Message).To(Equal("containers with incomplete status: [init2]"))
-		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
-		Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(BeNil())
+		gomega.Expect(init).NotTo(gomega.BeNil())
+		framework.ExpectEqual(init.Status, v1.ConditionFalse)
+		framework.ExpectEqual(init.Reason, "ContainersNotInitialized")
+		framework.ExpectEqual(init.Message, "containers with incomplete status: [init2]")
+		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
+		gomega.Expect(endPod.Status.ContainerStatuses[0].State.Waiting).ToNot(gomega.BeNil())
 	})
 })

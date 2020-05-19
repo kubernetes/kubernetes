@@ -7,6 +7,8 @@ import (
 	"crypto/rsa"
 	"math/big"
 	"strconv"
+
+	"golang.org/x/crypto/ed25519"
 )
 
 const format = "Private-key-format: v1.3\n"
@@ -78,6 +80,12 @@ func (r *DNSKEY) PrivateKeyString(p crypto.PrivateKey) string {
 			"Base(g): " + base + "\n" +
 			"Private_value(x): " + priv + "\n" +
 			"Public_value(y): " + pub + "\n"
+
+	case ed25519.PrivateKey:
+		private := toBase64(p.Seed())
+		return format +
+			"Algorithm: " + algorithm + "\n" +
+			"PrivateKey: " + private + "\n"
 
 	default:
 		return ""

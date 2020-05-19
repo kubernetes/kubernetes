@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"flag"
 	"net"
 	"net/http"
@@ -26,17 +27,8 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/pborman/uuid"
-	apps "k8s.io/api/apps/v1beta1"
-	auditreg "k8s.io/api/auditregistration/v1alpha1"
-	autoscaling "k8s.io/api/autoscaling/v1"
-	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
-	nodev1alpha1 "k8s.io/api/node/v1alpha1"
-	rbac "k8s.io/api/rbac/v1alpha1"
-	storage "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/google/uuid"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
@@ -47,22 +39,24 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog"
+	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -80,7 +74,7 @@ type Config struct {
 // alwaysAllow always allows an action
 type alwaysAllow struct{}
 
-func (alwaysAllow) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	return authorizer.DecisionAllow, "always allow", nil
 }
 
@@ -151,7 +145,9 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
-		m.GenericAPIServer.RunPreShutdownHooks()
+		if m != nil {
+			m.GenericAPIServer.RunPreShutdownHooks()
+		}
 		close(stopCh)
 		s.Close()
 	}
@@ -167,12 +163,12 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 	masterConfig.GenericConfig.LoopbackClientConfig.Host = s.URL
 
-	privilegedLoopbackToken := uuid.NewRandom().String()
+	privilegedLoopbackToken := uuid.New().String()
 	// wrap any available authorizer
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,
-		UID:    uuid.NewRandom().String(),
+		UID:    uuid.New().String(),
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 
@@ -198,8 +194,20 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
+		masterConfig.GenericConfig.FlowControl = utilflowcontrol.New(
+			masterConfig.ExtraConfig.VersionedInformers,
+			clientset.FlowcontrolV1alpha1(),
+			masterConfig.GenericConfig.MaxRequestsInFlight+masterConfig.GenericConfig.MaxMutatingRequestsInFlight,
+			masterConfig.GenericConfig.RequestTimeout/4,
+		)
+	}
+
 	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
+		// We log the error first so that even if closeFn crashes, the error is shown
+		klog.Errorf("error in bringing up the master: %v", err)
 		closeFn()
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -222,7 +230,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		result := privilegedClient.Get().AbsPath("/healthz").Do()
+		result := privilegedClient.Get().AbsPath("/healthz").Do(context.TODO())
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {
@@ -242,7 +250,13 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 // NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
 func NewIntegrationTestMasterConfig() *master.Config {
-	masterConfig := NewMasterConfig()
+	return NewIntegrationTestMasterConfigWithOptions(&MasterConfigOptions{})
+}
+
+// NewIntegrationTestMasterConfigWithOptions returns the master config appropriate for most integration tests
+// configured with the provided options.
+func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+	masterConfig := NewMasterConfigWithOptions(opts)
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 
@@ -252,70 +266,43 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	return masterConfig
 }
 
-// NewMasterConfig returns a basic master config.
-func NewMasterConfig() *master.Config {
+// MasterConfigOptions are the configurable options for a new integration test master config.
+type MasterConfigOptions struct {
+	EtcdOptions *options.EtcdOptions
+}
+
+// DefaultEtcdOptions are the default EtcdOptions for use with integration tests.
+func DefaultEtcdOptions() *options.EtcdOptions {
 	// This causes the integration tests to exercise the etcd
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
-	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
+	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New().String(), nil))
 	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
+	return etcdOptions
+}
 
-	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
+// NewMasterConfig returns a basic master config.
+func NewMasterConfig() *master.Config {
+	return NewMasterConfigWithOptions(&MasterConfigOptions{})
+}
 
-	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
-	// FIXME (soltysh): this GroupVersionResource override should be configurable
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: batch.GroupName, Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	// we also need to set both for the storage group and for volumeattachments, separately
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csinodes"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csidrivers"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+// NewMasterConfigWithOptions returns a basic master config configured with the provided options.
+func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+	etcdOptions := DefaultEtcdOptions()
+	if opts.EtcdOptions != nil {
+		etcdOptions = opts.EtcdOptions
+	}
 
-	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: v1.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: autoscaling.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: batch.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: apps.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: extensions.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: policy.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: rbac.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: certificates.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: storage.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: auditreg.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: nodev1alpha1.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
+	storageConfig := kubeapiserver.NewStorageFactoryConfig()
+	storageConfig.APIResourceConfig = serverstorage.NewResourceConfig()
+	completedStorageConfig, err := storageConfig.Complete(etcdOptions)
+	if err != nil {
+		panic(err)
+	}
+	storageFactory, err := completedStorageConfig.New()
+	if err != nil {
+		panic(err)
+	}
 
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
@@ -325,7 +312,7 @@ func NewMasterConfig() *master.Config {
 	// TODO: get rid of these tests or port them to secure serving
 	genericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
-	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
+	err = etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -361,7 +348,7 @@ func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, mast
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
 func SharedEtcd() *storagebackend.Config {
-	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
+	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg
 }

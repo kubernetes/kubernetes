@@ -24,8 +24,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
@@ -38,26 +36,14 @@ func newSharedNodeInformer(client clientset.Interface, nodeName string,
 	updateFunc func(oldObj interface{}, newObj interface{}),
 	deleteFunc func(deletedObj interface{})) cache.SharedInformer {
 	// select nodes by name
-	fieldselector := fields.OneTermEqualSelector("metadata.name", nodeName)
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", nodeName)
 
 	// add some randomness to resync period, which can help avoid controllers falling into lock-step
 	minResyncPeriod := 15 * time.Minute
 	factor := rand.Float64() + 1
 	resyncPeriod := time.Duration(float64(minResyncPeriod.Nanoseconds()) * factor)
 
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (kuberuntime.Object, error) {
-			return client.CoreV1().Nodes().List(metav1.ListOptions{
-				FieldSelector: fieldselector.String(),
-			})
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Nodes().Watch(metav1.ListOptions{
-				FieldSelector:   fieldselector.String(),
-				ResourceVersion: options.ResourceVersion,
-			})
-		},
-	}
+	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
 
 	handler := cache.ResourceEventHandlerFuncs{
 		AddFunc:    addFunc,

@@ -20,7 +20,7 @@
 //  + combined operations such as AddRound/MulAdd etc
 //  + exchanging data in decimal32/64/128 formats
 //
-package inf
+package inf // import "gopkg.in/inf.v0"
 
 // TODO:
 //  - avoid excessive deep copying (quo and rounders)
@@ -104,7 +104,7 @@ var bigInt = [...]*big.Int{
 
 var exp10cache [64]big.Int = func() [64]big.Int {
 	e10, e10i := [64]big.Int{}, bigInt[1]
-	for i, _ := range e10 {
+	for i := range e10 {
 		e10[i].Set(e10i)
 		e10i = new(big.Int).Mul(e10i, bigInt[10])
 	}

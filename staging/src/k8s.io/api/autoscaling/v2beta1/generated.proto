@@ -32,7 +32,7 @@ option go_package = "v2beta1";
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
-  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+  // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
   optional string kind = 1;
 
   // Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
@@ -92,12 +92,12 @@ message ExternalMetricStatus {
 // implementing the scale subresource based on the metrics specified.
 message HorizontalPodAutoscaler {
   // metadata is the standard object metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the specification for the behaviour of the autoscaler.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
   optional HorizontalPodAutoscalerSpec spec = 2;
 
@@ -146,8 +146,11 @@ message HorizontalPodAutoscalerSpec {
   // should be collected, as well as to actually change the replica count.
   optional CrossVersionObjectReference scaleTargetRef = 1;
 
-  // minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.
-  // It defaults to 1 pod.
+  // minReplicas is the lower limit for the number of replicas to which the autoscaler
+  // can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
+  // alpha feature gate HPAScaleToZero is enabled and at least one Object or External
+  // metric is configured.  Scaling is active as long as at least one metric value is
+  // available.
   // +optional
   optional int32 minReplicas = 2;
 

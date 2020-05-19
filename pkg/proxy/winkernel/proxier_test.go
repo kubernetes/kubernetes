@@ -20,8 +20,10 @@ package winkernel
 
 import (
 	"k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 
 	"net"
 	"strings"
@@ -38,27 +40,6 @@ const destinationPrefix = "192.168.2.0/24"
 const providerAddress = "10.0.0.3"
 const guid = "123ABC"
 
-type fakeHealthChecker struct {
-	services  map[types.NamespacedName]uint16
-	endpoints map[types.NamespacedName]int
-}
-
-func newFakeHealthChecker() *fakeHealthChecker {
-	return &fakeHealthChecker{
-		services:  map[types.NamespacedName]uint16{},
-		endpoints: map[types.NamespacedName]int{},
-	}
-}
-func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName]uint16) error {
-	fake.services = newServices
-	return nil
-}
-
-func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
-	fake.endpoints = newEndpoints
-	return nil
-}
-
 type fakeHNS struct{}
 
 func newFakeHNS() *fakeHNS {
@@ -68,7 +49,7 @@ func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	var remoteSubnets []*remoteSubnetInfo
 	rs := &remoteSubnetInfo{
 		destinationPrefix: destinationPrefix,
-		isolationId:       4096,
+		isolationID:       4096,
 		providerAddress:   providerAddress,
 		drMacAddress:      macAddress,
 	}
@@ -110,7 +91,7 @@ func (hns fakeHNS) createEndpoint(ep *endpointsInfo, networkName string) (*endpo
 func (hns fakeHNS) deleteEndpoint(hnsID string) error {
 	return nil
 }
-func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
 	return &loadBalancerInfo{
 		hnsID: guid,
 	}, nil
@@ -125,20 +106,20 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		networkType: networkType,
 	}
 	proxier := &Proxier{
-		portsMap:         make(map[localPort]closeable),
-		serviceMap:       make(proxyServiceMap),
-		serviceChanges:   newServiceChangeMap(),
-		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(hostname),
-		clusterCIDR:      clusterCIDR,
-		hostname:         testHostName,
-		nodeIP:           nodeIP,
-		healthChecker:    newFakeHealthChecker(),
-		network:          *hnsNetworkInfo,
-		sourceVip:        sourceVip,
-		hostMac:          macAddress,
-		isDSR:            false,
-		hns:              newFakeHNS(),
+		portsMap:            make(map[localPort]closeable),
+		serviceMap:          make(proxyServiceMap),
+		serviceChanges:      newServiceChangeMap(),
+		endpointsMap:        make(proxyEndpointsMap),
+		endpointsChanges:    newEndpointsChangeMap(hostname),
+		clusterCIDR:         clusterCIDR,
+		hostname:            testHostName,
+		nodeIP:              nodeIP,
+		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
+		network:             *hnsNetworkInfo,
+		sourceVip:           sourceVip,
+		hostMac:             macAddress,
+		isDSR:               false,
+		hns:                 newFakeHNS(),
 	}
 	return proxier
 }
@@ -331,6 +312,15 @@ func TestCreateLoadBalancer(t *testing.T) {
 		t.Errorf("%v does not match %v", proxier.serviceMap[svcPortName].hnsID, guid)
 	}
 }
+
+func TestNoopEndpointSlice(t *testing.T) {
+	p := Proxier{}
+	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
+	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
+	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
+	p.OnEndpointSlicesSynced()
+}
+
 func makeNSN(namespace, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
 }

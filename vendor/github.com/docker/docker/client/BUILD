@@ -3,11 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "build_cancel.go",
         "build_prune.go",
         "checkpoint_create.go",
         "checkpoint_delete.go",
         "checkpoint_list.go",
         "client.go",
+        "client_deprecated.go",
         "client_unix.go",
         "client_windows.go",
         "config_create.go",
@@ -74,6 +76,7 @@ go_library(
         "node_list.go",
         "node_remove.go",
         "node_update.go",
+        "options.go",
         "ping.go",
         "plugin_create.go",
         "plugin_disable.go",
@@ -97,7 +100,6 @@ go_library(
         "service_logs.go",
         "service_remove.go",
         "service_update.go",
-        "session.go",
         "swarm_get_unlock_key.go",
         "swarm_init.go",
         "swarm_inspect.go",
@@ -134,11 +136,11 @@ go_library(
         "//vendor/github.com/docker/docker/api/types/time:go_default_library",
         "//vendor/github.com/docker/docker/api/types/versions:go_default_library",
         "//vendor/github.com/docker/docker/api/types/volume:go_default_library",
+        "//vendor/github.com/docker/docker/errdefs:go_default_library",
         "//vendor/github.com/docker/go-connections/sockets:go_default_library",
         "//vendor/github.com/docker/go-connections/tlsconfig:go_default_library",
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",
     ],
 )
 

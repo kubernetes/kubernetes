@@ -14,14 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# locate all API groups by their packages and versions
-
+# This scripts locates all API groups by their packages and versions
+# Usage: `hack/verify-api-groups.sh`.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 prefix="${KUBE_ROOT%"k8s.io/kubernetes"}"
 
@@ -44,7 +44,7 @@ for register_file in "${register_files[@]}"; do
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
 	if grep -q 'GroupName = "' "${register_file}"; then
-		group_name=$(grep -q 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
+		group_name=$(grep 'GroupName = "' "${register_file}" | cut -d\" -f2 -)
 	else
 		echo "${register_file} is missing \"const GroupName =\""
 		exit 1
@@ -98,7 +98,6 @@ packages_without_install=(
 )
 known_version_files=(
 	"pkg/master/import_known_versions.go"
-	"pkg/client/clientset_generated/internal_clientset/import_known_versions.go"
 )
 for expected_install_package in "${expected_install_packages[@]}"; do
 	found=0
@@ -112,8 +111,8 @@ for expected_install_package in "${expected_install_packages[@]}"; do
 	fi
 
 	for known_version_file in "${known_version_files[@]}"; do
-		if ! grep -q "${expected_install_package}/install" ${known_version_files} ; then
-			echo "missing ${expected_install_package}/install from ${known_version_files}"
+		if ! grep -q "${expected_install_package}/install" "${known_version_file}" ; then
+			echo "missing ${expected_install_package}/install from ${known_version_file}"
 			exit 1
 		fi
 	done

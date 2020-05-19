@@ -14,7 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a vestigial redirection.  Please do not add "real" logic.
+# This script vets all *.go files by running `go vet`. It is equivalent to
+# `make vet`.
+# Usage: `hack/verify-govet.sh` or `make vet`.
+# Note: This script is a vestigial redirection. Please do not add "real" logic.
 
 set -o errexit
 set -o nounset

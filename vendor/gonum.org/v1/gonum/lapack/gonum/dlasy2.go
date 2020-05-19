@@ -12,10 +12,10 @@ import (
 
 // Dlasy2 solves the Sylvester matrix equation where the matrices are of order 1
 // or 2. It computes the unknown n1×n2 matrix X so that
-//  TL*X   + sgn*X*TR   = scale*B,  if tranl == false and tranr == false,
-//  TL^T*X + sgn*X*TR   = scale*B,  if tranl == true  and tranr == false,
-//  TL*X   + sgn*X*TR^T = scale*B,  if tranl == false and tranr == true,
-//  TL^T*X + sgn*X*TR^T = scale*B,  if tranl == true  and tranr == true,
+//  TL*X   + sgn*X*TR  = scale*B  if tranl == false and tranr == false,
+//  TLᵀ*X + sgn*X*TR   = scale*B  if tranl == true  and tranr == false,
+//  TL*X   + sgn*X*TRᵀ = scale*B  if tranl == false and tranr == true,
+//  TLᵀ*X + sgn*X*TRᵀ  = scale*B  if tranl == true  and tranr == true,
 // where TL is n1×n1, TR is n2×n2, B is n1×n2, and 1 <= n1,n2 <= 2.
 //
 // isgn must be 1 or -1, and n1 and n2 must be 0, 1, or 2, but these conditions

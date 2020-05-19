@@ -34,10 +34,14 @@ go_test(
     embed = [":go_default_library"],
     tags = ["integration"],
     deps = [
+        "//cmd/kube-apiserver/app/testing:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//test/integration/framework:go_default_library",
     ],
 )

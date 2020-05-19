@@ -58,7 +58,7 @@ func (in *CronJob) DeepCopyObject() runtime.Object {
 func (in *CronJobList) DeepCopyInto(out *CronJobList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]CronJob, len(*in))
@@ -199,7 +199,7 @@ func (in *JobCondition) DeepCopy() *JobCondition {
 func (in *JobList) DeepCopyInto(out *JobList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Job, len(*in))

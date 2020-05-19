@@ -24,6 +24,7 @@ import (
 	unsafe "unsafe"
 
 	v1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
@@ -149,7 +150,17 @@ func Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_Certific
 
 func autoConvert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in *v1beta1.CertificateSigningRequestList, out *certificates.CertificateSigningRequestList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]certificates.CertificateSigningRequest)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]certificates.CertificateSigningRequest, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -160,7 +171,17 @@ func Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSi
 
 func autoConvert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(in *certificates.CertificateSigningRequestList, out *v1beta1.CertificateSigningRequestList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.CertificateSigningRequest)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.CertificateSigningRequest, len(*in))
+		for i := range *in {
+			if err := Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -171,6 +192,9 @@ func Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSi
 
 func autoConvert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *v1beta1.CertificateSigningRequestSpec, out *certificates.CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
+	if err := v1.Convert_Pointer_string_To_string(&in.SignerName, &out.SignerName, s); err != nil {
+		return err
+	}
 	out.Usages = *(*[]certificates.KeyUsage)(unsafe.Pointer(&in.Usages))
 	out.Username = in.Username
 	out.UID = in.UID
@@ -186,6 +210,9 @@ func Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSi
 
 func autoConvert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in *certificates.CertificateSigningRequestSpec, out *v1beta1.CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
+	if err := v1.Convert_string_To_Pointer_string(&in.SignerName, &out.SignerName, s); err != nil {
+		return err
+	}
 	out.Usages = *(*[]v1beta1.KeyUsage)(unsafe.Pointer(&in.Usages))
 	out.Username = in.Username
 	out.UID = in.UID

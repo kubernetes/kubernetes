@@ -1,0 +1,15 @@
+language: go
+env:
+  -  GO111MODULE=on
+sudo: required
+go:
+  - "1.11.x"
+  - tip
+os:
+  - linux
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+script:
+  - make check

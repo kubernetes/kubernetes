@@ -3,12 +3,11 @@ sudo: false
 
 matrix:
   include:
-    - go: 1.4
-    - go: 1.5
-    - go: 1.6
-    - go: 1.7
-    - go: 1.8
-    - go: 1.9
+    - go: 1.7.x
+    - go: 1.8.x
+    - go: 1.9.x
+    - go: 1.10.x
+    - go: 1.11.x
     - go: tip
   allow_failures:
     - go: tip

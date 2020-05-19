@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // TlsTransportCache caches TLS http.RoundTrippers different configurations. The
@@ -39,13 +41,18 @@ const idleConnsPerHost = 25
 var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
 
 type tlsCacheKey struct {
-	insecure   bool
-	caData     string
-	certData   string
-	keyData    string
-	getCert    string
-	serverName string
-	dial       string
+	insecure           bool
+	caData             string
+	certData           string
+	keyData            string
+	certFile           string
+	keyFile            string
+	getCert            string
+	serverName         string
+	nextProtos         string
+	dial               string
+	disableCompression bool
+	proxy              string
 }
 
 func (t tlsCacheKey) String() string {
@@ -53,7 +60,7 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, getCert: %s, serverName:%s, dial:%s", t.insecure, t.caData, t.certData, keyText, t.getCert, t.serverName, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, getCert: %s, serverName:%s, dial:%s disableCompression:%t, proxy: %s", t.insecure, t.caData, t.certData, keyText, t.getCert, t.serverName, t.dial, t.disableCompression, t.proxy)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -77,7 +84,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 	// The options didn't require a custom TLS config
-	if tlsConfig == nil && config.Dial == nil {
+	if tlsConfig == nil && config.Dial == nil && config.Proxy == nil {
 		return http.DefaultTransport, nil
 	}
 
@@ -88,13 +95,29 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 			KeepAlive: 30 * time.Second,
 		}).DialContext
 	}
+
+	// If we use are reloading files, we need to handle certificate rotation properly
+	// TODO(jackkleeman): We can also add rotation here when config.HasCertCallback() is true
+	if config.TLS.ReloadTLSFiles {
+		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
+		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
+		dial = dynamicCertDialer.connDialer.DialContext
+		go dynamicCertDialer.Run(wait.NeverStop)
+	}
+
+	proxy := http.ProxyFromEnvironment
+	if config.Proxy != nil {
+		proxy = config.Proxy
+	}
+
 	// Cache a single transport for these options
 	c.transports[key] = utilnet.SetTransportDefaults(&http.Transport{
-		Proxy:               http.ProxyFromEnvironment,
+		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
 		DialContext:         dial,
+		DisableCompression:  config.DisableCompression,
 	})
 	return c.transports[key], nil
 }
@@ -105,13 +128,24 @@ func tlsConfigKey(c *Config) (tlsCacheKey, error) {
 	if err := loadTLSFiles(c); err != nil {
 		return tlsCacheKey{}, err
 	}
-	return tlsCacheKey{
-		insecure:   c.TLS.Insecure,
-		caData:     string(c.TLS.CAData),
-		certData:   string(c.TLS.CertData),
-		keyData:    string(c.TLS.KeyData),
-		getCert:    fmt.Sprintf("%p", c.TLS.GetCert),
-		serverName: c.TLS.ServerName,
-		dial:       fmt.Sprintf("%p", c.Dial),
-	}, nil
+	k := tlsCacheKey{
+		insecure:           c.TLS.Insecure,
+		caData:             string(c.TLS.CAData),
+		getCert:            fmt.Sprintf("%p", c.TLS.GetCert),
+		serverName:         c.TLS.ServerName,
+		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
+		dial:               fmt.Sprintf("%p", c.Dial),
+		disableCompression: c.DisableCompression,
+		proxy:              fmt.Sprintf("%p", c.Proxy),
+	}
+
+	if c.TLS.ReloadTLSFiles {
+		k.certFile = c.TLS.CertFile
+		k.keyFile = c.TLS.KeyFile
+	} else {
+		k.certData = string(c.TLS.CertData)
+		k.keyData = string(c.TLS.KeyData)
+	}
+
+	return k, nil
 }

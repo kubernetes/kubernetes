@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// ResourceMatches returns the result of the rule.Resources matching.
 func ResourceMatches(rule *PolicyRule, combinedRequestedResource, requestedSubresource string) bool {
 	for _, ruleResource := range rule.Resources {
 		// if everything is allowed, we match
@@ -52,7 +53,7 @@ func ResourceMatches(rule *PolicyRule, combinedRequestedResource, requestedSubre
 	return false
 }
 
-// subjectsStrings returns users, groups, serviceaccounts, unknown for display purposes.
+// SubjectsStrings returns users, groups, serviceaccounts, unknown for display purposes.
 func SubjectsStrings(subjects []Subject) ([]string, []string, []string, []string) {
 	users := []string{}
 	groups := []string{}
@@ -110,40 +111,46 @@ func (r PolicyRule) CompactString() string {
 	return fmt.Sprintf(formatString, formatArgs...)
 }
 
-// +k8s:deepcopy-gen=false
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct rules in code.  It's more compact than trying to write them
 // out in a literal and allows us to perform some basic checking during construction
+// +k8s:deepcopy-gen=false
 type PolicyRuleBuilder struct {
 	PolicyRule PolicyRule
 }
 
+// NewRule returns new PolicyRule made by input verbs.
 func NewRule(verbs ...string) *PolicyRuleBuilder {
 	return &PolicyRuleBuilder{
 		PolicyRule: PolicyRule{Verbs: sets.NewString(verbs...).List()},
 	}
 }
 
+// Groups combines the PolicyRule.APIGroups and input groups.
 func (r *PolicyRuleBuilder) Groups(groups ...string) *PolicyRuleBuilder {
 	r.PolicyRule.APIGroups = combine(r.PolicyRule.APIGroups, groups)
 	return r
 }
 
+// Resources combines the PolicyRule.Rule and input resources.
 func (r *PolicyRuleBuilder) Resources(resources ...string) *PolicyRuleBuilder {
 	r.PolicyRule.Resources = combine(r.PolicyRule.Resources, resources)
 	return r
 }
 
+// Names combines the PolicyRule.ResourceNames and input names.
 func (r *PolicyRuleBuilder) Names(names ...string) *PolicyRuleBuilder {
 	r.PolicyRule.ResourceNames = combine(r.PolicyRule.ResourceNames, names)
 	return r
 }
 
+// URLs combines the PolicyRule.NonResourceURLs and input urls.
 func (r *PolicyRuleBuilder) URLs(urls ...string) *PolicyRuleBuilder {
 	r.PolicyRule.NonResourceURLs = combine(r.PolicyRule.NonResourceURLs, urls)
 	return r
 }
 
+// RuleOrDie calls the binding method and panics if there is an error.
 func (r *PolicyRuleBuilder) RuleOrDie() PolicyRule {
 	ret, err := r.Rule()
 	if err != nil {
@@ -158,6 +165,7 @@ func combine(s1, s2 []string) []string {
 	return s.List()
 }
 
+// Rule returns PolicyRule and error.
 func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 	if len(r.PolicyRule.Verbs) == 0 {
 		return PolicyRule{}, fmt.Errorf("verbs are required: %#v", r.PolicyRule)
@@ -198,14 +206,18 @@ func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 	return r.PolicyRule, nil
 }
 
-// +k8s:deepcopy-gen=false
 // ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct bindings in code.  It's more compact than trying to write them
 // out in a literal.
+// +k8s:deepcopy-gen=false
 type ClusterRoleBindingBuilder struct {
 	ClusterRoleBinding ClusterRoleBinding
 }
 
+// NewClusterBinding creates a ClusterRoleBinding builder that can be used
+// to define the subjects of a cluster role binding. At least one of
+// the `Groups`, `Users` or `SAs` method must be called before
+// calling the `Binding*` methods.
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	return &ClusterRoleBindingBuilder{
 		ClusterRoleBinding: ClusterRoleBinding{
@@ -219,6 +231,7 @@ func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	}
 }
 
+// Groups adds the specified groups as the subjects of the ClusterRoleBinding.
 func (r *ClusterRoleBindingBuilder) Groups(groups ...string) *ClusterRoleBindingBuilder {
 	for _, group := range groups {
 		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: GroupKind, APIGroup: GroupName, Name: group})
@@ -226,6 +239,7 @@ func (r *ClusterRoleBindingBuilder) Groups(groups ...string) *ClusterRoleBinding
 	return r
 }
 
+// Users adds the specified users as the subjects of the ClusterRoleBinding.
 func (r *ClusterRoleBindingBuilder) Users(users ...string) *ClusterRoleBindingBuilder {
 	for _, user := range users {
 		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: UserKind, APIGroup: GroupName, Name: user})
@@ -233,6 +247,7 @@ func (r *ClusterRoleBindingBuilder) Users(users ...string) *ClusterRoleBindingBu
 	return r
 }
 
+// SAs adds the specified sas as the subjects of the ClusterRoleBinding.
 func (r *ClusterRoleBindingBuilder) SAs(namespace string, serviceAccountNames ...string) *ClusterRoleBindingBuilder {
 	for _, saName := range serviceAccountNames {
 		r.ClusterRoleBinding.Subjects = append(r.ClusterRoleBinding.Subjects, Subject{Kind: ServiceAccountKind, Namespace: namespace, Name: saName})
@@ -240,6 +255,7 @@ func (r *ClusterRoleBindingBuilder) SAs(namespace string, serviceAccountNames ..
 	return r
 }
 
+// BindingOrDie calls the binding method and panics if there is an error.
 func (r *ClusterRoleBindingBuilder) BindingOrDie() ClusterRoleBinding {
 	ret, err := r.Binding()
 	if err != nil {
@@ -248,6 +264,8 @@ func (r *ClusterRoleBindingBuilder) BindingOrDie() ClusterRoleBinding {
 	return ret
 }
 
+// Binding builds and returns the ClusterRoleBinding API object from the builder
+// object.
 func (r *ClusterRoleBindingBuilder) Binding() (ClusterRoleBinding, error) {
 	if len(r.ClusterRoleBinding.Subjects) == 0 {
 		return ClusterRoleBinding{}, fmt.Errorf("subjects are required: %#v", r.ClusterRoleBinding)
@@ -256,9 +274,9 @@ func (r *ClusterRoleBindingBuilder) Binding() (ClusterRoleBinding, error) {
 	return r.ClusterRoleBinding, nil
 }
 
-// +k8s:deepcopy-gen=false
 // RoleBindingBuilder let's us attach methods. It is similar to
 // ClusterRoleBindingBuilder above.
+// +k8s:deepcopy-gen=false
 type RoleBindingBuilder struct {
 	RoleBinding RoleBinding
 }
@@ -283,6 +301,10 @@ func NewRoleBinding(roleName, namespace string) *RoleBindingBuilder {
 	}
 }
 
+// NewRoleBindingForClusterRole creates a RoleBinding builder that can be used
+// to define the subjects of a cluster role binding. At least one of
+// the `Groups`, `Users` or `SAs` method must be called before
+// calling the `Binding*` methods.
 func NewRoleBindingForClusterRole(roleName, namespace string) *RoleBindingBuilder {
 	return &RoleBindingBuilder{
 		RoleBinding: RoleBinding{
@@ -343,6 +365,7 @@ func (r *RoleBindingBuilder) Binding() (RoleBinding, error) {
 	return r.RoleBinding, nil
 }
 
+// SortableRuleSlice is the slice of PolicyRule.
 type SortableRuleSlice []PolicyRule
 
 func (s SortableRuleSlice) Len() int      { return len(s) }

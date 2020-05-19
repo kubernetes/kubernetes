@@ -73,7 +73,7 @@ func (in *CertificateSigningRequestCondition) DeepCopy() *CertificateSigningRequ
 func (in *CertificateSigningRequestList) DeepCopyInto(out *CertificateSigningRequestList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]CertificateSigningRequest, len(*in))
@@ -109,6 +109,11 @@ func (in *CertificateSigningRequestSpec) DeepCopyInto(out *CertificateSigningReq
 		in, out := &in.Request, &out.Request
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
+	}
+	if in.SignerName != nil {
+		in, out := &in.SignerName, &out.SignerName
+		*out = new(string)
+		**out = **in
 	}
 	if in.Usages != nil {
 		in, out := &in.Usages, &out.Usages

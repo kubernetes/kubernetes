@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.NamespaceControllerConfiguration)(nil), (*config.NamespaceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_NamespaceControllerConfiguration_To_config_NamespaceControllerConfiguration(a.(*v1alpha1.NamespaceControllerConfiguration), b.(*config.NamespaceControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.NamespaceControllerConfiguration)(nil), (*v1alpha1.NamespaceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(a.(*config.NamespaceControllerConfiguration), b.(*v1alpha1.NamespaceControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.NamespaceControllerConfiguration)(nil), (*v1alpha1.NamespaceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(a.(*config.NamespaceControllerConfiguration), b.(*v1alpha1.NamespaceControllerConfiguration), scope)
 	}); err != nil {

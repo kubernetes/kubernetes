@@ -35,6 +35,91 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	return rt.Response, rt.Err
 }
 
+func TestMaskValue(t *testing.T) {
+	tcs := []struct {
+		key      string
+		value    string
+		expected string
+	}{
+		{
+			key:      "Authorization",
+			value:    "Basic YWxhZGRpbjpvcGVuc2VzYW1l",
+			expected: "Basic <masked>",
+		},
+		{
+			key:      "Authorization",
+			value:    "basic",
+			expected: "basic",
+		},
+		{
+			key:      "Authorization",
+			value:    "Basic",
+			expected: "Basic",
+		},
+		{
+			key:      "Authorization",
+			value:    "Bearer cn389ncoiwuencr",
+			expected: "Bearer <masked>",
+		},
+		{
+			key:      "Authorization",
+			value:    "Bearer",
+			expected: "Bearer",
+		},
+		{
+			key:      "Authorization",
+			value:    "bearer",
+			expected: "bearer",
+		},
+		{
+			key:      "Authorization",
+			value:    "bearer ",
+			expected: "bearer",
+		},
+		{
+			key:      "Authorization",
+			value:    "Negotiate cn389ncoiwuencr",
+			expected: "Negotiate <masked>",
+		},
+		{
+			key:      "ABC",
+			value:    "Negotiate cn389ncoiwuencr",
+			expected: "Negotiate cn389ncoiwuencr",
+		},
+		{
+			key:      "Authorization",
+			value:    "Negotiate",
+			expected: "Negotiate",
+		},
+		{
+			key:      "Authorization",
+			value:    "Negotiate ",
+			expected: "Negotiate",
+		},
+		{
+			key:      "Authorization",
+			value:    "negotiate",
+			expected: "negotiate",
+		},
+		{
+			key:      "Authorization",
+			value:    "abc cn389ncoiwuencr",
+			expected: "<masked>",
+		},
+		{
+			key:      "Authorization",
+			value:    "",
+			expected: "",
+		},
+	}
+	for _, tc := range tcs {
+		maskedValue := maskValue(tc.key, tc.value)
+		if tc.expected != maskedValue {
+			t.Errorf("unexpected value %s, given %s.", maskedValue, tc.value)
+		}
+	}
+}
+
 func TestBearerAuthRoundTripper(t *testing.T) {
 	rt := &testRoundTripper{}
 	req := &http.Request{}

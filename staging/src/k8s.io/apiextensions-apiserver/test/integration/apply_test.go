@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -27,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestApplyBasic(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
@@ -73,7 +74,7 @@ values:
 		Name("mytest").
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err != nil {
 		t.Fatal(err, string(result))
 	}
@@ -82,7 +83,7 @@ values:
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
 		Body([]byte(`{"values":{"numVal": 5}}`)).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err != nil {
 		t.Fatal(err, string(result))
 	}
@@ -93,7 +94,7 @@ values:
 		Name("mytest").
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object, got no error: %s", result)
 	}
@@ -112,7 +113,7 @@ values:
 		Param("force", "true").
 		Param("fieldManager", "apply_test").
 		Body(yamlBody).
-		DoRaw()
+		DoRaw(context.TODO())
 	if err != nil {
 		t.Fatal(err, string(result))
 	}

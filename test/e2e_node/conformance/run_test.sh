@@ -24,8 +24,16 @@
 # TODO(random-liu): Use standard tool to start kubelet in production way (such
 # as systemd, supervisord etc.)
 
-# Refresh sudo credentials if not running on GCE.
-if ! ping -c 1 -q metadata.google.internal &> /dev/null; then
+# Refresh sudo credentials if needed
+if ping -c 1 -q metadata.google.internal &> /dev/null; then
+  echo 'Running on GCE, not asking for sudo credentials'
+elif sudo --non-interactive "$(which bash)" -c true 2> /dev/null; then
+  # if we can run bash without a password, it's a pretty safe bet that either
+  # we can run any command without a password, or that sudo credentials
+  # are already cached - and they've just been re-cached
+  echo 'No need to refresh sudo credentials'
+else
+  echo 'Updating sudo credentials'
   sudo -v || exit 1
 fi
 
@@ -59,12 +67,12 @@ KUBELET_BIN=${KUBELET_BIN:-"kubelet"}
 
 # KUBELET is the kubelet binary path. If it is not specified, assume kubelet is
 # in PATH.
-KUBELET=${KUBELET:-"`which $KUBELET_BIN`"}
+KUBELET=${KUBELET:-"$(which "$KUBELET_BIN")"}
 
 # LOG_DIR is the absolute path of the directory where the test will collect all
 # logs to. By default, use the current directory.
-LOG_DIR=${LOG_DIR:-`pwd`}
-mkdir -p $LOG_DIR
+LOG_DIR=${LOG_DIR:-$(pwd)}
+mkdir -p "$LOG_DIR"
 
 # NETWORK_PLUGIN is the network plugin used by kubelet. Do not use network
 # plugin by default.
@@ -84,7 +92,8 @@ KUBELET_KUBECONFIG=${KUBELET_KUBECONFIG:-"/var/lib/kubelet/kubeconfig"}
 function create-kubelet-kubeconfig() {
   local api_addr="${1}"
   local dest="${2}"
-  local dest_dir="$(dirname "${dest}")"
+  local dest_dir
+  dest_dir="$(dirname "${dest}")"
   mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
   sudo=$(test -w "${dest_dir}" || echo "sudo -E")
   cat <<EOF | ${sudo} tee "${dest}" > /dev/null
@@ -106,10 +115,12 @@ EOF
 kubelet_log=kubelet.log
 start_kubelet() {
   echo "Creating kubelet.kubeconfig"
-  create-kubelet-kubeconfig "http://localhost:8080" $KUBELET_KUBECONFIG
+  create-kubelet-kubeconfig "http://localhost:8080" "${KUBELET_KUBECONFIG}"
   echo "Starting kubelet..."
-  sudo -b $KUBELET $@ &>$LOG_DIR/$kubelet_log
-  if [ $? -ne 0 ]; then
+  # we want to run this command as root but log the file to a normal user file
+  # (so disable SC2024)
+  # shellcheck disable=SC2024
+  if ! sudo -b "${KUBELET}" "$@" &>"${LOG_DIR}/${kubelet_log}"; then 
     echo "Failed to start kubelet"
     exit 1
   fi
@@ -122,8 +133,7 @@ wait_kubelet() {
   local maxRetry=10
   local cur=1
   while [ $cur -le $maxRetry ]; do
-    curl -s $healthCheckURL > /dev/null
-    if [ $? -eq 0 ]; then
+    if curl -s $healthCheckURL > /dev/null; then
       echo "Kubelet is ready"
       break
     fi
@@ -140,8 +150,7 @@ wait_kubelet() {
 # kill_kubelet kills kubelet.
 kill_kubelet() {
   echo "Stopping kubelet..."
-  sudo pkill $KUBELET_BIN
-  if [ $? -ne 0 ]; then
+  if ! sudo pkill "${KUBELET_BIN}"; then
     echo "Failed to stop kubelet."
     exit 1
   fi
@@ -150,13 +159,13 @@ kill_kubelet() {
 # run_test runs the node test container.
 run_test() {
   env=""
-  if [ ! -z "$FOCUS" ]; then
+  if [ -n "$FOCUS" ]; then
     env="$env -e FOCUS=\"$FOCUS\""
   fi
-  if [ ! -z "$SKIP" ]; then
+  if [ -n "$SKIP" ]; then
     env="$env -e SKIP=\"$SKIP\""
   fi
-  if [ ! -z "$TEST_ARGS" ]; then
+  if [ -n "$TEST_ARGS" ]; then
     env="$env -e TEST_ARGS=\"$TEST_ARGS\""
   fi
   # The test assumes that inside the container:
@@ -169,33 +178,31 @@ run_test() {
 
 # Check whether kubelet is running. If kubelet is running, tell the user to stop
 # it before running the test.
-pid=`pidof $KUBELET_BIN`
-if [ ! -z $pid ]; then
+pid=$(pidof "${KUBELET_BIN}")
+if [ -n "$pid" ]; then
   echo "Kubelet is running (pid=$pid), please stop it before running the test."
   exit 1
 fi
 
 volume_stats_agg_period=10s
-allow_privileged=true
 serialize_image_pulls=false
-config_dir=`mktemp -d`
+config_dir=$(mktemp -d)
 file_check_frequency=10s
 pod_cidr=10.100.0.0/24
 log_level=4
-start_kubelet --kubeconfig ${KUBELET_KUBECONFIG} \
+start_kubelet --kubeconfig "${KUBELET_KUBECONFIG}" \
   --volume-stats-agg-period $volume_stats_agg_period \
-  --allow-privileged=$allow_privileged \
   --serialize-image-pulls=$serialize_image_pulls \
-  --pod-manifest-path $config_dir \
+  --pod-manifest-path "${config_dir}" \
   --file-check-frequency $file_check_frequency \
   --pod-cidr=$pod_cidr \
   --runtime-cgroups=/docker-daemon \
   --kubelet-cgroups=/kubelet \
   --system-cgroups=/system \
   --cgroup-root=/ \
-  --network-plugin=$NETWORK_PLUGIN \
-  --cni-conf-dir=$CNI_CONF_DIR \
-  --cni-bin-dir=$CNI_BIN_DIR \
+  "--network-plugin=${NETWORK_PLUGIN}" \
+  "--cni-conf-dir=${CNI_CONF_DIR}" \
+  "--cni-bin-dir=${CNI_BIN_DIR}" \
   --v=$log_level \
   --logtostderr
 
@@ -206,4 +213,4 @@ run_test
 kill_kubelet
 
 # Clean up the kubelet config directory
-sudo rm -rf $config_dir
+sudo rm -rf "${config_dir}"

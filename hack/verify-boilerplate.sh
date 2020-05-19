@@ -14,16 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks boilerplate header for all files.
+# Usage: `hack/verify-boilerplate.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 boilerDir="${KUBE_ROOT}/hack/boilerplate"
 boiler="${boilerDir}/boilerplate.py"
 
-files_need_boilerplate=($(${boiler} "$@"))
+files_need_boilerplate=()
+while IFS=$'\n' read -r line; do
+  files_need_boilerplate+=( "$line" )
+done < <("${boiler}" "$@")
 
 # Run boilerplate check
 if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then

@@ -1,3 +1,4 @@
+// +build !providerless
 // +build windows
 
 /*
@@ -24,23 +25,25 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog/v2"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 )
 
-func scsiHostRescan(io ioHandler, exec mount.Exec) {
+var winDiskNumFormat = "/dev/disk%d"
+
+func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	cmd := "Update-HostStorageCache"
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("Update-HostStorageCache failed in scsiHostRescan, error: %v, output: %q", err, string(output))
 	}
 }
 
 // search Windows disk number by LUN
-func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error) {
+func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (string, error) {
 	cmd := `Get-Disk | select number, location | ConvertTo-Json`
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("Get-Disk failed in findDiskByLun, error: %v, output: %q", err, string(output))
 		return "", err
@@ -70,7 +73,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 					continue
 				}
 
-				klog.V(4).Infof("found a disk, locatin: %q, lun: %q", location, arr[arrLen-1])
+				klog.V(4).Infof("found a disk, location: %q, lun: %q", location, arr[arrLen-1])
 				//last element of location field is LUN number, e.g.
 				//		"location":  "Integrated : Adapter 3 : Port 0 : Target 0 : LUN 1"
 				l, err := strconv.Atoi(arr[arrLen-1])
@@ -80,11 +83,11 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 				}
 
 				if l == lun {
-					klog.V(4).Infof("found a disk and lun, locatin: %q, lun: %d", location, lun)
+					klog.V(4).Infof("found a disk and lun, location: %q, lun: %d", location, lun)
 					if d, ok := v["number"]; ok {
 						if diskNum, ok := d.(float64); ok {
 							klog.V(2).Infof("azureDisk Mount: got disk number(%d) by LUN(%d)", int(diskNum), lun)
-							return strconv.Itoa(int(diskNum)), nil
+							return fmt.Sprintf(winDiskNumFormat, int(diskNum)), nil
 						}
 						klog.Warningf("LUN(%d) found, but could not get disk number(%q), location: %q", lun, d, location)
 					}
@@ -97,7 +100,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 	return "", nil
 }
 
-func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
+func formatIfNotFormatted(disk string, fstype string, exec utilexec.Interface) {
 	if err := mount.ValidateDiskNumber(disk); err != nil {
 		klog.Errorf("azureDisk Mount: formatIfNotFormatted failed, err: %v\n", err)
 		return
@@ -109,7 +112,7 @@ func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
 	}
 	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru", disk)
 	cmd += fmt.Sprintf(" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", fstype)
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("azureDisk Mount: Get-Disk failed, error: %v, output: %q", err, string(output))
 	} else {

@@ -20,14 +20,15 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 const (
@@ -39,7 +40,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 	f := framework.NewDefaultFramework("sd-logging")
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	ginkgo.It("should ingest logs [Feature:StackdriverLogging]", func() {

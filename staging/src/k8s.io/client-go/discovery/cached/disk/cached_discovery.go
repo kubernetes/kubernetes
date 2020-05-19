@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
-	"k8s.io/klog"
+	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -172,7 +172,7 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 }
 
 func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Object) error {
-	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), 0750); err != nil {
 		return err
 	}
 
@@ -191,7 +191,7 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	err = os.Chmod(f.Name(), 0755)
+	err = os.Chmod(f.Name(), 0660)
 	if err != nil {
 		return err
 	}

@@ -32,6 +32,7 @@ type schemaSliceValidator struct {
 	Items           *spec.SchemaOrArray
 	Root            interface{}
 	KnownFormats    strfmt.Registry
+	Options         SchemaValidatorOptions
 }
 
 func (s *schemaSliceValidator) SetPath(path string) {
@@ -53,7 +54,7 @@ func (s *schemaSliceValidator) Validate(data interface{}) *Result {
 	size := val.Len()
 
 	if s.Items != nil && s.Items.Schema != nil {
-		validator := NewSchemaValidator(s.Items.Schema, s.Root, s.Path, s.KnownFormats)
+		validator := NewSchemaValidator(s.Items.Schema, s.Root, s.Path, s.KnownFormats, s.Options.Options()...)
 		for i := 0; i < size; i++ {
 			validator.SetPath(fmt.Sprintf("%s.%d", s.Path, i))
 			value := val.Index(i)
@@ -65,11 +66,11 @@ func (s *schemaSliceValidator) Validate(data interface{}) *Result {
 	if s.Items != nil && len(s.Items.Schemas) > 0 {
 		itemsSize = len(s.Items.Schemas)
 		for i := 0; i < itemsSize; i++ {
-			validator := NewSchemaValidator(&s.Items.Schemas[i], s.Root, fmt.Sprintf("%s.%d", s.Path, i), s.KnownFormats)
+			validator := NewSchemaValidator(&s.Items.Schemas[i], s.Root, fmt.Sprintf("%s.%d", s.Path, i), s.KnownFormats, s.Options.Options()...)
 			if val.Len() <= i {
 				break
 			}
-			result.mergeForSlice(val, int(i), validator.Validate(val.Index(i).Interface()))
+			result.mergeForSlice(val, i, validator.Validate(val.Index(i).Interface()))
 		}
 	}
 	if s.AdditionalItems != nil && itemsSize < size {
@@ -78,8 +79,8 @@ func (s *schemaSliceValidator) Validate(data interface{}) *Result {
 		}
 		if s.AdditionalItems.Schema != nil {
 			for i := itemsSize; i < size-itemsSize+1; i++ {
-				validator := NewSchemaValidator(s.AdditionalItems.Schema, s.Root, fmt.Sprintf("%s.%d", s.Path, i), s.KnownFormats)
-				result.mergeForSlice(val, int(i), validator.Validate(val.Index(int(i)).Interface()))
+				validator := NewSchemaValidator(s.AdditionalItems.Schema, s.Root, fmt.Sprintf("%s.%d", s.Path, i), s.KnownFormats, s.Options.Options()...)
+				result.mergeForSlice(val, i, validator.Validate(val.Index(i).Interface()))
 			}
 		}
 	}

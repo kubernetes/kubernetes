@@ -17,17 +17,18 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
-	"k8s.io/kubernetes/pkg/util/mount"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -180,7 +181,7 @@ func TestOperationExecutor_UnmountDeviceConcurrently(t *testing.T) {
 	}
 }
 
-func TestOperationExecutor_AttachVolumeConcurrently(t *testing.T) {
+func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToSameNode(t *testing.T) {
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
@@ -191,6 +192,13 @@ func TestOperationExecutor_AttachVolumeConcurrently(t *testing.T) {
 		volumesToAttach[i] = VolumeToAttach{
 			VolumeName: v1.UniqueVolumeName(pdName),
 			NodeName:   "node",
+			VolumeSpec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					},
+				},
+			},
 		}
 		oe.AttachVolume(volumesToAttach[i], nil /* actualStateOfWorldAttacherUpdater */)
 	}
@@ -201,7 +209,91 @@ func TestOperationExecutor_AttachVolumeConcurrently(t *testing.T) {
 	}
 }
 
-func TestOperationExecutor_DetachVolumeConcurrently(t *testing.T) {
+func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToSameNode(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
+	pdName := "pd-volume"
+
+	// Act
+	for i := range volumesToAttach {
+		volumesToAttach[i] = VolumeToAttach{
+			VolumeName: v1.UniqueVolumeName(pdName),
+			NodeName:   "node",
+			VolumeSpec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
+					},
+				},
+			},
+		}
+		oe.AttachVolume(volumesToAttach[i], nil /* actualStateOfWorldAttacherUpdater */)
+	}
+
+	// Assert
+	if !isOperationRunSerially(ch, quit) {
+		t.Fatalf("Attach volume operations should not start concurrently")
+	}
+}
+
+func TestOperationExecutor_AttachSingleNodeVolumeConcurrentlyToDifferentNodes(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
+	pdName := "pd-volume"
+
+	// Act
+	for i := range volumesToAttach {
+		volumesToAttach[i] = VolumeToAttach{
+			VolumeName: v1.UniqueVolumeName(pdName),
+			NodeName:   types.NodeName(fmt.Sprintf("node%d", i)),
+			VolumeSpec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					},
+				},
+			},
+		}
+		oe.AttachVolume(volumesToAttach[i], nil /* actualStateOfWorldAttacherUpdater */)
+	}
+
+	// Assert
+	if !isOperationRunSerially(ch, quit) {
+		t.Fatalf("Attach volume operations should not start concurrently")
+	}
+}
+
+func TestOperationExecutor_AttachMultiNodeVolumeConcurrentlyToDifferentNodes(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToAttach := make([]VolumeToAttach, numVolumesToAttach)
+	pdName := "pd-volume"
+
+	// Act
+	for i := range volumesToAttach {
+		volumesToAttach[i] = VolumeToAttach{
+			VolumeName: v1.UniqueVolumeName(pdName),
+			NodeName:   types.NodeName(fmt.Sprintf("node%d", i)),
+			VolumeSpec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
+					},
+				},
+			},
+		}
+		oe.AttachVolume(volumesToAttach[i], nil /* actualStateOfWorldAttacherUpdater */)
+	}
+
+	// Assert
+	if !isOperationRunConcurrently(ch, quit, numVolumesToAttach) {
+		t.Fatalf("Attach volume operations should not execute serially")
+	}
+}
+
+func TestOperationExecutor_DetachSingleNodeVolumeConcurrentlyFromSameNode(t *testing.T) {
 	// Arrange
 	ch, quit, oe := setup()
 	attachedVolumes := make([]AttachedVolume, numVolumesToDetach)
@@ -212,6 +304,13 @@ func TestOperationExecutor_DetachVolumeConcurrently(t *testing.T) {
 		attachedVolumes[i] = AttachedVolume{
 			VolumeName: v1.UniqueVolumeName(pdName),
 			NodeName:   "node",
+			VolumeSpec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					},
+				},
+			},
 		}
 		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */)
 	}
@@ -222,13 +321,87 @@ func TestOperationExecutor_DetachVolumeConcurrently(t *testing.T) {
 	}
 }
 
-func TestOperationExecutor_VerifyVolumesAreAttachedConcurrently(t *testing.T) {
+func TestOperationExecutor_DetachMultiNodeVolumeConcurrentlyFromSameNode(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	attachedVolumes := make([]AttachedVolume, numVolumesToDetach)
+	pdName := "pd-volume"
+
+	// Act
+	for i := range attachedVolumes {
+		attachedVolumes[i] = AttachedVolume{
+			VolumeName: v1.UniqueVolumeName(pdName),
+			NodeName:   "node",
+			VolumeSpec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
+					},
+				},
+			},
+		}
+		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */)
+	}
+
+	// Assert
+	if !isOperationRunSerially(ch, quit) {
+		t.Fatalf("DetachVolume operations should not run concurrently")
+	}
+}
+
+func TestOperationExecutor_DetachMultiNodeVolumeConcurrentlyFromDifferentNodes(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	attachedVolumes := make([]AttachedVolume, numVolumesToDetach)
+	pdName := "pd-volume"
+
+	// Act
+	for i := range attachedVolumes {
+		attachedVolumes[i] = AttachedVolume{
+			VolumeName: v1.UniqueVolumeName(pdName),
+			NodeName:   types.NodeName(fmt.Sprintf("node%d", i)),
+			VolumeSpec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
+					},
+				},
+			},
+		}
+		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */)
+	}
+
+	// Assert
+	if !isOperationRunConcurrently(ch, quit, numVolumesToDetach) {
+		t.Fatalf("Attach volume operations should not execute serially")
+	}
+}
+
+func TestOperationExecutor_VerifyVolumesAreAttachedConcurrentlyOnSameNode(t *testing.T) {
 	// Arrange
 	ch, quit, oe := setup()
 
 	// Act
 	for i := 0; i < numVolumesToVerifyAttached; i++ {
 		oe.VerifyVolumesAreAttachedPerNode(nil /* attachedVolumes */, "node-name", nil /* actualStateOfWorldAttacherUpdater */)
+	}
+
+	// Assert
+	if !isOperationRunConcurrently(ch, quit, numVolumesToVerifyAttached) {
+		t.Fatalf("VerifyVolumesAreAttached operation is not being run concurrently")
+	}
+}
+
+func TestOperationExecutor_VerifyVolumesAreAttachedConcurrentlyOnDifferentNodes(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+
+	// Act
+	for i := 0; i < numVolumesToVerifyAttached; i++ {
+		oe.VerifyVolumesAreAttachedPerNode(
+			nil, /* attachedVolumes */
+			types.NodeName(fmt.Sprintf("node-name-%d", i)),
+			nil /* actualStateOfWorldAttacherUpdater */)
 	}
 
 	// Assert
@@ -407,14 +580,14 @@ func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount Mo
 		OperationFunc: opFunc,
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
 	}
 	return volumetypes.GeneratedOperations{
 		OperationFunc: opFunc,
-	}, nil
+	}
 }
 func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
@@ -434,7 +607,7 @@ func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolum
 		OperationFunc: opFunc,
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
@@ -453,8 +626,7 @@ func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(v
 	}, nil
 }
 
-func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvcWithResizeRequest *expandcache.PVCWithResizeRequest,
-	resizeMap expandcache.VolumeResizeMap) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
@@ -464,7 +636,7 @@ func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvcWithResizeReques
 	}, nil
 }
 
-func (fopg *fakeOperationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
@@ -508,7 +680,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmapVolumeFunc(volumeToUnmount Moun
 	}, nil
 }
 
-func (fopg *fakeOperationGenerator) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil
@@ -520,6 +692,10 @@ func (fopg *fakeOperationGenerator) GenerateUnmapDeviceFunc(deviceToDetach Attac
 
 func (fopg *fakeOperationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
 	return nil
+}
+
+func (fopg *fakeOperationGenerator) GetCSITranslator() InTreeToCSITranslator {
+	return csitrans.New()
 }
 
 func getTestPodWithSecret(podName, secretName string) *v1.Pod {

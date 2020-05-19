@@ -11,7 +11,7 @@ To enable these plugins in your program, import them in your main package.
 
 You can load all auth plugins:
 ```go
-import _ "k8s.io/client-go/plugin/pkg/client/auth
+import _ "k8s.io/client-go/plugin/pkg/client/auth"
 ```
 
 Or you can load specific auth plugins:

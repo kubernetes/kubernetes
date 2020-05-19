@@ -58,6 +58,10 @@ type LimitRangeNamespaceListerExpansion interface{}
 // NamespaceLister.
 type NamespaceListerExpansion interface{}
 
+// NodeListerExpansion allows custom methods to be added to
+// NodeLister.
+type NodeListerExpansion interface{}
+
 // PersistentVolumeListerExpansion allows custom methods to be added to
 // PersistentVolumeLister.
 type PersistentVolumeListerExpansion interface{}
@@ -101,6 +105,14 @@ type SecretListerExpansion interface{}
 // SecretNamespaceListerExpansion allows custom methods to be added to
 // SecretNamespaceLister.
 type SecretNamespaceListerExpansion interface{}
+
+// ServiceListerExpansion allows custom methods to be added to
+// ServiceLister.
+type ServiceListerExpansion interface{}
+
+// ServiceNamespaceListerExpansion allows custom methods to be added to
+// ServiceNamespaceLister.
+type ServiceNamespaceListerExpansion interface{}
 
 // ServiceAccountListerExpansion allows custom methods to be added to
 // ServiceAccountLister.

@@ -22,8 +22,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -91,11 +94,382 @@ func TestValidateScale(t *testing.T) {
 	}
 }
 
+func TestValidateBehavior(t *testing.T) {
+	maxPolicy := autoscaling.MaxPolicySelect
+	minPolicy := autoscaling.MinPolicySelect
+	disabledPolicy := autoscaling.DisabledPolicySelect
+	incorrectPolicy := autoscaling.ScalingPolicySelect("incorrect")
+	simplePoliciesList := []autoscaling.HPAScalingPolicy{
+		{
+			Type:          autoscaling.PercentScalingPolicy,
+			Value:         10,
+			PeriodSeconds: 1,
+		},
+		{
+			Type:          autoscaling.PodsScalingPolicy,
+			Value:         1,
+			PeriodSeconds: 1800,
+		},
+	}
+	successCases := []autoscaling.HorizontalPodAutoscalerBehavior{
+		{
+			ScaleUp:   nil,
+			ScaleDown: nil,
+		},
+		{
+			ScaleUp: &autoscaling.HPAScalingRules{
+				StabilizationWindowSeconds: utilpointer.Int32Ptr(3600),
+				SelectPolicy:               &minPolicy,
+				Policies:                   simplePoliciesList,
+			},
+			ScaleDown: &autoscaling.HPAScalingRules{
+				StabilizationWindowSeconds: utilpointer.Int32Ptr(0),
+				SelectPolicy:               &disabledPolicy,
+				Policies:                   simplePoliciesList,
+			},
+		},
+		{
+			ScaleUp: &autoscaling.HPAScalingRules{
+				StabilizationWindowSeconds: utilpointer.Int32Ptr(120),
+				SelectPolicy:               &maxPolicy,
+				Policies: []autoscaling.HPAScalingPolicy{
+					{
+						Type:          autoscaling.PodsScalingPolicy,
+						Value:         1,
+						PeriodSeconds: 2,
+					},
+					{
+						Type:          autoscaling.PercentScalingPolicy,
+						Value:         3,
+						PeriodSeconds: 4,
+					},
+					{
+						Type:          autoscaling.PodsScalingPolicy,
+						Value:         5,
+						PeriodSeconds: 6,
+					},
+					{
+						Type:          autoscaling.PercentScalingPolicy,
+						Value:         7,
+						PeriodSeconds: 8,
+					},
+				},
+			},
+			ScaleDown: &autoscaling.HPAScalingRules{
+				StabilizationWindowSeconds: utilpointer.Int32Ptr(120),
+				SelectPolicy:               &maxPolicy,
+				Policies: []autoscaling.HPAScalingPolicy{
+					{
+						Type:          autoscaling.PodsScalingPolicy,
+						Value:         1,
+						PeriodSeconds: 2,
+					},
+					{
+						Type:          autoscaling.PercentScalingPolicy,
+						Value:         3,
+						PeriodSeconds: 4,
+					},
+					{
+						Type:          autoscaling.PodsScalingPolicy,
+						Value:         5,
+						PeriodSeconds: 6,
+					},
+					{
+						Type:          autoscaling.PercentScalingPolicy,
+						Value:         7,
+						PeriodSeconds: 8,
+					},
+				},
+			},
+		},
+	}
+	for _, behavior := range successCases {
+		hpa := prepareHPAWithBehavior(behavior)
+		if errs := ValidateHorizontalPodAutoscaler(&hpa); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	errorCases := []struct {
+		behavior autoscaling.HorizontalPodAutoscalerBehavior
+		msg      string
+	}{
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					SelectPolicy: &minPolicy,
+				},
+			},
+			msg: "spec.behavior.scaleUp.policies: Required value: must specify at least one Policy",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					StabilizationWindowSeconds: utilpointer.Int32Ptr(3601),
+					SelectPolicy:               &minPolicy,
+					Policies:                   simplePoliciesList,
+				},
+			},
+			msg: "spec.behavior.scaleUp.stabilizationWindowSeconds: Invalid value: 3601: must be less than or equal to 3600",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							Value:         7,
+							PeriodSeconds: 1801,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleUp.policies[0].periodSeconds: Invalid value: 1801: must be less than or equal to 1800",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					SelectPolicy: &incorrectPolicy,
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							Value:         7,
+							PeriodSeconds: 8,
+						},
+					},
+				},
+			},
+			msg: `spec.behavior.scaleUp.selectPolicy: Unsupported value: "incorrect": supported values: "Disabled", "Max", "Min"`,
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.HPAScalingPolicyType("hm"),
+							Value:         7,
+							PeriodSeconds: 8,
+						},
+					},
+				},
+			},
+			msg: `spec.behavior.scaleUp.policies[0].type: Unsupported value: "hm": supported values: "Percent", "Pods"`,
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:  autoscaling.PodsScalingPolicy,
+							Value: 8,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleUp.policies[0].periodSeconds: Invalid value: 0: must be greater than zero",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							PeriodSeconds: 8,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleUp.policies[0].value: Invalid value: 0: must be greater than zero",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							PeriodSeconds: -1,
+							Value:         1,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleUp.policies[0].periodSeconds: Invalid value: -1: must be greater than zero",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							PeriodSeconds: 1,
+							Value:         -1,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleUp.policies[0].value: Invalid value: -1: must be greater than zero",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					SelectPolicy: &minPolicy,
+				},
+			},
+			msg: "spec.behavior.scaleDown.policies: Required value: must specify at least one Policy",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					StabilizationWindowSeconds: utilpointer.Int32Ptr(3601),
+					SelectPolicy:               &minPolicy,
+					Policies:                   simplePoliciesList,
+				},
+			},
+			msg: "spec.behavior.scaleDown.stabilizationWindowSeconds: Invalid value: 3601: must be less than or equal to 3600",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PercentScalingPolicy,
+							Value:         7,
+							PeriodSeconds: 1801,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleDown.policies[0].periodSeconds: Invalid value: 1801: must be less than or equal to 1800",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					SelectPolicy: &incorrectPolicy,
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							Value:         7,
+							PeriodSeconds: 8,
+						},
+					},
+				},
+			},
+			msg: `spec.behavior.scaleDown.selectPolicy: Unsupported value: "incorrect": supported values: "Disabled", "Max", "Min"`,
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.HPAScalingPolicyType("hm"),
+							Value:         7,
+							PeriodSeconds: 8,
+						},
+					},
+				},
+			},
+			msg: `spec.behavior.scaleDown.policies[0].type: Unsupported value: "hm": supported values: "Percent", "Pods"`,
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:  autoscaling.PodsScalingPolicy,
+							Value: 8,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleDown.policies[0].periodSeconds: Invalid value: 0: must be greater than zero",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							PeriodSeconds: 8,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleDown.policies[0].value: Invalid value: 0: must be greater than zero",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							PeriodSeconds: -1,
+							Value:         1,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleDown.policies[0].periodSeconds: Invalid value: -1: must be greater than zero",
+		},
+		{
+			behavior: autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscaling.HPAScalingRules{
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							PeriodSeconds: 1,
+							Value:         -1,
+						},
+					},
+				},
+			},
+			msg: "spec.behavior.scaleDown.policies[0].value: Invalid value: -1: must be greater than zero",
+		},
+	}
+	for _, c := range errorCases {
+		hpa := prepareHPAWithBehavior(c.behavior)
+		if errs := ValidateHorizontalPodAutoscaler(&hpa); len(errs) == 0 {
+			t.Errorf("expected failure for %s", c.msg)
+		} else if !strings.Contains(errs[0].Error(), c.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], c.msg)
+		}
+	}
+}
+
+func prepareHPAWithBehavior(b autoscaling.HorizontalPodAutoscalerBehavior) autoscaling.HorizontalPodAutoscaler {
+	return autoscaling.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "myautoscaler",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "ReplicationController",
+				Name: "myrc",
+			},
+			MinReplicas: utilpointer.Int32Ptr(1),
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: utilpointer.Int32Ptr(70),
+						},
+					},
+				},
+			},
+			Behavior: &b,
+		},
+	}
+}
+
 func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
 	if err != nil {
 		t.Errorf("unable to parse label selector: %v", err)
 	}
+
 	successCases := []autoscaling.HorizontalPodAutoscaler{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -396,7 +770,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MaxReplicas:    5,
 				},
 			},
-			msg: "must be greater than 0",
+			msg: "must be greater than or equal to 1",
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
@@ -999,6 +1373,165 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			} else if !strings.Contains(errs[0].Error(), expectedMsg) {
 				t.Errorf("unexpected error: %q, expected %q", errs[0], expectedMsg)
 			}
+		}
+	}
+}
+
+func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.HorizontalPodAutoscaler {
+	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
+	if err != nil {
+		t.Errorf("unable to parse label selector: %v", err)
+	}
+	minReplicasCases := []autoscaling.HorizontalPodAutoscaler{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "myautoscaler",
+				Namespace:       metav1.NamespaceDefault,
+				ResourceVersion: "theversion",
+			},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+					Kind: "ReplicationController",
+					Name: "myrc",
+				},
+				MinReplicas: utilpointer.Int32Ptr(minReplicas),
+				MaxReplicas: 5,
+				Metrics: []autoscaling.MetricSpec{
+					{
+						Type: autoscaling.ObjectMetricSourceType,
+						Object: &autoscaling.ObjectMetricSource{
+							DescribedObject: autoscaling.CrossVersionObjectReference{
+								Kind: "ReplicationController",
+								Name: "myrc",
+							},
+							Metric: autoscaling.MetricIdentifier{
+								Name: "somemetric",
+							},
+							Target: autoscaling.MetricTarget{
+								Type:  autoscaling.ValueMetricType,
+								Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "myautoscaler",
+				Namespace:       metav1.NamespaceDefault,
+				ResourceVersion: "theversion",
+			},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+					Kind: "ReplicationController",
+					Name: "myrc",
+				},
+				MinReplicas: utilpointer.Int32Ptr(minReplicas),
+				MaxReplicas: 5,
+				Metrics: []autoscaling.MetricSpec{
+					{
+						Type: autoscaling.ExternalMetricSourceType,
+						External: &autoscaling.ExternalMetricSource{
+							Metric: autoscaling.MetricIdentifier{
+								Name:     "somemetric",
+								Selector: metricLabelSelector,
+							},
+							Target: autoscaling.MetricTarget{
+								Type:         autoscaling.AverageValueMetricType,
+								AverageValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return minReplicasCases
+}
+
+func TestValidateHorizontalPodAutoscalerScaleToZeroEnabled(t *testing.T) {
+	// Enable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	for _, successCase := range zeroMinReplicasCases {
+		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerScaleToZeroDisabled(t *testing.T) {
+	// Disable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	errorMsg := "must be greater than or equal to 1"
+
+	for _, errorCase := range zeroMinReplicasCases {
+		errs := ValidateHorizontalPodAutoscaler(&errorCase)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", errorMsg)
+		} else if !strings.Contains(errs[0].Error(), errorMsg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
+		}
+	}
+
+	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
+
+	for _, successCase := range nonZeroMinReplicasCases {
+		successCase.Spec.MinReplicas = utilpointer.Int32Ptr(1)
+		if errs := ValidateHorizontalPodAutoscaler(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerUpdateScaleToZeroEnabled(t *testing.T) {
+	// Enable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
+
+	for i, zeroCase := range zeroMinReplicasCases {
+		nonZeroCase := nonZeroMinReplicasCases[i]
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerScaleToZeroUpdateDisabled(t *testing.T) {
+	// Disable HPAScaleToZero feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, false)()
+
+	zeroMinReplicasCases := prepareMinReplicasCases(t, 0)
+	nonZeroMinReplicasCases := prepareMinReplicasCases(t, 1)
+	errorMsg := "must be greater than or equal to 1"
+
+	for i, zeroCase := range zeroMinReplicasCases {
+		nonZeroCase := nonZeroMinReplicasCases[i]
+		errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &nonZeroCase)
+
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", errorMsg)
+		} else if !strings.Contains(errs[0].Error(), errorMsg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], errorMsg)
+		}
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&zeroCase, &zeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+
+		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
 		}
 	}
 }

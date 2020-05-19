@@ -1,2 +1,2 @@
-amd64=nvidia/cuda:10.0-devel-ubuntu18.04
-ppc64le=nvidia/cuda-ppc64le:10.0-devel-ubuntu18.04
+linux/amd64=nvidia/cuda:10.0-devel-ubuntu18.04
+linux/ppc64le=nvidia/cuda-ppc64le:10.0-devel-ubuntu18.04

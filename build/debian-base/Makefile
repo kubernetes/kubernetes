@@ -14,18 +14,18 @@
 
 all: all-build
 
-REGISTRY ?= staging-k8s.gcr.io
+REGISTRY ?= gcr.io/k8s-staging-build-image
 IMAGE ?= $(REGISTRY)/debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= v1.0.0
+TAG ?= v2.1.0
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 TEMP_DIR:=$(shell mktemp -d)
-QEMUVERSION=v2.9.1
+QEMUVERSION=v4.2.0-6
 
 SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
@@ -33,22 +33,22 @@ SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
 ifeq ($(ARCH),amd64)
-	BASEIMAGE?=debian:stretch
+	BASEIMAGE?=debian:buster-slim
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/debian:stretch
+	BASEIMAGE?=arm32v7/debian:buster-slim
 	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/debian:stretch
+	BASEIMAGE?=arm64v8/debian:buster-slim
 	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/debian:stretch
+	BASEIMAGE?=ppc64le/debian:buster-slim
 	QEMUARCH=ppc64le
 endif
 ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/debian:stretch
+	BASEIMAGE?=s390x/debian:buster-slim
 	QEMUARCH=s390x
 endif
 

@@ -115,7 +115,7 @@ func (in *CustomResourceDefinitionCondition) DeepCopy() *CustomResourceDefinitio
 func (in *CustomResourceDefinitionList) DeepCopyInto(out *CustomResourceDefinitionList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]CustomResourceDefinition, len(*in))
@@ -200,6 +200,11 @@ func (in *CustomResourceDefinitionSpec) DeepCopyInto(out *CustomResourceDefiniti
 		in, out := &in.Conversion, &out.Conversion
 		*out = new(CustomResourceConversion)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.PreserveUnknownFields != nil {
+		in, out := &in.PreserveUnknownFields, &out.PreserveUnknownFields
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }

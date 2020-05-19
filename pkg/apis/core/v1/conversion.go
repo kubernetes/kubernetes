@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -31,31 +31,8 @@ import (
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_core_Pod_To_v1_Pod,
-		Convert_core_PodSpec_To_v1_PodSpec,
-		Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
-		Convert_core_ServiceSpec_To_v1_ServiceSpec,
-		Convert_v1_Pod_To_core_Pod,
-		Convert_v1_PodSpec_To_core_PodSpec,
-		Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec,
-		Convert_v1_Secret_To_core_Secret,
-		Convert_v1_ServiceSpec_To_core_ServiceSpec,
-		Convert_v1_ResourceList_To_core_ResourceList,
-		Convert_v1_ReplicationController_To_apps_ReplicaSet,
-		Convert_v1_ReplicationControllerSpec_To_apps_ReplicaSetSpec,
-		Convert_v1_ReplicationControllerStatus_To_apps_ReplicaSetStatus,
-		Convert_apps_ReplicaSet_To_v1_ReplicationController,
-		Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec,
-		Convert_apps_ReplicaSetStatus_To_v1_ReplicationControllerStatus,
-	)
-	if err != nil {
-		return err
-	}
-
 	// Add field conversion funcs.
-	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Pod"),
+	err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Pod"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
@@ -66,6 +43,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.serviceAccountName",
 				"status.phase",
 				"status.podIP",
+				"status.podIPs",
 				"status.nominatedNodeName":
 				return label, value, nil
 			// This is for backwards compatibility with old v1 clients which send spec.host
@@ -270,6 +248,44 @@ func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, 
 	return nil
 }
 
+func Convert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodStatus, s conversion.Scope) error {
+	if err := autoConvert_v1_PodStatus_To_core_PodStatus(in, out, s); err != nil {
+		return err
+	}
+
+	// If both fields (v1.PodIPs and v1.PodIP) are provided and differ, then PodIP is authoritative for compatibility with older kubelets
+	if (len(in.PodIP) > 0 && len(in.PodIPs) > 0) && (in.PodIP != in.PodIPs[0].IP) {
+		out.PodIPs = []core.PodIP{
+			{
+				IP: in.PodIP,
+			},
+		}
+	}
+	// at the this point, autoConvert copied v1.PodIPs -> core.PodIPs
+	// if v1.PodIPs was empty but v1.PodIP is not, then set core.PodIPs[0] with v1.PodIP
+	if len(in.PodIP) > 0 && len(in.PodIPs) == 0 {
+		out.PodIPs = []core.PodIP{
+			{
+				IP: in.PodIP,
+			},
+		}
+	}
+	return nil
+}
+
+func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatus, s conversion.Scope) error {
+	if err := autoConvert_core_PodStatus_To_v1_PodStatus(in, out, s); err != nil {
+		return err
+	}
+	// at the this point autoConvert copied core.PodIPs -> v1.PodIPs
+	//  v1.PodIP (singular value field, which does not exist in core) needs to
+	// be set with core.PodIPs[0]
+	if len(in.PodIPs) > 0 {
+		out.PodIP = in.PodIPs[0].IP
+	}
+	return nil
+}
+
 // The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
 // as an alias for ServiceAccountName.
 func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
@@ -289,6 +305,36 @@ func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s con
 		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
 	}
 
+	return nil
+}
+
+func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
+	if err := autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s); err != nil {
+		return err
+	}
+	// at the this point autoConvert copied core.PodCIDRs -> v1.PodCIDRs
+	// v1.PodCIDR (singular value field, which does not exist in core) needs to
+	// be set with core.PodCIDRs[0]
+	if len(in.PodCIDRs) > 0 {
+		out.PodCIDR = in.PodCIDRs[0]
+	}
+	return nil
+}
+
+func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
+	if err := autoConvert_v1_NodeSpec_To_core_NodeSpec(in, out, s); err != nil {
+		return err
+	}
+	// If both fields (v1.PodCIDRs and v1.PodCIDR) are provided and differ, then PodCIDR is authoritative for compatibility with older clients
+	if (len(in.PodCIDR) > 0 && len(in.PodCIDRs) > 0) && (in.PodCIDR != in.PodCIDRs[0]) {
+		out.PodCIDRs = []string{in.PodCIDR}
+	}
+
+	// at the this point, autoConvert copied v1.PodCIDRs -> core.PodCIDRs
+	// if v1.PodCIDRs was empty but v1.PodCIDR is not, then set core.PodCIDRs[0] with v1.PodCIDR
+	if len(in.PodCIDR) > 0 && len(in.PodCIDRs) == 0 {
+		out.PodCIDRs = []string{in.PodCIDR}
+	}
 	return nil
 }
 
@@ -351,88 +397,6 @@ func Convert_v1_Secret_To_core_Secret(in *v1.Secret, out *core.Secret, s convers
 		}
 		for k, v := range in.StringData {
 			out.Data[k] = []byte(v)
-		}
-	}
-
-	return nil
-}
-
-func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
-	if in.Capabilities != nil {
-		out.Capabilities = new(v1.Capabilities)
-		if err := Convert_core_Capabilities_To_v1_Capabilities(in.Capabilities, out.Capabilities, s); err != nil {
-			return err
-		}
-	} else {
-		out.Capabilities = nil
-	}
-	out.Privileged = in.Privileged
-	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(v1.SELinuxOptions)
-		if err := Convert_core_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
-			return err
-		}
-	} else {
-		out.SELinuxOptions = nil
-	}
-	out.RunAsUser = in.RunAsUser
-	out.RunAsGroup = in.RunAsGroup
-	out.RunAsNonRoot = in.RunAsNonRoot
-	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
-	out.AllowPrivilegeEscalation = in.AllowPrivilegeEscalation
-	if in.ProcMount != nil {
-		pm := string(*in.ProcMount)
-		pmt := v1.ProcMountType(pm)
-		out.ProcMount = &pmt
-	}
-	return nil
-}
-
-func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
-	out.SupplementalGroups = in.SupplementalGroups
-	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(v1.SELinuxOptions)
-		if err := Convert_core_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
-			return err
-		}
-	} else {
-		out.SELinuxOptions = nil
-	}
-	out.RunAsUser = in.RunAsUser
-	out.RunAsGroup = in.RunAsGroup
-	out.RunAsNonRoot = in.RunAsNonRoot
-	out.FSGroup = in.FSGroup
-	if in.Sysctls != nil {
-		out.Sysctls = make([]v1.Sysctl, len(in.Sysctls))
-		for i, sysctl := range in.Sysctls {
-			if err := Convert_core_Sysctl_To_v1_Sysctl(&sysctl, &out.Sysctls[i], s); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurityContext, out *core.PodSecurityContext, s conversion.Scope) error {
-	out.SupplementalGroups = in.SupplementalGroups
-	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(core.SELinuxOptions)
-		if err := Convert_v1_SELinuxOptions_To_core_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
-			return err
-		}
-	} else {
-		out.SELinuxOptions = nil
-	}
-	out.RunAsUser = in.RunAsUser
-	out.RunAsGroup = in.RunAsGroup
-	out.RunAsNonRoot = in.RunAsNonRoot
-	out.FSGroup = in.FSGroup
-	if in.Sysctls != nil {
-		out.Sysctls = make([]core.Sysctl, len(in.Sysctls))
-		for i, sysctl := range in.Sysctls {
-			if err := Convert_v1_Sysctl_To_core_Sysctl(&sysctl, &out.Sysctls[i], s); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -544,4 +508,34 @@ func dropInitContainerAnnotations(oldAnnotations map[string]string) map[string]s
 		}
 	}
 	return newAnnotations
+}
+
+// Convert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus is defined outside the autogenerated file for use by other API packages
+func Convert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus(in *core.LoadBalancerStatus, out *v1.LoadBalancerStatus, s conversion.Scope) error {
+	return autoConvert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus(in, out, s)
+}
+
+// Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus is defined outside the autogenerated file for use by other API packages
+func Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(in *v1.LoadBalancerStatus, out *core.LoadBalancerStatus, s conversion.Scope) error {
+	return autoConvert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(in, out, s)
+}
+
+// Convert_core_Volume_To_v1_Volume is defined outside the autogenerated file for use by other API packages
+func Convert_core_Volume_To_v1_Volume(in *core.Volume, out *v1.Volume, s conversion.Scope) error {
+	return autoConvert_core_Volume_To_v1_Volume(in, out, s)
+}
+
+// Convert_v1_Volume_To_core_Volume is defined outside the autogenerated file for use by other API packages
+func Convert_v1_Volume_To_core_Volume(in *v1.Volume, out *core.Volume, s conversion.Scope) error {
+	return autoConvert_v1_Volume_To_core_Volume(in, out, s)
+}
+
+// Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec is defined outside the autogenerated file for use by other API packages
+func Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.PersistentVolumeSpec, out *v1.PersistentVolumeSpec, s conversion.Scope) error {
+	return autoConvert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in, out, s)
+}
+
+// Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec is defined outside the autogenerated file for use by other API packages
+func Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.PersistentVolumeSpec, out *core.PersistentVolumeSpec, s conversion.Scope) error {
+	return autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in, out, s)
 }

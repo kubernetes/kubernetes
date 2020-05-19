@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -43,7 +44,7 @@ var (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the dns as expected
-var _ = KubeadmDescribe("DNS addon", func() {
+var _ = Describe("DNS addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("DNS")
@@ -54,7 +55,7 @@ var _ = KubeadmDescribe("DNS addon", func() {
 
 	// kubeadm supports two type of DNS addon, and so
 	// it is necessary to get it from the kubeadm-config ConfigMap before testing
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// if the dnsType name is already known exit
 		if dnsType != "" {
 			return
@@ -73,43 +74,43 @@ var _ = KubeadmDescribe("DNS addon", func() {
 		}
 	})
 
-	Context("kube-dns", func() {
-		Context("kube-dns ServiceAccount", func() {
-			It("should exist", func() {
+	ginkgo.Context("kube-dns", func() {
+		ginkgo.Context("kube-dns ServiceAccount", func() {
+			ginkgo.It("should exist", func() {
 				if dnsType != "kube-dns" {
-					framework.Skipf("Skipping because DNS type is %s", dnsType)
+					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
 				}
 
 				ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, kubeDNSServiceAccountName)
 			})
 		})
 
-		Context("kube-dns Deployment", func() {
-			It("should exist and be properly configured", func() {
+		ginkgo.Context("kube-dns Deployment", func() {
+			ginkgo.It("should exist and be properly configured", func() {
 				if dnsType != "kube-dns" {
-					framework.Skipf("Skipping because DNS type is %s", dnsType)
+					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
 				}
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, kubeDNSDeploymentName)
 
-				Expect(d.Spec.Template.Spec.ServiceAccountName).To(Equal(kubeDNSServiceAccountName))
+				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, kubeDNSServiceAccountName)
 			})
 		})
 	})
 
-	Context("CoreDNS", func() {
-		Context("CoreDNS ServiceAccount", func() {
-			It("should exist", func() {
+	ginkgo.Context("CoreDNS", func() {
+		ginkgo.Context("CoreDNS ServiceAccount", func() {
+			ginkgo.It("should exist", func() {
 				if dnsType != "CoreDNS" {
-					framework.Skipf("Skipping because DNS type is %s", dnsType)
+					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
 				}
 
 				ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, coreDNSServiceAccountName)
 			})
 
-			It("should have related ClusterRole and ClusterRoleBinding", func() {
+			ginkgo.It("should have related ClusterRole and ClusterRoleBinding", func() {
 				if dnsType != "CoreDNS" {
-					framework.Skipf("Skipping because DNS type is %s", dnsType)
+					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
 				}
 
 				ExpectClusterRole(f.ClientSet, coreDNSRoleName)
@@ -117,33 +118,33 @@ var _ = KubeadmDescribe("DNS addon", func() {
 			})
 		})
 
-		Context("CoreDNS ConfigMap", func() {
-			It("should exist and be properly configured", func() {
+		ginkgo.Context("CoreDNS ConfigMap", func() {
+			ginkgo.It("should exist and be properly configured", func() {
 				if dnsType != "CoreDNS" {
-					framework.Skipf("Skipping because DNS type is %s", dnsType)
+					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
 				}
 
 				cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, coreDNSConfigMap)
 
-				Expect(cm.Data).To(HaveKey(coreDNSConfigMapKey))
+				gomega.Expect(cm.Data).To(gomega.HaveKey(coreDNSConfigMapKey))
 			})
 		})
 
-		Context("CoreDNS Deployment", func() {
-			It("should exist and be properly configured", func() {
+		ginkgo.Context("CoreDNS Deployment", func() {
+			ginkgo.It("should exist and be properly configured", func() {
 				if dnsType != "CoreDNS" {
-					framework.Skipf("Skipping because DNS type is %s", dnsType)
+					e2eskipper.Skipf("Skipping because DNS type is %s", dnsType)
 				}
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, coreDNSDeploymentName)
 
-				Expect(d.Spec.Template.Spec.ServiceAccountName).To(Equal(coreDNSServiceAccountName))
+				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, coreDNSServiceAccountName)
 			})
 		})
 	})
 
-	Context("DNS Service", func() {
-		It("should exist", func() {
+	ginkgo.Context("DNS Service", func() {
+		ginkgo.It("should exist", func() {
 			ExpectService(f.ClientSet, kubeSystemNamespace, dnsService)
 		})
 	})

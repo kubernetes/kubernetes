@@ -50,3 +50,8 @@ func (_ *realSELinuxRunner) Getfilecon(path string) (string, error) {
 	}
 	return selinux.FileLabel(path)
 }
+
+// SetFileLabel applies the SELinux label on the path or returns an error.
+func SetFileLabel(path string, label string) error {
+	return selinux.SetFileLabel(path, label)
+}

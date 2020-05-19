@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -27,7 +28,7 @@ import (
 	commontypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -92,7 +93,7 @@ func NewVolumeResizeMap(kubeClient clientset.Interface) VolumeResizeMap {
 // AddPVCUpdate adds pvc for resizing
 // This function intentionally allows addition of PVCs for which pv.Spec.Size >= pvc.Spec.Size,
 // the reason being - lack of transaction in k8s means after successful resize, we can't guarantee that when we update PV,
-// pvc update will be successful too and after resize we alyways update PV first.
+// pvc update will be successful too and after resize we always update PV first.
 // If for some reason we weren't able to update PVC after successful resize, then we are going to reprocess
 // the PVC and hopefully after a no-op resize in volume plugin, PVC will be updated with right values as well.
 func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
@@ -202,7 +203,7 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 		return fmt.Errorf("Error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
 	}
 
-	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, commontypes.StrategicMergePatchType, patchBytes)
+	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(context.TODO(), pvClone.Name, commontypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 
 	if updateErr != nil {
 		klog.V(4).Infof("Error updating pv %q with error : %v", pvClone.Name, updateErr)

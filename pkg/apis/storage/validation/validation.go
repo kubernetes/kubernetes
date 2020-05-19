@@ -29,6 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -168,8 +171,22 @@ func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 // validateSource tests if the source is valid for VolumeAttachment.
 func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+	switch {
+	case source.InlineVolumeSpec == nil && source.PersistentVolumeName == nil:
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+			allErrs = append(allErrs, field.Required(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath, "must specify persistentVolumeName when CSIMigration feature is disabled"))
+		}
+	case source.InlineVolumeSpec != nil && source.PersistentVolumeName != nil:
+		allErrs = append(allErrs, field.Forbidden(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
+	case source.PersistentVolumeName != nil:
+		if len(*source.PersistentVolumeName) == 0 {
+			// Invalid err
+			allErrs = append(allErrs, field.Required(fldPath.Child("persistentVolumeName"), "must specify non empty persistentVolumeName"))
+		}
+	case source.InlineVolumeSpec != nil:
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
 	}
 	return allErrs
 }
@@ -247,7 +264,7 @@ func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.P
 func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if topologies == nil || len(topologies) == 0 {
+	if len(topologies) == 0 {
 		return allErrs
 	}
 
@@ -329,12 +346,25 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path) field.Error
 	return allErrs
 }
 
+// validateCSINodeDriverAllocatable tests if Allocatable in CSINodeDriver has valid volume limits.
+func validateCSINodeDriverAllocatable(a *storage.VolumeNodeResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if a == nil || a.Count == nil {
+		return allErrs
+	}
+
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*a.Count), fldPath.Child("count"))...)
+	return allErrs
+}
+
 // validateCSINodeDriver tests if CSINodeDriver has valid entries
 func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(driver.Name, fldPath.Child("name"))...)
 	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"))...)
+	allErrs = append(allErrs, validateCSINodeDriverAllocatable(driver.Allocatable, fldPath.Child("allocatable"))...)
 
 	// check for duplicate entries for the same driver in specs
 	if driverNamesInSpecs.Has(driver.Name) {
@@ -388,6 +418,7 @@ func validateCSIDriverSpec(
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAttachRequired(spec.AttachRequired, fldPath.Child("attachedRequired"))...)
 	allErrs = append(allErrs, validatePodInfoOnMount(spec.PodInfoOnMount, fldPath.Child("podInfoOnMount"))...)
+	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
 	return allErrs
 }
 
@@ -406,6 +437,24 @@ func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.Err
 	allErrs := field.ErrorList{}
 	if podInfoOnMount == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+// validateVolumeLifecycleModes tests if mode has one of the allowed values.
+func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, mode := range modes {
+		switch mode {
+		case storage.VolumeLifecyclePersistent, storage.VolumeLifecycleEphemeral:
+		default:
+			allErrs = append(allErrs, field.NotSupported(fldPath, mode,
+				[]string{
+					string(storage.VolumeLifecyclePersistent),
+					string(storage.VolumeLifecycleEphemeral),
+				}))
+		}
 	}
 
 	return allErrs

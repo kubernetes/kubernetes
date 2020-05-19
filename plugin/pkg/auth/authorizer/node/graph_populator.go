@@ -18,7 +18,7 @@ package node
 
 import (
 	"fmt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -64,13 +64,11 @@ func AddGraphEventHandlers(
 		DeleteFunc: g.deletePV,
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc:    g.addVolumeAttachment,
-			UpdateFunc: g.updateVolumeAttachment,
-			DeleteFunc: g.deleteVolumeAttachment,
-		})
-	}
+	attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    g.addVolumeAttachment,
+		UpdateFunc: g.updateVolumeAttachment,
+		DeleteFunc: g.deleteVolumeAttachment,
+	})
 }
 
 func (g *graphPopulator) addNode(obj interface{}) {

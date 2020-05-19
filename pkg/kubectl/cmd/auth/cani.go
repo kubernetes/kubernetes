@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,25 +31,28 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
+	discovery "k8s.io/client-go/discovery"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	describeutil "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
-	"k8s.io/kubernetes/pkg/kubectl/util/printers"
-	rbacutil "k8s.io/kubernetes/pkg/kubectl/util/rbac"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/describe"
+	rbacutil "k8s.io/kubectl/pkg/util/rbac"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type CanIOptions struct {
-	AllNamespaces bool
-	Quiet         bool
-	NoHeaders     bool
-	Namespace     string
-	AuthClient    authorizationv1client.AuthorizationV1Interface
+	AllNamespaces   bool
+	Quiet           bool
+	NoHeaders       bool
+	Namespace       string
+	AuthClient      authorizationv1client.AuthorizationV1Interface
+	DiscoveryClient discovery.DiscoveryInterface
 
 	Verb           string
 	Resource       schema.GroupVersionResource
@@ -74,7 +78,7 @@ var (
 		kubectl auth can-i create pods --all-namespaces
 
 		# Check to see if I can list deployments in my current namespace
-		kubectl auth can-i list deployments.extensions
+		kubectl auth can-i list deployments.apps
 
 		# Check to see if I can do everything in my current namespace ("*" means all)
 		kubectl auth can-i '*' '*'
@@ -169,6 +173,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		return err
 	}
 	o.AuthClient = client.AuthorizationV1()
+	o.DiscoveryClient = client.Discovery()
 	o.Namespace = ""
 	if !o.AllNamespaces {
 		o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -196,6 +201,14 @@ func (o *CanIOptions) Validate() error {
 		if o.Resource != (schema.GroupVersionResource{}) || o.ResourceName != "" {
 			return fmt.Errorf("NonResourceURL and ResourceName can not specified together")
 		}
+	} else if !o.Resource.Empty() && !o.AllNamespaces && o.DiscoveryClient != nil {
+		if namespaced, err := isNamespaced(o.Resource, o.DiscoveryClient); err == nil && !namespaced {
+			if len(o.Resource.Group) == 0 {
+				fmt.Fprintf(o.ErrOut, "Warning: resource '%s' is not namespace scoped\n", o.Resource.Resource)
+			} else {
+				fmt.Fprintf(o.ErrOut, "Warning: resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group)
+			}
+		}
 	}
 
 	if o.NoHeaders {
@@ -211,7 +224,7 @@ func (o *CanIOptions) RunAccessList() error {
 			Namespace: o.Namespace,
 		},
 	}
-	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectRulesReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -246,7 +259,7 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 		}
 	}
 
-	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(sar)
+	response, err := o.AuthClient.SelfSubjectAccessReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -354,9 +367,29 @@ func printAccessHeaders(out io.Writer) error {
 
 func printAccess(out io.Writer, rules []rbacv1.PolicyRule) error {
 	for _, r := range rules {
-		if _, err := fmt.Fprintf(out, "%s\t%v\t%v\t%v\n", describeutil.CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs); err != nil {
+		if _, err := fmt.Fprintf(out, "%s\t%v\t%v\t%v\n", describe.CombineResourceGroup(r.Resources, r.APIGroups), r.NonResourceURLs, r.ResourceNames, r.Verbs); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func isNamespaced(gvr schema.GroupVersionResource, discoveryClient discovery.DiscoveryInterface) (bool, error) {
+	if gvr.Resource == "*" {
+		return true, nil
+	}
+	apiResourceList, err := discoveryClient.ServerResourcesForGroupVersion(schema.GroupVersion{
+		Group: gvr.Group, Version: gvr.Version,
+	}.String())
+	if err != nil {
+		return true, err
+	}
+
+	for _, resource := range apiResourceList.APIResources {
+		if resource.Name == gvr.Resource {
+			return resource.Namespaced, nil
+		}
+	}
+
+	return false, fmt.Errorf("the server doesn't have a resource type '%s' in group '%s'", gvr.Resource, gvr.Group)
 }

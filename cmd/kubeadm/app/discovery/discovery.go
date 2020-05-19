@@ -22,8 +22,9 @@ import (
 	"github.com/pkg/errors"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
@@ -43,17 +44,29 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 		return nil, errors.Wrap(err, "couldn't validate the identity of the API Server")
 	}
 
-	if len(cfg.Discovery.TLSBootstrapToken) == 0 {
+	// If the users has provided a TLSBootstrapToken use it for the join process.
+	// This is usually the case of Token discovery, but it can also be used with a discovery file
+	// without embedded authentication credentials.
+	if len(cfg.Discovery.TLSBootstrapToken) != 0 {
+		klog.V(1).Info("[discovery] Using provided TLSBootstrapToken as authentication credentials for the join process")
+
+		clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
+		return kubeconfigutil.CreateWithToken(
+			clusterinfo.Server,
+			kubeadmapiv1beta2.DefaultClusterName,
+			TokenUser,
+			clusterinfo.CertificateAuthorityData,
+			cfg.Discovery.TLSBootstrapToken,
+		), nil
+	}
+
+	// if the config returned from discovery has authentication credentials, proceed with the TLS boostrap process
+	if kubeconfigutil.HasAuthenticationCredentials(config) {
 		return config, nil
 	}
-	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
-	return kubeconfigutil.CreateWithToken(
-		clusterinfo.Server,
-		kubeadmapiv1beta1.DefaultClusterName,
-		TokenUser,
-		clusterinfo.CertificateAuthorityData,
-		cfg.Discovery.TLSBootstrapToken,
-	), nil
+
+	// if there are no authentication credentials (nor in the config returned from discovery, nor in the TLSBootstrapToken), fail
+	return nil, errors.New("couldn't find authentication credentials for the TLS boostrap process. Please use Token discovery, a discovery file with embedded authentication credentials or a discovery file without authentication credentials but with the TLSBootstrapToken flag")
 }
 
 // DiscoverValidatedKubeConfig returns a validated Config object that specifies where the cluster is and the CA cert to trust
@@ -62,11 +75,11 @@ func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	case cfg.Discovery.File != nil:
 		kubeConfigPath := cfg.Discovery.File.KubeConfigPath
 		if isHTTPSURL(kubeConfigPath) {
-			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta1.DefaultClusterName)
+			return https.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName, cfg.Discovery.Timeout.Duration)
 		}
-		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta1.DefaultClusterName)
+		return file.RetrieveValidatedConfigInfo(kubeConfigPath, kubeadmapiv1beta2.DefaultClusterName, cfg.Discovery.Timeout.Duration)
 	case cfg.Discovery.BootstrapToken != nil:
-		return token.RetrieveValidatedConfigInfo(cfg)
+		return token.RetrieveValidatedConfigInfo(&cfg.Discovery)
 	default:
 		return nil, errors.New("couldn't find a valid discovery configuration")
 	}

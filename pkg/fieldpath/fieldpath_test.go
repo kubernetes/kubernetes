@@ -33,9 +33,10 @@ func TestExtractFieldPathAsString(t *testing.T) {
 		expectedMessageFragment string
 	}{
 		{
-			name:      "not an API object",
-			fieldPath: "metadata.name",
-			obj:       "",
+			name:                    "not an API object",
+			fieldPath:               "metadata.name",
+			obj:                     "",
+			expectedMessageFragment: "object does not implement the Object interfaces",
 		},
 		{
 			name:      "ok - namespace",

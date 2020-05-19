@@ -26,13 +26,12 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 )
@@ -82,23 +81,16 @@ func TestServerSupportsVersion(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fakeClient := &fake.RESTClient{
-			NegotiatedSerializer: scheme.Codecs,
-			Resp: &http.Response{
-				StatusCode: test.statusCode,
-				Body:       objBody(&metav1.APIVersions{Versions: test.serverVersions}),
-			},
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if test.sendErr != nil {
-					return nil, test.sendErr
-				}
-				header := http.Header{}
-				header.Set("Content-Type", runtime.ContentTypeJSON)
-				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&metav1.APIVersions{Versions: test.serverVersions})}, nil
-			}),
-		}
+		fakeClient := fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if test.sendErr != nil {
+				return nil, test.sendErr
+			}
+			header := http.Header{}
+			header.Set("Content-Type", runtime.ContentTypeJSON)
+			return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&metav1.APIVersions{Versions: test.serverVersions})}, nil
+		})
 		c := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{})
-		c.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+		c.RESTClient().(*restclient.RESTClient).Client = fakeClient
 		err := discovery.ServerSupportsVersion(c, test.requiredVersion)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)

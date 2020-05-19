@@ -23,6 +23,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
+	"time"
+
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/klog/v2"
 )
 
 // New returns an http.RoundTripper that will provide the authentication
@@ -53,7 +58,7 @@ func New(config *Config) (http.RoundTripper, error) {
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
 func TLSConfigFor(c *Config) (*tls.Config, error) {
-	if !(c.HasCA() || c.HasCertAuth() || c.HasCertCallback() || c.TLS.Insecure || len(c.TLS.ServerName) > 0) {
+	if !(c.HasCA() || c.HasCertAuth() || c.HasCertCallback() || c.TLS.Insecure || len(c.TLS.ServerName) > 0 || len(c.TLS.NextProtos) > 0) {
 		return nil, nil
 	}
 	if c.HasCA() && c.TLS.Insecure {
@@ -70,6 +75,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: c.TLS.Insecure,
 		ServerName:         c.TLS.ServerName,
+		NextProtos:         c.TLS.NextProtos,
 	}
 
 	if c.HasCA() {
@@ -77,7 +83,8 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 	}
 
 	var staticCert *tls.Certificate
-	if c.HasCertAuth() {
+	// Treat cert as static if either key or cert was data, not a file
+	if c.HasCertAuth() && !c.TLS.ReloadTLSFiles {
 		// If key/cert were provided, verify them before setting up
 		// tlsConfig.GetClientCertificate.
 		cert, err := tls.X509KeyPair(c.TLS.CertData, c.TLS.KeyData)
@@ -87,12 +94,21 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		staticCert = &cert
 	}
 
+	var dynamicCertLoader func() (*tls.Certificate, error)
+	if c.TLS.ReloadTLSFiles {
+		dynamicCertLoader = cachingCertificateLoader(c.TLS.CertFile, c.TLS.KeyFile)
+	}
+
 	if c.HasCertAuth() || c.HasCertCallback() {
 		tlsConfig.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			// Note: static key/cert data always take precedence over cert
 			// callback.
 			if staticCert != nil {
 				return staticCert, nil
+			}
+			// key/cert files lead to ReloadTLSFiles being set - takes precedence over cert callback
+			if dynamicCertLoader != nil {
+				return dynamicCertLoader()
 			}
 			if c.HasCertCallback() {
 				cert, err := c.TLS.GetCert()
@@ -123,6 +139,11 @@ func loadTLSFiles(c *Config) error {
 	c.TLS.CAData, err = dataFromSliceOrFile(c.TLS.CAData, c.TLS.CAFile)
 	if err != nil {
 		return err
+	}
+
+	// Check that we are purely loading from files
+	if len(c.TLS.CertFile) > 0 && len(c.TLS.CertData) == 0 && len(c.TLS.KeyFile) > 0 && len(c.TLS.KeyData) == 0 {
+		c.TLS.ReloadTLSFiles = true
 	}
 
 	c.TLS.CertData, err = dataFromSliceOrFile(c.TLS.CertData, c.TLS.CertFile)
@@ -223,5 +244,60 @@ func (b *contextCanceller) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, b.err
 	default:
 		return b.rt.RoundTrip(req)
+	}
+}
+
+func tryCancelRequest(rt http.RoundTripper, req *http.Request) {
+	type canceler interface {
+		CancelRequest(*http.Request)
+	}
+	switch rt := rt.(type) {
+	case canceler:
+		rt.CancelRequest(req)
+	case utilnet.RoundTripperWrapper:
+		tryCancelRequest(rt.WrappedRoundTripper(), req)
+	default:
+		klog.Warningf("Unable to cancel request for %T", rt)
+	}
+}
+
+type certificateCacheEntry struct {
+	cert  *tls.Certificate
+	err   error
+	birth time.Time
+}
+
+// isStale returns true when this cache entry is too old to be usable
+func (c *certificateCacheEntry) isStale() bool {
+	return time.Now().Sub(c.birth) > time.Second
+}
+
+func newCertificateCacheEntry(certFile, keyFile string) certificateCacheEntry {
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	return certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
+}
+
+// cachingCertificateLoader ensures that we don't hammer the filesystem when opening many connections
+// the underlying cert files are read at most once every second
+func cachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate, error) {
+	current := newCertificateCacheEntry(certFile, keyFile)
+	var currentMtx sync.RWMutex
+
+	return func() (*tls.Certificate, error) {
+		currentMtx.RLock()
+		if current.isStale() {
+			currentMtx.RUnlock()
+
+			currentMtx.Lock()
+			defer currentMtx.Unlock()
+
+			if current.isStale() {
+				current = newCertificateCacheEntry(certFile, keyFile)
+			}
+		} else {
+			defer currentMtx.RUnlock()
+		}
+
+		return current.cert, current.err
 	}
 }

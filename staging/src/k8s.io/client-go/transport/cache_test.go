@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/url"
 	"testing"
 )
 
@@ -126,6 +127,8 @@ func TestTLSConfigKey(t *testing.T) {
 				GetCert: getCert,
 			},
 		},
+		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
+		"http1.1-only":   {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
 	}
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
@@ -153,5 +156,25 @@ func TestTLSConfigKey(t *testing.T) {
 				continue
 			}
 		}
+	}
+}
+
+func TestTLSConfigKeyFuncPtr(t *testing.T) {
+	keys := make(map[tlsCacheKey]struct{})
+	makeKey := func(p func(*http.Request) (*url.URL, error)) tlsCacheKey {
+		key, err := tlsConfigKey(&Config{Proxy: p})
+		if err != nil {
+			t.Fatalf("Unexpected error creating cache key: %v", err)
+		}
+		return key
+	}
+
+	keys[makeKey(http.ProxyFromEnvironment)] = struct{}{}
+	keys[makeKey(http.ProxyFromEnvironment)] = struct{}{}
+	keys[makeKey(http.ProxyURL(nil))] = struct{}{}
+	keys[makeKey(nil)] = struct{}{}
+
+	if got, want := len(keys), 3; got != want {
+		t.Fatalf("Unexpected number of keys: got=%d want=%d", got, want)
 	}
 }

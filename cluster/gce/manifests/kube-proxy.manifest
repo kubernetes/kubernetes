@@ -1,19 +1,16 @@
+# Please keep kube-proxy configuration in-sync with:
+# cluster/addons/kube-proxy/kube-proxy-ds.yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: kube-proxy
   namespace: kube-system
-  # This annotation ensures that kube-proxy does not get evicted if the node
-  # supports critical pod annotation based priority scheme.
-  # Note that kube-proxy runs as a static pod so this annotation does NOT have
-  # any effect on default scheduler which scheduling kube-proxy.
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     tier: node
     component: kube-proxy
 spec:
   priorityClassName: system-node-critical
+  priority: 2000001000
   hostNetwork: true
   tolerations:
   - operator: "Exists"
@@ -22,14 +19,14 @@ spec:
     effect: "NoSchedule"
   containers:
   - name: kube-proxy
-    image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+    image: {{pillar['kube_docker_registry']}}/kube-proxy-amd64:{{pillar['kube-proxy_docker_tag']}}
     resources:
       requests:
         cpu: {{ cpurequest }}
     command:
     - /bin/sh
     - -c
-    - exec kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    - exec kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
     {{container_env}}
     {{kube_cache_mutation_detector_env_name}}
       {{kube_cache_mutation_detector_env_value}}

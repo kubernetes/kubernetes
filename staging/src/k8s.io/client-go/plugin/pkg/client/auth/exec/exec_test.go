@@ -97,6 +97,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		panic(err)
+	}
 	validCert = &cert
 }
 
@@ -713,8 +717,54 @@ func TestTLSCredentials(t *testing.T) {
 	get(t, "valid TLS cert again", false)
 }
 
+func TestConcurrentUpdateTransportConfig(t *testing.T) {
+	n := time.Now()
+	now := func() time.Time { return n }
+
+	env := []string{""}
+	environ := func() []string {
+		s := make([]string, len(env))
+		copy(s, env)
+		return s
+	}
+
+	c := api.ExecConfig{
+		Command:    "./testdata/test-plugin.sh",
+		APIVersion: "client.authentication.k8s.io/v1alpha1",
+	}
+	a, err := newAuthenticator(newCache(), &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.environ = environ
+	a.now = now
+	a.stderr = ioutil.Discard
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	numConcurrent := 2
+
+	for i := 0; i < numConcurrent; i++ {
+		go func() {
+			for {
+				tc := &transport.Config{}
+				a.UpdateTransportConfig(tc)
+
+				select {
+				case <-stopCh:
+					return
+				default:
+					continue
+				}
+			}
+		}()
+	}
+	time.Sleep(2 * time.Second)
+}
+
 // genClientCert generates an x509 certificate for testing. Certificate and key
-// are returned in PEM encoding.
+// are returned in PEM encoding. The generated cert expires in 24 hours.
 func genClientCert(t *testing.T) ([]byte, []byte) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

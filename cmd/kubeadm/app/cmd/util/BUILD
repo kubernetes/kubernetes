@@ -14,19 +14,21 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/pubkeypin:go_default_library",
-        "//pkg/util/normalizer:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["cmdutil_test.go"],
+    srcs = [
+        "cmdutil_test.go",
+        "documentation_test.go",
+    ],
     embed = [":go_default_library"],
 )
 

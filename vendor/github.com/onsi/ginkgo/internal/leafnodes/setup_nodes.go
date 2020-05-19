@@ -1,9 +1,10 @@
 package leafnodes
 
 import (
+	"time"
+
 	"github.com/onsi/ginkgo/internal/failer"
 	"github.com/onsi/ginkgo/types"
-	"time"
 )
 
 type SetupNode struct {
@@ -37,5 +38,11 @@ func NewAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout
 func NewJustBeforeEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration, failer *failer.Failer, componentIndex int) *SetupNode {
 	return &SetupNode{
 		runner: newRunner(body, codeLocation, timeout, failer, types.SpecComponentTypeJustBeforeEach, componentIndex),
+	}
+}
+
+func NewJustAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration, failer *failer.Failer, componentIndex int) *SetupNode {
+	return &SetupNode{
+		runner: newRunner(body, codeLocation, timeout, failer, types.SpecComponentTypeJustAfterEach, componentIndex),
 	}
 }

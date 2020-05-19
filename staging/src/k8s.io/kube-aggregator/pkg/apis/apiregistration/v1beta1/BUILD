@@ -8,12 +8,15 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "defaults.go",
         "doc.go",
         "generated.pb.go",
         "register.go",
         "types.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
+        "zz_generated.prerelease-lifecycle.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
     importpath = "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
@@ -24,6 +27,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

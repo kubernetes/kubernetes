@@ -20,7 +20,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -37,16 +37,20 @@ type podContainerDeletor struct {
 	containersToKeep int
 }
 
-func (a containerStatusbyCreatedList) Len() int           { return len(a) }
-func (a containerStatusbyCreatedList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a containerStatusbyCreatedList) Less(i, j int) bool { return a[i].CreatedAt.After(a[j].CreatedAt) }
+func (a containerStatusbyCreatedList) Len() int      { return len(a) }
+func (a containerStatusbyCreatedList) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a containerStatusbyCreatedList) Less(i, j int) bool {
+	return a[i].CreatedAt.After(a[j].CreatedAt)
+}
 
 func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int) *podContainerDeletor {
 	buffer := make(chan kubecontainer.ContainerID, containerDeletorBufferLimit)
 	go wait.Until(func() {
 		for {
 			id := <-buffer
-			runtime.DeleteContainer(id)
+			if err := runtime.DeleteContainer(id); err != nil {
+				klog.Warningf("[pod_container_deletor] DeleteContainer returned error for (id=%v): %v", id, err)
+			}
 		}
 	}, 0, wait.NeverStop)
 

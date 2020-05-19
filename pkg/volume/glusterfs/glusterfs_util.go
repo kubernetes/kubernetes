@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // readGlusterLog will take the last 2 lines of the log file

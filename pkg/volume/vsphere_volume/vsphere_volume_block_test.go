@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -18,10 +20,10 @@ package vsphere_volume
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -46,18 +48,21 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
 
-	expectedGlobalPath := path.Join(tmpVDir, testGlobalPath)
+	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
 	// Bad Path
-	badspec, err := getVolumeSpecFromGlobalMapPath("")
+	badspec, err := getVolumeSpecFromGlobalMapPath("", "")
 	if badspec != nil || err == nil {
 		t.Errorf("Expected not to get spec from GlobalMapPath but did")
 	}
 
 	// Good Path
-	spec, err := getVolumeSpecFromGlobalMapPath(expectedGlobalPath)
+	spec, err := getVolumeSpecFromGlobalMapPath("myVolume", expectedGlobalPath)
 	if spec == nil || err != nil {
 		t.Fatalf("Failed to get spec from GlobalMapPath: %s", err)
+	}
+	if spec.PersistentVolume.Name != "myVolume" {
+		t.Errorf("Invalid PV name from GlobalMapPath spec: %s", spec.PersistentVolume.Name)
 	}
 	if spec.PersistentVolume.Spec.VsphereVolume.VolumePath != testVolumePath {
 		t.Fatalf("Invalid volumePath from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.VsphereVolume.VolumePath)
@@ -80,12 +85,12 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 	// deferred clean up
 	defer os.RemoveAll(tmpVDir)
 
-	expectedGlobalPath := path.Join(tmpVDir, testGlobalPath)
-	expectedPodPath := path.Join(tmpVDir, testPodPath)
+	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
+	expectedPodPath := filepath.Join(tmpVDir, testPodPath)
 
 	spec := getTestVolume(true) // block volume
 	pluginMgr := volume.VolumePluginMgr{}
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
 	plugin, err := pluginMgr.FindMapperPluginByName(vsphereVolumePluginName)
 	if err != nil {
 		os.RemoveAll(tmpVDir)

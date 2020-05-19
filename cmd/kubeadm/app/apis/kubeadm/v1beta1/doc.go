@@ -19,6 +19,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
+// Package v1beta1 has been deprecated by v1beta2
 // Package v1beta1 defines the v1beta1 version of the kubeadm configuration file format.
 // This version graduates the configuration format to BETA and is a big step towards GA.
 //
@@ -180,7 +181,7 @@ limitations under the License.
 // 	    value: "master"
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
-// 	    cgroupDriver: "cgroupfs"
+// 	    cgroup-driver: "cgroupfs"
 // 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
@@ -237,12 +238,12 @@ limitations under the License.
 // 	scheduler:
 // 	  extraArgs:
 // 	    address: "10.100.0.1"
-// 	extraVolumes:
-// 	- name: "some-volume"
-// 	  hostPath: "/etc/some-path"
-// 	  mountPath: "/etc/some-pod-path"
-// 	  readOnly: false
-// 	  pathType: File
+// 	  extraVolumes:
+// 	  - name: "some-volume"
+// 	    hostPath: "/etc/some-path"
+// 	    mountPath: "/etc/some-pod-path"
+// 	    readOnly: false
+// 	    pathType: File
 // 	certificatesDir: "/etc/kubernetes/pki"
 // 	imageRepository: "k8s.gcr.io"
 // 	useHyperKubeImage: false

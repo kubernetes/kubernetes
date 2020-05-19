@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package ctxhttp provides helper functions for performing context-aware HTTP requests.
-package ctxhttp
+package ctxhttp // import "golang.org/x/net/context/ctxhttp"
 
 import (
 	"context"

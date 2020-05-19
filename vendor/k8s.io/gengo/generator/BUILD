@@ -11,6 +11,7 @@ go_library(
         "generator.go",
         "import_tracker.go",
         "snippet_writer.go",
+        "transitive_closure.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/gengo/generator",
     importpath = "k8s.io/gengo/generator",
@@ -20,7 +21,7 @@ go_library(
         "//vendor/k8s.io/gengo/namer:go_default_library",
         "//vendor/k8s.io/gengo/parser:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

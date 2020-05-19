@@ -18,6 +18,7 @@ package history
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -27,8 +28,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -260,7 +261,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 
 		var collisionCount int32
 		for _, item := range test.existing {
-			_, err := client.AppsV1().ControllerRevisions(item.parent.GetNamespace()).Create(item.revision)
+			_, err := client.AppsV1().ControllerRevisions(item.parent.GetNamespace()).Create(context.TODO(), item.revision, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -968,12 +969,12 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 					return true, nil, errors.NewNotFound(apps.Resource("controllerrevisions"), test.revision.Name)
 				}
 				b, err := strategicpatch.StrategicMergePatch(
-					[]byte(runtime.EncodeOrDie(testapi.Apps.Codec(), test.revision)),
+					[]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), test.revision)),
 					action.GetPatch(), test.revision)
 				if err != nil {
 					return true, nil, err
 				}
-				obj, err := runtime.Decode(testapi.Apps.Codec(), b)
+				obj, err := runtime.Decode(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), b)
 				if err != nil {
 					return true, nil, err
 				}
@@ -1219,12 +1220,12 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 						test.revision.GroupVersionKind().GroupKind(), test.revision.Name, nil)
 				}
 				b, err := strategicpatch.StrategicMergePatch(
-					[]byte(runtime.EncodeOrDie(testapi.Apps.Codec(), test.revision)),
+					[]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), test.revision)),
 					action.GetPatch(), test.revision)
 				if err != nil {
 					return true, nil, err
 				}
-				obj, err := runtime.Decode(testapi.Apps.Codec(), b)
+				obj, err := runtime.Decode(clientscheme.Codecs.LegacyCodec(apps.SchemeGroupVersion), b)
 				if err != nil {
 					return true, nil, err
 				}

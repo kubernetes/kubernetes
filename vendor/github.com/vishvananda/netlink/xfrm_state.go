@@ -3,6 +3,7 @@ package netlink
 import (
 	"fmt"
 	"net"
+	"time"
 )
 
 // XfrmStateAlgo represents the algorithm to use for the ipsec encryption.
@@ -67,6 +68,19 @@ type XfrmStateLimits struct {
 	TimeUseHard uint64
 }
 
+// XfrmStateStats represents the current number of bytes/packets
+// processed by this State, the State's installation and first use
+// time and the replay window counters.
+type XfrmStateStats struct {
+	ReplayWindow uint32
+	Replay       uint32
+	Failed       uint32
+	Bytes        uint64
+	Packets      uint64
+	AddTime      uint64
+	UseTime      uint64
+}
+
 // XfrmState represents the state of an ipsec policy. It optionally
 // contains an XfrmStateAlgo for encryption and one for authentication.
 type XfrmState struct {
@@ -78,7 +92,10 @@ type XfrmState struct {
 	Reqid        int
 	ReplayWindow int
 	Limits       XfrmStateLimits
+	Statistics   XfrmStateStats
 	Mark         *XfrmMark
+	OutputMark   int
+	Ifid         int
 	Auth         *XfrmStateAlgo
 	Crypt        *XfrmStateAlgo
 	Aead         *XfrmStateAlgo
@@ -87,17 +104,23 @@ type XfrmState struct {
 }
 
 func (sa XfrmState) String() string {
-	return fmt.Sprintf("Dst: %v, Src: %v, Proto: %s, Mode: %s, SPI: 0x%x, ReqID: 0x%x, ReplayWindow: %d, Mark: %v, Auth: %v, Crypt: %v, Aead: %v, Encap: %v, ESN: %t",
-		sa.Dst, sa.Src, sa.Proto, sa.Mode, sa.Spi, sa.Reqid, sa.ReplayWindow, sa.Mark, sa.Auth, sa.Crypt, sa.Aead, sa.Encap, sa.ESN)
+	return fmt.Sprintf("Dst: %v, Src: %v, Proto: %s, Mode: %s, SPI: 0x%x, ReqID: 0x%x, ReplayWindow: %d, Mark: %v, OutputMark: %d, Ifid: %d, Auth: %v, Crypt: %v, Aead: %v, Encap: %v, ESN: %t",
+		sa.Dst, sa.Src, sa.Proto, sa.Mode, sa.Spi, sa.Reqid, sa.ReplayWindow, sa.Mark, sa.OutputMark, sa.Ifid, sa.Auth, sa.Crypt, sa.Aead, sa.Encap, sa.ESN)
 }
 func (sa XfrmState) Print(stats bool) string {
 	if !stats {
 		return sa.String()
 	}
-
-	return fmt.Sprintf("%s, ByteSoft: %s, ByteHard: %s, PacketSoft: %s, PacketHard: %s, TimeSoft: %d, TimeHard: %d, TimeUseSoft: %d, TimeUseHard: %d",
+	at := time.Unix(int64(sa.Statistics.AddTime), 0).Format(time.UnixDate)
+	ut := "-"
+	if sa.Statistics.UseTime > 0 {
+		ut = time.Unix(int64(sa.Statistics.UseTime), 0).Format(time.UnixDate)
+	}
+	return fmt.Sprintf("%s, ByteSoft: %s, ByteHard: %s, PacketSoft: %s, PacketHard: %s, TimeSoft: %d, TimeHard: %d, TimeUseSoft: %d, TimeUseHard: %d, Bytes: %d, Packets: %d, "+
+		"AddTime: %s, UseTime: %s, ReplayWindow: %d, Replay: %d, Failed: %d",
 		sa.String(), printLimit(sa.Limits.ByteSoft), printLimit(sa.Limits.ByteHard), printLimit(sa.Limits.PacketSoft), printLimit(sa.Limits.PacketHard),
-		sa.Limits.TimeSoft, sa.Limits.TimeHard, sa.Limits.TimeUseSoft, sa.Limits.TimeUseHard)
+		sa.Limits.TimeSoft, sa.Limits.TimeHard, sa.Limits.TimeUseSoft, sa.Limits.TimeUseHard, sa.Statistics.Bytes, sa.Statistics.Packets, at, ut,
+		sa.Statistics.ReplayWindow, sa.Statistics.Replay, sa.Statistics.Failed)
 }
 
 func printLimit(lmt uint64) string {

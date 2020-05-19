@@ -17,7 +17,7 @@ type benchmarker struct {
 
 func newBenchmarker() *benchmarker {
 	return &benchmarker{
-		measurements: make(map[string]*types.SpecMeasurement, 0),
+		measurements: make(map[string]*types.SpecMeasurement),
 	}
 }
 
@@ -35,15 +35,15 @@ func (b *benchmarker) Time(name string, body func(), info ...interface{}) (elaps
 }
 
 func (b *benchmarker) RecordValue(name string, value float64, info ...interface{}) {
-	measurement := b.getMeasurement(name, "Smallest", " Largest", " Average", "", 3, info...)
 	b.mu.Lock()
+	measurement := b.getMeasurement(name, "Smallest", " Largest", " Average", "", 3, info...)
 	defer b.mu.Unlock()
 	measurement.Results = append(measurement.Results, value)
 }
 
 func (b *benchmarker) RecordValueWithPrecision(name string, value float64, units string, precision int, info ...interface{}) {
-	measurement := b.getMeasurement(name, "Smallest", " Largest", " Average", units, precision, info...)
 	b.mu.Lock()
+	measurement := b.getMeasurement(name, "Smallest", " Largest", " Average", units, precision, info...)
 	defer b.mu.Unlock()
 	measurement.Results = append(measurement.Results, value)
 }

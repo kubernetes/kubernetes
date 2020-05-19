@@ -27,7 +27,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap",
     deps = [
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -41,7 +40,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/certificate:go_default_library",
         "//staging/src/k8s.io/client-go/util/certificate/csr:go_default_library",
         "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

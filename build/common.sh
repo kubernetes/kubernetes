@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
+
 # Common utilities, variables and checks for all build scripts.
 set -o errexit
 set -o nounset
@@ -39,6 +41,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"
+
+readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-k8s.gcr.io}"
+readonly KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-us.gcr.io/k8s-artifacts-prod/build-image}"
 
 # This version number is used to cause everyone to rebuild their data containers
 # and build image.  This is especially useful for automated build systems like
@@ -89,16 +94,16 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   local arch=$1
-  local debian_base_version=0.4.1
-  local debian_iptables_version=v11.0.1
+  local debian_base_version=v2.1.0
+  local debian_iptables_version=v12.1.0
+  local go_runner_version=v0.1.1
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
-    cloud-controller-manager,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
-    kube-apiserver,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
-    kube-controller-manager,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
-    kube-scheduler,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
-    kube-proxy,"k8s.gcr.io/debian-iptables-${arch}:${debian_iptables_version}"
+    "kube-apiserver,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
+    "kube-controller-manager,${KUBE_BASE_IMAGE_REGISTRY}/debian-base-${arch}:${debian_base_version}"
+    "kube-scheduler,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
+    "kube-proxy,${KUBE_BASE_IMAGE_REGISTRY}/debian-iptables-${arch}:${debian_iptables_version}"
   )
 
   echo "${targets[@]}"
@@ -159,6 +164,9 @@ function kube::build::verify_prereqs() {
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${KUBE_ROOT}/.dockerized-kube-version-defs"
+
+  # Without this, the user's umask can leak through.
+  umask 0022
 }
 
 # ---------------------------------------------------------------------------
@@ -250,7 +258,7 @@ function kube::build::update_dockerfile() {
   sed "${sed_opts[@]}" "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 }
 
-function  kube::build::set_proxy() {
+function kube::build::set_proxy() {
   if [[ -n "${KUBERNETES_HTTPS_PROXY:-}" ]]; then
     echo "ENV https_proxy $KUBERNETES_HTTPS_PROXY" >> "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   fi
@@ -302,7 +310,7 @@ function kube::build::has_ip() {
 # Detect if a specific image exists
 #
 # $1 - image repo name
-# #2 - image tag
+# $2 - image tag
 function kube::build::docker_image_exists() {
   [[ -n $1 && -n $2 ]] || {
     kube::log::error "Internal error. Image not specified in docker_image_exists."
@@ -565,6 +573,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
     --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
+    --env "KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-}"
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
@@ -725,7 +734,6 @@ function kube::build::copy_output() {
     --prune-empty-dirs \
     --filter='- /_temp/' \
     --filter='+ /vendor/' \
-    --filter='+ /Godeps/' \
     --filter='+ /staging/***/Godeps/**' \
     --filter='+ /_output/dockerized/bin/**' \
     --filter='+ zz_generated.*' \

@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -74,7 +75,7 @@ func NewClientBackedDryRunGetterFromKubeconfig(file string) (*ClientBackedDryRun
 
 // HandleGetAction handles GET actions to the dryrun clientset this interface supports
 func (clg *ClientBackedDryRunGetter) HandleGetAction(action core.GetAction) (bool, runtime.Object, error) {
-	unstructuredObj, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).Get(action.GetName(), metav1.GetOptions{})
+	unstructuredObj, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).Get(context.TODO(), action.GetName(), metav1.GetOptions{})
 	// Inform the user that the requested object wasn't found.
 	printIfNotExists(err)
 	if err != nil {
@@ -95,7 +96,7 @@ func (clg *ClientBackedDryRunGetter) HandleListAction(action core.ListAction) (b
 		FieldSelector: action.GetListRestrictions().Fields.String(),
 	}
 
-	unstructuredList, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).List(listOpts)
+	unstructuredList, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).List(context.TODO(), listOpts)
 	if err != nil {
 		return true, nil, err
 	}
@@ -113,7 +114,7 @@ func (clg *ClientBackedDryRunGetter) Client() clientset.Interface {
 }
 
 // decodeUnversionedIntoAPIObject converts the *unversioned.Unversioned object returned from the dynamic client
-// to bytes; and then decodes it back _to an external api version (k8s.io/api vs k8s.io/kubernetes/pkg/api*)_ using the normal API machinery
+// to bytes; and then decodes it back _to an external api version (k8s.io/api)_ using the normal API machinery
 func decodeUnstructuredIntoAPIObject(action core.Action, unstructuredObj runtime.Unstructured) (runtime.Object, error) {
 	objBytes, err := json.Marshal(unstructuredObj)
 	if err != nil {

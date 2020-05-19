@@ -1,2 +1,0 @@
-# This stubs out charm-pre-install coming from layer-docker as a workaround for
-# offline installs until https://github.com/juju/charm-tools/issues/301 is fixed.

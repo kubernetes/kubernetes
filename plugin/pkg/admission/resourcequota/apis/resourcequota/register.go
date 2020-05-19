@@ -22,29 +22,29 @@ import (
 )
 
 var (
+	// SchemeBuilder is a pointer used to call AddToScheme
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme is used to register the types to API encoding/decoding machinery
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
+// LegacyGroupName is the group name use in this package
+const LegacyGroupName = "resourcequota.admission.k8s.io"
+
+// LegacySchemeGroupVersion is group version used to register these objects
+var LegacySchemeGroupVersion = schema.GroupVersion{Group: LegacyGroupName, Version: runtime.APIVersionInternal}
+
 // GroupName is the group name use in this package
-const GroupName = "resourcequota.admission.k8s.io"
+const GroupName = "apiserver.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
-
-// Resource takes an unqualified resource and returns a Group qualified GroupResource
-func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
-}
-
 func addKnownTypes(scheme *runtime.Scheme) error {
-	// TODO this will get cleaned up with the scheme types are fixed
-	scheme.AddKnownTypes(SchemeGroupVersion,
+	scheme.AddKnownTypes(LegacySchemeGroupVersion,
+		&Configuration{},
+	)
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ResourceQuotaConfiguration"),
 		&Configuration{},
 	)
 	return nil

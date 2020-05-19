@@ -265,7 +265,7 @@ func (b *Builder) Unstructured() *Builder {
 		localFn:      b.isLocal,
 		restMapperFn: b.restMapperFn,
 		clientFn:     b.getClient,
-		decoder:      unstructured.UnstructuredJSONScheme,
+		decoder:      &metadataValidatingDecoder{unstructured.UnstructuredJSONScheme},
 	}
 
 	return b
@@ -284,7 +284,7 @@ func (b *Builder) WithScheme(scheme *runtime.Scheme, decodingVersions ...schema.
 	// if you specified versions, you're specifying a desire for external types, which you don't want to round-trip through
 	// internal types
 	if len(decodingVersions) > 0 {
-		negotiatedSerializer = &serializer.DirectCodecFactory{CodecFactory: codecFactory}
+		negotiatedSerializer = codecFactory.WithoutConversion()
 	}
 	b.negotiatedSerializer = negotiatedSerializer
 
@@ -820,6 +820,12 @@ func (b *Builder) visitorResult() *Result {
 	}
 
 	if len(b.resources) != 0 {
+		for _, r := range b.resources {
+			_, err := b.mappingFor(r)
+			if err != nil {
+				return &Result{err: err}
+			}
+		}
 		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
 	}
 	return &Result{err: missingResourceError}

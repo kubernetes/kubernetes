@@ -146,10 +146,21 @@ function sha1sum_file() {
 function download_tarball() {
   local -r download_path="$1"
   local -r file="$2"
+  local trace_on="off"
+  if [[ -o xtrace ]]; then 
+    trace_on="on"
+    set +x
+  fi
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
   if [[ $(which curl) ]]; then
-    curl -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
+    # if the url belongs to GCS API we should use oauth2_token in the headers
+    curl_headers=""
+    if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
+       [[ "$url" =~ ^https://storage.googleapis.com.* ]]; then
+      curl_headers="Authorization: Bearer $(gcloud auth print-access-token)"
+    fi
+    curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else
@@ -164,6 +175,9 @@ function download_tarball() {
   echo "sha1sum(${file})=${sha1sum}"
   echo
   # TODO: add actual verification
+  if [[ "${trace_on}" == "on" ]]; then
+    set -x
+  fi
 }
 
 function extract_arch_tarball() {

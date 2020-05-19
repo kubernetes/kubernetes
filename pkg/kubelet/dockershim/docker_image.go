@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -26,7 +28,7 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -66,10 +68,16 @@ func (ds *dockerService) ImageStatus(_ context.Context, r *runtimeapi.ImageStatu
 
 	imageInspect, err := ds.client.InspectImageByRef(image.Image)
 	if err != nil {
-		if libdocker.IsImageNotFoundError(err) {
-			return &runtimeapi.ImageStatusResponse{}, nil
+		if !libdocker.IsImageNotFoundError(err) {
+			return nil, err
 		}
-		return nil, err
+		imageInspect, err = ds.client.InspectImageByID(image.Image)
+		if err != nil {
+			if libdocker.IsImageNotFoundError(err) {
+				return &runtimeapi.ImageStatusResponse{}, nil
+			}
+			return nil, err
+		}
 	}
 
 	imageStatus, err := imageInspectToRuntimeAPIImage(imageInspect)

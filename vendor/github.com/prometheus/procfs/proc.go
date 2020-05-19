@@ -1,11 +1,28 @@
+// Copyright 2018 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package procfs
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs/internal/fs"
+	"github.com/prometheus/procfs/internal/util"
 )
 
 // Proc provides information about a running process.
@@ -13,7 +30,7 @@ type Proc struct {
 	// The process ID.
 	PID int
 
-	fs FS
+	fs fs.FS
 }
 
 // Procs represents a list of Proc structs.
@@ -38,7 +55,7 @@ func NewProc(pid int) (Proc, error) {
 	if err != nil {
 		return Proc{}, err
 	}
-	return fs.NewProc(pid)
+	return fs.Proc(pid)
 }
 
 // AllProcs returns a list of all currently available processes under /proc.
@@ -52,28 +69,35 @@ func AllProcs() (Procs, error) {
 
 // Self returns a process for the current process.
 func (fs FS) Self() (Proc, error) {
-	p, err := os.Readlink(fs.Path("self"))
+	p, err := os.Readlink(fs.proc.Path("self"))
 	if err != nil {
 		return Proc{}, err
 	}
-	pid, err := strconv.Atoi(strings.Replace(p, string(fs), "", -1))
+	pid, err := strconv.Atoi(strings.Replace(p, string(fs.proc), "", -1))
 	if err != nil {
 		return Proc{}, err
 	}
-	return fs.NewProc(pid)
+	return fs.Proc(pid)
 }
 
 // NewProc returns a process for the given pid.
+//
+// Deprecated: use fs.Proc() instead
 func (fs FS) NewProc(pid int) (Proc, error) {
-	if _, err := os.Stat(fs.Path(strconv.Itoa(pid))); err != nil {
+	return fs.Proc(pid)
+}
+
+// Proc returns a process for the given pid.
+func (fs FS) Proc(pid int) (Proc, error) {
+	if _, err := os.Stat(fs.proc.Path(strconv.Itoa(pid))); err != nil {
 		return Proc{}, err
 	}
-	return Proc{PID: pid, fs: fs}, nil
+	return Proc{PID: pid, fs: fs.proc}, nil
 }
 
 // AllProcs returns a list of all currently available processes.
 func (fs FS) AllProcs() (Procs, error) {
-	d, err := os.Open(fs.Path())
+	d, err := os.Open(fs.proc.Path())
 	if err != nil {
 		return Procs{}, err
 	}
@@ -90,7 +114,7 @@ func (fs FS) AllProcs() (Procs, error) {
 		if err != nil {
 			continue
 		}
-		p = append(p, Proc{PID: int(pid), fs: fs})
+		p = append(p, Proc{PID: int(pid), fs: fs.proc})
 	}
 
 	return p, nil
@@ -98,13 +122,7 @@ func (fs FS) AllProcs() (Procs, error) {
 
 // CmdLine returns the command line of a process.
 func (p Proc) CmdLine() ([]string, error) {
-	f, err := os.Open(p.path("cmdline"))
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	data, err := ioutil.ReadAll(f)
+	data, err := util.ReadFileNoStat(p.path("cmdline"))
 	if err != nil {
 		return nil, err
 	}
@@ -113,18 +131,12 @@ func (p Proc) CmdLine() ([]string, error) {
 		return []string{}, nil
 	}
 
-	return strings.Split(string(data[:len(data)-1]), string(byte(0))), nil
+	return strings.Split(string(bytes.TrimRight(data, string("\x00"))), string(byte(0))), nil
 }
 
 // Comm returns the command name of a process.
 func (p Proc) Comm() (string, error) {
-	f, err := os.Open(p.path("comm"))
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	data, err := ioutil.ReadAll(f)
+	data, err := util.ReadFileNoStat(p.path("comm"))
 	if err != nil {
 		return "", err
 	}
@@ -140,6 +152,26 @@ func (p Proc) Executable() (string, error) {
 	}
 
 	return exe, err
+}
+
+// Cwd returns the absolute path to the current working directory of the process.
+func (p Proc) Cwd() (string, error) {
+	wd, err := os.Readlink(p.path("cwd"))
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+
+	return wd, err
+}
+
+// RootDir returns the absolute path to the process's root directory (as set by chroot)
+func (p Proc) RootDir() (string, error) {
+	rdir, err := os.Readlink(p.path("root"))
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+
+	return rdir, err
 }
 
 // FileDescriptors returns the currently open file descriptors of a process.
@@ -204,6 +236,18 @@ func (p Proc) MountStats() ([]*Mount, error) {
 	return parseMountStats(f)
 }
 
+// MountInfo retrieves mount information for mount points in a
+// process's namespace.
+// It supplies information missing in `/proc/self/mounts` and
+// fixes various other problems with that file too.
+func (p Proc) MountInfo() ([]*MountInfo, error) {
+	data, err := util.ReadFileNoStat(p.path("mountinfo"))
+	if err != nil {
+		return nil, err
+	}
+	return parseMountInfo(data)
+}
+
 func (p Proc) fileDescriptors() ([]string, error) {
 	d, err := os.Open(p.path("fd"))
 	if err != nil {
@@ -221,4 +265,34 @@ func (p Proc) fileDescriptors() ([]string, error) {
 
 func (p Proc) path(pa ...string) string {
 	return p.fs.Path(append([]string{strconv.Itoa(p.PID)}, pa...)...)
+}
+
+// FileDescriptorsInfo retrieves information about all file descriptors of
+// the process.
+func (p Proc) FileDescriptorsInfo() (ProcFDInfos, error) {
+	names, err := p.fileDescriptors()
+	if err != nil {
+		return nil, err
+	}
+
+	var fdinfos ProcFDInfos
+
+	for _, n := range names {
+		fdinfo, err := p.FDInfo(n)
+		if err != nil {
+			continue
+		}
+		fdinfos = append(fdinfos, *fdinfo)
+	}
+
+	return fdinfos, nil
+}
+
+// Schedstat returns task scheduling information for the process.
+func (p Proc) Schedstat() (ProcSchedstat, error) {
+	contents, err := ioutil.ReadFile(p.path("schedstat"))
+	if err != nil {
+		return ProcSchedstat{}, err
+	}
+	return parseProcSchedstat(string(contents))
 }

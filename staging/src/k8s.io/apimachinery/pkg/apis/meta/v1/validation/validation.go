@@ -158,3 +158,29 @@ func ValidateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
 }
 
 const UninitializedStatusUpdateErrorMsg string = `must not update status when the object is uninitialized`
+
+// ValidateTableOptions returns any invalid flags on TableOptions.
+func ValidateTableOptions(opts *metav1.TableOptions) field.ErrorList {
+	var allErrs field.ErrorList
+	switch opts.IncludeObject {
+	case metav1.IncludeMetadata, metav1.IncludeNone, metav1.IncludeObject, "":
+	default:
+		allErrs = append(allErrs, field.Invalid(field.NewPath("includeObject"), opts.IncludeObject, "must be 'Metadata', 'Object', 'None', or empty"))
+	}
+	return allErrs
+}
+
+func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, fields := range fieldsList {
+		switch fields.Operation {
+		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("operation"), fields.Operation, "must be `Apply` or `Update`"))
+		}
+		if fields.FieldsType != "FieldsV1" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
+		}
+	}
+	return allErrs
+}

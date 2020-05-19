@@ -130,6 +130,7 @@ func TestRequiresRefresh(t *testing.T) {
 	cases := []struct {
 		now, exp      time.Time
 		expectRefresh bool
+		requestTweaks func(*authenticationv1.TokenRequest)
 	}{
 		{
 			now:           start.Add(10 * time.Minute),
@@ -151,6 +152,15 @@ func TestRequiresRefresh(t *testing.T) {
 			exp:           start.Add(60 * time.Minute),
 			expectRefresh: true,
 		},
+		{
+			// expiry will be overwritten by the tweak below.
+			now:           start.Add(0 * time.Minute),
+			exp:           start.Add(60 * time.Minute),
+			expectRefresh: false,
+			requestTweaks: func(tr *authenticationv1.TokenRequest) {
+				tr.Spec.ExpirationSeconds = nil
+			},
+		},
 	}
 
 	for i, c := range cases {
@@ -165,6 +175,11 @@ func TestRequiresRefresh(t *testing.T) {
 					ExpirationTimestamp: metav1.Time{Time: c.exp},
 				},
 			}
+
+			if c.requestTweaks != nil {
+				c.requestTweaks(tr)
+			}
+
 			mgr := NewManager(nil)
 			mgr.clock = clock
 

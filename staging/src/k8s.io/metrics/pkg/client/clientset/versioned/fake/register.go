@@ -30,7 +30,7 @@ import (
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
-var parameterCodec = runtime.NewParameterCodec(scheme)
+
 var localSchemeBuilder = runtime.SchemeBuilder{
 	metricsv1alpha1.AddToScheme,
 	metricsv1beta1.AddToScheme,

@@ -17,6 +17,7 @@ limitations under the License.
 package mutating
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
@@ -70,6 +71,6 @@ func (a *Plugin) ValidateInitialization() error {
 }
 
 // Admit makes an admission decision based on the request attributes.
-func (a *Plugin) Admit(attr admission.Attributes, o admission.ObjectInterfaces) error {
-	return a.Webhook.Dispatch(attr, o)
+func (a *Plugin) Admit(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
+	return a.Webhook.Dispatch(ctx, attr, o)
 }

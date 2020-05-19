@@ -58,7 +58,7 @@ func TestSecretboxKeyRotation(t *testing.T) {
 
 	// verify changing the context does not fails storage
 	// Secretbox is not currently an authenticating store
-	from, stale, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
+	_, _, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
 	if err != nil {
 		t.Fatalf("secretbox is not authenticated")
 	}

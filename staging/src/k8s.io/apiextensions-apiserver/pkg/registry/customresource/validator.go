@@ -59,9 +59,7 @@ func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Objec
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
-	}
+	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
@@ -89,9 +87,7 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
-	}
+	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleSpec(ctx, u, scale)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
@@ -119,9 +115,7 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))...)
-	if err = apiservervalidation.ValidateCustomResource(u.UnstructuredContent(), a.schemaValidator); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(""), u.UnstructuredContent(), err.Error()))
-	}
+	allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(nil, u.UnstructuredContent(), a.schemaValidator)...)
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, u, scale)...)
 
 	return allErrs

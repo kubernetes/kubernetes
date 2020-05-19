@@ -46,7 +46,7 @@ const (
 
 	// DefaultAPIVersion is the Azure Storage API version string used when a
 	// basic client is created.
-	DefaultAPIVersion = "2016-05-31"
+	DefaultAPIVersion = "2018-03-28"
 
 	defaultUseHTTPS      = true
 	defaultRetryAttempts = 5
@@ -367,11 +367,14 @@ func newSASClient(accountName, baseURL string, sasToken url.Values) Client {
 		accountName:     accountName,
 		baseURL:         baseURL,
 		accountSASToken: sasToken,
+		useHTTPS:        defaultUseHTTPS,
 	}
 	c.userAgent = c.getDefaultUserAgent()
 	// Get API version and protocol from token
 	c.apiVersion = sasToken.Get("sv")
-	c.useHTTPS = sasToken.Get("spr") == "https"
+	if spr := sasToken.Get("spr"); spr != "" {
+		c.useHTTPS = spr == "https"
+	}
 	return c
 }
 

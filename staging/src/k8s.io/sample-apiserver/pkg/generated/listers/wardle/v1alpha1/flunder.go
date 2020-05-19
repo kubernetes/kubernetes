@@ -26,8 +26,10 @@ import (
 )
 
 // FlunderLister helps list Flunders.
+// All objects returned here must be treated as read-only.
 type FlunderLister interface {
 	// List lists all Flunders in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.Flunder, err error)
 	// Flunders returns an object that can list and get Flunders.
 	Flunders(namespace string) FlunderNamespaceLister
@@ -58,10 +60,13 @@ func (s *flunderLister) Flunders(namespace string) FlunderNamespaceLister {
 }
 
 // FlunderNamespaceLister helps list and get Flunders.
+// All objects returned here must be treated as read-only.
 type FlunderNamespaceLister interface {
 	// List lists all Flunders in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.Flunder, err error)
 	// Get retrieves the Flunder from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.Flunder, error)
 	FlunderNamespaceListerExpansion
 }

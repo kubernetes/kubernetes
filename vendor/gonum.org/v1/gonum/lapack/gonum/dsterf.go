@@ -26,14 +26,21 @@ func (impl Implementation) Dsterf(n int, d, e []float64) (ok bool) {
 	if n < 0 {
 		panic(nLT0)
 	}
+
+	// Quick return if possible.
 	if n == 0 {
 		return true
 	}
-	if len(d) < n {
-		panic(badD)
+
+	switch {
+	case len(d) < n:
+		panic(shortD)
+	case len(e) < n-1:
+		panic(shortE)
 	}
-	if len(e) < n-1 {
-		panic(badE)
+
+	if n == 1 {
+		return true
 	}
 
 	const (

@@ -40,10 +40,12 @@ type Versioner interface {
 	// from database.
 	UpdateObject(obj runtime.Object, resourceVersion uint64) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
-	// cannot be updated correctly. May return nil if the requested object does not need metadata
-	// from database. continueValue is optional and indicates that more results are available if
-	// the client passes that value to the server in a subsequent call.
-	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string) error
+	// cannot be updated correctly. May return nil if the requested object does not need metadata from
+	// database. continueValue is optional and indicates that more results are available if the client
+	// passes that value to the server in a subsequent call. remainingItemCount indicates the number
+	// of remaining objects if the list is partial. The remainingItemCount field is omitted during
+	// serialization if it is set to nil.
+	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, remainingItemCount *int64) error
 	// PrepareObjectForStorage should set SelfLink and ResourceVersion to the empty value. Should
 	// return an error if the specified object cannot be updated.
 	PrepareObjectForStorage(obj runtime.Object) error
@@ -71,16 +73,13 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// MatchValue defines a pair (<index name>, <value for that index>).
-type MatchValue struct {
-	IndexName string
-	Value     string
-}
+// IndexerFunc is a function that for a given object computes
+// <value of an index> for a particular <index>.
+type IndexerFunc func(obj runtime.Object) string
 
-// TriggerPublisherFunc is a function that takes an object, and returns a list of pairs
-// (<index name>, <index value for the given object>) for all indexes known
-// to that function.
-type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
+// IndexerFuncs is a mapping from <index name> to function that
+// for a given object computes <value for that index>.
+type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
 var Everything = SelectionPredicate{
@@ -88,10 +87,26 @@ var Everything = SelectionPredicate{
 	Field: fields.Everything(),
 }
 
+// MatchValue defines a pair (<index name>, <value for that index>).
+type MatchValue struct {
+	IndexName string
+	Value     string
+}
+
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
 // that is guaranteed to succeed.
 // See the comment for GuaranteedUpdate for more details.
 type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
+
+// ValidateObjectFunc is a function to act on a given object. An error may be returned
+// if the hook cannot be completed. The function may NOT transform the provided
+// object.
+type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
+
+// ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
+func ValidateAllObjectFunc(ctx context.Context, obj runtime.Object) error {
+	return nil
+}
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {
@@ -151,7 +166,7 @@ type Interface interface {
 
 	// Delete removes the specified key and returns the value that existed at that spot.
 	// If key didn't exist, it will return NotFound storage error.
-	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
+	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions, validateDeletion ValidateObjectFunc) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
@@ -209,7 +224,7 @@ type Interface interface {
 	// err := s.GuaranteedUpdate(
 	//     "myKey", &MyType{}, true,
 	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
-	//       // Before each incovation of the user defined function, "input" is reset to
+	//       // Before each invocation of the user defined function, "input" is reset to
 	//       // current contents for "myKey" in database.
 	//       curr := input.(*MyType)  // Guaranteed to succeed.
 	//
@@ -219,8 +234,8 @@ type Interface interface {
 	//       // Return the modified object - return an error to stop iterating. Return
 	//       // a uint64 to alter the TTL on the object, or nil to keep it the same value.
 	//       return cur, nil, nil
-	//    }
-	// })
+	//    },
+	// )
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
 		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error

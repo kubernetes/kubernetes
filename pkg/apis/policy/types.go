@@ -47,8 +47,8 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
-	// status informatio is valid only if observedGeneration equals to PDB's object generation.
+	// Most recent generation observed when updating this PDB status. DisruptionsAllowed and other
+	// status information is valid only if observedGeneration equals to PDB's object generation.
 	// +optional
 	ObservedGeneration int64
 
@@ -67,7 +67,7 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time
 
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32
+	DisruptionsAllowed int32
 
 	// current number of healthy pods
 	CurrentHealthy int32
@@ -79,7 +79,6 @@ type PodDisruptionBudgetStatus struct {
 	ExpectedPods int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
@@ -106,8 +105,6 @@ type PodDisruptionBudgetList struct {
 	Items []PodDisruptionBudget
 }
 
-// +genclient
-// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
@@ -125,8 +122,6 @@ type Eviction struct {
 	DeleteOptions *metav1.DeleteOptions
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
@@ -214,7 +209,8 @@ type PodSecurityPolicySpec struct {
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume
 	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
-	// An empty value means no CSI drivers can run inline within a pod spec.
+	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
+	// This is an alpha field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
 	AllowedCSIDrivers []AllowedCSIDriver
 	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
@@ -240,6 +236,11 @@ type PodSecurityPolicySpec struct {
 	// Empty or nil indicates that only the DefaultProcMountType may be used.
 	// +optional
 	AllowedProcMountTypes []api.ProcMountType
+	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
+	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
+	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.
+	// +optional
+	RuntimeClass *RuntimeClassStrategyOptions
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -274,7 +275,8 @@ var AllowAllCapabilities api.Capability = "*"
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
-var (
+// Exported FSTypes.
+const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
 	FlexVolume            FSType = "flexVolume"
@@ -443,6 +445,25 @@ const (
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
+
+// RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
+// for a pod.
+type RuntimeClassStrategyOptions struct {
+	// allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a pod.
+	// A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
+	// list. An empty list requires the RuntimeClassName field to be unset.
+	AllowedRuntimeClassNames []string
+	// defaultRuntimeClassName is the default RuntimeClassName to set on the pod.
+	// The default MUST be allowed by the allowedRuntimeClassNames list.
+	// A value of nil does not mutate the Pod.
+	// +optional
+	DefaultRuntimeClassName *string
+}
+
+// AllowAllRuntimeClassNames can be used as a value for the
+// RuntimeClassStrategyOptions.allowedRuntimeClassNames field and means that any runtimeClassName is
+// allowed.
+const AllowAllRuntimeClassNames = "*"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

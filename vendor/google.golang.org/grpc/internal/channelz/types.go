@@ -20,9 +20,12 @@ package channelz
 
 import (
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -39,6 +42,8 @@ type entry interface {
 	// deleteSelfIfReady check whether triggerDelete() has been called before, and whether child
 	// list is now empty. If both conditions are met, then delete self from database.
 	deleteSelfIfReady()
+	// getParentID returns parent ID of the entry. 0 value parent ID means no parent.
+	getParentID() int64
 }
 
 // dummyEntry is a fake entry to handle entry not found case.
@@ -72,6 +77,10 @@ func (*dummyEntry) deleteSelfIfReady() {
 	// code should not reach here. deleteSelfIfReady is always called on an existing entry.
 }
 
+func (*dummyEntry) getParentID() int64 {
+	return 0
+}
+
 // ChannelMetric defines the info channelz provides for a specific Channel, which
 // includes ChannelInternalMetric and channelz-specific data, such as channelz id,
 // child list, etc.
@@ -94,6 +103,8 @@ type ChannelMetric struct {
 	// Note current grpc implementation doesn't allow channel having sockets directly,
 	// therefore, this is field is unused.
 	Sockets map[int64]string
+	// Trace contains the most recent traced events.
+	Trace *ChannelTrace
 }
 
 // SubChannelMetric defines the info channelz provides for a specific SubChannel,
@@ -120,6 +131,8 @@ type SubChannelMetric struct {
 	// Sockets tracks the socket type children of this subchannel in the format of a map
 	// from socket channelz id to corresponding reference string.
 	Sockets map[int64]string
+	// Trace contains the most recent traced events.
+	Trace *ChannelTrace
 }
 
 // ChannelInternalMetric defines the struct that the implementor of Channel interface
@@ -137,13 +150,47 @@ type ChannelInternalMetric struct {
 	CallsFailed int64
 	// The last time a call was started on the channel.
 	LastCallStartedTimestamp time.Time
-	//TODO: trace
+}
+
+// ChannelTrace stores traced events on a channel/subchannel and related info.
+type ChannelTrace struct {
+	// EventNum is the number of events that ever got traced (i.e. including those that have been deleted)
+	EventNum int64
+	// CreationTime is the creation time of the trace.
+	CreationTime time.Time
+	// Events stores the most recent trace events (up to $maxTraceEntry, newer event will overwrite the
+	// oldest one)
+	Events []*TraceEvent
+}
+
+// TraceEvent represent a single trace event
+type TraceEvent struct {
+	// Desc is a simple description of the trace event.
+	Desc string
+	// Severity states the severity of this trace event.
+	Severity Severity
+	// Timestamp is the event time.
+	Timestamp time.Time
+	// RefID is the id of the entity that gets referenced in the event. RefID is 0 if no other entity is
+	// involved in this event.
+	// e.g. SubChannel (id: 4[]) Created. --> RefID = 4, RefName = "" (inside [])
+	RefID int64
+	// RefName is the reference name for the entity that gets referenced in the event.
+	RefName string
+	// RefType indicates the referenced entity type, i.e Channel or SubChannel.
+	RefType RefChannelType
 }
 
 // Channel is the interface that should be satisfied in order to be tracked by
 // channelz as Channel or SubChannel.
 type Channel interface {
 	ChannelzMetric() *ChannelInternalMetric
+}
+
+type dummyChannel struct{}
+
+func (d *dummyChannel) ChannelzMetric() *ChannelInternalMetric {
+	return &ChannelInternalMetric{}
 }
 
 type channel struct {
@@ -155,6 +202,10 @@ type channel struct {
 	id          int64
 	pid         int64
 	cm          *channelMap
+	trace       *channelTrace
+	// traceRefCount is the number of trace events that reference this channel.
+	// Non-zero traceRefCount means the trace of this channel cannot be deleted.
+	traceRefCount int32
 }
 
 func (c *channel) addChild(id int64, e entry) {
@@ -179,25 +230,96 @@ func (c *channel) triggerDelete() {
 	c.deleteSelfIfReady()
 }
 
-func (c *channel) deleteSelfIfReady() {
+func (c *channel) getParentID() int64 {
+	return c.pid
+}
+
+// deleteSelfFromTree tries to delete the channel from the channelz entry relation tree, which means
+// deleting the channel reference from its parent's child list.
+//
+// In order for a channel to be deleted from the tree, it must meet the criteria that, removal of the
+// corresponding grpc object has been invoked, and the channel does not have any children left.
+//
+// The returned boolean value indicates whether the channel has been successfully deleted from tree.
+func (c *channel) deleteSelfFromTree() (deleted bool) {
 	if !c.closeCalled || len(c.subChans)+len(c.nestedChans) != 0 {
-		return
+		return false
 	}
-	c.cm.deleteEntry(c.id)
 	// not top channel
 	if c.pid != 0 {
 		c.cm.findEntry(c.pid).deleteChild(c.id)
 	}
+	return true
+}
+
+// deleteSelfFromMap checks whether it is valid to delete the channel from the map, which means
+// deleting the channel from channelz's tracking entirely. Users can no longer use id to query the
+// channel, and its memory will be garbage collected.
+//
+// The trace reference count of the channel must be 0 in order to be deleted from the map. This is
+// specified in the channel tracing gRFC that as long as some other trace has reference to an entity,
+// the trace of the referenced entity must not be deleted. In order to release the resource allocated
+// by grpc, the reference to the grpc object is reset to a dummy object.
+//
+// deleteSelfFromMap must be called after deleteSelfFromTree returns true.
+//
+// It returns a bool to indicate whether the channel can be safely deleted from map.
+func (c *channel) deleteSelfFromMap() (delete bool) {
+	if c.getTraceRefCount() != 0 {
+		c.c = &dummyChannel{}
+		return false
+	}
+	return true
+}
+
+// deleteSelfIfReady tries to delete the channel itself from the channelz database.
+// The delete process includes two steps:
+// 1. delete the channel from the entry relation tree, i.e. delete the channel reference from its
+//    parent's child list.
+// 2. delete the channel from the map, i.e. delete the channel entirely from channelz. Lookup by id
+//    will return entry not found error.
+func (c *channel) deleteSelfIfReady() {
+	if !c.deleteSelfFromTree() {
+		return
+	}
+	if !c.deleteSelfFromMap() {
+		return
+	}
+	c.cm.deleteEntry(c.id)
+	c.trace.clear()
+}
+
+func (c *channel) getChannelTrace() *channelTrace {
+	return c.trace
+}
+
+func (c *channel) incrTraceRefCount() {
+	atomic.AddInt32(&c.traceRefCount, 1)
+}
+
+func (c *channel) decrTraceRefCount() {
+	atomic.AddInt32(&c.traceRefCount, -1)
+}
+
+func (c *channel) getTraceRefCount() int {
+	i := atomic.LoadInt32(&c.traceRefCount)
+	return int(i)
+}
+
+func (c *channel) getRefName() string {
+	return c.refName
 }
 
 type subChannel struct {
-	refName     string
-	c           Channel
-	closeCalled bool
-	sockets     map[int64]string
-	id          int64
-	pid         int64
-	cm          *channelMap
+	refName       string
+	c             Channel
+	closeCalled   bool
+	sockets       map[int64]string
+	id            int64
+	pid           int64
+	cm            *channelMap
+	trace         *channelTrace
+	traceRefCount int32
 }
 
 func (sc *subChannel) addChild(id int64, e entry) {
@@ -218,12 +340,82 @@ func (sc *subChannel) triggerDelete() {
 	sc.deleteSelfIfReady()
 }
 
-func (sc *subChannel) deleteSelfIfReady() {
+func (sc *subChannel) getParentID() int64 {
+	return sc.pid
+}
+
+// deleteSelfFromTree tries to delete the subchannel from the channelz entry relation tree, which
+// means deleting the subchannel reference from its parent's child list.
+//
+// In order for a subchannel to be deleted from the tree, it must meet the criteria that, removal of
+// the corresponding grpc object has been invoked, and the subchannel does not have any children left.
+//
+// The returned boolean value indicates whether the channel has been successfully deleted from tree.
+func (sc *subChannel) deleteSelfFromTree() (deleted bool) {
 	if !sc.closeCalled || len(sc.sockets) != 0 {
+		return false
+	}
+	sc.cm.findEntry(sc.pid).deleteChild(sc.id)
+	return true
+}
+
+// deleteSelfFromMap checks whether it is valid to delete the subchannel from the map, which means
+// deleting the subchannel from channelz's tracking entirely. Users can no longer use id to query
+// the subchannel, and its memory will be garbage collected.
+//
+// The trace reference count of the subchannel must be 0 in order to be deleted from the map. This is
+// specified in the channel tracing gRFC that as long as some other trace has reference to an entity,
+// the trace of the referenced entity must not be deleted. In order to release the resource allocated
+// by grpc, the reference to the grpc object is reset to a dummy object.
+//
+// deleteSelfFromMap must be called after deleteSelfFromTree returns true.
+//
+// It returns a bool to indicate whether the channel can be safely deleted from map.
+func (sc *subChannel) deleteSelfFromMap() (delete bool) {
+	if sc.getTraceRefCount() != 0 {
+		// free the grpc struct (i.e. addrConn)
+		sc.c = &dummyChannel{}
+		return false
+	}
+	return true
+}
+
+// deleteSelfIfReady tries to delete the subchannel itself from the channelz database.
+// The delete process includes two steps:
+// 1. delete the subchannel from the entry relation tree, i.e. delete the subchannel reference from
+//    its parent's child list.
+// 2. delete the subchannel from the map, i.e. delete the subchannel entirely from channelz. Lookup
+//    by id will return entry not found error.
+func (sc *subChannel) deleteSelfIfReady() {
+	if !sc.deleteSelfFromTree() {
+		return
+	}
+	if !sc.deleteSelfFromMap() {
 		return
 	}
 	sc.cm.deleteEntry(sc.id)
-	sc.cm.findEntry(sc.pid).deleteChild(sc.id)
+	sc.trace.clear()
+}
+
+func (sc *subChannel) getChannelTrace() *channelTrace {
+	return sc.trace
+}
+
+func (sc *subChannel) incrTraceRefCount() {
+	atomic.AddInt32(&sc.traceRefCount, 1)
+}
+
+func (sc *subChannel) decrTraceRefCount() {
+	atomic.AddInt32(&sc.traceRefCount, -1)
+}
+
+func (sc *subChannel) getTraceRefCount() int {
+	i := atomic.LoadInt32(&sc.traceRefCount)
+	return int(i)
+}
+
+func (sc *subChannel) getRefName() string {
+	return sc.refName
 }
 
 // SocketMetric defines the info channelz provides for a specific Socket, which
@@ -281,9 +473,9 @@ type SocketInternalMetric struct {
 	RemoteAddr net.Addr
 	// Optional, represents the name of the remote endpoint, if different than
 	// the original target name.
-	RemoteName string
-	//TODO: socket options
-	//TODO: Security
+	RemoteName    string
+	SocketOptions *SocketOptionData
+	Security      credentials.ChannelzSecurityValue
 }
 
 // Socket is the interface that should be satisfied in order to be tracked by
@@ -317,6 +509,10 @@ func (ls *listenSocket) deleteSelfIfReady() {
 	grpclog.Errorf("cannot call deleteSelfIfReady on a listen socket")
 }
 
+func (ls *listenSocket) getParentID() int64 {
+	return ls.pid
+}
+
 type normalSocket struct {
 	refName string
 	s       Socket
@@ -340,6 +536,10 @@ func (ns *normalSocket) triggerDelete() {
 
 func (ns *normalSocket) deleteSelfIfReady() {
 	grpclog.Errorf("cannot call deleteSelfIfReady on a normal socket")
+}
+
+func (ns *normalSocket) getParentID() int64 {
+	return ns.pid
 }
 
 // ServerMetric defines the info channelz provides for a specific Server, which
@@ -369,7 +569,6 @@ type ServerInternalMetric struct {
 	CallsFailed int64
 	// The last time a call was started on the server.
 	LastCallStartedTimestamp time.Time
-	//TODO: trace
 }
 
 // Server is the interface to be satisfied in order to be tracked by channelz as
@@ -415,4 +614,89 @@ func (s *server) deleteSelfIfReady() {
 		return
 	}
 	s.cm.deleteEntry(s.id)
+}
+
+func (s *server) getParentID() int64 {
+	return 0
+}
+
+type tracedChannel interface {
+	getChannelTrace() *channelTrace
+	incrTraceRefCount()
+	decrTraceRefCount()
+	getRefName() string
+}
+
+type channelTrace struct {
+	cm          *channelMap
+	createdTime time.Time
+	eventCount  int64
+	mu          sync.Mutex
+	events      []*TraceEvent
+}
+
+func (c *channelTrace) append(e *TraceEvent) {
+	c.mu.Lock()
+	if len(c.events) == getMaxTraceEntry() {
+		del := c.events[0]
+		c.events = c.events[1:]
+		if del.RefID != 0 {
+			// start recursive cleanup in a goroutine to not block the call originated from grpc.
+			go func() {
+				// need to acquire c.cm.mu lock to call the unlocked attemptCleanup func.
+				c.cm.mu.Lock()
+				c.cm.decrTraceRefCount(del.RefID)
+				c.cm.mu.Unlock()
+			}()
+		}
+	}
+	e.Timestamp = time.Now()
+	c.events = append(c.events, e)
+	c.eventCount++
+	c.mu.Unlock()
+}
+
+func (c *channelTrace) clear() {
+	c.mu.Lock()
+	for _, e := range c.events {
+		if e.RefID != 0 {
+			// caller should have already held the c.cm.mu lock.
+			c.cm.decrTraceRefCount(e.RefID)
+		}
+	}
+	c.mu.Unlock()
+}
+
+// Severity is the severity level of a trace event.
+// The canonical enumeration of all valid values is here:
+// https://github.com/grpc/grpc-proto/blob/9b13d199cc0d4703c7ea26c9c330ba695866eb23/grpc/channelz/v1/channelz.proto#L126.
+type Severity int
+
+const (
+	// CtUNKNOWN indicates unknown severity of a trace event.
+	CtUNKNOWN Severity = iota
+	// CtINFO indicates info level severity of a trace event.
+	CtINFO
+	// CtWarning indicates warning level severity of a trace event.
+	CtWarning
+	// CtError indicates error level severity of a trace event.
+	CtError
+)
+
+// RefChannelType is the type of the entity being referenced in a trace event.
+type RefChannelType int
+
+const (
+	// RefChannel indicates the referenced entity is a Channel.
+	RefChannel RefChannelType = iota
+	// RefSubChannel indicates the referenced entity is a SubChannel.
+	RefSubChannel
+)
+
+func (c *channelTrace) dumpData() *ChannelTrace {
+	c.mu.Lock()
+	ct := &ChannelTrace{EventNum: c.eventCount, CreationTime: c.createdTime}
+	ct.Events = c.events[:len(c.events)]
+	c.mu.Unlock()
+	return ct
 }

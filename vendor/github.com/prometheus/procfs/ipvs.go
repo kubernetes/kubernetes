@@ -1,7 +1,21 @@
+// Copyright 2018 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package procfs
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,6 +25,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/procfs/internal/util"
 )
 
 // IPVSStats holds IPVS statistics, as exposed by the kernel in `/proc/net/ip_vs_stats`.
@@ -31,16 +47,16 @@ type IPVSStats struct {
 type IPVSBackendStatus struct {
 	// The local (virtual) IP address.
 	LocalAddress net.IP
+	// The remote (real) IP address.
+	RemoteAddress net.IP
 	// The local (virtual) port.
 	LocalPort uint16
+	// The remote (real) port.
+	RemotePort uint16
 	// The local firewall mark
 	LocalMark string
 	// The transport protocol (TCP, UDP).
 	Proto string
-	// The remote (real) IP address.
-	RemoteAddress net.IP
-	// The remote (real) port.
-	RemotePort uint16
 	// The current number of active connections for this virtual/real address pair.
 	ActiveConn uint64
 	// The current number of inactive connections for this virtual/real address pair.
@@ -49,29 +65,18 @@ type IPVSBackendStatus struct {
 	Weight uint64
 }
 
-// NewIPVSStats reads the IPVS statistics.
-func NewIPVSStats() (IPVSStats, error) {
-	fs, err := NewFS(DefaultMountPoint)
+// IPVSStats reads the IPVS statistics from the specified `proc` filesystem.
+func (fs FS) IPVSStats() (IPVSStats, error) {
+	data, err := util.ReadFileNoStat(fs.proc.Path("net/ip_vs_stats"))
 	if err != nil {
 		return IPVSStats{}, err
 	}
 
-	return fs.NewIPVSStats()
-}
-
-// NewIPVSStats reads the IPVS statistics from the specified `proc` filesystem.
-func (fs FS) NewIPVSStats() (IPVSStats, error) {
-	file, err := os.Open(fs.Path("net/ip_vs_stats"))
-	if err != nil {
-		return IPVSStats{}, err
-	}
-	defer file.Close()
-
-	return parseIPVSStats(file)
+	return parseIPVSStats(bytes.NewReader(data))
 }
 
 // parseIPVSStats performs the actual parsing of `ip_vs_stats`.
-func parseIPVSStats(file io.Reader) (IPVSStats, error) {
+func parseIPVSStats(r io.Reader) (IPVSStats, error) {
 	var (
 		statContent []byte
 		statLines   []string
@@ -79,7 +84,7 @@ func parseIPVSStats(file io.Reader) (IPVSStats, error) {
 		stats       IPVSStats
 	)
 
-	statContent, err := ioutil.ReadAll(file)
+	statContent, err := ioutil.ReadAll(r)
 	if err != nil {
 		return IPVSStats{}, err
 	}
@@ -118,19 +123,9 @@ func parseIPVSStats(file io.Reader) (IPVSStats, error) {
 	return stats, nil
 }
 
-// NewIPVSBackendStatus reads and returns the status of all (virtual,real) server pairs.
-func NewIPVSBackendStatus() ([]IPVSBackendStatus, error) {
-	fs, err := NewFS(DefaultMountPoint)
-	if err != nil {
-		return []IPVSBackendStatus{}, err
-	}
-
-	return fs.NewIPVSBackendStatus()
-}
-
-// NewIPVSBackendStatus reads and returns the status of all (virtual,real) server pairs from the specified `proc` filesystem.
-func (fs FS) NewIPVSBackendStatus() ([]IPVSBackendStatus, error) {
-	file, err := os.Open(fs.Path("net/ip_vs"))
+// IPVSBackendStatus reads and returns the status of all (virtual,real) server pairs from the specified `proc` filesystem.
+func (fs FS) IPVSBackendStatus() ([]IPVSBackendStatus, error) {
+	file, err := os.Open(fs.proc.Path("net/ip_vs"))
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +146,7 @@ func parseIPVSBackendStatus(file io.Reader) ([]IPVSBackendStatus, error) {
 	)
 
 	for scanner.Scan() {
-		fields := strings.Fields(string(scanner.Text()))
+		fields := strings.Fields(scanner.Text())
 		if len(fields) == 0 {
 			continue
 		}

@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
@@ -43,9 +43,9 @@ const (
 // cloudAlias is the interface to the cloud platform APIs.
 type cloudAlias interface {
 	// Alias returns the IP alias for the node.
-	Alias(ctx context.Context, nodeName string) (*net.IPNet, error)
+	Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error)
 	// AddAlias adds an alias to the node.
-	AddAlias(ctx context.Context, nodeName string, cidrRange *net.IPNet) error
+	AddAlias(ctx context.Context, node *v1.Node, cidrRange *net.IPNet) error
 }
 
 // kubeAPI is the interface to the Kubernetes APIs.
@@ -204,7 +204,7 @@ func (op *updateOp) run(sync *NodeSync) error {
 		op.node = node
 	}
 
-	aliasRange, err := sync.cloudAlias.Alias(ctx, sync.nodeName)
+	aliasRange, err := sync.cloudAlias.Alias(ctx, op.node)
 	if err != nil {
 		klog.Errorf("Error getting cloud alias for node %q: %v", sync.nodeName, err)
 		return err
@@ -293,7 +293,7 @@ func (op *updateOp) updateAliasFromNode(ctx context.Context, sync *NodeSync, nod
 		return err
 	}
 
-	if err := sync.cloudAlias.AddAlias(ctx, node.Name, aliasRange); err != nil {
+	if err := sync.cloudAlias.AddAlias(ctx, node, aliasRange); err != nil {
 		klog.Errorf("Could not add alias %v for node %q: %v", aliasRange, node.Name, err)
 		return err
 	}
@@ -325,7 +325,7 @@ func (op *updateOp) allocateRange(ctx context.Context, sync *NodeSync, node *v1.
 	// If addAlias returns a hard error, cidrRange will be leaked as there
 	// is no durable record of the range. The missing space will be
 	// recovered on the next restart of the controller.
-	if err := sync.cloudAlias.AddAlias(ctx, node.Name, cidrRange); err != nil {
+	if err := sync.cloudAlias.AddAlias(ctx, node, cidrRange); err != nil {
 		klog.Errorf("Could not add alias %v for node %q: %v", cidrRange, node.Name, err)
 		return err
 	}

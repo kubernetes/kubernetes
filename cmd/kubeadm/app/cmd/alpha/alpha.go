@@ -30,7 +30,7 @@ func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
 		Short: "Kubeadm experimental sub-commands",
 	}
 
-	cmd.AddCommand(newCmdCertsUtility())
+	cmd.AddCommand(newCmdCertsUtility(out))
 	cmd.AddCommand(newCmdKubeletUtility())
 	cmd.AddCommand(newCmdKubeConfigUtility(out))
 	cmd.AddCommand(NewCmdSelfhosting(in))

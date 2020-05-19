@@ -33,7 +33,10 @@ import (
 )
 
 var (
+	// Scheme defines methods for serializing and deserializing API objects.
 	Scheme = runtime.NewScheme()
+	// Codecs provides methods for retrieving codecs and serializers for specific
+	// versions and content types.
 	Codecs = serializer.NewCodecFactory(Scheme)
 )
 
@@ -55,10 +58,12 @@ func init() {
 	)
 }
 
+// ExtraConfig holds custom apiserver config
 type ExtraConfig struct {
 	// Place you custom config here.
 }
 
+// Config defines the config for the apiserver
 type Config struct {
 	GenericConfig *genericapiserver.RecommendedConfig
 	ExtraConfig   ExtraConfig
@@ -74,8 +79,8 @@ type completedConfig struct {
 	ExtraConfig   *ExtraConfig
 }
 
+// CompletedConfig embeds a private pointer that cannot be instantiated outside of this package.
 type CompletedConfig struct {
-	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedConfig
 }
 

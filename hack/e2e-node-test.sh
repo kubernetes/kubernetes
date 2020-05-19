@@ -15,6 +15,15 @@
 # limitations under the License.
 
 # This script is a vestigial redirection.  Please do not add "real" logic.
+# The "true" target of this makerule is `hack/make-rules/test-e2e-node.sh`.
+
+# This script runs `make test-e2e-node` command.
+# The command builds and runs node end-to-end tests.
+# Args:
+#  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
+#  SKIP: Regexp that matches the tests that needs to be skipped.  Defaults
+# Usage: `hack/e2e-node-test.sh `.
+# Example: `hack/e2e-node-test.sh FOCUS=Kubelet SKIP=container`.
 
 set -o errexit
 set -o nounset

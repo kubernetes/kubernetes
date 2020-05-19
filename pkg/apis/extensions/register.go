@@ -41,6 +41,7 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
+// Builds new Scheme of known types
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
@@ -53,7 +54,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&apps.Deployment{},
 		&apps.DeploymentList{},
 		&apps.DeploymentRollback{},
-		&ReplicationControllerDummy{},
 		&apps.DaemonSetList{},
 		&apps.DaemonSet{},
 		&networking.Ingress{},

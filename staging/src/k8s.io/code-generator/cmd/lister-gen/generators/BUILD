@@ -10,7 +10,6 @@ go_library(
     srcs = [
         "expansion.go",
         "lister.go",
-        "tags.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen/generators",
     importpath = "k8s.io/code-generator/cmd/lister-gen/generators",
@@ -21,7 +20,7 @@ go_library(
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

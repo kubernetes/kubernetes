@@ -240,6 +240,11 @@ func matchHTTP2Field(w io.Writer, r io.Reader, name string, matches func(string)
 
 		switch f := f.(type) {
 		case *http2.SettingsFrame:
+			// Sender acknoweldged the SETTINGS frame. No need to write
+			// SETTINGS again.
+			if f.IsAck() {
+				break
+			}
 			if err := framer.WriteSettings(); err != nil {
 				return false
 			}

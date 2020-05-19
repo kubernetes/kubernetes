@@ -12,7 +12,7 @@
 // removed in the future. It exists for internal use only.
 // Please switch to another JWS package or copy this package into your own
 // source tree.
-package jws
+package jws // import "golang.org/x/oauth2/jws"
 
 import (
 	"bytes"

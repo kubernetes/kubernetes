@@ -21,12 +21,21 @@ syntax = 'proto2';
 
 package k8s.io.api.node.v1beta1;
 
+import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
+
+// Overhead structure represents the resource overhead associated with running a pod.
+message Overhead {
+  // PodFixed represents the fixed resource overhead associated with running a pod.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> podFixed = 1;
+}
 
 // RuntimeClass defines a class of container runtime supported in the cluster.
 // The RuntimeClass is used to determine which container runtime is used to run
@@ -36,7 +45,7 @@ option go_package = "v1beta1";
 // pod.  For more details, see
 // https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
 message RuntimeClass {
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -51,16 +60,49 @@ message RuntimeClass {
   // The Handler must conform to the DNS Label (RFC 1123) requirements, and is
   // immutable.
   optional string handler = 2;
+
+  // Overhead represents the resource overhead associated with running a pod for a
+  // given RuntimeClass. For more details, see
+  // https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
+  // This field is alpha-level as of Kubernetes v1.15, and is only honored by servers that enable the PodOverhead feature.
+  // +optional
+  optional Overhead overhead = 3;
+
+  // Scheduling holds the scheduling constraints to ensure that pods running
+  // with this RuntimeClass are scheduled to nodes that support it.
+  // If scheduling is nil, this RuntimeClass is assumed to be supported by all
+  // nodes.
+  // +optional
+  optional Scheduling scheduling = 4;
 }
 
 // RuntimeClassList is a list of RuntimeClass objects.
 message RuntimeClassList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of schema objects.
   repeated RuntimeClass items = 2;
+}
+
+// Scheduling specifies the scheduling constraints for nodes supporting a
+// RuntimeClass.
+message Scheduling {
+  // nodeSelector lists labels that must be present on nodes that support this
+  // RuntimeClass. Pods using this RuntimeClass can only be scheduled to a
+  // node matched by this selector. The RuntimeClass nodeSelector is merged
+  // with a pod's existing nodeSelector. Any conflicts will cause the pod to
+  // be rejected in admission.
+  // +optional
+  map<string, string> nodeSelector = 1;
+
+  // tolerations are appended (excluding duplicates) to pods running with this
+  // RuntimeClass during admission, effectively unioning the set of nodes
+  // tolerated by the pod and the RuntimeClass.
+  // +optional
+  // +listType=atomic
+  repeated k8s.io.api.core.v1.Toleration tolerations = 2;
 }
 

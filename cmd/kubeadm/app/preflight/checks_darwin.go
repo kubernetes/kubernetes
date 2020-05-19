@@ -25,9 +25,3 @@ package preflight
 func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
 	return nil, nil
 }
-
-// Check determines if IPVS proxier can be used or not
-// No-op for for Darwin (MacOS).
-func (ipvspc IPVSProxierCheck) Check() (warnings, errors []error) {
-	return nil, nil
-}

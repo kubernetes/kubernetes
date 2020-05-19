@@ -3,10 +3,12 @@
 approvers:
 - Random-Liu
 - tallclair
-- vishh
 - derekwaynecarr
 - yujuhong
-- balajismaniam
 - ConnorDoyle
+- klueska
+emeritus_approvers:
+- balajismaniam
+- vishh
 reviewers:
 - sig-node-reviewers

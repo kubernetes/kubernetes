@@ -17,10 +17,12 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -41,6 +43,8 @@ type Attributes interface {
 	GetSubresource() string
 	// GetOperation is the operation being performed
 	GetOperation() Operation
+	// GetOperationOptions is the options for the operation being performed
+	GetOperationOptions() runtime.Object
 	// IsDryRun indicates that modifications will definitely not be persisted for this request. This is to prevent
 	// admission controllers with side effects and a method of reconciliation from being overwhelmed.
 	// However, a value of false for this does not mean that the modification will be persisted, because it
@@ -59,7 +63,17 @@ type Attributes interface {
 	// "podsecuritypolicy" is the name of the plugin, "admission.k8s.io" is the name of the organization, "admit-policy" is the key name.
 	// An error is returned if the format of key is invalid. When trying to overwrite annotation with a new value, an error is returned.
 	// Both ValidationInterface and MutationInterface are allowed to add Annotations.
+	// By default, an annotation gets logged into audit event if the request's audit level is greater or
+	// equal to Metadata.
 	AddAnnotation(key, value string) error
+
+	// AddAnnotationWithLevel sets annotation according to key-value pair with additional intended audit level.
+	// An Annotation gets logged into audit event if the request's audit level is greater or equal to the
+	// intended audit level.
+	AddAnnotationWithLevel(key, value string, level auditinternal.Level) error
+
+	// GetReinvocationContext tracks the admission request information relevant to the re-invocation policy.
+	GetReinvocationContext() ReinvocationContext
 }
 
 // ObjectInterfaces is an interface used by AdmissionController to get object interfaces
@@ -74,17 +88,35 @@ type ObjectInterfaces interface {
 	GetObjectDefaulter() runtime.ObjectDefaulter
 	// GetObjectConvertor is the ObjectConvertor appropriate for the requested object.
 	GetObjectConvertor() runtime.ObjectConvertor
+	// GetEquivalentResourceMapper is the EquivalentResourceMapper appropriate for finding equivalent resources and expected kind for the requested object.
+	GetEquivalentResourceMapper() runtime.EquivalentResourceMapper
 }
 
 // privateAnnotationsGetter is a private interface which allows users to get annotations from Attributes.
 type privateAnnotationsGetter interface {
-	getAnnotations() map[string]string
+	getAnnotations(maxLevel auditinternal.Level) map[string]string
 }
 
 // AnnotationsGetter allows users to get annotations from Attributes. An alternate Attribute should implement
 // this interface.
 type AnnotationsGetter interface {
-	GetAnnotations() map[string]string
+	GetAnnotations(maxLevel auditinternal.Level) map[string]string
+}
+
+// ReinvocationContext provides access to the admission related state required to implement the re-invocation policy.
+type ReinvocationContext interface {
+	// IsReinvoke returns true if the current admission check is a re-invocation.
+	IsReinvoke() bool
+	// SetIsReinvoke sets the current admission check as a re-invocation.
+	SetIsReinvoke()
+	// ShouldReinvoke returns true if any plugin has requested a re-invocation.
+	ShouldReinvoke() bool
+	// SetShouldReinvoke signals that a re-invocation is desired.
+	SetShouldReinvoke()
+	// AddValue set a value for a plugin name, possibly overriding a previous value.
+	SetValue(plugin string, v interface{})
+	// Value reads a value for a webhook.
+	Value(plugin string) interface{}
 }
 
 // Interface is an abstract, pluggable interface for Admission Control decisions.
@@ -97,8 +129,9 @@ type Interface interface {
 type MutationInterface interface {
 	Interface
 
-	// Admit makes an admission decision based on the request attributes
-	Admit(a Attributes, o ObjectInterfaces) (err error)
+	// Admit makes an admission decision based on the request attributes.
+	// Context is used only for timeout/deadline/cancellation and tracing information.
+	Admit(ctx context.Context, a Attributes, o ObjectInterfaces) (err error)
 }
 
 // ValidationInterface is an abstract, pluggable interface for Admission Control decisions.
@@ -106,7 +139,8 @@ type ValidationInterface interface {
 	Interface
 
 	// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate
-	Validate(a Attributes, o ObjectInterfaces) (err error)
+	// Context is used only for timeout/deadline/cancellation and tracing information.
+	Validate(ctx context.Context, a Attributes, o ObjectInterfaces) (err error)
 }
 
 // Operation is the type of resource operation being checked for admission control

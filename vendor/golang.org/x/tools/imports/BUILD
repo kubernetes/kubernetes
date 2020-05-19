@@ -2,22 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "fix.go",
-        "imports.go",
-        "mod.go",
-        "sortimports.go",
-        "zstdlib.go",
-    ],
+    srcs = ["forward.go"],
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/tools/imports",
     importpath = "golang.org/x/tools/imports",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/golang.org/x/tools/go/ast/astutil:go_default_library",
-        "//vendor/golang.org/x/tools/go/packages:go_default_library",
-        "//vendor/golang.org/x/tools/internal/gopathwalk:go_default_library",
-        "//vendor/golang.org/x/tools/internal/module:go_default_library",
-    ],
+    deps = ["//vendor/golang.org/x/tools/internal/imports:go_default_library"],
 )
 
 filegroup(

@@ -17,6 +17,7 @@ limitations under the License.
 package recyclerclient
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -26,9 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
+// RecycleEventRecorder is a func that defines how to record RecycleEvent.
 type RecycleEventRecorder func(eventtype, message string)
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
@@ -127,9 +129,8 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 				if pod.Status.Phase == v1.PodFailed {
 					if pod.Status.Message != "" {
 						return fmt.Errorf(pod.Status.Message)
-					} else {
-						return fmt.Errorf("pod failed, pod.Status.Message unknown.")
 					}
+					return fmt.Errorf("pod failed, pod.Status.Message unknown")
 				}
 
 			case watch.Deleted:
@@ -177,15 +178,15 @@ type realRecyclerClient struct {
 }
 
 func (c *realRecyclerClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
-	return c.client.CoreV1().Pods(pod.Namespace).Create(pod)
+	return c.client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
 func (c *realRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
-	return c.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (c *realRecyclerClient) DeletePod(name, namespace string) error {
-	return c.client.CoreV1().Pods(namespace).Delete(name, nil)
+	return c.client.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
 func (c *realRecyclerClient) Event(eventtype, message string) {
@@ -204,13 +205,13 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 		Watch:         true,
 	}
 
-	podWatch, err := c.client.CoreV1().Pods(namespace).Watch(options)
+	podWatch, err := c.client.CoreV1().Pods(namespace).Watch(context.TODO(), options)
 	if err != nil {
 		return nil, err
 	}
 
 	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
-	eventWatch, err := c.client.CoreV1().Events(namespace).Watch(metav1.ListOptions{
+	eventWatch, err := c.client.CoreV1().Events(namespace).Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector: eventSelector.String(),
 		Watch:         true,
 	})
@@ -238,9 +239,8 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 			case eventEvent, ok := <-eventWatch.ResultChan():
 				if !ok {
 					return
-				} else {
-					eventCh <- eventEvent
 				}
+				eventCh <- eventEvent
 			}
 		}
 	}()
@@ -256,9 +256,8 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 			case podEvent, ok := <-podWatch.ResultChan():
 				if !ok {
 					return
-				} else {
-					eventCh <- podEvent
 				}
+				eventCh <- podEvent
 			}
 		}
 	}()

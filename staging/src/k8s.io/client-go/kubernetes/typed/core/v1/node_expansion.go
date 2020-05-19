@@ -17,7 +17,9 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -25,19 +27,19 @@ import (
 type NodeExpansion interface {
 	// PatchStatus modifies the status of an existing node. It returns the copy
 	// of the node that the server returns, or an error.
-	PatchStatus(nodeName string, data []byte) (*v1.Node, error)
+	PatchStatus(ctx context.Context, nodeName string, data []byte) (*v1.Node, error)
 }
 
 // PatchStatus modifies the status of an existing node. It returns the copy of
 // the node that the server returns, or an error.
-func (c *nodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
+func (c *nodes) PatchStatus(ctx context.Context, nodeName string, data []byte) (*v1.Node, error) {
 	result := &v1.Node{}
 	err := c.client.Patch(types.StrategicMergePatchType).
 		Resource("nodes").
 		Name(nodeName).
 		SubResource("status").
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return result, err
 }

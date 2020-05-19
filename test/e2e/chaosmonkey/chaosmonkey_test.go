@@ -22,7 +22,7 @@ import (
 )
 
 func TestDoWithPanic(t *testing.T) {
-	var counter int64 = 0
+	var counter int64
 	cm := New(func() {})
 	tests := []Test{
 		// No panic

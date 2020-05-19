@@ -23,7 +23,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -69,6 +69,19 @@ func TestValidateSupportedVersion(t *testing.T) {
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
 				Version: "v1beta1",
+			},
+			allowDeprecated: true,
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta1",
+			},
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta2",
 			},
 		},
 		{
@@ -119,11 +132,9 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					APIServer: kubeadmapiv1beta1.APIServer{
-						CertSANs: test.in,
-					},
+			cfg := &kubeadmapiv1beta2.ClusterConfiguration{
+				APIServer: kubeadmapiv1beta2.APIServer{
+					CertSANs: test.in,
 				},
 			}
 
@@ -157,13 +168,13 @@ func TestVerifyAPIServerBindAddress(t *testing.T) {
 			address: "2001:db8:85a3::8a2e:370:7334",
 		},
 		{
-			name:          "invalid address: not a global unicast 0.0.0.0",
-			address:       "0.0.0.0",
-			expectedError: true,
+			name:          "valid address 127.0.0.1",
+			address:       "127.0.0.1",
+			expectedError: false,
 		},
 		{
-			name:          "invalid address: not a global unicast 127.0.0.1",
-			address:       "127.0.0.1",
+			name:          "invalid address: not a global unicast 0.0.0.0",
+			address:       "0.0.0.0",
 			expectedError: true,
 		},
 		{

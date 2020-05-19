@@ -17,11 +17,12 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,11 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 )
-
-type nodeAndCIDR struct {
-	cidr     *net.IPNet
-	nodeName string
-}
 
 // CIDRAllocatorType is the type of the allocator to use.
 type CIDRAllocatorType string
@@ -93,8 +89,21 @@ type CIDRAllocator interface {
 	Run(stopCh <-chan struct{})
 }
 
+// CIDRAllocatorParams is parameters that's required for creating new
+// cidr range allocator.
+type CIDRAllocatorParams struct {
+	// ClusterCIDRs is list of cluster cidrs
+	ClusterCIDRs []*net.IPNet
+	// ServiceCIDR is primary service cidr for cluster
+	ServiceCIDR *net.IPNet
+	// SecondaryServiceCIDR is secondary service cidr for cluster
+	SecondaryServiceCIDR *net.IPNet
+	// NodeCIDRMaskSizes is list of node cidr mask sizes
+	NodeCIDRMaskSizes []int
+}
+
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
+func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
 	nodeList, err := listNodes(kubeClient)
 	if err != nil {
 		return nil, err
@@ -102,11 +111,11 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInfo
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		return NewCIDRRangeAllocator(kubeClient, nodeInformer, allocatorParams, nodeList)
 	case CloudAllocatorType:
 		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:
-		return nil, fmt.Errorf("Invalid CIDR allocator type: %v", allocatorType)
+		return nil, fmt.Errorf("invalid CIDR allocator type: %v", allocatorType)
 	}
 }
 
@@ -116,7 +125,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 	// controller manager to restart.
 	if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
 		var err error
-		nodeList, err = kubeClient.CoreV1().Nodes().List(metav1.ListOptions{
+		nodeList, err = kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 			FieldSelector: fields.Everything().String(),
 			LabelSelector: labels.Everything().String(),
 		})
@@ -126,7 +135,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 		}
 		return true, nil
 	}); pollErr != nil {
-		return nil, fmt.Errorf("Failed to list all nodes in %v, cannot proceed without updating CIDR map",
+		return nil, fmt.Errorf("failed to list all nodes in %v, cannot proceed without updating CIDR map",
 			apiserverStartupGracePeriod)
 	}
 	return nodeList, nil

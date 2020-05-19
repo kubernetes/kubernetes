@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - build-image-approvers
+reviewers:
+  - build-image-reviewers
+
+labels:
+  - sig/release
+  - area/release-eng

@@ -2,6 +2,7 @@ package netlink
 
 import (
 	"fmt"
+	"net"
 )
 
 type Filter interface {
@@ -17,7 +18,7 @@ type FilterAttrs struct {
 	Handle    uint32
 	Parent    uint32
 	Priority  uint16 // lower is higher priority
-	Protocol  uint16 // syscall.ETH_P_*
+	Protocol  uint16 // unix.ETH_P_*
 }
 
 func (q FilterAttrs) String() string {
@@ -135,6 +136,27 @@ func (action *BpfAction) Attrs() *ActionAttrs {
 	return &action.ActionAttrs
 }
 
+type ConnmarkAction struct {
+	ActionAttrs
+	Zone uint16
+}
+
+func (action *ConnmarkAction) Type() string {
+	return "connmark"
+}
+
+func (action *ConnmarkAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewConnmarkAction() *ConnmarkAction {
+	return &ConnmarkAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
 type MirredAct uint8
 
 func (a MirredAct) String() string {
@@ -182,47 +204,74 @@ func NewMirredAction(redirIndex int) *MirredAction {
 	}
 }
 
-// Sel of the U32 filters that contains multiple TcU32Key. This is the copy
-// and the frontend representation of nl.TcU32Sel. It is serialized into canonical
-// nl.TcU32Sel with the appropriate endianness.
-type TcU32Sel struct {
-	Flags    uint8
-	Offshift uint8
-	Nkeys    uint8
-	Pad      uint8
-	Offmask  uint16
-	Off      uint16
-	Offoff   int16
-	Hoff     int16
-	Hmask    uint32
-	Keys     []TcU32Key
+type TunnelKeyAct int8
+
+const (
+	TCA_TUNNEL_KEY_SET   TunnelKeyAct = 1 // set tunnel key
+	TCA_TUNNEL_KEY_UNSET TunnelKeyAct = 2 // unset tunnel key
+)
+
+type TunnelKeyAction struct {
+	ActionAttrs
+	Action  TunnelKeyAct
+	SrcAddr net.IP
+	DstAddr net.IP
+	KeyID   uint32
 }
 
-// TcU32Key contained of Sel in the U32 filters. This is the copy and the frontend
-// representation of nl.TcU32Key. It is serialized into chanonical nl.TcU32Sel
-// with the appropriate endianness.
-type TcU32Key struct {
-	Mask    uint32
-	Val     uint32
-	Off     int32
-	OffMask int32
+func (action *TunnelKeyAction) Type() string {
+	return "tunnel_key"
 }
 
-// U32 filters on many packet related properties
-type U32 struct {
+func (action *TunnelKeyAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewTunnelKeyAction() *TunnelKeyAction {
+	return &TunnelKeyAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
+type SkbEditAction struct {
+	ActionAttrs
+	QueueMapping *uint16
+	PType        *uint16
+	Priority     *uint32
+	Mark         *uint32
+}
+
+func (action *SkbEditAction) Type() string {
+	return "skbedit"
+}
+
+func (action *SkbEditAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewSkbEditAction() *SkbEditAction {
+	return &SkbEditAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
+// MatchAll filters match all packets
+type MatchAll struct {
 	FilterAttrs
-	ClassId    uint32
-	RedirIndex int
-	Sel        *TcU32Sel
-	Actions    []Action
+	ClassId uint32
+	Actions []Action
 }
 
-func (filter *U32) Attrs() *FilterAttrs {
+func (filter *MatchAll) Attrs() *FilterAttrs {
 	return &filter.FilterAttrs
 }
 
-func (filter *U32) Type() string {
-	return "u32"
+func (filter *MatchAll) Type() string {
+	return "matchall"
 }
 
 type FilterFwAttrs struct {
@@ -247,6 +296,8 @@ type BpfFilter struct {
 	Fd           int
 	Name         string
 	DirectAction bool
+	Id           int
+	Tag          string
 }
 
 func (filter *BpfFilter) Type() string {

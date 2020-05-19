@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -34,6 +34,7 @@ const (
 	podPrefix = "Pod"
 )
 
+// PodCheckpoint defines the operations to retrieve pod
 type PodCheckpoint interface {
 	checkpointmanager.Checkpoint
 	GetPod() *v1.Pod
@@ -66,6 +67,7 @@ func (cp *Data) VerifyChecksum() error {
 	return cp.Checksum.Verify(*cp.Pod)
 }
 
+// GetPod retrieves the pod from the checkpoint
 func (cp *Data) GetPod() *v1.Pod {
 	return cp.Pod
 }
@@ -89,9 +91,7 @@ func getPodKey(pod *v1.Pod) string {
 func LoadPods(cpm checkpointmanager.CheckpointManager) ([]*v1.Pod, error) {
 	pods := make([]*v1.Pod, 0)
 
-	var err error
-	checkpointKeys := []string{}
-	checkpointKeys, err = cpm.ListCheckpoints()
+	checkpointKeys, err := cpm.ListCheckpoints()
 	if err != nil {
 		klog.Errorf("Failed to list checkpoints: %v", err)
 	}

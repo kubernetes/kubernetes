@@ -20,8 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/gofuzz"
-
+	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -193,28 +192,31 @@ func TestGenericTypeMeta(t *testing.T) {
 }
 
 type InternalTypeMeta struct {
-	Kind              string                  `json:"kind,omitempty"`
-	Namespace         string                  `json:"namespace,omitempty"`
-	Name              string                  `json:"name,omitempty"`
-	GenerateName      string                  `json:"generateName,omitempty"`
-	UID               string                  `json:"uid,omitempty"`
-	CreationTimestamp metav1.Time             `json:"creationTimestamp,omitempty"`
-	SelfLink          string                  `json:"selfLink,omitempty"`
-	ResourceVersion   string                  `json:"resourceVersion,omitempty"`
-	Continue          string                  `json:"next,omitempty"`
-	APIVersion        string                  `json:"apiVersion,omitempty"`
-	Labels            map[string]string       `json:"labels,omitempty"`
-	Annotations       map[string]string       `json:"annotations,omitempty"`
-	Finalizers        []string                `json:"finalizers,omitempty"`
-	OwnerReferences   []metav1.OwnerReference `json:"ownerReferences,omitempty"`
+	Kind               string                  `json:"kind,omitempty"`
+	Namespace          string                  `json:"namespace,omitempty"`
+	Name               string                  `json:"name,omitempty"`
+	GenerateName       string                  `json:"generateName,omitempty"`
+	UID                string                  `json:"uid,omitempty"`
+	CreationTimestamp  metav1.Time             `json:"creationTimestamp,omitempty"`
+	SelfLink           string                  `json:"selfLink,omitempty"`
+	ResourceVersion    string                  `json:"resourceVersion,omitempty"`
+	Continue           string                  `json:"next,omitempty"`
+	RemainingItemCount *int64                  `json:"remainingItemCount,omitempty"`
+	APIVersion         string                  `json:"apiVersion,omitempty"`
+	Labels             map[string]string       `json:"labels,omitempty"`
+	Annotations        map[string]string       `json:"annotations,omitempty"`
+	Finalizers         []string                `json:"finalizers,omitempty"`
+	OwnerReferences    []metav1.OwnerReference `json:"ownerReferences,omitempty"`
 }
 
-func (m *InternalTypeMeta) GetResourceVersion() string   { return m.ResourceVersion }
-func (m *InternalTypeMeta) SetResourceVersion(rv string) { m.ResourceVersion = rv }
-func (m *InternalTypeMeta) GetSelfLink() string          { return m.SelfLink }
-func (m *InternalTypeMeta) SetSelfLink(link string)      { m.SelfLink = link }
-func (m *InternalTypeMeta) GetContinue() string          { return m.Continue }
-func (m *InternalTypeMeta) SetContinue(c string)         { m.Continue = c }
+func (m *InternalTypeMeta) GetResourceVersion() string     { return m.ResourceVersion }
+func (m *InternalTypeMeta) SetResourceVersion(rv string)   { m.ResourceVersion = rv }
+func (m *InternalTypeMeta) GetSelfLink() string            { return m.SelfLink }
+func (m *InternalTypeMeta) SetSelfLink(link string)        { m.SelfLink = link }
+func (m *InternalTypeMeta) GetContinue() string            { return m.Continue }
+func (m *InternalTypeMeta) SetContinue(c string)           { m.Continue = c }
+func (m *InternalTypeMeta) GetRemainingItemCount() *int64  { return m.RemainingItemCount }
+func (m *InternalTypeMeta) SetRemainingItemCount(c *int64) { m.RemainingItemCount = c }
 
 type MyAPIObject struct {
 	TypeMeta InternalTypeMeta `json:",inline"`

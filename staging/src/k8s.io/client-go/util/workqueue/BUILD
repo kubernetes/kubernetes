@@ -11,7 +11,9 @@ go_test(
     srcs = [
         "default_rate_limiters_test.go",
         "delaying_queue_test.go",
+        "main_test.go",
         "metrics_test.go",
+        "parallelizer_test.go",
         "queue_test.go",
         "rate_limiting_queue_test.go",
     ],
@@ -19,6 +21,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )
 

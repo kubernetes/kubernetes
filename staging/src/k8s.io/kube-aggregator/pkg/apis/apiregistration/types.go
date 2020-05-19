@@ -34,15 +34,21 @@ type ServiceReference struct {
 	Namespace string
 	// Name is the name of the service
 	Name string
+	// If specified, the port on the service that hosting the service.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port int32
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.
 // Only https is supported, though you are able to disable certificate verification.
 type APIServiceSpec struct {
 	// Service is a reference to the service for this API server.  It must communicate
-	// on port 443
+	// on port 443.
 	// If the Service is nil, that means the handling for the API groupversion is handled locally on this server.
 	// The call will simply delegate to the normal handler chain to be fulfilled.
+	// +optional
 	Service *ServiceReference
 	// Group is the API group name this server hosts
 	Group string

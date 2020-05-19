@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var deploymentsResource = schema.GroupVersionResource{Group: "extensions", Versi
 var deploymentsKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
+func (c *FakeDeployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
 
@@ -50,7 +52,7 @@ func (c *FakeDeployments) Get(name string, options v1.GetOptions) (result *v1bet
 }
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *FakeDeployments) List(opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
+func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), &v1beta1.DeploymentList{})
 
@@ -72,14 +74,14 @@ func (c *FakeDeployments) List(opts v1.ListOptions) (result *v1beta1.DeploymentL
 }
 
 // Watch returns a watch.Interface that watches the requested deployments.
-func (c *FakeDeployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(deploymentsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
-func (c *FakeDeployments) Create(deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
+func (c *FakeDeployments) Create(ctx context.Context, deployment *v1beta1.Deployment, opts v1.CreateOptions) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &v1beta1.Deployment{})
 
@@ -90,7 +92,7 @@ func (c *FakeDeployments) Create(deployment *v1beta1.Deployment) (result *v1beta
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
-func (c *FakeDeployments) Update(deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
+func (c *FakeDeployments) Update(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), &v1beta1.Deployment{})
 
@@ -102,7 +104,7 @@ func (c *FakeDeployments) Update(deployment *v1beta1.Deployment) (result *v1beta
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDeployments) UpdateStatus(deployment *v1beta1.Deployment) (*v1beta1.Deployment, error) {
+func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (*v1beta1.Deployment, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &v1beta1.Deployment{})
 
@@ -113,7 +115,7 @@ func (c *FakeDeployments) UpdateStatus(deployment *v1beta1.Deployment) (*v1beta1
 }
 
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
-func (c *FakeDeployments) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
 
@@ -121,15 +123,15 @@ func (c *FakeDeployments) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeDeployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOptions)
+func (c *FakeDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DeploymentList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched deployment.
-func (c *FakeDeployments) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Deployment, err error) {
+func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, pt, data, subresources...), &v1beta1.Deployment{})
 
@@ -140,7 +142,7 @@ func (c *FakeDeployments) Patch(name string, pt types.PatchType, data []byte, su
 }
 
 // GetScale takes name of the deployment, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeDeployments) GetScale(deploymentName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
+func (c *FakeDeployments) GetScale(ctx context.Context, deploymentName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), &v1beta1.Scale{})
 
@@ -151,7 +153,7 @@ func (c *FakeDeployments) GetScale(deploymentName string, options v1.GetOptions)
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeDeployments) UpdateScale(deploymentName string, scale *v1beta1.Scale) (result *v1beta1.Scale, err error) {
+func (c *FakeDeployments) UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (result *v1beta1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &v1beta1.Scale{})
 

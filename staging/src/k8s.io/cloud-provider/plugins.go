@@ -22,7 +22,7 @@ import (
 	"os"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Factory is a function that returns a cloudprovider.Interface.
@@ -42,11 +42,8 @@ var (
 	}{
 		{"aws", false, "The AWS provider is deprecated and will be removed in a future release"},
 		{"azure", false, "The Azure provider is deprecated and will be removed in a future release"},
-		{"cloudstack", false, "The CloudStack Controller project is no longer maintained."},
 		{"gce", false, "The GCE provider is deprecated and will be removed in a future release"},
 		{"openstack", true, "https://github.com/kubernetes/cloud-provider-openstack"},
-		{"ovirt", false, "The ovirt Controller project is no longer maintained."},
-		{"photon", false, "The Photon Controller project is no longer maintained."},
 		{"vsphere", false, "The vSphere provider is deprecated and will be removed in a future release"},
 	}
 )

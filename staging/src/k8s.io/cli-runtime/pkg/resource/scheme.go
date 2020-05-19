@@ -41,11 +41,13 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 		return nil, nil, err
 	}
 
-	if _, ok := obj.(*metav1.Status); !ok && strings.ToLower(gvk.Kind) == "status" {
-		obj = &metav1.Status{}
-		err := json.Unmarshal(data, obj)
-		if err != nil {
-			return nil, nil, err
+	if strings.ToLower(gvk.Kind) == "status" && gvk.Version == "v1" && (gvk.Group == "" || gvk.Group == "meta.k8s.io") {
+		if _, ok := obj.(*metav1.Status); !ok {
+			obj = &metav1.Status{}
+			err := json.Unmarshal(data, obj)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
@@ -53,21 +55,22 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 }
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
+	// There is no need to handle runtime.CacheableObject, as we only
+	// fallback to other encoders here.
 	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
 }
 
-// ContentConfig returns a rest.ContentConfig for dynamic types.  It includes enough codecs to act as a "normal"
+// Identifier implements runtime.Encoder interface.
+func (dynamicCodec) Identifier() runtime.Identifier {
+	return unstructured.UnstructuredJSONScheme.Identifier()
+}
+
+// UnstructuredPlusDefaultContentConfig returns a rest.ContentConfig for dynamic types.  It includes enough codecs to act as a "normal"
 // serializer for the rest.client with options, status and the like.
 func UnstructuredPlusDefaultContentConfig() rest.ContentConfig {
-	var jsonInfo runtime.SerializerInfo
 	// TODO: scheme.Codecs here should become "pkg/apis/server/scheme" which is the minimal core you need
 	// to talk to a kubernetes server
-	for _, info := range scheme.Codecs.SupportedMediaTypes() {
-		if info.MediaType == runtime.ContentTypeJSON {
-			jsonInfo = info
-			break
-		}
-	}
+	jsonInfo, _ := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 
 	jsonInfo.Serializer = dynamicCodec{}
 	jsonInfo.PrettySerializer = nil

@@ -21,7 +21,7 @@ import (
 	"net"
 	"strconv"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // LocalPort describes a port on specific IP address and protocol
@@ -51,7 +51,7 @@ type Closeable interface {
 // PortOpener is an interface around port opening/closing.
 // Abstracted out for testing.
 type PortOpener interface {
-	OpenLocalPort(lp *LocalPort) (Closeable, error)
+	OpenLocalPort(lp *LocalPort, isIPv6 bool) (Closeable, error)
 }
 
 // RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only

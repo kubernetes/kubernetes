@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script lints each shell script by `shellcheck`.
+# Usage: `hack/verify-shellcheck.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -24,9 +27,9 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # required version for this script, if not installed on the host we will
 # use the official docker image instead. keep this in sync with SHELLCHECK_IMAGE
-SHELLCHECK_VERSION="0.6.0"
-# upstream shellcheck latest stable image as of January 10th, 2019
-SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.6.0@sha256:7d4d712a2686da99d37580b4e2f45eb658b74e4b01caf67c1099adc294b96b52"
+SHELLCHECK_VERSION="0.7.0"
+# upstream shellcheck latest stable image as of October 23rd, 2019
+SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.7.0@sha256:24bbf52aae6eaa27accc9f61de32d30a1498555e6ef452966d0702ff06f38ecb"
 
 # fixed name for the shellcheck docker container so we can reliably clean it up
 SHELLCHECK_CONTAINER="k8s-shellcheck"
@@ -66,8 +69,13 @@ remove_container () {
 # ensure we're linting the k8s source tree
 cd "${KUBE_ROOT}"
 
-# find all shell scripts excluding ./_*, ./.git/*, ./vendor*,
-# and anything git-ignored
+# Find all shell scripts excluding:
+# - Anything git-ignored - No need to lint untracked files.
+# - ./_* - No need to lint output directories.
+# - ./.git/* - Ignore anything in the git object store.
+# - ./vendor* - Vendored code should be fixed upstream instead.
+# - ./third_party/*, but re-include ./third_party/forked/*  - only code we
+#    forked should be linted and fixed.
 all_shell_scripts=()
 while IFS=$'\n' read -r script;
   do git check-ignore -q "$script" || all_shell_scripts+=("$script");
@@ -75,7 +83,8 @@ done < <(find . -name "*.sh" \
   -not \( \
     -path ./_\*      -o \
     -path ./.git\*   -o \
-    -path ./vendor\*    \
+    -path ./vendor\* -o \
+    \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
   \))
 
 # make sure known failures are sorted
@@ -117,6 +126,13 @@ else
   fi
 fi
 
+# if KUBE_JUNIT_REPORT_DIR is set, disable colorized output.
+# Colorized output causes malformed XML in the JUNIT report.
+SHELLCHECK_COLORIZED_OUTPUT="auto"
+if [[ -n "${KUBE_JUNIT_REPORT_DIR:-}" ]]; then
+  SHELLCHECK_COLORIZED_OUTPUT="never"
+fi
+
 # common arguments we'll pass to shellcheck
 SHELLCHECK_OPTIONS=(
   # allow following sourced files that are not specified in the command,
@@ -125,6 +141,8 @@ SHELLCHECK_OPTIONS=(
   "--external-sources"
   # include our disabled lints
   "--exclude=${SHELLCHECK_DISABLED}"
+  # set colorized output
+  "--color=${SHELLCHECK_COLORIZED_OUTPUT}"
 )
 
 # lint each script, tracking failures
@@ -148,7 +166,7 @@ for f in "${all_shell_scripts[@]}"; do
   fi
 done
 
-# Check to be sure all the packages that should pass lint are.
+# Check to be sure all the files that should pass lint are.
 if [ ${#errors[@]} -eq 0 ]; then
   echo 'Congratulations! All shell files are passing lint (excluding those in hack/.shellcheck_failures).'
 else
@@ -158,27 +176,27 @@ else
       echo "$err"
     done
     echo
-    echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck"'
+    echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck.sh"'
     echo 'If the above warnings do not make sense, you can exempt this package from shellcheck'
     echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
   {
-    echo "Some packages in hack/.shellcheck_failures are passing shellcheck. Please remove them."
+    echo "Some files in hack/.shellcheck_failures are passing shellcheck. Please remove them."
     echo
     for f in "${not_failing[@]}"; do
       echo "  $f"
     done
     echo
   } >&2
-  false
+  exit 1
 fi
 
-# Check that all failing_packages actually still exist
+# Check that all failing_files actually still exist
 gone=()
 for f in "${failing_files[@]}"; do
   kube::util::array_contains "$f" "${all_shell_scripts[@]}" || gone+=( "$f" )
@@ -193,5 +211,5 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi

@@ -27,9 +27,6 @@ const (
 
 	// A counter-like value that is only expected to increase.
 	MetricCumulative MetricType = "cumulative"
-
-	// Rate over a time period.
-	MetricDelta MetricType = "delta"
 )
 
 // DataType for metric being exported.
@@ -68,7 +65,8 @@ type MetricValBasic struct {
 // An exported metric.
 type MetricVal struct {
 	// Label associated with a metric
-	Label string `json:"label,omitempty"`
+	Label  string            `json:"label,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// Time at which the metric was queried
 	Timestamp time.Time `json:"timestamp"`

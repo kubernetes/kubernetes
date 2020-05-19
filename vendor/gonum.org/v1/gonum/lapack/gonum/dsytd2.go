@@ -9,15 +9,15 @@ import (
 	"gonum.org/v1/gonum/blas/blas64"
 )
 
-// Dsytd2 reduces a symmetric n×n matrix A to symmetric tridiagonal form T by an
-// orthogonal similarity transformation
-//  Q^T * A * Q = T
+// Dsytd2 reduces a symmetric n×n matrix A to symmetric tridiagonal form T by
+// an orthogonal similarity transformation
+//  Qᵀ * A * Q = T
 // On entry, the matrix is contained in the specified triangle of a. On exit,
 // if uplo == blas.Upper, the diagonal and first super-diagonal of a are
 // overwritten with the elements of T. The elements above the first super-diagonal
-// are overwritten with the the elementary reflectors that are used with the
-// elements written to tau in order to construct Q. If uplo == blas.Lower, the
-// elements are written in the lower triangular region.
+// are overwritten with the elementary reflectors that are used with
+// the elements written to tau in order to construct Q. If uplo == blas.Lower,
+// the elements are written in the lower triangular region.
 //
 // d must have length at least n. e and tau must have length at least n-1. Dsytd2
 // will panic if these sizes are not met.
@@ -28,7 +28,7 @@ import (
 // and if uplo == blas.Lower
 //  Q = H_0 * H_1 * ... * H_{n-2}
 // where
-//  H_i = I - tau * v * v^T
+//  H_i = I - tau * v * vᵀ
 // where tau is stored in tau[i], and v is stored in a.
 //
 // If uplo == blas.Upper, v[0:i-1] is stored in A[0:i-1,i+1], v[i] = 1, and
@@ -49,24 +49,37 @@ import (
 //
 // Dsytd2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dsytd2(uplo blas.Uplo, n int, a []float64, lda int, d, e, tau []float64) {
-	checkMatrix(n, n, a, lda)
-	if len(d) < n {
-		panic(badD)
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
+		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if len(e) < n-1 {
-		panic(badE)
-	}
-	if len(tau) < n-1 {
-		panic(badTau)
-	}
-	if n <= 0 {
+
+	// Quick return if possible.
+	if n == 0 {
 		return
 	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(d) < n:
+		panic(shortD)
+	case len(e) < n-1:
+		panic(shortE)
+	case len(tau) < n-1:
+		panic(shortTau)
+	}
+
 	bi := blas64.Implementation()
+
 	if uplo == blas.Upper {
 		// Reduce the upper triangle of A.
 		for i := n - 2; i >= 0; i-- {
-			// Generate elementary reflector H_i = I - tau * v * v^T to
+			// Generate elementary reflector H_i = I - tau * v * vᵀ to
 			// annihilate A[i:i-1, i+1].
 			var taui float64
 			a[i*lda+i+1], taui = impl.Dlarfg(i+1, a[i*lda+i+1], a[i+1:], lda)
@@ -78,12 +91,12 @@ func (impl Implementation) Dsytd2(uplo blas.Uplo, n int, a []float64, lda int, d
 				// Compute x := tau * A * v storing x in tau[0:i].
 				bi.Dsymv(uplo, i+1, taui, a, lda, a[i+1:], lda, 0, tau, 1)
 
-				// Compute w := x - 1/2 * tau * (x^T * v) * v.
+				// Compute w := x - 1/2 * tau * (xᵀ * v) * v.
 				alpha := -0.5 * taui * bi.Ddot(i+1, tau, 1, a[i+1:], lda)
 				bi.Daxpy(i+1, alpha, a[i+1:], lda, tau, 1)
 
 				// Apply the transformation as a rank-2 update
-				// A = A - v * w^T - w * v^T.
+				// A = A - v * wᵀ - w * vᵀ.
 				bi.Dsyr2(uplo, i+1, -1, a[i+1:], lda, tau, 1, a, lda)
 				a[i*lda+i+1] = e[i]
 			}
@@ -95,7 +108,7 @@ func (impl Implementation) Dsytd2(uplo blas.Uplo, n int, a []float64, lda int, d
 	}
 	// Reduce the lower triangle of A.
 	for i := 0; i < n-1; i++ {
-		// Generate elementary reflector H_i = I - tau * v * v^T to
+		// Generate elementary reflector H_i = I - tau * v * vᵀ to
 		// annihilate A[i+2:n, i].
 		var taui float64
 		a[(i+1)*lda+i], taui = impl.Dlarfg(n-i-1, a[(i+1)*lda+i], a[min(i+2, n-1)*lda+i:], lda)
@@ -107,12 +120,12 @@ func (impl Implementation) Dsytd2(uplo blas.Uplo, n int, a []float64, lda int, d
 			// Compute x := tau * A * v, storing y in tau[i:n-1].
 			bi.Dsymv(uplo, n-i-1, taui, a[(i+1)*lda+i+1:], lda, a[(i+1)*lda+i:], lda, 0, tau[i:], 1)
 
-			// Compute w := x - 1/2 * tau * (x^T * v) * v.
+			// Compute w := x - 1/2 * tau * (xᵀ * v) * v.
 			alpha := -0.5 * taui * bi.Ddot(n-i-1, tau[i:], 1, a[(i+1)*lda+i:], lda)
 			bi.Daxpy(n-i-1, alpha, a[(i+1)*lda+i:], lda, tau[i:], 1)
 
 			// Apply the transformation as a rank-2 update
-			// A = A - v * w^T - w * v^T.
+			// A = A - v * wᵀ - w * vᵀ.
 			bi.Dsyr2(uplo, n-i-1, -1, a[(i+1)*lda+i:], lda, tau[i:], 1, a[(i+1)*lda+i+1:], lda)
 			a[(i+1)*lda+i] = e[i]
 		}

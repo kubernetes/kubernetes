@@ -36,9 +36,6 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims/status"]
     verbs: ["update", "patch"]
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
-    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
@@ -68,8 +65,8 @@ metadata:
   namespace: default
   name: external-resizer-cfg
 rules:
-- apiGroups: [""]
-  resources: ["endpoints"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
   verbs: ["get", "watch", "list", "delete", "update", "create"]
 
 ---

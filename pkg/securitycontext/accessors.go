@@ -201,6 +201,7 @@ func (w *podSecurityContextWrapper) SetFSGroup(v *int64) {
 	w.podSC.FSGroup = v
 }
 
+// ContainerSecurityContextAccessor allows reading the values of a SecurityContext object
 type ContainerSecurityContextAccessor interface {
 	Capabilities() *api.Capabilities
 	Privileged() *bool
@@ -213,6 +214,7 @@ type ContainerSecurityContextAccessor interface {
 	AllowPrivilegeEscalation() *bool
 }
 
+// ContainerSecurityContextMutator allows reading and writing the values of a SecurityContext object
 type ContainerSecurityContextMutator interface {
 	ContainerSecurityContextAccessor
 
@@ -228,10 +230,14 @@ type ContainerSecurityContextMutator interface {
 	SetAllowPrivilegeEscalation(*bool)
 }
 
+// NewContainerSecurityContextAccessor returns an accessor for the provided container security context
+// May be initialized with a nil SecurityContext
 func NewContainerSecurityContextAccessor(containerSC *api.SecurityContext) ContainerSecurityContextAccessor {
 	return &containerSecurityContextWrapper{containerSC: containerSC}
 }
 
+// NewContainerSecurityContextMutator returns a mutator for the provided container security context
+// May be initialized with a nil SecurityContext
 func NewContainerSecurityContextMutator(containerSC *api.SecurityContext) ContainerSecurityContextMutator {
 	return &containerSecurityContextWrapper{containerSC: containerSC}
 }
@@ -365,10 +371,14 @@ func (w *containerSecurityContextWrapper) SetAllowPrivilegeEscalation(v *bool) {
 	w.containerSC.AllowPrivilegeEscalation = v
 }
 
+// NewEffectiveContainerSecurityContextAccessor returns an accessor for reading effective values
+// for the provided pod security context and container security context
 func NewEffectiveContainerSecurityContextAccessor(podSC PodSecurityContextAccessor, containerSC ContainerSecurityContextMutator) ContainerSecurityContextAccessor {
 	return &effectiveContainerSecurityContextWrapper{podSC: podSC, containerSC: containerSC}
 }
 
+// NewEffectiveContainerSecurityContextMutator returns a mutator for reading and writing effective values
+// for the provided pod security context and container security context
 func NewEffectiveContainerSecurityContextMutator(podSC PodSecurityContextAccessor, containerSC ContainerSecurityContextMutator) ContainerSecurityContextMutator {
 	return &effectiveContainerSecurityContextWrapper{podSC: podSC, containerSC: containerSC}
 }

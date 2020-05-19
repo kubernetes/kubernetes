@@ -25,15 +25,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/utils/pointer"
 )
 
 const defaultContainerName = "test-c"
@@ -171,6 +175,8 @@ func TestMutateContainerNonmutating(t *testing.T) {
 }
 
 func TestValidatePodFailures(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	failHostNetworkPod := defaultPod()
 	failHostNetworkPod.Spec.SecurityContext.HostNetwork = true
 
@@ -327,6 +333,18 @@ func TestValidatePodFailures(t *testing.T) {
 		},
 	}
 
+	failCSIDriverPod := defaultPod()
+	failCSIDriverPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "csi volume pod",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "csi.driver.foo",
+				},
+			},
+		},
+	}
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *policy.PodSecurityPolicy
@@ -432,6 +450,40 @@ func TestValidatePodFailures(t *testing.T) {
 			psp:           allowFlexVolumesPSP(false, true),
 			expectedError: "Flexvolume driver is not allowed to be used",
 		},
+		"CSI policy using disallowed CDI driver": {
+			pod: failCSIDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.CSI}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "csi.driver.disallowed"}}
+				return psp
+			}(),
+			expectedError: "Inline CSI driver is not allowed to be used",
+		},
+		"Using inline CSI driver with no policy specified": {
+			pod: failCSIDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "csi.driver.foo"}}
+				return psp
+			}(),
+			expectedError: "csi volumes are not allowed to be used",
+		},
+		"policy.All using disallowed CDI driver": {
+			pod: failCSIDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.All}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "csi.driver.disallowed"}}
+				return psp
+			}(),
+			expectedError: "Inline CSI driver is not allowed to be used",
+		},
+		"CSI inline volumes without proper policy set": {
+			pod:           failCSIDriverPod,
+			psp:           defaultPSP(),
+			expectedError: "csi volumes are not allowed to be used",
+		},
 	}
 	for name, test := range errorCases {
 		t.Run(name, func(t *testing.T) {
@@ -494,17 +546,17 @@ func TestValidateContainerFailures(t *testing.T) {
 
 	failNilAppArmorPod := defaultPod()
 	v1FailInvalidAppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
+	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, v1.AppArmorBetaProfileNamePrefix+"foo")
 	failInvalidAppArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
 
 	failAppArmorPSP := defaultPSP()
 	failAppArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 
 	failPrivPod := defaultPod()
-	var priv bool = true
+	var priv = true
 	failPrivPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
 	failProcMountPod := defaultPod()
@@ -615,6 +667,8 @@ func TestValidateContainerFailures(t *testing.T) {
 }
 
 func TestValidatePodSuccess(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	hostNetworkPSP := defaultPSP()
 	hostNetworkPSP.Spec.HostNetwork = true
 	hostNetworkPod := defaultPod()
@@ -805,6 +859,34 @@ func TestValidatePodSuccess(t *testing.T) {
 		},
 	}
 
+	csiDriverPod := defaultPod()
+	csiDriverPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "csi inline driver",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "foo",
+				},
+			},
+		},
+		{
+			Name: "csi inline driver 2",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "bar",
+				},
+			},
+		},
+		{
+			Name: "csi inline driver 3",
+			VolumeSource: api.VolumeSource{
+				CSI: &api.CSIVolumeSource{
+					Driver: "baz",
+				},
+			},
+		},
+	}
+
 	successCases := map[string]struct {
 		pod *api.Pod
 		psp *policy.PodSecurityPolicy
@@ -885,6 +967,33 @@ func TestValidatePodSuccess(t *testing.T) {
 			pod: flexVolumePod,
 			psp: allowFlexVolumesPSP(true, false),
 		},
+		"CSI policy with no CSI volumes used": {
+			pod: defaultPod(),
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.CSI}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}, {Name: "bar"}, {Name: "baz"}}
+				return psp
+			}(),
+		},
+		"CSI policy with CSI inline volumes used": {
+			pod: csiDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.CSI}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}, {Name: "bar"}, {Name: "baz"}}
+				return psp
+			}(),
+		},
+		"policy.All with CSI inline volumes used": {
+			pod: csiDriverPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.All}
+				psp.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}, {Name: "bar"}, {Name: "baz"}}
+				return psp
+			}(),
+		},
 	}
 
 	for name, test := range successCases {
@@ -924,17 +1033,17 @@ func TestValidateContainerSuccess(t *testing.T) {
 
 	appArmorPSP := defaultPSP()
 	appArmorPSP.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 	}
 	v1AppArmorPod := defaultV1Pod()
-	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
+	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, v1.AppArmorBetaProfileRuntimeDefault)
 	appArmorPod := &api.Pod{}
 	k8s_api_v1.Convert_v1_Pod_To_core_Pod(v1AppArmorPod, appArmorPod, nil)
 
 	privPSP := defaultPSP()
 	privPSP.Spec.Privileged = true
 	privPod := defaultPod()
-	var priv bool = true
+	var priv = true
 	privPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
 	capsPSP := defaultPSP()
@@ -1134,10 +1243,14 @@ func TestGenerateContainerSecurityContextReadOnlyRootFS(t *testing.T) {
 }
 
 func defaultPSP() *policy.PodSecurityPolicy {
+	return defaultNamedPSP("psp-sa")
+}
+
+func defaultNamedPSP(name string) *policy.PodSecurityPolicy {
 	allowPrivilegeEscalation := true
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "psp-sa",
+			Name:        name,
 			Annotations: map[string]string{},
 		},
 		Spec: policy.PodSecurityPolicySpec{
@@ -1162,7 +1275,7 @@ func defaultPSP() *policy.PodSecurityPolicy {
 }
 
 func defaultPod() *api.Pod {
-	var notPriv bool = false
+	var notPriv = false
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
@@ -1186,7 +1299,7 @@ func defaultPod() *api.Pod {
 }
 
 func defaultV1Pod() *v1.Pod {
-	var notPriv bool = false
+	var notPriv = false
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
@@ -1213,6 +1326,8 @@ func defaultV1Pod() *v1.Pod {
 // a pod with that type of volume and deny it, accept it explicitly, or accept it with
 // the FSTypeAll wildcard.
 func TestValidateAllowedVolumes(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	val := reflect.ValueOf(api.VolumeSource{})
 
 	for i := 0; i < val.NumField(); i++ {
@@ -1259,7 +1374,7 @@ func TestValidateAllowedVolumes(t *testing.T) {
 }
 
 func TestAllowPrivilegeEscalation(t *testing.T) {
-	ptr := func(b bool) *bool { return &b }
+	ptr := pointer.BoolPtr
 	tests := []struct {
 		pspAPE    bool  // PSP AllowPrivilegeEscalation
 		pspDAPE   *bool // PSP DefaultAllowPrivilegeEscalation
@@ -1315,6 +1430,132 @@ func TestAllowPrivilegeEscalation(t *testing.T) {
 				assert.Empty(t, errs, "expected no validation errors")
 				ape := pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation
 				assert.Equal(t, test.expectAPE, ape, "expected pod AllowPrivilegeEscalation")
+			}
+		})
+	}
+}
+
+func TestDefaultRuntimeClassName(t *testing.T) {
+	const (
+		defaultedName = "foo"
+		presetName    = "tim"
+	)
+
+	noRCS := defaultNamedPSP("nil-strategy")
+	emptyRCS := defaultNamedPSP("empty-strategy")
+	emptyRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{}
+	noDefaultRCS := defaultNamedPSP("no-default")
+	noDefaultRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{
+		AllowedRuntimeClassNames: []string{"foo", "bar"},
+	}
+	defaultRCS := defaultNamedPSP("defaulting")
+	defaultRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{
+		DefaultRuntimeClassName: pointer.StringPtr(defaultedName),
+	}
+
+	noRCPod := defaultPod()
+	noRCPod.Name = "no-runtimeclass"
+	rcPod := defaultPod()
+	rcPod.Name = "preset-runtimeclass"
+	rcPod.Spec.RuntimeClassName = pointer.StringPtr(presetName)
+
+	type testcase struct {
+		psp                      *policy.PodSecurityPolicy
+		pod                      *api.Pod
+		expectedRuntimeClassName *string
+	}
+	tests := []testcase{{
+		psp:                      defaultRCS,
+		pod:                      noRCPod,
+		expectedRuntimeClassName: pointer.StringPtr(defaultedName),
+	}}
+	// Non-defaulting no-preset cases
+	for _, psp := range []*policy.PodSecurityPolicy{noRCS, emptyRCS, noDefaultRCS} {
+		tests = append(tests, testcase{psp, noRCPod, nil})
+	}
+	// Non-defaulting preset cases
+	for _, psp := range []*policy.PodSecurityPolicy{noRCS, emptyRCS, noDefaultRCS, defaultRCS} {
+		tests = append(tests, testcase{psp, rcPod, pointer.StringPtr(presetName)})
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s-psp %s-pod", test.psp.Name, test.pod.Name), func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "error creating provider")
+
+			actualPod := test.pod.DeepCopy()
+			require.NoError(t, provider.MutatePod(actualPod))
+
+			expectedPod := test.pod.DeepCopy()
+			expectedPod.Spec.RuntimeClassName = test.expectedRuntimeClassName
+			assert.Equal(t, expectedPod, actualPod)
+		})
+	}
+}
+
+func TestAllowedRuntimeClassNames(t *testing.T) {
+	const (
+		goodName = "good"
+	)
+
+	noRCPod := defaultPod()
+	noRCPod.Name = "no-runtimeclass"
+	rcPod := defaultPod()
+	rcPod.Name = "good-runtimeclass"
+	rcPod.Spec.RuntimeClassName = pointer.StringPtr(goodName)
+	otherPod := defaultPod()
+	otherPod.Name = "bad-runtimeclass"
+	otherPod.Spec.RuntimeClassName = pointer.StringPtr("bad")
+	allPods := []*api.Pod{noRCPod, rcPod, otherPod}
+
+	type testcase struct {
+		name        string
+		strategy    *policy.RuntimeClassStrategyOptions
+		validPods   []*api.Pod
+		invalidPods []*api.Pod
+	}
+	tests := []testcase{{
+		name:      "nil-strategy",
+		validPods: allPods,
+	}, {
+		name: "empty-strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{},
+		},
+		validPods:   []*api.Pod{noRCPod},
+		invalidPods: []*api.Pod{rcPod, otherPod},
+	}, {
+		name: "allow-all-strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*"},
+			DefaultRuntimeClassName:  pointer.StringPtr("foo"),
+		},
+		validPods: allPods,
+	}, {
+		name: "named-allowed",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{goodName},
+		},
+		validPods:   []*api.Pod{rcPod},
+		invalidPods: []*api.Pod{otherPod},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			psp := defaultNamedPSP(test.name)
+			psp.Spec.RuntimeClass = test.strategy
+			provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "error creating provider")
+
+			for _, pod := range test.validPods {
+				copy := pod.DeepCopy()
+				assert.NoError(t, provider.ValidatePod(copy).ToAggregate(), "expected valid pod %s", pod.Name)
+				assert.Equal(t, pod, copy, "validate should not mutate!")
+			}
+			for _, pod := range test.invalidPods {
+				copy := pod.DeepCopy()
+				assert.Error(t, provider.ValidatePod(copy).ToAggregate(), "expected invalid pod %s", pod.Name)
+				assert.Equal(t, pod, copy, "validate should not mutate!")
 			}
 		})
 	}

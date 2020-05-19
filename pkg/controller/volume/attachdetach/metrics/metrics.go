@@ -19,33 +19,40 @@ package metrics
 import (
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const pluginNameNotAvailable = "N/A"
 
 var (
-	inUseVolumeMetricDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
+	inUseVolumeMetricDesc = metrics.NewDesc(
+		metrics.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
 		"Measure number of volumes in use",
-		[]string{"node", "volume_plugin"}, nil)
+		[]string{"node", "volume_plugin"}, nil,
+		metrics.ALPHA, "")
 
-	totalVolumesMetricDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", "attachdetach_controller", "total_volumes"),
+	totalVolumesMetricDesc = metrics.NewDesc(
+		metrics.BuildFQName("", "attachdetach_controller", "total_volumes"),
 		"Number of volumes in A/D Controller",
-		[]string{"plugin_name", "state"}, nil)
+		[]string{"plugin_name", "state"}, nil,
+		metrics.ALPHA, "")
 
-	forcedDetachMetricCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "attachdetach_controller_forced_detaches",
-			Help: "Number of times the A/D Controller performed a forced detach"})
+	forcedDetachMetricCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "attachdetach_controller_forced_detaches",
+			Help:           "Number of times the A/D Controller performed a forced detach",
+			StabilityLevel: metrics.ALPHA,
+		})
 )
 var registerMetrics sync.Once
 
@@ -55,25 +62,33 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 	podLister corelisters.PodLister,
 	asw cache.ActualStateOfWorld,
 	dsw cache.DesiredStateOfWorld,
-	pluginMgr *volume.VolumePluginMgr) {
+	pluginMgr *volume.VolumePluginMgr,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) {
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(newAttachDetachStateCollector(pvcLister,
+		legacyregistry.CustomMustRegister(newAttachDetachStateCollector(pvcLister,
 			podLister,
 			pvLister,
 			asw,
 			dsw,
-			pluginMgr))
-		prometheus.MustRegister(forcedDetachMetricCounter)
+			pluginMgr,
+			csiMigratedPluginManager,
+			intreeToCSITranslator))
+		legacyregistry.MustRegister(forcedDetachMetricCounter)
 	})
 }
 
 type attachDetachStateCollector struct {
-	pvcLister       corelisters.PersistentVolumeClaimLister
-	podLister       corelisters.PodLister
-	pvLister        corelisters.PersistentVolumeLister
-	asw             cache.ActualStateOfWorld
-	dsw             cache.DesiredStateOfWorld
-	volumePluginMgr *volume.VolumePluginMgr
+	metrics.BaseStableCollector
+
+	pvcLister                corelisters.PersistentVolumeClaimLister
+	podLister                corelisters.PodLister
+	pvLister                 corelisters.PersistentVolumeLister
+	asw                      cache.ActualStateOfWorld
+	dsw                      cache.DesiredStateOfWorld
+	volumePluginMgr          *volume.VolumePluginMgr
+	csiMigratedPluginManager csimigration.PluginManager
+	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 }
 
 // volumeCount is a map of maps used as a counter, e.g.:
@@ -98,46 +113,40 @@ func newAttachDetachStateCollector(
 	pvLister corelisters.PersistentVolumeLister,
 	asw cache.ActualStateOfWorld,
 	dsw cache.DesiredStateOfWorld,
-	pluginMgr *volume.VolumePluginMgr) *attachDetachStateCollector {
-	return &attachDetachStateCollector{pvcLister, podLister, pvLister, asw, dsw, pluginMgr}
+	pluginMgr *volume.VolumePluginMgr,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) *attachDetachStateCollector {
+	return &attachDetachStateCollector{pvcLister: pvcLister, podLister: podLister, pvLister: pvLister, asw: asw, dsw: dsw, volumePluginMgr: pluginMgr, csiMigratedPluginManager: csiMigratedPluginManager, intreeToCSITranslator: intreeToCSITranslator}
 }
 
 // Check if our collector implements necessary collector interface
-var _ prometheus.Collector = &attachDetachStateCollector{}
+var _ metrics.StableCollector = &attachDetachStateCollector{}
 
-func (collector *attachDetachStateCollector) Describe(ch chan<- *prometheus.Desc) {
+func (collector *attachDetachStateCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- inUseVolumeMetricDesc
 	ch <- totalVolumesMetricDesc
 }
 
-func (collector *attachDetachStateCollector) Collect(ch chan<- prometheus.Metric) {
+func (collector *attachDetachStateCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	nodeVolumeMap := collector.getVolumeInUseCount()
 	for nodeName, pluginCount := range nodeVolumeMap {
 		for pluginName, count := range pluginCount {
-			metric, err := prometheus.NewConstMetric(inUseVolumeMetricDesc,
-				prometheus.GaugeValue,
+			ch <- metrics.NewLazyConstMetric(inUseVolumeMetricDesc,
+				metrics.GaugeValue,
 				float64(count),
 				string(nodeName),
 				pluginName)
-			if err != nil {
-				klog.Warningf("Failed to create metric : %v", err)
-			}
-			ch <- metric
 		}
 	}
 
 	stateVolumeMap := collector.getTotalVolumesCount()
 	for stateName, pluginCount := range stateVolumeMap {
 		for pluginName, count := range pluginCount {
-			metric, err := prometheus.NewConstMetric(totalVolumesMetricDesc,
-				prometheus.GaugeValue,
+			ch <- metrics.NewLazyConstMetric(totalVolumesMetricDesc,
+				metrics.GaugeValue,
 				float64(count),
 				pluginName,
 				string(stateName))
-			if err != nil {
-				klog.Warningf("Failed to create metric : %v", err)
-			}
-			ch <- metric
 		}
 	}
 }
@@ -159,7 +168,7 @@ func (collector *attachDetachStateCollector) getVolumeInUseCount() volumeCount {
 			continue
 		}
 		for _, podVolume := range pod.Spec.Volumes {
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, pod.Namespace, collector.pvcLister, collector.pvLister)
+			volumeSpec, err := util.CreateVolumeSpec(podVolume, pod.Namespace, types.NodeName(pod.Spec.NodeName), collector.volumePluginMgr, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
 			if err != nil {
 				continue
 			}

@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -25,7 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 const (
@@ -111,7 +113,7 @@ func (d *DenyExec) ValidateInitialization() error {
 }
 
 // Validate makes an admission decision based on the request attributes
-func (d *DenyExec) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (d *DenyExec) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	path := a.GetResource().Resource
 	if subresource := a.GetSubresource(); subresource != "" {
 		path = path + "/" + subresource
@@ -120,7 +122,7 @@ func (d *DenyExec) Validate(a admission.Attributes, o admission.ObjectInterfaces
 	if path != "pods/exec" && path != "pods/attach" {
 		return nil
 	}
-	pod, err := d.client.CoreV1().Pods(a.GetNamespace()).Get(a.GetName(), metav1.GetOptions{})
+	pod, err := d.client.CoreV1().Pods(a.GetNamespace()).Get(context.TODO(), a.GetName(), metav1.GetOptions{})
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -146,21 +148,16 @@ func (d *DenyExec) Validate(a admission.Attributes, o admission.ObjectInterfaces
 
 // isPrivileged will return true a pod has any privileged containers
 func isPrivileged(pod *corev1.Pod) bool {
-	for _, c := range pod.Spec.InitContainers {
+	var privileged bool
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(c *corev1.Container, containerType podutil.ContainerType) bool {
 		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
-			continue
-		}
-		if *c.SecurityContext.Privileged {
 			return true
 		}
-	}
-	for _, c := range pod.Spec.Containers {
-		if c.SecurityContext == nil || c.SecurityContext.Privileged == nil {
-			continue
-		}
 		if *c.SecurityContext.Privileged {
-			return true
+			privileged = true
+			return false
 		}
-	}
-	return false
+		return true
+	})
+	return privileged
 }

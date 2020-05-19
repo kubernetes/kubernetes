@@ -22,11 +22,13 @@ import (
 
 	"github.com/euank/go-kmsg-parser/kmsgparser"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
-	containerRegexp = regexp.MustCompile(`Task in (.*) killed as a result of limit of (.*)`)
+	legacyContainerRegexp = regexp.MustCompile(`Task in (.*) killed as a result of limit of (.*)`)
+	// Starting in 5.0 linux kernels, the OOM message changed
+	containerRegexp = regexp.MustCompile(`oom-kill:constraint=(.*),nodemask=(.*),cpuset=(.*),mems_allowed=(.*),oom_memcg=(.*) (.*),task_memcg=(.*),task=(.*),pid=(.*),uid=(.*)`)
 	lastLineRegexp  = regexp.MustCompile(`Killed process ([0-9]+) \((.+)\)`)
 	firstLineRegexp = regexp.MustCompile(`invoked oom-killer:`)
 )
@@ -51,17 +53,39 @@ type OomInstance struct {
 	// the absolute name of the container that was killed
 	// due to the OOM.
 	VictimContainerName string
+	// the constraint that triggered the OOM.  One of CONSTRAINT_NONE,
+	// CONSTRAINT_CPUSET, CONSTRAINT_MEMORY_POLICY, CONSTRAINT_MEMCG
+	Constraint string
 }
 
 // gets the container name from a line and adds it to the oomInstance.
-func getContainerName(line string, currentOomInstance *OomInstance) error {
-	parsedLine := containerRegexp.FindStringSubmatch(line)
+func getLegacyContainerName(line string, currentOomInstance *OomInstance) error {
+	parsedLine := legacyContainerRegexp.FindStringSubmatch(line)
 	if parsedLine == nil {
 		return nil
 	}
 	currentOomInstance.ContainerName = path.Join("/", parsedLine[1])
 	currentOomInstance.VictimContainerName = path.Join("/", parsedLine[2])
 	return nil
+}
+
+// gets the container name from a line and adds it to the oomInstance.
+func getContainerName(line string, currentOomInstance *OomInstance) (bool, error) {
+	parsedLine := containerRegexp.FindStringSubmatch(line)
+	if parsedLine == nil {
+		// Fall back to the legacy format if it isn't found here.
+		return false, getLegacyContainerName(line, currentOomInstance)
+	}
+	currentOomInstance.ContainerName = parsedLine[7]
+	currentOomInstance.VictimContainerName = parsedLine[5]
+	currentOomInstance.Constraint = parsedLine[1]
+	pid, err := strconv.Atoi(parsedLine[9])
+	if err != nil {
+		return false, err
+	}
+	currentOomInstance.Pid = pid
+	currentOomInstance.ProcessName = parsedLine[8]
+	return true, nil
 }
 
 // gets the pid, name, and date from a line and adds it to oomInstance
@@ -83,36 +107,35 @@ func getProcessNamePid(line string, currentOomInstance *OomInstance) (bool, erro
 
 // uses regex to see if line is the start of a kernel oom log
 func checkIfStartOfOomMessages(line string) bool {
-	potential_oom_start := firstLineRegexp.MatchString(line)
-	if potential_oom_start {
-		return true
-	}
-	return false
+	potentialOomStart := firstLineRegexp.MatchString(line)
+	return potentialOomStart
 }
 
 // StreamOoms writes to a provided a stream of OomInstance objects representing
 // OOM events that are found in the logs.
 // It will block and should be called from a goroutine.
-func (self *OomParser) StreamOoms(outStream chan<- *OomInstance) {
-	kmsgEntries := self.parser.Parse()
-	defer self.parser.Close()
+func (p *OomParser) StreamOoms(outStream chan<- *OomInstance) {
+	kmsgEntries := p.parser.Parse()
+	defer p.parser.Close()
 
 	for msg := range kmsgEntries {
-		in_oom_kernel_log := checkIfStartOfOomMessages(msg.Message)
-		if in_oom_kernel_log {
+		isOomMessage := checkIfStartOfOomMessages(msg.Message)
+		if isOomMessage {
 			oomCurrentInstance := &OomInstance{
 				ContainerName:       "/",
 				VictimContainerName: "/",
 				TimeOfDeath:         msg.Timestamp,
 			}
 			for msg := range kmsgEntries {
-				err := getContainerName(msg.Message, oomCurrentInstance)
+				finished, err := getContainerName(msg.Message, oomCurrentInstance)
 				if err != nil {
 					klog.Errorf("%v", err)
 				}
-				finished, err := getProcessNamePid(msg.Message, oomCurrentInstance)
-				if err != nil {
-					klog.Errorf("%v", err)
+				if !finished {
+					finished, err = getProcessNamePid(msg.Message, oomCurrentInstance)
+					if err != nil {
+						klog.Errorf("%v", err)
+					}
 				}
 				if finished {
 					oomCurrentInstance.TimeOfDeath = msg.Timestamp
