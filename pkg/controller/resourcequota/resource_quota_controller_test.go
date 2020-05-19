@@ -1135,7 +1135,7 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *
 		return fmt.Errorf("discoveryClient.ServerPreferredResources() called %d times over %v", after-before, t)
 	}
 
-	workerLockAcquired := make(chan struct{})
+	workerLockAcquired := make(chan struct{}, 1)
 	go func() {
 		workerLock.Lock()
 		workerLock.Unlock()
