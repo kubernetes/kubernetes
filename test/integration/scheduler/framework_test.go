@@ -507,7 +507,7 @@ func TestPreFilterPlugin(t *testing.T) {
 		preFilterPlugin.rejectPreFilter = test.reject
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -559,7 +559,7 @@ func TestScorePlugin(t *testing.T) {
 		scorePlugin.failScore = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Fatalf("Error while creating a test pod: %v", err)
 		}
@@ -617,7 +617,7 @@ func TestNormalizeScorePlugin(t *testing.T) {
 
 	// Create a best effort pod.
 	pod, err := createPausePod(testCtx.ClientSet,
-		initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+		initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 	if err != nil {
 		t.Fatalf("Error while creating a test pod: %v", err)
 	}
@@ -666,7 +666,7 @@ func TestReservePlugin(t *testing.T) {
 		reservePlugin.failReserve = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -744,7 +744,7 @@ func TestPrebindPlugin(t *testing.T) {
 		preBindPlugin.rejectPreBind = test.reject
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -819,7 +819,7 @@ func TestUnreservePlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -953,7 +953,7 @@ func TestBindPlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1080,7 +1080,7 @@ func TestPostBindPlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1165,7 +1165,7 @@ func TestPermitPlugin(t *testing.T) {
 
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1214,7 +1214,7 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	// Create a test pod.
 	podName := "test-pod"
 	pod, err := createPausePod(testCtx.ClientSet,
-		initPausePod(testCtx.ClientSet, &pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
+		initPausePod(&pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
 	if err != nil {
 		t.Errorf("Error while creating a test pod: %v", err)
 	}
@@ -1269,7 +1269,7 @@ func TestPermitPluginsCancelled(t *testing.T) {
 	// Create a test pod.
 	podName := "test-pod"
 	pod, err := createPausePod(testCtx.ClientSet,
-		initPausePod(testCtx.ClientSet, &pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
+		initPausePod(&pausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
 	if err != nil {
 		t.Errorf("Error while creating a test pod: %v", err)
 	}
@@ -1328,12 +1328,12 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 		// Create two pods. First pod to enter Permit() will wait and a second one will either
 		// reject or allow first one.
 		podA, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "pod-a", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "pod-a", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating the first pod: %v", err)
 		}
 		podB, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "pod-b", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "pod-b", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating the second pod: %v", err)
 		}
@@ -1403,7 +1403,7 @@ func TestFilterPlugin(t *testing.T) {
 		filterPlugin.failFilter = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1457,7 +1457,7 @@ func TestPreScorePlugin(t *testing.T) {
 		preScorePlugin.failPreScore = fail
 		// Create a best effort pod.
 		pod, err := createPausePod(testCtx.ClientSet,
-			initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
 		if err != nil {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
@@ -1517,7 +1517,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	}
 
 	// First pod will go waiting.
-	waitingPod := initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "waiting-pod", Namespace: testCtx.NS.Name, Priority: &lowPriority, Resources: &resourceRequest})
+	waitingPod := initPausePod(&pausePodConfig{Name: "waiting-pod", Namespace: testCtx.NS.Name, Priority: &lowPriority, Resources: &resourceRequest})
 	waitingPod.Spec.TerminationGracePeriodSeconds = new(int64)
 	waitingPod, err = createPausePod(testCtx.ClientSet, waitingPod)
 	if err != nil {
@@ -1532,7 +1532,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 
 	// Create second pod which should preempt first pod.
 	preemptorPod, err := createPausePod(testCtx.ClientSet,
-		initPausePod(testCtx.ClientSet, &pausePodConfig{Name: "preemptor-pod", Namespace: testCtx.NS.Name, Priority: &highPriority, Resources: &resourceRequest}))
+		initPausePod(&pausePodConfig{Name: "preemptor-pod", Namespace: testCtx.NS.Name, Priority: &highPriority, Resources: &resourceRequest}))
 	if err != nil {
 		t.Errorf("Error while creating the preemptor pod: %v", err)
 	}
