@@ -125,6 +125,9 @@ type RunOptions struct {
 	TTY            bool
 	fieldManager   string
 
+	Namespace        string
+	EnforceNamespace bool
+
 	genericclioptions.IOStreams
 }
 
@@ -283,7 +286,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
 	}
 
-	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -324,7 +327,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
 	var createdObjects = []*RunObject{}
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"))
 	if err != nil {
 		return err
 	}
@@ -336,7 +339,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		if len(serviceGenerator) == 0 {
 			return cmdutil.UsageErrorf(cmd, "No service generator specified")
 		}
-		serviceRunObject, err := o.generateService(f, cmd, serviceGenerator, params, namespace)
+		serviceRunObject, err := o.generateService(f, cmd, serviceGenerator, params)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		} else {
@@ -563,7 +566,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 	return cmdutil.UsageErrorf(cmd, "invalid image pull policy: %s", pullPolicy)
 }
 
-func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
+func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}) (*RunObject, error) {
 	generators := generateversioned.GeneratorFn("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
@@ -593,7 +596,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 		params["default-name"] = name
 	}
 
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"), namespace)
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"))
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +612,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 	return runObject, nil
 }
 
-func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
+func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrides string) (*RunObject, error) {
 	err := generate.ValidateParams(names, params)
 	if err != nil {
 		return nil, err
@@ -665,9 +668,13 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 			NewHelper(client, mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 			WithFieldManager(o.fieldManager).
-			Create(namespace, false, obj)
+			Create(o.Namespace, false, obj)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		if meta, err := meta.Accessor(actualObj); err == nil && o.EnforceNamespace {
+			meta.SetNamespace(o.Namespace)
 		}
 	}
 
