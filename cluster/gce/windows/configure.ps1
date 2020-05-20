@@ -147,6 +147,8 @@ try {
   Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet
+  DownloadAndInstall-GKEMetadataServer
+  Start-GKEMetadataServer
 
   # Even if Logging agent is already installed, the function will still [re]start the service.
   if (IsLoggingEnabled $kube_env) {
