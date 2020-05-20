@@ -183,8 +183,7 @@ type DeltaFIFO struct {
 	// Indication the queue is closed.
 	// Used to indicate a queue is closed so a control loop can exit when a queue is empty.
 	// Currently, not used to gate any of CRED operations.
-	closed     bool
-	closedLock sync.Mutex
+	closed bool
 
 	// emitDeltaTypeReplaced is whether to emit the Replaced or Sync
 	// DeltaType when Replace() is called (to preserve backwards compat).
@@ -204,8 +203,8 @@ var (
 
 // Close the queue.
 func (f *DeltaFIFO) Close() {
-	f.closedLock.Lock()
-	defer f.closedLock.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	f.closed = true
 	f.cond.Broadcast()
 }
@@ -447,8 +446,8 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 
 // IsClosed checks if the queue is closed
 func (f *DeltaFIFO) IsClosed() bool {
-	f.closedLock.Lock()
-	defer f.closedLock.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	return f.closed
 }
 
@@ -472,7 +471,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 			// When Close() is called, the f.closed is set and the condition is broadcasted.
 			// Which causes this loop to continue and return from the Pop().
-			if f.IsClosed() {
+			if f.closed {
 				return nil, ErrFIFOClosed
 			}
 
