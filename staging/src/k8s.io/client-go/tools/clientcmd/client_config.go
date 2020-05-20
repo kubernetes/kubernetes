@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"unicode"
 
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
@@ -269,6 +270,7 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	}
 	if configAuthInfo.Exec != nil {
 		mergedConfig.ExecProvider = configAuthInfo.Exec
+		mergedConfig.ExecProvider.InstallHint = cleanANSIEscapeCodes(mergedConfig.ExecProvider.InstallHint)
 	}
 
 	// if there still isn't enough information to authenticate the user, try prompting
@@ -312,6 +314,41 @@ func canIdentifyUser(config restclient.Config) bool {
 		len(config.BearerToken) > 0 ||
 		config.AuthProvider != nil ||
 		config.ExecProvider != nil
+}
+
+// cleanANSIEscapeCodes takes an arbitrary string and ensures that there are no
+// ANSI escape sequences that could put the terminal in a weird state (e.g.,
+// "\e[1m" bolds text)
+func cleanANSIEscapeCodes(s string) string {
+	// spaceControlCharacters includes tab, new line, vertical tab, new page, and
+	// carriage return. These are in the unicode.Cc category, but that category also
+	// contains ESC (U+001B) which we don't want.
+	spaceControlCharacters := unicode.RangeTable{
+		R16: []unicode.Range16{
+			{Lo: 0x0009, Hi: 0x000D, Stride: 1},
+		},
+	}
+
+	// Why not make this deny-only (instead of allow-only)? Because unicode.C
+	// contains newline and tab characters that we want.
+	allowedRanges := []*unicode.RangeTable{
+		unicode.L,
+		unicode.M,
+		unicode.N,
+		unicode.P,
+		unicode.S,
+		unicode.Z,
+		&spaceControlCharacters,
+	}
+	builder := strings.Builder{}
+	for _, roon := range s {
+		if unicode.IsOneOf(allowedRanges, roon) {
+			builder.WriteRune(roon) // returns nil error, per go doc
+		} else {
+			fmt.Fprintf(&builder, "%U", roon)
+		}
+	}
+	return builder.String()
 }
 
 // Namespace implements ClientConfig
