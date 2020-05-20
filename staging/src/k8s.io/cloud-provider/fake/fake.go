@@ -292,6 +292,18 @@ func (f *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return f.NodeShutdown, f.ErrShutdownByProviderID
 }
 
+// InstanceMetadataByProviderID returns metadata of the specified instance.
+func (f *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+	f.addCall("instance-metadata-by-provider-id")
+	f.addressesMux.Lock()
+	defer f.addressesMux.Unlock()
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		Type:          f.InstanceTypes[types.NodeName(providerID)],
+		NodeAddresses: f.Addresses,
+	}, f.Err
+}
+
 // List is a test-spy implementation of Instances.List.
 // It adds an entry "list" into the internal method call record.
 func (f *Cloud) List(filter string) ([]types.NodeName, error) {
