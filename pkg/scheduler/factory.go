@@ -192,7 +192,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
-		podQueue,
+		nominator,
 		c.nodeInfoSnapshot,
 		extenders,
 		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),

@@ -510,4 +510,6 @@ type PodNominator interface {
 	DeleteNominatedPodIfExists(pod *v1.Pod)
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
 	UpdateNominatedPod(oldPod, newPod *v1.Pod)
+	// NominatedPodsForNode returns nominatedPods on the given node.
+	NominatedPodsForNode(nodeName string) []*v1.Pod
 }

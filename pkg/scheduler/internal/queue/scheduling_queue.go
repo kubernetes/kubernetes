@@ -83,7 +83,6 @@ type SchedulingQueue interface {
 	MoveAllToActiveOrBackoffQueue(event string)
 	AssignedPodAdded(pod *v1.Pod)
 	AssignedPodUpdated(pod *v1.Pod)
-	NominatedPodsForNode(nodeName string) []*v1.Pod
 	PendingPods() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
@@ -556,14 +555,6 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 	return podsToMove
 }
 
-// NominatedPodsForNode returns pods that are nominated to run on the given node,
-// but they are waiting for other pods to be removed from the node before they
-// can be actually scheduled.
-func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*v1.Pod {
-	// TODO: make podsForNode() public?
-	return p.PodNominator.(*nominatedPodMap).podsForNode(nodeName)
-}
-
 // PendingPods returns all the pending pods in the queue. This function is
 // used for debugging purposes in the scheduler cache dumper and comparer.
 func (p *PriorityQueue) PendingPods() []*v1.Pod {
@@ -606,6 +597,16 @@ func (npm *nominatedPodMap) AddNominatedPod(pod *v1.Pod, nodeName string) {
 	npm.Lock()
 	npm.add(pod, nodeName)
 	npm.Unlock()
+}
+
+// NominatedPodsForNode returns pods that are nominated to run on the given node,
+// but they are waiting for other pods to be removed from the node.
+func (npm *nominatedPodMap) NominatedPodsForNode(nodeName string) []*v1.Pod {
+	npm.RLock()
+	defer npm.RUnlock()
+	// TODO: we may need to return a copy of []*Pods to avoid modification
+	// on the caller side.
+	return npm.nominatedPods[nodeName]
 }
 
 func (p *PriorityQueue) podsCompareBackoffCompleted(podInfo1, podInfo2 interface{}) bool {
@@ -792,15 +793,6 @@ func (npm *nominatedPodMap) UpdateNominatedPod(oldPod, newPod *v1.Pod) {
 	// that pod pointer is updated.
 	npm.delete(oldPod)
 	npm.add(newPod, nodeName)
-}
-
-func (npm *nominatedPodMap) podsForNode(nodeName string) []*v1.Pod {
-	npm.RLock()
-	defer npm.RUnlock()
-	if list, ok := npm.nominatedPods[nodeName]; ok {
-		return list
-	}
-	return nil
 }
 
 // NewPodNominator creates a nominatedPodMap as a backing of framework.PodNominator.
