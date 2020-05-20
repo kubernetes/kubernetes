@@ -39,6 +39,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1alpha2.NodeResourcesMostAllocatedArgs{}, func(obj interface{}) {
 		SetObjectDefaults_NodeResourcesMostAllocatedArgs(obj.(*v1alpha2.NodeResourcesMostAllocatedArgs))
 	})
+	scheme.AddTypeDefaultingFunc(&v1alpha2.RequestedToCapacityRatioArgs{}, func(obj interface{}) {
+		SetObjectDefaults_RequestedToCapacityRatioArgs(obj.(*v1alpha2.RequestedToCapacityRatioArgs))
+	})
 	return nil
 }
 
@@ -56,4 +59,8 @@ func SetObjectDefaults_NodeResourcesLeastAllocatedArgs(in *v1alpha2.NodeResource
 
 func SetObjectDefaults_NodeResourcesMostAllocatedArgs(in *v1alpha2.NodeResourcesMostAllocatedArgs) {
 	SetDefaults_NodeResourcesMostAllocatedArgs(in)
+}
+
+func SetObjectDefaults_RequestedToCapacityRatioArgs(in *v1alpha2.RequestedToCapacityRatioArgs) {
+	SetDefaults_RequestedToCapacityRatioArgs(in)
 }

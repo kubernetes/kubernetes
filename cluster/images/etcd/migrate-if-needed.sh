@@ -45,7 +45,8 @@ set -o nounset
 # etcd image (to make this script work correctly).
 BUNDLED_VERSIONS="3.0.17, 3.1.12, 3.2.24, 3.3.17, 3.4.7"
 
-ETCD_NAME="${ETCD_NAME:-etcd-$(hostname)}"
+# shellcheck disable=SC2039
+ETCD_NAME="${ETCD_NAME:-etcd-$HOSTNAME}"
 if [ -z "${DATA_DIRECTORY:-}" ]; then
   echo "DATA_DIRECTORY variable unset - unexpected failure"
   exit 1
@@ -87,8 +88,8 @@ ETCD_CREDS="${ETCD_CREDS:-}"
 
 # Correctly support upgrade and rollback to non-default version.
 if [ "${DO_NOT_MOVE_BINARIES:-}" != "true" ]; then
-  cp "/usr/local/bin/etcd-${TARGET_VERSION}" "/usr/local/bin/etcd"
-  cp "/usr/local/bin/etcdctl-${TARGET_VERSION}" "/usr/local/bin/etcdctl"
+  /bin/cp "/usr/local/bin/etcd-${TARGET_VERSION}" "/usr/local/bin/etcd"
+  /bin/cp "/usr/local/bin/etcdctl-${TARGET_VERSION}" "/usr/local/bin/etcdctl"
 fi
 
 /usr/local/bin/migrate \

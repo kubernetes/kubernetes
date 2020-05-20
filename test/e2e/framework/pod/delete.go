@@ -35,10 +35,15 @@ const (
 	PodDeleteTimeout = 5 * time.Minute
 )
 
-// DeletePodOrFail deletes the pod of the specified namespace and name.
+// DeletePodOrFail deletes the pod of the specified namespace and name. Resilient to the pod
+// not existing.
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	ginkgo.By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil && apierrors.IsNotFound(err) {
+		return
+	}
+
 	expectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
 

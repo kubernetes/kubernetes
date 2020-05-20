@@ -172,7 +172,7 @@ func TestPreemption(t *testing.T) {
 			description: "basic pod preemption",
 			initTokens:  maxTokens,
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -182,7 +182,7 @@ func TestPreemption(t *testing.T) {
 					},
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -197,7 +197,7 @@ func TestPreemption(t *testing.T) {
 			description: "basic pod preemption with filter",
 			initTokens:  1,
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -207,7 +207,7 @@ func TestPreemption(t *testing.T) {
 					},
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -224,7 +224,7 @@ func TestPreemption(t *testing.T) {
 			initTokens:   1,
 			unresolvable: true,
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -234,7 +234,7 @@ func TestPreemption(t *testing.T) {
 					},
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -249,13 +249,13 @@ func TestPreemption(t *testing.T) {
 			description: "preemption is performed to satisfy anti-affinity",
 			initTokens:  maxTokens,
 			existingPods: []*v1.Pod{
-				initPausePod(cs, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name: "pod-0", Namespace: testCtx.NS.Name,
 					Priority:  &mediumPriority,
 					Labels:    map[string]string{"pod": "p0"},
 					Resources: defaultPodRes,
 				}),
-				initPausePod(cs, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name: "pod-1", Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
 					Labels:    map[string]string{"pod": "p1"},
@@ -281,7 +281,7 @@ func TestPreemption(t *testing.T) {
 				}),
 			},
 			// A higher priority pod with anti-affinity.
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -313,13 +313,13 @@ func TestPreemption(t *testing.T) {
 			description: "preemption is not performed when anti-affinity is not satisfied",
 			initTokens:  maxTokens,
 			existingPods: []*v1.Pod{
-				initPausePod(cs, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name: "pod-0", Namespace: testCtx.NS.Name,
 					Priority:  &mediumPriority,
 					Labels:    map[string]string{"pod": "p0"},
 					Resources: defaultPodRes,
 				}),
-				initPausePod(cs, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name: "pod-1", Namespace: testCtx.NS.Name,
 					Priority:  &highPriority,
 					Labels:    map[string]string{"pod": "p1"},
@@ -345,7 +345,7 @@ func TestPreemption(t *testing.T) {
 				}),
 			},
 			// A higher priority pod with anti-affinity.
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -449,7 +449,7 @@ func TestDisablePreemption(t *testing.T) {
 		{
 			description: "pod preemption will not happen",
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "victim-pod",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -459,7 +459,7 @@ func TestDisablePreemption(t *testing.T) {
 					},
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -549,7 +549,7 @@ func TestPodPriorityResolution(t *testing.T) {
 			Name:             "SystemNodeCritical priority class",
 			PriorityClass:    scheduling.SystemNodeCritical,
 			ExpectedPriority: scheduling.SystemCriticalPriority + 1000,
-			Pod: initPausePod(cs, &pausePodConfig{
+			Pod: initPausePod(&pausePodConfig{
 				Name:              fmt.Sprintf("pod1-%v", scheduling.SystemNodeCritical),
 				Namespace:         metav1.NamespaceSystem,
 				PriorityClassName: scheduling.SystemNodeCritical,
@@ -559,7 +559,7 @@ func TestPodPriorityResolution(t *testing.T) {
 			Name:             "SystemClusterCritical priority class",
 			PriorityClass:    scheduling.SystemClusterCritical,
 			ExpectedPriority: scheduling.SystemCriticalPriority,
-			Pod: initPausePod(cs, &pausePodConfig{
+			Pod: initPausePod(&pausePodConfig{
 				Name:              fmt.Sprintf("pod2-%v", scheduling.SystemClusterCritical),
 				Namespace:         metav1.NamespaceSystem,
 				PriorityClassName: scheduling.SystemClusterCritical,
@@ -569,7 +569,7 @@ func TestPodPriorityResolution(t *testing.T) {
 			Name:             "Invalid priority class should result in error",
 			PriorityClass:    "foo",
 			ExpectedPriority: scheduling.SystemCriticalPriority,
-			Pod: initPausePod(cs, &pausePodConfig{
+			Pod: initPausePod(&pausePodConfig{
 				Name:              fmt.Sprintf("pod3-%v", scheduling.SystemClusterCritical),
 				Namespace:         metav1.NamespaceSystem,
 				PriorityClassName: "foo",
@@ -622,7 +622,7 @@ func mkPriorityPodWithGrace(tc *testutils.TestContext, name string, priority int
 		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
 	}
-	pod := initPausePod(tc.ClientSet, &pausePodConfig{
+	pod := initPausePod(&pausePodConfig{
 		Name:      name,
 		Namespace: tc.NS.Name,
 		Priority:  &priority,
@@ -655,7 +655,7 @@ func TestPreemptionStarvation(t *testing.T) {
 			description:        "starvation test: higher priority pod is scheduled before the lower priority ones",
 			numExistingPod:     10,
 			numExpectedPending: 5,
-			preemptor: initPausePod(cs, &pausePodConfig{
+			preemptor: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -754,7 +754,7 @@ func TestPreemptionRaces(t *testing.T) {
 			numInitialPods:    2,
 			numAdditionalPods: 50,
 			numRepetitions:    10,
-			preemptor: initPausePod(cs, &pausePodConfig{
+			preemptor: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -889,7 +889,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		}
 	}
 	// Step 2. Create a medium priority pod.
-	podConf := initPausePod(cs, &pausePodConfig{
+	podConf := initPausePod(&pausePodConfig{
 		Name:      "medium-priority",
 		Namespace: testCtx.NS.Name,
 		Priority:  &mediumPriority,
@@ -907,7 +907,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		t.Errorf("NominatedNodeName annotation was not set for pod %v/%v: %v", medPriPod.Namespace, medPriPod.Name, err)
 	}
 	// Step 4. Create a high priority pod.
-	podConf = initPausePod(cs, &pausePodConfig{
+	podConf = initPausePod(&pausePodConfig{
 		Name:      "high-priority",
 		Namespace: testCtx.NS.Name,
 		Priority:  &highPriority,
@@ -1006,28 +1006,28 @@ func TestPDBInPreemption(t *testing.T) {
 			},
 			pdbPodNum: []int32{2},
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod1",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
 					Resources: defaultPodRes,
 					Labels:    map[string]string{"foo": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod2",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
 					Resources: defaultPodRes,
 					Labels:    map[string]string{"foo": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "mid-pod3",
 					Namespace: testCtx.NS.Name,
 					Priority:  &mediumPriority,
 					Resources: defaultPodRes,
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -1049,7 +1049,7 @@ func TestPDBInPreemption(t *testing.T) {
 			},
 			pdbPodNum: []int32{1},
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod1",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -1057,7 +1057,7 @@ func TestPDBInPreemption(t *testing.T) {
 					NodeName:  "node-1",
 					Labels:    map[string]string{"foo": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "mid-pod2",
 					Namespace: testCtx.NS.Name,
 					Priority:  &mediumPriority,
@@ -1065,7 +1065,7 @@ func TestPDBInPreemption(t *testing.T) {
 					Resources: defaultPodRes,
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,
@@ -1089,7 +1089,7 @@ func TestPDBInPreemption(t *testing.T) {
 			},
 			pdbPodNum: []int32{1, 5},
 			existingPods: []*v1.Pod{
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod1",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -1097,14 +1097,14 @@ func TestPDBInPreemption(t *testing.T) {
 					NodeName:  "node-1",
 					Labels:    map[string]string{"foo1": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "mid-pod1",
 					Namespace: testCtx.NS.Name,
 					Priority:  &mediumPriority,
 					Resources: defaultPodRes,
 					NodeName:  "node-1",
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod2",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -1112,7 +1112,7 @@ func TestPDBInPreemption(t *testing.T) {
 					NodeName:  "node-2",
 					Labels:    map[string]string{"foo2": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "mid-pod2",
 					Namespace: testCtx.NS.Name,
 					Priority:  &mediumPriority,
@@ -1120,7 +1120,7 @@ func TestPDBInPreemption(t *testing.T) {
 					NodeName:  "node-2",
 					Labels:    map[string]string{"foo2": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod4",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -1128,7 +1128,7 @@ func TestPDBInPreemption(t *testing.T) {
 					NodeName:  "node-3",
 					Labels:    map[string]string{"foo2": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod5",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -1136,7 +1136,7 @@ func TestPDBInPreemption(t *testing.T) {
 					NodeName:  "node-3",
 					Labels:    map[string]string{"foo2": "bar"},
 				}),
-				initPausePod(testCtx.ClientSet, &pausePodConfig{
+				initPausePod(&pausePodConfig{
 					Name:      "low-pod6",
 					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
@@ -1145,7 +1145,7 @@ func TestPDBInPreemption(t *testing.T) {
 					Labels:    map[string]string{"foo2": "bar"},
 				}),
 			},
-			pod: initPausePod(cs, &pausePodConfig{
+			pod: initPausePod(&pausePodConfig{
 				Name:      "preemptor-pod",
 				Namespace: testCtx.NS.Name,
 				Priority:  &highPriority,

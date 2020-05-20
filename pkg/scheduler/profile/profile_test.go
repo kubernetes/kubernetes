@@ -82,6 +82,20 @@ func TestNewProfile(t *testing.T) {
 			},
 			wantErr: "at least one bind plugin is needed",
 		},
+		{
+			name: "one queue sort plugin required for profile",
+			cfg: config.KubeSchedulerProfile{
+				SchedulerName: "profile-1",
+				Plugins: &config.Plugins{
+					Bind: &config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "Bind1"},
+						},
+					},
+				},
+			},
+			wantErr: "no queue sort plugin is enabled",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -272,6 +286,35 @@ func TestNewMap(t *testing.T) {
 				},
 			},
 			wantErr: "duplicate profile",
+		},
+		{
+			name: "scheduler name is needed",
+			cfgs: []config.KubeSchedulerProfile{
+				{
+					Plugins: &config.Plugins{
+						QueueSort: &config.PluginSet{
+							Enabled: []config.Plugin{
+								{Name: "QueueSort"},
+							},
+						},
+						Bind: &config.PluginSet{
+							Enabled: []config.Plugin{
+								{Name: "Bind1"},
+							},
+						},
+					},
+				},
+			},
+			wantErr: "scheduler name is needed",
+		},
+		{
+			name: "plugins required for profile",
+			cfgs: []config.KubeSchedulerProfile{
+				{
+					SchedulerName: "profile-1",
+				},
+			},
+			wantErr: "plugins required for profile",
 		},
 	}
 	for _, tc := range cases {

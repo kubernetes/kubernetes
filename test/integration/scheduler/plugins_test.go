@@ -54,7 +54,7 @@ func TestNodeResourceLimits(t *testing.T) {
 	}
 
 	podName := "pod-with-resource-limits"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
+	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
 		Name:      podName,
 		Namespace: testCtx.NS.Name,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{

@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -164,6 +165,8 @@ func (pl *InterPodAffinity) PreScore(
 		podInfo:       framework.NewPodInfo(pod),
 	}
 
+	topoScores := make([]scoreMap, len(allNodes))
+	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
 		if nodeInfo.Node() == nil {
@@ -182,12 +185,14 @@ func (pl *InterPodAffinity) PreScore(
 			pl.processExistingPod(state, existingPod, nodeInfo, pod, topoScore)
 		}
 		if len(topoScore) > 0 {
-			pl.Lock()
-			state.topologyScore.append(topoScore)
-			pl.Unlock()
+			topoScores[atomic.AddInt32(&index, 1)] = topoScore
 		}
 	}
 	parallelize.Until(context.Background(), len(allNodes), processNode)
+
+	for i := 0; i <= int(index); i++ {
+		state.topologyScore.append(topoScores[i])
+	}
 
 	cycleState.Write(preScoreStateKey, state)
 	return nil

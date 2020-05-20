@@ -18,7 +18,6 @@ package interpodaffinity
 
 import (
 	"fmt"
-	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -45,7 +44,6 @@ var _ framework.ScorePlugin = &InterPodAffinity{}
 type InterPodAffinity struct {
 	args         config.InterPodAffinityArgs
 	sharedLister framework.SharedLister
-	sync.Mutex
 }
 
 // Name returns name of the plugin. It is used in logs, etc.

@@ -172,7 +172,10 @@ func applyFeatureGates(config *schedulerapi.Plugins) {
 		config.PreFilter.Enabled = append(config.PreFilter.Enabled, f)
 		config.Filter.Enabled = append(config.Filter.Enabled, f)
 		config.PreScore.Enabled = append(config.PreScore.Enabled, f)
-		s := schedulerapi.Plugin{Name: podtopologyspread.Name, Weight: 1}
+		// Weight is doubled because:
+		// - This is a score coming from user preference.
+		// - It makes its signal comparable to NodeResourcesLeastAllocated.
+		s := schedulerapi.Plugin{Name: podtopologyspread.Name, Weight: 2}
 		config.Score.Enabled = append(config.Score.Enabled, s)
 	}
 

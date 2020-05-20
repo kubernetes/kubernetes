@@ -62,7 +62,7 @@ func TestNodeAffinity(t *testing.T) {
 	}
 	// Create a pod with node affinity.
 	podName := "pod-with-node-affinity"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
+	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
 		Name:      podName,
 		Namespace: testCtx.NS.Name,
 		Affinity: &v1.Affinity{
@@ -121,7 +121,7 @@ func TestPodAffinity(t *testing.T) {
 	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
 	labelValue := "S1"
-	_, err = runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
+	_, err = runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
 		Name:      "attractor-pod",
 		Namespace: testCtx.NS.Name,
 		Labels:    map[string]string{labelKey: labelValue},
@@ -136,7 +136,7 @@ func TestPodAffinity(t *testing.T) {
 	}
 	// Add a new pod with affinity to the attractor pod.
 	podName := "pod-with-podaffinity"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(testCtx.ClientSet, &pausePodConfig{
+	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
 		Name:      podName,
 		Namespace: testCtx.NS.Name,
 		Affinity: &v1.Affinity{

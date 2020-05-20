@@ -172,9 +172,9 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 	// initialize the workflow runner with the list of phases
 	initRunner.AppendPhase(phases.NewPreflightPhase())
-	initRunner.AppendPhase(phases.NewKubeletStartPhase())
 	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeConfigPhase())
+	initRunner.AppendPhase(phases.NewKubeletStartPhase())
 	initRunner.AppendPhase(phases.NewControlPlanePhase())
 	initRunner.AppendPhase(phases.NewEtcdPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())

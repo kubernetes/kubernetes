@@ -1,3 +1,6 @@
+## Version 9.1.1 (Wed May 19 2020 Antoni Zawodny <zawodny@google.com>)
+ - Fix kube-addons.sh and kubectl permissions
+
 ## Version 9.1.0 (Wed May 13 2020 Antoni Zawodny <zawodny@google.com>)
  - Enable overriding the default list of whitelisted resources
 
