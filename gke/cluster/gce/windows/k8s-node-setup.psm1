@@ -385,6 +385,98 @@ function DownloadAndInstall-AuthPlugin {
       -OutFile "${env:LICENSE_DIR}\LICENSE_gke-exec-auth-plugin.txt"
 }
 
+# Returns true if this node enables workload identity
+function Test-EnableWorkloadIdentity {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+  return $KubeEnv.Contains('ENABLE_WINDOWS_WORKLOAD_IDENTITY') -and `
+      ($KubeEnv['ENABLE_WINDOWS_WORKLOAD_IDENTITY'] -eq 'true')
+}
+
+#  Download and install the gke-metadata-server to support workload identity
+#  if ENABLE_WINDOWS_WORKLOAD_IDENTITY is set as true in kube_env
+#  Required ${kube_env} keys:
+#    GKE_METADATA_SERVER_URL
+function DownloadAndInstall-GKEMetadataServer {
+  if (-not (Test-EnableWorkloadIdentity ${kube_env})) {
+    Log-Output 'Skipping downloading gke-metadata-server as workload identity is not enabled'
+    return
+  }
+  if (-not (ShouldWrite-File "${env:NODE_DIR}\gke-metadata-server.exe")) {
+    return
+  }
+
+  if (-not ($kube_env.ContainsKey('GKE_METADATA_SERVER_URL') -and
+            $kube_env.ContainsKey('GKE_METADATA_SERVER_SHA'))) {
+    Log-Output -Fatal ("Missing GKE_METADATA_SERVER_URL and/or GKE_METADATA_SERVER_SHA " +
+                       "for downloading gke-metadata-server: $(Out-String $kube_env)")
+  }
+  MustDownload-File `
+      -URLs ${kube_env}['GKE_METADATA_SERVER_URL'] `
+      -Hash ${kube_env}['GKE_METADATA_SERVER_SHA'] `
+      -OutFile "${env:NODE_DIR}\gke-metadata-server.exe"
+}
+
+# Sets up the gke-metadata-server arguments and starts it as native Windows service
+# if workload identity is enabled.
+#
+# Required ${kube_env} keys:
+#   GKE_METADATA_SERVER_ARGS
+function Start-GKEMetadataServer {
+  if (-not (Test-EnableWorkloadIdentity ${kube_env})) {
+    Log-Output 'Skipping starting gke-metadata-server as workload identity is not enabled'
+    return
+  }
+
+  if (Get-Process | Where-Object Name -eq "gke-metadata-server") {
+    Log-Output -Fatal `
+        "A gke-metadata-server process is already running, don't know what to do"
+  }
+
+  $args_str = ${kube_env}['GKE_METADATA_SERVER_ARGS']
+  $args = $args_str.Split(" ")
+
+  # Creates log directory if specified in args
+  ForEach($arg in $args) {
+    $key, $val = $arg -split "=",2
+    if ($key -eq "--log_dir") {
+      Log-Output "Creating log directory ${val}"
+      mkdir -Force $val
+      break
+    }
+  }
+
+  $pod_gateway = Get_Endpoint_Gateway_From_CIDR ${env:POD_CIDR}
+  $mgmt_ip = (Get_MgmtNetAdapter | Get-NetIPAddress -AddressFamily IPv4).IPAddress
+  $default_args = @(`
+      "--addr=${pod_gateway}:988",
+      "--metrics_addr=${mgmt_ip}:989"
+  )
+  $args = $args + $default_args
+  Log-Output "gke-metadata-server args: ${args}"
+
+
+  Log-Output "Creating gke-metadata-server service"
+  & sc.exe create gke-metadata-server binPath= "${env:NODE_DIR}\gke-metadata-server.exe ${args}" start= demand
+  & sc.exe failure gke-metadata-server reset= 0 actions= restart/10000
+  Log-Output "Starting gke-metadata-server service"
+  & sc.exe start gke-metadata-server
+
+  # Wait for gke-metadata-server to be ready within 10s
+  $waited = 0
+  $timeout = 10
+  while (((Get-Service gke-metadata-server).Status -ne 'Running') -and $waited -lt $timeout) {
+    Start-Sleep 1
+    $waited++
+  }
+
+  if ($waited -ge $timeout) {
+    Log-Output "$(Get-Service gke-metadata-server | Out-String)"
+    Throw ("Timeout while waiting ${timeout} seconds for gke-metadata-server to start")
+  }
+}
+
 # Downloads the Kubernetes binaries from kube-env's NODE_BINARY_TAR_URL and
 # puts them in a subdirectory of $env:K8S_DIR.
 #
@@ -923,6 +1015,8 @@ function Configure-HostNetworkingService {
     Get-HNSPolicyList | Remove-HnsPolicyList
   } Catch { }
 
+  Apply_ACLPolicyForWorkloadIdentity ${hns_endpoint}.Id
+
   # Add a route from the management NIC to the pod CIDR.
   #
   # When a packet from a Kubernetes service backend arrives on the destination
@@ -961,6 +1055,58 @@ function Configure-HostNetworkingService {
 
   Log-Output "Host network setup complete"
 }
+
+# When workload identity is enabled, gke-metadata-server will listen on POD_GATEWAY:988
+# This access control list policy should be applied on POD_GATEWAY, so that only the pod
+# on this node, whose ip is in POD_CIDR, can make TCP (Protocol 6) requests to POD_GATEWAY:988.
+# Those ACL policies will be evaluated from smaller Priority to bigger Priority until it
+# meets one entry and then the Action will be taken (Allow or Block).
+# So those policies will only affect the "In" TCP requests to POD_GATEWAY:988.
+function Apply_ACLPolicyForWorkloadIdentity {
+  param (
+    [parameter(Mandatory=$true)] [string]$HNSEndpointID
+  )
+  if (-not (Test-EnableWorkloadIdentity ${kube_env})) {
+    Log-Output "Skipping applying access control list policies for workload identity as it's not enabled"
+  }
+  $acl_json = '{
+    "Policies": [
+        {
+            "Type": "ACL",
+            "Action": "Allow",
+            "Direction": "In",
+            "LocalAddresses": "",
+            "RemoteAddresses": "POD_CIDR",
+            "LocalPorts": "988",
+            "Protocol": 6,
+            "Priority": 200
+        },
+        {
+            "Type": "ACL",
+            "Action": "Block",
+            "Direction": "In",
+            "LocalPorts": "988",
+            "Protocol": 6,
+            "Priority": 300
+        },
+        {
+            "Type": "ACL",
+            "Action": "Allow",
+            "Direction": "In",
+            "Priority": 400
+        },
+        {
+            "Type": "ACL",
+            "Action": "Allow",
+            "Direction": "Out",
+            "Priority": 400
+        }
+    ]
+  }'.replace('POD_CIDR', ${env:POD_CIDR})
+  Log-Output 'Apply access control policy on hns endpoint id ${HNSEndpointID} for workload identity: $acl_json'
+  Invoke-HNSRequest -Method POST -Type endpoints -Id ${HNSEndpointID} -Data $acl_json
+}
+
 
 function Configure-GcePdTools {
   if (ShouldWrite-File ${env:K8S_DIR}\GetGcePdName.dll) {
@@ -1046,6 +1192,8 @@ function Configure_Dockerd_CniNetworking {
 
   $cidr_range_start = Get_PodIP_Range_Start(${env:POD_CIDR})
 
+  $proxy_policy_for_workload_identity = Get_ProxyPolicyForWorkloadIdentity
+
   # Explanation of the CNI config values:
   #   POD_CIDR: the pod CIDR assigned to this node.
   #   CIDR_RANGE_START: start of the pod CIDR range.
@@ -1081,6 +1229,7 @@ function Configure_Dockerd_CniNetworking {
     ]
   },
   "Policies":  [
+    PROXY_POLICY_FOR_WORKLOAD_IDENTITY
     {
       "Name":  "EndpointPolicy",
       "Value":  {
@@ -1123,9 +1272,33 @@ function Configure_Dockerd_CniNetworking {
   replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
   replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
   replace('MGMT_IP', ${mgmt_ip}).`
-  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE'])
+  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE']).`
+  replace('PROXY_POLICY_FOR_WORKLOAD_IDENTITY', ${proxy_policy_for_workload_identity})
 
   Log-Output "CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
+}
+
+# When workload identity is enabled, gke-metadata-server will listen on POD_GATEWAY:988
+# This proxy policy will be in the CNI config, which will be applied to every pod on this node.
+# The request to 169.254.169.254:80 (GCE Metadata) will be redirected to gke-metadata-server.
+function Get_ProxyPolicyForWorkloadIdentity {
+  if (-not (Test-EnableWorkloadIdentity ${kube_env})) {
+    Log-Output "Workload identity is not enabled. No proxy policy is needed"
+    return ""
+  }
+
+  $pod_gateway = Get_Endpoint_Gateway_From_CIDR ${env:POD_CIDR}
+
+  return '{
+      "Name":  "EndpointPolicy",
+      "Value":  {
+         "Type": "PROXY",
+         "IP": "GCE_METADATA_SERVER",
+         "Port": "80",
+         "Destination": "POD_GATEWAY:988"
+      }
+    },'.replace('POD_GATEWAY', ${pod_gateway}).`
+       replace('GCE_METADATA_SERVER', $GCE_METADATA_SERVER)
 }
 
 # Obtain the host dns conf and save it to a file so that kubelet/CNI
@@ -2110,6 +2283,21 @@ $FLUENTBIT_CONFIG = @'
     Refresh_Interval 5
     Path             /etc/kubernetes/logs/kube-proxy.log
     DB               /var/run/google-fluentbit/pos-files/kube-proxy.db
+    Multiline        On
+    Parser_Firstline glog
+
+# Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+# Example:
+# I0716 02:08:55.559351    3356 log_spam.go:42] Command line arguments:
+[INPUT]
+    Name             tail
+    Alias            gke-metadata-server
+    Tag              gke-metadata-server
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             C:\etc\kubernetes\logs\gke-metadata-server\*.log.INFO*
+    DB               /var/run/google-fluentbit/pos-files/gke-metadata-server.db
     Multiline        On
     Parser_Firstline glog
 
