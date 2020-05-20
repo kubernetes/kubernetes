@@ -179,13 +179,13 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		// sj spec
+		// cj spec
 		concurrencyPolicy batchV1beta1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
 
-		// sj status
+		// cj status
 		ranPreviously bool
 		stillActive   bool
 
@@ -253,12 +253,12 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			sj := cronJob()
-			sj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
-			sj.Spec.Suspend = &tc.suspend
-			sj.Spec.Schedule = tc.schedule
+			cj := cronJob()
+			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
+			cj.Spec.Suspend = &tc.suspend
+			cj.Spec.Schedule = tc.schedule
 			if tc.deadline != noDead {
-				sj.Spec.StartingDeadlineSeconds = &tc.deadline
+				cj.Spec.StartingDeadlineSeconds = &tc.deadline
 			}
 
 			var (
@@ -267,30 +267,30 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			)
 			js := []batchv1.Job{}
 			if tc.ranPreviously {
-				sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
-				sj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
-				job, err = getJobFromTemplate(&sj, sj.Status.LastScheduleTime.Time)
+				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
+				cj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
+				job, err = getJobFromTemplate(&cj, cj.Status.LastScheduleTime.Time)
 				if err != nil {
 					t.Fatalf("%s: unexpected error creating a job from template: %v", name, err)
 				}
 				job.UID = "1234"
 				job.Namespace = ""
 				if tc.stillActive {
-					sj.Status.Active = []v1.ObjectReference{{UID: job.UID}}
+					cj.Status.Active = []v1.ObjectReference{{UID: job.UID}}
 					js = append(js, *job)
 				}
 			} else {
-				sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
+				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
 				if tc.stillActive {
 					t.Errorf("%s: test setup error: this case makes no sense", name)
 				}
 			}
 
 			jc := &fakeJobControl{Job: job}
-			sjc := &fakeSJControl{}
+			cjc := &fakeCJControl{}
 			recorder := record.NewFakeRecorder(10)
 
-			syncOne(&sj, js, tc.now, jc, sjc, recorder)
+			syncOne(&cj, js, tc.now, jc, cjc, recorder)
 			expectedCreates := 0
 			if tc.expectCreate {
 				expectedCreates = 1
@@ -310,10 +310,10 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 					if got, want := controllerRef.Kind, "CronJob"; got != want {
 						t.Errorf("%s: controllerRef.Kind = %q, want %q", name, got, want)
 					}
-					if got, want := controllerRef.Name, sj.Name; got != want {
+					if got, want := controllerRef.Name, cj.Name; got != want {
 						t.Errorf("%s: controllerRef.Name = %q, want %q", name, got, want)
 					}
-					if got, want := controllerRef.UID, sj.UID; got != want {
+					if got, want := controllerRef.UID, cj.UID; got != want {
 						t.Errorf("%s: controllerRef.UID = %q, want %q", name, got, want)
 					}
 					if controllerRef.Controller == nil || *controllerRef.Controller != true {
@@ -357,8 +357,8 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 				t.Errorf("%s: expected %d warnings, actually %v", name, tc.expectedWarnings, numWarnings)
 			}
 
-			if tc.expectActive != len(sjc.Updates[expectUpdates-1].Status.Active) {
-				t.Errorf("%s: expected Active size %d, got %d", name, tc.expectActive, len(sjc.Updates[expectUpdates-1].Status.Active))
+			if tc.expectActive != len(cjc.Updates[expectUpdates-1].Status.Active) {
+				t.Errorf("%s: expected Active size %d, got %d", name, tc.expectActive, len(cjc.Updates[expectUpdates-1].Status.Active))
 			}
 		})
 	}
@@ -493,14 +493,14 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 		name := name
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			sj := cronJob()
+			cj := cronJob()
 			suspend := false
-			sj.Spec.ConcurrencyPolicy = f
-			sj.Spec.Suspend = &suspend
-			sj.Spec.Schedule = onTheHour
+			cj.Spec.ConcurrencyPolicy = f
+			cj.Spec.Suspend = &suspend
+			cj.Spec.Schedule = onTheHour
 
-			sj.Spec.SuccessfulJobsHistoryLimit = tc.successfulJobsHistoryLimit
-			sj.Spec.FailedJobsHistoryLimit = tc.failedJobsHistoryLimit
+			cj.Spec.SuccessfulJobsHistoryLimit = tc.successfulJobsHistoryLimit
+			cj.Spec.FailedJobsHistoryLimit = tc.failedJobsHistoryLimit
 
 			var (
 				job *batchv1.Job
@@ -511,19 +511,19 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 			if len(tc.jobSpecs) != 0 {
 				firstTime := startTimeStringToTime(tc.jobSpecs[0].StartTime)
 				lastTime := startTimeStringToTime(tc.jobSpecs[len(tc.jobSpecs)-1].StartTime)
-				sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: firstTime}
-				sj.Status.LastScheduleTime = &metav1.Time{Time: lastTime}
+				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: firstTime}
+				cj.Status.LastScheduleTime = &metav1.Time{Time: lastTime}
 			} else {
-				sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
+				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
 			}
 
 			// Create jobs
 			js := []batchv1.Job{}
 			jobsToDelete := sets.NewString()
-			sj.Status.Active = []v1.ObjectReference{}
+			cj.Status.Active = []v1.ObjectReference{}
 
 			for i, spec := range tc.jobSpecs {
-				job, err = getJobFromTemplate(&sj, startTimeStringToTime(spec.StartTime))
+				job, err = getJobFromTemplate(&cj, startTimeStringToTime(spec.StartTime))
 				if err != nil {
 					t.Fatalf("%s: unexpected error creating a job from template: %v", name, err)
 				}
@@ -542,13 +542,13 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 					job.Status.Conditions = append(job.Status.Conditions, condition)
 
 					if spec.IsStillInActiveList {
-						sj.Status.Active = append(sj.Status.Active, v1.ObjectReference{UID: job.UID})
+						cj.Status.Active = append(cj.Status.Active, v1.ObjectReference{UID: job.UID})
 					}
 				} else {
 					if spec.IsSuccessful || spec.IsStillInActiveList {
 						t.Errorf("%s: test setup error: this case makes no sense", name)
 					}
-					sj.Status.Active = append(sj.Status.Active, v1.ObjectReference{UID: job.UID})
+					cj.Status.Active = append(cj.Status.Active, v1.ObjectReference{UID: job.UID})
 				}
 
 				js = append(js, *job)
@@ -558,10 +558,10 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 			}
 
 			jc := &fakeJobControl{Job: job}
-			sjc := &fakeSJControl{}
+			cjc := &fakeCJControl{}
 			recorder := record.NewFakeRecorder(10)
 
-			cleanupFinishedJobs(&sj, js, jc, sjc, recorder)
+			cleanupFinishedJobs(&cj, js, jc, cjc, recorder)
 
 			// Check we have actually deleted the correct jobs
 			if len(jc.DeleteJobName) != len(jobsToDelete) {
@@ -584,8 +584,8 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 
 			// Check for jobs still in active list
 			numActive := 0
-			if len(sjc.Updates) != 0 {
-				numActive = len(sjc.Updates[len(sjc.Updates)-1].Status.Active)
+			if len(cjc.Updates) != 0 {
+				numActive = len(cjc.Updates[len(cjc.Updates)-1].Status.Active)
 			}
 			if tc.expectActive != numActive {
 				t.Errorf("%s: expected Active size %d, got %d", name, tc.expectActive, numActive)
@@ -597,7 +597,7 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 // TODO: simulation where the controller randomly doesn't run, and randomly has errors starting jobs or deleting jobs,
 // but over time, all jobs run as expected (assuming Allow and no deadline).
 
-// TestSyncOne_Status tests sj.UpdateStatus in syncOne
+// TestSyncOne_Status tests cj.UpdateStatus in syncOne
 func TestSyncOne_Status(t *testing.T) {
 	finishedJob := newJob("1")
 	finishedJob.Status.Conditions = append(finishedJob.Status.Conditions, batchv1.JobCondition{Type: batchv1.JobComplete, Status: v1.ConditionTrue})
@@ -605,13 +605,13 @@ func TestSyncOne_Status(t *testing.T) {
 	missingJob := newJob("3")
 
 	testCases := map[string]struct {
-		// sj spec
+		// cj spec
 		concurrencyPolicy batchV1beta1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
 
-		// sj status
+		// cj status
 		ranPreviously  bool
 		hasFinishedJob bool
 
@@ -681,21 +681,21 @@ func TestSyncOne_Status(t *testing.T) {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			// Setup the test
-			sj := cronJob()
-			sj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
-			sj.Spec.Suspend = &tc.suspend
-			sj.Spec.Schedule = tc.schedule
+			cj := cronJob()
+			cj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
+			cj.Spec.Suspend = &tc.suspend
+			cj.Spec.Schedule = tc.schedule
 			if tc.deadline != noDead {
-				sj.Spec.StartingDeadlineSeconds = &tc.deadline
+				cj.Spec.StartingDeadlineSeconds = &tc.deadline
 			}
 			if tc.ranPreviously {
-				sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
-				sj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
+				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
+				cj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
 			} else {
 				if tc.hasFinishedJob || tc.hasUnexpectedJob || tc.hasMissingJob {
 					t.Errorf("%s: test setup error: this case makes no sense", name)
 				}
-				sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
+				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeTheHour()}
 			}
 			jobs := []batchv1.Job{}
 			if tc.hasFinishedJob {
@@ -703,7 +703,7 @@ func TestSyncOne_Status(t *testing.T) {
 				if err != nil {
 					t.Errorf("%s: test setup error: failed to get job's ref: %v.", name, err)
 				}
-				sj.Status.Active = []v1.ObjectReference{*ref}
+				cj.Status.Active = []v1.ObjectReference{*ref}
 				jobs = append(jobs, finishedJob)
 			}
 			if tc.hasUnexpectedJob {
@@ -714,19 +714,19 @@ func TestSyncOne_Status(t *testing.T) {
 				if err != nil {
 					t.Errorf("%s: test setup error: failed to get job's ref: %v.", name, err)
 				}
-				sj.Status.Active = append(sj.Status.Active, *ref)
+				cj.Status.Active = append(cj.Status.Active, *ref)
 			}
 			if tc.beingDeleted {
 				timestamp := metav1.NewTime(tc.now)
-				sj.DeletionTimestamp = &timestamp
+				cj.DeletionTimestamp = &timestamp
 			}
 
 			jc := &fakeJobControl{}
-			sjc := &fakeSJControl{}
+			cjc := &fakeCJControl{}
 			recorder := record.NewFakeRecorder(10)
 
 			// Run the code
-			syncOne(&sj, jobs, tc.now, jc, sjc, recorder)
+			syncOne(&cj, jobs, tc.now, jc, cjc, recorder)
 
 			// Status update happens once when ranging through job list, and another one if create jobs.
 			expectUpdates := 1
@@ -753,24 +753,24 @@ func TestSyncOne_Status(t *testing.T) {
 				t.Errorf("%s: expected %d event, actually %v: %#v", name, expectedEvents, len(recorder.Events), recorder.Events)
 			}
 
-			if expectUpdates != len(sjc.Updates) {
-				t.Errorf("%s: expected %d status updates, actually %d", name, expectUpdates, len(sjc.Updates))
+			if expectUpdates != len(cjc.Updates) {
+				t.Errorf("%s: expected %d status updates, actually %d", name, expectUpdates, len(cjc.Updates))
 			}
 
-			if tc.hasFinishedJob && inActiveList(sjc.Updates[0], finishedJob.UID) {
-				t.Errorf("%s: expected finished job removed from active list, actually active list = %#v", name, sjc.Updates[0].Status.Active)
+			if tc.hasFinishedJob && inActiveList(cjc.Updates[0], finishedJob.UID) {
+				t.Errorf("%s: expected finished job removed from active list, actually active list = %#v", name, cjc.Updates[0].Status.Active)
 			}
 
-			if tc.hasUnexpectedJob && inActiveList(sjc.Updates[0], unexpectedJob.UID) {
-				t.Errorf("%s: expected unexpected job not added to active list, actually active list = %#v", name, sjc.Updates[0].Status.Active)
+			if tc.hasUnexpectedJob && inActiveList(cjc.Updates[0], unexpectedJob.UID) {
+				t.Errorf("%s: expected unexpected job not added to active list, actually active list = %#v", name, cjc.Updates[0].Status.Active)
 			}
 
-			if tc.hasMissingJob && inActiveList(sjc.Updates[0], missingJob.UID) {
-				t.Errorf("%s: expected missing job to be removed from active list, actually active list = %#v", name, sjc.Updates[0].Status.Active)
+			if tc.hasMissingJob && inActiveList(cjc.Updates[0], missingJob.UID) {
+				t.Errorf("%s: expected missing job to be removed from active list, actually active list = %#v", name, cjc.Updates[0].Status.Active)
 			}
 
-			if tc.expectCreate && !sjc.Updates[1].Status.LastScheduleTime.Time.Equal(topOfTheHour()) {
-				t.Errorf("%s: expected LastScheduleTime updated to %s, got %s", name, topOfTheHour(), sjc.Updates[1].Status.LastScheduleTime)
+			if tc.expectCreate && !cjc.Updates[1].Status.LastScheduleTime.Time.Equal(topOfTheHour()) {
+				t.Errorf("%s: expected LastScheduleTime updated to %s, got %s", name, topOfTheHour(), cjc.Updates[1].Status.LastScheduleTime)
 			}
 		})
 	}
