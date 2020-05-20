@@ -7242,7 +7242,7 @@ func TestValidatePod(t *testing.T) {
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
+					core.SeccompPodAnnotationKey: core.DeprecatedSeccompProfileRuntimeDefault,
 				},
 			},
 			Spec: validPodSpec(nil),

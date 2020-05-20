@@ -255,7 +255,7 @@ func restrictedPod(name string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                            v1.SeccompProfileRuntimeDefault,
+				v1.SeccompPodAnnotationKey:                            v1.DeprecatedSeccompProfileRuntimeDefault,
 				v1.AppArmorBetaContainerAnnotationKeyPrefix + "pause": v1.AppArmorBetaProfileRuntimeDefault,
 			},
 		},
@@ -315,8 +315,8 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:        v1.SeccompProfileRuntimeDefault,
-				seccomp.DefaultProfileAnnotationKey:         v1.SeccompProfileRuntimeDefault,
+				seccomp.AllowedProfilesAnnotationKey:        v1.DeprecatedSeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:         v1.DeprecatedSeccompProfileRuntimeDefault,
 				v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault,
 				v1.AppArmorBetaDefaultProfileAnnotationKey:  v1.AppArmorBetaProfileRuntimeDefault,
 			},

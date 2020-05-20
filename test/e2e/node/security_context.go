@@ -150,7 +150,7 @@ var _ = SIGDescribe("Security Context", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
 		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = "unconfined"
-		pod.Annotations[v1.SeccompPodAnnotationKey] = v1.SeccompProfileRuntimeDefault
+		pod.Annotations[v1.SeccompPodAnnotationKey] = v1.DeprecatedSeccompProfileRuntimeDefault
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
@@ -166,7 +166,7 @@ var _ = SIGDescribe("Security Context", func() {
 	ginkgo.It("should support seccomp alpha runtime/default annotation [Feature:Seccomp] [LinuxOnly]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = v1.SeccompProfileRuntimeDefault
+		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = v1.DeprecatedSeccompProfileDockerDefault
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"2"}) // seccomp filtered
 	})

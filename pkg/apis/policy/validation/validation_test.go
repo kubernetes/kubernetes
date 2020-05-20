@@ -254,7 +254,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
+		seccomp.AllowedProfilesAnnotationKey: api.DeprecatedSeccompProfileRuntimeDefault + ",not-good",
 	}
 
 	invalidAllowedHostPathMissingPath := validPSP()
@@ -533,8 +533,8 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
+		seccomp.DefaultProfileAnnotationKey:  api.DeprecatedSeccompProfileRuntimeDefault,
+		seccomp.AllowedProfilesAnnotationKey: api.DeprecatedSeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()

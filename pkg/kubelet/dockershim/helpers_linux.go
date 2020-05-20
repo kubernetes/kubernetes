@@ -54,7 +54,7 @@ func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 		return defaultSeccompOpt, nil
 	}
 
-	if seccompProfile == v1.SeccompProfileRuntimeDefault || seccompProfile == v1.DeprecatedSeccompProfileDockerDefault {
+	if seccompProfile == v1.DeprecatedSeccompProfileRuntimeDefault || seccompProfile == v1.DeprecatedSeccompProfileDockerDefault {
 		// return nil so docker will load the default seccomp profile
 		return nil, nil
 	}

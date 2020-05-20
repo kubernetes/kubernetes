@@ -3551,7 +3551,7 @@ func validatePodAffinity(podAffinity *core.PodAffinity, fldPath *field.Path) fie
 }
 
 func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
-	if p == core.SeccompProfileRuntimeDefault || p == core.DeprecatedSeccompProfileDockerDefault {
+	if p == core.DeprecatedSeccompProfileRuntimeDefault || p == core.DeprecatedSeccompProfileDockerDefault {
 		return nil
 	}
 	if p == "unconfined" {

@@ -45,11 +45,14 @@ const (
 	// to one container of a pod.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
 
-	// SeccompProfileRuntimeDefault represents the default seccomp profile used by container runtime.
-	SeccompProfileRuntimeDefault string = "runtime/default"
+	// DeprecatedSeccompProfileRuntimeDefault represents the default seccomp profile used by container runtime.
+	// Seccomp annotations are now deprecated.
+	// This should be replaced by setting SeccompProfileRuntimeDefault on SeccompProfile.SeccompProfileType.
+	DeprecatedSeccompProfileRuntimeDefault string = "runtime/default"
 
 	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
-	// This is now deprecated and should be replaced by SeccompProfileRuntimeDefault.
+	// Seccomp annotations are now deprecated.
+	// This should be replaced by setting SeccompProfileRuntimeDefault on SeccompProfile.SeccompProfileType.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)

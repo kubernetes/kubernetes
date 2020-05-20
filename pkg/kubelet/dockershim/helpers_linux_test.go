@@ -45,7 +45,7 @@ func TestGetSeccompSecurityOpts(t *testing.T) {
 		expectedOpts:   []string{"seccomp=unconfined"},
 	}, {
 		msg:            "Seccomp default",
-		seccompProfile: v1.SeccompProfileRuntimeDefault,
+		seccompProfile: v1.DeprecatedSeccompProfileRuntimeDefault,
 		expectedOpts:   nil,
 	}, {
 		msg:            "Seccomp deprecated default",
