@@ -496,10 +496,12 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 				"InterPodAffinity": &config.InterPodAffinityArgs{
 					HardPodAffinityWeight: 1,
 				},
-				"NodeLabel":                &config.NodeLabelArgs{},
-				"NodeResourcesFit":         &config.NodeResourcesFitArgs{},
-				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{},
-				"PodTopologySpread":        &config.PodTopologySpreadArgs{},
+				"NodeLabel":        &config.NodeLabelArgs{},
+				"NodeResourcesFit": &config.NodeResourcesFitArgs{},
+				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
+					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+				},
+				"PodTopologySpread": &config.PodTopologySpreadArgs{},
 			},
 		},
 		{
@@ -526,8 +528,10 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 				"NodeResourcesFit": &config.NodeResourcesFitArgs{
 					IgnoredResources: []string{"example.com/foo"},
 				},
-				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{},
-				"PodTopologySpread":        &config.PodTopologySpreadArgs{},
+				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
+					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+				},
+				"PodTopologySpread": &config.PodTopologySpreadArgs{},
 			},
 		},
 	}

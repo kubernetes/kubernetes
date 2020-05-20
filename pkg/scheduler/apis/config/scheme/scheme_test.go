@@ -98,7 +98,8 @@ profiles:
 						{
 							Name: "RequestedToCapacityRatio",
 							Args: &config.RequestedToCapacityRatioArgs{
-								Shape: []config.UtilizationShapePoint{{Utilization: 1}},
+								Shape:     []config.UtilizationShapePoint{{Utilization: 1}},
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 							},
 						},
 						{
