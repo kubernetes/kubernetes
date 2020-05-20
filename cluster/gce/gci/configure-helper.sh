@@ -43,6 +43,18 @@ function convert-manifest-params {
   fi
 }
 
+function append-param-if-not-present {
+  # A helper function to add flag to an arguments string
+  # if no such flag is present already
+  local params="$1"
+  local -r flag="$2"
+  local -r value="$3"
+  if [[ ! "${params}" =~ "--${flag}"[=\ ] ]]; then
+    params+=" --${flag}=${value}"
+  fi
+  echo "${params}"
+}
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
