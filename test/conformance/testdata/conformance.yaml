@@ -1359,6 +1359,14 @@
     proper information.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
+- testname: Kubectl, diff Deployment
+  codename: '[sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds
+    a difference for Deployments [Conformance]'
+  description: Create a Deployment with httpd image. Declare the same Deployment with
+    a different image, busybox. Diff of live Deployment with declared Deployment MUST
+    include the difference between live and declared image.
+  release: v1.19
+  file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, create service, replication controller
   codename: '[sig-cli] Kubectl client Kubectl expose should create services for rc  [Conformance]'
   description: Create a Pod running agnhost listening to port 6379. Using kubectl
@@ -1415,6 +1423,15 @@
     in the run command. After the run command there SHOULD be a pod that should exist
     with one container running the specified image.
   release: v1.9
+  file: test/e2e/kubectl/kubectl.go
+- testname: Kubectl, server-side dry-run Pod
+  codename: '[sig-cli] Kubectl client Kubectl server-side dry-run should check if
+    kubectl can dry-run update Pods [Conformance]'
+  description: The command 'kubectl run' must create a pod with the specified image
+    name. After, the command 'kubectl replace --dry-run=server' should update the
+    Pod with the new image name and server-side dry-run enabled. The image name must
+    not change.
+  release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, version
   codename: '[sig-cli] Kubectl client Kubectl version should check is all data is
