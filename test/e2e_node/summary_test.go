@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -333,8 +333,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			})
 
 			ginkgo.By("Validating /stats/summary")
-			// Give pods a minute to actually start up.
-			gomega.Eventually(getNodeSummary, 1*time.Minute, 15*time.Second).Should(matchExpectations)
+			// Give pods two minutes to actually start up.
+			gomega.Eventually(getNodeSummary, 2*time.Minute, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
 			gomega.Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
