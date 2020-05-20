@@ -1304,6 +1304,14 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
+func getDynamicResourceWatch(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions) func() (watch.Interface, error) {
+	return func() (watch.Interface, error) {
+		res, err := dc.Resource(resourceType).Namespace(namespace).Watch(context.TODO(), listOptions)
+		ExpectNoError(err, "Failed to create a watch for %v", resourceType.Resource)
+		return res, err
+	}
+}
+
 // WatchEventEnsurerAndManager
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
 //   testContext         cancelation signal across API boundries, e.g: context.TODO()
