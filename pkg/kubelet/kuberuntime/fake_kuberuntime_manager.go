@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
-	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
 )
 
 const (

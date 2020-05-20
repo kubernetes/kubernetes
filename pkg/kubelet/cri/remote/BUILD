@@ -14,10 +14,10 @@ go_library(
         "remote_runtime.go",
         "utils.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cri/remote",
     deps = [
-        "//pkg/kubelet/util:go_default_library",
-        "//pkg/kubelet/util/logreduction:go_default_library",
+        "//pkg/kubelet/cri/remote/util:go_default_library",
+        "//staging/src/k8s.io/component-base/logs/logreduction:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
@@ -37,7 +37,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/remote/fake:all-srcs",
+        "//pkg/kubelet/cri/remote/fake:all-srcs",
+        "//pkg/kubelet/cri/remote/util:all-srcs",
     ],
     tags = ["automanaged"],
 )
@@ -47,7 +48,7 @@ go_test(
     srcs = ["remote_runtime_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/remote/fake:go_default_library",
+        "//pkg/kubelet/cri/remote/fake:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

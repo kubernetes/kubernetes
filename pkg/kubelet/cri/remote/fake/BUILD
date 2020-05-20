@@ -16,9 +16,9 @@ go_library(
         "fake_image_service.go",
         "fake_runtime.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/remote/fake",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake",
     deps = [
-        "//pkg/kubelet/util:go_default_library",
+        "//pkg/kubelet/cri/remote/util:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",

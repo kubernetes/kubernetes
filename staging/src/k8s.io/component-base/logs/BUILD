@@ -26,6 +26,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/component-base/logs/logreduction:all-srcs",
+    ],
     tags = ["automanaged"],
 )

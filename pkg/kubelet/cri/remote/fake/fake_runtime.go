@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
 	utilexec "k8s.io/utils/exec"
 )
 

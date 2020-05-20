@@ -13,10 +13,10 @@ go_library(
         "request_cache.go",
         "server.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/server/streaming",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cri/streaming",
     deps = [
-        "//pkg/kubelet/server/portforward:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
+        "//pkg/kubelet/cri/streaming/portforward:go_default_library",
+        "//pkg/kubelet/cri/streaming/remotecommand:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/remotecommand:go_default_library",
@@ -36,7 +36,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/server/portforward:go_default_library",
+        "//pkg/kubelet/cri/streaming/portforward:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
@@ -57,6 +57,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/cri/streaming/portforward:all-srcs",
+        "//pkg/kubelet/cri/streaming/remotecommand:all-srcs",
+    ],
     tags = ["automanaged"],
 )

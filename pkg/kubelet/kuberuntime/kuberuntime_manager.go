@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
 )
 
 const (

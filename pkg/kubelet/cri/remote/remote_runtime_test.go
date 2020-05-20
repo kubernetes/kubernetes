@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
-	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
+	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 )
 
 const (
