@@ -45,6 +45,14 @@ func NewCounter(opts *CounterOpts) *Counter {
 	return kc
 }
 
+// Reset resets the underlying prometheus Counter to start counting from 0 again
+func (c *Counter) Reset() {
+	if !c.IsCreated() {
+		return
+	}
+	c.setPrometheusCounter(prometheus.NewCounter(c.CounterOpts.toPromCounterOpts()))
+}
+
 // setPrometheusCounter sets the underlying CounterMetric object, i.e. the thing that does the measurement.
 func (c *Counter) setPrometheusCounter(counter prometheus.Counter) {
 	c.CounterMetric = counter
