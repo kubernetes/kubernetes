@@ -191,9 +191,6 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmd.Flags().Bool("server-dry-run", false, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted.")
-	cmd.Flags().MarkDeprecated("server-dry-run", "--server-dry-run is deprecated and can be replaced with --dry-run=server.")
-	cmd.Flags().MarkHidden("server-dry-run")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, FieldManagerClientSideApply)
@@ -232,15 +229,6 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	if o.DryRunStrategy == cmdutil.DryRunClient && o.ServerSideApply {
 		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
-	}
-
-	var deprecatedServerDryRunFlag = cmdutil.GetFlagBool(cmd, "server-dry-run")
-	if o.DryRunStrategy == cmdutil.DryRunClient && deprecatedServerDryRunFlag {
-		return fmt.Errorf("--dry-run=client and --server-dry-run can't be used together (did you mean --dry-run=server instead?)")
-	}
-
-	if o.DryRunStrategy == cmdutil.DryRunNone && deprecatedServerDryRunFlag {
-		o.DryRunStrategy = cmdutil.DryRunServer
 	}
 
 	// allow for a success message operation to be specified at print time
