@@ -107,11 +107,18 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 }
 
 func updateISCSINode(b iscsiDiskMounter, tp string) error {
+	// setting node.session.scan to manual to handle https://github.com/kubernetes/kubernetes/issues/90982
+	out, err := execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.scan", "-v", "manual")
+	if err != nil {
+		// don't fail if iscsiadm fails or the version does not support node.session.scan - log a warning to highlight the potential exposure
+		klog.Warningf("iscsi: failed to update node with node.session.scan=manual, possible exposure to issue 90982: %v", out)
+	}
+
 	if !b.chapSession {
 		return nil
 	}
 
-	out, err := execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP")
+	out, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP")
 	if err != nil {
 		return fmt.Errorf("iscsi: failed to update node with CHAP, output: %v", out)
 	}
