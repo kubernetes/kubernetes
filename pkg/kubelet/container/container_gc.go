@@ -23,7 +23,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Specified a policy for garbage collecting containers.
+// ContainerGCPolicy specifies a policy for garbage collecting containers.
 type ContainerGCPolicy struct {
 	// Minimum age at which a container can be garbage collected, zero for no limit.
 	MinAge time.Duration
@@ -36,7 +36,7 @@ type ContainerGCPolicy struct {
 	MaxContainers int
 }
 
-// Manages garbage collection of dead containers.
+// ContainerGC manages garbage collection of dead containers.
 //
 // Implementation is thread-compatible.
 type ContainerGC interface {
@@ -64,7 +64,7 @@ type realContainerGC struct {
 	sourcesReadyProvider SourcesReadyProvider
 }
 
-// New ContainerGC instance with the specified policy.
+// NewContainerGC creates a new instance of ContainerGC with the specified policy.
 func NewContainerGC(runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvider SourcesReadyProvider) (ContainerGC, error) {
 	if policy.MinAge < 0 {
 		return nil, fmt.Errorf("invalid minimum garbage collection age: %v", policy.MinAge)

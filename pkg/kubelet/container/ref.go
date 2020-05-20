@@ -19,14 +19,15 @@ package container
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-var ImplicitContainerPrefix string = "implicitly required container "
+// ImplicitContainerPrefix is a container name prefix that will indicate that container was started implicitly (like the pod infra container).
+var ImplicitContainerPrefix = "implicitly required container "
 
 // GenerateContainerRef returns an *v1.ObjectReference which references the given container
 // within the given pod. Returns an error if the reference can't be constructed or the
