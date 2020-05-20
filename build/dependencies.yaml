@@ -197,3 +197,11 @@ dependencies:
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
       match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+"}
+
+  - name: "repo-infra"
+    version: 0.0.5
+    refPaths:
+    - path: build/root/WORKSPACE
+      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
+    - path: build/root/WORKSPACE
+      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz
