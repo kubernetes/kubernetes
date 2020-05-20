@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1alpha2"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -79,7 +78,6 @@ type framework struct {
 
 	clientSet       clientset.Interface
 	informerFactory informers.SharedInformerFactory
-	volumeBinder    scheduling.SchedulerVolumeBinder
 
 	metricsRecorder *metricsRecorder
 
@@ -122,7 +120,6 @@ type frameworkOptions struct {
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister SharedLister
 	metricsRecorder      *metricsRecorder
-	volumeBinder         scheduling.SchedulerVolumeBinder
 	podNominator         PodNominator
 	runAllFilters        bool
 }
@@ -166,13 +163,6 @@ func withMetricsRecorder(recorder *metricsRecorder) Option {
 	}
 }
 
-// WithVolumeBinder sets volume binder for the scheduling framework.
-func WithVolumeBinder(binder scheduling.SchedulerVolumeBinder) Option {
-	return func(o *frameworkOptions) {
-		o.volumeBinder = binder
-	}
-}
-
 // WithPodNominator sets podNominator for the scheduling framework.
 func WithPodNominator(nominator PodNominator) Option {
 	return func(o *frameworkOptions) {
@@ -200,7 +190,6 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		waitingPods:           newWaitingPodsMap(),
 		clientSet:             options.clientSet,
 		informerFactory:       options.informerFactory,
-		volumeBinder:          options.volumeBinder,
 		metricsRecorder:       options.metricsRecorder,
 		preemptHandle:         options.podNominator,
 		runAllFilters:         options.runAllFilters,
@@ -920,11 +909,6 @@ func (f *framework) ClientSet() clientset.Interface {
 // SharedInformerFactory returns a shared informer factory.
 func (f *framework) SharedInformerFactory() informers.SharedInformerFactory {
 	return f.informerFactory
-}
-
-// VolumeBinder returns the volume binder used by scheduler.
-func (f *framework) VolumeBinder() scheduling.SchedulerVolumeBinder {
-	return f.volumeBinder
 }
 
 func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
