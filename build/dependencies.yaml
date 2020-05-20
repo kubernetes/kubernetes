@@ -117,3 +117,11 @@ dependencies:
     version: v1.13.9-5
     refPaths:
     - path: build/build-image/cross/VERSION
+
+  - name: "repo-infra"
+    version: 0.0.5
+    refPaths:
+    - path: build/root/WORKSPACE
+      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
+    - path: build/root/WORKSPACE
+      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz
