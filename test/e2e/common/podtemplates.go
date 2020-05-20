@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"strconv"
 
 	"github.com/onsi/ginkgo"
 )
@@ -104,7 +103,6 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 
 	ginkgo.It("should delete a collection of pod templates", func() {
 		podTemplateNames := []string{"test-podtemplate-1", "test-podtemplate-2", "test-podtemplate-3"}
-		podTemplateNamesCount := len(podTemplateNames)
 
 		ginkgo.By("Create set of pod templates")
 		// create a set of pod templates in test namespace
@@ -133,18 +131,7 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 		})
 		framework.ExpectNoError(err, "failed to get a list of pod templates")
 
-		// check that we find all the pod templates created
-		podTemplateListItemsCount := len(podTemplateList.Items)
-		errMsg := "found " + strconv.Itoa(podTemplateListItemsCount) + " pod templates when " + strconv.Itoa(podTemplateNamesCount) + " pod templates where expected"
-		logMsg := "found " + strconv.Itoa(podTemplateListItemsCount) + " pod templates"
-
-		foundCreatedSet := true
-		if podTemplateListItemsCount != podTemplateNamesCount {
-			foundCreatedSet = false
-		} else {
-			framework.Logf(logMsg)
-		}
-		framework.ExpectEqual(foundCreatedSet, true, errMsg)
+		framework.ExpectEqual(len(podTemplateList.Items), len(podTemplateNames), "looking for expected number of pod templates")
 
 		ginkgo.By("delete collection of pod templates")
 		// delete collection
@@ -161,18 +148,7 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 		})
 		framework.ExpectNoError(err, "failed to get a list of pod templates")
 
-		// check that we don't find any created pod templates
-		podTemplateListItemsCount = len(podTemplateList.Items)
-		errMsg = "found " + strconv.Itoa(podTemplateListItemsCount) + " pod templates when zero pod templates where expected"
-		logMsg = "found " + strconv.Itoa(podTemplateListItemsCount) + " pod templates"
-
-		foundCreatedSet = false
-		if podTemplateListItemsCount != 0 {
-			foundCreatedSet = true
-		} else {
-			framework.Logf(logMsg)
-		}
-		framework.ExpectEqual(foundCreatedSet, false, errMsg)
+		framework.ExpectEqual(len(podTemplateList.Items), 0, "pod templates should all be deleted")
 
 	})
 
