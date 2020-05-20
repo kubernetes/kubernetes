@@ -38,8 +38,7 @@ type RegistryList struct {
 	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
-	QuayK8sCSI              string `yaml:"quayK8sCSI"`
-	QuayIncubator           string `yaml:"quayIncubator"`
+	K8sCSI                  string `yaml:"k8sCSI"`
 }
 
 // Config holds an images registry, name, and version
@@ -78,8 +77,7 @@ func initReg() RegistryList {
 		GoogleContainerRegistry: "gcr.io/google-containers",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
-		QuayK8sCSI:              "quay.io/k8scsi",
-		QuayIncubator:           "quay.io/kubernetes_incubator",
+		K8sCSI:                  "gcr.io/k8s-staging-csi",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -109,8 +107,7 @@ var (
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	googleContainerRegistry = registry.GoogleContainerRegistry
 	invalidRegistry         = registry.InvalidRegistry
-	quayK8sCSI              = registry.QuayK8sCSI
-	quayIncubator           = registry.QuayIncubator
+	k8sCSI                  = registry.K8sCSI
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
 	sampleRegistry  = registry.SampleRegistry
@@ -227,7 +224,7 @@ func initImageConfigs() map[int]Config {
 	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
 	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
-	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.2"}
+	configs[NFSProvisioner] = Config{k8sCSI, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
@@ -293,8 +290,8 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 		registryAndUser = gcrReleaseRegistry
 	case "docker.io/library":
 		registryAndUser = dockerLibraryRegistry
-	case "quay.io/k8scsi":
-		registryAndUser = quayK8sCSI
+	case "gcr.io/k8s-staging-csi":
+		registryAndUser = k8sCSI
 	default:
 		if countParts == 1 {
 			// We assume we found an image from docker hub library
