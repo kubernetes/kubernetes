@@ -70,16 +70,23 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	// Create the temp staging directory
 	klog.V(2).Infof("Staging test binaries on %q", host)
 	workspace := newWorkspaceDir()
-	// Do not sudo here, so that we can use scp to copy test archive to the directory.
-	if output, err := SSHNoSudo(host, "mkdir", workspace); err != nil {
-		// Exit failure with the error
-		return "", false, fmt.Errorf("failed to create workspace directory %q on host %q: %v output: %q", workspace, host, err, output)
+	// we can't just create workspace in /tmp as it's mounted with noexec option on COS:
+	// https://cloud.google.com/kubernetes-engine/docs/concepts/node-images#file_system_layout
+	// workspace should be mounted separately to be able to unpack test archive and run ginkgo
+	cmd := getSSHCommand(" && ",
+		fmt.Sprintf("mkdir %s", workspace),
+		fmt.Sprintf("sudo mount -orw,exec -t tmpfs tmpfs %s", workspace),
+		fmt.Sprintf("sudo chown $(id -u) %s", workspace),
+	)
+	if output, err := SSHNoSudo(host, "sh", "-c", cmd); err != nil {
+		return "", false, fmt.Errorf("failed to mount workspace %q on host %q: %v, output: %q", workspace, host, err, output)
 	}
+
 	if cleanup {
 		defer func() {
-			output, err := SSH(host, "rm", "-rf", workspace)
+			output, err := SSH(host, "umount", workspace)
 			if err != nil {
-				klog.Errorf("failed to cleanup workspace %q on host %q: %v.  Output:\n%s", workspace, host, err, output)
+				klog.Errorf("failed to unmount workspace %q on host %q: %v, output: %q", workspace, host, err, output)
 			}
 		}()
 	}
@@ -91,7 +98,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	}
 
 	// Extract the archive
-	cmd := getSSHCommand(" && ",
+	cmd = getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 	)
