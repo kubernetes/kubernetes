@@ -745,7 +745,15 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.Logf("completed pod")
 	})
 
-	ginkgo.It("should run through the lifecycle of a ServiceAccount", func() {
+	/*
+			   Release: v1.19
+			   Testname: ServiceAccount lifecycle test
+			   Description: Creates a ServiceAccount with a static Label MUST be added as shown in watch event.
+		                        Patching the ServiceAccount MUST return it's new property.
+		                        Listing the ServiceAccounts MUST return the test ServiceAccount with it's patched values.
+		                        ServiceAccount will be deleted and MUST find a deleted watch event.
+	*/
+	framework.ConformanceIt("should run through the lifecycle of a ServiceAccount", func() {
 		testNamespaceName := f.Namespace.Name
 		testServiceAccountName := "testserviceaccount"
 		testServiceAccountStaticLabels := map[string]string{"test-serviceaccount-static": "true"}
