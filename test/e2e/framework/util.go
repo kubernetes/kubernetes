@@ -1288,33 +1288,37 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 
 // WatchEventEnsurerAndManager
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
+//   testContext         cancelation signal across API boundries, e.g: context.TODO()
+//   dc                  sets up a client to the API
+//   resourceType        specify the type of resource
+//   namespace           select a namespace
+//   resourceName        the name of the given resource
+//   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
+//   expectedWatchEvents array of events which are expected to occur
+//   scenario            the function to run
 func WatchEventEnsurerAndManager(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watch.Interface) []watch.Event) {
+	// TODO add client-go/tools/watch/retrywatcher to manage watch restarts
 	retries := 3
 retriesLoop:
 	for try := 1; try <= retries; try++ {
-		var watchEvents []watch.Event
-		resourceWatch := &watch.Interface{}
-		// TODO consider watch deaths
-		&resourceWatch, err = dc.Resource(resourceType).Namespace(namespace).Watch(testContext, listOptions)
-		framework.ExpectNoError(err, "Failed to set a resource watch up for resourceType %v in namespace %s", resourceType, namespace)
-
-		actualWatchEvents := scenario(resourceWatch)
-		framework.ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Amount of actual watch events to be equal to or greater than the amount of expected watch events")
-
-	expectedWatchEventsLoop:
-		for expectedWatchEventIndex, expectedWatchEvent := range expectedWatchEvents {
-			for actualWatchEventIndex, _ := range actualWatchEvents {
-				if actualWatchEvents[expectedWatchEventIndex].Type == expectedWatchEvents[actualWatchEventIndex].Type {
-					watchEvents = append(watchEvents, expectedWatchEvent)
-					continue expectedWatchEventsLoop
+		errs := sets.NewString()
+	watchEventsLoop:
+		for watchEventIndex, _ := range expectedWatchEvents {
+			watchEventNextIndex := watchEventIndex + 1
+			if watchEventNextIndex >= len(expectedWatchEvents) {
+				continue watchEventsLoop
+			}
+			// TODO validate watchEvent.Type, not Object
+			for _, fn := range fns {
+				if err := fn(expectedWatchEvents[watchEventIndex].Object, expectedWatchEvents[watchEventNextIndex].Object); err != nil {
+					errs.Insert(err.Error())
 				}
 			}
 		}
-
-		// TODO clean up resources, based on watchEvent.Object, using DynamicClient
-
-		if len(watchEvents) != len(actualWatchEvents) {
+		if errs.Len() > 0 && try < retries {
+			fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* "))
 			continue retriesLoop
 		}
+		ExpectEqual(errs.Len() > 0, false, fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* ")))
 	}
 }
