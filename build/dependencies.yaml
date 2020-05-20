@@ -129,3 +129,11 @@ dependencies:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/kube-cross:v\d+\.\d+\.\d+-\d+
+
+  - name: "repo-infra"
+    version: 0.0.5
+    refPaths:
+    - path: build/root/WORKSPACE
+      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
+    - path: build/root/WORKSPACE
+      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz
