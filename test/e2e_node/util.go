@@ -93,6 +93,7 @@ func getNodeSummary() (*kubeletstatsv1alpha1.Summary, error) {
 		return nil, fmt.Errorf("failed to read /stats/summary: %+v", resp)
 	}
 
+	klog.Errorf(">>>>> getNodeSummary: %s", string(contentsBytes))
 	decoder := json.NewDecoder(strings.NewReader(string(contentsBytes)))
 	summary := kubeletstatsv1alpha1.Summary{}
 	err = decoder.Decode(&summary)
