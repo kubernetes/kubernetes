@@ -725,9 +725,16 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus) v1.PodStatus {
 		}
 	}
 
-	for _, c := range newPodStatus.Conditions {
-		if kubetypes.PodConditionByKubelet(c.Type) {
-			podConditions = append(podConditions, c)
+	for _, newConditions := range newPodStatus.Conditions {
+		if kubetypes.PodConditionByKubelet(newConditions.Type) {
+			for _, oldConditions := range oldPodStatus.Conditions {
+				// // Need to update LastTransitionTime.
+				if oldConditions.Type == newConditions.Type && oldConditions.Status != newConditions.Status {
+					newConditions.LastTransitionTime = metav1.Now()
+					continue
+				}
+			}
+			podConditions = append(podConditions, newConditions)
 		}
 	}
 	newPodStatus.Conditions = podConditions
