@@ -115,7 +115,6 @@ type SchedulerVolumeBinder interface {
 	//
 	// It returns true if all volumes are fully bound
 	//
-	// This function will modify assumedPod with the node name.
 	// This function is called serially.
 	AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (allFullyBound bool, err error)
 
@@ -333,8 +332,6 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 		klog.V(4).Infof("AssumePodVolumes for pod %q, node %q: all PVCs bound and nothing to do", podName, nodeName)
 		return true, nil
 	}
-
-	assumedPod.Spec.NodeName = nodeName
 
 	claimsToBind := b.podBindingCache.GetBindings(assumedPod, nodeName)
 	claimsToProvision := b.podBindingCache.GetProvisionedPVCs(assumedPod, nodeName)
