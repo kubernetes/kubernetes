@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM k8s.gcr.io/debian-base:v1.0.0
+FROM us.gcr.io/k8s-artifacts-prod/build-image/debian-base:v2.1.0
 
 COPY etcdctl etcd-empty-dir-cleanup.sh /
 RUN chmod a+rx /etcdctl /etcd-empty-dir-cleanup.sh

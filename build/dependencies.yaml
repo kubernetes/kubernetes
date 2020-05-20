@@ -77,6 +77,36 @@ dependencies:
     - path: test/images/Makefile
       match: GOLANG_VERSION
 
+  - name: "k8s.gcr.io/debian-base: dependents"
+    version: 2.1.0
+    refPaths:
+    - path: build/common.sh
+      match: debian_base_version=
+    - path: build/workspace.bzl
+      match: tag =
+    - path: build/debian-iptables/Makefile
+      match: BASEIMAGE\?\=\$\(BASE_REGISTRY\)\/debian-base-\$\(ARCH\)
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-arm:v\d+\.\d+\.\d+
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-arm64:v\d+\.\d+\.\d+
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
+    - path: cluster/images/etcd-empty-dir-cleanup/Dockerfile
+      match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
+
+  - name: "k8s.gcr.io/debian-iptables: dependents"
+    version: 12.1.0
+    refPaths:
+    - path: build/common.sh
+      match: debian_iptables_version=
+    - path: build/workspace.bzl
+      match: tag =
+
   - name: "k8s.gcr.io/kube-cross: dependents"
     version: v1.13.9-5
     refPaths:
