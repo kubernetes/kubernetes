@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.4.7
 # REVISION provides a version number fo this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=1
+REVISION?=2
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -82,6 +82,8 @@ ifeq ($(ARCH),s390x)
     BASEIMAGE?=us.gcr.io/k8s-artifacts-prod/build-image/debian-base-s390x:v2.1.0
 endif
 
+RUNNERIMAGE?=gcr.io/distroless/static:latest
+
 build:
 	# Explicitly copy files to the temp directory
 	$(BIN_INSTALL) migrate-if-needed.sh $(TEMP_DIR)
@@ -91,7 +93,10 @@ build:
 	migrate_tmp_dir=$(shell mktemp -d); \
 	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
-	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR)
+	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
+	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
+	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
 
@@ -140,6 +145,7 @@ endif
 
 	# Replace BASEIMAGE with the real base image
 	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
+	cd $(TEMP_DIR) && sed -i.bak 's|RUNNERIMAGE|$(RUNNERIMAGE)|g' Dockerfile
 
 	# And build the image
 	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(TEMP_DIR)

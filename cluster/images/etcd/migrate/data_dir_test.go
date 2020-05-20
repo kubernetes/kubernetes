@@ -132,6 +132,10 @@ func TestBackup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open data dir: %v", err)
 	}
+	_, err = os.Create(filepath.Join(path, "data-dir", "empty.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = d.Backup()
 	if err != nil {
 		t.Fatalf("Failed to backup data directory %s: %v", d.path, err)

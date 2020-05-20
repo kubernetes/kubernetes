@@ -17,6 +17,7 @@ filegroup(
         "//cluster/gce:all-srcs",
         "//cluster/images/conformance:all-srcs",
         "//cluster/images/etcd-version-monitor:all-srcs",
+        "//cluster/images/etcd/cp:all-srcs",
         "//cluster/images/etcd/migrate:all-srcs",
         "//cluster/images/kubemark:all-srcs",
     ],
