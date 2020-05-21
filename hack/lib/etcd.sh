@@ -41,7 +41,7 @@ kube::etcd::validate() {
   fi
   if ${port_check_command} -nat | grep "LISTEN" | grep "[\.:]${ETCD_PORT:?}" >/dev/null 2>&1; then
     kube::log::usage "unable to start etcd as port ${ETCD_PORT} is in use. please stop the process listening on this port and retry."
-    kube::log::usage "$(netstat -nat | grep "[\.:]${ETCD_PORT:?} .*LISTEN")"
+    kube::log::usage "$(command -v netstat >/dev/null 2>&1 && netstat -nat | grep "[\.:]${ETCD_PORT:?} .*LISTEN" || ss -nplt | grep "[\.:]${ETCD_PORT:?} ")"
     exit 1
   fi
 
