@@ -29,13 +29,16 @@ import (
 type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
 	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
+	DockerGluster           string `yaml:"dockerGluster"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
+	E2eVolumeRegistry       string `yaml:"e2eVolumeRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
 	GoogleContainerRegistry string `yaml:"googleContainerRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
+	QuayIncubator           string `yaml:"quayIncubator"`
 	QuayK8sCSI              string `yaml:"quayK8sCSI"`
 }
 
@@ -65,7 +68,9 @@ func initReg() RegistryList {
 	registry := RegistryList{
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
 		DockerLibraryRegistry:   "docker.io/library",
+		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
+		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
 		InvalidRegistry:         "invalid.com/invalid",
 		GcRegistry:              "k8s.gcr.io",
 		GcrReleaseRegistry:      "gcr.io/gke-release",
@@ -73,6 +78,7 @@ func initReg() RegistryList {
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 		QuayK8sCSI:              "quay.io/k8scsi",
+		QuayIncubator:           "quay.io/kubernetes_incubator",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -94,14 +100,17 @@ func initReg() RegistryList {
 var (
 	registry                = initReg()
 	dockerLibraryRegistry   = registry.DockerLibraryRegistry
+	dockerGluster           = registry.DockerGluster
 	e2eRegistry             = registry.E2eRegistry
 	e2eGcRegistry           = "gcr.io/kubernetes-e2e-test-images"
+	e2eVolumeRegistry       = registry.E2eVolumeRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	googleContainerRegistry = registry.GoogleContainerRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	quayK8sCSI              = registry.QuayK8sCSI
+	quayIncubator           = registry.QuayIncubator
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
 	sampleRegistry  = registry.SampleRegistry
@@ -141,6 +150,8 @@ const (
 	Etcd
 	// GBFrontend image
 	GBFrontend
+	// GlusterDynamicProvisioner image
+	GlusterDynamicProvisioner
 	// Httpd image
 	Httpd
 	// HttpdNew image
@@ -161,6 +172,8 @@ const (
 	MounttestUser
 	// Nautilus image
 	Nautilus
+	// NFSProvisioner image
+	NFSProvisioner
 	// Nginx image
 	Nginx
 	// NginxNew image
@@ -219,6 +232,7 @@ func initImageConfigs() map[int]Config {
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.15"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
+	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
 	configs[Invalid] = Config{gcRegistry, "invalid-image", "invalid-tag"}
@@ -229,6 +243,7 @@ func initImageConfigs() map[int]Config {
 	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
 	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
+	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.0-k8s1.12"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
@@ -244,10 +259,10 @@ func initImageConfigs() map[int]Config {
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[StartupScript] = Config{googleContainerRegistry, "startup-script", "v1"}
 	configs[TestWebserver] = Config{e2eRegistry, "test-webserver", "1.0"}
-	configs[VolumeNFSServer] = Config{e2eRegistry, "volume/nfs", "1.0"}
-	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "2.0"}
-	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}
-	configs[VolumeRBDServer] = Config{e2eRegistry, "volume/rbd", "1.0.1"}
+	configs[VolumeNFSServer] = Config{e2eVolumeRegistry, "nfs", "1.0"}
+	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "1.0"}
+	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}
+	configs[VolumeRBDServer] = Config{e2eVolumeRegistry, "rbd", "1.0.1"}
 	configs[WindowsNanoServer] = Config{e2eGcRegistry, "windows-nanoserver", "v1"}
 	return configs
 }
@@ -286,6 +301,8 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	switch registryAndUser {
 	case "gcr.io/kubernetes-e2e-test-images":
 		registryAndUser = e2eRegistry
+	case "gcr.io/kubernetes-e2e-test-images/volume":
+		registryAndUser = e2eVolumeRegistry
 	case "k8s.gcr.io":
 		registryAndUser = gcRegistry
 	case "gcr.io/k8s-authenticated-test":
