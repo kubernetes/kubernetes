@@ -78,16 +78,8 @@ func RemoveObjectManagedFields(obj runtime.Object) {
 }
 
 // DecodeObjectManagedFields extracts and converts the objects ManagedFields into a fieldpath.ManagedFields.
-func DecodeObjectManagedFields(from runtime.Object) (ManagedInterface, error) {
-	if from == nil {
-		return &managedStruct{}, nil
-	}
-	accessor, err := meta.Accessor(from)
-	if err != nil {
-		panic(fmt.Sprintf("couldn't get accessor: %v", err))
-	}
-
-	managed, err := decodeManagedFields(accessor.GetManagedFields())
+func DecodeObjectManagedFields(from []metav1.ManagedFieldsEntry) (ManagedInterface, error) {
+	managed, err := decodeManagedFields(from)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert managed fields from API: %v", err)
 	}
