@@ -286,17 +286,17 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			node.Annotations = make(map[string]string)
 		}
 
-		klog.Infof("Setting node annotation to enable volume controller attach/detach")
+		klog.V(2).Infof("Setting node annotation to enable volume controller attach/detach")
 		node.Annotations[volutil.ControllerManagedAttachAnnotation] = "true"
 	} else {
-		klog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
+		klog.V(2).Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
 	if kl.keepTerminatedPodVolumes {
 		if node.Annotations == nil {
 			node.Annotations = make(map[string]string)
 		}
-		klog.Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
+		klog.V(2).Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
 		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
 	}
 
