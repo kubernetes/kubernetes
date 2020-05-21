@@ -78,14 +78,14 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	ginkgo.Describe("NFSv4", func() {
 		ginkgo.It("should be mountable for NFSv4", func() {
-			config, _, serverIP := e2evolume.NewNFSServer(c, namespace.Name, []string{})
+			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
 			defer e2evolume.TestServerCleanup(f, config)
 
 			tests := []e2evolume.Test{
 				{
 					Volume: v1.VolumeSource{
 						NFS: &v1.NFSVolumeSource{
-							Server:   serverIP,
+							Server:   serverHost,
 							Path:     "/",
 							ReadOnly: true,
 						},
@@ -102,14 +102,14 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 
 	ginkgo.Describe("NFSv3", func() {
 		ginkgo.It("should be mountable for NFSv3", func() {
-			config, _, serverIP := e2evolume.NewNFSServer(c, namespace.Name, []string{})
+			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
 			defer e2evolume.TestServerCleanup(f, config)
 
 			tests := []e2evolume.Test{
 				{
 					Volume: v1.VolumeSource{
 						NFS: &v1.NFSVolumeSource{
-							Server:   serverIP,
+							Server:   serverHost,
 							Path:     "/exports",
 							ReadOnly: true,
 						},

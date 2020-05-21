@@ -123,17 +123,17 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 		var (
 			nfsServerPod *v1.Pod
-			serverIP     string
+			serverHost   string
 		)
 
 		ginkgo.BeforeEach(func() {
-			_, nfsServerPod, serverIP = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+			_, nfsServerPod, serverHost = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			pvConfig = e2epv.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
 				Labels:     volLabel,
 				PVSource: v1.PersistentVolumeSource{
 					NFS: &v1.NFSVolumeSource{
-						Server:   serverIP,
+						Server:   serverHost,
 						Path:     "/exports",
 						ReadOnly: false,
 					},
