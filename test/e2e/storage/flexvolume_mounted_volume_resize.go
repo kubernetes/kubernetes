@@ -45,7 +45,7 @@ const (
 	totalResizeWaitPeriod = 5 * time.Minute
 )
 
-var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
+var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]", func() {
 	var (
 		c                 clientset.Interface
 		ns                string
