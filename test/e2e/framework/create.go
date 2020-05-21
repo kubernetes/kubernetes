@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // LoadFromManifests loads .yaml or .json manifest files and returns
@@ -305,6 +306,20 @@ func (f *Framework) PatchNamespace(item *string) {
 	}
 }
 
+// PatchContainerImages replaces the specified Container Registry with a custom
+// one provided via the KUBE_TEST_REPO_LIST env variable
+func PatchContainerImages(containers []v1.Container) error {
+	var err error
+	for i, c := range containers {
+		containers[i].Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (f *Framework) patchItemRecursively(item interface{}) error {
 	switch item := item.(type) {
 	case *rbac.Subject:
@@ -355,8 +370,20 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *apps.StatefulSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		if err := PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
 	case *apps.DaemonSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		if err := PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("missing support for patching item of type %T", item)
 	}

@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 )
@@ -926,7 +927,7 @@ func generateBacksideHTTPSDeploymentSpec() *apps.Deployment {
 					Containers: []v1.Container{
 						{
 							Name:  "echoheaders-https",
-							Image: "k8s.gcr.io/echoserver:1.10",
+							Image: imageutils.GetE2EImage(imageutils.EchoServer),
 							Ports: []v1.ContainerPort{{
 								ContainerPort: 8443,
 								Name:          "echo-443",
