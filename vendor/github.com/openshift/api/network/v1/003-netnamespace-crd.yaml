@@ -1,0 +1,83 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: netnamespaces.network.openshift.io
+spec:
+  group: network.openshift.io
+  names:
+    kind: NetNamespace
+    listKind: NetNamespaceList
+    plural: netnamespaces
+    singular: netnamespace
+  scope: Cluster
+  validation:
+    # As compared to ValidateNetNamespace, this does not validate that:
+    #   - .netname == .name
+    #   - .netid is not 1-9
+    openAPIV3Schema:
+      description: NetNamespace describes a single isolated network. When using the
+        redhat/openshift-ovs-multitenant plugin, every Namespace will have a corresponding
+        NetNamespace object with the same name. (When using redhat/openshift-ovs-subnet,
+        NetNamespaces are not used.)
+      type: object
+      required:
+      - netid
+      - netname
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        egressIPs:
+          description: EgressIPs is a list of reserved IPs that will be used as the
+            source for external traffic coming from pods in this namespace. (If empty,
+            external traffic will be masqueraded to Node IPs.)
+          type: array
+          items:
+            description: NetNamespaceEgressIP is a single egress IP out of a list
+              of reserved IPs used as source of external traffic coming from pods
+              in this namespace
+            type: string
+            pattern: ^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        netid:
+          description: NetID is the network identifier of the network namespace assigned
+            to each overlay network packet. This can be manipulated with the "oc adm
+            pod-network" commands.
+          type: integer
+          format: int32
+          maximum: 16777215
+          minimum: 0
+        netname:
+          description: NetName is the name of the network namespace. (This is the
+            same as the object's name, but both fields must be set.)
+          type: string
+          pattern: ^[a-z0-9.-]+$
+  additionalPrinterColumns:
+  - name: NetID
+    type: integer
+    description: The network identifier of the network namespace
+    JSONPath: .netid
+  - name: Egress IPs
+    type: string
+    description: The network egress IP addresses
+    JSONPath: .egressIPs
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

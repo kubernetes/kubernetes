@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "doc.go",
         "interfaces.go",
+        "patch_dc.go",
         "util.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/scale",

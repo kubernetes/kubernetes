@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "horizontal.go",
+        "patch_dc.go",
         "rate_limiters.go",
         "replica_calculator.go",
     ],
