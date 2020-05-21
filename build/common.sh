@@ -190,6 +190,10 @@ function kube::build::docker_available_on_osx() {
   fi
 }
 
+function kube::build::docker_buildx_available() {
+	DOCKER_CLI_EXPERIMENTAL=enabled docker buildx &>/dev/null
+}
+
 function kube::build::prepare_docker_machine() {
   kube::log::status "docker-machine was found."
 

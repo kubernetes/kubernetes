@@ -27,6 +27,10 @@ source "${KUBE_ROOT}/build/lib/release.sh"
 
 CMD_TARGETS="${KUBE_SERVER_IMAGE_TARGETS[*]}"
 if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
+    kube::build::docker_buildx_avaliable || {
+        echo "docker buildx is not available. Docker 19.03 or higher is required" >&2
+        exit 1
+    }
     CMD_TARGETS="${CMD_TARGETS} ${KUBE_CONFORMANCE_IMAGE_TARGETS[*]}"
 fi
 
