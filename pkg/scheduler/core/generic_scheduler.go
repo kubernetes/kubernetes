@@ -40,7 +40,6 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -124,7 +123,7 @@ type ScheduleResult struct {
 
 type genericScheduler struct {
 	cache                    internalcache.Cache
-	schedulingQueue          internalqueue.SchedulingQueue
+	podNominator             framework.PodNominator
 	extenders                []framework.Extender
 	nodeInfoSnapshot         *internalcache.Snapshot
 	pvcLister                corelisters.PersistentVolumeClaimLister
@@ -353,7 +352,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
 func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName string) []*v1.Pod {
-	pods := g.schedulingQueue.NominatedPodsForNode(nodeName)
+	pods := g.podNominator.NominatedPodsForNode(nodeName)
 
 	if len(pods) == 0 {
 		return nil
@@ -522,11 +521,11 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, filtered []*v
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
 func (g *genericScheduler) addNominatedPods(ctx context.Context, prof *profile.Profile, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
-	if g.schedulingQueue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
+	if g.podNominator == nil || nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPods := g.schedulingQueue.NominatedPodsForNode(nodeInfo.Node().Name)
+	nominatedPods := g.podNominator.NominatedPodsForNode(nodeInfo.Node().Name)
 	if len(nominatedPods) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -1101,7 +1100,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache internalcache.Cache,
-	podQueue internalqueue.SchedulingQueue,
+	podNominator framework.PodNominator,
 	nodeInfoSnapshot *internalcache.Snapshot,
 	extenders []framework.Extender,
 	pvcLister corelisters.PersistentVolumeClaimLister,
@@ -1110,7 +1109,7 @@ func NewGenericScheduler(
 	percentageOfNodesToScore int32) ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
-		schedulingQueue:          podQueue,
+		podNominator:             podNominator,
 		extenders:                extenders,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		pvcLister:                pvcLister,
