@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -27,11 +28,16 @@ import (
 // RegistryList holds public and private image registries
 type RegistryList struct {
 	DockerLibraryRegistry string `yaml:"dockerLibraryRegistry"`
+	DockerGluster         string `yaml:"dockerGluster"`
 	E2eRegistry           string `yaml:"e2eRegistry"`
+	E2eVolumeRegistry     string `yaml:"e2eVolumeRegistry"`
 	EtcdRegistry          string `yaml:"etcdRegistry"`
 	GcRegistry            string `yaml:"gcRegistry"`
+	GcrReleaseRegistry    string `yaml:"gcrReleaseRegistry"`
 	PrivateRegistry       string `yaml:"privateRegistry"`
 	SampleRegistry        string `yaml:"sampleRegistry"`
+	QuayIncubator         string `yaml:"quayIncubator"`
+	QuayK8sCSI            string `yaml:"quayK8sCSI"`
 }
 
 // Config holds an images registry, name, and version
@@ -59,11 +65,16 @@ func (i *Config) SetVersion(version string) {
 func initReg() RegistryList {
 	registry := RegistryList{
 		DockerLibraryRegistry: "docker.io/library",
+		DockerGluster:         "docker.io/gluster",
 		E2eRegistry:           "gcr.io/kubernetes-e2e-test-images",
+		E2eVolumeRegistry:     "gcr.io/kubernetes-e2e-test-images/volume",
 		EtcdRegistry:          "quay.io/coreos",
 		GcRegistry:            "k8s.gcr.io",
+		GcrReleaseRegistry:    "gcr.io/gke-release",
 		PrivateRegistry:       "gcr.io/k8s-authenticated-test",
 		SampleRegistry:        "gcr.io/google-samples",
+		QuayK8sCSI:            "quay.io/k8scsi",
+		QuayIncubator:         "quay.io/kubernetes_incubator",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -85,9 +96,14 @@ func initReg() RegistryList {
 var (
 	registry              = initReg()
 	dockerLibraryRegistry = registry.DockerLibraryRegistry
+	dockerGluster         = registry.DockerGluster
 	e2eRegistry           = registry.E2eRegistry
+	e2eVolumeRegistry     = registry.E2eVolumeRegistry
 	etcdRegistry          = registry.EtcdRegistry
 	gcRegistry            = registry.GcRegistry
+	gcrReleaseRegistry    = registry.GcrReleaseRegistry
+	quayK8sCSI            = registry.QuayK8sCSI
+	quayIncubator         = registry.QuayIncubator
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
 	sampleRegistry  = registry.SampleRegistry
@@ -127,6 +143,8 @@ const (
 	Fakegitserver
 	// GBFrontend image
 	GBFrontend
+	// GlusterDynamicProvisioner image
+	GlusterDynamicProvisioner
 	// GBRedisSlave image
 	GBRedisSlave
 	// Hostexec image
@@ -155,6 +173,8 @@ const (
 	Netexec
 	// Nettest image
 	Nettest
+	// NFSProvisioner image
+	NFSProvisioner
 	// Nginx image
 	Nginx
 	// NginxNew image
@@ -209,6 +229,7 @@ func initImageConfigs() map[int]Config {
 	configs[Etcd] = Config{etcdRegistry, "etcd", "v3.3.10"}
 	configs[Fakegitserver] = Config{e2eRegistry, "fakegitserver", "1.0"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
+	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
 	configs[GBRedisSlave] = Config{sampleRegistry, "gb-redisslave", "v3"}
 	configs[Hostexec] = Config{e2eRegistry, "hostexec", "1.1"}
 	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
@@ -223,6 +244,7 @@ func initImageConfigs() map[int]Config {
 	configs[Net] = Config{e2eRegistry, "net", "1.0"}
 	configs[Netexec] = Config{e2eRegistry, "netexec", "1.1"}
 	configs[Nettest] = Config{e2eRegistry, "nettest", "1.0"}
+	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.0-k8s1.12"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
@@ -237,10 +259,10 @@ func initImageConfigs() map[int]Config {
 	configs[ResourceController] = Config{e2eRegistry, "resource-consumer/controller", "1.0"}
 	configs[ServeHostname] = Config{e2eRegistry, "serve-hostname", "1.1"}
 	configs[TestWebserver] = Config{e2eRegistry, "test-webserver", "1.0"}
-	configs[VolumeNFSServer] = Config{e2eRegistry, "volume/nfs", "1.0"}
-	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "1.0"}
-	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}
-	configs[VolumeRBDServer] = Config{e2eRegistry, "volume/rbd", "1.0.1"}
+	configs[VolumeNFSServer] = Config{e2eVolumeRegistry, "nfs", "1.0"}
+	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "1.0"}
+	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}
+	configs[VolumeRBDServer] = Config{e2eVolumeRegistry, "rbd", "1.0.1"}
 	return configs
 }
 
@@ -267,4 +289,41 @@ func (i *Config) GetE2EImage() string {
 // GetPauseImageName returns the pause image name with proper version
 func GetPauseImageName() string {
 	return GetE2EImage(Pause)
+}
+
+// ReplaceRegistryInImageURL replaces the registry in the image URL with a custom one
+func ReplaceRegistryInImageURL(imageURL string) (string, error) {
+	parts := strings.Split(imageURL, "/")
+	countParts := len(parts)
+	registryAndUser := strings.Join(parts[:countParts-1], "/")
+
+	switch registryAndUser {
+	case "gcr.io/kubernetes-e2e-test-images":
+		registryAndUser = e2eRegistry
+	case "gcr.io/kubernetes-e2e-test-images/volume":
+		registryAndUser = e2eVolumeRegistry
+	case "k8s.gcr.io":
+		registryAndUser = gcRegistry
+	case "gcr.io/k8s-authenticated-test":
+		registryAndUser = PrivateRegistry
+	case "gcr.io/google-samples":
+		registryAndUser = sampleRegistry
+	case "gcr.io/gke-release":
+		registryAndUser = gcrReleaseRegistry
+	case "docker.io/library":
+		registryAndUser = dockerLibraryRegistry
+	case "quay.io/k8scsi":
+		registryAndUser = quayK8sCSI
+	default:
+		if countParts == 1 {
+			// We assume we found an image from docker hub library
+			// e.g. openjdk -> docker.io/library/openjdk
+			registryAndUser = dockerLibraryRegistry
+			break
+		}
+
+		return "", fmt.Errorf("Registry: %s is missing in test/utils/image/manifest.go, please add the registry, otherwise the test will fail on air-gapped clusters", registryAndUser)
+	}
+
+	return fmt.Sprintf("%s/%s", registryAndUser, parts[countParts-1]), nil
 }
