@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -724,18 +723,4 @@ func waitForPreemptingWithTimeout(f *framework.Framework, pod *v1.Pod, timeout t
 		return false, err
 	})
 	framework.ExpectNoError(err, "pod %v/%v failed to preempt other pods", pod.Namespace, pod.Name)
-}
-
-func getCurrentPodUsageOnTheNode(nodeName string, pods []v1.Pod, resource *v1.ResourceRequirements) (int64, int64) {
-	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
-	totalRequestedMemResource := resource.Requests.Memory().Value()
-	for _, pod := range pods {
-		if pod.Spec.NodeName != nodeName || v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
-			continue
-		}
-		result := getNonZeroRequests(&pod)
-		totalRequestedCPUResource += result.MilliCPU
-		totalRequestedMemResource += result.Memory
-	}
-	return totalRequestedCPUResource, totalRequestedMemResource
 }
