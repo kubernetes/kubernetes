@@ -18,14 +18,10 @@ package flowcontrol
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -37,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -167,29 +164,18 @@ func getSharedConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int,
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
+	samples, err := testutil.ExtractMetricSamples(resp)
+	if err != nil {
+		return nil, err
 	}
 
 	concurrency := make(map[string]int)
-	for {
-		var v model.Vector
-		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				return concurrency, nil
-			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
-		}
-		for _, metric := range v {
-			switch name := string(metric.Metric[model.MetricNameLabel]); name {
-			case sharedConcurrencyMetricsName:
-				concurrency[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
-			}
+	for _, sample := range samples {
+		if string(sample.Metric[model.MetricNameLabel]) == sharedConcurrencyMetricsName {
+			concurrency[string(sample.Metric[labelPriorityLevel])] = int(sample.Value)
 		}
 	}
+	return concurrency, nil
 }
 
 func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, error) {
@@ -198,29 +184,18 @@ func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, erro
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
+	samples, err := testutil.ExtractMetricSamples(resp)
+	if err != nil {
+		return nil, err
 	}
 
-	reqCounts := make(map[string]int)
-	for {
-		var v model.Vector
-		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				return reqCounts, nil
-			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
-		}
-		for _, metric := range v {
-			switch name := string(metric.Metric[model.MetricNameLabel]); name {
-			case dispatchedRequestCountMetricsName:
-				reqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
-			}
+	concurrency := make(map[string]int)
+	for _, sample := range samples {
+		if string(sample.Metric[model.MetricNameLabel]) == dispatchedRequestCountMetricsName {
+			concurrency[string(sample.Metric[labelPriorityLevel])] = int(sample.Value)
 		}
 	}
+	return concurrency, nil
 }
 
 func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrolv1alpha1.PriorityLevelConfiguration, *flowcontrolv1alpha1.FlowSchema, error) {
