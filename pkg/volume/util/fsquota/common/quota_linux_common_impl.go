@@ -21,16 +21,15 @@ package common
 import (
 	"bufio"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"io/ioutil"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
-
-	"k8s.io/klog/v2"
 )
 
 var quotaCmd string
@@ -55,12 +54,12 @@ var (
 	linuxSupportedFilesystems = []linuxFilesystemType{
 		{
 			name:             "XFS",
-			typeMagic:        0x58465342,
+			typeMagic:        unix.XFS_SUPER_MAGIC,
 			maxQuota:         1<<(bitsPerWord-1) - 1,
 			allowEmptyOutput: true, // XFS filesystems report nothing if a quota is not present
 		}, {
 			name:             "ext4fs",
-			typeMagic:        0xef53,
+			typeMagic:        unix.EXT4_SUPER_MAGIC,
 			maxQuota:         (1<<(bitsPerWord-1) - 1) & (1<<58 - 1),
 			allowEmptyOutput: false, // ext4 filesystems always report something even if a quota is not present
 		},
@@ -82,12 +81,14 @@ var lsattrParseRegexp = regexp.MustCompilePOSIX("^ *([0-9]+) [^ ]+ (.*)$")
 
 // GetQuotaApplier -- does this backing device support quotas that
 // can be applied to directories?
-func (*VolumeProvider) GetQuotaApplier(mountpoint string, backingDev string) LinuxVolumeQuotaApplier {
+func (*VolumeProvider) GetQuotaApplier(mountpoint string, fsTypeMagic int64) LinuxVolumeQuotaApplier {
 	for _, fsType := range linuxSupportedFilesystems {
-		if isFilesystemOfType(mountpoint, backingDev, fsType.typeMagic) {
-			return linuxVolumeQuotaApplier{mountpoint: mountpoint,
+		if isFilesystemOfType(mountpoint, fsTypeMagic, fsType.typeMagic) {
+			return linuxVolumeQuotaApplier{
+				mountpoint:       mountpoint,
 				maxQuota:         fsType.maxQuota,
 				allowEmptyOutput: fsType.allowEmptyOutput,
+				typeMagic:        fsType.typeMagic,
 			}
 		}
 	}
@@ -98,6 +99,7 @@ type linuxVolumeQuotaApplier struct {
 	mountpoint       string
 	maxQuota         int64
 	allowEmptyOutput bool
+	typeMagic        int64
 }
 
 func getXFSQuotaCmd() (string, error) {
@@ -119,15 +121,26 @@ func getXFSQuotaCmd() (string, error) {
 	return "", fmt.Errorf("No xfs_quota program found")
 }
 
-func doRunXFSQuotaCommand(mountpoint string, mountsFile, command string) (string, error) {
+func doRunXFSQuotaCommand(mountpoint string, mountsFile, command string, fsTypeMagic int64) (string, error) {
 	quotaCmd, err := getXFSQuotaCmd()
 	if err != nil {
 		return "", err
 	}
+
+	var cmd *exec.Cmd
 	// We're using numeric project IDs directly; no need to scan
 	// /etc/projects or /etc/projid
-	klog.V(4).Infof("runXFSQuotaCommand %s -t %s -P/dev/null -D/dev/null -x -f %s -c %s", quotaCmd, mountsFile, mountpoint, command)
-	cmd := exec.Command(quotaCmd, "-t", mountsFile, "-P/dev/null", "-D/dev/null", "-x", "-f", mountpoint, "-c", command)
+	switch fsTypeMagic {
+	// xfs don't need '-f' option
+	case unix.XFS_SUPER_MAGIC:
+		klog.V(4).Infof("runXFSQuotaCommand %s -t %s -P/dev/null -D/dev/null -x %s -c %s", quotaCmd, mountsFile, mountpoint, command)
+		cmd = exec.Command(quotaCmd, "-t", mountsFile, "-P/dev/null", "-D/dev/null", "-x", mountpoint, "-c", command)
+		break
+	// other filesystems (such as ext4) need '-f' option
+	default:
+		klog.V(4).Infof("runXFSQuotaCommand %s -t %s -P/dev/null -D/dev/null -x -f %s -c %s", quotaCmd, mountsFile, mountpoint, command)
+		cmd = exec.Command(quotaCmd, "-t", mountsFile, "-P/dev/null", "-D/dev/null", "-x", "-f", mountpoint, "-c", command)
+	}
 
 	data, err := cmd.Output()
 	if err != nil {
@@ -142,7 +155,7 @@ func doRunXFSQuotaCommand(mountpoint string, mountsFile, command string) (string
 // a stuck NFS mount is present.
 // See https://bugzilla.redhat.com/show_bug.cgi?id=237120 for an example
 // of the problem that could be caused if this were to happen.
-func runXFSQuotaCommand(mountpoint string, command string) (string, error) {
+func runXFSQuotaCommand(mountpoint string, fsTypeMagic int64, command string) (string, error) {
 	tmpMounts, err := ioutil.TempFile("", "mounts")
 	if err != nil {
 		return "", fmt.Errorf("Cannot create temporary mount file: %v", err)
@@ -169,7 +182,7 @@ func runXFSQuotaCommand(mountpoint string, command string) (string, error) {
 				if err := tmpMounts.Sync(); err != nil {
 					return "", fmt.Errorf("Cannot sync temporary mounts file: %v", err)
 				}
-				return doRunXFSQuotaCommand(mountpoint, tmpMountsFileName, command)
+				return doRunXFSQuotaCommand(mountpoint, tmpMountsFileName, command, fsTypeMagic)
 			}
 		}
 	}
@@ -177,8 +190,8 @@ func runXFSQuotaCommand(mountpoint string, command string) (string, error) {
 }
 
 // SupportsQuotas determines whether the filesystem supports quotas.
-func SupportsQuotas(mountpoint string, qType QuotaType) (bool, error) {
-	data, err := runXFSQuotaCommand(mountpoint, "state -p")
+func SupportsQuotas(mountpoint string, fsTypeMagic int64, qType QuotaType) (bool, error) {
+	data, err := runXFSQuotaCommand(mountpoint, fsTypeMagic, "state -p")
 	if err != nil {
 		return false, err
 	}
@@ -188,17 +201,11 @@ func SupportsQuotas(mountpoint string, qType QuotaType) (bool, error) {
 	return strings.Contains(data, "Accounting: ON"), nil
 }
 
-func isFilesystemOfType(mountpoint string, backingDev string, typeMagic int64) bool {
-	var buf syscall.Statfs_t
-	err := syscall.Statfs(mountpoint, &buf)
-	if err != nil {
-		klog.Warningf("Warning: Unable to statfs %s: %v", mountpoint, err)
+func isFilesystemOfType(mountpoint string, fsTypeMagic int64, typeMagic int64) bool {
+	if fsTypeMagic != typeMagic {
 		return false
 	}
-	if int64(buf.Type) != typeMagic {
-		return false
-	}
-	if answer, _ := SupportsQuotas(mountpoint, FSQuotaAccounting); answer {
+	if answer, _ := SupportsQuotas(mountpoint, fsTypeMagic, FSQuotaAccounting); answer {
 		return true
 	}
 	return false
@@ -232,17 +239,17 @@ func (v linuxVolumeQuotaApplier) SetQuotaOnDir(path string, id QuotaID, bytes in
 	if bytes < 0 || bytes > v.maxQuota {
 		bytes = v.maxQuota
 	}
-	_, err := runXFSQuotaCommand(v.mountpoint, fmt.Sprintf("limit -p bhard=%v bsoft=%v %v", bytes, bytes, id))
+	_, err := runXFSQuotaCommand(v.mountpoint, v.typeMagic, fmt.Sprintf("limit -p bhard=%v bsoft=%v %v", bytes, bytes, id))
 	if err != nil {
 		return err
 	}
 
-	_, err = runXFSQuotaCommand(v.mountpoint, fmt.Sprintf("project -s -p %s %v", path, id))
+	_, err = runXFSQuotaCommand(v.mountpoint, v.typeMagic, fmt.Sprintf("project -s -p %s %v", path, id))
 	return err
 }
 
-func getQuantity(mountpoint string, id QuotaID, xfsQuotaArg string, multiplier int64, allowEmptyOutput bool) (int64, error) {
-	data, err := runXFSQuotaCommand(mountpoint, fmt.Sprintf("quota -p -N -n -v %s %v", xfsQuotaArg, id))
+func getQuantity(mountpoint string, id QuotaID, xfsQuotaArg string, multiplier int64, allowEmptyOutput bool, fsTypeMagic int64) (int64, error) {
+	data, err := runXFSQuotaCommand(mountpoint, fsTypeMagic, fmt.Sprintf("quota -p -N -n -v %s %v", xfsQuotaArg, id))
 	if err != nil {
 		return 0, fmt.Errorf("Unable to run xfs_quota: %v", err)
 	}
@@ -263,12 +270,12 @@ func getQuantity(mountpoint string, id QuotaID, xfsQuotaArg string, multiplier i
 
 // GetConsumption returns the consumption in bytes if available via quotas
 func (v linuxVolumeQuotaApplier) GetConsumption(_ string, id QuotaID) (int64, error) {
-	return getQuantity(v.mountpoint, id, "-b", 1024, v.allowEmptyOutput)
+	return getQuantity(v.mountpoint, id, "-b", 1024, v.allowEmptyOutput, v.typeMagic)
 }
 
 // GetInodes returns the inodes in use if available via quotas
 func (v linuxVolumeQuotaApplier) GetInodes(_ string, id QuotaID) (int64, error) {
-	return getQuantity(v.mountpoint, id, "-i", 1, v.allowEmptyOutput)
+	return getQuantity(v.mountpoint, id, "-i", 1, v.allowEmptyOutput, v.typeMagic)
 }
 
 // QuotaIDIsInUse checks whether the specified quota ID is in use on the specified

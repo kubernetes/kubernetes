@@ -45,6 +45,7 @@ go_test(
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
@@ -54,6 +55,7 @@ go_test(
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "//conditions:default": [],

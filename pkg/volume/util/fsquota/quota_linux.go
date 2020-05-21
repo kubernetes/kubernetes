@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
@@ -70,6 +71,9 @@ var backingDevLock sync.RWMutex
 
 var mountpointMap = make(map[string]string)
 var mountpointLock sync.RWMutex
+
+var fsTypeMagicMap = make(map[string]int64)
+var fsTypeMagicLock sync.RWMutex
 
 var providers = []common.LinuxVolumeQuotaProvider{
 	&common.VolumeProvider{},
@@ -154,15 +158,34 @@ func clearMountpoint(path string) {
 	delete(mountpointMap, path)
 }
 
+func detectFsTypeMagic(path string) (int64, error) {
+	var buf syscall.Statfs_t
+	err := syscall.Statfs(path, &buf)
+	if err != nil {
+		klog.Warningf("Warning: Unable to statfs %s: %v", path, err)
+		return -1, err
+	}
+	return int64(buf.Type), nil
+}
+
+func clearFsTypeMagic(path string) {
+	fsTypeMagicLock.Lock()
+	defer fsTypeMagicLock.Unlock()
+	delete(fsTypeMagicMap, path)
+}
+
 // getFSInfo Returns mountpoint and backing device
 // getFSInfo should cache the mountpoint and backing device for the
 // path.
-func getFSInfo(m mount.Interface, path string) (string, string, error) {
+func getFSInfo(m mount.Interface, path string) (string, string, int64, error) {
 	mountpointLock.Lock()
 	defer mountpointLock.Unlock()
 
 	backingDevLock.Lock()
 	defer backingDevLock.Unlock()
+
+	fsTypeMagicLock.Lock()
+	defer fsTypeMagicLock.Unlock()
 
 	var err error
 
@@ -170,7 +193,7 @@ func getFSInfo(m mount.Interface, path string) (string, string, error) {
 	if !okMountpoint {
 		mountpoint, err = detectMountpoint(m, path)
 		if err != nil {
-			return "", "", fmt.Errorf("Cannot determine mountpoint for %s: %v", path, err)
+			return "", "", -1, fmt.Errorf("Cannot determine mountpoint for %s: %v", path, err)
 		}
 	}
 
@@ -178,17 +201,28 @@ func getFSInfo(m mount.Interface, path string) (string, string, error) {
 	if !okBackingDev {
 		backingDev, err = detectBackingDev(m, mountpoint)
 		if err != nil {
-			return "", "", fmt.Errorf("Cannot determine backing device for %s: %v", path, err)
+			return "", "", -1, fmt.Errorf("Cannot determine backing device for %s: %v", path, err)
 		}
 	}
+
+	fsTypeMagic, okFsType := fsTypeMagicMap[path]
+	if !okFsType {
+		fsTypeMagic, err = detectFsTypeMagic(mountpoint)
+		if err != nil {
+			return "", "", -1, fmt.Errorf("Cannot determine fsType magic for %s: %v", path, err)
+		}
+	}
+
 	mountpointMap[path] = mountpoint
 	backingDevMap[path] = backingDev
-	return mountpoint, backingDev, nil
+	fsTypeMagicMap[path] = fsTypeMagic
+	return mountpoint, backingDev, fsTypeMagic, nil
 }
 
 func clearFSInfo(path string) {
 	clearMountpoint(path)
 	clearBackingDev(path)
+	clearFsTypeMagic(path)
 }
 
 func getApplier(path string) common.LinuxVolumeQuotaApplier {
@@ -214,7 +248,7 @@ func setQuotaOnDir(path string, id common.QuotaID, bytes int64) error {
 }
 
 func getQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
-	_, _, err := getFSInfo(m, path)
+	_, _, _, err := getFSInfo(m, path)
 	if err != nil {
 		return common.BadQuotaID, err
 	}
@@ -275,7 +309,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 	if supportsQuotas, ok := supportsQuotasMap[path]; ok {
 		return supportsQuotas, nil
 	}
-	mount, dev, err := getFSInfo(m, path)
+	mount, _, fsTypeMagic, err := getFSInfo(m, path)
 	if err != nil {
 		return false, err
 	}
@@ -283,7 +317,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 	applier, ok := devApplierMap[mount]
 	if !ok {
 		for _, provider := range providers {
-			if applier = provider.GetQuotaApplier(mount, dev); applier != nil {
+			if applier = provider.GetQuotaApplier(mount, fsTypeMagic); applier != nil {
 				devApplierMap[mount] = applier
 				break
 			}
@@ -296,6 +330,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 	}
 	delete(backingDevMap, path)
 	delete(mountpointMap, path)
+	delete(fsTypeMagicMap, path)
 	return false, nil
 }
 

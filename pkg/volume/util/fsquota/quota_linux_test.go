@@ -20,6 +20,7 @@ package fsquota
 
 import (
 	"fmt"
+	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -244,6 +245,14 @@ func dummySetFSInfo(path string) {
 			if strings.HasPrefix(path, mount.Path) {
 				mountpointMap[path] = mount.Path
 				backingDevMap[path] = mount.Device
+				switch mount.Type {
+				case "ext4":
+					fsTypeMagicMap[path] = unix.EXT4_SUPER_MAGIC
+					break
+				case "xfs":
+					fsTypeMagicMap[path] = unix.XFS_SUPER_MAGIC
+					break
+				}
 				return
 			}
 		}
@@ -305,20 +314,24 @@ func logAllMaps(where string) {
 	for key, val := range mountpointMap {
 		fmt.Printf("        %v -> %v\n", key, val)
 	}
+	fmt.Printf("    Map fsTypeMagicMap contents:\n")
+	for key, val := range fsTypeMagicMap {
+		fmt.Printf("        %v -> %v\n", key, val)
+	}
 	fmt.Printf("End maps %s\n", where)
 }
 
 var testIDQuotaMap = make(map[common.QuotaID]string)
 var testQuotaIDMap = make(map[string]common.QuotaID)
 
-func (*VolumeProvider1) GetQuotaApplier(mountpoint string, backingDev string) common.LinuxVolumeQuotaApplier {
+func (*VolumeProvider1) GetQuotaApplier(mountpoint string, fsTypeMagic int64) common.LinuxVolumeQuotaApplier {
 	if strings.HasPrefix(mountpoint, "/quota1") {
 		return testVolumeQuota{}
 	}
 	return nil
 }
 
-func (*VolumeProvider2) GetQuotaApplier(mountpoint string, backingDev string) common.LinuxVolumeQuotaApplier {
+func (*VolumeProvider2) GetQuotaApplier(mountpoint string, fsTypeMagic int64) common.LinuxVolumeQuotaApplier {
 	if strings.HasPrefix(mountpoint, "/quota2") {
 		return testVolumeQuota{}
 	}
@@ -401,6 +414,7 @@ type quotaTestCase struct {
 	deltaExpectedSupportsQuotasCount int
 	deltaExpectedBackingDevCount     int
 	deltaExpectedMountpointCount     int
+	deltaExpectedFsTypeMagicCount    int
 }
 
 const (
@@ -444,43 +458,43 @@ volume1048581:1048581
 var quotaTestCases = []quotaTestCase{
 	{
 		"/quota1/a", "", 1024, "Supports", "", "",
-		true, true, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1,
+		true, true, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1,
 	},
 	{
 		"/quota1/a", "", 1024, "Set", projects1, projid1,
-		true, true, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0,
+		true, true, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0,
 	},
 	{
 		"/quota1/b", "x", 1024, "Set", projects2, projid2,
-		true, true, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
+		true, true, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1,
 	},
 	{
 		"/quota2/b", "x", 1024, "Set", projects3, projid3,
-		true, true, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		true, true, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	},
 	{
 		"/quota1/b", "x", 1024, "Set", projects3, projid3,
-		true, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		true, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"/quota1/b", "", 1024, "Clear", projects4, projid4,
-		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
+		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1, -1,
 	},
 	{
 		"/noquota/a", "", 1024, "Supports", projects4, projid4,
-		false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"/quota1/a", "", 1024, "Clear", projects5, projid5,
-		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
+		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1, -1,
 	},
 	{
 		"/quota1/a", "", 1024, "Clear", projects5, projid5,
-		true, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		true, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	},
 	{
 		"/quota2/b", "", 1024, "Clear", "", "",
-		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1,
+		true, true, -1, -1, -1, -1, 0, -1, -1, -1, -1, -1, -1, -1,
 	},
 }
 
@@ -636,6 +650,9 @@ func testAddRemoveQuotas(t *testing.T, enabled bool) {
 	for k := range mountpointMap {
 		delete(mountpointMap, k)
 	}
+	for k := range fsTypeMagicMap {
+		delete(fsTypeMagicMap, k)
+	}
 	for k := range testIDQuotaMap {
 		delete(testIDQuotaMap, k)
 	}
@@ -653,6 +670,7 @@ func testAddRemoveQuotas(t *testing.T, enabled bool) {
 	expectedSupportsQuotasCount := 0
 	expectedBackingDevCount := 0
 	expectedMountpointCount := 0
+	expectedFsTypeMagicCount := 0
 	for seq, testcase := range quotaTestCases {
 		if enabled {
 			expectedPodQuotaCount += testcase.deltaExpectedPodQuotaCount
@@ -666,6 +684,7 @@ func testAddRemoveQuotas(t *testing.T, enabled bool) {
 			expectedSupportsQuotasCount += testcase.deltaExpectedSupportsQuotasCount
 			expectedBackingDevCount += testcase.deltaExpectedBackingDevCount
 			expectedMountpointCount += testcase.deltaExpectedMountpointCount
+			expectedFsTypeMagicCount += testcase.deltaExpectedFsTypeMagicCount
 		}
 		fail := false
 		if enabled {
@@ -718,6 +737,10 @@ func testAddRemoveQuotas(t *testing.T, enabled bool) {
 		if len(mountpointMap) != expectedMountpointCount {
 			fail = true
 			t.Errorf("Case %v (%s, %v) MountpointCount mismatch: got %v, expect %v", seq, testcase.path, enabled, len(mountpointMap), expectedMountpointCount)
+		}
+		if len(fsTypeMagicMap) != expectedFsTypeMagicCount {
+			fail = true
+			t.Errorf("Case %v (%s, %v) FsTypeMagicCount mismatch: got %v, expect %v", seq, testcase.path, enabled, len(fsTypeMagicMap), expectedFsTypeMagicCount)
 		}
 		if fail {
 			logAllMaps(fmt.Sprintf("%v %s", seq, testcase.path))

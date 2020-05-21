@@ -59,7 +59,7 @@ type LinuxVolumeQuotaProvider interface {
 	// GetQuotaApplier retrieves an object that can apply
 	// quotas (or nil if this provider cannot support quotas
 	// on the device)
-	GetQuotaApplier(mountpoint string, backingDev string) LinuxVolumeQuotaApplier
+	GetQuotaApplier(mountpoint string, fsTypeMagic int64) LinuxVolumeQuotaApplier
 }
 
 // LinuxVolumeQuotaApplier is a generic interface to any quota
