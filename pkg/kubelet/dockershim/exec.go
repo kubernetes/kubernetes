@@ -60,6 +60,7 @@ func (d *dockerExitError) ExitStatus() int {
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.
 type NativeExecHandler struct{}
 
+// ExecInContainer executes the cmd in container using the Docker's exec API
 func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	done := make(chan struct{})
 	defer close(done)

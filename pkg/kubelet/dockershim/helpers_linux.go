@@ -30,10 +30,11 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+// DefaultMemorySwap always returns 0 for no memory swap in a sandbox
 func DefaultMemorySwap() int64 {
 	return 0
 }

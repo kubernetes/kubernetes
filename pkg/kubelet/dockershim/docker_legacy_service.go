@@ -94,7 +94,7 @@ func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, contain
 // GetContainerLogTail attempts to read up to MaxContainerTerminationMessageLogLength
 // from the end of the log when docker is configured with a log driver other than json-log.
 // It reads up to MaxContainerTerminationMessageLogLines lines.
-func (d *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerId kubecontainer.ContainerID) (string, error) {
+func (d *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerID kubecontainer.ContainerID) (string, error) {
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
 	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
 	// Although this is not a full spec pod, dockerLegacyService.GetContainerLogs() currently completely ignores its pod param
@@ -105,7 +105,7 @@ func (d *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace s
 			Namespace: namespace,
 		},
 	}
-	err := d.GetContainerLogs(context.Background(), pod, containerId, &v1.PodLogOptions{TailLines: &value}, buf, buf)
+	err := d.GetContainerLogs(context.Background(), pod, containerID, &v1.PodLogOptions{TailLines: &value}, buf, buf)
 	if err != nil {
 		return "", err
 	}

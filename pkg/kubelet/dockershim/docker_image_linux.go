@@ -67,7 +67,7 @@ func dirSize(path string) (int64, int64, error) {
 		if err != nil {
 			return err
 		}
-		inodes += 1
+		inodes++
 		if !info.IsDir() {
 			bytes += info.Size()
 		}

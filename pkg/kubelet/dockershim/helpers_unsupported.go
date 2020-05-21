@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// DefaultMemorySwap always returns -1 for no memory swap in a sandbox
 func DefaultMemorySwap() int64 {
 	return -1
 }

@@ -33,7 +33,7 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		return nil, err
 	}
 
-	hcsshim_container, err := hcsshim.OpenContainer(containerID)
+	hcsshimContainer, err := hcsshim.OpenContainer(containerID)
 	if err != nil {
 		// As we moved from using Docker stats to hcsshim directly, we may query HCS with already exited container IDs.
 		// That will typically happen with init-containers in Exited state. Docker still knows about them but the HCS does not.
@@ -44,13 +44,13 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		return nil, nil
 	}
 	defer func() {
-		closeErr := hcsshim_container.Close()
+		closeErr := hcsshimContainer.Close()
 		if closeErr != nil {
 			klog.Errorf("Error closing container '%s': %v", containerID, closeErr)
 		}
 	}()
 
-	stats, err := hcsshim_container.Statistics()
+	stats, err := hcsshimContainer.Statistics()
 	if err != nil {
 		return nil, err
 	}
