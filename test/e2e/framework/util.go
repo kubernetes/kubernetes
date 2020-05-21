@@ -1304,12 +1304,9 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
-func getDynamicResourceWatch(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions) func() (watch.Interface, error) {
-	return func() (watch.Interface, error) {
-		res, err := dc.Resource(resourceType).Namespace(namespace).Watch(context.TODO(), listOptions)
-		ExpectNoError(err, "Failed to create a watch for %v", resourceType.Resource)
-		return res, err
-	}
+func getDynamicResourceWatch(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, listOptions metav1.ListOptions) (watch.Interface, error) {
+	res, err := dc.Resource(resourceType).Namespace(namespace).Watch(context.TODO(), listOptions)
+	return res, err
 }
 
 // WatchEventEnsurerAndManager
@@ -1323,10 +1320,20 @@ func getDynamicResourceWatch(testContext context.Context, dc dynamic.Interface, 
 //   expectedWatchEvents array of events which are expected to occur
 //   scenario            the function to run
 func WatchEventEnsurerAndManager(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watch.Interface) []watch.Event) {
-	// TODO add client-go/tools/watch/retrywatcher to manage watch restarts
+	listWatcher := &cache.ListWatch{
+		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
+			return getDynamicResourceWatch(testContext, dc, resourceType, namespace, listOptions)
+		},
+	}
+	resourceWatch, err := watchtools.NewRetryWatcher("", listWatcher)
+	ExpectNoError(err, "Failed to create a resource watch of %v in namespace %v", resourceType.Resource, namespace)
+
+	ExpectNoError(err, "Failed to create a watch for %v", resourceType.Resource)
 	retries := 3
 retriesLoop:
 	for try := 1; try <= retries; try++ {
+		// TODO pass resourceWatch to the test function, or just collect events separately and parse them after
+		scenario()
 		errs := sets.NewString()
 	watchEventsLoop:
 		for watchEventIndex, _ := range expectedWatchEvents {
