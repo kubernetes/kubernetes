@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,33 @@ import (
 	"testing"
 )
 
+/*
+	struct fields in go AST:
+
+     type Struct struct {
+		// fields with a direct field Name as <Ident>
+        A X  // regular fields
+        B *X // pointer fields
+        C    // embedded type field
+
+        // qualified embedded type fields use an <SelExpr> in the AST
+        v1.TypeMeta // X=v1, Sel=TypeMeta
+
+        // fields without a direct name, but
+        // a <StarExpr> in the go-AST
+        *D   // type field embedded as pointer
+        *v1.ListMeta   // qualified type field embedded as pointer
+                       // with <StarExpr> pointing to <SelExpr>
+     }
+*/
+
 func TestProtoParser(t *testing.T) {
 	ident := ast.NewIdent("FieldName")
 	tests := []struct {
 		expr ast.Expr
 		err  bool
 	}{
+		// valid struct field expressions
 		{
 			expr: ident,
 			err:  false,
@@ -60,6 +81,7 @@ func TestProtoParser(t *testing.T) {
 			err: false,
 		},
 
+		// something else should provide an error
 		{
 			expr: &ast.KeyValueExpr{
 				Key:   ident,
