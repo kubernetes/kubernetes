@@ -152,13 +152,18 @@ func TestValidateKubeletFlags(t *testing.T) {
 		error  bool
 		labels map[string]string
 	}{
-		{
-			name:  "Invalid kubernetes.io label",
-			error: true,
-			labels: map[string]string{
-				"beta.kubernetes.io/metadata-proxy-ready": "true",
+		// Disabled because the check for unknown labels in
+		// ValidateKubeletFlags is disabled pending a fix for allowing
+		// the node-role.kubernetes.io/master label.
+		/*
+			{
+				name:  "Invalid kubernetes.io label",
+				error: true,
+				labels: map[string]string{
+					"beta.kubernetes.io/metadata-proxy-ready": "true",
+				},
 			},
-		},
+		*/
 		{
 			name:  "Valid label outside of kubernetes.io and k8s.io",
 			error: false,

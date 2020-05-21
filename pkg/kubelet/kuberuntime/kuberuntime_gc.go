@@ -356,9 +356,35 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 	logSymlinks, _ := osInterface.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
 	for _, logSymlink := range logSymlinks {
 		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
+			if containerID, err := getContainerIDFromLegacyLogSymlink(logSymlink); err == nil {
+				status, err := cgc.manager.runtimeService.ContainerStatus(containerID)
+				if err != nil {
+					// TODO: we should handle container not found (i.e. container was deleted) case differently
+					// once https://github.com/kubernetes/kubernetes/issues/63336 is resolved
+					klog.Infof("Error getting ContainerStatus for containerID %q: %v", containerID, err)
+				} else if status.State != runtimeapi.ContainerState_CONTAINER_EXITED {
+					// Here is how container log rotation works (see containerLogManager#rotateLatestLog):
+					//
+					// 1. rename current log to rotated log file whose filename contains current timestamp (fmt.Sprintf("%s.%s", log, timestamp))
+					// 2. reopen the container log
+					// 3. if #2 fails, rename rotated log file back to container log
+					//
+					// There is small but indeterministic amount of time during which log file doesn't exist (between steps #1 and #2, between #1 and #3).
+					// Hence the symlink may be deemed unhealthy during that period.
+					// See https://github.com/kubernetes/kubernetes/issues/52172
+					//
+					// We only remove unhealthy symlink for dead containers
+					klog.V(5).Infof("Container %q is still running, not removing symlink %q.", containerID, logSymlink)
+					continue
+				}
+			} else {
+				klog.V(4).Infof("unable to obtain container Id: %v", err)
+			}
 			err := osInterface.Remove(logSymlink)
 			if err != nil {
 				klog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+			} else {
+				klog.V(4).Infof("removed symlink %s", logSymlink)
 			}
 		}
 	}

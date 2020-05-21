@@ -239,9 +239,13 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 			unknownLabels.Insert(k)
 		}
 	}
-	if len(unknownLabels) > 0 {
-		return fmt.Errorf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
-	}
+	// disabled because we set node-role.kubernetes.io/master
+	// TODO(node): reenable this validation as per https://bugzilla.redhat.com/show_bug.cgi?id=1814320
+	/*
+		if len(unknownLabels) > 0 {
+			return fmt.Errorf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
+		}
+	*/
 
 	return nil
 }

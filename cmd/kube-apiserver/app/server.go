@@ -30,19 +30,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/admissionenablement"
+	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
+	"k8s.io/kubernetes/openshift-kube-apiserver/openshiftkubeapiserver"
+
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -70,8 +74,9 @@ import (
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/core"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
-	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
@@ -84,10 +89,10 @@ import (
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
+	eventstorage "k8s.io/kubernetes/pkg/registry/core/event/storage"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
 const (
@@ -104,9 +109,44 @@ func NewAPIServerCommand() *cobra.Command {
 for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.`,
+
+		// stop printing usage when the command errors
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
-			utilflag.PrintFlags(cmd.Flags())
+
+			if len(s.OpenShiftConfig) > 0 {
+				openshiftConfig, err := enablement.GetOpenshiftConfig(s.OpenShiftConfig)
+				if err != nil {
+					klog.Fatal(err)
+				}
+				enablement.ForceOpenShift(openshiftConfig)
+
+				// this forces a patch to be called
+				// TODO we're going to try to remove bits of the patching.
+				configPatchFn := openshiftkubeapiserver.NewOpenShiftKubeAPIServerConfigPatch(openshiftConfig)
+				OpenShiftKubeAPIServerConfigPatch = configPatchFn
+
+				args, err := openshiftkubeapiserver.ConfigToFlags(openshiftConfig)
+				if err != nil {
+					return err
+				}
+
+				// hopefully this resets the flags?
+				if err := cmd.ParseFlags(args); err != nil {
+					return err
+				}
+
+				// print merged flags (merged from OpenshiftConfig)
+				utilflag.PrintFlags(cmd.Flags())
+
+				enablement.ForceGlobalInitializationForOpenShift()
+				admissionenablement.InstallOpenShiftAdmissionPlugins(s)
+
+			} else {
+				// print default flags
+				utilflag.PrintFlags(cmd.Flags())
+			}
 
 			// set default options
 			completedOptions, err := Complete(s)
@@ -322,6 +362,13 @@ func CreateKubeAPIServerConfig(
 		}
 	}
 
+	var eventStorage *eventstorage.REST
+	eventStorage, err = eventstorage.NewREST(genericConfig.RESTOptionsGetter, uint64(s.EventTTL.Seconds()))
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	genericConfig.EventSink = eventRegistrySink{eventStorage}
+
 	config := &master.Config{
 		GenericConfig: genericConfig,
 		ExtraConfig: master.ExtraConfig{
@@ -417,6 +464,7 @@ func CreateKubeAPIServerConfig(
 func buildGenericConfig(
 	s *options.ServerRunOptions,
 	proxyTransport *http.Transport,
+
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
@@ -438,9 +486,6 @@ func buildGenericConfig(
 		return
 	}
 	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
-		return
-	}
-	if lastErr = s.Authentication.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
@@ -490,6 +535,8 @@ func buildGenericConfig(
 	// on a fast local network
 	genericConfig.LoopbackClientConfig.DisableCompression = true
 
+	enablement.SetLoopbackClientConfig(genericConfig.LoopbackClientConfig)
+
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
@@ -498,9 +545,8 @@ func buildGenericConfig(
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, genericConfig.EgressSelector, clientgoExternalClient, versionedInformers)
-	if err != nil {
-		lastErr = fmt.Errorf("invalid authentication config: %v", err)
+	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
+	if lastErr = s.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
 
@@ -542,6 +588,14 @@ func buildGenericConfig(
 		return
 	}
 
+	if err := PatchKubeAPIServerConfig(genericConfig, versionedInformers, &pluginInitializers); err != nil {
+		lastErr = fmt.Errorf("failed to patch: %v", err)
+		return
+	}
+
+	if enablement.IsOpenShift() {
+		admissionenablement.SetAdmissionDefaults(s, versionedInformers, clientgoExternalClient)
+	}
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
@@ -557,35 +611,6 @@ func buildGenericConfig(
 	}
 
 	return
-}
-
-// BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
-	authenticatorConfig, err := s.Authentication.ToAuthenticationConfig()
-	if err != nil {
-		return nil, nil, err
-	}
-	if s.Authentication.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
-			extclient,
-			versionedInformer.Core().V1().Secrets().Lister(),
-			versionedInformer.Core().V1().ServiceAccounts().Lister(),
-			versionedInformer.Core().V1().Pods().Lister(),
-		)
-	}
-	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-		versionedInformer.Core().V1().Secrets().Lister().Secrets(v1.NamespaceSystem),
-	)
-
-	if EgressSelector != nil {
-		egressDialer, err := EgressSelector.Lookup(egressselector.Master.AsNetworkContext())
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticatorConfig.CustomDial = egressDialer
-	}
-
-	return authenticatorConfig.New()
 }
 
 // BuildAuthorizer constructs the authorizer
@@ -786,4 +811,36 @@ func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, ne
 		secondaryServiceIPRange = *secondaryServiceClusterCIDR
 	}
 	return apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, nil
+}
+
+// eventRegistrySink wraps an event registry in order to be used as direct event sync, without going through the API.
+type eventRegistrySink struct {
+	*eventstorage.REST
+}
+
+var _ genericapiserver.EventSink = eventRegistrySink{}
+
+func (s eventRegistrySink) Create(v1event *corev1.Event) (*corev1.Event, error) {
+	ctx := request.WithNamespace(request.NewContext(), v1event.Namespace)
+
+	var event core.Event
+	if err := v1.Convert_v1_Event_To_core_Event(v1event, &event, nil); err != nil {
+		return nil, err
+	}
+
+	obj, err := s.REST.Create(ctx, &event, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	ret, ok := obj.(*core.Event)
+	if !ok {
+		return nil, fmt.Errorf("expected corev1.Event, got %T", obj)
+	}
+
+	var v1ret corev1.Event
+	if err := v1.Convert_core_Event_To_v1_Event(ret, &v1ret, nil); err != nil {
+		return nil, err
+	}
+
+	return &v1ret, nil
 }

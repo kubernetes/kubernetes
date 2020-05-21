@@ -183,8 +183,8 @@ func NodeRules() []rbacv1.PolicyRule {
 	return nodePolicyRules
 }
 
-// ClusterRoles returns the cluster roles to bootstrap an API server with
-func ClusterRoles() []rbacv1.ClusterRole {
+// clusterRoles returns the cluster roles to bootstrap an API server with
+func clusterRoles() []rbacv1.ClusterRole {
 	roles := []rbacv1.ClusterRole{
 		{
 			// a "root" role which can do absolutely anything
@@ -204,6 +204,15 @@ func ClusterRoles() []rbacv1.ClusterRole {
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
+				).RuleOrDie(),
+			},
+		},
+		{
+			// a role which provides unauthenticated access.
+			ObjectMeta: metav1.ObjectMeta{Name: "system:openshift:public-info-viewer"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get").URLs(
+					"/.well-known", "/.well-known/*",
 				).RuleOrDie(),
 			},
 		},
@@ -555,12 +564,13 @@ func ClusterRoles() []rbacv1.ClusterRole {
 const systemNodeRoleName = "system:node"
 
 // ClusterRoleBindings return default rolebindings to the default roles
-func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
+func clusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	rolebindings := []rbacv1.ClusterRoleBinding{
 		rbacv1helpers.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:public-info-viewer").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:openshift:public-info-viewer").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),

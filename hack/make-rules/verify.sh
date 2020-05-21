@@ -36,6 +36,16 @@ EXCLUDED_PATTERNS=(
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )
 
+# Excluded checks for openshift/kubernetes fork
+EXCLUDED_PATTERNS+=(
+  "verify-boilerplate.sh"            # Carries do not require boilerplate
+  "verify-golint.sh"                 # TODO(marun) Cleanup carried code
+  "verify-generated-files-remake.sh" # TODO(marun) Should this be passing?
+  "verify-no-vendor-cycles.sh"       # Incompatible with the way many carries are specified
+  "verify-vendor.sh"                 # Wants to update pins to newer versions than used upstream
+  "verify-publishing-bot.py"         # Verifies the upstream rules, which are not maintained in o/k
+  )
+
 # Exclude typecheck in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(

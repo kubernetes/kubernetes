@@ -87,7 +87,13 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	}
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after upgrade", rsName))
-	framework.ExpectNoError(replicaset.WaitForReadyReplicaSet(c, ns, rsName))
+
+	err = replicaset.WaitForReadyReplicaSet(c, ns, rsName)
+	if err != nil {
+		framework.DumpAllNamespaceInfo(f.ClientSet, ns)
+	}
+
+	framework.ExpectNoError(err)
 
 	// Verify the upgraded RS is active by scaling up the RS to scaleNum and ensuring all pods are Ready
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset %s to %d", rsName, scaleNum))
@@ -97,7 +103,12 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after scaling", rsName))
-	framework.ExpectNoError(replicaset.WaitForReadyReplicaSet(c, ns, rsName))
+
+	err = replicaset.WaitForReadyReplicaSet(c, ns, rsName)
+	if err != nil {
+		framework.DumpAllNamespaceInfo(f.ClientSet, ns)
+	}
+	framework.ExpectNoError(err)
 }
 
 // Teardown cleans up any remaining resources.

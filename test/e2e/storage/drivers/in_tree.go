@@ -1316,6 +1316,7 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 		Prefix:    "gcepd",
 		Framework: f,
 	}
+
 	if framework.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
@@ -1328,17 +1329,18 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 }
 
 func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	zone := getInlineVolumeZone(config.Framework)
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+				v1.LabelZoneFailureDomain: zone,
 			},
 		}
 	}
 	ginkgo.By("creating a test gce pd volume")
-	vname, err := e2epv.CreatePDWithRetry()
+	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
 	return &gcePdVolume{
 		volumeName: vname,
@@ -1592,7 +1594,17 @@ func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTe
 
 func (a *azureDiskDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
-	volumeName, err := e2epv.CreatePDWithRetry()
+	zone := getInlineVolumeZone(config.Framework)
+	if volType == testpatterns.InlineVolume {
+		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+		// so pods should be also scheduled there.
+		config.ClientNodeSelection = e2epod.NodeSelection{
+			Selector: map[string]string{
+				v1.LabelZoneFailureDomain: zone,
+			},
+		}
+	}
+	volumeName, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
 	return &azureDiskVolume{
 		volumeName: volumeName,
@@ -1713,6 +1725,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		Prefix:    "aws",
 		Framework: f,
 	}
+
 	if framework.NodeOSDistroIs("windows") {
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
@@ -1724,17 +1737,18 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 }
 
 func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	zone := getInlineVolumeZone(config.Framework)
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+				v1.LabelZoneFailureDomain: zone,
 			},
 		}
 	}
 	ginkgo.By("creating a test aws volume")
-	vname, err := e2epv.CreatePDWithRetry()
+	vname, err := e2epv.CreatePDWithRetryAndZone(zone)
 	framework.ExpectNoError(err)
 	return &awsVolume{
 		volumeName: vname,
@@ -1935,6 +1949,20 @@ func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 // cleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
 func cleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
 	cleanUpVolumeServerWithSecret(f, serverPod, nil)
+}
+
+func getInlineVolumeZone(f *framework.Framework) string {
+	if framework.TestContext.CloudConfig.Zone != "" {
+		return framework.TestContext.CloudConfig.Zone
+	}
+	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
+	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	framework.ExpectNoError(err)
+	zone, ok := node.Labels[v1.LabelZoneFailureDomain]
+	if ok {
+		return zone
+	}
+	return ""
 }
 
 // cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.

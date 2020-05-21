@@ -1,0 +1,144 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: images.config.openshift.io
+spec:
+  group: config.openshift.io
+  scope: Cluster
+  preserveUnknownFields: false
+  names:
+    kind: Image
+    singular: image
+    plural: images
+    listKind: ImageList
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  subresources:
+    status: {}
+  "validation":
+    "openAPIV3Schema":
+      description: Image governs policies related to imagestream imports and runtime
+        configuration for external registries. It allows cluster admins to configure
+        which registries OpenShift is allowed to import images from, extra CA trust
+        bundles for external registries, and policies to block or allow registry hostnames.
+        When exposing OpenShift's image registry to the public, this also lets cluster
+        admins specify the external hostname.
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec holds user settable values for configuration
+          type: object
+          properties:
+            additionalTrustedCA:
+              description: additionalTrustedCA is a reference to a ConfigMap containing
+                additional CAs that should be trusted during imagestream import, pod
+                image pull, build image pull, and imageregistry pullthrough. The namespace
+                for this config map is openshift-config.
+              type: object
+              required:
+              - name
+              properties:
+                name:
+                  description: name is the metadata.name of the referenced config
+                    map
+                  type: string
+            allowedRegistriesForImport:
+              description: allowedRegistriesForImport limits the container image registries
+                that normal users may import images from. Set this list to the registries
+                that you trust to contain valid Docker images and that you want applications
+                to be able to import from. Users with permission to create Images
+                or ImageStreamMappings via the API are not affected by this policy
+                - typically only administrators or system integrations will have those
+                permissions.
+              type: array
+              items:
+                description: RegistryLocation contains a location of the registry
+                  specified by the registry domain name. The domain name might include
+                  wildcards, like '*' or '??'.
+                type: object
+                properties:
+                  domainName:
+                    description: domainName specifies a domain name for the registry
+                      In case the registry use non-standard (80 or 443) port, the
+                      port should be included in the domain name as well.
+                    type: string
+                  insecure:
+                    description: insecure indicates whether the registry is secure
+                      (https) or insecure (http) By default (if not specified) the
+                      registry is assumed as secure.
+                    type: boolean
+            externalRegistryHostnames:
+              description: externalRegistryHostnames provides the hostnames for the
+                default external image registry. The external hostname should be set
+                only when the image registry is exposed externally. The first value
+                is used in 'publicDockerImageRepository' field in ImageStreams. The
+                value must be in "hostname[:port]" format.
+              type: array
+              items:
+                type: string
+            registrySources:
+              description: registrySources contains configuration that determines
+                how the container runtime should treat individual registries when
+                accessing images for builds+pods. (e.g. whether or not to allow insecure
+                access).  It does not contain configuration for the internal cluster
+                registry.
+              type: object
+              properties:
+                allowedRegistries:
+                  description: "allowedRegistries are the only registries permitted
+                    for image pull and push actions. All other registries are denied.
+                    \n Only one of BlockedRegistries or AllowedRegistries may be set."
+                  type: array
+                  items:
+                    type: string
+                blockedRegistries:
+                  description: "blockedRegistries cannot be used for image pull and
+                    push actions. All other registries are permitted. \n Only one
+                    of BlockedRegistries or AllowedRegistries may be set."
+                  type: array
+                  items:
+                    type: string
+                insecureRegistries:
+                  description: insecureRegistries are registries which do not have
+                    a valid TLS certificates or only support HTTP connections.
+                  type: array
+                  items:
+                    type: string
+        status:
+          description: status holds observed values from the cluster. They may not
+            be overridden.
+          type: object
+          properties:
+            externalRegistryHostnames:
+              description: externalRegistryHostnames provides the hostnames for the
+                default external image registry. The external hostname should be set
+                only when the image registry is exposed externally. The first value
+                is used in 'publicDockerImageRepository' field in ImageStreams. The
+                value must be in "hostname[:port]" format.
+              type: array
+              items:
+                type: string
+            internalRegistryHostname:
+              description: internalRegistryHostname sets the hostname for the default
+                internal image registry. The value must be in "hostname[:port]" format.
+                This value is set by the image registry operator which controls the
+                internal registry hostname. For backward compatibility, users can
+                still use OPENSHIFT_DEFAULT_REGISTRY environment variable but this
+                setting overrides the environment variable.
+              type: string

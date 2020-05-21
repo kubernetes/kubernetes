@@ -1212,11 +1212,18 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	}
 
 	// Find out delta size
-	expansionSize := resource.NewScaledQuantity((newSize.Value() - oldSize.Value()), 0)
-	expansionSizeGiB := int(volumehelpers.RoundUpToGiB(*expansionSize))
+	expansionSize := newSize
+	expansionSize.Sub(oldSize)
+	expansionSizeGiB, err := volumehelpers.RoundUpToGiBInt(expansionSize)
+	if err != nil {
+		return oldSize, err
+	}
 
 	// Find out requested Size
-	requestGiB := volumehelpers.RoundUpToGiB(newSize)
+	requestGiB, err := volumehelpers.RoundUpToGiB(newSize)
+	if err != nil {
+		return oldSize, err
+	}
 
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)

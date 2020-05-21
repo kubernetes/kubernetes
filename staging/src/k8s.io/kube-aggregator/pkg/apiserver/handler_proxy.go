@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -48,17 +49,17 @@ const (
 	aggregatedDiscoveryTimeout = 5 * time.Second
 )
 
+type certKeyFunc func() ([]byte, []byte)
+
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type proxyHandler struct {
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
 
-	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
-	// this to confirm the proxy's identity
-	proxyClientCert []byte
-	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	// proxyCurrentCertKeyContent holds the client cert used to identify this proxy. Backing APIServices use this to confirm the proxy's identity
+	proxyCurrentCertKeyContent certKeyFunc
+	proxyTransport             *http.Transport
 
 	// Endpoints based routing to map from cluster IP to routable IP
 	serviceResolver ServiceResolver
@@ -120,6 +121,14 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		r.localDelegate.ServeHTTP(w, req)
 		return
+	}
+
+	// some groupResources should always be delegated
+	if requestInfo, ok := genericapirequest.RequestInfoFrom(req.Context()); ok {
+		if alwaysLocalDelegateGroupResource[schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}] {
+			r.localDelegate.ServeHTTP(w, req)
+			return
+		}
 	}
 
 	if !handlingInfo.serviceAvailable {
@@ -248,14 +257,16 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		return
 	}
 
+	proxyClientCert, proxyClientKey := r.proxyCurrentCertKeyContent()
+
 	newInfo := proxyHandlingInfo{
 		name: apiService.Name,
 		restConfig: &restclient.Config{
 			TLSClientConfig: restclient.TLSClientConfig{
 				Insecure:   apiService.Spec.InsecureSkipTLSVerify,
 				ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
-				CertData:   r.proxyClientCert,
-				KeyData:    r.proxyClientKey,
+				CertData:   proxyClientCert,
+				KeyData:    proxyClientKey,
 				CAData:     apiService.Spec.CABundle,
 			},
 		},

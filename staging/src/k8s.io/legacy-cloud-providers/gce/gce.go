@@ -42,7 +42,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -130,6 +130,9 @@ type Cloud struct {
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 	manager                  diskServiceManager
+
+	externalInstanceGroupsPrefix string // If non-"", finds prefixed instance groups for ILB.
+
 	// Lock for access to nodeZones
 	nodeZonesLock sync.Mutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
@@ -174,6 +177,9 @@ type ConfigGlobal struct {
 	NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 	Regional           bool     `gcfg:"regional"`
 	Multizone          bool     `gcfg:"multizone"`
+	// ExternalInstanceGroupsPrefix is the prefix that will be used to filter instance groups
+	// that be backend for ILB containing cluster nodes if not-empty.
+	ExternalInstanceGroupsPrefix string `gcfg:"external-instance-groups-prefix"`
 	// APIEndpoint is the GCE compute API endpoint to use. If this is blank,
 	// then the default endpoint is used.
 	APIEndpoint string `gcfg:"api-endpoint"`
@@ -201,24 +207,25 @@ type ConfigFile struct {
 
 // CloudConfig includes all the necessary configuration for creating Cloud
 type CloudConfig struct {
-	APIEndpoint          string
-	ContainerAPIEndpoint string
-	ProjectID            string
-	NetworkProjectID     string
-	Region               string
-	Regional             bool
-	Zone                 string
-	ManagedZones         []string
-	NetworkName          string
-	NetworkURL           string
-	SubnetworkName       string
-	SubnetworkURL        string
-	SecondaryRangeName   string
-	NodeTags             []string
-	NodeInstancePrefix   string
-	TokenSource          oauth2.TokenSource
-	UseMetadataServer    bool
-	AlphaFeatureGate     *AlphaFeatureGate
+	APIEndpoint                  string
+	ContainerAPIEndpoint         string
+	ProjectID                    string
+	NetworkProjectID             string
+	Region                       string
+	Regional                     bool
+	Zone                         string
+	ManagedZones                 []string
+	NetworkName                  string
+	NetworkURL                   string
+	SubnetworkName               string
+	SubnetworkURL                string
+	SecondaryRangeName           string
+	NodeTags                     []string
+	NodeInstancePrefix           string
+	ExternalInstanceGroupsPrefix string
+	TokenSource                  oauth2.TokenSource
+	UseMetadataServer            bool
+	AlphaFeatureGate             *AlphaFeatureGate
 }
 
 func init() {
@@ -308,6 +315,7 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 
 		cloudConfig.NodeTags = configFile.Global.NodeTags
 		cloudConfig.NodeInstancePrefix = configFile.Global.NodeInstancePrefix
+		cloudConfig.ExternalInstanceGroupsPrefix = configFile.Global.ExternalInstanceGroupsPrefix
 		cloudConfig.AlphaFeatureGate = NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
 	}
 
@@ -505,28 +513,29 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(5, 5) // 5 qps, 5 burst.
 
 	gce := &Cloud{
-		service:                  service,
-		serviceAlpha:             serviceAlpha,
-		serviceBeta:              serviceBeta,
-		containerService:         containerService,
-		tpuService:               tpuService,
-		projectID:                projID,
-		networkProjectID:         netProjID,
-		onXPN:                    onXPN,
-		region:                   config.Region,
-		regional:                 config.Regional,
-		localZone:                config.Zone,
-		managedZones:             config.ManagedZones,
-		networkURL:               networkURL,
-		isLegacyNetwork:          isLegacyNetwork,
-		subnetworkURL:            subnetURL,
-		secondaryRangeName:       config.SecondaryRangeName,
-		nodeTags:                 config.NodeTags,
-		nodeInstancePrefix:       config.NodeInstancePrefix,
-		useMetadataServer:        config.UseMetadataServer,
-		operationPollRateLimiter: operationPollRateLimiter,
-		AlphaFeatureGate:         config.AlphaFeatureGate,
-		nodeZones:                map[string]sets.String{},
+		service:                      service,
+		serviceAlpha:                 serviceAlpha,
+		serviceBeta:                  serviceBeta,
+		containerService:             containerService,
+		tpuService:                   tpuService,
+		projectID:                    projID,
+		networkProjectID:             netProjID,
+		onXPN:                        onXPN,
+		region:                       config.Region,
+		regional:                     config.Regional,
+		localZone:                    config.Zone,
+		managedZones:                 config.ManagedZones,
+		networkURL:                   networkURL,
+		isLegacyNetwork:              isLegacyNetwork,
+		subnetworkURL:                subnetURL,
+		secondaryRangeName:           config.SecondaryRangeName,
+		nodeTags:                     config.NodeTags,
+		nodeInstancePrefix:           config.NodeInstancePrefix,
+		externalInstanceGroupsPrefix: config.ExternalInstanceGroupsPrefix,
+		useMetadataServer:            config.UseMetadataServer,
+		operationPollRateLimiter:     operationPollRateLimiter,
+		AlphaFeatureGate:             config.AlphaFeatureGate,
+		nodeZones:                    map[string]sets.String{},
 	}
 
 	gce.manager = &gceServiceManager{gce}

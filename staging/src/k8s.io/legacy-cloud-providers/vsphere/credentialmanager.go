@@ -77,6 +77,8 @@ func (secretCredentialManager *SecretCredentialManager) GetCredential(server str
 		klog.Warningf("secret %q not found in namespace %q", secretCredentialManager.SecretName, secretCredentialManager.SecretNamespace)
 	}
 
+	// Converting server FQIN to lowercase to consolidate with config parsing approach
+	server = strings.ToLower(server)
 	credential, found := secretCredentialManager.Cache.GetCredential(server)
 	if !found {
 		klog.Errorf("credentials not found for server %q", server)

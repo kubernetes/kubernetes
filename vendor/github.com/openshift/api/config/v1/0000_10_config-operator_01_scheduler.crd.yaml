@@ -1,0 +1,88 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: schedulers.config.openshift.io
+spec:
+  group: config.openshift.io
+  scope: Cluster
+  preserveUnknownFields: false
+  names:
+    kind: Scheduler
+    singular: scheduler
+    plural: schedulers
+    listKind: SchedulerList
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  subresources:
+    status: {}
+  "validation":
+    "openAPIV3Schema":
+      description: Scheduler holds cluster-wide config information to run the Kubernetes
+        Scheduler and influence its placement decisions. The canonical name for this
+        config is `cluster`.
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec holds user settable values for configuration
+          type: object
+          properties:
+            defaultNodeSelector:
+              description: 'defaultNodeSelector helps set the cluster-wide default
+                node selector to restrict pod placement to specific nodes. This is
+                applied to the pods created in all namespaces without a specified
+                nodeSelector value. For example, defaultNodeSelector: "type=user-node,region=east"
+                would set nodeSelector field in pod spec to "type=user-node,region=east"
+                to all pods created in all namespaces. Namespaces having project-wide
+                node selectors won''t be impacted even if this field is set. This
+                adds an annotation section to the namespace. For example, if a new
+                namespace is created with node-selector=''type=user-node,region=east'',
+                the annotation openshift.io/node-selector: type=user-node,region=east
+                gets added to the project. When the openshift.io/node-selector annotation
+                is set on the project the value is used in preference to the value
+                we are setting for defaultNodeSelector field. For instance, openshift.io/node-selector:
+                "type=user-node,region=west" means that the default of "type=user-node,region=east"
+                set in defaultNodeSelector would not be applied.'
+              type: string
+            mastersSchedulable:
+              description: 'MastersSchedulable allows masters nodes to be schedulable.
+                When this flag is turned on, all the master nodes in the cluster will
+                be made schedulable, so that workload pods can run on them. The default
+                value for this field is false, meaning none of the master nodes are
+                schedulable. Important Note: Once the workload pods start running
+                on the master nodes, extreme care must be taken to ensure that cluster-critical
+                control plane components are not impacted. Please turn on this field
+                after doing due diligence.'
+              type: boolean
+            policy:
+              description: policy is a reference to a ConfigMap containing scheduler
+                policy which has user specified predicates and priorities. If this
+                ConfigMap is not available scheduler will default to use DefaultAlgorithmProvider.
+                The namespace for this configmap is openshift-config.
+              type: object
+              required:
+              - name
+              properties:
+                name:
+                  description: name is the metadata.name of the referenced config
+                    map
+                  type: string
+        status:
+          description: status holds observed values from the cluster. They may not
+            be overridden.
+          type: object

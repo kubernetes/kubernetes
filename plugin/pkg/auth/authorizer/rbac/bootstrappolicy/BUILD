@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "controller_policy.go",
         "namespace_policy.go",
+        "patch_policy.go",
         "policy.go",
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy",

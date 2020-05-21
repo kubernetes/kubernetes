@@ -9,6 +9,7 @@ go_library(
         "ha_master.go",
         "kubelet_security.go",
         "node_lease.go",
+        "patch_flagaccess.go",
         "reboot.go",
         "resize_nodes.go",
         "restart.go",

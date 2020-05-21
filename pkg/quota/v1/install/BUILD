@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["registry.go"],
+    srcs = [
+        "patch_ignoredresources.go",
+        "registry.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/quota/v1/install",
     deps = [
         "//pkg/quota/v1:go_default_library",

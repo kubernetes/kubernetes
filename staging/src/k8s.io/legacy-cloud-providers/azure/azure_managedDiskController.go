@@ -82,10 +82,12 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	var err error
 	klog.V(4).Infof("azureDisk - creating new managed Name:%s StorageAccountType:%s Size:%v", options.DiskName, options.StorageAccountType, options.SizeGB)
 
-	var createZones *[]string
+	var createZones []string
 	if len(options.AvailabilityZone) > 0 {
-		zoneList := []string{c.common.cloud.GetZoneID(options.AvailabilityZone)}
-		createZones = &zoneList
+		requestedZone := c.common.cloud.GetZoneID(options.AvailabilityZone)
+		if requestedZone != "" {
+			createZones = append(createZones, requestedZone)
+		}
 	}
 
 	// insert original tags to newTags
@@ -155,11 +157,14 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 	model := compute.Disk{
 		Location: &c.common.location,
 		Tags:     newTags,
-		Zones:    createZones,
 		Sku: &compute.DiskSku{
 			Name: diskSku,
 		},
 		DiskProperties: &diskProperties,
+	}
+
+	if len(createZones) > 0 {
+		model.Zones = &createZones
 	}
 
 	if options.ResourceGroup == "" {
@@ -273,7 +278,11 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 	}
 
 	// Azure resizes in chunks of GiB (not GB)
-	requestGiB := int32(volumehelpers.RoundUpToGiB(newSize))
+	requestGiB, err := volumehelpers.RoundUpToGiBInt32(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	klog.V(2).Infof("azureDisk - begin to resize disk(%s) with new size(%d), old size(%v)", diskName, requestGiB, oldSize)
