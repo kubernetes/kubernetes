@@ -300,6 +300,7 @@ func CreateKubeAPIServerConfig(
 	})
 
 	s.Metrics.Apply()
+	serviceaccount.RegisterMetrics()
 
 	serviceIPRange, apiServerServiceIP, err := master.ServiceIPRange(s.PrimaryServiceClusterIPRange)
 	if err != nil {
