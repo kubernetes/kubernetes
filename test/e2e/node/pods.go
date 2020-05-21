@@ -54,9 +54,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 		/*
 			Release : v1.15
 			Testname: Pods, delete grace period
-			Description: Create a pod, make sure it is running. Using the http client send a 'delete' with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
+			Description: Create a pod, make sure it is running. Using the http client send a 'delete' with gracePeriodSeconds=30. Pod SHOULD get terminated within gracePeriodSeconds and removed from API server within a window.
 		*/
-		ginkgo.It("should be submitted and removed [Flaky]", func() {
+		ginkgo.It("should be submitted and removed", func() {
 			ginkgo.By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -116,8 +116,11 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			ginkgo.By("verifying the kubelet observed the termination notice")
 
+			// allow up to 3x grace period (which allows process termination)
+			// for the kubelet to remove from api.  need to follow-up on if this
+			// latency between termination and reportal can be isolated further.
 			start := time.Now()
-			err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
+			err = wait.Poll(time.Second*5, time.Second*30*3, func() (bool, error) {
 				podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
 					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
