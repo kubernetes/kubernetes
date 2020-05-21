@@ -892,6 +892,16 @@ function Configure-GcePdTools {
 '$modulePath = "K8S_DIR\GetGcePdName.dll"
 Unblock-File $modulePath
 Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
+
+  if (Test-IsTestCluster $kube_env) {
+    if (ShouldWrite-File ${env:K8S_DIR}\diskutil.exe) {
+      # The source code of this executable file is https://github.com/kubernetes-sigs/sig-windows-tools/blob/master/cmd/diskutil/diskutil.c
+      MustDownload-File -OutFile ${env:K8S_DIR}\diskutil.exe `
+        -URLs "https://ddebroywin1.s3-us-west-2.amazonaws.com/diskutil.exe"
+    }
+    Copy-Item ${env:K8S_DIR}\diskutil.exe -Destination "C:\Windows\system32"
+  }
+
 }
 
 # Setup cni network. This function supports both Docker and containerd.
