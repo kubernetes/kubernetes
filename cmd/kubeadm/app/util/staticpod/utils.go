@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/url"
 	"os"
 	"sort"
@@ -32,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kustomize"
@@ -220,12 +222,28 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 
 // LivenessProbe creates a Probe object with a HTTPGet handler
 func LivenessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
-	return createHTTPProbe(host, path, port, scheme, 15, 15, 8, 10)
+	// sets initialDelaySeconds same as periodSeconds to skip one period before running a check
+	return createHTTPProbe(host, path, port, scheme, 10, 15, 8, 10)
 }
 
 // ReadinessProbe creates a Probe object with a HTTPGet handler
 func ReadinessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
+	// sets initialDelaySeconds as '0' because we don't want to delay user infrastructure checks
+	// looking for "ready" status on kubeadm static Pods
 	return createHTTPProbe(host, path, port, scheme, 0, 15, 3, 1)
+}
+
+// StartupProbe creates a Probe object with a HTTPGet handler
+func StartupProbe(host, path string, port int, scheme v1.URIScheme, timeoutForControlPlane *metav1.Duration) *v1.Probe {
+	periodSeconds, timeoutForControlPlaneSeconds := int32(10), constants.DefaultControlPlaneTimeout.Seconds()
+	if timeoutForControlPlane != nil {
+		timeoutForControlPlaneSeconds = timeoutForControlPlane.Seconds()
+	}
+	// sets failureThreshold big enough to guarantee the full timeout can cover the worst case scenario for the control-plane to come alive
+	// we ignore initialDelaySeconds in the calculation here for simplicity
+	failureThreshold := int32(math.Ceil(timeoutForControlPlaneSeconds / float64(periodSeconds)))
+	// sets initialDelaySeconds same as periodSeconds to skip one period before running a check
+	return createHTTPProbe(host, path, port, scheme, periodSeconds, 15, failureThreshold, periodSeconds)
 }
 
 func createHTTPProbe(host, path string, port int, scheme v1.URIScheme, initialDelaySeconds, timeoutSeconds, failureThreshold, periodSeconds int32) *v1.Probe {
