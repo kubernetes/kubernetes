@@ -260,7 +260,7 @@ const (
 	ContainerStateRunning ContainerState = "running"
 	// ContainerStateExited indicates a container that ran and completed ("stopped" in other contexts, although a created container is technically also "stopped").
 	ContainerStateExited ContainerState = "exited"
-	// ContainerStateUnknown encompasses all the states that we currently don't care (like restarting, paused, dead).
+	// ContainerStateUnknown encompasses all the states that we currently don't care about (like restarting, paused, dead).
 	ContainerStateUnknown ContainerState = "unknown"
 )
 
