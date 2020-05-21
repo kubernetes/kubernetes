@@ -1017,7 +1017,7 @@ filename | sha256 hash
 * Correct the article in generated documents ([#32557](https://github.com/kubernetes/kubernetes/pull/32557), [@asalkeld](https://github.com/asalkeld))
 * Update PodAntiAffinity to ignore calls to subresources ([#35608](https://github.com/kubernetes/kubernetes/pull/35608), [@soltysh](https://github.com/soltysh))
 * The apiserver can now select which type of kubelet-reported address to use for apiserver->node communications, using the --kubelet-preferred-address-types flag. ([#35497](https://github.com/kubernetes/kubernetes/pull/35497), [@liggitt](https://github.com/liggitt))
-* update list of vailable resources ([#32687](https://github.com/kubernetes/kubernetes/pull/32687), [@jouve](https://github.com/jouve))
+* update list of available resources ([#32687](https://github.com/kubernetes/kubernetes/pull/32687), [@jouve](https://github.com/jouve))
 * Remove stale volumes if endpoint/svc creation fails. ([#35285](https://github.com/kubernetes/kubernetes/pull/35285), [@humblec](https://github.com/humblec))
 * add kubectl cp ([#34914](https://github.com/kubernetes/kubernetes/pull/34914), [@brendandburns](https://github.com/brendandburns))
 * Remove Job also from .status.active for Replace strategy ([#35420](https://github.com/kubernetes/kubernetes/pull/35420), [@soltysh](https://github.com/soltysh))
