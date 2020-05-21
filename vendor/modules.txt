@@ -1661,6 +1661,7 @@ k8s.io/component-base/cli/flag
 k8s.io/component-base/cli/globalflag
 k8s.io/component-base/codec
 k8s.io/component-base/config
+k8s.io/component-base/config/options
 k8s.io/component-base/config/testing
 k8s.io/component-base/config/v1alpha1
 k8s.io/component-base/config/validation

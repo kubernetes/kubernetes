@@ -52,7 +52,6 @@ filegroup(
         "//pkg/auth/nodeidentifier:all-srcs",
         "//pkg/capabilities:all-srcs",
         "//pkg/client/conditions:all-srcs",
-        "//pkg/client/leaderelectionconfig:all-srcs",
         "//pkg/client/testdata:all-srcs",
         "//pkg/client/tests:all-srcs",
         "//pkg/cloudprovider:all-srcs",
