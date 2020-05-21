@@ -29,10 +29,13 @@ import (
 	v1beta1 "k8s.io/api/node/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	nodev1beta1client "k8s.io/client-go/kubernetes/typed/node/v1beta1"
 	nodev1beta1listers "k8s.io/client-go/listers/node/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
@@ -58,12 +61,25 @@ func Register(plugins *admission.Plugins) {
 type RuntimeClass struct {
 	*admission.Handler
 	runtimeClassLister nodev1beta1listers.RuntimeClassLister
+<<<<<<< HEAD
+=======
+	runtimeClassClient nodev1beta1client.RuntimeClassInterface
+
+	inspectedFeatures   bool
+	runtimeClassEnabled bool
+	podOverheadEnabled  bool
+>>>>>>> 6b8e2cc24e4... Fix runtime admission flaky test due to race condition
 }
 
 var _ admission.MutationInterface = &RuntimeClass{}
 var _ admission.ValidationInterface = &RuntimeClass{}
 
 var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &RuntimeClass{}
+var _ genericadmissioninitailizer.WantsExternalKubeClientSet = &RuntimeClass{}
+
+func (r *RuntimeClass) SetExternalKubeClientSet(client kubernetes.Interface) {
+	r.runtimeClassClient = client.NodeV1beta1().RuntimeClasses()
+}
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
@@ -76,6 +92,9 @@ func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformer
 func (r *RuntimeClass) ValidateInitialization() error {
 	if r.runtimeClassLister == nil {
 		return fmt.Errorf("missing RuntimeClass lister")
+	}
+	if r.runtimeClassClient == nil {
+		return fmt.Errorf("missing RuntimeClass client")
 	}
 	return nil
 }
@@ -91,7 +110,7 @@ func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attribute
 		return nil
 	}
 
-	pod, runtimeClass, err := r.prepareObjects(attributes)
+	pod, runtimeClass, err := r.prepareObjects(ctx, attributes)
 	if err != nil {
 		return err
 	}
@@ -115,7 +134,7 @@ func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attrib
 		return nil
 	}
 
-	pod, runtimeClass, err := r.prepareObjects(attributes)
+	pod, runtimeClass, err := r.prepareObjects(ctx, attributes)
 	if err != nil {
 		return err
 	}
@@ -136,7 +155,7 @@ func NewRuntimeClass() *RuntimeClass {
 }
 
 // prepareObjects returns pod and runtimeClass types from the given admission attributes
-func (r *RuntimeClass) prepareObjects(attributes admission.Attributes) (pod *api.Pod, runtimeClass *v1beta1.RuntimeClass, err error) {
+func (r *RuntimeClass) prepareObjects(ctx context.Context, attributes admission.Attributes) (pod *api.Pod, runtimeClass *v1beta1.RuntimeClass, err error) {
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
 		return nil, nil, apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
@@ -149,7 +168,11 @@ func (r *RuntimeClass) prepareObjects(attributes admission.Attributes) (pod *api
 	// get RuntimeClass object
 	runtimeClass, err = r.runtimeClassLister.Get(*pod.Spec.RuntimeClassName)
 	if apierrors.IsNotFound(err) {
-		return pod, nil, admission.NewForbidden(attributes, fmt.Errorf("pod rejected: RuntimeClass %q not found", *pod.Spec.RuntimeClassName))
+		// if not found, our informer cache could be lagging, do a live lookup
+		runtimeClass, err = r.runtimeClassClient.Get(ctx, *pod.Spec.RuntimeClassName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return pod, nil, admission.NewForbidden(attributes, fmt.Errorf("pod rejected: RuntimeClass %q not found", *pod.Spec.RuntimeClassName))
+		}
 	}
 
 	// return the pod and runtimeClass.
