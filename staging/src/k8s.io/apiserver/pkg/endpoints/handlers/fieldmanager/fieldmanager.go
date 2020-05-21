@@ -18,6 +18,7 @@ package fieldmanager
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -96,25 +97,31 @@ func NewCRDFieldManager(models openapiproto.Models, objectConverter runtime.Obje
 func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error) {
 	// If the object doesn't have metadata, we should just return without trying to
 	// set the managedFields at all, so creates/updates/patches will work normally.
-	if _, err := meta.Accessor(newObj); err != nil {
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
 		return newObj, nil
 	}
 
 	// First try to decode the managed fields provided in the update,
 	// This is necessary to allow directly updating managed fields.
-	managed, err := internal.DecodeObjectManagedFields(newObj)
-
-	// If the managed field is empty or we failed to decode it,
-	// let's try the live object. This is to prevent clients who
-	// don't understand managedFields from deleting it accidentally.
-	if err != nil || len(managed.Fields) == 0 {
-		managed, err = internal.DecodeObjectManagedFields(liveObj)
+	var managed internal.Managed
+	if isResetManagedFields(newAccessor.GetManagedFields()) {
+		managed = internal.NewEmptyManaged()
+	} else if managed, err = internal.DecodeObjectManagedFields(newAccessor.GetManagedFields()); err != nil || len(managed.Fields) == 0 {
+		liveAccessor, err := meta.Accessor(liveObj)
 		if err != nil {
+			return newObj, nil
+		}
+		// If the managed field is empty or we failed to decode it,
+		// let's try the live object. This is to prevent clients who
+		// don't understand managedFields from deleting it accidentally.
+		if managed, err = internal.DecodeObjectManagedFields(liveAccessor.GetManagedFields()); err != nil {
 			managed = internal.NewEmptyManaged()
 		}
 	}
 	// if managed field is still empty, skip updating managed fields altogether
 	if len(managed.Fields) == 0 {
+		newAccessor.SetManagedFields(nil)
 		return newObj, nil
 	}
 	newObjVersioned, err := f.toVersioned(newObj)
@@ -193,6 +200,21 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 	return obj
 }
 
+// Returns true if the managedFields indicate that the user is trying to
+// reset the managedFields, i.e. if the list is non-nil but empty, or if
+// the list has one empty item.
+func isResetManagedFields(managedFields []metav1.ManagedFieldsEntry) bool {
+	if len(managedFields) == 0 {
+		return managedFields != nil
+	}
+
+	if len(managedFields) == 1 {
+		return reflect.DeepEqual(managedFields[0], metav1.ManagedFieldsEntry{})
+	}
+
+	return false
+}
+
 // Apply is used when server-side apply is called, as it merges the
 // object and update the managed fields.
 func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
@@ -203,7 +225,8 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	}
 	missingManagedFields := (len(accessor.GetManagedFields()) == 0)
 
-	managed, err := internal.DecodeObjectManagedFields(liveObj)
+	// Decode the managed fields in the live object, since it isn't allowed in the patch.
+	managed, err := internal.DecodeObjectManagedFields(accessor.GetManagedFields())
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
