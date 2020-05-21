@@ -270,6 +270,7 @@ function test_apiserver_off {
             echo "API SERVER insecure port is free, proceeding..."
         else
             echo "ERROR starting API SERVER, exiting. Some process on ${API_HOST} is serving already on ${API_PORT}"
+	    echo "$(command -v netstat >/dev/null 2>&1 && netstat -nat | grep "[\.:]${API_PORT:?} .*LISTEN" || ss -nplt | grep "[\.:]${API_PORT:?} ")"
             exit 1
         fi
     fi
@@ -278,6 +279,7 @@ function test_apiserver_off {
         echo "API SERVER secure port is free, proceeding..."
     else
         echo "ERROR starting API SERVER, exiting. Some process on ${API_HOST} is serving already on ${API_SECURE_PORT}"
+	echo "$(command -v netstat >/dev/null 2>&1 && netstat -nat | grep "[\.:]${API_SECURE_PORT:?} .*LISTEN" || ss -nplt | grep "[\.:]${API_SECURE_PORT:?} ")"
         exit 1
     fi
 }
