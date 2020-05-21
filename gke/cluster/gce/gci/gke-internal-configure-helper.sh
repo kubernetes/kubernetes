@@ -68,6 +68,10 @@ function start_pod_autoscaler {
 
     cp "${manifests_dir}/internal-vpa-crd.yaml" "${manifests_dir}/pod-autoscaler"
     cp "${manifests_dir}/internal-vpa-rbac.yaml" "${manifests_dir}/pod-autoscaler"
+    if [[ "${ENABLE_MULTIDIM_POD_AUTOSCALER:-}" == "true" ]]; then
+      cp "${manifests_dir}/internal-mpa-crd.yaml" "${manifests_dir}/pod-autoscaler"
+      cp "${manifests_dir}/internal-mpa-rbac.yaml" "${manifests_dir}/pod-autoscaler"
+    fi
     setup-addon-manifests "addons" "pod-autoscaler"
 
     for component in admission-controller recommender updater; do
