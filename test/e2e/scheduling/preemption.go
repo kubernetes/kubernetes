@@ -103,10 +103,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	// This test verifies that when a higher priority pod is created and no node with
-	// enough resources is found, scheduler preempts a lower priority pod to schedule
-	// the high priority pod.
-	ginkgo.It("validates basic preemption works", func() {
+	/*
+		Release : v1.19
+		Testname: Scheduler, Basic Preemption
+		Description: When a higher priority pod is created and no node with enough
+		resources is found, the scheduler MUST preempt a lower priority pod and
+		schedule the high priority pod.
+	*/
+	framework.ConformanceIt("validates basic preemption works", func() {
 		var podRes v1.ResourceList
 
 		// Create one pod per node that uses a lot of the node's resources.
@@ -186,10 +190,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		framework.ExpectEqual(podPreempted, true)
 	})
 
-	// This test verifies that when a critical pod is created and no node with
-	// enough resources is found, scheduler preempts a lower priority pod to schedule
-	// this critical pod.
-	ginkgo.It("validates lower priority pod preemption by critical pod", func() {
+	/*
+		Release : v1.19
+		Testname: Scheduler, Preemption for critical pod
+		Description: When a critical pod is created and no node with enough
+		resources is found, the scheduler MUST preempt a lower priority pod to
+		schedule the critical pod.
+	*/
+	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func() {
 		var podRes v1.ResourceList
 
 		ginkgo.By("Create pods that use 2/3 of node resources.")
