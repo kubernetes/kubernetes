@@ -141,7 +141,7 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 	return command
 }
 
-// ExpandContainerVolumeMounts expands the subpath of the given VolumeMount by replacing variable references `with the values of given EnvVar.
+// ExpandContainerVolumeMounts expands the subpath of the given VolumeMount by replacing variable references with the values of given EnvVar.
 func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, error) {
 
 	envmap := EnvVarsToMap(envs)
