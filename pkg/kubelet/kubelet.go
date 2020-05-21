@@ -248,15 +248,6 @@ type DockerOptions struct {
 // makePodSourceConfig creates a config.PodConfig from the given
 // KubeletConfiguration or returns an error.
 func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, bootstrapCheckpointPath string) (*config.PodConfig, error) {
-	manifestURLHeader := make(http.Header)
-	if len(kubeCfg.StaticPodURLHeader) > 0 {
-		for k, v := range kubeCfg.StaticPodURLHeader {
-			for i := range v {
-				manifestURLHeader.Add(k, v[i])
-			}
-		}
-	}
-
 	// source of all configuration
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
 
@@ -268,6 +259,15 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 
 	// define url config source
 	if kubeCfg.StaticPodURL != "" {
+		manifestURLHeader := make(http.Header)
+		if len(kubeCfg.StaticPodURLHeader) > 0 {
+			for k, v := range kubeCfg.StaticPodURLHeader {
+				for i := range v {
+					manifestURLHeader.Add(k, v[i])
+				}
+			}
+		}
+
 		klog.Infof("Adding pod url %q with HTTP header %v", kubeCfg.StaticPodURL, manifestURLHeader)
 		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
