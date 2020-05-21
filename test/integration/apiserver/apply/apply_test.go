@@ -1212,7 +1212,7 @@ func TestClearManagedFieldsWithMergePatch(t *testing.T) {
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Body([]byte(`{"metadata":{"managedFields": [{}]}}`)).Do(context.TODO()).Get()
+		Body([]byte(`{"metadata":{"managedFields": []}}`)).Do(context.TODO()).Get()
 	if err != nil {
 		t.Fatalf("Failed to patch object: %v", err)
 	}
@@ -1268,7 +1268,7 @@ func TestClearManagedFieldsWithStrategicMergePatch(t *testing.T) {
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Body([]byte(`{"metadata":{"managedFields": [{}]}}`)).Do(context.TODO()).Get()
+		Body([]byte(`{"metadata":{"managedFields": []}}`)).Do(context.TODO()).Get()
 	if err != nil {
 		t.Fatalf("Failed to patch object: %v", err)
 	}
@@ -1328,7 +1328,7 @@ func TestClearManagedFieldsWithJSONPatch(t *testing.T) {
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Body([]byte(`[{"op": "replace", "path": "/metadata/managedFields", "value": [{}]}]`)).Do(context.TODO()).Get()
+		Body([]byte(`[{"op": "replace", "path": "/metadata/managedFields", "value": []}]`)).Do(context.TODO()).Get()
 	if err != nil {
 		t.Fatalf("Failed to patch object: %v", err)
 	}
@@ -1390,7 +1390,7 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 			"metadata": {
 				"name": "test-cm",
 				"namespace": "default",
-				"managedFields": [{}],
+				"managedFields": [],
 				"labels": {
 					"test-label": "test"
 				}

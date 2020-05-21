@@ -111,18 +111,26 @@ func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind
 func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (object runtime.Object, err error) {
 	// If the object doesn't have metadata, we should just return without trying to
 	// set the managedFields at all, so creates/updates/patches will work normally.
-	if _, err = meta.Accessor(newObj); err != nil {
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
 		return newObj, nil
 	}
 
 	// First try to decode the managed fields provided in the update,
 	// This is necessary to allow directly updating managed fields.
 	var managed Managed
-	if managed, err = internal.DecodeObjectManagedFields(newObj); err != nil || len(managed.Fields()) == 0 {
+	if newAccessor.GetManagedFields() != nil {
+		managed, err = internal.DecodeObjectManagedFields(newAccessor.GetManagedFields())
+	}
+	if newAccessor.GetManagedFields() == nil || err != nil {
+		liveAccessor, err := meta.Accessor(liveObj)
+		if err != nil {
+			return newObj, nil
+		}
 		// If the managed field is empty or we failed to decode it,
 		// let's try the live object. This is to prevent clients who
 		// don't understand managedFields from deleting it accidentally.
-		managed, err = internal.DecodeObjectManagedFields(liveObj)
+		managed, err = internal.DecodeObjectManagedFields(liveAccessor.GetManagedFields())
 		if err != nil {
 			// If we also can't decode the liveObject, then
 			// just restart managedFields from scratch.
@@ -167,13 +175,14 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 // object and updates the managed fields.
 func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string, force bool) (object runtime.Object, err error) {
 	// If the object doesn't have metadata, apply isn't allowed.
-	if _, err = meta.Accessor(liveObj); err != nil {
+	accessor, err := meta.Accessor(liveObj)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
 
 	// Decode the managed fields in the live object, since it isn't allowed in the patch.
 	var managed Managed
-	if managed, err = internal.DecodeObjectManagedFields(liveObj); err != nil {
+	if managed, err = internal.DecodeObjectManagedFields(accessor.GetManagedFields()); err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
 
