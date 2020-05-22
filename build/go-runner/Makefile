@@ -63,7 +63,7 @@ manifest: push
 
 .PHONY: init-docker-buildx
 init-docker-buildx:
-ifneq ($(shell docker buildx 2>&1 >/dev/null; echo $?),)
+ifneq ($(shell docker buildx &>/dev/null; echo $$?),0)
 	$(error "buildx not vailable. Docker 19.03 or higher is required")
 endif
 	docker run --rm --privileged linuxkit/binfmt:4ea3b9b0938cbd19834c096aa31ff475cc75d281
