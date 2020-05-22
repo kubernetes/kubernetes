@@ -2544,6 +2544,7 @@ EOF
 
   # Place addon manager pod manifest.
   src_file="${src_dir}/kube-addon-manager.yaml"
+  sed -i -e "s@{{kubectl_prune_whitelist_override}}@${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}@g" "${src_file}"
   sed -i -e "s@{{kubectl_extra_prune_whitelist}}@${ADDON_MANAGER_PRUNE_WHITELIST:-}@g" "${src_file}"
   sed -i -e "s@{{runAsUser}}@${KUBE_ADDON_MANAGER_RUNASUSER:-2002}@g" "${src_file}"
   sed -i -e "s@{{runAsGroup}}@${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}@g" "${src_file}"
