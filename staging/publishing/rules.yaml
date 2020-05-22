@@ -1598,3 +1598,13 @@ rules:
       branch: release-1.18
     - repository: metrics
       branch: release-1.18
+
+- destination: controller-manager
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/controller-manager
+    name: master
+    go: 1.13.9
+
