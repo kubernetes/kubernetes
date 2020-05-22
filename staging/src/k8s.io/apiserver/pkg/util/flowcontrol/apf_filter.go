@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
@@ -51,6 +52,9 @@ type Interface interface {
 	// any needed changes to local behavior.  This method ceases
 	// activity and returns after the given channel is closed.
 	Run(stopCh <-chan struct{}) error
+
+	// Install installs debugging endpoints to the web-server.
+	Install(c *mux.PathRecorderMux)
 }
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md

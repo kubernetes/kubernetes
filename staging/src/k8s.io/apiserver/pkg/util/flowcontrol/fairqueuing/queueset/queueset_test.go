@@ -79,7 +79,7 @@ func exerciseQueueSetUniformScenario(t *testing.T, name string, qs fq.QueueSet, 
 			go func(i, j int, uc uniformClient, igr test.Integrator) {
 				for k := 0; k < uc.nCalls; k++ {
 					ClockWait(clk, counter, uc.thinkDuration)
-					req, idle := qs.StartRequest(context.Background(), uc.hash, fsName, name, []int{i, j, k})
+					req, idle := qs.StartRequest(context.Background(), uc.hash, "", fsName, name, []int{i, j, k})
 					t.Logf("%s: %d, %d, %d got req=%p, idle=%v", clk.Now().Format(nsTimeFmt), i, j, k, req, idle)
 					if req == nil {
 						atomic.AddUint64(&failedCount, 1)
@@ -346,7 +346,7 @@ func TestContextCancel(t *testing.T) {
 	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 1})
 	counter.Add(1) // account for the goroutine running this test
 	ctx1 := context.Background()
-	req1, _ := qs.StartRequest(ctx1, 1, "fs1", "test", "one")
+	req1, _ := qs.StartRequest(ctx1, 1, "", "fs1", "test", "one")
 	if req1 == nil {
 		t.Error("Request rejected")
 		return
@@ -362,7 +362,7 @@ func TestContextCancel(t *testing.T) {
 			counter.Add(1)
 			cancel2()
 		}()
-		req2, idle2a := qs.StartRequest(ctx2, 2, "fs2", "test", "two")
+		req2, idle2a := qs.StartRequest(ctx2, 2, "", "fs2", "test", "two")
 		if idle2a {
 			t.Error("2nd StartRequest returned idle")
 		}

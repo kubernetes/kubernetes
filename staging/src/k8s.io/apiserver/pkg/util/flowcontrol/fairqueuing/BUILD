@@ -6,6 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing",
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing",
     visibility = ["//visibility:public"],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/debug:go_default_library"],
 )
 
 filegroup(
