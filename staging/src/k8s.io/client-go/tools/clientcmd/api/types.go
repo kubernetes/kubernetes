@@ -193,7 +193,7 @@ func (c AuthProviderConfig) String() string {
 // ExecConfig specifies a command to provide client credentials. The command is exec'd
 // and outputs structured stdout holding credentials.
 //
-// See the client.authentiction.k8s.io API group for specifications of the exact input
+// See the client.authentication.k8s.io API group for specifications of the exact input
 // and output format
 type ExecConfig struct {
 	// Command to execute.
