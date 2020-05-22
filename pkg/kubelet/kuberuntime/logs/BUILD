@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime/logs",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/kubelet/types:go_default_library",
         "//pkg/util/tail:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
