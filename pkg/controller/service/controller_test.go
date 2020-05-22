@@ -490,7 +490,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 		{
 			node:         v1.Node{},
 			expectAccept: false,
-			name:         "empty",
+			name:         "nodes that are not ready are not included",
 		},
 		{
 			node: v1.Node{
@@ -501,7 +501,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 				},
 			},
 			expectAccept: true,
-			name:         "basic",
+			name:         "healthy nodes are included",
 		},
 		{
 			node: v1.Node{
@@ -512,8 +512,8 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 					},
 				},
 			},
-			expectAccept: false,
-			name:         "unschedulable",
+			expectAccept: true,
+			name:         "unschedulable but healthy nodes are included",
 		},
 	}
 	pred := getNodeConditionPredicate()
