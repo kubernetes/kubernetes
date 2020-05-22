@@ -28,6 +28,7 @@ import (
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/client-go/informers"
@@ -95,6 +96,10 @@ func (cqs *ctlTestQueueSet) BeginConfigChange(qc fq.QueuingConfig) (fq.QueueSetC
 	return ctlTestQueueSetCompleter{cqs.cts, cqs, qc}, nil
 }
 
+func (cqs *ctlTestQueueSet) Dump(bool) debug.QueueSetDump {
+	return debug.QueueSetDump{}
+}
+
 func (cqc ctlTestQueueSetCompleter) Complete(dc fq.DispatchingConfig) fq.QueueSet {
 	cqc.cts.lock.Lock()
 	defer cqc.cts.lock.Unlock()
@@ -115,7 +120,7 @@ func (cqs *ctlTestQueueSet) IsIdle() bool {
 	return cqs.countActive == 0
 }
 
-func (cqs *ctlTestQueueSet) StartRequest(ctx context.Context, hashValue uint64, fsName string, descr1, descr2 interface{}) (req fq.Request, idle bool) {
+func (cqs *ctlTestQueueSet) StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}) (req fq.Request, idle bool) {
 	cqs.cts.lock.Lock()
 	defer cqs.cts.lock.Unlock()
 	cqs.countActive++

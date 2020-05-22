@@ -20,15 +20,20 @@ import (
 	"context"
 	"time"
 
+	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 )
 
 // request is a temporary container for "requests" with additional
 // tracking fields required for the functionality FQScheduler
 type request struct {
-	qs     *queueSet
-	fsName string
-	ctx    context.Context
+	ctx context.Context
+
+	qs *queueSet
+
+	flowDistinguisher string
+	fsName            string
 
 	// The relevant queue.  Is nil if this request did not go through
 	// a queue.
@@ -93,4 +98,28 @@ func (q *queue) GetVirtualFinish(J int, G float64) float64 {
 	// counting from J=1 for the head (eg: queue.requests[0] -> J=1) - J+1
 	jg := float64(J+1) * float64(G)
 	return jg + q.virtualStart
+}
+
+func (q *queue) dump(includeDetails bool) debug.QueueDump {
+	digest := make([]debug.RequestDump, len(q.requests))
+	for i, r := range q.requests {
+		// dump requests.
+		digest[i].MatchedFlowSchema = r.fsName
+		digest[i].FlowDistinguisher = r.flowDistinguisher
+		digest[i].ArriveTime = r.arrivalTime
+		digest[i].StartTime = r.startTime
+		if includeDetails {
+			userInfo, _ := genericrequest.UserFrom(r.ctx)
+			digest[i].UserName = userInfo.GetName()
+			requestInfo, ok := genericrequest.RequestInfoFrom(r.ctx)
+			if ok {
+				digest[i].RequestInfo = *requestInfo
+			}
+		}
+	}
+	return debug.QueueDump{
+		VirtualStart:      q.virtualStart,
+		Requests:          digest,
+		ExecutingRequests: q.requestsExecuting,
+	}
 }
