@@ -245,10 +245,6 @@ const (
 	// This file should exist under KubeletRunDirectory
 	KubeletConfigurationFileName = "config.yaml"
 
-	// DynamicKubeletConfigurationDirectoryName specifies the directory which stores the dynamic configuration checkpoints for the kubelet
-	// This directory should exist under KubeletRunDirectory
-	DynamicKubeletConfigurationDirectoryName = "dynamic-config"
-
 	// KubeletEnvFileName is a file "kubeadm init" writes at runtime. Using that interface, kubeadm can customize certain
 	// kubelet flags conditionally based on the environment at runtime. Also, parameters given to the configuration file
 	// might be passed through this file. "kubeadm init" writes one variable, with the name ${KubeletEnvFileVariableName}.
@@ -324,18 +320,6 @@ const (
 
 	// KubeDNSDnsMasqNannyImageName specifies the name of the image for the dnsmasq container in the kube-dns add-on
 	KubeDNSDnsMasqNannyImageName = "k8s-dns-dnsmasq-nanny"
-
-	// AuditPolicyDir is the directory that will contain the audit policy
-	AuditPolicyDir = "audit"
-	// AuditPolicyFile is the name of the audit policy file itself
-	AuditPolicyFile = "audit.yaml"
-	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
-	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
-
-	// LeaseEndpointReconcilerType will select a storage based reconciler
-	// Copied from pkg/master/reconcilers to avoid pulling extra dependencies
-	// TODO: Import this constant from a consts only package, that does not pull any further dependencies.
-	LeaseEndpointReconcilerType = "lease"
 
 	// KubeDNSVersion is the version of kube-dns to be deployed if it is used
 	KubeDNSVersion = "1.14.13"
@@ -623,11 +607,6 @@ func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, erro
 		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
 	}
 	return internalAPIServerVirtualIP, nil
-}
-
-// GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
-func GetStaticPodAuditPolicyFile() string {
-	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
 }
 
 // GetDNSVersion is a handy function that returns the DNS version by DNS type
