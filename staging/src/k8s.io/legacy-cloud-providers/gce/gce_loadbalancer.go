@@ -111,6 +111,11 @@ func (g *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, svc *v1
 
 		return status, true, nil
 	}
+	// Checking for finalizer is more accurate because controller restart could happen in the middle of resource
+	// deletion. So even though forwarding rule was deleted, cleanup might not have been complete.
+	if hasFinalizer(svc, ILBFinalizerV1) {
+		return &v1.LoadBalancerStatus{}, true, nil
+	}
 	return nil, false, ignoreNotFound(err)
 }
 
