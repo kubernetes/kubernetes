@@ -17,6 +17,8 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"sync"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -56,8 +58,12 @@ var (
 	)
 )
 
-func init() {
-	legacyregistry.MustRegister(legacyTokensTotal)
-	legacyregistry.MustRegister(staleTokensTotal)
-	legacyregistry.MustRegister(validTokensTotal)
+var registerMetricsOnce sync.Once
+
+func RegisterMetrics() {
+	registerMetricsOnce.Do(func() {
+		legacyregistry.MustRegister(legacyTokensTotal)
+		legacyregistry.MustRegister(staleTokensTotal)
+		legacyregistry.MustRegister(validTokensTotal)
+	})
 }
