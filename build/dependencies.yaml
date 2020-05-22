@@ -1,6 +1,6 @@
 dependencies:
   - name: "cni"
-    version: 0.8.5
+    version: 0.8.6
     refPaths:
     - path: build/workspace.bzl
       match: CNI_VERSION =
