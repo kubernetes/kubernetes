@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -70,7 +70,8 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, namespaces informers.NamespaceInformer, cl clientset.Interface,
+	options TokensControllerOptions) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -91,6 +92,9 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 			return nil, err
 		}
 	}
+
+	e.namespaces = namespaces.Lister()
+	e.namespacesSynced = namespaces.Informer().HasSynced
 
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
@@ -136,6 +140,7 @@ type TokensController struct {
 
 	rootCA []byte
 
+	namespaces      listersv1.NamespaceLister
 	serviceAccounts listersv1.ServiceAccountLister
 	// updatedSecrets is a wrapper around the shared cache which allows us to record
 	// and return our local mutations (since we're very likely to act on an updated
@@ -145,6 +150,7 @@ type TokensController struct {
 	// Since we join two objects, we'll watch both of them with controllers.
 	serviceAccountSynced cache.InformerSynced
 	secretSynced         cache.InformerSynced
+	namespacesSynced     cache.InformerSynced
 
 	// syncServiceAccountQueue handles service account events:
 	//   * ensures a referenced token exists for service accounts which still exist
@@ -169,7 +175,7 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	defer e.syncServiceAccountQueue.ShutDown()
 	defer e.syncSecretQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("tokens", stopCh, e.serviceAccountSynced, e.secretSynced) {
+	if !cache.WaitForNamedCacheSync("tokens", stopCh, e.serviceAccountSynced, e.secretSynced, e.namespacesSynced) {
 		return
 	}
 
@@ -241,6 +247,18 @@ func (e *TokensController) syncServiceAccount() {
 		return
 	}
 
+	// Ensure namespace is not terminating
+	ns, nsErr := e.namespaces.Get(saInfo.namespace)
+	if nsErr != nil {
+		klog.Error(err)
+		retry = true
+		return
+	}
+	if ns.Status.Phase == v1.NamespaceTerminating {
+		retry = false
+		return
+	}
+
 	sa, err := e.getServiceAccount(saInfo.namespace, saInfo.name, saInfo.uid, false)
 	switch {
 	case err != nil:
@@ -298,6 +316,17 @@ func (e *TokensController) syncSecret() {
 			}
 		}
 	default:
+		// Ensure namespace is not terminating
+		ns, nsErr := e.namespaces.Get(secretInfo.namespace)
+		if nsErr != nil {
+			klog.Error(err)
+			retry = true
+			return
+		}
+		if ns.Status.Phase == v1.NamespaceTerminating {
+			retry = false
+			return
+		}
 		// Ensure service account exists
 		sa, saErr := e.getServiceAccount(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, true)
 		switch {

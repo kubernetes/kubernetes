@@ -26,7 +26,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -583,7 +583,9 @@ func TestTokenCreation(t *testing.T) {
 		secretInformer := informers.Core().V1().Secrets().Informer()
 		secrets := secretInformer.GetStore()
 		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), informers.Core().V1().Namespaces(), client, TokensControllerOptions{TokenGenerator: generator,
+			RootCA:     []byte("CA Data"),
+			MaxRetries: tc.MaxRetries})
 		if err != nil {
 			t.Fatalf("error creating Tokens controller: %v", err)
 		}

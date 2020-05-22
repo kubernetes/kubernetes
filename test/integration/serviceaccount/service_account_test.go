@@ -463,6 +463,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	tokenController, err := serviceaccountcontroller.NewTokensController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
+		informers.Core().V1().Namespaces(),
 		rootClientset,
 		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: tokenGenerator},
 	)

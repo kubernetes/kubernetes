@@ -573,6 +573,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	controller, err := serviceaccountcontroller.NewTokensController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Secrets(),
+		ctx.InformerFactory.Core().V1().Namespaces(),
 		c.rootClientBuilder.ClientOrDie("tokens-controller"),
 		serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
