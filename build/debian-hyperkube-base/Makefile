@@ -25,7 +25,7 @@ ALL_ARCH = amd64 arm arm64 ppc64le s390x
 CACHEBUST?=1
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
-CNI_VERSION=v0.8.5
+CNI_VERSION?=v0.8.6
 
 TEMP_DIR:=$(shell mktemp -d)
 CNI_TARBALL=cni-plugins-linux-$(ARCH)-$(CNI_VERSION).tgz
