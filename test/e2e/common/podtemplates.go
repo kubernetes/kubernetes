@@ -24,10 +24,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"time"
 
 	"github.com/onsi/ginkgo"
+)
+
+const (
+	podTemplateRetryPeriod  = 1 * time.Second
+	podTemplateRetryTimeout = 1 * time.Minute
 )
 
 var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
@@ -134,12 +141,10 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 		framework.ExpectEqual(len(podTemplateList.Items), len(podTemplateNames), "looking for expected number of pod templates")
 
 		ginkgo.By("delete collection of pod templates")
-		// delete collection
+		// confirm that delete collection does remove all pod templates
 
-		framework.Logf("requesting DeleteCollection of pod templates")
-		err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-			LabelSelector: "podtemplate-set=true"})
-		framework.ExpectNoError(err, "failed to delete all pod templates")
+		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, deletePodTemplateCollection(f, "podtemplate-set=true"))
+		framework.ExpectNoError(err, "failed to delete collection")
 
 		ginkgo.By("get a list of pod templates with a label in the current namespace")
 		// get list of pod templates
@@ -153,3 +158,21 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 	})
 
 })
+
+func deletePodTemplateCollection(f *framework.Framework, label string) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		framework.Logf("requesting DeleteCollection of pod templates")
+
+		err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: label})
+
+		if err != nil {
+			return false, err
+		} else {
+			return true, nil
+		}
+
+	}
+}
