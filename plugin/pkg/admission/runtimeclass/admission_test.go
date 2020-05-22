@@ -1,4 +1,3 @@
-
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -30,12 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/client-go/kubernetes/fake"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -352,7 +351,7 @@ func newRuntimeClassForTest(runtimeClassEnabled bool,
 	if addClient {
 		var client kubernetes.Interface
 		if clientObject != nil {
-		    client = fake.NewSimpleClientset(clientObject)
+			client = fake.NewSimpleClientset(clientObject)
 		} else {
 			client = fake.NewSimpleClientset()
 		}
@@ -386,7 +385,7 @@ func TestValidateInitialization(t *testing.T) {
 		{
 			name:         "runtimeClass enabled, no lister",
 			expectError:  true,
-			runtimeClass: newRuntimeClassForTest(true, true, false, nil, true, nil,),
+			runtimeClass: newRuntimeClassForTest(true, true, false, nil, true, nil),
 		},
 		{
 			name:         "runtimeClass enabled, no client",
@@ -432,7 +431,6 @@ func TestAdmit(t *testing.T) {
 		nil,
 		false,
 		nil)
-
 
 	tests := []struct {
 		name         string

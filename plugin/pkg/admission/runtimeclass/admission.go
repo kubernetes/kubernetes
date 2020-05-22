@@ -74,6 +74,7 @@ var _ admission.ValidationInterface = &RuntimeClass{}
 var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &RuntimeClass{}
 var _ genericadmissioninitailizer.WantsExternalKubeClientSet = &RuntimeClass{}
 
+// SetExternalKubeClientSet sets the client for the plugin
 func (r *RuntimeClass) SetExternalKubeClientSet(client kubernetes.Interface) {
 	r.runtimeClassClient = client.NodeV1beta1().RuntimeClasses()
 }
