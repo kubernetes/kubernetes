@@ -317,13 +317,11 @@ func MachineInfo(nodeName string,
 			}
 
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
-			if devicePluginCapacity != nil {
-				for k, v := range devicePluginCapacity {
-					if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
-						klog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
-					}
-					node.Status.Capacity[k] = v
+			for k, v := range devicePluginCapacity {
+				if old, ok := node.Status.Capacity[k]; !ok || old.Value() != v.Value() {
+					klog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
 				}
+				node.Status.Capacity[k] = v
 			}
 
 			for _, removedResource := range removedDevicePlugins {
@@ -365,13 +363,11 @@ func MachineInfo(nodeName string,
 			node.Status.Allocatable[k] = value
 		}
 
-		if devicePluginAllocatable != nil {
-			for k, v := range devicePluginAllocatable {
-				if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
-					klog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
-				}
-				node.Status.Allocatable[k] = v
+		for k, v := range devicePluginAllocatable {
+			if old, ok := node.Status.Allocatable[k]; !ok || old.Value() != v.Value() {
+				klog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
 			}
+			node.Status.Allocatable[k] = v
 		}
 		// for every huge page reservation, we need to remove it from allocatable memory
 		for k, v := range node.Status.Capacity {
