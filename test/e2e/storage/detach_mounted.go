@@ -43,7 +43,7 @@ var (
 	durationForStuckMount = 110 * time.Second
 )
 
-var _ = utils.SIGDescribe("Detaching volumes", func() {
+var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
 
 	// note that namespace deletion is handled by delete-namespace flag

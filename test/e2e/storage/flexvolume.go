@@ -200,7 +200,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		uninstallFlex(cs, node, "k8s", driverInstallAs)
 	})
 
-	ginkgo.It("should be mountable when attachable", func() {
+	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func() {
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 
