@@ -118,7 +118,7 @@ func newSuffixer() suffixer {
 	sh.binSuffixes.addSuffix("Ei", bePair{2, 60})
 	// Don't emit an error when trying to produce
 	// a suffix for 2^0.
-	sh.decSuffixes.addSuffix("", bePair{2, 0})
+	sh.binSuffixes.addSuffix("", bePair{2, 0})
 
 	sh.decSuffixes.addSuffix("n", bePair{10, -9})
 	sh.decSuffixes.addSuffix("u", bePair{10, -6})
