@@ -467,12 +467,7 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 }
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate, stopCh <-chan struct{}) (err error) {
-	// Set global feature gates based on the value on the initial KubeletServer
-	err = utilfeature.DefaultMutableFeatureGate.SetFromMap(s.KubeletConfiguration.FeatureGates)
-	if err != nil {
-		return err
-	}
-	// validate the initial KubeletServer (we set feature gates first, because this validation depends on feature gates)
+	// validate the initial KubeletServer
 	if err := options.ValidateKubeletServer(s); err != nil {
 		return err
 	}
