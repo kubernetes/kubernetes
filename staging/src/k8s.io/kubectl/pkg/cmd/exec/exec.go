@@ -152,8 +152,7 @@ type ExecOptions struct {
 	Command          []string
 	EnforceNamespace bool
 
-	ParentCommandName       string
-	EnableSuggestedCmdUsage bool
+	ParentCommandName string
 
 	Builder          func() *resource.Builder
 	ExecutablePodFn  polymorphichelpers.AttachablePodForObjectFunc
@@ -197,14 +196,6 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 	p.Builder = f.NewBuilder
 	p.restClientGetter = f
-
-	cmdParent := cmd.Parent()
-	if cmdParent != nil {
-		p.ParentCommandName = cmdParent.CommandPath()
-	}
-	if len(p.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.EnableSuggestedCmdUsage = true
-	}
 
 	p.Config, err = f.ToRESTConfig()
 	if err != nil {
@@ -326,10 +317,8 @@ func (p *ExecOptions) Run() error {
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		if len(pod.Spec.Containers) > 1 {
-			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-			if p.EnableSuggestedCmdUsage {
-				fmt.Fprintf(p.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", p.ParentCommandName, pod.Name, p.Namespace)
-			}
+			fmt.Fprintf(p.ErrOut, "%s", polymorphichelpers.CheckAllContainersIfMoreThanOne(pod))
+			fmt.Fprintf(p.ErrOut, "If not choose, defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
 		}
 		containerName = pod.Spec.Containers[0].Name
 	}

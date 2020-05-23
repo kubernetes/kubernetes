@@ -189,3 +189,16 @@ func SelectorsForObject(object runtime.Object) (namespace string, selector label
 
 	return namespace, selector, nil
 }
+
+func CheckAllContainersIfMoreThanOne(pod *corev1.Pod) string {
+	containerNames := getContainerNames(pod.Spec.Containers)
+	otherContainersDesc := ""
+	if len(pod.Spec.InitContainers) > 0 {
+		otherContainersDesc += fmt.Sprintf(" or one of the init containers: [%s]", getContainerNames(pod.Spec.InitContainers))
+	}
+	if len(pod.Spec.EphemeralContainers) > 0 {
+		otherContainersDesc += fmt.Sprintf(" or one of the ephemeral containers: [%s]", getContainerNames(ephemeralContainersToContainers(pod.Spec.EphemeralContainers)))
+	}
+
+	return fmt.Sprintf("A container name must be specified for pod %s, choose one of: [%s]%s\n", pod.Name, containerNames, otherContainersDesc)
+}
