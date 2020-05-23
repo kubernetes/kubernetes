@@ -263,7 +263,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				if volumeSpec.Volume.EmptyDir != nil &&
 					volumeSpec.Volume.EmptyDir.SizeLimit != nil &&
 					volumeSpec.Volume.EmptyDir.SizeLimit.Value() > 0 &&
-					volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value() {
+					(sizeLimit.Value() == 0 || volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value()) {
 					sizeLimit = resource.NewQuantity(volumeSpec.Volume.EmptyDir.SizeLimit.Value(), resource.BinarySI)
 				}
 			}
