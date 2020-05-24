@@ -44,6 +44,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
+	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -54,7 +55,12 @@ var triggerTime = time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
 var triggerTimeString = triggerTime.Format(time.RFC3339Nano)
 var oldTriggerTimeString = triggerTime.Add(-time.Hour).Format(time.RFC3339Nano)
 
-func testPod(namespace string, id int, nPorts int, isReady bool, makeDualstack bool) *v1.Pod {
+var ipv4only = []v1.IPFamily{v1.IPv4Protocol}
+var ipv6only = []v1.IPFamily{v1.IPv6Protocol}
+var ipv4ipv6 = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+var ipv6ipv4 = []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
+
+func testPod(namespace string, id int, nPorts int, isReady bool, ipFamilies []v1.IPFamily) *v1.Pod {
 	p := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -81,19 +87,24 @@ func testPod(namespace string, id int, nPorts int, isReady bool, makeDualstack b
 		p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
 			v1.ContainerPort{Name: fmt.Sprintf("port%d", j), ContainerPort: int32(8080 + j)})
 	}
-	p.Status.PodIPs = append(p.Status.PodIPs, v1.PodIP{IP: fmt.Sprintf("1.2.3.%d", 4+id)})
-	if makeDualstack {
-		p.Status.PodIPs = append(p.Status.PodIPs, v1.PodIP{IP: fmt.Sprintf("2000::%d", id)})
+	for _, family := range ipFamilies {
+		var ip string
+		if family == v1.IPv4Protocol {
+			ip = fmt.Sprintf("1.2.3.%d", 4+id)
+		} else {
+			ip = fmt.Sprintf("2000::%d", 4+id)
+		}
+		p.Status.PodIPs = append(p.Status.PodIPs, v1.PodIP{IP: ip})
 	}
 	p.Status.PodIP = p.Status.PodIPs[0].IP
 
 	return p
 }
 
-func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int, makeDualstack bool) {
+func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int, ipFamilies []v1.IPFamily) {
 	for i := 0; i < nPods+nNotReady; i++ {
 		isReady := i < nPods
-		pod := testPod(namespace, i, nPorts, isReady, makeDualstack)
+		pod := testPod(namespace, i, nPorts, isReady, ipFamilies)
 		store.Add(pod)
 	}
 }
@@ -301,7 +312,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -345,7 +356,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "UDP"}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -389,7 +400,7 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "SCTP"}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -430,7 +441,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -470,7 +481,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
-	addPods(endpoints.podStore, ns, 0, 1, 1, false)
+	addPods(endpoints.podStore, ns, 0, 1, 1, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -510,7 +521,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 1, false)
+	addPods(endpoints.podStore, ns, 1, 1, 1, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -554,7 +565,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -597,7 +608,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	addPods(endpoints.podStore, metav1.NamespaceDefault, 1, 1, 0, false)
+	addPods(endpoints.podStore, metav1.NamespaceDefault, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
 		Spec: v1.ServiceSpec{
@@ -614,8 +625,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
 	endpoints := newController(testServer.URL, 0*time.Second)
-	addPods(endpoints.podStore, ns, 3, 2, 0, false)
-	addPods(endpoints.podStore, "blah", 5, 2, 0, false) // make sure these aren't found!
+	addPods(endpoints.podStore, ns, 3, 2, 0, ipv4only)
+	addPods(endpoints.podStore, "blah", 5, 2, 0, ipv4only) // make sure these aren't found!
 
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -659,7 +670,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
 	endpoints := newController(testServer.URL, 0*time.Second)
-	addPods(endpoints.podStore, ns, 3, 2, 0, false)
+	addPods(endpoints.podStore, ns, 3, 2, 0, ipv4only)
 	serviceLabels := map[string]string{"foo": "bar"}
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -721,7 +732,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	serviceLabels := map[string]string{"baz": "blah"}
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -771,7 +782,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
 			endpoints := newController(testServer.URL, 0*time.Second)
-			addPods(endpoints.podStore, ns, 1, 1, 0, false)
+			addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 
 			service := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -823,7 +834,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, Labels: map[string]string{"a": "b"}},
 		Spec: v1.ServiceSpec{
@@ -987,7 +998,7 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 			Ports:     nil,
 		},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -1095,89 +1106,211 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 		}
 	}
 }
+
 func TestPodToEndpointAddressForService(t *testing.T) {
+	ipv4 := v1.IPv4Protocol
+	ipv6 := v1.IPv6Protocol
+
 	testCases := []struct {
-		name               string
-		expectedEndPointIP string
-		enableDualStack    bool
-		expectError        bool
-		enableDualStackPod bool
+		name string
+
+		enableDualStack bool
+		ipFamilies      []v1.IPFamily
 
 		service v1.Service
+
+		expectedEndpointFamily v1.IPFamily
+		expectError            bool
 	}{
 		{
-			name:               "v4 service, in a single stack cluster",
-			expectedEndPointIP: "1.2.3.4",
+			name: "v4 service, in a single stack cluster",
 
-			enableDualStack:    false,
-			expectError:        false,
-			enableDualStackPod: false,
+			enableDualStack: false,
+			ipFamilies:      ipv4only,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
+
+			expectedEndpointFamily: ipv4,
 		},
 		{
 			name: "v4 service, in a dual stack cluster",
 
-			expectedEndPointIP: "1.2.3.4",
-			enableDualStack:    true,
-			expectError:        false,
-			enableDualStackPod: true,
+			enableDualStack: true,
+			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
+
+			expectedEndpointFamily: ipv4,
 		},
 		{
-			name:               "v6 service, in a dual stack cluster. dual stack enabled",
-			expectedEndPointIP: "2000::0",
+			name: "v4 service, in a dual stack ipv6-primary cluster",
 
-			enableDualStack:    true,
-			expectError:        false,
-			enableDualStackPod: true,
+			enableDualStack: true,
+			ipFamilies:      ipv6ipv4,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.1",
+				},
+			},
+
+			expectedEndpointFamily: ipv4,
+		},
+		{
+			name: "v4 headless service, in a single stack cluster",
+
+			enableDualStack: false,
+			ipFamilies:      ipv4only,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+				},
+			},
+
+			expectedEndpointFamily: ipv4,
+		},
+		{
+			name: "v4 headless service, in a dual stack cluster",
+
+			enableDualStack: false,
+			ipFamilies:      ipv4ipv6,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+					IPFamily:  &ipv4,
+				},
+			},
+
+			expectedEndpointFamily: ipv4,
+		},
+		{
+			name: "v4 legacy headless service, in a dual stack cluster",
+
+			enableDualStack: false,
+			ipFamilies:      ipv4ipv6,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+				},
+			},
+
+			expectedEndpointFamily: ipv4,
+		},
+		{
+			name: "v4 legacy headless service, in a dual stack ipv6-primary cluster",
+
+			enableDualStack: true,
+			ipFamilies:      ipv6ipv4,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+				},
+			},
+
+			expectedEndpointFamily: ipv4,
+		},
+		{
+			name: "v6 service, in a dual stack cluster",
+
+			enableDualStack: true,
+			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
+
+			expectedEndpointFamily: ipv6,
+		},
+		{
+			name: "v6 headless service, in a single stack cluster",
+
+			enableDualStack: false,
+			ipFamilies:      ipv6only,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+				},
+			},
+
+			expectedEndpointFamily: ipv6,
+		},
+		// {
+		// 	name: "v6 headless service, in a dual stack cluster",
+		//
+		// 	enableDualStack: true,
+		// 	ipFamilies:      ipv4ipv6,
+		//
+		// 	service: v1.Service{
+		// 		Spec: v1.ServiceSpec{
+		// 			ClusterIP: v1.ClusterIPNone,
+		// 			IPFamily:  &ipv6,
+		// 		},
+		// 	},
+		//
+		// 	expectedEndpointFamily: ipv6,
+		// },
+		{
+			name: "v6 legacy headless service, in a dual stack cluster",
+
+			enableDualStack: false,
+			ipFamilies:      ipv4ipv6,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+				},
+			},
+
+			// This is not the behavior we *want*, but it's the behavior we currently expect.
+			expectedEndpointFamily: ipv4,
 		},
 
 		// in reality this is a misconfigured cluster
 		// i.e user is not using dual stack and have PodIP == v4 and ServiceIP==v6
 		// we are testing that we will keep producing the expected behavior
 		{
-			name:               "v6 service, in a v4 only cluster. dual stack disabled",
-			expectedEndPointIP: "1.2.3.4",
+			name: "v6 service, in a v4 only cluster. dual stack disabled",
 
-			enableDualStack:    false,
-			expectError:        false,
-			enableDualStackPod: false,
+			enableDualStack: false,
+			ipFamilies:      ipv4only,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
+
+			expectedEndpointFamily: ipv4,
 		},
+		// but this will actually give an error
 		{
-			name:               "v6 service, in a v4 only cluster - dual stack enabled",
-			expectedEndPointIP: "1.2.3.4",
+			name: "v6 service, in a v4 only cluster - dual stack enabled",
 
-			enableDualStack:    true,
-			expectError:        true,
-			enableDualStackPod: false,
+			enableDualStack: true,
+			ipFamilies:      ipv4only,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
+
+			expectError: true,
 		},
 	}
 	for _, tc := range testCases {
@@ -1185,7 +1318,7 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 			ns := "test"
-			addPods(podStore, ns, 1, 1, 0, tc.enableDualStackPod)
+			addPods(podStore, ns, 1, 1, 0, tc.ipFamilies)
 			pods := podStore.List()
 			if len(pods) != 1 {
 				t.Fatalf("podStore size: expected: %d, got: %d", 1, len(pods))
@@ -1205,8 +1338,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 				return
 			}
 
-			if epa.IP != tc.expectedEndPointIP {
-				t.Fatalf("IP: expected: %s, got: %s", pod.Status.PodIP, epa.IP)
+			if utilnet.IsIPv6String(epa.IP) != (tc.expectedEndpointFamily == ipv6) {
+				t.Fatalf("IP: expected %s, got: %s", tc.expectedEndpointFamily, epa.IP)
 			}
 			if *(epa.NodeName) != pod.Spec.NodeName {
 				t.Fatalf("NodeName: expected: %s, got: %s", pod.Spec.NodeName, *(epa.NodeName))
@@ -1247,7 +1380,7 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, CreationTimestamp: metav1.NewTime(triggerTime)},
 		Spec: v1.ServiceSpec{
@@ -1297,7 +1430,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 		}},
 	})
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, CreationTimestamp: metav1.NewTime(triggerTime)},
 		Spec: v1.ServiceSpec{
@@ -1348,7 +1481,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 		}},
 	})
 	// Neither pod nor service has trigger time, this should cause annotation to be cleared.
-	addPods(endpoints.podStore, ns, 1, 1, 0, false)
+	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -1487,7 +1620,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 
 			go endpoints.Run(1, stopCh)
 
-			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, false)
+			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
 
 			endpoints.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -1621,7 +1754,7 @@ func TestPodAddsBatching(t *testing.T) {
 			for i, add := range tc.adds {
 				time.Sleep(add.delay)
 
-				p := testPod(ns, i, 1, true, false)
+				p := testPod(ns, i, 1, true, ipv4only)
 				endpoints.podStore.Add(p)
 				endpoints.addPod(p)
 			}
@@ -1732,7 +1865,7 @@ func TestPodDeleteBatching(t *testing.T) {
 
 			go endpoints.Run(1, stopCh)
 
-			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, false)
+			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
 
 			endpoints.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
