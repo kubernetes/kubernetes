@@ -1286,12 +1286,7 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
-func getDynamicResourceWatch(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, listOptions metav1.ListOptions) (watch.Interface, error) {
-	res, err := dc.Resource(resourceType).Namespace(namespace).Watch(context.TODO(), listOptions)
-	return res, err
-}
-
-// WatchEventEnsurerAndManager
+// WatchEventSequenceVerifier
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
 //   testContext         cancelation signal across API boundries, e.g: context.TODO()
 //   dc                  sets up a client to the API
@@ -1301,39 +1296,45 @@ func getDynamicResourceWatch(testContext context.Context, dc dynamic.Interface, 
 //   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
 //   expectedWatchEvents array of events which are expected to occur
 //   scenario            the function to run
-func WatchEventEnsurerAndManager(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watch.Interface) []watch.Event) {
+func WatchEventSequenceVerifier(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event) {
 	listWatcher := &cache.ListWatch{
 		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
-			return getDynamicResourceWatch(testContext, dc, resourceType, namespace, listOptions)
+			return dc.Resource(resourceType).Namespace(namespace).Watch(testContext, listOptions)
 		},
 	}
 	resourceWatch, err := watchtools.NewRetryWatcher("", listWatcher)
 	ExpectNoError(err, "Failed to create a resource watch of %v in namespace %v", resourceType.Resource, namespace)
 
-	ExpectNoError(err, "Failed to create a watch for %v", resourceType.Resource)
+	// NOTE value of 3 retries seems to make sense
 	retries := 3
 retriesLoop:
 	for try := 1; try <= retries; try++ {
-		// TODO pass resourceWatch to the test function, or just collect events separately and parse them after
-		scenario()
+		// NOTE the test may need access to the events to see what's going on, such as a change in status
+		actualWatchEvents := scenario(resourceWatch)
 		errs := sets.NewString()
 	watchEventsLoop:
 		for watchEventIndex, _ := range expectedWatchEvents {
+			foundExpectedWatchEvent := false
 			watchEventNextIndex := watchEventIndex + 1
 			if watchEventNextIndex >= len(expectedWatchEvents) {
 				continue watchEventsLoop
 			}
-			// TODO validate watchEvent.Type, not Object
-			for _, fn := range fns {
-				if err := fn(expectedWatchEvents[watchEventIndex].Object, expectedWatchEvents[watchEventNextIndex].Object); err != nil {
-					errs.Insert(err.Error())
+			for actualWatchEventIndex, _ := range actualWatchEvents {
+				if actualWatchEvents[watchEventIndex] == expectedWatchEvents[actualWatchEventIndex] {
+					foundExpectedWatchEvent = true
 				}
 			}
+			if foundExpectedWatchEvent == false {
+				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvents[watchEventIndex]))
+			}
 		}
+		// TODO restructure failures handling
 		if errs.Len() > 0 && try < retries {
 			fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* "))
+			// TODO delete resources via DynamicClient (on failure)
 			continue retriesLoop
 		}
 		ExpectEqual(errs.Len() > 0, false, fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* ")))
+		// TODO delete resources via DynamicClient (on failure)
 	}
 }
