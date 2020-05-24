@@ -18,7 +18,6 @@ package endpointslice
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,19 +35,7 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-// podEndpointChanged returns true if the results of podToEndpoint are different
-// for the pods passed to this function.
-func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
-	endpoint1 := podToEndpoint(pod1, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
-	endpoint2 := podToEndpoint(pod2, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
-
-	endpoint1.TargetRef.ResourceVersion = ""
-	endpoint2.TargetRef.ResourceVersion = ""
-
-	return !reflect.DeepEqual(endpoint1, endpoint2)
-}
-
-// podToEndpoint returns an Endpoint object generated from a Pod and Node.
+// podToEndpoint returns an Endpoint object generated from pod, node, and service.
 func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) discovery.Endpoint {
 	// Build out topology information. This is currently limited to hostname,
 	// zone, and region, but this will be expanded in the future.
