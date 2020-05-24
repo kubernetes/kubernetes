@@ -28,22 +28,6 @@ import (
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler
 	SchedulerSubsystem = "scheduler"
-	// DeprecatedSchedulingDurationName - scheduler duration metric name which is deprecated
-	DeprecatedSchedulingDurationName = "scheduling_duration_seconds"
-
-	// OperationLabel - operation label name
-	OperationLabel = "operation"
-	// Below are possible values for the operation label. Each represents a substep of e2e scheduling:
-
-	// PredicateEvaluation - predicate evaluation operation label value
-	PredicateEvaluation = "predicate_evaluation"
-	// PriorityEvaluation - priority evaluation operation label value
-	PriorityEvaluation = "priority_evaluation"
-	// PreemptionEvaluation - preemption evaluation operation label value (occurs in case of scheduling fitError).
-	PreemptionEvaluation = "preemption_evaluation"
-	// Binding - binding operation label value
-	Binding = "binding"
-	// E2eScheduling - e2e scheduling operation label value
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
@@ -63,20 +47,7 @@ var (
 	PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
 	// PodScheduleErrors counts how many pods could not be scheduled due to a scheduler error.
 	// This metric will be initialized again in Register() to assure the metric is not no-op metric.
-	PodScheduleErrors            = scheduleAttempts.With(metrics.Labels{"result": "error"})
-	DeprecatedSchedulingDuration = metrics.NewSummaryVec(
-		&metrics.SummaryOpts{
-			Subsystem: SchedulerSubsystem,
-			Name:      DeprecatedSchedulingDurationName,
-			Help:      "Scheduling latency in seconds split by sub-parts of the scheduling operation",
-			// Make the sliding window of 5h.
-			// TODO: The value for this should be based on some SLI definition (long term).
-			MaxAge:            5 * time.Hour,
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.19.0",
-		},
-		[]string{OperationLabel},
-	)
+	PodScheduleErrors    = scheduleAttempts.With(metrics.Labels{"result": "error"})
 	E2eSchedulingLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -93,26 +64,6 @@ var (
 			Help:           "Scheduling algorithm latency in seconds",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		},
-	)
-	DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:         SchedulerSubsystem,
-			Name:              "scheduling_algorithm_predicate_evaluation_seconds",
-			Help:              "Scheduling algorithm predicate evaluation duration in seconds",
-			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.19.0",
-		},
-	)
-	DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:         SchedulerSubsystem,
-			Name:              "scheduling_algorithm_priority_evaluation_seconds",
-			Help:              "Scheduling algorithm priority evaluation duration in seconds",
-			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.19.0",
 		},
 	)
 	SchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
@@ -234,12 +185,9 @@ var (
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
-		DeprecatedSchedulingDuration,
 		E2eSchedulingLatency,
 		SchedulingAlgorithmLatency,
 		BindingLatency,
-		DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration,
-		DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration,
 		SchedulingAlgorithmPreemptionEvaluationDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
@@ -295,11 +243,6 @@ func BackoffPods() metrics.GaugeMetric {
 // UnschedulablePods returns the pending pods metrics with the label unschedulable
 func UnschedulablePods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "unschedulable"})
-}
-
-// Reset resets metrics
-func Reset() {
-	DeprecatedSchedulingDuration.Reset()
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.

@@ -162,7 +162,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	}
 
 	// Run "prefilter" plugins.
-	startPredicateEvalTime := time.Now()
 	filteredNodes, filteredNodesStatuses, err := g.findNodesThatFitPod(ctx, prof, state, pod)
 	if err != nil {
 		return result, err
@@ -177,13 +176,8 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 		}
 	}
 
-	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
-	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
-
-	startPriorityEvalTime := time.Now()
 	// When only one node after predicate, just use it.
 	if len(filteredNodes) == 1 {
-		metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 		return ScheduleResult{
 			SuggestedHost:  filteredNodes[0].Name,
 			EvaluatedNodes: 1 + len(filteredNodesStatuses),
@@ -195,9 +189,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 	if err != nil {
 		return result, err
 	}
-
-	metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
-	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 
 	host, err := g.selectHost(priorityList)
 	trace.Step("Prioritizing done")

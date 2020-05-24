@@ -20,7 +20,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	goruntime "runtime"
@@ -58,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
@@ -232,17 +230,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
 	configz.InstallHandler(pathRecorderMux)
 	//lint:ignore SA1019 See the Metrics Stability Migration KEP
-	defaultMetricsHandler := legacyregistry.Handler().ServeHTTP
-	pathRecorderMux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "DELETE" {
-			metrics.Reset()
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-			io.WriteString(w, "metrics reset\n")
-			return
-		}
-		defaultMetricsHandler(w, req)
-	})
+	pathRecorderMux.Handle("/metrics", legacyregistry.Handler())
 }
 
 // newMetricsHandler builds a metrics server from the config.

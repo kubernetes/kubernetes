@@ -512,7 +512,6 @@ func (sched *Scheduler) finishBinding(prof *profile.Profile, assumed *v1.Pod, ta
 	}
 
 	metrics.BindingLatency.Observe(metrics.SinceInSeconds(start))
-	metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(start))
 	prof.Recorder.Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 
@@ -558,7 +557,6 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				sched.preempt(schedulingCycleCtx, prof, state, pod, fitError)
 				metrics.PreemptionAttempts.Inc()
 				metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
-				metrics.DeprecatedSchedulingDuration.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
 			}
 			// Pod did not fit anywhere, so it is counted as a failure. If preemption
 			// succeeds, the pod should get counted as a success the next time we try to
