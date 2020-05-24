@@ -59,7 +59,7 @@ type endpointMeta struct {
 func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) error {
 	addressType := discovery.AddressTypeIPv4
 
-	if isIPv6Service(service) {
+	if endpointutil.IsIPv6Service(service) {
 		addressType = discovery.AddressTypeIPv6
 	}
 

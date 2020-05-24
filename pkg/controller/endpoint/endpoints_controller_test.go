@@ -1249,21 +1249,21 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 			expectedEndpointFamily: ipv6,
 		},
-		// {
-		// 	name: "v6 headless service, in a dual stack cluster",
-		//
-		// 	enableDualStack: true,
-		// 	ipFamilies:      ipv4ipv6,
-		//
-		// 	service: v1.Service{
-		// 		Spec: v1.ServiceSpec{
-		// 			ClusterIP: v1.ClusterIPNone,
-		// 			IPFamily:  &ipv6,
-		// 		},
-		// 	},
-		//
-		// 	expectedEndpointFamily: ipv6,
-		// },
+		{
+			name: "v6 headless service, in a dual stack cluster",
+
+			enableDualStack: true,
+			ipFamilies:      ipv4ipv6,
+
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
+					IPFamily:  &ipv6,
+				},
+			},
+
+			expectedEndpointFamily: ipv6,
+		},
 		{
 			name: "v6 legacy headless service, in a dual stack cluster",
 

@@ -215,19 +215,13 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 	var endpointIP string
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		// In a legacy cluster, the pod IP is guaranteed to be usable
 		endpointIP = pod.Status.PodIP
 	} else {
-		// api-server service controller ensured that the service got the correct IP Family
-		// according to user setup, here we only need to match EndPoint IPs' family to service
-		// actual IP family. as in, we don't need to check service.IPFamily
-
-		ipv6ClusterIP := utilnet.IsIPv6String(svc.Spec.ClusterIP)
+		ipv6Service := endpointutil.IsIPv6Service(svc)
 		for _, podIP := range pod.Status.PodIPs {
 			ipv6PodIP := utilnet.IsIPv6String(podIP.IP)
-			// same family?
-			// TODO (khenidak) when we remove the max of 2 PodIP limit from pods
-			// we will have to return multiple endpoint addresses
-			if ipv6ClusterIP == ipv6PodIP {
+			if ipv6Service == ipv6PodIP {
 				endpointIP = podIP.IP
 				break
 			}
