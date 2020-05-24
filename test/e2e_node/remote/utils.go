@@ -31,7 +31,7 @@ const (
 	cniArch          = "amd64"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
-	cniURL           = "https://dl.k8s.io/network-plugins/cni-plugins-" + cniArch + "-" + cniVersion + ".tgz"
+	cniURL           = "https://storage.googleapis.com/k8s-artifacts-cni/release/" + cniVersion + "/" + "cni-plugins-linux-" + cniArch + "-" + cniVersion + ".tgz"
 )
 
 const cniConfig = `{
