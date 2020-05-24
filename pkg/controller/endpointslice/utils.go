@@ -120,18 +120,12 @@ func getEndpointAddresses(podStatus corev1.PodStatus, service *corev1.Service) [
 
 	for _, podIP := range podStatus.PodIPs {
 		isIPv6PodIP := utilnet.IsIPv6String(podIP.IP)
-		if isIPv6PodIP == isIPv6Service(service) {
+		if isIPv6PodIP == endpointutil.IsIPv6Service(service) {
 			addresses = append(addresses, podIP.IP)
 		}
 	}
 
 	return addresses
-}
-
-// isIPv6Service returns true if the Service uses IPv6 addresses.
-func isIPv6Service(service *corev1.Service) bool {
-	// IPFamily is not guaranteed to be set, even in an IPv6 only cluster.
-	return (service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol) || utilnet.IsIPv6String(service.Spec.ClusterIP)
 }
 
 // endpointsEqualBeyondHash returns true if endpoints have equal attributes
