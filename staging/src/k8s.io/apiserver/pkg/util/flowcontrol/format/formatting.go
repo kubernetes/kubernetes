@@ -24,6 +24,7 @@ import (
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/client-go/tools/cache"
 )
 
 // This file provides an easy way to mark a value for formatting to
@@ -62,6 +63,8 @@ func (sr Stringer) String() string {
 		flowcontrol.PriorityLevelConfigurationSpec,
 		*flowcontrol.LimitedPriorityLevelConfiguration,
 		flowcontrol.LimitedPriorityLevelConfiguration,
+		*flowcontrol.ConcurrencyLimitStatus,
+		flowcontrol.ConcurrencyLimitStatus,
 		flowcontrol.LimitResponse,
 		*flowcontrol.QueuingConfiguration,
 		flowcontrol.QueuingConfiguration:
@@ -70,6 +73,10 @@ func (sr Stringer) String() string {
 		return FmtUsers(typed)
 	case []*request.RequestInfo:
 		return FmtRequests(typed)
+	case cache.DeletedFinalStateUnknown:
+		return fmt.Sprintf("DeletedFinalStateUnknown{Key=%s, Obj=%s}", typed.Key, Fmt(typed.Obj))
+	case *cache.DeletedFinalStateUnknown:
+		return fmt.Sprintf("&DeletedFinalStateUnknown{Key=%s, Obj=%s}", typed.Key, Fmt(typed.Obj))
 	default:
 		return fmt.Sprintf("%#+v", sr.val)
 	}

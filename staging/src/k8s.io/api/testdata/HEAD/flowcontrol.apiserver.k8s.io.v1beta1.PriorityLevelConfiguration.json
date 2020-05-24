@@ -64,6 +64,12 @@
         "reason": "20",
         "message": "21"
       }
+    ],
+    "concurrencyLimits": [
+      {
+        "apiServer": "22",
+        "limit": -1876826602
+      }
     ]
   }
 }

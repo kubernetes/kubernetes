@@ -7737,6 +7737,16 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: rule
       type:
         scalar: string
+- name: io.k8s.api.flowcontrol.v1alpha1.ConcurrencyLimitStatus
+  map:
+    fields:
+    - name: apiServer
+      type:
+        scalar: string
+      default: ""
+    - name: limit
+      type:
+        scalar: numeric
 - name: io.k8s.api.flowcontrol.v1alpha1.FlowDistinguisherMethod
   map:
     fields:
@@ -7949,6 +7959,14 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.flowcontrol.v1alpha1.PriorityLevelConfigurationStatus
   map:
     fields:
+    - name: concurrencyLimits
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1alpha1.ConcurrencyLimitStatus
+          elementRelationship: associative
+          keys:
+          - apiServer
     - name: conditions
       type:
         list:
@@ -8045,6 +8063,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.flowcontrol.v1beta1.ConcurrencyLimitStatus
+  map:
+    fields:
+    - name: apiServer
+      type:
+        scalar: string
+      default: ""
+    - name: limit
+      type:
+        scalar: numeric
 - name: io.k8s.api.flowcontrol.v1beta1.FlowDistinguisherMethod
   map:
     fields:
@@ -8257,6 +8285,14 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationStatus
   map:
     fields:
+    - name: concurrencyLimits
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1beta1.ConcurrencyLimitStatus
+          elementRelationship: associative
+          keys:
+          - apiServer
     - name: conditions
       type:
         list:

@@ -196,11 +196,16 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	controlPlaneConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, controlPlaneConfig.GenericConfig.LoopbackClientConfig.Timeout)
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
+		var idHint net.IP
+		if listenAddr, ok := controlPlaneConfig.GenericConfig.SecureServing.Listener.Addr().(*net.TCPAddr); ok {
+			idHint = listenAddr.IP
+		}
 		controlPlaneConfig.GenericConfig.FlowControl = utilflowcontrol.New(
 			controlPlaneConfig.ExtraConfig.VersionedInformers,
 			clientset.FlowcontrolV1beta1(),
 			controlPlaneConfig.GenericConfig.MaxRequestsInFlight+controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight,
 			controlPlaneConfig.GenericConfig.RequestTimeout/4,
+			idHint,
 		)
 	}
 

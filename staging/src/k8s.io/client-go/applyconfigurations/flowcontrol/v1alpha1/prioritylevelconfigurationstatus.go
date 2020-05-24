@@ -21,7 +21,8 @@ package v1alpha1
 // PriorityLevelConfigurationStatusApplyConfiguration represents an declarative configuration of the PriorityLevelConfigurationStatus type for use
 // with apply.
 type PriorityLevelConfigurationStatusApplyConfiguration struct {
-	Conditions []PriorityLevelConfigurationConditionApplyConfiguration `json:"conditions,omitempty"`
+	Conditions        []PriorityLevelConfigurationConditionApplyConfiguration `json:"conditions,omitempty"`
+	ConcurrencyLimits []ConcurrencyLimitStatusApplyConfiguration              `json:"concurrencyLimits,omitempty"`
 }
 
 // PriorityLevelConfigurationStatusApplyConfiguration constructs an declarative configuration of the PriorityLevelConfigurationStatus type for use with
@@ -39,6 +40,19 @@ func (b *PriorityLevelConfigurationStatusApplyConfiguration) WithConditions(valu
 			panic("nil value passed to WithConditions")
 		}
 		b.Conditions = append(b.Conditions, *values[i])
+	}
+	return b
+}
+
+// WithConcurrencyLimits adds the given value to the ConcurrencyLimits field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ConcurrencyLimits field.
+func (b *PriorityLevelConfigurationStatusApplyConfiguration) WithConcurrencyLimits(values ...*ConcurrencyLimitStatusApplyConfiguration) *PriorityLevelConfigurationStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithConcurrencyLimits")
+		}
+		b.ConcurrencyLimits = append(b.ConcurrencyLimits, *values[i])
 	}
 	return b
 }

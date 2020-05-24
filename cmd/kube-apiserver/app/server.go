@@ -561,6 +561,7 @@ func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgocli
 		extclient.FlowcontrolV1beta1(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
+		s.SecureServing.BindAddress,
 	)
 }
 

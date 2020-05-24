@@ -261,6 +261,7 @@ func TestConfigConsumer(t *testing.T) {
 				ServerConcurrencyLimit: 100,         // server concurrency limit
 				RequestWaitLimit:       time.Minute, // request wait limit
 				ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				IDHint:                 nil,
 				QueueSetFactory:        cts,
 			})
 			cts.cfgCtlr = ctlr
@@ -326,7 +327,7 @@ func TestConfigConsumer(t *testing.T) {
 						t.Logf("For %s, digesting newFS=%s", trialStep, fcfmt.Fmt(newFS))
 					}
 				}
-				_ = ctlr.lockAndDigestConfigObjects(newPLs, newFSs)
+				_, _ = ctlr.lockAndDigestConfigObjects(newPLs, newFSs)
 			}
 			for plName, hr, nCount := cts.popHeldRequest(); hr != nil; plName, hr, nCount = cts.popHeldRequest() {
 				if testDebugLogs {
@@ -393,6 +394,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		RequestWaitLimit:       time.Minute,
 		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
 		QueueSetFactory:        cts,
+		IDHint:                 nil,
 	})
 
 	stopCh, controllerCompletedCh := make(chan struct{}), make(chan struct{})

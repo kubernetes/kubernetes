@@ -26,11 +26,13 @@ import (
 	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfc "k8s.io/apiserver/pkg/util/flowcontrol"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
+	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -57,14 +59,15 @@ import (
    every 10 seconds.
 */
 type fightTest struct {
-	t              *testing.T
-	ctx            context.Context
-	loopbackConfig *rest.Config
-	teamSize       int
-	stopCh         chan struct{}
-	now            time.Time
-	clk            *clock.FakeClock
-	ctlrs          map[bool][]utilfc.Interface
+	t                 *testing.T
+	ctx               context.Context
+	loopbackConfig    *rest.Config
+	audienceClientset clientset.Interface
+	teamSize          int
+	stopCh            chan struct{}
+	now               time.Time
+	clk               *clock.FakeClock
+	ctlrs             map[bool][]utilfc.Interface
 
 	countsMutex sync.Mutex
 
@@ -93,8 +96,8 @@ func newFightTest(t *testing.T, loopbackConfig *rest.Config, teamSize int) *figh
 func (ft *fightTest) createMainInformer() {
 	myConfig := rest.CopyConfig(ft.loopbackConfig)
 	myConfig = rest.AddUserAgent(myConfig, "audience")
-	myClientset := clientset.NewForConfigOrDie(myConfig)
-	informerFactory := informers.NewSharedInformerFactory(myClientset, 0)
+	ft.audienceClientset = clientset.NewForConfigOrDie(myConfig)
+	informerFactory := informers.NewSharedInformerFactory(ft.audienceClientset, 0)
 	inf := informerFactory.Flowcontrol().V1beta1().FlowSchemas().Informer()
 	inf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -157,10 +160,17 @@ func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {
 	maxWritesPerWriter := 6 * int(math.Ceil(maxFightSecs/60))
 	maxTotalWrites := (1 + ft.teamSize*2) * maxWritesPerWriter
 	for flowSchemaName, writeCount := range ft.writeCounts {
+		fmtCurState := func() string {
+			fs, err := ft.audienceClientset.FlowcontrolV1beta1().FlowSchemas().Get(ft.ctx, flowSchemaName, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Sprintf("(failed to fetch FS %s, err=%s", flowSchemaName, err)
+			}
+			return fcfmt.ToJSON(fs)
+		}
 		if writeCount < minTotalWrites {
-			ft.t.Errorf("There were a total of %d writes to FlowSchema %s but there should have been at least %d from %s to %s", writeCount, flowSchemaName, minTotalWrites, tAfterCreate, tBeforeLock)
+			ft.t.Errorf("There were a total of %d writes to FlowSchema %s but there should have been at least %d from %s to %s; current state is %s", writeCount, flowSchemaName, minTotalWrites, tAfterCreate, tBeforeLock, fmtCurState())
 		} else if writeCount > maxTotalWrites {
-			ft.t.Errorf("There were a total of %d writes to FlowSchema %s but there should have been no more than %d from %s to %s", writeCount, flowSchemaName, maxTotalWrites, tBeforeCreate, tAfterLock)
+			ft.t.Errorf("There were a total of %d writes to FlowSchema %s but there should have been no more than %d from %s to %s; current state is %s", writeCount, flowSchemaName, maxTotalWrites, tBeforeCreate, tAfterLock, fmtCurState())
 		} else {
 			ft.t.Logf("There were a total of %d writes to FlowSchema %s over %v, %v seconds", writeCount, flowSchemaName, minFightSecs, maxFightSecs)
 		}

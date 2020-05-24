@@ -41,6 +41,9 @@ spec:
       type: V夸eɑeʤ
   type: īqJ枊a8衍`Ĩɘ.蘯
 status:
+  concurrencyLimits:
+  - apiServer: "22"
+    limit: -1876826602
   conditions:
   - lastTransitionTime: "2559-09-14T11:32:46Z"
     message: "21"

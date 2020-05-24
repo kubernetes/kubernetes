@@ -19,6 +19,7 @@ package internalversion
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"net"
 	"sort"
 	"strconv"
@@ -576,6 +577,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "HandSize", Type: "string", Description: flowcontrolv1beta1.QueuingConfiguration{}.SwaggerDoc()["handSize"]},
 		{Name: "QueueLengthLimit", Type: "string", Description: flowcontrolv1beta1.QueuingConfiguration{}.SwaggerDoc()["queueLengthLimit"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "ConcurrencyLimit", Type: "string", Description: flowcontrolv1beta1.ConcurrencyLimitStatus{}.SwaggerDoc()["limit"]},
 	}
 	h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfiguration)
 	h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfigurationList)
@@ -2586,7 +2588,31 @@ func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration
 			queueLengthLimit = qc.QueueLengthLimit
 		}
 	}
-	row.Cells = append(row.Cells, name, string(obj.Spec.Type), acs, queues, handSize, queueLengthLimit, translateTimestampSince(obj.CreationTimestamp))
+	var someUnlimited bool
+	var minLimit int32 = math.MaxInt32
+	var maxLimit int32
+	for _, cl := range obj.Status.ConcurrencyLimits {
+		if cl.Limit == nil {
+			someUnlimited = true
+		} else {
+			if minLimit > *cl.Limit {
+				minLimit = *cl.Limit
+			}
+			if maxLimit < *cl.Limit {
+				maxLimit = *cl.Limit
+			}
+		}
+	}
+	limits := []string{}
+	if minLimit == maxLimit {
+		limits = append(limits, strconv.FormatInt(int64(minLimit), 10))
+	} else if minLimit < maxLimit {
+		limits = append(limits, fmt.Sprintf("%d-%d", minLimit, maxLimit))
+	}
+	if someUnlimited {
+		limits = append(limits, "unlimited")
+	}
+	row.Cells = append(row.Cells, name, string(obj.Spec.Type), acs, queues, handSize, queueLengthLimit, translateTimestampSince(obj.CreationTimestamp), strings.Join(limits, ","))
 
 	return []metav1.TableRow{row}, nil
 }

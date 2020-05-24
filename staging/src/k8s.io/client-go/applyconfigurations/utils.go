@@ -919,6 +919,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.SupplementalGroupsStrategyOptionsApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithKind("ConcurrencyLimitStatus"):
+		return &flowcontrolv1alpha1.ConcurrencyLimitStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &flowcontrolv1alpha1.FlowDistinguisherMethodApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FlowSchema"):
@@ -961,6 +963,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &flowcontrolv1alpha1.UserSubjectApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta1
+	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("ConcurrencyLimitStatus"):
+		return &applyconfigurationsflowcontrolv1beta1.ConcurrencyLimitStatusApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
 		return &applyconfigurationsflowcontrolv1beta1.FlowDistinguisherMethodApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("FlowSchema"):
