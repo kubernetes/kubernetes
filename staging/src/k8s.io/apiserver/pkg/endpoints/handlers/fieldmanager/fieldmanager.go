@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apiserver/pkg/registry/rest"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
@@ -72,7 +73,7 @@ func NewFieldManager(f Manager) *FieldManager {
 
 // NewDefaultFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, resetFields *fieldpath.Set) (*FieldManager, error) {
+func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, resetFields rest.ResetFields) (*FieldManager, error) {
 	f, err := NewStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub, resetFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
@@ -83,7 +84,7 @@ func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.
 // NewDefaultCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, preserveUnknownFields bool, resetFields *fieldpath.Set) (_ *FieldManager, err error) {
+func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, preserveUnknownFields bool, resetFields rest.ResetFields) (_ *FieldManager, err error) {
 	f, err := NewCRDStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub, preserveUnknownFields, resetFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)

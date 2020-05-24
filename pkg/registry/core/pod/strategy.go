@@ -89,22 +89,23 @@ var Strategy = podStrategy{
 
 			podutil.DropDisabledPodFields(newPod, oldPod)
 		},
-		// ResetFields
-		map[string]*fieldpath.Set{
+		rest.ResetFields{
 			"v1": fieldpath.NewSet(
 				fieldpath.MakePathOrDie("status"),
 				// TODO: add fields reset by podutil.DropDisabledPodFields
 			),
 		},
 		// ResetFieldsBuilders
-		func(version string, fields *fieldpath.Set) {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-				// TODO: add the actual fieldpath here, this is just a probably wrong dummy based on
-				// podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken
-				fields.Insert(fieldpath.MakePathOrDie("spec", "volumes", "projected", "sources", "serviceAccountToken"))
+		func(resetFields rest.ResetFields) {
+			for _, fields := range resetFields {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+					// TODO: add the actual fieldpath here, this is just a probably wrong dummy based on
+					// podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken
+					fields.Insert(fieldpath.MakePathOrDie("spec", "volumes", "projected", "sources", "serviceAccountToken"))
+				}
+				// TODO: add all the fields from podutil.DropDisabledPodFields (a lot)
+				// Maybe create a function for this in podutil and allow setting a path prefix for usability
 			}
-			// TODO: add all the fields from podutil.DropDisabledPodFields (a lot)
-			// Maybe create a function for this in podutil and allow setting a path prefix for usability
 		},
 	),
 }
@@ -207,8 +208,7 @@ var StatusStrategy = podStatusStrategy{
 			// that breaks garbage collection
 			newPod.OwnerReferences = oldPod.OwnerReferences
 		},
-		// ResetFields
-		map[string]*fieldpath.Set{
+		rest.ResetFields{
 			"v1": fieldpath.NewSet(
 				fieldpath.MakePathOrDie("spec"),
 				fieldpath.MakePathOrDie("metadata", "deletionTimestamp"),

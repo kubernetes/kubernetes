@@ -35,22 +35,19 @@ type CreationPreparator interface {
 	// callers of an api (users) should not be setting an initial status on
 	// newly created objects.
 	PrepareForCreate(ctx context.Context, obj runtime.Object)
-	// ResetFieldsForCreate returns a set of fields for the provided version that get reset before persisting the object.
-	// If no fieldset is defined for a version, nil is returned.
-	ResetFieldsForCreate(version string) *fieldpath.Set
+	// ResetFieldsForCreate returns the set of fields per version that get reset before persisting the object.
+	ResetFieldsForCreate() ResetFields
 }
 
 // ResetFields maps versions to the sets of fields that will be reset by the Preparator
-type ResetFields map[string]*fieldpath.Set
+type ResetFields map[fieldpath.APIVersion]*fieldpath.Set
 
 // NewCreationPreparator using the PrepareForCreate function and exposing the defined resetFields.
-// If a fieldBuilder is provided, it will be called once for every version at initialization to allow adding fields based on runtime information.
+// Providing a fieldBuilder allows modifying the ResetFields with information available at runtime.
 // The fieldBuilder can call Insert on the fields to add paths.
-func NewCreationPreparator(fn prepareForCreate, resetFields ResetFields, fieldBuilder ...func(version string, fields *fieldpath.Set)) CreationPreparator {
-	for version, fields := range resetFields {
-		for _, builder := range fieldBuilder {
-			builder(version, fields)
-		}
+func NewCreationPreparator(fn prepareForCreate, resetFields ResetFields, fieldBuilder ...func(ResetFields)) CreationPreparator {
+	for _, builder := range fieldBuilder {
+		builder(resetFields)
 	}
 
 	return &creationPreparator{
@@ -71,12 +68,7 @@ func (p *creationPreparator) PrepareForCreate(ctx context.Context, obj runtime.O
 	p.prepare(ctx, obj)
 }
 
-// ResetFieldsForCreate returns a set of fields for the provided version that get reset before persisting the object.
-// If no fieldset is defined for a version, nil is returned.
-func (p *creationPreparator) ResetFieldsForCreate(version string) *fieldpath.Set {
-	set, ok := p.resetFields[version]
-	if !ok {
-		return nil
-	}
-	return set
+// ResetFieldsForCreate returns the set of fields per version that get reset before persisting the object.
+func (p *creationPreparator) ResetFieldsForCreate() ResetFields {
+	return p.resetFields
 }

@@ -43,7 +43,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 const (
@@ -254,18 +253,18 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	// Take the resetFields provided by the update strategy. If it doesn't provide them, check create (for resources that don't implement update)
 	// TODO(kwiesmueller): check if this is necessary
-	var resetFields *fieldpath.Set
+	var resetFields rest.ResetFields
 	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		if getter, isUpdateStrategyGetter := storage.(registry.UpdateStrategyGetter); isUpdateStrategyGetter {
 			if preparator, isPreparator := getter.GetUpdateStrategy().(rest.UpdatePreparator); isPreparator && preparator != nil {
-				resetFields = preparator.ResetFieldsForUpdate(a.group.GroupVersion.Version)
+				resetFields = preparator.ResetFieldsForUpdate()
 			} else {
 				// TODO: temporary debug logging
 				klog.Infof("---- !ResetFieldsForUpdate: %v %v %v", a.group.GroupVersion.Group, a.group.GroupVersion.Version, path)
 			}
 		} else if getter, isCreateStrategyGetter := storage.(registry.CreateStrategyGetter); isCreateStrategyGetter {
 			if preparator, isPreparator := getter.GetCreateStrategy().(rest.CreationPreparator); isPreparator && preparator != nil {
-				resetFields = preparator.ResetFieldsForCreate(a.group.GroupVersion.Version)
+				resetFields = preparator.ResetFieldsForCreate()
 			} else {
 				// TODO: temporary debug logging
 				klog.Infof("---- !ResetFieldsForCreate: %v %v %v", a.group.GroupVersion.Group, a.group.GroupVersion.Version, path)

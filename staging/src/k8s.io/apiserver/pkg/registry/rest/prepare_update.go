@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
 )
 
 // UpdatePreparator provides an interface to prepare updates for being persisted
@@ -30,19 +29,16 @@ type UpdatePreparator interface {
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
 	PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
-	// ResetFieldsForUpdate returns a set of fields for the provided version that get reset before persisting the object.
-	// If no fieldset is defined for a version, nil is returned.
-	ResetFieldsForUpdate(version string) *fieldpath.Set
+	// ResetFieldsForUpdate returns the set of fields per version that get reset before persisting the object.
+	ResetFieldsForUpdate() ResetFields
 }
 
 // NewUpdatePreparator using the PrepareForUpdate function and exposing the defined resetFields.
-// If a fieldBuilder is provided, it will be called once for every version at initialization to allow adding fields based on runtime information.
+// Providing a fieldBuilder allows modifying the ResetFields with information available at runtime.
 // The fieldBuilder can call Insert on the fields to add paths.
-func NewUpdatePreparator(fn prepareForUpdate, resetFields ResetFields, fieldBuilder ...func(version string, fields *fieldpath.Set)) UpdatePreparator {
-	for version, fields := range resetFields {
-		for _, builder := range fieldBuilder {
-			builder(version, fields)
-		}
+func NewUpdatePreparator(fn prepareForUpdate, resetFields ResetFields, fieldBuilder ...func(ResetFields)) UpdatePreparator {
+	for _, builder := range fieldBuilder {
+		builder(resetFields)
 	}
 
 	return &updatePreparator{
@@ -63,12 +59,7 @@ func (p *updatePreparator) PrepareForUpdate(ctx context.Context, obj, old runtim
 	p.prepare(ctx, obj, old)
 }
 
-// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
-// If no fieldset is defined for a version, nil is returned.
-func (p *updatePreparator) ResetFieldsForUpdate(version string) *fieldpath.Set {
-	set, ok := p.resetFields[version]
-	if !ok {
-		return nil
-	}
-	return set
+// ResetFieldsForUpdate returns the set of fields per version that get reset before persisting the object.
+func (p *updatePreparator) ResetFieldsForUpdate() ResetFields {
+	return p.resetFields
 }

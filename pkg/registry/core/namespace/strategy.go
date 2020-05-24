@@ -85,7 +85,7 @@ var Strategy = namespaceStrategy{
 			newNamespace.Status = oldNamespace.Status
 		},
 		// ResetFields
-		map[string]*fieldpath.Set{
+		rest.ResetFields{
 			"v1": fieldpath.NewSet(
 				fieldpath.MakePathOrDie("status"),
 				fieldpath.MakePathOrDie("spec.finalizers"),
@@ -143,8 +143,7 @@ var StatusStrategy = namespaceStatusStrategy{
 			oldNamespace := old.(*api.Namespace)
 			newNamespace.Spec = oldNamespace.Spec
 		},
-		// ResetFields
-		map[string]*fieldpath.Set{
+		rest.ResetFields{
 			"v1": fieldpath.NewSet(
 				fieldpath.MakePathOrDie("spec"),
 			),
@@ -175,8 +174,7 @@ var FinalizeStrategy = namespaceFinalizeStrategy{
 			oldNamespace := old.(*api.Namespace)
 			newNamespace.Status = oldNamespace.Status
 		},
-		// ResetFields
-		map[string]*fieldpath.Set{
+		rest.ResetFields{
 			"v1": fieldpath.NewSet(
 				fieldpath.MakePathOrDie("status"),
 			),
