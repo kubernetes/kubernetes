@@ -30,7 +30,8 @@ type Converter interface {
 // Updater is the object used to compute updated FieldSets and also
 // merge the object on Apply.
 type Updater struct {
-	Converter Converter
+	Converter     Converter
+	IgnoredFields map[fieldpath.APIVersion]*fieldpath.Set
 
 	enableUnions bool
 }
@@ -41,16 +42,16 @@ func (s *Updater) EnableUnionFeature() {
 	s.enableUnions = true
 }
 
-func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, ignored *fieldpath.Set, workflow string, force bool) (fieldpath.ManagedFields, *typed.Comparison, error) {
+func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, *typed.Comparison, error) {
 	conflicts := fieldpath.ManagedFields{}
 	removed := fieldpath.ManagedFields{}
-	compare, err := oldObject.CompareWithout(newObject, ignored)
+	compare, err := oldObject.Compare(newObject)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to compare objects: %v", err)
 	}
 
 	versions := map[fieldpath.APIVersion]*typed.Comparison{
-		version: compare,
+		version: compare.ExcludeFields(s.IgnoredFields[version]),
 	}
 
 	for manager, managerSet := range managers {
@@ -76,11 +77,11 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 				}
 				return nil, nil, fmt.Errorf("failed to convert new object: %v", err)
 			}
-			compare, err = versionedOldObject.CompareWithout(versionedNewObject, ignored)
+			compare, err = versionedOldObject.Compare(versionedNewObject)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to compare objects: %v", err)
 			}
-			versions[managerSet.APIVersion()] = compare
+			versions[managerSet.APIVersion()] = compare.ExcludeFields(s.IgnoredFields[managerSet.APIVersion()])
 		}
 
 		conflictSet := managerSet.Set().Intersection(compare.Modified.Union(compare.Added))
@@ -119,7 +120,7 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 // that you intend to persist (after applying the patch if this is for a
 // PATCH call), and liveObject must be the original object (empty if
 // this is a CREATE call).
-func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, ignored *fieldpath.Set, manager string) (*typed.TypedValue, fieldpath.ManagedFields, error) {
+func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (*typed.TypedValue, fieldpath.ManagedFields, error) {
 	var err error
 	if s.enableUnions {
 		newObject, err = liveObject.NormalizeUnions(newObject)
@@ -128,15 +129,20 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 		}
 	}
 	managers = shallowCopyManagers(managers)
-	managers, compare, err := s.update(liveObject, newObject, version, managers, ignored, manager, true)
+	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, true)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}
 	if _, ok := managers[manager]; !ok {
 		managers[manager] = fieldpath.NewVersionedSet(fieldpath.NewSet(), version, false)
 	}
+
+	ignored := s.IgnoredFields[version]
+	if ignored == nil {
+		ignored = fieldpath.NewSet()
+	}
 	managers[manager] = fieldpath.NewVersionedSet(
-		managers[manager].Set().Union(compare.Modified).Union(compare.Added).Difference(compare.Removed),
+		managers[manager].Set().Union(compare.Modified).Union(compare.Added).Difference(compare.Removed).RecursiveDifference(ignored),
 		version,
 		false,
 	)
@@ -174,12 +180,21 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to get field set: %v", err)
 	}
+
+	ignored := s.IgnoredFields[version]
+	if ignored != nil {
+		set = set.RecursiveDifference(ignored)
+		// TODO: is this correct. If we don't remove from lastSet pruning might remove the fields?
+		if lastSet != nil {
+			lastSet.Set().RecursiveDifference(ignored)
+		}
+	}
 	managers[manager] = fieldpath.NewVersionedSet(set, version, true)
 	newObject, err = s.prune(newObject, managers, manager, lastSet)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, fmt.Errorf("failed to prune fields: %v", err)
 	}
-	managers, compare, err := s.update(liveObject, newObject, version, managers, nil, manager, force)
+	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, force)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}
@@ -213,7 +228,6 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 		return nil, fmt.Errorf("failed to convert merged object to last applied version: %v", err)
 	}
 
-	// pruned is the value *after* pruning
 	pruned := convertedMerged.RemoveItems(lastSet.Set())
 	pruned, err = s.addBackOwnedItems(convertedMerged, pruned, managers, applyingManager)
 	if err != nil {
@@ -262,11 +276,7 @@ func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFie
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field set from pruned object at version %v: %v", version, err)
 		}
-
-		newOrManaged := prunedSet.Union(managed)
-		oldAndUnmanaged := mergedSet.Difference(newOrManaged)
-		// a value containing only new or previously managed fields
-		pruned = merged.RemoveItems(oldAndUnmanaged)
+		pruned = merged.RemoveItems(mergedSet.Difference(prunedSet.Union(managed)))
 	}
 	return pruned, nil
 }
@@ -290,9 +300,5 @@ func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field set from merged object in last applied version: %v", err)
 	}
-
-	oldOrUnmanaged := mergedSet.Difference(prunedSet)
-	onlyOld := oldOrUnmanaged.Intersection(lastSet.Set())
-
-	return merged.RemoveItems(onlyOld), nil
+	return merged.RemoveItems(mergedSet.Difference(prunedSet).Intersection(lastSet.Set())), nil
 }

@@ -109,28 +109,12 @@ func (tv TypedValue) Merge(pso *TypedValue) (*TypedValue, error) {
 // match), or an error will be returned. Validation errors will be returned if
 // the objects don't conform to the schema.
 func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
-	return tv.CompareWithout(rhs, nil)
-}
-
-// CompareWithout compares the two objects, but ignores the provided set of fields.
-// See the comments on the `Comparison` struct for details on the return value.
-//
-// tv and rhs must both be of the same type (their Schema and TypeRef must
-// match), or an error will be returned. Validation errors will be returned if
-// the objects don't conform to the schema.
-func (tv TypedValue) CompareWithout(rhs *TypedValue, ignored *fieldpath.Set) (c *Comparison, err error) {
 	c = &Comparison{
 		Removed:  fieldpath.NewSet(),
 		Modified: fieldpath.NewSet(),
 		Added:    fieldpath.NewSet(),
 	}
-	if ignored == nil {
-		ignored = fieldpath.NewSet()
-	}
 	_, err = merge(&tv, rhs, func(w *mergingWalker) {
-		if ignored.HasPartial(w.path) {
-			return
-		}
 		if w.lhs == nil {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {
@@ -141,9 +125,6 @@ func (tv TypedValue) CompareWithout(rhs *TypedValue, ignored *fieldpath.Set) (c 
 			c.Modified.Insert(w.path)
 		}
 	}, func(w *mergingWalker) {
-		if ignored.HasPartial(w.path) {
-			return
-		}
 		if w.lhs == nil {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {
@@ -157,16 +138,9 @@ func (tv TypedValue) CompareWithout(rhs *TypedValue, ignored *fieldpath.Set) (c 
 	return c, nil
 }
 
-// Remove recursively removes each provided path, including its sub-paths.
-// For example `.a` would also remove `.a.b` as it's a sub-path.
-func (tv TypedValue) Remove(items *fieldpath.Set) *TypedValue {
-	tv.value = removeWithSchema(tv.value, items, tv.schema, tv.typeRef, false)
-	return &tv
-}
-
 // RemoveItems removes each provided list or map item from the value.
 func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
-	tv.value = removeWithSchema(tv.value, items, tv.schema, tv.typeRef, true)
+	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef)
 	return &tv
 }
 
@@ -316,4 +290,16 @@ func (c *Comparison) String() string {
 		bld.WriteString(fmt.Sprintf("- Removed Fields:\n%v\n", c.Removed))
 	}
 	return bld.String()
+}
+
+// ExcludeFields fields from the compare recursively removes the fields
+// from the entire comparison
+func (c *Comparison) ExcludeFields(fields *fieldpath.Set) *Comparison {
+	if fields == nil || fields.Empty() {
+		return c
+	}
+	c.Removed = c.Removed.RecursiveDifference(fields)
+	c.Modified = c.Modified.RecursiveDifference(fields)
+	c.Added = c.Added.RecursiveDifference(fields)
+	return c
 }
