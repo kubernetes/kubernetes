@@ -107,7 +107,7 @@ func WithPriorityAndFairness(
 			}
 			defer func() {
 				if isMutatingRequest {
-					atomic.AddInt32(&atomicMutatingLen, -11)
+					atomic.AddInt32(&atomicMutatingLen, -1)
 					watermark.recordMutating(mutatingLen)
 				} else {
 					atomic.AddInt32(&atomicNonMutatingLen, -1)
