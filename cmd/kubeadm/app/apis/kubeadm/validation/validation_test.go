@@ -111,6 +111,7 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		{"valid-nodename", kubeadmapiv1beta2.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
 		{"valid-nodename", "bla:///some/path", true},                                         // unsupported url scheme
 		{"valid-nodename", ":::", true},                                                      // unparseable url
+		{"valid-nodename", "", true},                                                         // invalid CRISocket (path is not absolute)
 	}
 	for _, rt := range tests {
 		nro := kubeadm.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: rt.criSocket}
