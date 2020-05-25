@@ -29,6 +29,7 @@ go_test(
     srcs = ["azure_vmssclient_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient:go_default_library",
