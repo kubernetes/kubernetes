@@ -1314,6 +1314,7 @@ retriesLoop:
 		errs := sets.NewString()
 		// watchEventsLoop:
 		totalValidWatchEvents := 0
+		actualWatchEventsHasDelete := false
 		for watchEventIndex, _ := range expectedWatchEvents {
 			foundExpectedWatchEvent := false
 			ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount must be greater than or equal to expected watch events amount")
@@ -1321,20 +1322,24 @@ retriesLoop:
 				if actualWatchEvents[watchEventIndex].Type == expectedWatchEvents[actualWatchEventIndex].Type {
 					foundExpectedWatchEvent = true
 				}
+				if actualWatchEvents[actualWatchEventIndex].Type == watch.Deleted && actualWatchEventsHasDelete != true {
+					actualWatchEventsHasDelete = true
+				}
 			}
 			if foundExpectedWatchEvent == false {
 				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvents[watchEventIndex].Type))
 			}
 			totalValidWatchEvents ++
 		}
-		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%v) and expected watch events (%v)", totalValidWatchEvents, len(expectedWatchEvents))
+		if actualWatchEventsHasDelete == false {
+			_ = dc.Resource(resourceType).Namespace(namespace).DeleteCollection(testContext, metav1.DeleteOptions{}, listOptions)
+		}
 		// TODO restructure failures handling
 		if errs.Len() > 0 && try < retries {
-			fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* "))
-			// TODO delete resources via DynamicClient (on failure)
+			fmt.Println(fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* ")))
 			continue retriesLoop
 		}
 		ExpectEqual(errs.Len() > 0, false, fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* ")))
-		// TODO delete resources via DynamicClient (on failure)
+		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%v) and expected watch events (%v)", totalValidWatchEvents, len(expectedWatchEvents))
 	}
 }
