@@ -1302,7 +1302,7 @@ func WatchEventSequenceVerifier(testContext context.Context, dc dynamic.Interfac
 			return dc.Resource(resourceType).Namespace(namespace).Watch(testContext, listOptions)
 		},
 	}
-	resourceWatch, err := watchtools.NewRetryWatcher("", listWatcher)
+	resourceWatch, err := watchtools.NewRetryWatcher("1", listWatcher)
 	ExpectNoError(err, "Failed to create a resource watch of %v in namespace %v", resourceType.Resource, namespace)
 
 	// NOTE value of 3 retries seems to make sense
