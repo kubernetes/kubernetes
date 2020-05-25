@@ -27,67 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
-func TestValidateNodeLabelArgs(t *testing.T) {
-	tests := []struct {
-		name string
-		args config.NodeLabelArgs
-		err  bool
-	}{
-		{
-			name: "happy case",
-			args: config.NodeLabelArgs{
-				PresentLabels:           []string{"foo", "bar"},
-				AbsentLabels:            []string{"baz"},
-				PresentLabelsPreference: []string{"foo", "bar"},
-				AbsentLabelsPreference:  []string{"baz"},
-			},
-		},
-		{
-			name: "label presence conflict",
-			// "bar" exists in both present and absent labels therefore validation should fail.
-			args: config.NodeLabelArgs{
-				PresentLabels:           []string{"foo", "bar"},
-				AbsentLabels:            []string{"bar", "baz"},
-				PresentLabelsPreference: []string{"foo", "bar"},
-				AbsentLabelsPreference:  []string{"baz"},
-			},
-			err: true,
-		},
-		{
-			name: "label preference conflict",
-			// "bar" exists in both present and absent labels preferences therefore validation should fail.
-			args: config.NodeLabelArgs{
-				PresentLabels:           []string{"foo", "bar"},
-				AbsentLabels:            []string{"baz"},
-				PresentLabelsPreference: []string{"foo", "bar"},
-				AbsentLabelsPreference:  []string{"bar", "baz"},
-			},
-			err: true,
-		},
-		{
-			name: "both label presence and preference conflict",
-			args: config.NodeLabelArgs{
-				PresentLabels:           []string{"foo", "bar"},
-				AbsentLabels:            []string{"bar", "baz"},
-				PresentLabelsPreference: []string{"foo", "bar"},
-				AbsentLabelsPreference:  []string{"bar", "baz"},
-			},
-			err: true,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			_, err := New(&test.args, nil)
-			if test.err && err == nil {
-				t.Fatal("Plugin initialization should fail.")
-			}
-			if !test.err && err != nil {
-				t.Fatalf("Plugin initialization shouldn't fail: %v", err)
-			}
-		})
-	}
-}
-
 func TestNodeLabelFilter(t *testing.T) {
 	label := map[string]string{"foo": "any value", "bar": "any value"}
 	var pod *v1.Pod
@@ -341,5 +280,4 @@ func TestNodeLabelScoreWithoutNode(t *testing.T) {
 			t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), framework.Error)
 		}
 	})
-
 }
