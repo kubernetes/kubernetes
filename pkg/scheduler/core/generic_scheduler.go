@@ -161,7 +161,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, 
 		return result, ErrNoNodesAvailable
 	}
 
-	// Run "prefilter" plugins.
 	startPredicateEvalTime := time.Now()
 	filteredNodes, filteredNodesStatuses, err := g.findNodesThatFitPod(ctx, prof, state, pod)
 	if err != nil {
@@ -395,6 +394,7 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
 func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.NodeToStatusMap, error) {
+	// Run "prefilter" plugins.
 	s := prof.RunPreFilterPlugins(ctx, state, pod)
 	if !s.IsSuccess() {
 		return nil, nil, s.AsError()
