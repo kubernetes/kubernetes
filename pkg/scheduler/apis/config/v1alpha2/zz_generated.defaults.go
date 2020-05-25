@@ -42,6 +42,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1alpha2.RequestedToCapacityRatioArgs{}, func(obj interface{}) {
 		SetObjectDefaults_RequestedToCapacityRatioArgs(obj.(*v1alpha2.RequestedToCapacityRatioArgs))
 	})
+	scheme.AddTypeDefaultingFunc(&v1alpha2.VolumeBindingArgs{}, func(obj interface{}) { SetObjectDefaults_VolumeBindingArgs(obj.(*v1alpha2.VolumeBindingArgs)) })
 	return nil
 }
 
@@ -63,4 +64,8 @@ func SetObjectDefaults_NodeResourcesMostAllocatedArgs(in *v1alpha2.NodeResources
 
 func SetObjectDefaults_RequestedToCapacityRatioArgs(in *v1alpha2.RequestedToCapacityRatioArgs) {
 	SetDefaults_RequestedToCapacityRatioArgs(in)
+}
+
+func SetObjectDefaults_VolumeBindingArgs(in *v1alpha2.VolumeBindingArgs) {
+	SetDefaults_VolumeBindingArgs(in)
 }

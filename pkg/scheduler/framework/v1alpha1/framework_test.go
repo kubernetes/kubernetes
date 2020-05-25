@@ -470,7 +470,16 @@ func recordingPluginFactory(name string, result map[string]runtime.Object) Plugi
 
 func TestNewFrameworkPluginDefaults(t *testing.T) {
 	// In-tree plugins that use args.
-	pluginsWithArgs := []string{"InterPodAffinity", "NodeLabel", "NodeResourcesFit", "NodeResourcesLeastAllocated", "NodeResourcesMostAllocated", "PodTopologySpread", "RequestedToCapacityRatio"}
+	pluginsWithArgs := []string{
+		"InterPodAffinity",
+		"NodeLabel",
+		"NodeResourcesFit",
+		"NodeResourcesLeastAllocated",
+		"NodeResourcesMostAllocated",
+		"PodTopologySpread",
+		"RequestedToCapacityRatio",
+		"VolumeBinding",
+	}
 	plugins := config.Plugins{
 		Filter: &config.PluginSet{},
 	}
@@ -510,6 +519,9 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 				},
 				"PodTopologySpread": &config.PodTopologySpreadArgs{},
+				"VolumeBinding": &config.VolumeBindingArgs{
+					BindTimeoutSeconds: 600,
+				},
 			},
 		},
 		{
@@ -545,6 +557,12 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 						Resources: []config.ResourceSpec{{Name: "resource", Weight: 2}},
 					},
 				},
+				{
+					Name: "VolumeBinding",
+					Args: &config.VolumeBindingArgs{
+						BindTimeoutSeconds: 300,
+					},
+				},
 			},
 			wantCfg: map[string]runtime.Object{
 				"InterPodAffinity": &config.InterPodAffinityArgs{
@@ -563,6 +581,9 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 				"PodTopologySpread": &config.PodTopologySpreadArgs{},
 				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
 					Resources: []config.ResourceSpec{{Name: "resource", Weight: 2}},
+				},
+				"VolumeBinding": &config.VolumeBindingArgs{
+					BindTimeoutSeconds: 300,
 				},
 			},
 		},

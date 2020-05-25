@@ -148,6 +148,8 @@ type ServiceAffinityArgs struct {
 type VolumeBindingArgs struct {
 	metav1.TypeMeta
 
-	// BindTimeoutSeconds is the timeout in seconds in volume binding.
+	// BindTimeoutSeconds is the timeout in seconds in volume binding operation.
+	// Value must be non-negative integer. The value zero indicates no waiting.
+	// If this value is nil, the default value will be used.
 	BindTimeoutSeconds int64
 }

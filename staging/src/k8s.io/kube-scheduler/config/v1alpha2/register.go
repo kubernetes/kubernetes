@@ -46,6 +46,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ServiceAffinityArgs{},
 		&NodeResourcesLeastAllocatedArgs{},
 		&NodeResourcesMostAllocatedArgs{},
+		&VolumeBindingArgs{},
 	)
 	return nil
 }
