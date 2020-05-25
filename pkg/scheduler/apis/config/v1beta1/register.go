@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package v1beta1
 
 import (
-	"k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kube-scheduler/config/v1beta1"
 )
 
 // GroupName is the group name used in this package
-const GroupName = v1alpha2.GroupName
+const GroupName = v1beta1.GroupName
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = v1alpha2.SchemeGroupVersion
+var SchemeGroupVersion = v1beta1.SchemeGroupVersion
 
 var (
 	// localSchemeBuilder extends the SchemeBuilder instance with the external types. In this package,
 	// defaulting and conversion init funcs are registered as well.
-	localSchemeBuilder = &v1alpha2.SchemeBuilder
+	localSchemeBuilder = &v1beta1.SchemeBuilder
 	// AddToScheme is a global function that registers this API group & version to a scheme
 	AddToScheme = localSchemeBuilder.AddToScheme
 )

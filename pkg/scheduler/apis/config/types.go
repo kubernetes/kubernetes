@@ -57,7 +57,7 @@ type KubeSchedulerConfiguration struct {
 
 	// AlgorithmSource specifies the scheduler algorithm source.
 	// TODO(#87526): Remove AlgorithmSource from this package
-	// DEPRECATED: AlgorithmSource is removed in the v1alpha2 ComponentConfig
+	// DEPRECATED: AlgorithmSource is removed in the v1beta1 ComponentConfig
 	AlgorithmSource SchedulerAlgorithmSource
 
 	// LeaderElection defines the configuration of leader election client.
