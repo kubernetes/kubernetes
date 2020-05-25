@@ -961,3 +961,82 @@ func TestValidateURLs(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateEtcd(t *testing.T) {
+	var tests = []struct {
+		name           string
+		etcd           *kubeadm.Etcd
+		expectedErrors bool
+	}{
+		{
+			name:           "either .Etcd.Local or .Etcd.External is required",
+			etcd:           &kubeadm.Etcd{},
+			expectedErrors: true,
+		},
+		{
+			name: ".Etcd.Local and .Etcd.External are mutually exclusive",
+			etcd: &kubeadm.Etcd{
+				Local: &kubeadm.LocalEtcd{
+					DataDir: "/some/path",
+				},
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379"},
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
+					CertFile:  "/some/file.crt",
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
+					CertFile:  "/some/file.crt",
+					KeyFile:   "/some/file.key",
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "valid external etcd",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
+					CertFile:  "/etcd.crt",
+					KeyFile:   "/etcd.key",
+					CAFile:    "/etcd-ca.crt",
+				},
+			},
+			expectedErrors: false,
+		},
+		{
+			name: "valid external etcd (no TLS)",
+			etcd: &kubeadm.Etcd{
+				External: &kubeadm.ExternalEtcd{
+					Endpoints: []string{"http://10.100.0.1:2379", "http://10.100.0.2:2379"},
+				},
+			},
+			expectedErrors: false,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateEtcd(tc.etcd, field.NewPath("etcd"))
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("Error: \n\texpected: %t\n\t  actual: %t",
+				tc.expectedErrors,
+				actualErrors,
+			)
+		}
+	}
+}
