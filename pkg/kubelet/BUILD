@@ -165,6 +165,7 @@ go_test(
     srcs = [
         "active_deadline_test.go",
         "kubelet_getters_test.go",
+        "kubelet_linux_test.go",
         "kubelet_network_test.go",
         "kubelet_node_status_test.go",
         "kubelet_pods_linux_test.go",
@@ -181,8 +182,10 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/config:go_default_library",
@@ -219,7 +222,6 @@ go_test(
         "//pkg/volume/awsebs:go_default_library",
         "//pkg/volume/azure_dd:go_default_library",
         "//pkg/volume/gcepd:go_default_library",
-        "//pkg/volume/hostpath:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/hostutil:go_default_library",
@@ -243,6 +245,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
@@ -257,9 +260,11 @@ go_test(
         "//vendor/k8s.io/utils/mount:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/securitycontext:go_default_library",
             "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/securitycontext:go_default_library",
             "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         ],
         "//conditions:default": [],

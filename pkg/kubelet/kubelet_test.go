@@ -19,6 +19,14 @@ package kubelet
 import (
 	"fmt"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	utiltesting "k8s.io/client-go/util/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"sort"
 	"testing"
@@ -64,7 +72,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/token"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -72,7 +79,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
-	_ "k8s.io/kubernetes/pkg/volume/hostpath"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -2039,3 +2045,111 @@ type podsByUID []*v1.Pod
 func (p podsByUID) Len() int           { return len(p) }
 func (p podsByUID) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podsByUID) Less(i, j int) bool { return p[i].UID < p[j].UID }
+
+func Test_makePodSourceConfig_StaticPodURL(t *testing.T) {
+	nodeName := "makepodsourceconfig"
+	args := []struct {
+		name                    string
+		kubeCfg                 *kubeletconfiginternal.KubeletConfiguration
+		kubeDeps                *Dependencies
+		staticPod               *v1.Pod
+		nodeName                string
+		bootstrapCheckpointPath string
+	}{
+		{
+			name: "test_makePodSourceConfig_StaticPodURL",
+			kubeCfg: &kubeletconfiginternal.KubeletConfiguration{
+				StaticPodURL: "",
+				StaticPodURLHeader: map[string][]string{
+					"Static_pod_header_1": {
+						"header_1_key1",
+					},
+					"Static_pod_header_2": {
+						"header_2_key1",
+						"header_2_key2",
+					},
+				},
+				HTTPCheckFrequency: metav1.Duration{Duration: 15 * time.Second},
+			},
+			kubeDeps: &Dependencies{
+				KubeClient: nil,
+			},
+			staticPod: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					UID:       "123456",
+					Namespace: "mynamespace",
+				},
+				Spec: v1.PodSpec{
+					Containers:      []v1.Container{{Name: "image", Image: "test/image", ImagePullPolicy: v1.PullAlways, TerminationMessagePolicy: v1.TerminationMessageReadFile}},
+					SecurityContext: &v1.PodSecurityContext{},
+					SchedulerName:   api.DefaultSchedulerName,
+				},
+			},
+			nodeName: nodeName,
+		},
+	}
+
+	for _, tt := range args {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), tt.staticPod)
+			if err != nil {
+				t.Fatalf("error in encoding the pod: %v", err)
+			}
+			fakeHandler := utiltesting.FakeHandler{
+				StatusCode:   http.StatusOK,
+				ResponseBody: string(data),
+			}
+
+			testServer := httptest.NewServer(&fakeHandler)
+			defer testServer.Close()
+
+			expectURLPath := testServer.URL
+			tt.kubeCfg.StaticPodURL = expectURLPath
+			updates, err := makePodSourceConfig(tt.kubeCfg, tt.kubeDeps, types.NodeName(nodeName), tt.bootstrapCheckpointPath)
+			if err != nil {
+				t.Fatalf("makePodSourceConfig() error = %v", err)
+			}
+
+			select {
+			case got := <-updates.Updates():
+				actualPods := got.Pods
+				if 1 != len(actualPods) {
+					t.Fatal("Expected pod size equals 1")
+				}
+
+				actualPod := actualPods[0]
+				if tt.staticPod.Name+"-"+nodeName != actualPod.Name {
+					t.Fatal("Expected pod name equals")
+				}
+
+				requestReceived := fakeHandler.RequestReceived
+				actualHeader := requestReceived.Header
+				expectHeader := make(http.Header)
+				for k, v := range tt.kubeCfg.StaticPodURLHeader {
+					for i := range v {
+						expectHeader.Add(k, v[i])
+					}
+				}
+
+				actualHeader1 := actualHeader.Get("Static_pod_header_1")
+				expectHeader1 := expectHeader.Get("Static_pod_header_1")
+				if actualHeader1 != expectHeader1 {
+					t.Fatalf("Expected header not same, header key: Static_pod_header_1 actual value: %s expect value:%s", actualHeader1, expectHeader1)
+				}
+
+				actualHeader2 := actualHeader.Get("Static_pod_header_2")
+				expectHeader2 := expectHeader.Get("Static_pod_header_2")
+				if actualHeader2 != expectHeader2 {
+					t.Fatalf("Expected header not same, header key: Static_pod_header_1 actual value: %s expect value:%s", actualHeader2, expectHeader2)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatalf("%s: Expected update, timeout instead", tt.name)
+			}
+		})
+	}
+}
