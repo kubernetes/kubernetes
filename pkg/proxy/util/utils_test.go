@@ -630,3 +630,77 @@ func TestFilterIncorrectIPVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceAnnotation(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		defaultSetting bool
+		expect         bool
+		svc            *v1.Service
+	}{
+		{
+			desc:   "service without annotation",
+			svc:    &v1.Service{},
+			expect: false,
+		},
+		{
+			desc:           "service without annotation using defaultsetting true",
+			svc:            &v1.Service{},
+			defaultSetting: true,
+			expect:         true,
+		},
+		{
+			desc: "service with correct annotation value false",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{DisableExternalShortRouting: "false"},
+				},
+			},
+			expect: false,
+		},
+		{
+			desc: "service with correct annotation value true",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{DisableExternalShortRouting: "true"},
+				},
+			},
+			expect: true,
+		},
+		{
+			desc: "service with correct annotation invalid value",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{DisableExternalShortRouting: "invalidvalue"},
+				},
+			},
+			defaultSetting: false,
+			expect:         false,
+		},
+		{
+			desc: "service with incorrect annotation value true",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"foobar": "true"},
+				},
+			},
+			expect: false,
+		},
+		{
+			desc: "service with incorrect annotation value false",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"foobar": "false"},
+				},
+			},
+			expect: false,
+		},
+	}
+
+	for _, testcase := range testCases {
+		got := GetBoolFromServiceAnnotation(testcase.svc, DisableExternalShortRouting, testcase.defaultSetting)
+		if testcase.expect != got {
+			t.Errorf("case %s: expected %v, got %v", testcase.desc, testcase.expect, got)
+		}
+	}
+}

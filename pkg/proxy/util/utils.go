@@ -304,6 +304,7 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 	return nil
 }
 
+// GetBoolFromServiceAnnotation returns boolean value from service annotation
 func GetBoolFromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting bool) bool {
 	klog.V(4).Infof("GetBoolFromServiceAnnotation(%v, %v, %v)", service.Annotations, annotationKey, defaultSetting)
 	if annotationValue, ok := service.Annotations[annotationKey]; ok {
