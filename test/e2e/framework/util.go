@@ -1312,22 +1312,22 @@ retriesLoop:
 		// NOTE the test may need access to the events to see what's going on, such as a change in status
 		actualWatchEvents := scenario(resourceWatch)
 		errs := sets.NewString()
-	watchEventsLoop:
+		// watchEventsLoop:
+		totalValidWatchEvents := 0
 		for watchEventIndex, _ := range expectedWatchEvents {
 			foundExpectedWatchEvent := false
-			watchEventNextIndex := watchEventIndex + 1
-			if watchEventNextIndex >= len(expectedWatchEvents) {
-				continue watchEventsLoop
-			}
+			ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount must be greater than or equal to expected watch events amount")
 			for actualWatchEventIndex, _ := range actualWatchEvents {
-				if actualWatchEvents[watchEventIndex] == expectedWatchEvents[actualWatchEventIndex] {
+				if actualWatchEvents[watchEventIndex].Type == expectedWatchEvents[actualWatchEventIndex].Type {
 					foundExpectedWatchEvent = true
 				}
 			}
 			if foundExpectedWatchEvent == false {
-				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvents[watchEventIndex]))
+				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvents[watchEventIndex].Type))
 			}
+			totalValidWatchEvents ++
 		}
+		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%v) and expected watch events (%v)", totalValidWatchEvents, len(expectedWatchEvents))
 		// TODO restructure failures handling
 		if errs.Len() > 0 && try < retries {
 			fmt.Errorf("invariants violated:\n* %s", strings.Join(errs.List(), "\n* "))
