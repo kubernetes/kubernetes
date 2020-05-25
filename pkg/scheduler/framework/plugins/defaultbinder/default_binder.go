@@ -20,6 +20,7 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -54,7 +55,7 @@ func (b DefaultBinder) Bind(ctx context.Context, state *framework.CycleState, p 
 		Target:     v1.ObjectReference{Kind: "Node", Name: nodeName},
 	}
 	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 	return nil
