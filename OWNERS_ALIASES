@@ -215,7 +215,6 @@ aliases:
     - Random-Liu
     - dchen1107
     - derekwaynecarr
-    - tallclair
     - vishh
     - yujuhong
   sig-node-reviewers:
@@ -229,7 +228,6 @@ aliases:
     - pmorie
     - resouer
     - sjenning
-    - tallclair
     - vishh
     - yifan-gu
     - yujuhong
