@@ -1765,6 +1765,7 @@ type ContainerPort struct {
 	// Protocol for port. Must be UDP, TCP, or SCTP.
 	// Defaults to "TCP".
 	// +optional
+	// +kubebuilder:default=TCP
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=Protocol"`
 	// What host IP to bind the external port to.
 	// +optional
