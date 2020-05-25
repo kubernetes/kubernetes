@@ -755,6 +755,35 @@ func TestDeleteInstancesWaitError(t *testing.T) {
 	assert.NotNil(t, rerr)
 	assert.Equal(t, vmssDeleteInstancesErr, rerr)
 }
+func TestDeleteInstancesAsync(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vmss := getTestVMSS("vmss1")
+	vmInstanceIDs := compute.VirtualMachineScaleSetVMInstanceRequiredIDs{
+		InstanceIds: &[]string{"0", "1", "2"},
+	}
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Request:    &http.Request{Method: "POST"},
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte("{}"))),
+	}
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	armClient.EXPECT().PostResource(gomock.Any(), to.String(vmss.ID), "delete", vmInstanceIDs).Return(response, nil).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
+
+	vmssClient := getTestVMSSClient(armClient)
+	future, rerr := vmssClient.DeleteInstancesAsync(context.TODO(), "rg", "vmss1", vmInstanceIDs)
+	assert.Nil(t, rerr)
+	assert.Equal(t, future.Status(), "Succeeded")
+
+	// on error
+	retryErr := &retry.Error{RawError: fmt.Errorf("error")}
+	armClient.EXPECT().PostResource(gomock.Any(), to.String(vmss.ID), "delete", vmInstanceIDs).Return(&http.Response{StatusCode: http.StatusBadRequest}, retryErr).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
+	_, rerr = vmssClient.DeleteInstancesAsync(context.TODO(), "rg", "vmss1", vmInstanceIDs)
+	assert.Equal(t, retryErr, rerr)
+}
 
 func getTestVMSS(name string) compute.VirtualMachineScaleSet {
 	return compute.VirtualMachineScaleSet{
