@@ -258,7 +258,9 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	stopCh := make(chan struct{})
+	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
+	// when the select statement reads something other than the one the goroutine sends on.
+	stopCh := make(chan struct{}, 1)
 	tearDown := func() {
 		close(stopCh)
 		result.TearDownFn()
