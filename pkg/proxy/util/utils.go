@@ -41,6 +41,9 @@ const (
 
 	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
+
+	// DisableExternalShortRouting annotation value to disable external LB "short" routing
+	DisableExternalShortRouting = "loadbalancer.kubernetes.io/disable-lb-short-routing"
 )
 
 var (
@@ -299,4 +302,25 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
 	}
 	return nil
+}
+
+func GetBoolFromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting bool) bool {
+	klog.V(4).Infof("GetBoolFromServiceAnnotation(%v, %v, %v)", service.Annotations, annotationKey, defaultSetting)
+	if annotationValue, ok := service.Annotations[annotationKey]; ok {
+		returnValue := false
+		switch annotationValue {
+		case "true":
+			returnValue = true
+		case "false":
+			returnValue = false
+		default:
+			klog.V(4).Infof("Invalid value falling back to defaultSetting")
+			return defaultSetting
+		}
+
+		klog.V(4).Infof("Found a Service Annotation: %v = %v", annotationKey, returnValue)
+		return returnValue
+	}
+	klog.V(4).Infof("Could not find a Service Annotation; falling back to default setting: %v = %v", annotationKey, defaultSetting)
+	return defaultSetting
 }

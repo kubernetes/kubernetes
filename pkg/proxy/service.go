@@ -40,18 +40,19 @@ import (
 // or can be used for constructing a more specific ServiceInfo struct
 // defined by the proxier if needed.
 type BaseServiceInfo struct {
-	clusterIP                net.IP
-	port                     int
-	protocol                 v1.Protocol
-	nodePort                 int
-	loadBalancerStatus       v1.LoadBalancerStatus
-	sessionAffinityType      v1.ServiceAffinity
-	stickyMaxAgeSeconds      int
-	externalIPs              []string
-	loadBalancerSourceRanges []string
-	healthCheckNodePort      int
-	onlyNodeLocalEndpoints   bool
-	topologyKeys             []string
+	clusterIP                   net.IP
+	port                        int
+	protocol                    v1.Protocol
+	nodePort                    int
+	loadBalancerStatus          v1.LoadBalancerStatus
+	sessionAffinityType         v1.ServiceAffinity
+	stickyMaxAgeSeconds         int
+	externalIPs                 []string
+	loadBalancerSourceRanges    []string
+	healthCheckNodePort         int
+	onlyNodeLocalEndpoints      bool
+	topologyKeys                []string
+	disableExternalShortRouting bool
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -109,6 +110,9 @@ func (info *BaseServiceInfo) ExternalIPStrings() []string {
 // LoadBalancerIPStrings is part of ServicePort interface.
 func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
 	var ips []string
+	if info.disableExternalShortRouting {
+		return ips
+	}
 	for _, ing := range info.loadBalancerStatus.Ingress {
 		ips = append(ips, ing.IP)
 	}
@@ -130,20 +134,23 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
+	disableExternalShortRouting := utilproxy.GetBoolFromServiceAnnotation(service, utilproxy.DisableExternalShortRouting, false)
+
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 	info := &BaseServiceInfo{
-		clusterIP:              net.ParseIP(service.Spec.ClusterIP),
-		port:                   int(port.Port),
-		protocol:               port.Protocol,
-		nodePort:               int(port.NodePort),
-		sessionAffinityType:    service.Spec.SessionAffinity,
-		stickyMaxAgeSeconds:    stickyMaxAgeSeconds,
-		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
-		topologyKeys:           service.Spec.TopologyKeys,
+		clusterIP:                   net.ParseIP(service.Spec.ClusterIP),
+		port:                        int(port.Port),
+		protocol:                    port.Protocol,
+		nodePort:                    int(port.NodePort),
+		sessionAffinityType:         service.Spec.SessionAffinity,
+		stickyMaxAgeSeconds:         stickyMaxAgeSeconds,
+		onlyNodeLocalEndpoints:      onlyNodeLocalEndpoints,
+		topologyKeys:                service.Spec.TopologyKeys,
+		disableExternalShortRouting: disableExternalShortRouting,
 	}
 
 	if sct.isIPv6Mode == nil {
