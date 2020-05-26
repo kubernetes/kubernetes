@@ -94,6 +94,8 @@ type KubeletConfiguration struct {
 	Address string
 	// port is the port for the Kubelet to serve on.
 	Port int32
+	// EnableHTTPs specifies whether the traffic to kubelet should be encrypted.
+	EnableHTTPS bool
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32

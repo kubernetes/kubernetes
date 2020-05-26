@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -63,6 +64,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
 	}
+	obj.EnableHTTPS = true
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
 	}

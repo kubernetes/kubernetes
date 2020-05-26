@@ -3801,6 +3801,8 @@ type DaemonEndpoint struct {
 
 	// Port number of the given endpoint.
 	Port int32
+	// Url Scheme
+	Scheme string
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.

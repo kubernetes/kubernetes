@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/utils/clock"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -139,6 +139,7 @@ func ListenAndServeKubeletServer(
 	address net.IP,
 	port uint,
 	tlsOptions *TLSOptions,
+	enableHttps bool,
 	auth AuthInterface,
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
@@ -154,7 +155,7 @@ func ListenAndServeKubeletServer(
 		WriteTimeout:   4 * 60 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
-	if tlsOptions != nil {
+	if tlsOptions != nil && enableHttps {
 		s.TLSConfig = tlsOptions.Config
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig

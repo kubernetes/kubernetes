@@ -132,6 +132,10 @@ type KubeletConfiguration struct {
 	// Default: 10250
 	// +optional
 	Port int32 `json:"port,omitempty"`
+	// EnableHTTPs specifies whether the traffic to kubelet should be encrypted.
+	// Default: true
+	// +optional
+	EnableHTTPS bool `json:"enableHTTPS,omitempty"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
