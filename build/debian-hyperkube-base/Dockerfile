@@ -30,15 +30,14 @@ RUN ln -s /hyperkube /apiserver \
  && ln -s /hyperkube /usr/local/bin/kubectl \
  && ln -s /hyperkube /usr/local/bin/kubelet
 
-RUN echo CACHEBUST>/dev/null && clean-install \
-    bash
+RUN clean-install bash
 
 # The samba-common, cifs-utils, and nfs-common packages depend on
 # ucf, which itself depends on /bin/bash.
 RUN echo "dash dash/sh boolean false" | debconf-set-selections
 RUN DEBIAN_FRONTEND=noninteractive dpkg-reconfigure dash
 
-RUN echo CACHEBUST>/dev/null && clean-install \
+RUN clean-install \
     ca-certificates \
     ceph-common \
     cifs-utils \

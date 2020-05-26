@@ -84,6 +84,8 @@ dependencies:
       match: debian_base_version=
     - path: build/workspace.bzl
       match: tag =
+    - path: build/debian-hyperkube-base/Makefile
+      match: BASEIMAGE\?\=\$\(BASE_REGISTRY\)\/debian-base-\$\(ARCH\)
     - path: build/debian-iptables/Makefile
       match: BASEIMAGE\?\=\$\(BASE_REGISTRY\)\/debian-base-\$\(ARCH\)
     - path: cluster/images/etcd/Makefile
@@ -100,10 +102,10 @@ dependencies:
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-hyperkube-base"
-    version: 0.12.2
+    version: 1.0.0
     refPaths:
     - path: build/debian-hyperkube-base/Makefile
-      match: TAG=
+      match: TAG\?=
 
   - name: "k8s.gcr.io/debian-hyperkube-base: dependents"
     version: 0.12.1
