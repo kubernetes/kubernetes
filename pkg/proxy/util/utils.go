@@ -221,6 +221,11 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			}
 		}
 	}
+
+	if uniqueAddressList.Len() == 0 {
+		return nil, fmt.Errorf("no addresses found for cidrs %v", cidrs)
+	}
+
 	return uniqueAddressList, nil
 }
 
