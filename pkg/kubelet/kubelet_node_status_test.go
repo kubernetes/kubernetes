@@ -1902,7 +1902,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 			ip = v.IP
 		}
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() {
-			break
+			continue
 		}
 		successTest := test{
 			nodeIP:   ip.String(),
