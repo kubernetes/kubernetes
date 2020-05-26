@@ -139,3 +139,18 @@ func (mr *MockInterfaceMockRecorder) DeleteInstances(ctx, resourceGroupName, vmS
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstances", reflect.TypeOf((*MockInterface)(nil).DeleteInstances), ctx, resourceGroupName, vmScaleSetName, vmInstanceIDs)
 }
+
+// DeleteInstancesAsync mocks base method
+func (m *MockInterface) DeleteInstancesAsync(ctx context.Context, resourceGroupName, VMScaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (*azure.Future, *retry.Error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteInstancesAsync", ctx, resourceGroupName, VMScaleSetName, vmInstanceIDs)
+	ret0, _ := ret[0].(*azure.Future)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
+}
+
+// DeleteInstancesAsync indicates an expected call of DeleteInstancesAsync
+func (mr *MockInterfaceMockRecorder) DeleteInstancesAsync(ctx, resourceGroupName, VMScaleSetName, vmInstanceIDs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstancesAsync", reflect.TypeOf((*MockInterface)(nil).DeleteInstancesAsync), ctx, resourceGroupName, VMScaleSetName, vmInstanceIDs)
+}
