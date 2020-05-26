@@ -454,8 +454,7 @@ func returnedOpenAPI() *openapi_v2.Document {
 	}
 }
 
-func openapiSchemaDeprecatedFakeServer(status int) (*httptest.Server, error) {
-	var sErr error
+func openapiSchemaDeprecatedFakeServer(status int, t *testing.T) (*httptest.Server, error) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/openapi/v2" {
 			// write the error status for the new endpoint request
@@ -463,54 +462,81 @@ func openapiSchemaDeprecatedFakeServer(status int) (*httptest.Server, error) {
 			return
 		}
 		if req.URL.Path != "/swagger-2.0.0.pb-v1" {
-			sErr = fmt.Errorf("Unexpected url %v", req.URL)
+			errMsg := fmt.Sprintf("Unexpected url %v", req.URL)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 		if req.Method != "GET" {
-			sErr = fmt.Errorf("Unexpected method %v", req.Method)
+			errMsg := fmt.Sprintf("Unexpected method %v", req.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 
 		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
 		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
-			sErr = err
+			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	return server, sErr
+
+	return server, nil
 }
 
-func openapiSchemaFakeServer() (*httptest.Server, error) {
-	var sErr error
+func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path != "/openapi/v2" {
-			sErr = fmt.Errorf("Unexpected url %v", req.URL)
+			errMsg := fmt.Sprintf("Unexpected url %v", req.URL)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 		if req.Method != "GET" {
-			sErr = fmt.Errorf("Unexpected method %v", req.Method)
+			errMsg := fmt.Sprintf("Unexpected method %v", req.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 		decipherableFormat := req.Header.Get("Accept")
 		if decipherableFormat != "application/com.github.proto-openapi.spec.v2@v1.0+protobuf" {
-			sErr = fmt.Errorf("Unexpected accept mime type %v", decipherableFormat)
+			errMsg := fmt.Sprintf("Unexpected accept mime type %v", decipherableFormat)
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 
 		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
 		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
-			sErr = err
+			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	return server, sErr
+
+	return server, nil
 }
 
 func TestGetOpenAPISchema(t *testing.T) {
-	server, err := openapiSchemaFakeServer()
+	server, err := openapiSchemaFakeServer(t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
@@ -527,7 +553,7 @@ func TestGetOpenAPISchema(t *testing.T) {
 }
 
 func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusForbidden)
+	server, err := openapiSchemaDeprecatedFakeServer(http.StatusForbidden, t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
@@ -544,7 +570,7 @@ func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
 }
 
 func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotFound)
+	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotFound, t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
@@ -561,7 +587,7 @@ func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
 }
 
 func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotAcceptable)
+	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotAcceptable, t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
