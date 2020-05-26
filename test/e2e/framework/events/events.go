@@ -34,10 +34,9 @@ import (
 )
 
 const (
- eventRetryPeriod  = 1 * time.Second
- eventRetryTimeout = 1 * time.Minute
+	eventRetryPeriod  = 1 * time.Second
+	eventRetryTimeout = 1 * time.Minute
 )
-
 
 // Action is a function to be performed by the system.
 type Action func() error
@@ -205,19 +204,19 @@ func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) 
 }
 
 func deleteEventCollection(f *framework.Framework, label string) func() (bool, error) {
- return func() (bool, error) {
-  var err error
+	return func() (bool, error) {
+		var err error
 
-  framework.Logf("requesting DeleteCollection of events")
+		framework.Logf("requesting DeleteCollection of events")
 
-  err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-   LabelSelector: label})
+		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: label})
 
-  if err != nil {
-   return false, err
-  } else {
-   return true, nil
-  }
+		if err != nil {
+			return false, err
+		} else {
+			return true, nil
+		}
 
- }
+	}
 }
