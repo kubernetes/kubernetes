@@ -534,19 +534,16 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 	size := w.endIndex - w.startIndex
 	var oldest uint64
 	switch {
-	case size >= w.capacity:
-		// Once the watch event buffer is full, the oldest watch event we can deliver
-		// is the first one in the buffer.
-		oldest = w.cache[w.startIndex%w.capacity].ResourceVersion
-	case w.listResourceVersion > 0:
-		// If the watch event buffer isn't full, the oldest watch event we can deliver
-		// is one greater than the resource version of the last full list.
+	case w.listResourceVersion > 0 && w.startIndex == 0:
+		// If no event was removed from the buffer since last relist, the oldest watch
+		// event we can deliver is one greater than the resource version of the list.
 		oldest = w.listResourceVersion + 1
 	case size > 0:
-		// If we've never completed a list, use the resourceVersion of the oldest event
-		// in the buffer.
-		// This should only happen in unit tests that populate the buffer without
-		// performing list/replace operations.
+		// If the previous condition is not satisfied: either some event was already
+		// removed from the buffer or we've never completed a list (the latter can
+		// only happen in unit tests that populate the buffer without performing
+		// list/replace operations), the oldest watch event we can deliver is the first
+		// one in the buffer.
 		oldest = w.cache[w.startIndex%w.capacity].ResourceVersion
 	default:
 		return nil, fmt.Errorf("watch cache isn't correctly initialized")
