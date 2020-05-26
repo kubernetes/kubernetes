@@ -37,6 +37,7 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -349,15 +350,26 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 	return allErrs
 }
 
-func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]core.VolumeSource, field.ErrorList) {
+func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath *field.Path) (map[string]core.VolumeSource, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
 	allNames := sets.String{}
+	allCreatedPVCs := sets.String{}
+	// Determine which PVCs will be created for this pod. We need
+	// the exact name of the pod for this. Without it, this sanity
+	// check has to be skipped.
+	if podMeta != nil && podMeta.Name != "" {
+		for _, vol := range volumes {
+			if vol.VolumeSource.Ephemeral != nil {
+				allCreatedPVCs.Insert(podMeta.Name + "-" + vol.Name)
+			}
+		}
+	}
 	vols := make(map[string]core.VolumeSource)
 	for i, vol := range volumes {
 		idxPath := fldPath.Index(i)
 		namePath := idxPath.Child("name")
-		el := validateVolumeSource(&vol.VolumeSource, idxPath, vol.Name)
+		el := validateVolumeSource(&vol.VolumeSource, idxPath, vol.Name, podMeta)
 		if len(vol.Name) == 0 {
 			el = append(el, field.Required(namePath, ""))
 		} else {
@@ -372,8 +384,14 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]cor
 		} else {
 			allErrs = append(allErrs, el...)
 		}
-
+		// A PersistentVolumeClaimSource should not reference a created PVC. That doesn't
+		// make sense.
+		if vol.PersistentVolumeClaim != nil && allCreatedPVCs.Has(vol.PersistentVolumeClaim.ClaimName) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("persistentVolumeClaim").Child("claimName"), vol.PersistentVolumeClaim.ClaimName,
+				"must not reference a PVC that gets created for an ephemeral volume"))
+		}
 	}
+
 	return vols, allErrs
 }
 
@@ -428,7 +446,7 @@ func devicePathAlreadyExists(devicePath string, mounts map[string]string) bool {
 	return false
 }
 
-func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volName string) field.ErrorList {
+func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volName string, podMeta *metav1.ObjectMeta) field.ErrorList {
 	numVolumes := 0
 	allErrs := field.ErrorList{}
 	if source.EmptyDir != nil {
@@ -657,6 +675,23 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateCSIVolumeSource(source.CSI, fldPath.Child("csi"))...)
+		}
+	}
+	if source.Ephemeral != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("ephemeral"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateEphemeralVolumeSource(source.Ephemeral, fldPath.Child("ephemeral"))...)
+			// Check the expected name for the PVC. This gets skipped if information is missing,
+			// because that already gets flagged as a problem elsewhere. For example,
+			// ValidateObjectMeta as called by validatePodMetadataAndSpec checks that the name is set.
+			if podMeta != nil && podMeta.Name != "" && volName != "" {
+				pvcName := podMeta.Name + "-" + volName
+				for _, msg := range ValidatePersistentVolumeName(pvcName, false) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), volName, fmt.Sprintf("PVC name %q: %v", pvcName, msg)))
+				}
+			}
 		}
 	}
 
@@ -1550,6 +1585,41 @@ func validateCSIVolumeSource(csi *core.CSIVolumeSource, fldPath *field.Path) fie
 	}
 
 	return allErrs
+}
+
+func validateEphemeralVolumeSource(ephemeral *core.EphemeralVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ephemeral.VolumeClaimTemplate == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeClaimTemplate"), ""))
+	} else {
+		allErrs = append(allErrs, ValidatePersistentVolumeClaimTemplate(ephemeral.VolumeClaimTemplate, fldPath.Child("volumeClaimTemplate"))...)
+	}
+	return allErrs
+}
+
+// ValidatePersistentVolumeClaimTemplate verifies that the embedded object meta and spec are valid.
+// Checking of the object data is very minimal because only labels and annotations are used.
+func ValidatePersistentVolumeClaimTemplate(claimTemplate *core.PersistentVolumeClaimTemplate, fldPath *field.Path) field.ErrorList {
+	allErrs := validatePersistentVolumeClaimTemplateObjectMeta(&claimTemplate.ObjectMeta, fldPath.Child("metadata"))
+	allErrs = append(allErrs, ValidatePersistentVolumeClaimSpec(&claimTemplate.Spec, fldPath.Child("spec"))...)
+	return allErrs
+}
+
+func validatePersistentVolumeClaimTemplateObjectMeta(objMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	allErrs := apimachineryvalidation.ValidateAnnotations(objMeta.Annotations, fldPath.Child("annotations"))
+	allErrs = append(allErrs, v1validation.ValidateLabels(objMeta.Labels, fldPath.Child("labels"))...)
+	// All other fields are not supported and thus must not be set
+	// to avoid confusion.  We could reject individual fields,
+	// but then adding a new one to ObjectMeta wouldn't be checked
+	// unless this code gets updated. Instead, we ensure that
+	// only allowed fields are set via reflection.
+	allErrs = append(allErrs, validateFieldAllowList(*objMeta, allowedPVCTemplateObjectMetaFields, "cannot be set for an ephemeral volume", fldPath)...)
+	return allErrs
+}
+
+var allowedPVCTemplateObjectMetaFields = map[string]bool{
+	"Annotations": true,
+	"Labels":      true,
 }
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
@@ -2647,21 +2717,31 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		}
 
 		// Ephemeral Containers should not be relied upon for fundamental pod services, so fields such as
-		// Lifecycle, probes, resources and ports should be disallowed. This is implemented as a whitelist
-		// so that new fields will be given consideration prior to inclusion in Ephemeral Containers.
-		specType, specValue := reflect.TypeOf(ec.EphemeralContainerCommon), reflect.ValueOf(ec.EphemeralContainerCommon)
-		for i := 0; i < specType.NumField(); i++ {
-			f := specType.Field(i)
-			if allowedEphemeralContainerFields[f.Name] {
-				continue
-			}
+		// Lifecycle, probes, resources and ports should be disallowed. This is implemented as a list
+		// of allowed fields so that new fields will be given consideration prior to inclusion in Ephemeral Containers.
+		allErrs = append(allErrs, validateFieldAllowList(ec.EphemeralContainerCommon, allowedEphemeralContainerFields, "cannot be set for an Ephemeral Container", idxPath)...)
+	}
 
-			// Compare the value of this field to its zero value to determine if it has been set
-			if !reflect.DeepEqual(specValue.Field(i).Interface(), reflect.Zero(f.Type).Interface()) {
-				r, n := utf8.DecodeRuneInString(f.Name)
-				lcName := string(unicode.ToLower(r)) + f.Name[n:]
-				allErrs = append(allErrs, field.Forbidden(idxPath.Child(lcName), "cannot be set for an Ephemeral Container"))
-			}
+	return allErrs
+}
+
+// validateFieldAcceptList checks that only allowed fields are set.
+// The value must be a struct (not a pointer to a struct!).
+func validateFieldAllowList(value interface{}, allowedFields map[string]bool, errorText string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	reflectType, reflectValue := reflect.TypeOf(value), reflect.ValueOf(value)
+	for i := 0; i < reflectType.NumField(); i++ {
+		f := reflectType.Field(i)
+		if allowedFields[f.Name] {
+			continue
+		}
+
+		// Compare the value of this field to its zero value to determine if it has been set
+		if !reflect.DeepEqual(reflectValue.Field(i).Interface(), reflect.Zero(f.Type).Interface()) {
+			r, n := utf8.DecodeRuneInString(f.Name)
+			lcName := string(unicode.ToLower(r)) + f.Name[n:]
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child(lcName), errorText))
 		}
 	}
 
@@ -3119,7 +3199,7 @@ func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, &pod.ObjectMeta, field.NewPath("spec"))...)
 
 	// we do additional validation only pertinent for pods and not pod templates
 	// this was done to preserve backwards compatibility
@@ -3198,10 +3278,12 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
-func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+// The pod metadata is needed to validate generic ephemeral volumes. It is optional
+// and should be left empty unless the spec is from a real pod object.
+func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	vols, vErrs := ValidateVolumes(spec.Volumes, fldPath.Child("volumes"))
+	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, false, vols, fldPath.Child("containers"))...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, fldPath.Child("initContainers"))...)
@@ -4493,7 +4575,7 @@ func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path) fi
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
+	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, nil, fldPath.Child("spec"))...)
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(spec.ObjectMeta, &spec.Spec, fldPath.Child("spec"))...)
 
 	if len(spec.Spec.EphemeralContainers) > 0 {

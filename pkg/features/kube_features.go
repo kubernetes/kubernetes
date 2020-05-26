@@ -306,6 +306,12 @@ const (
 	// spreading and disables legacy SelectorSpread plugin.
 	DefaultPodTopologySpread featuregate.Feature = "DefaultPodTopologySpread"
 
+	// owner: @pohly
+	// alpha: v1.19
+	//
+	// Enables generic ephemeral inline volume support for pods
+	GenericEphemeralVolume featuregate.Feature = "GenericEphemeralVolume"
+
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta:  v1.14
@@ -671,6 +677,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
+	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: true, PreRelease: featuregate.Beta},

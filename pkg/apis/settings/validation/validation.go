@@ -44,7 +44,7 @@ func ValidatePodPresetSpec(spec *settings.PodPresetSpec, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumes", "env", "envFrom", "volumeMounts"), "must specify at least one"))
 	}
 
-	vols, vErrs := apivalidation.ValidateVolumes(spec.Volumes, fldPath.Child("volumes"))
+	vols, vErrs := apivalidation.ValidateVolumes(spec.Volumes, nil, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, apivalidation.ValidateEnv(spec.Env, fldPath.Child("env"))...)
 	allErrs = append(allErrs, apivalidation.ValidateEnvFrom(spec.EnvFrom, fldPath.Child("envFrom"))...)
