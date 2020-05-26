@@ -214,9 +214,8 @@ func deleteEventCollection(f *framework.Framework, label string) func() (bool, e
 
 		if err != nil {
 			return false, err
-		} else {
-			return true, nil
 		}
+		return true, nil
 
 	}
 }
