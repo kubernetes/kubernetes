@@ -121,6 +121,7 @@ type frameworkOptions struct {
 	snapshotSharedLister SharedLister
 	metricsRecorder      *metricsRecorder
 	podNominator         PodNominator
+	extenders            []Extender
 	runAllFilters        bool
 }
 
@@ -170,8 +171,29 @@ func WithPodNominator(nominator PodNominator) Option {
 	}
 }
 
+// WithExtenders sets extenders for the scheduling framework.
+func WithExtenders(extenders []Extender) Option {
+	return func(o *frameworkOptions) {
+		o.extenders = extenders
+	}
+}
+
 var defaultFrameworkOptions = frameworkOptions{
 	metricsRecorder: newMetricsRecorder(1000, time.Second),
+}
+
+// TODO(#91029): move this to framework runtime package.
+var _ PreemptHandle = &preemptHandle{}
+
+type preemptHandle struct {
+	extenders []Extender
+	PodNominator
+	PluginsRunner
+}
+
+// Extenders returns the registered extenders.
+func (ph *preemptHandle) Extenders() []Extender {
+	return ph.extenders
 }
 
 var _ Framework = &framework{}
@@ -191,8 +213,12 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		clientSet:             options.clientSet,
 		informerFactory:       options.informerFactory,
 		metricsRecorder:       options.metricsRecorder,
-		preemptHandle:         options.podNominator,
 		runAllFilters:         options.runAllFilters,
+	}
+	f.preemptHandle = &preemptHandle{
+		extenders:     options.extenders,
+		PodNominator:  options.podNominator,
+		PluginsRunner: f,
 	}
 	if plugins == nil {
 		return f, nil

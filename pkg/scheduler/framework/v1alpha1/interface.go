@@ -494,7 +494,12 @@ type FrameworkHandle interface {
 
 // PreemptHandle incorporates all needed logic to run preemption logic.
 type PreemptHandle interface {
+	// PodNominator abstracts operations to maintain nominated Pods.
 	PodNominator
+	// PluginsRunner abstracts operations to run some plugins.
+	PluginsRunner
+	// Extenders returns registered scheduler extenders.
+	Extenders() []Extender
 }
 
 // PodNominator abstracts operations to maintain nominated Pods.
@@ -508,4 +513,16 @@ type PodNominator interface {
 	UpdateNominatedPod(oldPod, newPod *v1.Pod)
 	// NominatedPodsForNode returns nominatedPods on the given node.
 	NominatedPodsForNode(nodeName string) []*v1.Pod
+}
+
+// PluginsRunner abstracts operations to run some plugins.
+// This is used by preemption PostFilter plugins when evaluating the feasibility of
+// scheduling the pod on nodes when certain running pods get evicted.
+type PluginsRunner interface {
+	// RunFilterPlugins runs the set of configured filter plugins for pod on the given node.
+	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) PluginToStatus
+	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured PreFilter plugins.
+	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *NodeInfo) *Status
+	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured PreFilter plugins.
+	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *NodeInfo) *Status
 }
