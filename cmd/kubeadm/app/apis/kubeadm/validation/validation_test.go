@@ -914,3 +914,50 @@ func TestValidateSocketPath(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateURLs(t *testing.T) {
+	var tests = []struct {
+		name           string
+		urls           []string
+		requireHTTPS   bool
+		expectedErrors bool
+	}{
+		{
+			name:           "valid urls (https not required)",
+			urls:           []string{"http://example.com", "https://example.org"},
+			requireHTTPS:   false,
+			expectedErrors: false,
+		},
+		{
+			name:           "valid urls (https required)",
+			urls:           []string{"https://example.com", "https://example.org"},
+			requireHTTPS:   true,
+			expectedErrors: false,
+		},
+		{
+			name:           "invalid url (https required)",
+			urls:           []string{"http://example.com", "https://example.org"},
+			requireHTTPS:   true,
+			expectedErrors: true,
+		},
+		{
+			name:           "URL parse error",
+			urls:           []string{"::://example.com"},
+			requireHTTPS:   false,
+			expectedErrors: true,
+		},
+		{
+			name:           "URL without scheme",
+			urls:           []string{"example.com"},
+			requireHTTPS:   false,
+			expectedErrors: true,
+		},
+	}
+	for _, tc := range tests {
+		actual := ValidateURLs(tc.urls, tc.requireHTTPS, nil)
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("error:\n\texpected: %t\n\t  actual: %t", tc.expectedErrors, actualErrors)
+		}
+	}
+}
