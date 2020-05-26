@@ -25,6 +25,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/mocks:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
