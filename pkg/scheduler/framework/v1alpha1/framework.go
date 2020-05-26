@@ -900,7 +900,7 @@ func (f *framework) HasScorePlugins() bool {
 }
 
 // ListPlugins returns a map of extension point name to plugin names configured at each extension
-// point. Returns nil if no plugins where configred.
+// point. Returns nil if no plugins where configured.
 func (f *framework) ListPlugins() map[string][]config.Plugin {
 	m := make(map[string][]config.Plugin)
 
