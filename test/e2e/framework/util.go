@@ -1333,10 +1333,10 @@ retriesLoop:
 		// watchEventsLoop:
 		totalValidWatchEvents := 0
 		actualWatchEventsHasDelete := false
-		for watchEventIndex, _ := range expectedWatchEvents {
+		for watchEventIndex := range expectedWatchEvents {
 			foundExpectedWatchEvent := false
 			ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount must be greater than or equal to expected watch events amount")
-			for actualWatchEventIndex, _ := range actualWatchEvents {
+			for actualWatchEventIndex := range actualWatchEvents {
 				if actualWatchEvents[watchEventIndex].Type == expectedWatchEvents[actualWatchEventIndex].Type {
 					foundExpectedWatchEvent = true
 				}
@@ -1347,7 +1347,7 @@ retriesLoop:
 			if foundExpectedWatchEvent == false {
 				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvents[watchEventIndex].Type))
 			}
-			totalValidWatchEvents ++
+			totalValidWatchEvents++
 		}
 		if actualWatchEventsHasDelete == false {
 			_ = dc.Resource(resourceType).Namespace(namespace).DeleteCollection(testContext, metav1.DeleteOptions{}, listOptions)
