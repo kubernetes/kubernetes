@@ -879,13 +879,8 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	// this makes sure the garbage collector will have added the pod to its
 	// dependency graph before handling the foreground deletion of the rc.
 	ctx.startGC(5)
-	timeout := make(chan struct{})
-	go func() {
-		select {
-		case <-time.After(5 * time.Second):
-			close(timeout)
-		}
-	}()
+	time.Sleep(5 * time.Second)
+
 	if !cache.WaitForCacheSync(timeout, gc.IsSynced) {
 		t.Fatalf("failed to wait for garbage collector to be synced")
 	}
