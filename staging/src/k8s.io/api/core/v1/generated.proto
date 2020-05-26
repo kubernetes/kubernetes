@@ -934,6 +934,9 @@ message ContainerStatus {
 message DaemonEndpoint {
   // Port number of the given endpoint.
   optional int32 Port = 1;
+
+  // Scheme to set kube-apiserver use for connecting to the host.
+  optional string scheme = 2;
 }
 
 // Represents downward API info for projecting into a projected volume.

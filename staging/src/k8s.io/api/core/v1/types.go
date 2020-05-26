@@ -4366,9 +4366,7 @@ type DaemonEndpoint struct {
 	// Port number of the given endpoint.
 	Port int32 `json:"Port" protobuf:"varint,1,opt,name=Port"`
 	// Scheme to set kube-apiserver use for connecting to the host.
-	// Defaults to HTTPS.
-	// +optional
-	Scheme string `json:"Scheme" protobuf:"bytes,2,opt,name=Scheme"`
+	Scheme string `json:"scheme" protobuf:"bytes,2,opt,name=scheme"`
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.

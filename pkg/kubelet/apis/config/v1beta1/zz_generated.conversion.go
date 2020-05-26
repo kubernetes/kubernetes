@@ -215,6 +215,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.StaticPodURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.StaticPodURLHeader))
 	out.Address = in.Address
 	out.Port = in.Port
+	out.EnableHTTPS = in.EnableHTTPS
 	out.ReadOnlyPort = in.ReadOnlyPort
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
@@ -351,6 +352,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.StaticPodURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.StaticPodURLHeader))
 	out.Address = in.Address
 	out.Port = in.Port
+	out.EnableHTTPS = in.EnableHTTPS
 	out.ReadOnlyPort = in.ReadOnlyPort
 	out.VolumePluginDir = in.VolumePluginDir
 	out.TLSCertFile = in.TLSCertFile

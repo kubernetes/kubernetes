@@ -155,7 +155,10 @@ func ListenAndServeKubeletServer(
 		WriteTimeout:   4 * 60 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
-	if tlsOptions != nil && enableHttps {
+	if enableHttps {
+		if tlsOptions == nil {
+			klog.Fatalf("Kubelet is enableHTTPS, but lack of tls options")
+		}
 		s.TLSConfig = tlsOptions.Config
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig
