@@ -375,6 +375,21 @@ func RewriteTypesWithProtobufStructTags(name string, structTags map[string]map[s
 	})
 }
 
+func getFieldName(expr ast.Expr, structname string) (name string, err error) {
+	for {
+		switch t := expr.(type) {
+		case *ast.Ident:
+			return t.Name, nil
+		case *ast.SelectorExpr:
+			return t.Sel.Name, nil
+		case *ast.StarExpr:
+			expr = t.X
+		default:
+			return "", fmt.Errorf("unable to get name for tag from struct %q, field %#v", structname, t)
+		}
+	}
+}
+
 func updateStructTags(decl ast.Decl, structTags map[string]map[string]string, toCopy []string) []error {
 	var errs []error
 	t, ok := decl.(*ast.GenDecl)
@@ -403,14 +418,11 @@ func updateStructTags(decl ast.Decl, structTags map[string]map[string]string, to
 		for i := range st.Fields.List {
 			f := st.Fields.List[i]
 			var name string
+			var err error
 			if len(f.Names) == 0 {
-				switch t := f.Type.(type) {
-				case *ast.Ident:
-					name = t.Name
-				case *ast.SelectorExpr:
-					name = t.Sel.Name
-				default:
-					errs = append(errs, fmt.Errorf("unable to get name for tag from struct %q, field %#v", spec.Name.Name, t))
+				name, err = getFieldName(f.Type, spec.Name.Name)
+				if err != nil {
+					errs = append(errs, err)
 					continue
 				}
 			} else {
