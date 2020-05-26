@@ -99,6 +99,20 @@ dependencies:
     - path: cluster/images/etcd-empty-dir-cleanup/Dockerfile
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
 
+  - name: "k8s.gcr.io/debian-hyperkube-base"
+    version: 0.12.2
+    refPaths:
+    - path: build/debian-hyperkube-base/Makefile
+      match: TAG=
+
+  - name: "k8s.gcr.io/debian-hyperkube-base: dependents"
+    version: 0.12.1
+    refPaths:
+    - path: build/workspace.bzl
+      match: tag =
+    - path: cluster/images/hyperkube/Makefile
+      match: BASEIMAGE\=k8s\.gcr\.io\/debian-hyperkube-base-\$\(ARCH\):\d+\.\d+\.\d+
+
   - name: "k8s.gcr.io/debian-iptables: dependents"
     version: 12.1.0
     refPaths:
