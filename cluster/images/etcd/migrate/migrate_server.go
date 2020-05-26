@@ -103,7 +103,7 @@ func (r *EtcdMigrateServer) Stop() error {
 		return fmt.Errorf("error sending SIGINT to etcd for graceful shutdown: %v", err)
 	}
 	gracefulWait := time.Minute * 2
-	stopped := make(chan bool)
+	stopped := make(chan bool, 1)
 	timedout := make(chan bool)
 	go func() {
 		time.Sleep(gracefulWait)
