@@ -33,6 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+ eventRetryPeriod  = 1 * time.Second
+ eventRetryTimeout = 1 * time.Minute
+)
+
+
 // Action is a function to be performed by the system.
 type Action func() error
 
@@ -159,12 +165,10 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 		framework.ExpectEqual(len(eventList.Items), len(eventTestNames), "looking for expected number of pod templates events")
 
 		ginkgo.By("delete collection of events")
-		// delete collection
+		// confirm that delete collection does remove all events
 
-		framework.Logf("requesting DeleteCollection of events")
-		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-			LabelSelector: "testevent-set=true"})
-		framework.ExpectNoError(err, "failed to delete the test event")
+		err = wait.PollImmediate(eventRetryPeriod, eventRetryTimeout, deleteEventCollection(f, "testevent-set=true"))
+		framework.ExpectNoError(err, "failed to delete collection")
 
 		ginkgo.By("get a list of Events with a label in the current namespace")
 		// get list of events
@@ -198,4 +202,22 @@ func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) 
 		}
 		return false, nil
 	}
+}
+
+func deleteEventCollection(f *framework.Framework, label string) func() (bool, error) {
+ return func() (bool, error) {
+  var err error
+
+  framework.Logf("requesting DeleteCollection of events")
+
+  err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+   LabelSelector: label})
+
+  if err != nil {
+   return false, err
+  } else {
+   return true, nil
+  }
+
+ }
 }
