@@ -17,12 +17,10 @@ limitations under the License.
 package cidrset
 
 import (
-	"math/big"
-	"net"
 	"reflect"
-	"testing"
 
-	"k8s.io/klog/v2"
+	"net"
+	"testing"
 )
 
 func TestCIDRSetFullyAllocated(t *testing.T) {
@@ -340,332 +338,179 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 	}
 }
 
-func TestGetBitforCIDR(t *testing.T) {
-	cases := []struct {
-		clusterCIDRStr string
-		subNetMaskSize int
-		subNetCIDRStr  string
-		expectedBit    int
-		expectErr      bool
-		description    string
-	}{
-		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.0.0.0/16",
-			expectedBit:    0,
-			expectErr:      false,
-			description:    "Get 0 Bit with IPv4",
-		},
-		{
-			clusterCIDRStr: "be00::/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "be00::/16",
-			expectedBit:    0,
-			expectErr:      false,
-			description:    "Get 0 Bit with IPv6",
-		},
-		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.123.0.0/16",
-			expectedBit:    123,
-			expectErr:      false,
-			description:    "Get 123rd Bit with IPv4",
-		},
-		{
-			clusterCIDRStr: "be00::/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "beef::/16",
-			expectedBit:    0xef,
-			expectErr:      false,
-			description:    "Get xef Bit with IPv6",
-		},
-		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.168.0.0/16",
-			expectedBit:    168,
-			expectErr:      false,
-			description:    "Get 168th Bit with IPv4",
-		},
-		{
-			clusterCIDRStr: "be00::/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "be68::/16",
-			expectedBit:    0x68,
-			expectErr:      false,
-			description:    "Get x68th Bit with IPv6",
-		},
-		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.224.0.0/16",
-			expectedBit:    224,
-			expectErr:      false,
-			description:    "Get 224th Bit with IPv4",
-		},
-		{
-			clusterCIDRStr: "be00::/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "be24::/16",
-			expectedBit:    0x24,
-			expectErr:      false,
-			description:    "Get x24th Bit with IPv6",
-		},
-		{
-			clusterCIDRStr: "192.168.0.0/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "192.168.12.0/24",
-			expectedBit:    12,
-			expectErr:      false,
-			description:    "Get 12th Bit with IPv4",
-		},
-		{
-			clusterCIDRStr: "beef::/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "beef:1200::/24",
-			expectedBit:    0x12,
-			expectErr:      false,
-			description:    "Get x12th Bit with IPv6",
-		},
-		{
-			clusterCIDRStr: "192.168.0.0/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "192.168.151.0/24",
-			expectedBit:    151,
-			expectErr:      false,
-			description:    "Get 151st Bit with IPv4",
-		},
-		{
-			clusterCIDRStr: "beef::/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "beef:9700::/24",
-			expectedBit:    0x97,
-			expectErr:      false,
-			description:    "Get x97st Bit with IPv6",
-		},
-		{
-			clusterCIDRStr: "192.168.0.0/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "127.168.224.0/24",
-			expectErr:      true,
-			description:    "Get error with IPv4",
-		},
-		{
-			clusterCIDRStr: "beef::/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "2001:db00::/24",
-			expectErr:      true,
-			description:    "Get error with IPv6",
-		},
-	}
-
-	for _, tc := range cases {
-		_, clusterCIDR, err := net.ParseCIDR(tc.clusterCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v for %v", err, tc.description)
-		}
-
-		cs, err := NewCIDRSet(clusterCIDR, tc.subNetMaskSize)
-		if err != nil {
-			t.Fatalf("Error allocating CIDRSet for %v", tc.description)
-		}
-		_, subnetCIDR, err := net.ParseCIDR(tc.subNetCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v for %v", err, tc.description)
-		}
-
-		got, err := cs.getIndexForCIDR(subnetCIDR)
-		if err == nil && tc.expectErr {
-			klog.Errorf("expected error but got null for %v", tc.description)
-			continue
-		}
-
-		if err != nil && !tc.expectErr {
-			klog.Errorf("unexpected error: %v for %v", err, tc.description)
-			continue
-		}
-
-		if got != tc.expectedBit {
-			klog.Errorf("expected %v, but got %v for %v", tc.expectedBit, got, tc.description)
-		}
-	}
-}
-
-func TestOccupy(t *testing.T) {
-	cases := []struct {
-		clusterCIDRStr    string
-		subNetMaskSize    int
-		subNetCIDRStr     string
-		expectedUsedBegin int
-		expectedUsedEnd   int
-		expectErr         bool
-		description       string
-	}{
-		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/8",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   255,
-			expectErr:         false,
-			description:       "Occupy all Bits with IPv4",
-		},
-		{
-			clusterCIDRStr:    "2001:beef:1200::/40",
-			subNetMaskSize:    48,
-			subNetCIDRStr:     "2001:beef:1200::/40",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   255,
-			expectErr:         false,
-			description:       "Occupy all Bits with IPv6",
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/2",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   255,
-			expectErr:         false,
-			description:       "Occupy every Bit with IPv4",
-		},
-		{
-			clusterCIDRStr:    "2001:beef:1200::/40",
-			subNetMaskSize:    48,
-			subNetCIDRStr:     "2001:beef:1234::/34",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   255,
-			expectErr:         false,
-			description:       "Occupy every Bit with IPv6",
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/16",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   0,
-			expectErr:         false,
-			description:       "Occupy 1st Bit with IPv4",
-		},
-		{
-			clusterCIDRStr:    "2001:beef:1200::/40",
-			subNetMaskSize:    48,
-			subNetCIDRStr:     "2001:beef:1200::/48",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   0,
-			expectErr:         false,
-			description:       "Occupy 1st Bit with IPv6",
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    32,
-			subNetCIDRStr:     "127.0.0.0/16",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   65535,
-			expectErr:         false,
-			description:       "Occupy 65535 Bits with IPv4",
-		},
-		{
-			clusterCIDRStr:    "2001:beef:1200::/48",
-			subNetMaskSize:    64,
-			subNetCIDRStr:     "2001:beef:1200::/48",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   65535,
-			expectErr:         false,
-			description:       "Occupy 65535 Bits with IPv6",
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/7",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/15",
-			expectedUsedBegin: 256,
-			expectedUsedEnd:   257,
-			expectErr:         false,
-			description:       "Occupy 257th Bit with IPv4",
-		},
-		{
-			clusterCIDRStr:    "2001:beef:7f00::/39",
-			subNetMaskSize:    48,
-			subNetCIDRStr:     "2001:beef:7f00::/47",
-			expectedUsedBegin: 256,
-			expectedUsedEnd:   257,
-			expectErr:         false,
-			description:       "Occupy 257th Bit with IPv6",
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/7",
-			subNetMaskSize:    15,
-			subNetCIDRStr:     "127.0.0.0/15",
-			expectedUsedBegin: 128,
-			expectedUsedEnd:   128,
-			expectErr:         false,
-			description:       "Occupy 128th Bit with IPv4",
-		},
-		{
-			clusterCIDRStr:    "2001:beef:7f00::/39",
-			subNetMaskSize:    47,
-			subNetCIDRStr:     "2001:beef:7f00::/47",
-			expectedUsedBegin: 128,
-			expectedUsedEnd:   128,
-			expectErr:         false,
-			description:       "Occupy 128th Bit with IPv6",
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/7",
-			subNetMaskSize:    18,
-			subNetCIDRStr:     "127.0.0.0/15",
-			expectedUsedBegin: 1024,
-			expectedUsedEnd:   1031,
-			expectErr:         false,
-			description:       "Occupy 1031st Bit with IPv4",
-		},
-		{
-			clusterCIDRStr:    "2001:beef:7f00::/39",
-			subNetMaskSize:    50,
-			subNetCIDRStr:     "2001:beef:7f00::/47",
-			expectedUsedBegin: 1024,
-			expectedUsedEnd:   1031,
-			expectErr:         false,
-			description:       "Occupy 1031st Bit with IPv6",
-		},
-	}
-
-	for _, tc := range cases {
-		_, clusterCIDR, err := net.ParseCIDR(tc.clusterCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v for %v", err, tc.description)
-		}
-
-		cs, err := NewCIDRSet(clusterCIDR, tc.subNetMaskSize)
-		if err != nil {
-			t.Fatalf("Error allocating CIDRSet for %v", tc.description)
-		}
-
-		_, subnetCIDR, err := net.ParseCIDR(tc.subNetCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v for %v", err, tc.description)
-		}
-
-		err = cs.Occupy(subnetCIDR)
-		if err == nil && tc.expectErr {
-			t.Errorf("expected error but got none for %v", tc.description)
-			continue
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("unexpected error: %v for %v", err, tc.description)
-			continue
-		}
-
-		expectedUsed := big.Int{}
-		for i := tc.expectedUsedBegin; i <= tc.expectedUsedEnd; i++ {
-			expectedUsed.SetBit(&expectedUsed, i, 1)
-		}
-		if expectedUsed.Cmp(&cs.used) != 0 {
-			t.Errorf("error for %v", tc.description)
-		}
-	}
-}
+//func TestOccupy(t *testing.T) {
+//	cases := []struct {
+//		clusterCIDRStr    string
+//		subNetMaskSize    int
+//		subNetCIDRStr     string
+//		expectedUsedBegin int
+//		expectedUsedEnd   int
+//		expectErr         bool
+//		description       string
+//	}{
+//		{
+//			clusterCIDRStr:    "127.0.0.0/8",
+//			subNetMaskSize:    16,
+//			subNetCIDRStr:     "127.0.0.0/8",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   255,
+//			expectErr:         false,
+//			description:       "Occupy all Bits with IPv4",
+//		},
+//		{
+//			clusterCIDRStr:    "2001:beef:1200::/40",
+//			subNetMaskSize:    48,
+//			subNetCIDRStr:     "2001:beef:1200::/40",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   255,
+//			expectErr:         false,
+//			description:       "Occupy all Bits with IPv6",
+//		},
+//		{
+//			clusterCIDRStr:    "127.0.0.0/8",
+//			subNetMaskSize:    16,
+//			subNetCIDRStr:     "127.0.0.0/2",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   255,
+//			expectErr:         false,
+//			description:       "Occupy every Bit with IPv4",
+//		},
+//		{
+//			clusterCIDRStr:    "2001:beef:1200::/40",
+//			subNetMaskSize:    48,
+//			subNetCIDRStr:     "2001:beef:1234::/34",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   255,
+//			expectErr:         false,
+//			description:       "Occupy every Bit with IPv6",
+//		},
+//		{
+//			clusterCIDRStr:    "127.0.0.0/8",
+//			subNetMaskSize:    16,
+//			subNetCIDRStr:     "127.0.0.0/16",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   0,
+//			expectErr:         false,
+//			description:       "Occupy 1st Bit with IPv4",
+//		},
+//		{
+//			clusterCIDRStr:    "2001:beef:1200::/40",
+//			subNetMaskSize:    48,
+//			subNetCIDRStr:     "2001:beef:1200::/48",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   0,
+//			expectErr:         false,
+//			description:       "Occupy 1st Bit with IPv6",
+//		},
+//		{
+//			clusterCIDRStr:    "127.0.0.0/8",
+//			subNetMaskSize:    32,
+//			subNetCIDRStr:     "127.0.0.0/16",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   65535,
+//			expectErr:         false,
+//			description:       "Occupy 65535 Bits with IPv4",
+//		},
+//		{
+//			clusterCIDRStr:    "2001:beef:1200::/48",
+//			subNetMaskSize:    64,
+//			subNetCIDRStr:     "2001:beef:1200::/48",
+//			expectedUsedBegin: 0,
+//			expectedUsedEnd:   65535,
+//			expectErr:         false,
+//			description:       "Occupy 65535 Bits with IPv6",
+//		},
+//		{
+//			clusterCIDRStr:    "127.0.0.0/7",
+//			subNetMaskSize:    16,
+//			subNetCIDRStr:     "127.0.0.0/15",
+//			expectedUsedBegin: 256,
+//			expectedUsedEnd:   257,
+//			expectErr:         false,
+//			description:       "Occupy 257th Bit with IPv4",
+//		},
+//		{
+//			clusterCIDRStr:    "2001:beef:7f00::/39",
+//			subNetMaskSize:    48,
+//			subNetCIDRStr:     "2001:beef:7f00::/47",
+//			expectedUsedBegin: 256,
+//			expectedUsedEnd:   257,
+//			expectErr:         false,
+//			description:       "Occupy 257th Bit with IPv6",
+//		},
+//		{
+//			clusterCIDRStr:    "127.0.0.0/7",
+//			subNetMaskSize:    15,
+//			subNetCIDRStr:     "127.0.0.0/15",
+//			expectedUsedBegin: 128,
+//			expectedUsedEnd:   128,
+//			expectErr:         false,
+//			description:       "Occupy 128th Bit with IPv4",
+//		},
+//		{
+//			clusterCIDRStr:    "2001:beef:7f00::/39",
+//			subNetMaskSize:    47,
+//			subNetCIDRStr:     "2001:beef:7f00::/47",
+//			expectedUsedBegin: 128,
+//			expectedUsedEnd:   128,
+//			expectErr:         false,
+//			description:       "Occupy 128th Bit with IPv6",
+//		},
+//		{
+//			clusterCIDRStr:    "127.0.0.0/7",
+//			subNetMaskSize:    18,
+//			subNetCIDRStr:     "127.0.0.0/15",
+//			expectedUsedBegin: 1024,
+//			expectedUsedEnd:   1031,
+//			expectErr:         false,
+//			description:       "Occupy 1031st Bit with IPv4",
+//		},
+//		{
+//			clusterCIDRStr:    "2001:beef:7f00::/39",
+//			subNetMaskSize:    50,
+//			subNetCIDRStr:     "2001:beef:7f00::/47",
+//			expectedUsedBegin: 1024,
+//			expectedUsedEnd:   1031,
+//			expectErr:         false,
+//			description:       "Occupy 1031st Bit with IPv6",
+//		},
+//	}
+//
+//	for _, tc := range cases {
+//		_, clusterCIDR, err := net.ParseCIDR(tc.clusterCIDRStr)
+//		if err != nil {
+//			t.Fatalf("unexpected error: %v for %v", err, tc.description)
+//		}
+//
+//		cs, err := NewCIDRSet(clusterCIDR, tc.subNetMaskSize)
+//		if err != nil {
+//			t.Fatalf("Error allocating CIDRSet for %v", tc.description)
+//		}
+//
+//		_, subnetCIDR, err := net.ParseCIDR(tc.subNetCIDRStr)
+//		if err != nil {
+//			t.Fatalf("unexpected error: %v for %v", err, tc.description)
+//		}
+//
+//		err = cs.Occupy(subnetCIDR)
+//		if err == nil && tc.expectErr {
+//			t.Errorf("expected error but got none for %v", tc.description)
+//			continue
+//		}
+//		if err != nil && !tc.expectErr {
+//			t.Errorf("unexpected error: %v for %v", err, tc.description)
+//			continue
+//		}
+//
+//		expectedUsed := big.Int{}
+//		for i := tc.expectedUsedBegin; i <= tc.expectedUsedEnd; i++ {
+//			expectedUsed.SetBit(&expectedUsed, i, 1)
+//		}
+//		if expectedUsed.Cmp(&cs.used) != 0 {
+//			t.Errorf("error for %v", tc.description)
+//		}
+//	}
+//}
 
 func TestCIDRSetv6(t *testing.T) {
 	cases := []struct {
@@ -730,9 +575,36 @@ func TestCIDRSetv6(t *testing.T) {
 			}
 			if !tc.expectErr {
 				if p2 != nil && p2.String() != tc.expectedCIDR2 {
-					t.Fatalf("a.AllocateNext() got %+v, want %+v", p2.String(), tc.expectedCIDR)
+					t.Fatalf("a.AllocateNext() got %+v, want %+v", p2.String(), tc.expectedCIDR2)
 				}
 			}
 		})
+	}
+}
+
+func BenchmarkIPv4AllocateNet(b *testing.B) {
+	_, clusterCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	a, err := NewCIDRSet(clusterCIDR, 24)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	for i := 0; i < a.maxCIDRs; i++ {
+		if _, err := a.AllocateNext(); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+}
+
+func BenchmarkIPv6AllocateNext(b *testing.B) {
+	_, clusterCIDR, _ := net.ParseCIDR("2001:0db8:1234:3::/48")
+	a, err := NewCIDRSet(clusterCIDR, 64)
+	if err != nil {
+		b.Fatalf("unexpected error: %v", err)
+	}
+	b.ResetTimer()
+	for i := 0; i < a.maxCIDRs; i++ {
+		if _, err := a.AllocateNext(); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
 	}
 }
