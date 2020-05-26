@@ -758,7 +758,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeAlphaFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
 
 	ginkgo.Context("With kubeconfig updated to static CPU Manager policy run the Topology Manager tests", func() {
