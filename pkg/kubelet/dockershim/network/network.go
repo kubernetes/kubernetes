@@ -18,8 +18,17 @@ limitations under the License.
 
 package network
 
-// TODO: Consider making this value configurable.
-const DefaultInterfaceName = "eth0"
+import (
+	"fmt"
+	"sync"
+
+	"github.com/vishvananda/netlink"
+
+	"k8s.io/klog/v2"
+)
+
+var defaultInterfaceName = "eth0"
+var defaultInterfaceNameOnce sync.Once
 
 // CNITimeoutSec is set to be slightly less than 240sec/4mins, which is the default remote runtime request timeout.
 const CNITimeoutSec = 220
@@ -27,3 +36,21 @@ const CNITimeoutSec = 220
 // UseDefaultMTU is a marker value that indicates the plugin should determine its own MTU
 // It is the zero value, so a non-initialized value will mean "UseDefault"
 const UseDefaultMTU = 0
+
+// Find an unused interface
+func DefaultInterfaceName() string {
+	defaultInterfaceNameOnce.Do(func() {
+		var err error
+		for i := 0; i < 10; i++ {
+			name := fmt.Sprintf("eth%d", i)
+			if _, err = netlink.LinkByName(name); err != nil {
+				if _, ok := err.(netlink.LinkNotFoundError); ok {
+					defaultInterfaceName = name
+					return
+				}
+			}
+		}
+		klog.Fatalf("unable to find an unused interface. last error : %q", err)
+	})
+	return defaultInterfaceName
+}

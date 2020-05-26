@@ -278,7 +278,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	//setup hairpinMode
 	setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
 
-	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
+	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName(), setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
 	klog.V(4).Infof("CNI network config set to %v", json)
 	plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 	if err != nil {
@@ -346,7 +346,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	}
 
 	// Hook container up with our bridge
-	resT, err := plugin.addContainerToNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id)
+	resT, err := plugin.addContainerToNetwork(plugin.netConfig, network.DefaultInterfaceName(), namespace, name, id)
 	if err != nil {
 		return err
 	}
@@ -515,8 +515,8 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	}
 
 	// no ip dependent actions
-	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
-		klog.Warningf("Failed to delete %q network: %v", network.DefaultInterfaceName, err)
+	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName(), namespace, name, id); err != nil {
+		klog.Warningf("Failed to delete %q network: %v", network.DefaultInterfaceName(), err)
 		errList = append(errList, err)
 	}
 
@@ -614,7 +614,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	if netnsPath == "" {
 		return nil, fmt.Errorf("cannot find the network namespace, skipping pod network status for container %q", id)
 	}
-	ips, err := network.GetPodIPs(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName)
+	ips, err := network.GetPodIPs(plugin.execer, plugin.nsenterPath, netnsPath, network.DefaultInterfaceName())
 	if err != nil {
 		return nil, err
 	}
