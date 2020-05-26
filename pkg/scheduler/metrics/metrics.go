@@ -145,7 +145,7 @@ var (
 	PreemptionAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "total_preemption_attempts",
+			Name:           "preemption_attempts_total",
 			Help:           "Total preemption attempts in the cluster till now",
 			StabilityLevel: metrics.ALPHA,
 		})

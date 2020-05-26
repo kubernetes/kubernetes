@@ -53,9 +53,6 @@ var exceptionMetrics = []string{
 	// kube-proxy
 	"kubernetes_build_info",
 
-	// kube-scheduler
-	"scheduler_total_preemption_attempts",
-
 	// kubelet-resource-v1alpha1
 	"container_cpu_usage_seconds_total",
 	"node_cpu_usage_seconds_total",
