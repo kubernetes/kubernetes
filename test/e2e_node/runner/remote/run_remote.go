@@ -244,6 +244,10 @@ func main() {
 					klog.Fatalf("Could not retrieve list of images based on image prefix %q and family %q: %v",
 						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
 				}
+				if len(images) == 0 { // if we have no images we can't run anything
+					klog.Fatalf("No matching images retrieved on image prefix %q and family %q: %v",
+						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
+				}
 			} else {
 				images = []string{imageConfig.Image}
 			}
