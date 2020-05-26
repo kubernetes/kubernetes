@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -127,7 +126,6 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 
 	ginkgo.It("should delete a collection of events", func() {
 		eventTestNames := []string{"test-event-1", "test-event-2", "test-event-3"}
-		eventTestNamesCount := len(eventTestNames)
 
 		ginkgo.By("Create set of events")
 		// create a test event in test namespace
@@ -158,18 +156,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
 
-		// check that we find all the events created
-		eventListItemsCount := len(eventList.Items)
-		errMsg := "found " + strconv.Itoa(eventListItemsCount) + " events when " + strconv.Itoa(eventTestNamesCount) + " events where expected"
-		logMsg := "found " + strconv.Itoa(eventListItemsCount) + " events"
-
-		foundCreatedEventSet := true
-		if eventListItemsCount != eventTestNamesCount {
-			foundCreatedEventSet = false
-		} else {
-			framework.Logf(logMsg)
-		}
-		framework.ExpectEqual(foundCreatedEventSet, true, errMsg)
+		framework.ExpectEqual(len(eventList.Items), len(eventTestNames), "looking for expected number of pod templates events")
 
 		ginkgo.By("delete collection of events")
 		// delete collection
@@ -186,18 +173,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
 
-		// check that we don't find any created events
-		eventListItemsCount = len(eventList.Items)
-		errMsg = "found " + strconv.Itoa(eventListItemsCount) + " events when zero events where expected"
-		logMsg = "found " + strconv.Itoa(eventListItemsCount) + " events"
-
-		foundCreatedEventSet = false
-		if eventListItemsCount != 0 {
-			foundCreatedEventSet = true
-		} else {
-			framework.Logf(logMsg)
-		}
-		framework.ExpectEqual(foundCreatedEventSet, false, errMsg)
+		framework.ExpectEqual(len(eventList.Items), 0, "events should all be deleted")
 	})
 
 })
