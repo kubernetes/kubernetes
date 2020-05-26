@@ -84,12 +84,11 @@ type nlbPortMapping struct {
 	SSLPolicy         string
 }
 
-// getLoadBalancerAdditionalTags converts the comma separated list of key-value
-// pairs in the ServiceAnnotationLoadBalancerAdditionalTags annotation and returns
-// it as a map.
-func getLoadBalancerAdditionalTags(annotations map[string]string) map[string]string {
+// getKeyValuePropertiesFromAnnotation converts the comma separated list of key-value
+// pairs from the specified annotation and returns it as a map.
+func getKeyValuePropertiesFromAnnotation(annotations map[string]string, annotation string) map[string]string {
 	additionalTags := make(map[string]string)
-	if additionalTagsList, ok := annotations[ServiceAnnotationLoadBalancerAdditionalTags]; ok {
+	if additionalTagsList, ok := annotations[annotation]; ok {
 		additionalTagsList = strings.TrimSpace(additionalTagsList)
 
 		// Break up list of "Key1=Val,Key2=Val2"
@@ -123,7 +122,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 	dirty := false
 
 	// Get additional tags set by the user
-	tags := getLoadBalancerAdditionalTags(annotations)
+	tags := getKeyValuePropertiesFromAnnotation(annotations, ServiceAnnotationLoadBalancerAdditionalTags)
 	// Add default tags
 	tags[TagNameKubernetesService] = namespacedName.String()
 	tags = c.tagging.buildTags(ResourceLifecycleOwned, tags)
@@ -939,7 +938,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 		}
 
 		// Get additional tags set by the user
-		tags := getLoadBalancerAdditionalTags(annotations)
+		tags := getKeyValuePropertiesFromAnnotation(annotations, ServiceAnnotationLoadBalancerAdditionalTags)
 
 		// Add default tags
 		tags[TagNameKubernetesService] = namespacedName.String()
@@ -1128,7 +1127,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 		{
 			// Add additional tags
 			klog.V(2).Infof("Creating additional load balancer tags for %s", loadBalancerName)
-			tags := getLoadBalancerAdditionalTags(annotations)
+			tags := getKeyValuePropertiesFromAnnotation(annotations, ServiceAnnotationLoadBalancerAdditionalTags)
 			if len(tags) > 0 {
 				err := c.addLoadBalancerTags(loadBalancerName, tags)
 				if err != nil {
@@ -1521,9 +1520,12 @@ func proxyProtocolEnabled(backend *elb.BackendServerDescription) bool {
 // findInstancesForELB gets the EC2 instances corresponding to the Nodes, for setting up an ELB
 // We ignore Nodes (with a log message) where the instanceid cannot be determined from the provider,
 // and we ignore instances which are not found
-func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[InstanceID]*ec2.Instance, error) {
+func (c *Cloud) findInstancesForELB(nodes []*v1.Node, annotations map[string]string) (map[InstanceID]*ec2.Instance, error) {
+
+	targetNodes := filterTargetNodes(nodes, annotations)
+
 	// Map to instance ids ignoring Nodes where we cannot find the id (but logging)
-	instanceIDs := mapToAWSInstanceIDsTolerant(nodes)
+	instanceIDs := mapToAWSInstanceIDsTolerant(targetNodes)
 
 	cacheCriteria := cacheCriteria{
 		// MaxAge not required, because we only care about security groups, which should not change
@@ -1538,4 +1540,36 @@ func (c *Cloud) findInstancesForELB(nodes []*v1.Node) (map[InstanceID]*ec2.Insta
 	// We ignore instances that cannot be found
 
 	return instances, nil
+}
+
+// filterTargetNodes uses node labels to filter the nodes that should be targeted by the ELB,
+// checking if all the labels provided in an annotation are present in the nodes
+func filterTargetNodes(nodes []*v1.Node, annotations map[string]string) []*v1.Node {
+
+	targetNodeLabels := getKeyValuePropertiesFromAnnotation(annotations, ServiceAnnotationLoadBalancerTargetNodeLabels)
+
+	if len(targetNodeLabels) == 0 {
+		return nodes
+	}
+
+	targetNodes := make([]*v1.Node, 0, len(nodes))
+
+	for _, node := range nodes {
+		if node.Labels != nil && len(node.Labels) > 0 {
+			allFiltersMatch := true
+
+			for targetLabelKey, targetLabelValue := range targetNodeLabels {
+				if nodeLabelValue, ok := node.Labels[targetLabelKey]; !ok || (nodeLabelValue != targetLabelValue && targetLabelValue != "") {
+					allFiltersMatch = false
+					break
+				}
+			}
+
+			if allFiltersMatch {
+				targetNodes = append(targetNodes, node)
+			}
+		}
+	}
+
+	return targetNodes
 }
