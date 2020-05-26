@@ -19,9 +19,9 @@ package registry
 import (
 	"context"
 	"fmt"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1006,59 +1006,35 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	if err != nil {
 		return nil, err
 	}
-	// Spawn a number of goroutines, so that we can issue requests to storage
-	// in parallel to speed up deletion.
-	// TODO: Make this proportional to the number of items to delete, up to
-	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
-	// workers to delete 10 items).
-	workersNumber := e.DeleteCollectionWorkers
-	if workersNumber < 1 {
-		workersNumber = 1
-	}
-	wg := sync.WaitGroup{}
-	toProcess := make(chan int, 2*workersNumber)
-	errs := make(chan error, workersNumber+1)
 
-	go func() {
-		defer utilruntime.HandleCrash(func(panicReason interface{}) {
-			errs <- fmt.Errorf("DeleteCollection distributor panicked: %v", panicReason)
-		})
-		for i := 0; i < len(items); i++ {
-			toProcess <- i
-		}
-		close(toProcess)
-	}()
-
-	wg.Add(workersNumber)
-	for i := 0; i < workersNumber; i++ {
+	errors := make(chan error, len(items))
+	for _, item := range items {
+		item := item
 		go func() {
-			// panics don't cross goroutine boundaries
-			defer utilruntime.HandleCrash(func(panicReason interface{}) {
-				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
-			})
-			defer wg.Done()
-
-			for index := range toProcess {
-				accessor, err := meta.Accessor(items[index])
-				if err != nil {
-					errs <- err
-					return
+			accessor, err := meta.Accessor(item)
+			if err != nil {
+				errors <- err
+			} else {
+				_, _, err = e.Delete(ctx, accessor.GetName(), deleteValidation, options)
+				if err != nil && !apierrors.IsNotFound(err) {
+					errors <- fmt.Errorf("failed to delete %s: %v", accessor.GetName(), err)
 				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !apierrors.IsNotFound(err) {
-					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
-					errs <- err
-					return
-				}
+				errors <- nil
 			}
 		}()
 	}
-	wg.Wait()
-	select {
-	case err := <-errs:
-		return nil, err
-	default:
-		return listObj, nil
+
+	var errorList []error
+	for range items {
+		if err := <- errors; err != nil {
+			errorList = append(errorList, err)
+		}
 	}
+
+	if len(errorList) > 0 {
+		return nil, utilerrors.NewAggregate(errorList)
+	}
+	return listObj, nil
 }
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and

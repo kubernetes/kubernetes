@@ -35,9 +35,9 @@ import (
 func RecommendedDefaultNamespaceControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.NamespaceControllerConfiguration) {
 	zero := metav1.Duration{}
 	if obj.ConcurrentNamespaceSyncs == 0 {
-		obj.ConcurrentNamespaceSyncs = 10
+		obj.ConcurrentNamespaceSyncs = 50
 	}
 	if obj.NamespaceSyncPeriod == zero {
-		obj.NamespaceSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
+		obj.NamespaceSyncPeriod = metav1.Duration{Duration: 2 * time.Minute}
 	}
 }

@@ -38,10 +38,10 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	// These defaults override the recommended defaults from the apimachineryconfigv1alpha1 package that are applied automatically
 	// These client-connection defaults are specific to the cloud-controller-manager
 	if obj.Generic.ClientConnection.QPS == 0 {
-		obj.Generic.ClientConnection.QPS = 20
+		obj.Generic.ClientConnection.QPS = 200
 	}
 	if obj.Generic.ClientConnection.Burst == 0 {
-		obj.Generic.ClientConnection.Burst = 30
+		obj.Generic.ClientConnection.Burst = 300
 	}
 
 	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options

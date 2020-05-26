@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net/http"
 	"time"
 
@@ -53,8 +54,9 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 			return
 		}
 
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
+		//// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		//timeout := parseTimeout(req.URL.Query().Get("timeout"))
+		timeout := 90 * time.Second
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -163,9 +165,13 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		startTime := time.Now()
 		trace := utiltrace.New("Delete", utiltrace.Field{"url", req.URL.Path})
 		defer trace.LogIfLong(500 * time.Millisecond)
-
+		klog.V(1).Infof("***BP*** Entering DeleteCollection for %s", req.URL.Path)
+		defer func() {
+			klog.V(1).Infof("***BP*** Leaving DeleteCollection for %s (Duration %v)", req.URL.Path, time.Since(startTime))
+		}()
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
 			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
 			return
@@ -176,9 +182,11 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
+			klog.V(1).Infof("***BP*** DeleteCollection failed to get namespace for %s: %v", req.URL.Path, err)
 			scope.err(err, w, req)
 			return
 		}
+		klog.V(1).Infof("***BP*** DeleteCollection namespace for %s: %v", req.URL.Path, namespace)
 
 		ctx, cancel := context.WithTimeout(req.Context(), timeout)
 		defer cancel()
@@ -187,12 +195,15 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
+			klog.V(1).Infof("***BP*** DeleteCollection failed to NegotiateOutputMediaType for %s: %v", req.URL.Path, err)
 			scope.err(err, w, req)
 			return
 		}
+		klog.V(1).Infof("***BP*** DeleteCollection outputMediaType for %s: %v", req.URL.Path, outputMediaType)
 
 		listOptions := metainternalversion.ListOptions{}
 		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
+			klog.V(1).Infof("***BP*** DeleteCollection failed to DecodeParameters for %s: %v", req.URL.Path, err)
 			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
@@ -205,6 +216,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				return scope.Convertor.ConvertFieldLabel(scope.Kind, label, value)
 			}
 			if listOptions.FieldSelector, err = listOptions.FieldSelector.Transform(fn); err != nil {
+				klog.V(1).Infof("***BP*** DeleteCollection failed to transform field selector for %s: %v", req.URL.Path, err)
 				// TODO: allow bad request to set field causes based on query parameters
 				err = errors.NewBadRequest(err.Error())
 				scope.err(err, w, req)
@@ -216,12 +228,14 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 		if checkBody {
 			body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 			if err != nil {
+				klog.V(1).Infof("***BP*** DeleteCollection failed to read body for %s: %v", req.URL.Path, err)
 				scope.err(err, w, req)
 				return
 			}
 			if len(body) > 0 {
 				s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)
 				if err != nil {
+					klog.V(1).Infof("***BP*** DeleteCollection failed to negotiate input serializer for %s: %v", req.URL.Path, err)
 					scope.err(err, w, req)
 					return
 				}
@@ -230,10 +244,12 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				defaultGVK := scope.Kind.GroupVersion().WithKind("DeleteOptions")
 				obj, _, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
+					klog.V(1).Infof("***BP*** DeleteCollection failed to DecoderToVersion for %s: %v", req.URL.Path, err)
 					scope.err(err, w, req)
 					return
 				}
 				if obj != options {
+					klog.V(1).Infof("***BP*** decoded object cannot be converted to DeleteOptions for %s: %v", req.URL.Path, err)
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
@@ -242,6 +258,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			} else {
 				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+					klog.V(1).Infof("***BP*** DeleteCollection failed to Decode parameters for %s: %v", req.URL.Path, err)
 					err = errors.NewBadRequest(err.Error())
 					scope.err(err, w, req)
 					return
@@ -249,6 +266,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			}
 		}
 		if errs := validation.ValidateDeleteOptions(options); len(errs) > 0 {
+			klog.V(1).Infof("***BP*** DeleteCollection failed to validate delete options for %s: %v", req.URL.Path, err)
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
@@ -259,9 +277,14 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 		userInfo, _ := request.UserFrom(ctx)
 		staticAdmissionAttrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.DeleteCollection(ctx, rest.AdmissionToValidateObjectDeleteFunc(admit, staticAdmissionAttrs, scope), options, &listOptions)
+			klog.V(1).Info("***BP*** Before r.DeleteCollection")
+			startTime := time.Now()
+			obj, err := r.DeleteCollection(ctx, rest.AdmissionToValidateObjectDeleteFunc(admit, staticAdmissionAttrs, scope), options, &listOptions)
+			klog.V(1).Infof("***BP*** After r.DeleteCollection, err = %v, duration = %v", err, time.Since(startTime))
+			return obj, err
 		})
 		if err != nil {
+			klog.V(1).Infof("***BP*** DeleteCollection failed to finish request for %s: %v", req.URL.Path, err)
 			scope.err(err, w, req)
 			return
 		}
@@ -279,5 +302,6 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 		}
 
 		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
+		klog.V(1).Infof("***BP*** DeleteCollection reached the end for %s", req.URL.Path)
 	}
 }

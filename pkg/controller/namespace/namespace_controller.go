@@ -18,6 +18,7 @@ package namespace
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -86,10 +87,12 @@ func NewNamespaceController(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*v1.Namespace)
+				klog.V(1).Infof("***BP*** namespace controller AddFunc %s", namespace)
 				namespaceController.enqueueNamespace(namespace)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				namespace := newObj.(*v1.Namespace)
+				klog.V(1).Infof("***BP*** namespace controller UpdateFunc %s", namespace)
 				namespaceController.enqueueNamespace(namespace)
 			},
 		},
@@ -118,18 +121,22 @@ func nsControllerRateLimiter() workqueue.RateLimiter {
 func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
+		klog.V(1).Infof("***BP*** enqueueNamespace failed to get key for object %v: %v", obj, err)
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
+	klog.V(1).Infof("***BP*** enqueueNamespace got key %s for object %v", key, obj)
 
 	namespace := obj.(*v1.Namespace)
 	// don't queue if we aren't deleted
 	if namespace.DeletionTimestamp == nil || namespace.DeletionTimestamp.IsZero() {
+		klog.V(1).Infof("***BP*** enqueueNamespace returning because %s is has no deletion timestamp: %v", key, namespace.DeletionTimestamp)
 		return
 	}
 
 	// delay processing namespace events to allow HA api servers to observe namespace deletion,
 	// and HA etcd servers to observe last minute object creations inside the namespace
+	klog.V(1).Infof("***BP*** enqueueNamespace adding %s to the queue after grace period of %d", key, namespaceDeletionGracePeriod)
 	nm.queue.AddAfter(key, namespaceDeletionGracePeriod)
 }
 
@@ -138,7 +145,13 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 // The system ensures that no two workers can process
 // the same namespace at the same time.
 func (nm *NamespaceController) worker() {
+	workerId := uuid.NewUUID()
 	workFunc := func() bool {
+		startTime := time.Now()
+		defer func() {
+			klog.V(1).Infof("***BP*** %v workFunc took %v", workerId, time.Since(startTime))
+		}()
+		klog.V(1).Infof("***BP*** %v Starting namespace controller workFunc.... Queue length is %d", workerId, nm.queue.Len())
 		key, quit := nm.queue.Get()
 		if quit {
 			return true
@@ -148,16 +161,19 @@ func (nm *NamespaceController) worker() {
 		err := nm.syncNamespaceFromKey(key.(string))
 		if err == nil {
 			// no error, forget this entry and return
+			klog.V(1).Infof("***BP*** %v syncNamespaceFromKey returned no error, so forgetting %s", workerId, key)
 			nm.queue.Forget(key)
 			return false
 		}
 
 		if estimate, ok := err.(*deletion.ResourcesRemainingError); ok {
 			t := estimate.Estimate/2 + 1
+			klog.V(1).Infof("***BP*** %v Content remaining in namespace %s, waiting %d seconds", workerId, key, t)
 			klog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
 			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
+			klog.V(1).Infof("***BP*** %v Delete namespace %s failed, adding it back to the queue", workerId, key)
 			nm.queue.AddRateLimited(key)
 			utilruntime.HandleError(fmt.Errorf("deletion of namespace %v failed: %v", key, err))
 		}
@@ -175,6 +191,8 @@ func (nm *NamespaceController) worker() {
 
 // syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
 func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
+	klog.V(1).Infof("***BP*** Entering syncNamespaceFromKey %s", key)
+
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
@@ -189,7 +207,15 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
 		return err
 	}
-	return nm.namespacedResourcesDeleter.Delete(namespace.Name)
+	klog.V(1).Infof("***BP*** Before calling m.namespacedResourcesDeleter.Delete(%s)", namespace.Name)
+	err = nm.namespacedResourcesDeleter.Delete(namespace.Name)
+	klog.V(1).Infof("***BP*** After calling m.namespacedResourcesDeleter.Delete(%s)", namespace.Name)
+	if err != nil {
+		klog.V(1).Infof("***BP*** m.namespacedResourcesDeleter.Delete(%s) err = %v", namespace.Name, err)
+	}
+
+	klog.V(1).Infof("***BP*** Leaving syncNamespaceFromKey %s", key)
+	return err
 }
 
 // Run starts observing the system with the specified number of workers.
@@ -204,7 +230,8 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 		return
 	}
 
-	klog.V(5).Info("Starting workers of namespace controller")
+	klog.V(1).Info("***BP*** Starting %d namespace controller workers", workers)
+	klog.V(5).Info("Starting %d namespace controller workers", workers)
 	for i := 0; i < workers; i++ {
 		go wait.Until(nm.worker, time.Second, stopCh)
 	}

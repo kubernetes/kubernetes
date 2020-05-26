@@ -59,10 +59,10 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	// These defaults override the recommended defaults from the componentbaseconfigv1alpha1 package that are applied automatically
 	// These client-connection defaults are specific to the kube-controller-manager
 	if obj.Generic.ClientConnection.QPS == 0.0 {
-		obj.Generic.ClientConnection.QPS = 20.0
+		obj.Generic.ClientConnection.QPS = 200.0
 	}
 	if obj.Generic.ClientConnection.Burst == 0 {
-		obj.Generic.ClientConnection.Burst = 30
+		obj.Generic.ClientConnection.Burst = 300
 	}
 
 	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options

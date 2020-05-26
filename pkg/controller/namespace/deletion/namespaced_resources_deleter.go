@@ -58,6 +58,7 @@ func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 		finalizerToken:      finalizerToken,
 	}
 	d.initOpCache()
+	klog.V(1).Infof("***BP*** namespace resource deleter created with finalizerToken %v", finalizerToken)
 	return d
 }
 
@@ -93,17 +94,26 @@ type namespacedResourcesDeleter struct {
 // to wait for them to go away.
 // Caller is expected to keep calling this until it succeeds.
 func (d *namespacedResourcesDeleter) Delete(nsName string) error {
+
+	klog.V(1).Infof("***BP*** Deleting namespace %s", nsName)
+	defer func() {
+		klog.V(1).Infof("***BP*** Leaving delete for namespace %s", nsName)
+	}()
+
 	// Multiple controllers may edit a namespace during termination
 	// first get the latest state of the namespace before proceeding
 	// if the namespace was deleted already, don't do anything
 	namespace, err := d.nsClient.Get(context.TODO(), nsName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
+			klog.V(1).Infof("***BP*** Namespace %s not found", nsName)
 			return nil
 		}
+		klog.V(1).Infof("***BP*** Namespace %s error: %v", nsName, err)
 		return err
 	}
 	if namespace.DeletionTimestamp == nil {
+		klog.V(1).Infof("***BP*** Namespace %s deletion timestamp is nil", nsName)
 		return nil
 	}
 
@@ -111,42 +121,61 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 
 	// ensure that the status is up to date on the namespace
 	// if we get a not found error, we assume the namespace is truly gone
+	klog.V(1).Infof("***BP*** Before updateNamespaceStatusFunc for %s", nsName)
 	namespace, err = d.retryOnConflictError(namespace, d.updateNamespaceStatusFunc)
+	klog.V(1).Infof("***BP*** After updateNamespaceStatusFunc for %s", nsName)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			klog.V(1).Infof("***BP*** Namespace %s not found (2)", nsName)
 			return nil
 		}
+		klog.V(1).Infof("***BP*** Namespace %s error (2): %v", nsName, err)
 		return err
 	}
 
 	// the latest view of the namespace asserts that namespace is no longer deleting..
 	if namespace.DeletionTimestamp.IsZero() {
+		klog.V(1).Infof("***BP*** Namespace %s deletion timestamp is zero", nsName)
 		return nil
 	}
 
 	// return if it is already finalized.
 	if finalized(namespace) {
+		klog.V(1).Infof("***BP*** Namespace %s already finalized", nsName)
 		return nil
+	}
+	klog.V(1).Infof("***BP*** Namespace %s has %d finalizers remaining", nsName, len(namespace.Spec.Finalizers))
+	for f := range namespace.Spec.Finalizers {
+		klog.V(1).Infof("***BP*** Namespace %s remaining finalizer = %v", nsName, f)
 	}
 
 	// there may still be content for us to remove
+	klog.V(1).Infof("***BP*** Before deleteAllContent for %s", nsName)
 	estimate, err := d.deleteAllContent(namespace)
+	klog.V(1).Infof("***BP*** After deleteAllContent for %s, it returned %d", nsName, estimate)
 	if err != nil {
+		klog.V(1).Infof("***BP*** Namespace %s delete all content error: %v", nsName, err)
 		return err
 	}
+	klog.V(1).Infof("***BP*** Namespace %s estimate = %v", nsName, estimate)
 	if estimate > 0 {
+		klog.V(1).Infof("***BP*** Returning for namespace %s because estimate > 0 (%d)", nsName, estimate)
 		return &ResourcesRemainingError{estimate}
 	}
 
 	// we have removed content, so mark it finalized by us
+	klog.V(1).Infof("***BP*** Before finalizeNamespace for %s", nsName)
 	_, err = d.retryOnConflictError(namespace, d.finalizeNamespace)
+	klog.V(1).Infof("***BP*** After finalizeNamespace for %s", nsName)
 	if err != nil {
 		// in normal practice, this should not be possible, but if a deployment is running
 		// two controllers to do namespace deletion that share a common finalizer token it's
 		// possible that a not found could occur since the other controller would have finished the delete.
 		if errors.IsNotFound(err) {
+			klog.V(1).Infof("***BP*** Namespace %s not found (3)", nsName)
 			return nil
 		}
+		klog.V(1).Infof("***BP*** Namespace %s finalize namespace error: %v", nsName, err)
 		return err
 	}
 	return nil
@@ -247,29 +276,41 @@ func (d *namespacedResourcesDeleter) retryOnConflictError(namespace *v1.Namespac
 			return result, nil
 		}
 		if !errors.IsConflict(err) {
+			klog.V(1).Infof("***BP*** Non-conflict error occurred for namespace %s: %v", latestNamespace.Name, err)
 			return nil, err
 		}
+		klog.V(1).Infof("***BP*** Conflict occurred for namespace %s: %v", latestNamespace.Name, err)
 		prevNamespace := latestNamespace
 		latestNamespace, err = d.nsClient.Get(context.TODO(), latestNamespace.Name, metav1.GetOptions{})
 		if err != nil {
+			klog.V(1).Infof("***BP*** Error getting latest for namespace %s: %v", prevNamespace.Name, err)
 			return nil, err
 		}
 		if prevNamespace.UID != latestNamespace.UID {
+			klog.V(1).Infof("***BP*** Namespace UID changed %s: %s --> %s", prevNamespace.Name, prevNamespace.UID, latestNamespace.UID)
 			return nil, fmt.Errorf("namespace uid has changed across retries")
 		}
+		klog.V(1).Infof("***BP*** Looping for retryOnConflict for namespace %s", latestNamespace.Name, err)
 	}
 }
 
 // updateNamespaceStatusFunc will verify that the status of the namespace is correct
 func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *v1.Namespace) (*v1.Namespace, error) {
 	if namespace.DeletionTimestamp.IsZero() || namespace.Status.Phase == v1.NamespaceTerminating {
+		klog.V(1).Infof("***BP*** updateNamespaceStatusFunc returning immediately for %s. DeletionTimestamp = %s, Phase = %s", namespace.Name, namespace.DeletionTimestamp, namespace.Status.Phase)
 		return namespace, nil
 	}
 	newNamespace := v1.Namespace{}
 	newNamespace.ObjectMeta = namespace.ObjectMeta
 	newNamespace.Status = *namespace.Status.DeepCopy()
 	newNamespace.Status.Phase = v1.NamespaceTerminating
-	return d.nsClient.UpdateStatus(context.TODO(), &newNamespace, metav1.UpdateOptions{})
+	klog.V(1).Infof("***BP*** Before updating status for %s", newNamespace.Name)
+	ns, err := d.nsClient.UpdateStatus(context.TODO(), &newNamespace, metav1.UpdateOptions{})
+	if err != nil {
+		klog.V(1).Infof("***BP*** Error updating status for %s: %v", newNamespace.Name, err)
+	}
+	klog.V(1).Infof("***BP*** After updating status for %s", newNamespace.Name)
+	return ns, err
 }
 
 // finalized returns true if the namespace.Spec.Finalizers is an empty list
@@ -306,7 +347,12 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 // it returns true if the operation was supported on the server.
 // it returns an error if the operation was supported on the server but was unable to complete.
 func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionResource, namespace string) (bool, error) {
+	startTime := time.Now()
 	klog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
+	klog.V(1).Infof("***BP*** Entering deleteCollection for %s, gvr %v", namespace, gvr)
+	defer func() {
+		klog.V(1).Infof("***BP*** Leaving deleteCollection for %s, gvr %v (duration=%v)", namespace, gvr, time.Since(startTime))
+	}()
 
 	key := operationKey{operation: operationDeleteCollection, gvr: gvr}
 	if !d.opCache.isSupported(key) {
@@ -319,7 +365,9 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 	// namespace itself.
 	background := metav1.DeletePropagationBackground
 	opts := metav1.DeleteOptions{PropagationPolicy: &background}
+	klog.V(1).Infof("***BP*** Before DeleteCollection for %s, gvr %v", namespace, gvr)
 	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(context.TODO(), opts, metav1.ListOptions{})
+	klog.V(1).Infof("***BP*** After DeleteCollection for %s, gvr %v, err = %v", namespace, gvr, err)
 
 	if err == nil {
 		return true, nil
@@ -332,6 +380,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 	// when working with this resource type, we will get a literal not found error rather than expected method not supported
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
+		klog.V(1).Infof("***BP*** deleteCollection for %s not supported, gvr %v", namespace, gvr)
 		klog.V(5).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
 		d.opCache.setNotSupported(key)
 		return false, nil
@@ -355,10 +404,19 @@ func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResou
 		return nil, false, nil
 	}
 
+	klog.V(1).Infof("***BP*** Before listCollection Listing resources for %s, gvr %v", namespace, gvr)
 	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
+	klog.V(1).Infof("***BP*** After listCollection Listing resources for %s, gvr %v", namespace, gvr)
 	if err == nil {
+		if partialList == nil {
+			klog.V(1).Infof("***BP*** Listing resources for %s succeeded but found no items", namespace)
+		} else {
+			klog.V(1).Infof("***BP*** Listing resources for %s found %d items", namespace, len(partialList.Items))
+		}
 		return partialList, true, nil
 	}
+
+	klog.V(1).Infof("***BP*** Listing resources for %s found nothing", namespace)
 
 	// this is strange, but we need to special case for both MethodNotSupported and NotFound errors
 	// TODO: https://github.com/kubernetes/kubernetes/issues/22413
@@ -367,6 +425,7 @@ func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResou
 	// when working with this resource type, we will get a literal not found error rather than expected method not supported
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
+		klog.V(1).Infof("***BP*** listCollection for %s not supported", namespace, len(partialList.Items))
 		klog.V(5).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
 		d.opCache.setNotSupported(key)
 		return nil, false, nil
@@ -387,11 +446,16 @@ func (d *namespacedResourcesDeleter) deleteEachItem(gvr schema.GroupVersionResou
 		return nil
 	}
 	for _, item := range unstructuredList.Items {
+
 		background := metav1.DeletePropagationBackground
 		opts := metav1.DeleteOptions{PropagationPolicy: &background}
+
+		klog.V(1).Infof("***BP*** Before deleting resource %s/%s", namespace, item.GetName())
 		if err = d.metadataClient.Resource(gvr).Namespace(namespace).Delete(context.TODO(), item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+			klog.V(1).Infof("***BP*** Error deleting resource %s/%s: %v", namespace, item.GetName(), err)
 			return err
 		}
+		klog.V(1).Infof("***BP*** After deleting resource %s/%s", namespace, item.GetName())
 	}
 	return nil
 }
@@ -413,9 +477,11 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	gvr schema.GroupVersionResource, namespace string,
 	namespaceDeletedAt metav1.Time) (gvrDeletionMetadata, error) {
 	klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
+	klog.V(1).Infof("***BP*** deleteAllContentForGroupVersionResource for namespace %s, gvr %s", namespace, gvr)
 
 	// estimate how long it will take for the resource to be deleted (needed for objects that support graceful delete)
 	estimate, err := d.estimateGracefulTermination(gvr, namespace, namespaceDeletedAt)
+	klog.V(1).Infof("***BP*** estimateGracefulTermination for namespace %s, gvr %s, namespaceDeletedAt %s = %d", namespace, gvr, namespaceDeletedAt, estimate)
 	if err != nil {
 		klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - unable to estimate - namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
 		return gvrDeletionMetadata{}, err
@@ -425,13 +491,16 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	// first try to delete the entire collection
 	deleteCollectionSupported, err := d.deleteCollection(gvr, namespace)
 	if err != nil {
+		klog.V(1).Infof("***BP*** Error deleting entire collection for namespace %s, gvr %s: %v", namespace, gvr, err)
 		return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, err
 	}
 
 	// delete collection was not supported, so we list and delete each item...
 	if !deleteCollectionSupported {
+		klog.V(1).Infof("***BP*** Deleting entire collection is not supported for namespace %s, gvr %s", namespace, gvr)
 		err = d.deleteEachItem(gvr, namespace)
 		if err != nil {
+			klog.V(1).Infof("***BP*** Error deleting each item for namespace %s, gvr %s: %v", namespace, gvr, err)
 			return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, err
 		}
 	}
@@ -441,13 +510,16 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - checking for no more items in namespace: %s, gvr: %v", namespace, gvr)
 	unstructuredList, listSupported, err := d.listCollection(gvr, namespace)
 	if err != nil {
+		klog.V(1).Infof("***BP*** Error listing collection for namespace %s, gvr %s: %v", namespace, gvr, err)
 		klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - error verifying no items in namespace: %s, gvr: %v, err: %v", namespace, gvr, err)
 		return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, err
 	}
 	if !listSupported {
+		klog.V(1).Infof("***BP*** Listing collection is not supported for namespace %s, gvr %s", namespace, gvr)
 		return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, nil
 	}
 	klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - items remaining - namespace: %s, gvr: %v, items: %v", namespace, gvr, len(unstructuredList.Items))
+	klog.V(1).Infof("***BP*** Found %d unstructuredList.Items for namespace %s, gvr %s", len(unstructuredList.Items), namespace, gvr)
 	if len(unstructuredList.Items) == 0 {
 		// we're done
 		return gvrDeletionMetadata{finalizerEstimateSeconds: 0, numRemaining: 0}, nil
@@ -462,6 +534,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	}
 
 	if estimate != int64(0) {
+		klog.V(1).Infof("***BP*** Returning because estimate > 0 (%d) for namespace %s, gvr %s", estimate, namespace, gvr)
 		klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - estimate is present - namespace: %s, gvr: %v, finalizers: %v", namespace, gvr, finalizersToNumRemaining)
 		return gvrDeletionMetadata{
 			finalizerEstimateSeconds: estimate,
@@ -472,6 +545,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 
 	// if any item has a finalizer, we treat that as a normal condition, and use a default estimation to allow for GC to complete.
 	if len(finalizersToNumRemaining) > 0 {
+		klog.V(1).Infof("***BP*** Returning because len(finalizersToNumRemaining) > 0 (%d) for namespace %s, gvr %s", estimate, namespace, gvr)
 		klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - items remaining with finalizers - namespace: %s, gvr: %v, finalizers: %v", namespace, gvr, finalizersToNumRemaining)
 		return gvrDeletionMetadata{
 			finalizerEstimateSeconds: finalizerEstimateSeconds,
@@ -498,6 +572,8 @@ type allGVRDeletionMetadata struct {
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
 func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, error) {
+	klog.V(1).Infof("***BP*** deleteAllContent for namespace %s", ns.Name)
+
 	namespace := ns.Name
 	namespaceDeletedAt := *ns.DeletionTimestamp
 	var errs []error
@@ -511,29 +587,40 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 		errs = append(errs, err)
 		conditionUpdater.ProcessDiscoverResourcesErr(err)
 	}
+	klog.V(1).Infof("***BP*** deleteAllContent discovered %d resources for namespace %s", len(resources), ns.Name)
 	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
 	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
+	klog.V(1).Infof("***BP*** deleteAllContent discovered %d deletable resources for namespace %s", len(deletableResources), ns.Name)
 	groupVersionResources, err := discovery.GroupVersionResources(deletableResources)
 	if err != nil {
+		klog.V(1).Infof("***BP*** deleteAllContent discovery error for namespace %s: %v", ns.Name, err)
 		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
 		errs = append(errs, err)
 		conditionUpdater.ProcessGroupVersionErr(err)
 	}
+
+	klog.V(1).Infof("***BP*** There are %d gvrs for namespace %s", len(groupVersionResources), ns.Name)
 
 	numRemainingTotals := allGVRDeletionMetadata{
 		gvrToNumRemaining:        map[schema.GroupVersionResource]int{},
 		finalizersToNumRemaining: map[string]int{},
 	}
 	for gvr := range groupVersionResources {
+		klog.V(1).Infof("***BP*** Before deleteAllContentForGroupVersionResource for %s %s %s %s", gvr.Group, gvr.Version, gvr.Resource, namespace)
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
+		klog.V(1).Infof("***BP*** After deleteAllContentForGroupVersionResource for %s %s %s %s", gvr.Group, gvr.Version, gvr.Resource, namespace)
 		if err != nil {
+			klog.V(1).Infof("***BP*** Error for deleteAllContentForGroupVersionResource for %s %s %s %s: %v", gvr.Group, gvr.Version, gvr.Resource, namespace, err)
 			// If there is an error, hold on to it but proceed with all the remaining
 			// groupVersionResources.
 			errs = append(errs, err)
 			conditionUpdater.ProcessDeleteContentErr(err)
 		}
+		klog.V(1).Infof("***BP*** gvrDeletionMetadata.finalizerEstimateSeconds for namespace %s, gvr %v = %d", namespace, gvr, gvrDeletionMetadata.finalizerEstimateSeconds)
+		klog.V(1).Infof("***BP*** gvrDeletionMetadata.numRemaining for namespace %s, gvr %v = %d", namespace, gvr, gvrDeletionMetadata.numRemaining)
 		if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
 			estimate = gvrDeletionMetadata.finalizerEstimateSeconds
+			klog.V(1).Infof("***BP*** deleteAllContent estimate updated for namespace %s, gvr %v = %d", namespace, gvr, estimate)
 		}
 		if gvrDeletionMetadata.numRemaining > 0 {
 			numRemainingTotals.gvrToNumRemaining[gvr] = gvrDeletionMetadata.numRemaining
@@ -545,19 +632,27 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 			}
 		}
 	}
+
+	klog.V(1).Infof("***BP*** Before ProcessContentTotals for %s: %d", namespace, numRemainingTotals)
 	conditionUpdater.ProcessContentTotals(numRemainingTotals)
+	klog.V(1).Infof("***BP*** After ProcessContentTotals for %s: %d", namespace, numRemainingTotals)
 
 	// we always want to update the conditions because if we have set a condition to "it worked" after it was previously, "it didn't work",
 	// we need to reflect that information.  Recall that additional finalizers can be set on namespaces, so this finalizer may clear itself and
 	// NOT remove the resource instance.
+	klog.V(1).Infof("***BP*** Before conditionUpdater.Update for %s", namespace)
 	if hasChanged := conditionUpdater.Update(ns); hasChanged {
+		klog.V(1).Infof("***BP*** Before nsClient.UpdateStatus for %s", namespace)
 		if _, err = d.nsClient.UpdateStatus(context.TODO(), ns, metav1.UpdateOptions{}); err != nil {
 			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
 		}
+		klog.V(1).Infof("***BP*** After nsClient.UpdateStatus for %s", namespace)
 	}
+	klog.V(1).Infof("***BP*** After conditionUpdater.Update for %s", namespace)
 
 	// if len(errs)==0, NewAggregate returns nil.
 	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v, errors: %v", namespace, estimate, utilerrors.NewAggregate(errs))
+	klog.V(1).Infof("***BP*** Estimate for %s = %d", namespace, estimate)
 	return estimate, utilerrors.NewAggregate(errs)
 }
 
