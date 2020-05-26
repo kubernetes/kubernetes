@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog/v2"
 )
@@ -126,9 +127,18 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	controller.classLister = p.ClassInformer.Lister()
 	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
 	controller.podLister = p.PodInformer.Lister()
+	controller.podIndexer = p.PodInformer.Informer().GetIndexer()
 	controller.podListerSynced = p.PodInformer.Informer().HasSynced
 	controller.NodeLister = p.NodeInformer.Lister()
 	controller.NodeListerSynced = p.NodeInformer.Informer().HasSynced
+
+	// This custom indexer will index pods by its PVC keys. Then we don't need
+	// to iterate all pods every time to find pods which reference given PVC.
+	if err := controller.podIndexer.AddIndexers(cache.Indexers{
+		pvcKeyIndex: indexByPVCKey,
+	}); err != nil {
+		return nil, fmt.Errorf("Could not initialize PersistentVolume Controller: %v", err)
+	}
 
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
@@ -558,6 +568,28 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 }
 
 // Stateless functions
+
+const (
+	pvcKeyIndex string = "pvc-key-index"
+)
+
+// indexByPVCKey returns PVC keys for given pod
+func indexByPVCKey(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		return []string{}, nil
+	}
+	if util.IsPodTerminated(pod, pod.Status) {
+		return []string{}, nil
+	}
+	keys := []string{}
+	for _, podVolume := range pod.Spec.Volumes {
+		if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
+			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
+		}
+	}
+	return keys, nil
+}
 
 func getClaimStatusForLogging(claim *v1.PersistentVolumeClaim) string {
 	bound := metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted)
