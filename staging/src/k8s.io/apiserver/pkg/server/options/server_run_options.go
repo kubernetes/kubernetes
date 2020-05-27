@@ -69,7 +69,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 }
 
-// ApplyOptions applies the run options to the method receiver and returns self
+// ApplyTo applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
 	c.ExternalAddress = s.ExternalHost
