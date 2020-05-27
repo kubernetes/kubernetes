@@ -174,7 +174,6 @@ func (p PluginToStatus) Merge() *Status {
 		} else if s.Code() == Unschedulable {
 			hasUnschedulable = true
 		}
-		finalStatus.code = s.Code()
 		for _, r := range s.reasons {
 			finalStatus.AppendReason(r)
 		}
