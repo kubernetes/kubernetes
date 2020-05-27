@@ -94,11 +94,6 @@ const (
 	// minutes by slow docker pulls or something else.
 	PodStartShortTimeout = 2 * time.Minute
 
-	// PodStartAfterResizeTimeout is same as `PodStartTimeout`, but longer to better
-	// tolerate attaching a volume that is still being modified in the cloud.
-	// Use it when starting a pod with a volume that has been recently resized in the cloud.
-	PodStartAfterResizeTimeout = 10 * time.Minute
-
 	// PodDeleteTimeout is how long to wait for a pod to be deleted.
 	PodDeleteTimeout = 5 * time.Minute
 
