@@ -135,7 +135,7 @@ type ObjectMeta struct {
 	// +optional
 	GenerateName string `json:"generateName,omitempty" protobuf:"bytes,2,opt,name=generateName"`
 
-	// Namespace defines the space within each name must be unique. An empty namespace is
+	// Namespace defines the space within which each name must be unique. An empty namespace is
 	// equivalent to the "default" namespace, but "default" is the canonical representation.
 	// Not all objects are required to be scoped to a namespace - the value of this field for
 	// those objects will be empty.
