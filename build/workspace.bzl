@@ -99,13 +99,18 @@ _DEBIAN_IPTABLES_DIGEST = {
     "s390x": "sha256:1b91a2788750552913377bf1bc99a095544dfb523d80a55674003c974c8e0905",
 }
 
+# Use skopeo to find these values: https://github.com/containers/skopeo
+#
+# Example
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.0.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.0.0
 _DEBIAN_HYPERKUBE_BASE_DIGEST = {
-    "manifest": "sha256:8cabe02be6e86685d8860b7ace7c7addc9591a339728703027a4854677f1c772",
-    "amd64": "sha256:5d4ea2fb5fbe9a9a9da74f67cf2faefc881968bc39f2ac5d62d9167e575812a1",
-    "arm": "sha256:73260814af61522ff6aa48291df457d3bb0a91c4bf72e7cfa51fbaf03eb65fae",
-    "arm64": "sha256:78eeb1a31eef7c16f954444d64636d939d89307e752964ad6d9d06966c722da3",
-    "ppc64le": "sha256:92857d647abe8d9c7b4d7160cd5699112afc12fde369082a8ed00688b17928a9",
-    "s390x": "sha256:c11d74fa0538c67238576c247bfaddf95ebaa90cd03cb4d2f2ac3c6ebe0441e2",
+    "manifest": "sha256:8c8d854d868fb08352f73dda94f9e0b998c7318b48ddc587a355d0cbaf687f14",
+    "amd64": "sha256:73a8cb2bfd6707c8ed70c252e97bdccad8bc265a9a585db12b8e3dac50d6cd2a",
+    "arm": "sha256:aee7c2958c6e0de896995e8b04c8173fd0a7bbb16cddb1f4668e3ae010b8c786",
+    "arm64": "sha256:a74fc6d690e5c5e393fd509f50d7203fa5cd19bfbb127d4a3a996fd1ebcf35c4",
+    "ppc64le": "sha256:54afd9a85d6ecbe0792496f36012e7902601fb8084347cdc195c8b0561da39a3",
+    "s390x": "sha256:405a94e6b82f2eb89c773e0e9f6105eb73cde5605d4508ae36a150d922fe1c66",
 }
 
 def _digest(d, arch):
@@ -140,9 +145,10 @@ def debian_image_dependencies():
             name = "debian-hyperkube-base-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_HYPERKUBE_BASE_DIGEST, arch),
-            registry = "k8s.gcr.io",
+            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-hyperkube-base",
-            tag = "0.12.1",  # ignored, but kept here for documentation
+            # Ensure the digests above are updated to match a new tag
+            tag = "v1.0.0",  # ignored, but kept here for documentation
         )
 
 def etcd_tarballs():
