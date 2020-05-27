@@ -301,7 +301,8 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
 		RequestTimeout:              time.Duration(60) * time.Second,
-		MinRequestTimeout:           1800,
+		// FIXME: Revert after issue is debugged and fixed.
+		MinRequestTimeout:           300,
 		LivezGracePeriod:            time.Duration(0),
 		ShutdownDelayDuration:       time.Duration(0),
 		// 1.5MB is the default client request size in bytes
