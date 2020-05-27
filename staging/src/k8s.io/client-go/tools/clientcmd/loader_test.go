@@ -246,7 +246,7 @@ contexts:
 current-context: any-context-value
 kind: Config
 preferences: {}
-users: null
+users: []
 `)
 	if !bytes.Equal(expected, data) {
 		t.Error(diff.ObjectReflectDiff(string(expected), string(data)))

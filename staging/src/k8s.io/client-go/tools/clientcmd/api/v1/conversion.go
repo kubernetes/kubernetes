@@ -81,6 +81,7 @@ func Convert_Slice_v1_NamedAuthInfo_To_Map_string_To_Pointer_api_AuthInfo(in *[]
 }
 
 func Convert_Map_string_To_Pointer_api_AuthInfo_To_Slice_v1_NamedAuthInfo(in *map[string]*api.AuthInfo, out *[]NamedAuthInfo, s conversion.Scope) error {
+	*out = make([]NamedAuthInfo, 0, len(*in))
 	allKeys := make([]string, 0, len(*in))
 	for key := range *in {
 		allKeys = append(allKeys, key)

@@ -69,7 +69,7 @@ contexts:
 current-context: token-bootstrap-client@somecluster
 kind: Config
 preferences: {}
-users: null
+users: []
 `
 	)
 
