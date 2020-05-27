@@ -26,9 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils"
@@ -247,8 +244,6 @@ func makeContainersWithImages(images []string) []v1.Container {
 
 // TestEvenPodsSpreadPriority verifies that EvenPodsSpread priority functions well.
 func TestEvenPodsSpreadPriority(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, true)()
-
 	testCtx := initTest(t, "eps-priority")
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name

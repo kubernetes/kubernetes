@@ -55,8 +55,8 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 			Enabled: []schedulerapi.Plugin{
 				{Name: noderesources.FitName},
 				{Name: nodeports.Name},
-				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
+				{Name: interpodaffinity.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{
@@ -74,16 +74,16 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodevolumelimits.AzureDiskName},
 				{Name: volumebinding.Name},
 				{Name: volumezone.Name},
-				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
+				{Name: interpodaffinity.Name},
 			},
 		},
 		PreScore: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: interpodaffinity.Name},
+				{Name: podtopologyspread.Name},
 				{Name: defaultpodtopologyspread.Name},
 				{Name: tainttoleration.Name},
-				{Name: podtopologyspread.Name},
 			},
 		},
 		Score: &schedulerapi.PluginSet{
@@ -94,9 +94,9 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: noderesources.MostAllocatedName, Weight: 1},
 				{Name: nodeaffinity.Name, Weight: 1},
 				{Name: nodepreferavoidpods.Name, Weight: 10000},
+				{Name: podtopologyspread.Name, Weight: 2},
 				{Name: defaultpodtopologyspread.Name, Weight: 1},
 				{Name: tainttoleration.Name, Weight: 1},
-				{Name: podtopologyspread.Name, Weight: 2},
 			},
 		},
 		Reserve: &schedulerapi.PluginSet{
@@ -152,6 +152,7 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []schedulerapi.Plugin{
 						{Name: noderesources.FitName},
 						{Name: nodeports.Name},
+						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
 					},
 				},
@@ -170,12 +171,14 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodevolumelimits.AzureDiskName},
 						{Name: volumebinding.Name},
 						{Name: volumezone.Name},
+						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
 					},
 				},
 				PreScore: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
+						{Name: podtopologyspread.Name},
 						{Name: defaultpodtopologyspread.Name},
 						{Name: tainttoleration.Name},
 					},
@@ -188,6 +191,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: noderesources.LeastAllocatedName, Weight: 1},
 						{Name: nodeaffinity.Name, Weight: 1},
 						{Name: nodepreferavoidpods.Name, Weight: 10000},
+						{Name: podtopologyspread.Name, Weight: 2},
 						{Name: defaultpodtopologyspread.Name, Weight: 1},
 						{Name: tainttoleration.Name, Weight: 1},
 					},
@@ -232,8 +236,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []schedulerapi.Plugin{
 						{Name: noderesources.FitName},
 						{Name: nodeports.Name},
-						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
+						{Name: interpodaffinity.Name},
 					},
 				},
 				Filter: &schedulerapi.PluginSet{
@@ -251,16 +255,16 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodevolumelimits.AzureDiskName},
 						{Name: volumebinding.Name},
 						{Name: volumezone.Name},
-						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
+						{Name: interpodaffinity.Name},
 					},
 				},
 				PreScore: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
+						{Name: podtopologyspread.Name},
 						{Name: defaultpodtopologyspread.Name},
 						{Name: tainttoleration.Name},
-						{Name: podtopologyspread.Name},
 						{Name: noderesources.ResourceLimitsName},
 					},
 				},
@@ -272,9 +276,9 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: noderesources.LeastAllocatedName, Weight: 1},
 						{Name: nodeaffinity.Name, Weight: 1},
 						{Name: nodepreferavoidpods.Name, Weight: 10000},
+						{Name: podtopologyspread.Name, Weight: 2},
 						{Name: defaultpodtopologyspread.Name, Weight: 1},
 						{Name: tainttoleration.Name, Weight: 1},
-						{Name: podtopologyspread.Name, Weight: 2},
 						{Name: noderesources.ResourceLimitsName, Weight: 1},
 					},
 				},
@@ -310,7 +314,6 @@ func TestApplyFeatureGates(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceLimitsPriorityFunction, test.featuresEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, test.featuresEnabled)()
 
 			r := NewRegistry()
 			gotConfig := r[schedulerapi.SchedulerDefaultProviderName]

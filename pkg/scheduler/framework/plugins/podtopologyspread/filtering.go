@@ -52,7 +52,6 @@ type preFilterState struct {
 
 // Clone makes a copy of the given state.
 func (s *preFilterState) Clone() framework.StateData {
-	// s could be nil when EvenPodsSpread feature is disabled
 	if s == nil {
 		return nil
 	}

@@ -200,6 +200,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 			PodToleratesNodeTaintsPred,
 			CheckVolumeBindingPred,
 			CheckNodeUnschedulablePred,
+			EvenPodsSpreadPred,
 		),
 
 		// Used as the default set of predicates if Policy was specified, but priorities was nil.
@@ -212,6 +213,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 			NodeAffinityPriority:        1,
 			TaintTolerationPriority:     1,
 			ImageLocalityPriority:       1,
+			EvenPodsSpreadPriority:      1,
 		},
 
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
@@ -338,6 +340,12 @@ func NewLegacyRegistry() *LegacyRegistry {
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, serviceaffinity.Name, nil)
 			return
 		})
+	registry.registerPredicateConfigProducer(EvenPodsSpreadPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, podtopologyspread.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, podtopologyspread.Name, nil)
+			return
+		})
 
 	// Register Priorities.
 	registry.registerPriorityConfigProducer(SelectorSpreadPriority,
@@ -401,7 +409,6 @@ func NewLegacyRegistry() *LegacyRegistry {
 			}
 			return
 		})
-
 	registry.registerPriorityConfigProducer(nodelabel.Name,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			// If there are n LabelPreference priorities in the policy, the weight for the corresponding
@@ -428,31 +435,16 @@ func NewLegacyRegistry() *LegacyRegistry {
 			}
 			return
 		})
+	registry.registerPriorityConfigProducer(EvenPodsSpreadPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PreScore = appendToPluginSet(plugins.PreScore, podtopologyspread.Name, nil)
+			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
+			return
+		})
 
-	// The following two features are the last ones to be supported as predicate/priority.
-	// Once they graduate to GA, there will be no more checking for feature gates here.
-	// Only register EvenPodsSpread predicate & priority if the feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
-		klog.Infof("Registering EvenPodsSpread predicate and priority function")
-
-		registry.registerPredicateConfigProducer(EvenPodsSpreadPred,
-			func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-				plugins.PreFilter = appendToPluginSet(plugins.PreFilter, podtopologyspread.Name, nil)
-				plugins.Filter = appendToPluginSet(plugins.Filter, podtopologyspread.Name, nil)
-				return
-			})
-		registry.DefaultPredicates.Insert(EvenPodsSpreadPred)
-
-		registry.registerPriorityConfigProducer(EvenPodsSpreadPriority,
-			func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-				plugins.PreScore = appendToPluginSet(plugins.PreScore, podtopologyspread.Name, nil)
-				plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
-				return
-			})
-		registry.DefaultPriorities[EvenPodsSpreadPriority] = 1
-	}
-
-	// Prioritizes nodes that satisfy pod's resource limits
+	// ResourceLimits is the last feature to be supported as predicate/priority.
+	// TODO: Remove this check once it graduates to GA.
+	// Prioritizes nodes that satisfy pod's resource limits.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
 

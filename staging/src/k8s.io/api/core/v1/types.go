@@ -3047,7 +3047,6 @@ type PodSpec struct {
 	Overhead ResourceList `json:"overhead,omitempty" protobuf:"bytes,32,opt,name=overhead"`
 	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
 	// domains. Scheduler will schedule pods in a way which abides by the constraints.
-	// This field is only honored by clusters that enable the EvenPodsSpread feature.
 	// All topologySpreadConstraints are ANDed.
 	// +optional
 	// +patchMergeKey=topologyKey
