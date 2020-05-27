@@ -55,6 +55,7 @@ type ClusterInterrogator interface {
 	CheckClusterHealth() error
 	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
 	Sync() error
+	ListMembers() ([]Member, error)
 	AddMember(name string, peerAddrs string) ([]Member, error)
 	GetMemberID(peerURL string) (uint64, error)
 	RemoveMember(id uint64) ([]Member, error)
@@ -258,8 +259,7 @@ type Member struct {
 	PeerURL string
 }
 
-// GetMemberID returns the member ID of the given peer URL
-func (c *Client) GetMemberID(peerURL string) (uint64, error) {
+func (c *Client) listMembers() (*clientv3.MemberListResponse, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
 		DialTimeout: dialTimeout,
@@ -269,7 +269,7 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 		TLS: c.TLS,
 	})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer cli.Close()
 
@@ -288,7 +288,16 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 		return false, nil
 	})
 	if err != nil {
-		return 0, lastError
+		return nil, lastError
+	}
+	return resp, nil
+}
+
+// GetMemberID returns the member ID of the given peer URL
+func (c *Client) GetMemberID(peerURL string) (uint64, error) {
+	resp, err := c.listMembers()
+	if err != nil {
+		return 0, err
 	}
 
 	for _, member := range resp.Members {
@@ -297,6 +306,20 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 		}
 	}
 	return 0, nil
+}
+
+// ListMembers returns the member list.
+func (c *Client) ListMembers() ([]Member, error) {
+	resp, err := c.listMembers()
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make([]Member, 0, len(resp.Members))
+	for _, m := range resp.Members {
+		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+	}
+	return ret, nil
 }
 
 // RemoveMember notifies an etcd cluster to remove an existing member
