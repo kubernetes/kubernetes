@@ -20,12 +20,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -39,6 +43,12 @@ var (
 
 var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
+
+	var dc dynamic.Interface
+
+	ginkgo.BeforeEach(func() {
+		dc = f.DynamicClient
+	})
 
 	/*
 		Release : v1.9
@@ -167,8 +177,13 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 		testNamespaceName := f.Namespace.Name
 		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
 
-		ginkgo.By("creating a ConfigMap")
-		_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &v1.ConfigMap{
+		configMapResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+		expectedWatchEvents := []watch.Event{
+			{Type: watch.Added},
+			{Type: watch.Modified},
+			{Type: watch.Deleted},
+		}
+		testConfigMap := v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testConfigMapName,
 				Labels: map[string]string{
@@ -178,88 +193,102 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 			Data: map[string]string{
 				"valueName": "value",
 			},
-		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ConfigMap")
-
-		ginkgo.By("setting a watch for the ConfigMap")
-		// setup a watch for the ConfigMap
-		resourceWatch, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-configmap-static=true", TimeoutSeconds: &generalWatchTimeout})
-		framework.ExpectNoError(err, "Failed to setup watch on newly created ConfigMap")
-
-		resourceWatchChan := resourceWatch.ResultChan()
-		ginkgo.By("waiting for the ConfigMap to be added")
-		foundWatchEvent := false
-		for watchEvent := range resourceWatchChan {
-			if watchEvent.Type == watch.Added {
-				foundWatchEvent = true
-				break
-			}
 		}
-		framework.ExpectEqual(true, foundWatchEvent, "expected to find a watch.Delete event configmap %s", testConfigMapName)
 
-		configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					"test-configmap": "patched",
+		framework.WatchEventSequenceVerifier(context.TODO(), dc, configMapResource, testNamespaceName, testConfigMapName, metav1.ListOptions{LabelSelector: "test-configmap-static=true"}, expectedWatchEvents, func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
+			ginkgo.By("creating a ConfigMap")
+			_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(context.TODO(), &testConfigMap, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create ConfigMap")
+			eventFound := false
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+				if watchEvent.Type != watch.Added {
+					return false, nil
+				}
+				actualWatchEvents = append(actualWatchEvents, watchEvent)
+				eventFound = true
+				return true, nil
+			})
+			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
+			framework.ExpectEqual(eventFound, true, "failed to find ConfigMap %v event", watch.Added)
+
+			configMapPatchPayload, err := json.Marshal(v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"test-configmap": "patched",
+					},
 				},
-			},
-			Data: map[string]string{
-				"valueName": "value1",
-			},
-		})
-		framework.ExpectNoError(err, "failed to marshal patch data")
+				Data: map[string]string{
+					"valueName": "value1",
+				},
+			})
+			framework.ExpectNoError(err, "failed to marshal patch data")
 
-		ginkgo.By("patching the ConfigMap")
-		_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch ConfigMap")
-		ginkgo.By("waiting for the ConfigMap to be modified")
-		foundWatchEvent = false
-		for watchEvent := range resourceWatchChan {
-			if watchEvent.Type == watch.Modified {
-				foundWatchEvent = true
-				break
+			ginkgo.By("patching the ConfigMap")
+			_, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(context.TODO(), testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
+			framework.ExpectNoError(err, "failed to patch ConfigMap")
+			ginkgo.By("waiting for the ConfigMap to be modified")
+			eventFound = false
+			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+				if watchEvent.Type != watch.Modified {
+					return false, nil
+				}
+				actualWatchEvents = append(actualWatchEvents, watchEvent)
+				eventFound = true
+				return true, nil
+			})
+			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
+			framework.ExpectEqual(eventFound, true, "failed to find ConfigMap %v event", watch.Modified)
+
+			ginkgo.By("fetching the ConfigMap")
+			configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get ConfigMap")
+			framework.ExpectEqual(configMap.Data["valueName"], "value1", "failed to patch ConfigMap")
+			framework.ExpectEqual(configMap.Labels["test-configmap"], "patched", "failed to patch ConfigMap")
+
+			ginkgo.By("listing all ConfigMaps in all namespaces")
+			configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
+				LabelSelector: "test-configmap-static=true",
+			})
+			framework.ExpectNoError(err, "failed to list ConfigMaps with LabelSelector")
+			framework.ExpectNotEqual(len(configMapList.Items), 0, "no ConfigMaps found in ConfigMap list")
+			testConfigMapFound := false
+			for _, cm := range configMapList.Items {
+				if cm.ObjectMeta.Name == testConfigMapName &&
+					cm.ObjectMeta.Namespace == testNamespaceName &&
+					cm.ObjectMeta.Labels["test-configmap-static"] == "true" &&
+					cm.Data["valueName"] == "value1" {
+					testConfigMapFound = true
+					break
+				}
 			}
-		}
-		framework.ExpectEqual(true, foundWatchEvent, "expected to find a watch.Modified event configmap %s", testConfigMapName)
+			framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap in list")
 
-		ginkgo.By("fetching the ConfigMap")
-		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(context.TODO(), testConfigMapName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get ConfigMap")
-		framework.ExpectEqual(configMap.Data["valueName"], "value1", "failed to patch ConfigMap")
-		framework.ExpectEqual(configMap.Labels["test-configmap"], "patched", "failed to patch ConfigMap")
+			ginkgo.By("deleting the ConfigMap by a collection")
+			err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+				LabelSelector: "test-configmap-static=true",
+			})
+			framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
+			ginkgo.By("waiting for the ConfigMap to be deleted")
+			eventFound = false
+			ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_, err = framework.WatchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+				if watchEvent.Type != watch.Deleted {
+					return false, nil
+				}
+				actualWatchEvents = append(actualWatchEvents, watchEvent)
+				eventFound = true
+				return true, nil
+			})
+			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
+			framework.ExpectEqual(eventFound, true, "failed to find ConfigMap %v event", watch.Deleted)
 
-		ginkgo.By("listing all ConfigMaps in all namespaces")
-		configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "test-configmap-static=true",
+			return actualWatchEvents
 		})
-		framework.ExpectNoError(err, "failed to list ConfigMaps with LabelSelector")
-		framework.ExpectNotEqual(len(configMapList.Items), 0, "no ConfigMaps found in ConfigMap list")
-		testConfigMapFound := false
-		for _, cm := range configMapList.Items {
-			if cm.ObjectMeta.Name == testConfigMapName &&
-				cm.ObjectMeta.Namespace == testNamespaceName &&
-				cm.ObjectMeta.Labels["test-configmap-static"] == "true" &&
-				cm.Data["valueName"] == "value1" {
-				testConfigMapFound = true
-				break
-			}
-		}
-		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap in list")
-
-		ginkgo.By("deleting the ConfigMap by a collection")
-		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
-			LabelSelector: "test-configmap-static=true",
-		})
-		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
-		ginkgo.By("waiting for the ConfigMap to be deleted")
-		foundWatchEvent = false
-		for watchEvent := range resourceWatchChan {
-			if watchEvent.Type == watch.Deleted {
-				foundWatchEvent = true
-				break
-			}
-		}
-		framework.ExpectEqual(true, foundWatchEvent, "expected to find a watch.Deleted event configmap %s", testConfigMapName)
 	})
 })
 
