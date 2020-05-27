@@ -173,10 +173,10 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		warnDefaultComponentConfigValue(kind, "healthzBindAddress", kubeletHealthzBindAddress, kc.config.HealthzBindAddress)
 	}
 
-	if kc.config.RootDirectory == "" {
-		kc.config.RootDirectory = kubeletconfig.DefaultRootDir
-	} else if kc.config.RootDirectory != kubeletconfig.DefaultRootDir {
-		warnDefaultComponentConfigValue(kind, "rootDir", kubeletconfig.DefaultRootDir, kc.config.RootDirectory)
+	if kc.config.RootDir == "" {
+		kc.config.RootDir = kubeletconfig.DefaultRootDir
+	} else if kc.config.RootDir != kubeletconfig.DefaultRootDir {
+		warnDefaultComponentConfigValue(kind, "rootDir", kubeletconfig.DefaultRootDir, kc.config.RootDir)
 	}
 
 	if kc.config.HealthzPort == nil {

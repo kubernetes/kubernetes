@@ -338,7 +338,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.VolumePluginDir = in.VolumePluginDir
 	out.ProviderID = in.ProviderID
-	out.RootDirectory = in.RootDirectory
+	out.RootDir = in.RootDir
 	return nil
 }
 
@@ -378,7 +378,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	out.RegistryBurst = in.RegistryBurst
-	out.RootDirectory = in.RootDirectory
+	out.RootDir = in.RootDir
 	if err := v1.Convert_int32_To_Pointer_int32(&in.EventRecordQPS, &out.EventRecordQPS, s); err != nil {
 		return err
 	}

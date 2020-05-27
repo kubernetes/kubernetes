@@ -624,7 +624,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDir, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
 		}
@@ -714,7 +714,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 				CgroupsPerQOS:         s.CgroupsPerQOS,
 				CgroupRoot:            s.CgroupRoot,
 				CgroupDriver:          s.CgroupDriver,
-				KubeletRootDir:        s.RootDirectory,
+				KubeletRootDir:        s.RootDir,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
 					KubeReservedCgroupName:   s.KubeReservedCgroup,
@@ -1088,8 +1088,8 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		AllowPrivileged: true,
 	})
 
-	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDirectory)
-	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDirectory)
+	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDir)
+	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDir)
 
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
@@ -1106,7 +1106,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,
-		kubeServer.RootDirectory,
+		kubeServer.RootDir,
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,

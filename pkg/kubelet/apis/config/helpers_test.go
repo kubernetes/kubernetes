@@ -135,6 +135,7 @@ var (
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
 		"ResolverConfig",
+		"RootDir",
 	)
 
 	// KubeletConfiguration fields that do not contain file paths.
@@ -228,6 +229,5 @@ var (
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
 		"VolumePluginDir",
-		"RootDirectory",
 	)
 )

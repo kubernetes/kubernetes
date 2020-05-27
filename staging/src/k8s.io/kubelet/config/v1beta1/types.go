@@ -782,11 +782,11 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ProviderID string `json:"providerID,omitempty"`
-	// rootDirectory is the directory path to place kubelet files (volume
+	// rootDir is the directory path to place kubelet files (volume
 	// mounts,etc).
 	// Default: "/var/lib/kubelet"
 	// +optional
-	RootDirectory string `json:"rootDirectory,omitempty"`
+	RootDir string `json:"rootDirectory,omitempty"`
 }
 
 type KubeletAuthorizationMode string

@@ -155,8 +155,6 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 
 	// Flags struct
 	f := options.NewKubeletFlags()
-	f.RootDirectory = testRootDir
-	f.EnableServer = true
 	f.HostnameOverride = opt.NodeName
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
@@ -191,7 +189,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.ImageGCLowThresholdPercent = 80
 	c.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
 	c.VolumeStatsAggPeriod.Duration = time.Minute
-	c.RootDirectory = testRootDir
+	c.RootDir = testRootDir
 	c.CgroupRoot = ""
 	c.CPUCFSQuota = true
 	c.EnableControllerAttachDetach = false
