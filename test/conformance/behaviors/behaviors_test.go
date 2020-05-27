@@ -56,7 +56,7 @@ func validateSuite(path string, t *testing.T) {
 	if err != nil {
 		t.Errorf("%q", err.Error())
 	}
-	err = yaml.UnmarshalStrict(yamlFile, &suite)
+	err = yaml.Unmarshal(yamlFile, &suite)
 
 	if err != nil {
 		t.Errorf("%q", err.Error())

@@ -337,6 +337,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Release : v1.9
 		Testname: Pods, update
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. Update the pod to change the value of the Label. Query for the Pod with the new value for the label MUST be successful.
+		Behaviors:
+		- pod/spec/label/create
+		- pod/spec/label/patch
 	*/
 	framework.ConformanceIt("should be updated [NodeConformance]", func() {
 		ginkgo.By("creating the pod")
