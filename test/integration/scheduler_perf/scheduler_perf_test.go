@@ -45,6 +45,8 @@ var (
 			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
 			"scheduler_binding_duration_seconds",
 			"scheduler_e2e_scheduling_duration_seconds",
+			"scheduler_scheduling_algorithm_preemption_evaluation_seconds",
+			"scheduler_pod_scheduling_duration_seconds",
 		},
 	}
 )
@@ -154,7 +156,7 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 		}
 		total += p.Num
 	}
-	if err := waitNumPodsScheduled(b, total, podInformer); err != nil {
+	if err := waitNumPodsScheduled(b, total, podInformer, setupNamespace); err != nil {
 		b.Fatal(err)
 	}
 
@@ -172,7 +174,7 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 	if err := createPods(testNamespace, test.PodsToSchedule, clientset); err != nil {
 		b.Fatal(err)
 	}
-	if err := waitNumPodsScheduled(b, total+test.PodsToSchedule.Num, podInformer); err != nil {
+	if err := waitNumPodsScheduled(b, test.PodsToSchedule.Num, podInformer, testNamespace); err != nil {
 		b.Fatal(err)
 	}
 
@@ -187,9 +189,9 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 	return dataItems
 }
 
-func waitNumPodsScheduled(b *testing.B, num int, podInformer coreinformers.PodInformer) error {
+func waitNumPodsScheduled(b *testing.B, num int, podInformer coreinformers.PodInformer, namespace string) error {
 	for {
-		scheduled, err := getScheduledPods(podInformer)
+		scheduled, err := getScheduledPods(podInformer, namespace)
 		if err != nil {
 			return err
 		}
@@ -203,7 +205,7 @@ func waitNumPodsScheduled(b *testing.B, num int, podInformer coreinformers.PodIn
 }
 
 func getTestDataCollectors(tc testCase, podInformer coreinformers.PodInformer, b *testing.B) []testDataCollector {
-	collectors := []testDataCollector{newThroughputCollector(podInformer, map[string]string{"Name": b.Name()})}
+	collectors := []testDataCollector{newThroughputCollector(podInformer, map[string]string{"Name": b.Name()}, []string{testNamespace})}
 	metricsCollectorConfig := defaultMetricsCollectorConfig
 	if tc.MetricsCollectorConfig != nil {
 		metricsCollectorConfig = *tc.MetricsCollectorConfig

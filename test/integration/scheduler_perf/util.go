@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -76,16 +77,19 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 	return shutdownFunc, podInformer, clientSet
 }
 
-func getScheduledPods(podInformer coreinformers.PodInformer) ([]*v1.Pod, error) {
+// Returns the list of scheduled pods in the specified namespaces.
+// Note that no namespces specified matches all namespaces.
+func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...string) ([]*v1.Pod, error) {
 	pods, err := podInformer.Lister().List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
+	s := sets.NewString(namespaces...)
 	scheduled := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		pod := pods[i]
-		if len(pod.Spec.NodeName) > 0 {
+		if len(pod.Spec.NodeName) > 0 && (len(s) == 0 || s.Has(pod.Namespace)) {
 			scheduled = append(scheduled, pod)
 		}
 	}
@@ -213,17 +217,19 @@ type throughputCollector struct {
 	podInformer           coreinformers.PodInformer
 	schedulingThroughputs []float64
 	labels                map[string]string
+	namespaces            []string
 }
 
-func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string) *throughputCollector {
+func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string) *throughputCollector {
 	return &throughputCollector{
 		podInformer: podInformer,
 		labels:      labels,
+		namespaces:  namespaces,
 	}
 }
 
 func (tc *throughputCollector) run(stopCh chan struct{}) {
-	podsScheduled, err := getScheduledPods(tc.podInformer)
+	podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
@@ -233,7 +239,7 @@ func (tc *throughputCollector) run(stopCh chan struct{}) {
 		case <-stopCh:
 			return
 		case <-time.After(throughputSampleFrequency):
-			podsScheduled, err := getScheduledPods(tc.podInformer)
+			podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
 			if err != nil {
 				klog.Fatalf("%v", err)
 			}
