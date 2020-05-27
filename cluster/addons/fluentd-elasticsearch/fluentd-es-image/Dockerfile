@@ -59,6 +59,7 @@ RUN apt-get update && \
         /var/log/* \
         /var/tmp/* \
         rm -rf /tmp/*
+RUN chmod +x /entrypoint.sh
 
 # Expose prometheus metrics.
 EXPOSE 80
