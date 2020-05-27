@@ -23,8 +23,6 @@ go_library(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/fuzzer:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
-        "//pkg/apis/auditregistration/fuzzer:go_default_library",
-        "//pkg/apis/auditregistration/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
         "//pkg/apis/autoscaling/fuzzer:go_default_library",

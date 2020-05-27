@@ -468,13 +468,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/auditregistration/v1alpha1
-		gvr("auditregistration.k8s.io", "v1alpha1", "auditsinks"): {
-			Stub:             `{"metadata":{"name":"sink1"},"spec":{"policy":{"level":"Metadata","stages":["ResponseStarted"]},"webhook":{"clientConfig":{"url":"http://localhost:4444","service":null,"caBundle":null}}}}`,
-			ExpectedEtcdPath: "/registry/auditsinks/sink1",
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/node/v1alpha1
 		gvr("node.k8s.io", "v1alpha1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc1"}, "spec": {"runtimeHandler": "h1"}}`,

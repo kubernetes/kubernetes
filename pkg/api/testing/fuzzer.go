@@ -31,7 +31,6 @@ import (
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsfuzzer "k8s.io/kubernetes/pkg/apis/apps/fuzzer"
-	auditregistrationfuzzer "k8s.io/kubernetes/pkg/apis/auditregistration/fuzzer"
 	autoscalingfuzzer "k8s.io/kubernetes/pkg/apis/autoscaling/fuzzer"
 	batchfuzzer "k8s.io/kubernetes/pkg/apis/batch/fuzzer"
 	certificatesfuzzer "k8s.io/kubernetes/pkg/apis/certificates/fuzzer"
@@ -103,7 +102,6 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	policyfuzzer.Funcs,
 	certificatesfuzzer.Funcs,
 	admissionregistrationfuzzer.Funcs,
-	auditregistrationfuzzer.Funcs,
 	storagefuzzer.Funcs,
 	networkingfuzzer.Funcs,
 	metafuzzer.Funcs,

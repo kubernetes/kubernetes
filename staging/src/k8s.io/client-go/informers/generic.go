@@ -26,7 +26,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
-	v1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -37,7 +36,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	v1alpha1 "k8s.io/api/discovery/v1alpha1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -131,10 +130,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1beta2.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().StatefulSets().Informer()}, nil
 
-		// Group=auditregistration.k8s.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("auditsinks"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Auditregistration().V1alpha1().AuditSinks().Informer()}, nil
-
 		// Group=autoscaling, Version=v1
 	case autoscalingv1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V1().HorizontalPodAutoscalers().Informer()}, nil
@@ -206,7 +201,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ServiceAccounts().Informer()}, nil
 
 		// Group=discovery.k8s.io, Version=v1alpha1
-	case discoveryv1alpha1.SchemeGroupVersion.WithResource("endpointslices"):
+	case v1alpha1.SchemeGroupVersion.WithResource("endpointslices"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Discovery().V1alpha1().EndpointSlices().Informer()}, nil
 
 		// Group=discovery.k8s.io, Version=v1beta1
