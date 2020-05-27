@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
+	"k8s.io/component-base/logs"
 
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -309,6 +310,7 @@ func TestAddFlags(t *testing.T) {
 		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
 		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
 		Metrics:                 &metrics.Options{},
+		Logs:                    logs.NewOptions(),
 	}
 
 	if !reflect.DeepEqual(expected, s) {
