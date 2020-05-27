@@ -34,6 +34,7 @@ go_library(
         "//pkg/proxy/ipvs:go_default_library",
         "//pkg/proxy/userspace:go_default_library",
         "//pkg/proxy/util:go_default_library",
+        "//pkg/util/conntrack:go_default_library",
         "//pkg/util/filesystem:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/ipset:go_default_library",

@@ -77,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
@@ -708,6 +709,13 @@ func (s *ProxyServer) Run() error {
 			if err := s.Conntracker.SetTCPCloseWaitTimeout(timeout); err != nil {
 				return err
 			}
+		}
+
+		// check if the conntrack user-space tool is installed, it's needed by the kube-proxy mainly for clearing
+		// and flushing conntrack entries that remain active after a service is deleted and may blackhole traffic
+		if !conntrack.Exists(s.execer) {
+			const message = "The binary conntrack is not installed, this can cause failures in network connection cleanup."
+			s.Recorder.Eventf(s.NodeRef, api.EventTypeWarning, err.Error(), message)
 		}
 	}
 
