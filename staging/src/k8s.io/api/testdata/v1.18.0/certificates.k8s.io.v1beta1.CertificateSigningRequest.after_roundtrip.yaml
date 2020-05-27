@@ -42,11 +42,11 @@ spec:
   - J枊a
   username: "20"
 status:
-  certificate: cw==
+  certificate: 9Q==
   conditions:
-  - lastTransitionTime: "2352-05-22T04:29:36Z"
-    lastUpdateTime: "1985-03-23T14:10:57Z"
+  - lastTransitionTime: null
+    lastUpdateTime: "2901-11-14T22:54:07Z"
     message: "26"
     reason: "25"
-    status: ěĂ凗蓏Ŋ蛊ĉy緅縕
+    status: ""
     type: o,c鮽ort昍řČ扷5Ɨ
