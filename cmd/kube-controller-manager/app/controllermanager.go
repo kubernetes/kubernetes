@@ -107,7 +107,7 @@ controller, and serviceaccounts controller.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
 
-			if err := ShimFlagsForOpenShift(s); err != nil {
+			if err := ShimFlagsForOpenShift(s, cmd); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}

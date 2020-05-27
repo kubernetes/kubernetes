@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	kyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 )
 
@@ -29,8 +31,8 @@ func getOpenShiftConfig(configFile string) (map[string]interface{}, error) {
 	return config, nil
 }
 
-func applyOpenShiftConfigFlags(controllerManagerOptions *options.KubeControllerManagerOptions, openshiftConfig map[string]interface{}) error {
-	if err := applyOpenShiftConfigControllerArgs(controllerManagerOptions, openshiftConfig); err != nil {
+func applyOpenShiftConfigFlags(controllerManagerOptions *options.KubeControllerManagerOptions, openshiftConfig map[string]interface{}, cmd *cobra.Command) error {
+	if err := applyOpenShiftConfigControllerArgs(controllerManagerOptions, openshiftConfig, cmd); err != nil {
 		return err
 	}
 	if err := applyOpenShiftConfigDefaultProjectSelector(controllerManagerOptions, openshiftConfig); err != nil {
@@ -65,7 +67,7 @@ func applyOpenShiftConfigKubeDefaultProjectSelector(controllerManagerOptions *op
 	return nil
 }
 
-func applyOpenShiftConfigControllerArgs(controllerManagerOptions *options.KubeControllerManagerOptions, openshiftConfig map[string]interface{}) error {
+func applyOpenShiftConfigControllerArgs(controllerManagerOptions *options.KubeControllerManagerOptions, openshiftConfig map[string]interface{}, cmd *cobra.Command) error {
 	var controllerArgs interface{}
 	kubeMasterConfig, ok := openshiftConfig["kubernetesMasterConfig"]
 	if !ok {
@@ -90,7 +92,7 @@ func applyOpenShiftConfigControllerArgs(controllerManagerOptions *options.KubeCo
 			args[key] = append(args[key], arrayValue.(string))
 		}
 	}
-	if err := applyFlags(args, controllerManagerOptions.Flags(KnownControllers(), ControllersDisabledByDefault.List())); len(err) > 0 {
+	if err := applyFlags(args, cmd.Flags()); len(err) > 0 {
 		return kerrors.NewAggregate(err)
 	}
 	return nil
@@ -98,24 +100,17 @@ func applyOpenShiftConfigControllerArgs(controllerManagerOptions *options.KubeCo
 
 // applyFlags stores the provided arguments onto a flag set, reporting any errors
 // encountered during the process.
-func applyFlags(args map[string][]string, flags flag.NamedFlagSets) []error {
+func applyFlags(args map[string][]string, flags *pflag.FlagSet) []error {
 	var errs []error
 	for key, value := range args {
-		found := false
-		// since flags are now groupped into sets we need to check each and every
-		// single of them and complain only if we don't find the flag at all
-		for _, fs := range flags.FlagSets {
-			if flag := fs.Lookup(key); flag != nil {
-				for _, s := range value {
-					if err := flag.Value.Set(s); err != nil {
-						errs = append(errs, field.Invalid(field.NewPath(key), s, fmt.Sprintf("could not be set: %v", err)))
-						break
-					}
+		if flag := flags.Lookup(key); flag != nil {
+			for _, s := range value {
+				if err := flag.Value.Set(s); err != nil {
+					errs = append(errs, field.Invalid(field.NewPath(key), s, fmt.Sprintf("could not be set: %v", err)))
+					break
 				}
-				found = true
 			}
-		}
-		if !found {
+		} else {
 			errs = append(errs, field.Invalid(field.NewPath("flag"), key, "is not a valid flag"))
 		}
 	}

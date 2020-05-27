@@ -3,6 +3,8 @@ package app
 import (
 	"path"
 
+	"github.com/spf13/cobra"
+
 	"k8s.io/client-go/informers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -45,7 +47,7 @@ func ShimForOpenShift(controllerManagerOptions *options.KubeControllerManagerOpt
 	return nil
 }
 
-func ShimFlagsForOpenShift(controllerManagerOptions *options.KubeControllerManagerOptions) error {
+func ShimFlagsForOpenShift(controllerManagerOptions *options.KubeControllerManagerOptions, cmd *cobra.Command) error {
 	if len(controllerManagerOptions.OpenShiftContext.OpenShiftConfig) == 0 {
 		return nil
 	}
@@ -57,14 +59,12 @@ func ShimFlagsForOpenShift(controllerManagerOptions *options.KubeControllerManag
 	}
 	// apply the config based controller manager flags.  They will override.
 	// TODO this should be replaced by the installer setting up the flags for us
-	if err := applyOpenShiftConfigFlags(controllerManagerOptions, openshiftConfig); err != nil {
+	if err := applyOpenShiftConfigFlags(controllerManagerOptions, openshiftConfig, cmd); err != nil {
 		return err
 	}
 
-	for name, fs := range controllerManagerOptions.Flags(KnownControllers(), ControllersDisabledByDefault.List()).FlagSets {
-		klog.V(1).Infof("FLAGSET: %s", name)
-		utilflag.PrintFlags(fs)
-	}
+	klog.V(1).Infof("Flags after OpenShift shims:")
+	utilflag.PrintFlags(cmd.Flags())
 
 	return nil
 }
