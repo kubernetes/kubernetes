@@ -1298,7 +1298,7 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 //   scenario            the function to run
 func WatchEventSequenceVerifier(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event) {
 	initResource, err := dc.Resource(resourceType).Namespace(namespace).List(testContext, listOptions)
-	ExpectNoError(err, "Failed to fetch inital resource")
+	ExpectNoError(err, "Failed to fetch initial resource")
 	listWatcher := &cache.ListWatch{
 		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
 			return dc.Resource(resourceType).Namespace(namespace).Watch(testContext, listOptions)
@@ -1346,6 +1346,14 @@ retriesLoop:
 	}
 }
 
+// WatchUntilWithoutRetry ...
+// reads items from the watch until each provided condition succeeds, and then returns the last watch
+// encountered. The first condition that returns an error terminates the watch (and the event is also returned).
+// If no event has been received, the returned event will be nil.
+// Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
+// Waits until context deadline or until context is canceled.
+//
+// the same as watchtools.UntilWithoutRetry, just without the closing of the watch
 func WatchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...watchtools.ConditionFunc) (*watch.Event, error) {
 	ch := watcher.ResultChan()
 	var lastEvent *watch.Event
