@@ -41,8 +41,8 @@ import (
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
-	"k8s.io/kubernetes/pkg/controller"
 
 	// add the related feature gates
 	_ "k8s.io/controller-manager/pkg/features/register"
@@ -194,11 +194,11 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 
 	c.EventRecorder = createRecorder(c.Client, userAgent)
 
-	rootClientBuilder := controller.SimpleControllerClientBuilder{
+	rootClientBuilder := clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,
 	}
 	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-		c.ClientBuilder = controller.SAControllerClientBuilder{
+		c.ClientBuilder = clientbuilder.SAControllerClientBuilder{
 			ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
 			CoreClient:           c.Client.CoreV1(),
 			AuthenticationClient: c.Client.AuthenticationV1(),

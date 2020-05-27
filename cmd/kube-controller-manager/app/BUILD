@@ -145,6 +145,7 @@ go_library(
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
         "//staging/src/k8s.io/controller-manager/app:go_default_library",
+        "//staging/src/k8s.io/controller-manager/pkg/clientbuilder:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1:go_default_library",
