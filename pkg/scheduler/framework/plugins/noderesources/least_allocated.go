@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -70,14 +71,12 @@ func NewLeastAllocated(laArgs runtime.Object, h framework.FrameworkHandle) (fram
 		return nil, fmt.Errorf("want args to be of type NodeResourcesLeastAllocatedArgs, got %T", laArgs)
 	}
 
+	if err := validation.ValidateNodeResourcesLeastAllocatedArgs(args); err != nil {
+		return nil, err
+	}
+
 	resToWeightMap := make(resourceToWeightMap)
 	for _, resource := range (*args).Resources {
-		if resource.Weight <= 0 {
-			return nil, fmt.Errorf("resource Weight of %v should be a positive value, got %v", resource.Name, resource.Weight)
-		}
-		if resource.Weight > framework.MaxNodeScore {
-			return nil, fmt.Errorf("resource Weight of %v should be less than 100, got %v", resource.Name, resource.Weight)
-		}
 		resToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
 	}
 

@@ -114,7 +114,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 				},
 			},
 		},
-		"max skew less than zero": {
+		"maxSkew less than zero": {
 			args: &config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{
@@ -138,7 +138,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 			},
 			wantErr: `defaultConstraints[0].topologyKey: Required value: can not be empty`,
 		},
-		"WhenUnsatisfiable is empty": {
+		"whenUnsatisfiable is empty": {
 			args: &config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{
@@ -150,7 +150,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 			},
 			wantErr: `defaultConstraints[0].whenUnsatisfiable: Required value: can not be empty`,
 		},
-		"WhenUnsatisfiable contains unsupported action": {
+		"whenUnsatisfiable contains unsupported action": {
 			args: &config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{
@@ -206,17 +206,285 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 	}
 }
 
+func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
+	cases := map[string]struct {
+		args    config.RequestedToCapacityRatioArgs
+		wantErr string
+	}{
+		"valid config": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 20,
+						Score:       5,
+					},
+					{
+						Utilization: 30,
+						Score:       3,
+					},
+					{
+						Utilization: 50,
+						Score:       2,
+					},
+				},
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "custom-resource",
+						Weight: 5,
+					},
+				},
+			},
+		},
+		"no shape points": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{},
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "custom",
+						Weight: 5,
+					},
+				},
+			},
+			wantErr: `at least one point must be specified`,
+		},
+		"utilization less than min": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: -10,
+						Score:       3,
+					},
+					{
+						Utilization: 10,
+						Score:       2,
+					},
+				},
+			},
+			wantErr: `utilization values must not be less than 0. Utilization[0]==-10`,
+		},
+		"utilization greater than max": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 10,
+						Score:       3,
+					},
+					{
+						Utilization: 110,
+						Score:       2,
+					},
+				},
+			},
+			wantErr: `utilization values must not be greater than 100. Utilization[1]==110`,
+		},
+		"Utilization values in non-increasing order": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 30,
+						Score:       3,
+					},
+					{
+						Utilization: 20,
+						Score:       2,
+					},
+					{
+						Utilization: 10,
+						Score:       1,
+					},
+				},
+			},
+			wantErr: `utilization values must be sorted. Utilization[0]==30 >= Utilization[1]==20`,
+		},
+		"duplicated utilization values": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 10,
+						Score:       3,
+					},
+					{
+						Utilization: 20,
+						Score:       2,
+					},
+					{
+						Utilization: 20,
+						Score:       1,
+					},
+				},
+			},
+			wantErr: `utilization values must be sorted. Utilization[1]==20 >= Utilization[2]==20`,
+		},
+		"score less than min": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 10,
+						Score:       -1,
+					},
+					{
+						Utilization: 20,
+						Score:       2,
+					},
+				},
+			},
+			wantErr: `score values must not be less than 0. Score[0]==-1`,
+		},
+		"score greater than max": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 10,
+						Score:       3,
+					},
+					{
+						Utilization: 20,
+						Score:       11,
+					},
+				},
+			},
+			wantErr: `score values must not be greater than 10. Score[1]==11`,
+		},
+		"resources weight less than 1": {
+			args: config.RequestedToCapacityRatioArgs{
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 10,
+						Score:       1,
+					},
+				},
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "custom",
+						Weight: 0,
+					},
+				},
+			},
+			wantErr: `resource custom weight 0 must not be less than 1`,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateRequestedToCapacityRatioArgs(tc.args)
+			assertErr(t, tc.wantErr, err)
+		})
+	}
+}
+
+func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
+	cases := map[string]struct {
+		args    *config.NodeResourcesLeastAllocatedArgs
+		wantErr string
+	}{
+		"valid config": {
+			args: &config.NodeResourcesLeastAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 50,
+					},
+					{
+						Name:   "memory",
+						Weight: 30,
+					},
+				},
+			},
+		},
+		"weight less than min": {
+			args: &config.NodeResourcesLeastAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 0,
+					},
+				},
+			},
+			wantErr: `resource Weight of cpu should be a positive value, got 0`,
+		},
+		"weight more than max": {
+			args: &config.NodeResourcesLeastAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "memory",
+						Weight: 101,
+					},
+				},
+			},
+			wantErr: `resource Weight of memory should be less than 100, got 101`,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateNodeResourcesLeastAllocatedArgs(tc.args)
+			assertErr(t, tc.wantErr, err)
+		})
+	}
+}
+
+func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
+	cases := map[string]struct {
+		args    *config.NodeResourcesMostAllocatedArgs
+		wantErr string
+	}{
+		"valid config": {
+			args: &config.NodeResourcesMostAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 70,
+					},
+					{
+						Name:   "memory",
+						Weight: 40,
+					},
+				},
+			},
+		},
+		"weight less than min": {
+			args: &config.NodeResourcesMostAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: -1,
+					},
+				},
+			},
+			wantErr: `resource Weight of cpu should be a positive value, got -1`,
+		},
+		"weight more than max": {
+			args: &config.NodeResourcesMostAllocatedArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "memory",
+						Weight: 110,
+					},
+				},
+			},
+			wantErr: `resource Weight of memory should be less than 100, got 110`,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateNodeResourcesMostAllocatedArgs(tc.args)
+			assertErr(t, tc.wantErr, err)
+		})
+	}
+}
+
 func assertErr(t *testing.T, wantErr string, gotErr error) {
 	if wantErr == "" {
 		if gotErr != nil {
-			t.Fatalf("wanted err to be: 'nil', got: '%s'", gotErr.Error())
+			t.Fatalf("\nwant err to be:\n\tnil\ngot:\n\t%s", gotErr.Error())
 		}
 	} else {
 		if gotErr == nil {
-			t.Fatalf("wanted err to be: '%s', got: nil", wantErr)
+			t.Fatalf("\nwant err to be:\n\t%s\ngot:\n\tnil", wantErr)
 		}
 		if gotErr.Error() != wantErr {
-			t.Errorf("wanted err to be: '%s', got '%s'", wantErr, gotErr.Error())
+			t.Errorf("\nwant err to be:\n\t%s\ngot:\n\t%s", wantErr, gotErr.Error())
 		}
 	}
 }
