@@ -80,14 +80,14 @@ func NewCreateCronJobOptions(ioStreams genericclioptions.IOStreams) *CreateCronJ
 func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateCronJobOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:     "cronjob NAME --image=image --schedule='0/5 * * * ?' -- [COMMAND] [args...]",
-		Aliases: []string{"cj"},
-		Short:   cronjobLong,
-		Long:    cronjobLong,
-		Example: cronjobExample,
+		Use:                   "cronjob NAME --image=image --schedule='0/5 * * * ?' -- [COMMAND] [args...]",
+		DisableFlagsInUseLine: false,
+		Aliases:               []string{"cj"},
+		Short:                 cronjobLong,
+		Long:                  cronjobLong,
+		Example:               cronjobExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -98,7 +98,9 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
+	cmd.MarkFlagRequired("image")
 	cmd.Flags().StringVar(&o.Schedule, "schedule", o.Schedule, "A schedule in the Cron format the job should be run with.")
+	cmd.MarkFlagRequired("schedule")
 	cmd.Flags().StringVar(&o.Restart, "restart", o.Restart, "job's restart policy. supported values: OnFailure, Never")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
@@ -158,20 +160,8 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	return nil
 }
 
-func (o *CreateCronJobOptions) Validate() error {
-	if len(o.Image) == 0 {
-		return fmt.Errorf("--image must be specified")
-	}
-	if len(o.Schedule) == 0 {
-		return fmt.Errorf("--schedule must be specified")
-	}
-	return nil
-}
-
 func (o *CreateCronJobOptions) Run() error {
-	var cronjob *batchv1beta1.CronJob
-	cronjob = o.createCronJob()
-
+	cronjob := o.createCronJob()
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
 		if o.FieldManager != "" {

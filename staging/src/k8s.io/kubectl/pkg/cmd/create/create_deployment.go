@@ -22,8 +22,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -41,17 +42,26 @@ var (
 	Create a deployment with the specified name.`))
 
 	deploymentExample = templates.Examples(i18n.T(`
-	# Create a new deployment named my-dep that runs the busybox image.
-	kubectl create deployment my-dep --image=busybox`))
+	# Create a deployment named my-dep that runs the busybox image.
+	kubectl create deployment my-dep --image=busybox
+
+	# Create a deployment with command
+	kubectl create deployment my-dep --image=busybox -- date
+
+	# Create a deployment named my-dep that runs the busybox image and expose port 5701.
+	kubectl create deployment my-dep --image=busybox --port=5701`))
 )
 
-// DeploymentOpts is returned by NewCmdCreateDeployment
-type DeploymentOpts struct {
+// CreateDeploymentOptions is returned by NewCmdCreateDeployment
+type CreateDeploymentOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
-	PrintObj   func(obj runtime.Object) error
+
+	PrintObj func(obj runtime.Object) error
 
 	Name             string
 	Images           []string
+	Port             int32
+	Command          []string
 	Namespace        string
 	EnforceNamespace bool
 	FieldManager     string
@@ -63,46 +73,55 @@ type DeploymentOpts struct {
 	genericclioptions.IOStreams
 }
 
-// NewCmdCreateDeployment is a macro command to create a new deployment.
-// This command is better known to users as `kubectl create deployment`.
-func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	options := &DeploymentOpts{
+func NewCreateCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *CreateDeploymentOptions {
+	return &CreateDeploymentOptions{
+		Port:       -1,
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
+}
 
+// NewCmdCreateDeployment is a macro command to create a new deployment.
+// This command is better known to users as `kubectl create deployment`.
+func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewCreateCreateDeploymentOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:                   "deployment NAME --image=image [--dry-run=server|client|none]",
+		Use:                   "deployment NAME --image=image -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
 		Short:                 deploymentLong,
 		Long:                  deploymentLong,
 		Example:               deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, "")
-	cmd.Flags().StringSliceVar(&options.Images, "image", []string{}, "Image name to run.")
-	_ = cmd.MarkFlagRequired("image")
-	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, "kubectl-create")
+	cmd.Flags().StringSliceVar(&o.Images, "image", o.Images, "Image names to run.")
+	cmd.MarkFlagRequired("image")
+	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	return cmd
 }
 
 // Complete completes all the options
-func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 	o.Name = name
+	if len(args) > 1 {
+		o.Command = args[1:]
+	}
 
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
@@ -144,8 +163,15 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return nil
 }
 
+func (o *CreateDeploymentOptions) Validate() error {
+	if len(o.Images) > 1 && len(o.Command) > 0 {
+		return fmt.Errorf("cannot specify multiple --image options and command")
+	}
+	return nil
+}
+
 // Run performs the execution of 'create deployment' sub command
-func (o *DeploymentOpts) Run() error {
+func (o *CreateDeploymentOptions) Run() error {
 	deploy := o.createDeployment()
 
 	if o.DryRunStrategy != cmdutil.DryRunClient {
@@ -169,7 +195,7 @@ func (o *DeploymentOpts) Run() error {
 	return o.PrintObj(deploy)
 }
 
-func (o *DeploymentOpts) createDeployment() *appsv1.Deployment {
+func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 	one := int32(1)
 	labels := map[string]string{"app": o.Name}
 	selector := metav1.LabelSelector{MatchLabels: labels}
@@ -188,7 +214,7 @@ func (o *DeploymentOpts) createDeployment() *appsv1.Deployment {
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &one,
 			Selector: &selector,
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
@@ -200,8 +226,8 @@ func (o *DeploymentOpts) createDeployment() *appsv1.Deployment {
 
 // buildPodSpec parses the image strings and assemble them into the Containers
 // of a PodSpec. This is all you need to create the PodSpec for a deployment.
-func (o *DeploymentOpts) buildPodSpec() v1.PodSpec {
-	podSpec := v1.PodSpec{Containers: []v1.Container{}}
+func (o *CreateDeploymentOptions) buildPodSpec() corev1.PodSpec {
+	podSpec := corev1.PodSpec{Containers: []corev1.Container{}}
 	for _, imageString := range o.Images {
 		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
@@ -214,7 +240,11 @@ func (o *DeploymentOpts) buildPodSpec() v1.PodSpec {
 			name = strings.Split(name, "@")[0]
 		}
 		name = sanitizeAndUniquify(name)
-		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
+		podSpec.Containers = append(podSpec.Containers, corev1.Container{
+			Name:    name,
+			Image:   imageString,
+			Command: o.Command,
+		})
 	}
 	return podSpec
 }

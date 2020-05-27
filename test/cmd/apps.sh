@@ -197,7 +197,7 @@ run_deployment_tests() {
   kubectl delete deployment test-nginx-extensions "${kube_flags[@]:?}"
 
   # Test kubectl create deployment
-  kubectl create deployment test-nginx-apps --image=k8s.gcr.io/nginx:test-cmd --generator=deployment-basic/apps.v1
+  kubectl create deployment test-nginx-apps --image=k8s.gcr.io/nginx:test-cmd
   # Post-Condition: Deployment "nginx" is created.
   kube::test::get_object_assert 'deploy test-nginx-apps' "{{${container_name_field:?}}}" 'nginx'
   # and new generator was used, iow. new defaults are applied
