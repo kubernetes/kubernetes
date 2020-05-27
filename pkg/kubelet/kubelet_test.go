@@ -180,6 +180,7 @@ func newTestKubeletWithImageList(
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
+	kubelet.serviceHasSynced = func() bool { return true }
 	kubelet.nodeLister = testNodeLister{
 		nodes: []*v1.Node{
 			{
