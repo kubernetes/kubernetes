@@ -102,18 +102,12 @@ func (r *EtcdMigrateServer) Stop() error {
 	if err != nil {
 		return fmt.Errorf("error sending SIGINT to etcd for graceful shutdown: %v", err)
 	}
-	gracefulWait := time.Minute * 2
 	stopped := make(chan bool)
-	timedout := make(chan struct{})
-	go func() {
-		time.Sleep(gracefulWait)
-		timedout <- struct{}{}
-	}()
 	go func() {
 		select {
 		case <-stopped:
 			return
-		case <-timedout:
+		case <-time.After(time.Minute * 2):
 			klog.Infof("etcd server has not terminated gracefully after %s, killing it.", gracefulWait)
 			r.cmd.Process.Kill()
 			return
