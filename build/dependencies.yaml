@@ -1,9 +1,7 @@
 dependencies:
   - name: "cni"
-    version: 0.7.5
+    version: 0.8.6
     refPaths:
-    - path: build/debian-hyperkube-base/Makefile
-      match: CNI_VERSION=
     - path: build/rpms/kubeadm.spec
       match: kubernetes-cni
     - path: build/rpms/kubelet.spec
@@ -92,6 +90,14 @@ dependencies:
       match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-\$\(ARCH\):v\d+\.\d+\.\d+
     - path: cluster/images/etcd-empty-dir-cleanup/Dockerfile
       match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
+
+  - name: "k8s.gcr.io/debian-hyperkube-base: dependents"
+    version: 1.0.0
+    refPaths:
+    - path: build/workspace.bzl
+      match: tag =
+    - path: cluster/images/hyperkube/Makefile
+      match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-hyperkube-base-\$\(ARCH\):v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
     version: 12.1.0

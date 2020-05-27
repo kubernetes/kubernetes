@@ -24,8 +24,8 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION="v0.7.5"
-DEFAULT_CNI_SHA1="52e9d2de8a5f927307d9397308735658ee44ab8d"
+DEFAULT_CNI_VERSION="v0.8.6"
+DEFAULT_CNI_SHA1="a31251105250279fe57b4474d91d2db1d4d48b5a"
 DEFAULT_NPD_VERSION="v0.7.1"
 DEFAULT_NPD_SHA1="a9cae965973d586bf5206ad4fe5aae07e6bfd154"
 DEFAULT_CRICTL_VERSION="v1.14.0"
@@ -236,19 +236,23 @@ function install-node-problem-detector {
 
 function install-cni-binaries {
   if [[ -n "${CNI_VERSION:-}" ]]; then
-      local -r cni_tar="cni-plugins-amd64-${CNI_VERSION}.tgz"
+      local -r cni_version="${CNI_VERSION}"
       local -r cni_sha1="${CNI_SHA1}"
   else
-      local -r cni_tar="cni-plugins-amd64-${DEFAULT_CNI_VERSION}.tgz"
+      local -r cni_version="${DEFAULT_CNI_VERSION}"
       local -r cni_sha1="${DEFAULT_CNI_SHA1}"
   fi
+
+  local -r cni_tar="${CNI_TAR_PREFIX}${cni_version}.tgz"
+  local -r cni_url="${CNI_STORAGE_URL_BASE}/${cni_version}/${cni_tar}"
+
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return
   fi
 
   echo "Downloading cni binaries"
-  download-or-bust "${cni_sha1}" "${CNI_STORAGE_PATH}/${cni_tar}"
+  download-or-bust "${cni_sha1}" "${cni_url}"
   local -r cni_dir="${KUBE_HOME}/cni"
   mkdir -p "${cni_dir}/bin"
   tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}/bin" --overwrite

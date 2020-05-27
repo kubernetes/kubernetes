@@ -17,13 +17,13 @@ load("//build:workspace_mirror.bzl", "mirror")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
-CNI_VERSION = "0.7.5"
+CNI_VERSION = "0.8.6"
 _CNI_TARBALL_ARCH_SHA256 = {
-    "amd64": "3ca15c0a18ee830520cf3a95408be826cbd255a1535a38e0be9608b25ad8bf64",
-    "arm": "0eb4a528b5b2e4ce23ebc96e41b2f5280d5a64d41eec8dd8b16c3d66aaa0f6b8",
-    "arm64": "7fec91af78e9548df306f0ec43bea527c8c10cc3a9682c33e971c8522a7fcded",
-    "ppc64le": "9164a26ed8dd398b2fe3b15d9d456271dfa59aa537528d10572ea9fa2cef7679",
-    "s390x": "415cdcf02c65c22f5b7e55b0ab61208a10f2b95a0c8310176c771d07a9f448cf",
+    "amd64": "994fbfcdbb2eedcfa87e48d8edb9bb365f4e2747a7e47658482556c12fd9b2f5",
+    "arm": "28e61b5847265135dc1ca397bf94322ecce4acab5c79cc7d360ca3f6a655bdb7",
+    "arm64": "43fbf750c5eccb10accffeeb092693c32b236fb25d919cf058c91a677822c999",
+    "ppc64le": "61d6c6c15d3e4fa3eb85d128c9c0ff2658f38e59047ae359be47d193c673e116",
+    "s390x": "ca126a3bd2cd8dff1c7bbfc3c69933b284c4e77614391c7e1f74b0851fc3b289",
 }
 
 CRI_TOOLS_VERSION = "1.14.0"
@@ -56,7 +56,7 @@ def cni_tarballs():
             name = "kubernetes_cni_%s" % arch,
             downloaded_file_path = "kubernetes_cni.tgz",
             sha256 = sha,
-            urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-%s-v%s.tgz" % (arch, CNI_VERSION)),
+            urls = ["https://storage.googleapis.com/k8s-artifacts-cni/release/v%s/cni-plugins-linux-%s-v%s.tgz" % (CNI_VERSION, arch, CNI_VERSION)],
         )
 
 def cri_tarballs():
@@ -96,13 +96,18 @@ _DEBIAN_IPTABLES_DIGEST = {
     "s390x": "sha256:1b91a2788750552913377bf1bc99a095544dfb523d80a55674003c974c8e0905",
 }
 
+# Use skopeo to find these values: https://github.com/containers/skopeo
+#
+# Example
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.0.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-hyperkube-base:v1.0.0
 _DEBIAN_HYPERKUBE_BASE_DIGEST = {
-    "manifest": "sha256:8cabe02be6e86685d8860b7ace7c7addc9591a339728703027a4854677f1c772",
-    "amd64": "sha256:5d4ea2fb5fbe9a9a9da74f67cf2faefc881968bc39f2ac5d62d9167e575812a1",
-    "arm": "sha256:73260814af61522ff6aa48291df457d3bb0a91c4bf72e7cfa51fbaf03eb65fae",
-    "arm64": "sha256:78eeb1a31eef7c16f954444d64636d939d89307e752964ad6d9d06966c722da3",
-    "ppc64le": "sha256:92857d647abe8d9c7b4d7160cd5699112afc12fde369082a8ed00688b17928a9",
-    "s390x": "sha256:c11d74fa0538c67238576c247bfaddf95ebaa90cd03cb4d2f2ac3c6ebe0441e2",
+    "manifest": "sha256:8c8d854d868fb08352f73dda94f9e0b998c7318b48ddc587a355d0cbaf687f14",
+    "amd64": "sha256:73a8cb2bfd6707c8ed70c252e97bdccad8bc265a9a585db12b8e3dac50d6cd2a",
+    "arm": "sha256:aee7c2958c6e0de896995e8b04c8173fd0a7bbb16cddb1f4668e3ae010b8c786",
+    "arm64": "sha256:a74fc6d690e5c5e393fd509f50d7203fa5cd19bfbb127d4a3a996fd1ebcf35c4",
+    "ppc64le": "sha256:54afd9a85d6ecbe0792496f36012e7902601fb8084347cdc195c8b0561da39a3",
+    "s390x": "sha256:405a94e6b82f2eb89c773e0e9f6105eb73cde5605d4508ae36a150d922fe1c66",
 }
 
 def _digest(d, arch):
@@ -137,9 +142,10 @@ def debian_image_dependencies():
             name = "debian-hyperkube-base-" + arch,
             architecture = arch,
             digest = _digest(_DEBIAN_HYPERKUBE_BASE_DIGEST, arch),
-            registry = "k8s.gcr.io",
+            registry = "us.gcr.io/k8s-artifacts-prod/build-image",
             repository = "debian-hyperkube-base",
-            tag = "0.12.1",  # ignored, but kept here for documentation
+            # Ensure the digests above are updated to match a new tag
+            tag = "v1.0.0",  # ignored, but kept here for documentation
         )
 
 def etcd_tarballs():
