@@ -1590,5 +1590,51 @@ func TestEnsureLoadBalancerSkipped(t *testing.T) {
 	// No loadbalancer resources will be created due to the ILB Feature Gate
 	assert.Empty(t, status)
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
 
+// TestEnsureLoadBalancerPartialDelete simulates a partial delete and checks whether deletion completes after a second
+// attempt.
+func TestEnsureLoadBalancerPartialDelete(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	nodeNames := []string{"test-node-1"}
+
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	assertInternalLbResources(t, gce, svc, vals, nodeNames)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	if !hasFinalizer(svc, ILBFinalizerV1) {
+		t.Errorf("Expected finalizer '%s' not found in Finalizer list - %v", ILBFinalizerV1, svc.Finalizers)
+	}
+	// Delete the forwarding rule to simulate controller getting shut down on partial cleanup
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	err = gce.DeleteRegionForwardingRule(lbName, gce.region)
+	require.NoError(t, err)
+	// Check output of GetLoadBalancer
+	_, exists, err := gce.GetLoadBalancer(context.TODO(), vals.ClusterName, svc)
+	require.NoError(t, err)
+	assert.True(t, exists)
+	// call EnsureDeleted again
+	err = gce.EnsureLoadBalancerDeleted(context.TODO(), vals.ClusterName, svc)
+	require.NoError(t, err)
+	// Make sure all resources are gone
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+	// Ensure that the finalizer has been deleted
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	if hasFinalizer(svc, ILBFinalizerV1) {
+		t.Errorf("Finalizer '%s' not deleted from service - %v", ILBFinalizerV1, svc.Finalizers)
+	}
+	_, exists, err = gce.GetLoadBalancer(context.TODO(), vals.ClusterName, svc)
+	require.NoError(t, err)
+	assert.False(t, exists)
 }
