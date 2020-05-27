@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -60,6 +59,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -209,10 +209,10 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	}
 
 	run := func(ctx context.Context) {
-		rootClientBuilder := controller.SimpleControllerClientBuilder{
+		rootClientBuilder := clientbuilder.SimpleControllerClientBuilder{
 			ClientConfig: c.Kubeconfig,
 		}
-		var clientBuilder controller.ControllerClientBuilder
+		var clientBuilder clientbuilder.ControllerClientBuilder
 		if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
 			if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 				// It's possible another controller process is creating the tokens for us.
@@ -229,7 +229,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 					"kube-system")
 			} else {
 				klog.V(1).Infof("using legacy client builder")
-				clientBuilder = controller.SAControllerClientBuilder{
+				clientBuilder = clientbuilder.SAControllerClientBuilder{
 					ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
 					CoreClient:           c.Client.CoreV1(),
 					AuthenticationClient: c.Client.AuthenticationV1(),
@@ -302,7 +302,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 // ControllerContext defines the context object for controller
 type ControllerContext struct {
 	// ClientBuilder will provide a client for this controller to use
-	ClientBuilder controller.ControllerClientBuilder
+	ClientBuilder clientbuilder.ControllerClientBuilder
 
 	// InformerFactory gives access to informers for the controller.
 	InformerFactory informers.SharedInformerFactory
@@ -433,7 +433,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 // TODO: In general, any controller checking this needs to be dynamic so
 // users don't have to restart their controller manager if they change the apiserver.
 // Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
-func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	client := clientBuilder.ClientOrDie("controller-discovery")
 	discoveryClient := client.Discovery()
 	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
@@ -461,7 +461,7 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
-func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
+func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
@@ -556,7 +556,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 // It cannot use the "normal" client builder, so it tracks its own. It must also avoid being included in the "normal"
 // init map so that it can always run first.
 type serviceAccountTokenControllerStarter struct {
-	rootClientBuilder controller.ControllerClientBuilder
+	rootClientBuilder clientbuilder.ControllerClientBuilder
 }
 
 func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {

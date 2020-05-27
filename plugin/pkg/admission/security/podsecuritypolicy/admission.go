@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
@@ -41,7 +42,6 @@ import (
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	psp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // PluginName is a string with the name of the plugin
