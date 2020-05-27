@@ -209,8 +209,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If true and the APIPriorityAndFairness feature gate is enabled, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
-		"Time to delay the termination. During that time the server keeps serving requests normally and /healthz "+
-		"returns success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
+		"Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez "+
+		"will return success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
 		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
