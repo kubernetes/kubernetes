@@ -17,15 +17,15 @@
 # Usage:
 #   [ARCH=amd64] [REGISTRY="staging-k8s.gcr.io"] make (build|push)
 
-REGISTRY?=staging-k8s.gcr.io
+REGISTRY?=gcr.io/k8s-staging-build-image
 IMAGE?=$(REGISTRY)/debian-hyperkube-base
-TAG=0.12.2
+TAG?=v1.0.0
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
-CACHEBUST?=1
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
-CNI_VERSION=v0.8.5
+BASE_REGISTRY?=us.gcr.io/k8s-artifacts-prod/build-image
+BASEIMAGE?=$(BASE_REGISTRY)/debian-base-$(ARCH):v2.1.0
+CNI_VERSION?=v0.8.6
 
 TEMP_DIR:=$(shell mktemp -d)
 CNI_TARBALL=cni-plugins-linux-$(ARCH)-$(CNI_VERSION).tgz
@@ -66,10 +66,6 @@ clean:
 build: cni-tars/$(CNI_TARBALL)
 	cp Dockerfile $(TEMP_DIR)
 	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
-
-ifeq ($(CACHEBUST),1)
-	cd ${TEMP_DIR} && sed -i.back "s|CACHEBUST|$(shell uuidgen)|g" Dockerfile
-endif
 
 	mkdir -p ${TEMP_DIR}/cni-bin/bin
 	tar -xz -C ${TEMP_DIR}/cni-bin/bin -f "cni-tars/${CNI_TARBALL}"
