@@ -18,11 +18,17 @@ package fake
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
+	fakerest "k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 )
 
@@ -57,7 +63,19 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
-	return &restclient.Request{}
+	fakeClient := &fakerest.RESTClient{
+		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(strings.NewReader("fake logs")),
+			}
+			return resp, nil
+		}),
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		GroupVersion:         podsKind.GroupVersion(),
+		VersionedAPIPath:     fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/log", c.ns, name),
+	}
+	return fakeClient.Request()
 }
 
 func (c *FakePods) Evict(ctx context.Context, eviction *policy.Eviction) error {
