@@ -89,7 +89,6 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
-			genericoptions.NewProcessInfo("kube-aggregator", "kube-system"),
 		),
 		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
