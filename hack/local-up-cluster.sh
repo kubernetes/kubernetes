@@ -90,6 +90,9 @@ PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 # enable kubernetes dashboard
 ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 
+# enable Kubernetes-CSI snapshotter
+ENABLE_CSI_SNAPSHOTTER=${ENABLE_CSI_SNAPSHOTTER:-false}
+
 # RBAC Mode options
 AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
@@ -916,6 +919,19 @@ function start_kubedashboard {
     fi
 }
 
+function start_csi_snapshotter {
+    if [[ "${ENABLE_CSI_SNAPSHOTTER}" = true ]]; then
+        echo "Creating Kubernetes-CSI snapshotter"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshots.yaml"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/volume-snapshot-controller/rbac-volume-snapshot-controller.yaml"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/volume-snapshot-controller/volume-snapshot-controller-deployment.yaml"
+
+        echo "Kubernetes-CSI snapshotter successfully deployed."
+    fi
+}
+
 function create_psp_policy {
     echo "Create podsecuritypolicy policies for RBAC."
     ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${KUBE_ROOT}/examples/podsecuritypolicy/rbac/policies.yaml"
@@ -1055,6 +1071,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     start_nodelocaldns
   fi
   start_kubedashboard
+  start_csi_snapshotter
 fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
