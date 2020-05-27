@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script genertates `*/api.pb.go` from the protobuf file `*/api.proto`.
+# Usage: 
+#     hack/update-generated-protobuf-dockerized.sh "${APIROOTS}"
+#     An example APIROOT is: "k8s.io/api/admissionregistration/v1"
+
 set -o errexit
 set -o nounset
 set -o pipefail
