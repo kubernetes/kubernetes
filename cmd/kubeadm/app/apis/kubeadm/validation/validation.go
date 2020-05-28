@@ -289,7 +289,7 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 		if (e.External.CertFile == "" && e.External.KeyFile != "") || (e.External.CertFile != "" && e.External.KeyFile == "") {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set"))
 		}
-		// If the cert and key are specified, require the VA as well
+		// If the cert and key are specified, require the CA as well
 		if e.External.CertFile != "" && e.External.KeyFile != "" && e.External.CAFile == "" {
 			allErrs = append(allErrs, field.Invalid(externalPath, "", "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile"))
 		}
