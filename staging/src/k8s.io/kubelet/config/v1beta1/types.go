@@ -793,6 +793,11 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	KernelMemcgNotification bool `json:"kernelMemcgNotification,omitempty"`
+	// LogFormat specifies the structure of log messages.
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	// Default: "text"
+	// + optional
+	LogFormat string `json:"logFormat,omitempty"`
 }
 
 type KubeletAuthorizationMode string

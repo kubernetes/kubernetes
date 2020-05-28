@@ -195,6 +195,7 @@ var (
 		"KubeReservedCgroup",
 		"KubeReserved[*]",
 		"KubeletCgroups",
+		"LogFormat",
 		"MakeIPTablesUtilChains",
 		"RotateCertificates",
 		"ServerTLSBootstrap",
