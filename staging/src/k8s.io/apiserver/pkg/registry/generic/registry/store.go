@@ -992,6 +992,12 @@ func (e *Store) DeleteReturnsDeletedObject() bool {
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
 func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+
+	// TODO: Remove temporary logging for troubleshooting timeout flakes
+	startTime := time.Now()
+	itemCount := 0
+	defer klog.V(1).Infof("***BP*** store.DeleteCollection for %d items finished with duration = %v", itemCount, time.Since(startTime))
+
 	if listOptions == nil {
 		listOptions = &metainternalversion.ListOptions{}
 	} else {
@@ -1006,6 +1012,9 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	if err != nil {
 		return nil, err
 	}
+
+	itemCount = len(items)
+
 	// Spawn a number of goroutines, so that we can issue requests to storage
 	// in parallel to speed up deletion.
 	// TODO: Make this proportional to the number of items to delete, up to

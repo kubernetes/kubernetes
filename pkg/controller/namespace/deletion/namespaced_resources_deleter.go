@@ -306,6 +306,11 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 // it returns true if the operation was supported on the server.
 // it returns an error if the operation was supported on the server but was unable to complete.
 func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionResource, namespace string) (bool, error) {
+
+	// TODO: Remove temporary logging for troubleshooting timeout flakes
+	startTime := time.Now()
+	defer klog.V(1).Infof("***BP*** namespacedResourcesDeleter.deleteCollection for %s, gvr: %v finished with duration = %v", namespace, gvr, time.Since(startTime))
+
 	klog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{operation: operationDeleteCollection, gvr: gvr}
@@ -412,6 +417,11 @@ type gvrDeletionMetadata struct {
 func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	gvr schema.GroupVersionResource, namespace string,
 	namespaceDeletedAt metav1.Time) (gvrDeletionMetadata, error) {
+
+	// TODO: Remove temporary logging for troubleshooting timeout flakes
+	startTime := time.Now()
+	defer klog.V(1).Infof("***BP*** namespacedResourcesDeleter.deleteAllContentForGroupVersionResource for %s, gvr: %v finished with duration = %v", namespace, gvr, time.Since(startTime))
+
 	klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
 
 	// estimate how long it will take for the resource to be deleted (needed for objects that support graceful delete)
