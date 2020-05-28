@@ -233,12 +233,7 @@ func TestDynamic(t *testing.T) {
 		// if the stop signal is not propagated correctly the buffers will not
 		// close down gracefully, and the shutdown method will hang causing
 		// the test will timeout.
-		timeoutChan := make(chan struct{})
 		successChan := make(chan struct{})
-		go func() {
-			time.Sleep(1 * time.Second)
-			timeoutChan <- struct{}{}
-		}()
 		go func() {
 			close(stopChan)
 			d.Shutdown()
@@ -246,7 +241,7 @@ func TestDynamic(t *testing.T) {
 		}()
 		for {
 			select {
-			case <-timeoutChan:
+			case <-time.After(1 * time.Second):
 				t.Error("shutdown timed out")
 				return
 			case <-successChan:
