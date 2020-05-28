@@ -272,7 +272,7 @@ func TestEvictionIngorePDB(t *testing.T) {
 			expectError:         true,
 			podPhase:            api.PodPending,
 			podName:             "t4",
-			expectedDeleteCount: retrySteps,
+			expectedDeleteCount: EvictionsRetry.Steps,
 		},
 		{
 			name: "pod pending, always conflict on delete, user provided ResourceVersion constraint",
@@ -285,7 +285,7 @@ func TestEvictionIngorePDB(t *testing.T) {
 			expectError:         true,
 			podPhase:            api.PodPending,
 			podName:             "t5",
-			expectedDeleteCount: retrySteps,
+			expectedDeleteCount: 1,
 		},
 	}
 

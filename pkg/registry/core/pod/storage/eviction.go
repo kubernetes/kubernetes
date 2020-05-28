@@ -45,13 +45,12 @@ const (
 	// This situation should self-correct because the PDB controller removes
 	// entries from the map automatically after the PDB DeletionTimeout regardless.
 	MaxDisruptedPodSize = 2000
-	retrySteps          = 20
 )
 
 // EvictionsRetry is the retry for a conflict where multiple clients
 // are making changes to the same resource.
 var EvictionsRetry = wait.Backoff{
-	Steps:    retrySteps,
+	Steps:    20,
 	Duration: 500 * time.Millisecond,
 	Factor:   1.0,
 	Jitter:   0.1,
@@ -124,7 +123,14 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 	var pod *api.Pod
 	deletedPod := false
-	err = retry.RetryOnConflict(EvictionsRetry, func() error {
+	// by default, retry conflict errors
+	shouldRetry := errors.IsConflict
+	if !resourceVersionIsUnset(originalDeleteOptions) {
+		// if the original options included a resourceVersion precondition, don't retry
+		shouldRetry = func(err error) bool { return false }
+	}
+
+	err = retry.OnError(EvictionsRetry, shouldRetry, func() error {
 		obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -140,6 +146,9 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 		// the PDB can be ignored, so delete the pod
 		deletionOptions := originalDeleteOptions.DeepCopy()
+		// We should check if resourceVersion is already set by the requestor
+		// as it might be older than the pod we just fetched and should be
+		// honored.
 		if shouldEnforceResourceVersion(pod) && resourceVersionIsUnset(originalDeleteOptions) {
 			// Set deletionOptions.Preconditions.ResourceVersion to ensure we're not
 			// racing with another PDB-impacting process elsewhere.
@@ -158,7 +167,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	switch {
 	case err != nil:
 		// this can happen in cases where the PDB can be ignored, but there was a problem issuing the pod delete:
-		// maybe we conflicted two many times or we didn't have permission or something else weird.
+		// maybe we conflicted too many times or we didn't have permission or something else weird.
 		return nil, err
 
 	case deletedPod:
@@ -245,11 +254,13 @@ func canIgnorePDB(pod *api.Pod) bool {
 }
 
 func shouldEnforceResourceVersion(pod *api.Pod) bool {
-	// Only pods that may be included as health in PDBs in the future need to be checked.
-	if pod.Status.Phase == api.PodPending {
-		return true
+	// We don't need to enforce ResourceVersion for terminal pods
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		return false
 	}
-	return false
+	// Return true for all other pods to ensure we don't race against a pod becoming
+	// ready and violating PDBs.
+	return true
 }
 
 func resourceVersionIsUnset(options *metav1.DeleteOptions) bool {
