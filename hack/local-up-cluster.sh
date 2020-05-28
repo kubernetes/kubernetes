@@ -146,7 +146,7 @@ if [ "$(id -u)" != "0" ]; then
 fi
 
 # Stop right away if the build fails
-set -e
+set -eE
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::util::ensure-gnu-sed
@@ -1054,6 +1054,9 @@ echo "Using GO_OUT ${GO_OUT}"
 export KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
+else
+  trap cleanup ERR
+  trap cleanup INT
 fi
 
 echo "Starting services now!"
