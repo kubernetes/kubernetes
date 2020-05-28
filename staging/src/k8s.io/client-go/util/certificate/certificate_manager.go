@@ -374,6 +374,9 @@ func getCurrentCertificateOrBootstrap(
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
+	if len(certs) < 1 {
+		return nil, false, fmt.Errorf("no cert data found")
+	}
 	bootstrapCert.Leaf = certs[0]
 
 	if _, err := store.Update(bootstrapCertificatePEM, bootstrapKeyPEM); err != nil {

@@ -194,13 +194,13 @@ func isOlderThan(t metav1.Time, d time.Duration) bool {
 // 'Issued' status. Implicitly, if there is a certificate associated with the
 // CSR, the CSR statuses that are visible via `kubectl` will include 'Issued'.
 func isIssued(csr *capi.CertificateSigningRequest) bool {
-	return csr.Status.Certificate != nil
+	return len(csr.Status.Certificate) > 0
 }
 
 // isExpired checks if the CSR has a certificate and the date in the `NotAfter`
 // field has gone by.
 func isExpired(csr *capi.CertificateSigningRequest) (bool, error) {
-	if csr.Status.Certificate == nil {
+	if len(csr.Status.Certificate) == 0 {
 		return false, nil
 	}
 	block, _ := pem.Decode(csr.Status.Certificate)
@@ -210,6 +210,9 @@ func isExpired(csr *capi.CertificateSigningRequest) (bool, error) {
 	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
 		return false, fmt.Errorf("unable to parse certificate data: %v", err)
+	}
+	if len(certs) == 0 {
+		return false, fmt.Errorf("no certificates found")
 	}
 	return time.Now().After(certs[0].NotAfter), nil
 }

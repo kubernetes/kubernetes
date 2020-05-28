@@ -125,7 +125,7 @@ func WaitForCertificate(ctx context.Context, client certificatesclient.Certifica
 				}
 			}
 			if approved {
-				if csr.Status.Certificate != nil {
+				if len(csr.Status.Certificate) > 0 {
 					klog.V(2).Infof("certificate signing request %s is issued", csr.Name)
 					return true, nil
 				}
