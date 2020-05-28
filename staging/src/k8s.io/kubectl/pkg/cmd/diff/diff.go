@@ -367,7 +367,6 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		Helper:          helper,
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
-		ServerDryRun:    true,
 		OpenapiSchema:   obj.OpenAPI,
 		ResourceVersion: resourceVersion,
 	}

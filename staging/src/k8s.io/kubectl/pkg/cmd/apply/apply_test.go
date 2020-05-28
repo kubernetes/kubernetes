@@ -44,7 +44,6 @@ import (
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -1333,6 +1332,11 @@ func TestForceApply(t *testing.T) {
 						}
 						t.Fatalf("unexpected request: %#v after %v tries\n%#v", req.URL, counts["patch"], req)
 						return nil, nil
+					case strings.HasSuffix(p, pathRC) && m == "DELETE":
+						counts["delete"]++
+						deleted = true
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case strings.HasSuffix(p, pathRC) && m == "PUT":
 						counts["put"]++
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
@@ -1351,16 +1355,6 @@ func TestForceApply(t *testing.T) {
 				}),
 			}
 			fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
-			fakeDynamicClient.PrependReactor("delete", "replicationcontrollers", func(action clienttesting.Action) (bool, runtime.Object, error) {
-				if deleteAction, ok := action.(clienttesting.DeleteAction); ok {
-					if deleteAction.GetName() == nameRC {
-						counts["delete"]++
-						deleted = true
-						return true, nil, nil
-					}
-				}
-				return false, nil, nil
-			})
 			tf.FakeDynamicClient = fakeDynamicClient
 			tf.OpenAPISchemaFunc = fn
 			tf.Client = tf.UnstructuredClient
