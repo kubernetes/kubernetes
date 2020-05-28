@@ -172,12 +172,15 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"File containing the default x509 private key matching --tls-cert-file.")
 
 	tlsCipherPreferredValues := cliflag.PreferredTLSCipherNames()
+	tlsMsg := "Comma-separated list of cipher suites for the server. " +
+		"If omitted, the default Go cipher suites will be used. \n" +
+		"Preferred values: " + strings.Join(tlsCipherPreferredValues, ", ") + "."
 	tlsCipherInsecureValues := cliflag.InsecureTLSCipherNames()
-	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites,
-		"Comma-separated list of cipher suites for the server. "+
-			"If omitted, the default Go cipher suites will be used. \n"+
-			"Preferred values: "+strings.Join(tlsCipherPreferredValues, ", ")+". \n"+
-			"Insecure values: "+strings.Join(tlsCipherInsecureValues, ", ")+".")
+
+	if len(tlsCipherInsecureValues) > 0 {
+		tlsMsg += " \nInsecure values: " + strings.Join(tlsCipherInsecureValues, ", ") + "."
+	}
+	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites, tlsMsg)
 
 	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,

@@ -23,6 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// minTLS12CipherSupported defines the minimum cipher suite supported.
+var minTLS12CipherSupported = tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+
 // ciphers maps strings into tls package cipher constants in
 // https://golang.org/pkg/crypto/tls/#pkg-constants
 // to be replaced by tls.CipherSuites() when the project migrates to go1.14.
@@ -63,7 +66,9 @@ var insecureCiphers = map[string]uint16{
 func InsecureTLSCiphers() map[string]uint16 {
 	cipherKeys := make(map[string]uint16, len(insecureCiphers))
 	for k, v := range insecureCiphers {
-		cipherKeys[k] = v
+		if v >= minTLS12CipherSupported {
+			cipherKeys[k] = v
+		}
 	}
 	return cipherKeys
 }
@@ -72,8 +77,10 @@ func InsecureTLSCiphers() map[string]uint16 {
 // which have security issues.
 func InsecureTLSCipherNames() []string {
 	cipherKeys := sets.NewString()
-	for key := range insecureCiphers {
-		cipherKeys.Insert(key)
+	for key, v := range insecureCiphers {
+		if v >= minTLS12CipherSupported {
+			cipherKeys.Insert(key)
+		}
 	}
 	return cipherKeys.List()
 }
@@ -81,8 +88,10 @@ func InsecureTLSCipherNames() []string {
 // PreferredTLSCipherNames returns a list of cipher suite names implemented by crypto/tls.
 func PreferredTLSCipherNames() []string {
 	cipherKeys := sets.NewString()
-	for key := range ciphers {
-		cipherKeys.Insert(key)
+	for key, v := range ciphers {
+		if v >= minTLS12CipherSupported {
+			cipherKeys.Insert(key)
+		}
 	}
 	return cipherKeys.List()
 }
@@ -90,10 +99,14 @@ func PreferredTLSCipherNames() []string {
 func allCiphers() map[string]uint16 {
 	acceptedCiphers := make(map[string]uint16, len(ciphers)+len(insecureCiphers))
 	for k, v := range ciphers {
-		acceptedCiphers[k] = v
+		if v >= minTLS12CipherSupported {
+			acceptedCiphers[k] = v
+		}
 	}
 	for k, v := range insecureCiphers {
-		acceptedCiphers[k] = v
+		if v >= minTLS12CipherSupported {
+			acceptedCiphers[k] = v
+		}
 	}
 	return acceptedCiphers
 }
@@ -117,12 +130,15 @@ func TLSCipherSuites(cipherNames []string) ([]uint16, error) {
 	ciphersIntSlice := make([]uint16, 0)
 	possibleCiphers := allCiphers()
 	for _, cipher := range cipherNames {
-		intValue, ok := possibleCiphers[cipher]
-		if !ok {
-			return nil, fmt.Errorf("Cipher suite %s not supported or doesn't exist", cipher)
+		if intValue, ok := possibleCiphers[cipher]; ok {
+			ciphersIntSlice = append(ciphersIntSlice, intValue)
 		}
-		ciphersIntSlice = append(ciphersIntSlice, intValue)
 	}
+
+	if len(cipherNames) > 0 && len(ciphersIntSlice) == 0 {
+		return nil, fmt.Errorf("Cipher suites not supported: %s", cipherNames)
+	}
+
 	return ciphersIntSlice, nil
 }
 

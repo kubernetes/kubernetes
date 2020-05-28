@@ -33,14 +33,14 @@ func TestStrToUInt16(t *testing.T) {
 	}{
 		{
 			// Happy case
-			flag:           []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_RSA_WITH_RC4_128_SHA", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"},
-			expected:       []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA},
+			flag:           []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"},
+			expected:       []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305, tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305},
 			expected_error: false,
 		},
 		{
 			// One flag only
-			flag:           []string{"TLS_RSA_WITH_RC4_128_SHA"},
-			expected:       []uint16{tls.TLS_RSA_WITH_RC4_128_SHA},
+			flag:           []string{"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"},
+			expected:       []uint16{tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305},
 			expected_error: false,
 		},
 		{
@@ -51,9 +51,21 @@ func TestStrToUInt16(t *testing.T) {
 		},
 		{
 			// Duplicated flag
-			flag:           []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_RSA_WITH_RC4_128_SHA", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "TLS_RSA_WITH_RC4_128_SHA"},
-			expected:       []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, tls.TLS_RSA_WITH_RC4_128_SHA},
+			flag:           []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"},
+			expected:       []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305, tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305, tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305},
 			expected_error: false,
+		},
+		{
+			// Ignore ciphers below minimum
+			flag:           []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_RSA_WITH_RC4_128_SHA", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"},
+			expected:       []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+			expected_error: false,
+		},
+		{
+			// Error if all ciphers below provided are below minimum tls cipher
+			flag:           []string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA", "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA", "TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA256", "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA", "TLS_ECDHE_RSA_WITH_RC4_128_SHA"},
+			expected:       nil,
+			expected_error: true,
 		},
 		{
 			// Invalid flag
@@ -82,16 +94,19 @@ func TestConstantMaps(t *testing.T) {
 	}
 	discoveredVersions := map[string]bool{}
 	discoveredCiphers := map[string]bool{}
+	acceptedCiphers := allCiphers()
 	for _, declName := range pkg.Scope().Names() {
 		if strings.HasPrefix(declName, "VersionTLS") {
 			discoveredVersions[declName] = true
 		}
 		if strings.HasPrefix(declName, "TLS_") && !strings.HasPrefix(declName, "TLS_FALLBACK_") {
-			discoveredCiphers[declName] = true
+			v, ok := acceptedCiphers[declName]
+			if ok && v >= minTLS12CipherSupported {
+				discoveredCiphers[declName] = true
+			}
 		}
 	}
 
-	acceptedCiphers := allCiphers()
 	for k := range discoveredCiphers {
 		if _, ok := acceptedCiphers[k]; !ok {
 			t.Errorf("discovered cipher tls.%s not in ciphers map", k)

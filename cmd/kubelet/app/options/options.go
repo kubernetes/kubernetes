@@ -466,11 +466,15 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 
 	tlsCipherPreferredValues := cliflag.PreferredTLSCipherNames()
 	tlsCipherInsecureValues := cliflag.InsecureTLSCipherNames()
-	fs.StringSliceVar(&c.TLSCipherSuites, "tls-cipher-suites", c.TLSCipherSuites,
-		"Comma-separated list of cipher suites for the server. "+
-			"If omitted, the default Go cipher suites will be used. \n"+
-			"Preferred values: "+strings.Join(tlsCipherPreferredValues, ", ")+". \n"+
-			"Insecure values: "+strings.Join(tlsCipherInsecureValues, ", ")+".")
+	tlsMsg := "Comma-separated list of cipher suites for the server. " +
+		"If omitted, the default Go cipher suites will be used. \n" +
+		"Preferred values: " + strings.Join(tlsCipherPreferredValues, ", ") + "."
+
+	if len(tlsCipherInsecureValues) > 0 {
+		tlsMsg += " \nInsecure values: " + strings.Join(tlsCipherInsecureValues, ", ") + "."
+	}
+	fs.StringSliceVar(&c.TLSCipherSuites, "tls-cipher-suites", c.TLSCipherSuites, tlsMsg)
+
 	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&c.TLSMinVersion, "tls-min-version", c.TLSMinVersion,
 		"Minimum TLS version supported. "+
