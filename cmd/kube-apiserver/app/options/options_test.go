@@ -163,7 +163,7 @@ func TestAddFlags(t *testing.T) {
 				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
-			DeleteCollectionWorkers: 1,
+			DeleteCollectionWorkers: 5,
 			EnableGarbageCollection: true,
 			EnableWatchCache:        true,
 			DefaultWatchCacheSize:   100,

@@ -306,6 +306,11 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 // it returns true if the operation was supported on the server.
 // it returns an error if the operation was supported on the server but was unable to complete.
 func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionResource, namespace string) (bool, error) {
+
+	// TODO: Remove temporary logging for troubleshooting timeout flakes
+	startTime := time.Now()
+	defer klog.V(1).Infof("***BP*** namespacedResourcesDeleter.deleteCollection for %s, gvr: %v finished with duration = %v", namespace, gvr, time.Since(startTime))
+
 	klog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{operation: operationDeleteCollection, gvr: gvr}
@@ -412,6 +417,11 @@ type gvrDeletionMetadata struct {
 func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	gvr schema.GroupVersionResource, namespace string,
 	namespaceDeletedAt metav1.Time) (gvrDeletionMetadata, error) {
+
+	// TODO: Remove temporary logging for troubleshooting timeout flakes
+	startTime := time.Now()
+	defer klog.V(1).Infof("***BP*** namespacedResourcesDeleter.deleteAllContentForGroupVersionResource for %s, gvr: %v finished with duration = %v", namespace, gvr, time.Since(startTime))
+
 	klog.V(5).Infof("namespace controller - deleteAllContentForGroupVersionResource - namespace: %s, gvr: %v", namespace, gvr)
 
 	// estimate how long it will take for the resource to be deleted (needed for objects that support graceful delete)
@@ -524,27 +534,37 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 		gvrToNumRemaining:        map[schema.GroupVersionResource]int{},
 		finalizersToNumRemaining: map[string]int{},
 	}
+	var wg sync.WaitGroup
+	var mutex sync.Mutex
 	for gvr := range groupVersionResources {
-		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
-		if err != nil {
-			// If there is an error, hold on to it but proceed with all the remaining
-			// groupVersionResources.
-			errs = append(errs, err)
-			conditionUpdater.ProcessDeleteContentErr(err)
-		}
-		if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
-			estimate = gvrDeletionMetadata.finalizerEstimateSeconds
-		}
-		if gvrDeletionMetadata.numRemaining > 0 {
-			numRemainingTotals.gvrToNumRemaining[gvr] = gvrDeletionMetadata.numRemaining
-			for finalizer, numRemaining := range gvrDeletionMetadata.finalizersToNumRemaining {
-				if numRemaining == 0 {
-					continue
-				}
-				numRemainingTotals.finalizersToNumRemaining[finalizer] = numRemainingTotals.finalizersToNumRemaining[finalizer] + numRemaining
+		gvr := gvr
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
+			mutex.Lock()
+			defer mutex.Unlock()
+			if err != nil {
+				// If there is an error, hold on to it but proceed with all the remaining
+				// groupVersionResources.
+				errs = append(errs, err)
+				conditionUpdater.ProcessDeleteContentErr(err)
 			}
-		}
+			if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
+				estimate = gvrDeletionMetadata.finalizerEstimateSeconds
+			}
+			if gvrDeletionMetadata.numRemaining > 0 {
+				numRemainingTotals.gvrToNumRemaining[gvr] = gvrDeletionMetadata.numRemaining
+				for finalizer, numRemaining := range gvrDeletionMetadata.finalizersToNumRemaining {
+					if numRemaining == 0 {
+						continue
+					}
+					numRemainingTotals.finalizersToNumRemaining[finalizer] = numRemainingTotals.finalizersToNumRemaining[finalizer] + numRemaining
+				}
+			}
+		}()
 	}
+	wg.Wait()
 	conditionUpdater.ProcessContentTotals(numRemainingTotals)
 
 	// we always want to update the conditions because if we have set a condition to "it worked" after it was previously, "it didn't work",

@@ -67,7 +67,7 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 	options := &EtcdOptions{
 		StorageConfig:           *backendConfig,
 		DefaultStorageMediaType: "application/json",
-		DeleteCollectionWorkers: 1,
+		DeleteCollectionWorkers: 5,
 		EnableGarbageCollection: true,
 		EnableWatchCache:        true,
 		DefaultWatchCacheSize:   100,

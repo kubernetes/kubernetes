@@ -646,6 +646,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				err   error
 			)
 			pvc = e2epv.MakePersistentVolumeClaim(makeLocalPVCConfig(config, DirectoryLocalVolumeType), config.ns)
+			defer framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(config.client, pvc.Name, config.ns))
 			ginkgo.By(fmt.Sprintf("Create a PVC %s", pvc.Name))
 			pvc, err = e2epv.CreatePVC(config.client, config.ns, pvc)
 			framework.ExpectNoError(err)
@@ -663,6 +664,18 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				framework.ExpectNoError(err)
 				pods[pod.Name] = pod
 			}
+			defer func() {
+				var wg sync.WaitGroup
+				for _, pod := range pods {
+					pod := pod
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						framework.ExpectNoError(e2epod.DeletePodWithWait(config.client, pod))
+					}()
+				}
+				wg.Wait()
+			}()
 			ginkgo.By("Wait for all pods are running")
 			const runningTimeout = 5 * time.Minute
 			waitErr := wait.PollImmediate(time.Second, runningTimeout, func() (done bool, err error) {
