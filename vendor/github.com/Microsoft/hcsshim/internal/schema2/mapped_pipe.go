@@ -10,7 +10,6 @@
 package hcsschema
 
 type MappedPipe struct {
-
 	ContainerPipeName string `json:"ContainerPipeName,omitempty"`
 
 	HostPath string `json:"HostPath,omitempty"`

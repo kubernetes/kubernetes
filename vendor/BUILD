@@ -56,6 +56,7 @@ filegroup(
         "//vendor/github.com/cilium/ebpf:all-srcs",
         "//vendor/github.com/clusterhq/flocker-go:all-srcs",
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi:all-srcs",
+        "//vendor/github.com/containerd/cgroups/stats/v1:all-srcs",
         "//vendor/github.com/containerd/console:all-srcs",
         "//vendor/github.com/containerd/containerd/api/services/containers/v1:all-srcs",
         "//vendor/github.com/containerd/containerd/api/services/tasks/v1:all-srcs",

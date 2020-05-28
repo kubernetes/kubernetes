@@ -11,6 +11,5 @@ package hcsschema
 
 //  Notification data that is indicated to components running in the Virtual Machine.
 type PauseNotification struct {
-
 	Reason string `json:"Reason,omitempty"`
 }
