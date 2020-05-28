@@ -147,14 +147,14 @@ aliases:
 
   sig-scheduling-maintainers:
     - alculquicondor
-    - bsalamat
     - k82cn
     - wojtek-t
     - ravisantoshgudimetla
     - Huang-Wei
     - ahg-g
+  # emeritus:
+  # - bsalamat
   sig-scheduling:
-    - bsalamat
     - k82cn
     - resouer
     - ravisantoshgudimetla
@@ -449,9 +449,9 @@ aliases:
     - mm4tt
     - wojtek-t
 
-  sig-scheduling-api-reviewers:
-      - bsalamat
-      - k82cn
+  # sig-scheduling-api-reviewers:
+  #   -
+  #   -
 
   sig-storage-api-reviewers:
     - saad-ali
