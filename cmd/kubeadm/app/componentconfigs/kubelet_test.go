@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 )
 
 // kubeletMarshalCases holds common marshal test cases for both the marshal and unmarshal tests
@@ -188,7 +189,7 @@ func TestKubeletDefault(t *testing.T) {
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
-					RootDir:            kubeletconfig.DefaultRootDir,
+					RootDir:            kubeletconfigv1beta1.DefaultRootDir,
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
@@ -222,7 +223,7 @@ func TestKubeletDefault(t *testing.T) {
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
-					RootDir:            kubeletconfig.DefaultRootDir,
+					RootDir:            kubeletconfigv1beta1.DefaultRootDir,
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
@@ -261,7 +262,7 @@ func TestKubeletDefault(t *testing.T) {
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
-					RootDir:            kubeletconfig.DefaultRootDir,
+					RootDir:            kubeletconfigv1beta1.DefaultRootDir,
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
@@ -300,7 +301,7 @@ func TestKubeletDefault(t *testing.T) {
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
-					RootDir:            kubeletconfig.DefaultRootDir,
+					RootDir:            kubeletconfigv1beta1.DefaultRootDir,
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
@@ -335,7 +336,7 @@ func TestKubeletDefault(t *testing.T) {
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
-					RootDir:            kubeletconfig.DefaultRootDir,
+					RootDir:            kubeletconfigv1beta1.DefaultRootDir,
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
@@ -367,7 +368,7 @@ func TestKubeletDefault(t *testing.T) {
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
-					RootDir:            kubeletconfig.DefaultRootDir,
+					RootDir:            kubeletconfigv1beta1.DefaultRootDir,
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,

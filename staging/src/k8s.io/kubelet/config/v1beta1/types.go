@@ -21,8 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const DefaultRootDir = "/var/lib/kubelet"
-
 // HairpinMode denotes how the kubelet should configure networking to handle
 // hairpin packets.
 type HairpinMode string

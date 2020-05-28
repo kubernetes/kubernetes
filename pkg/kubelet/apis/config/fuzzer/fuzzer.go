@@ -98,7 +98,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
 			obj.AllowedUnsafeSysctls = []string{}
 			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
-			obj.RootDir = v1beta1.DefaultRootDir
+			obj.RootDir = kubeletconfigv1beta1.DefaultRootDir
 		},
 	}
 }

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 )
 
 const (
@@ -174,9 +175,9 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	}
 
 	if kc.config.RootDir == "" {
-		kc.config.RootDir = kubeletconfig.DefaultRootDir
-	} else if kc.config.RootDir != kubeletconfig.DefaultRootDir {
-		warnDefaultComponentConfigValue(kind, "rootDir", kubeletconfig.DefaultRootDir, kc.config.RootDir)
+		kc.config.RootDir = kubeletconfigv1beta1.DefaultRootDir
+	} else if kc.config.RootDir != kubeletconfigv1beta1.DefaultRootDir {
+		warnDefaultComponentConfigValue(kind, "rootDir", kubeletconfigv1beta1.DefaultRootDir, kc.config.RootDir)
 	}
 
 	if kc.config.HealthzPort == nil {
