@@ -204,7 +204,7 @@ func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 		namespace = o.Namespace
 	}
 
-	return &appsv1.Deployment{
+	deploy := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      o.Name,
@@ -222,6 +222,11 @@ func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 			},
 		},
 	}
+
+	if o.Port >= 0 && len(deploy.Spec.Template.Spec.Containers) > 0 {
+		deploy.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{{ContainerPort: o.Port}}
+	}
+	return deploy
 }
 
 // buildPodSpec parses the image strings and assemble them into the Containers

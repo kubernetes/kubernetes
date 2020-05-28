@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,13 +53,44 @@ func TestCreateDeployment(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdCreateDeployment(tf, ioStreams)
-	cmd.Flags().Set("dry-run", "true")
+	cmd.Flags().Set("dry-run", "client")
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
 	cmd.Run(cmd, []string{depName})
 	expectedOutput := "deployment.apps/" + depName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
+	}
+}
+
+func TestCreateDeploymentWithPort(t *testing.T) {
+	depName := "jonny-dep"
+	port := "5701"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{}
+
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateDeployment(tf, ioStreams)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("port", port)
+	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
+	cmd.Run(cmd, []string{depName})
+	if !strings.Contains(buf.String(), port) {
+		t.Errorf("unexpected output: %s\nexpected to contain: %s", buf.String(), port)
 	}
 }
 
