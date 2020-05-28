@@ -25,6 +25,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/api/core/v1"
 )
 
 func TestElbProtocolsAreEqual(t *testing.T) {
@@ -416,6 +418,60 @@ func TestBuildTargetGroupName(t *testing.T) {
 			}
 			if got := c.buildTargetGroupName(tt.args.serviceName, tt.args.servicePort, tt.args.nodePort, tt.args.targetProtocol, tt.args.targetType); got != tt.want {
 				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+func TestFilterTargetNodes(t *testing.T) {
+	tests := []struct {
+		name                    string
+		nodeLabels, annotations map[string]string
+		nodeTargeted            bool
+	}{
+		{
+			name:         "when no filter is provided, node should be targeted",
+			nodeLabels:   map[string]string{"k1": "v1"},
+			nodeTargeted: true,
+		},
+		{
+			name:         "when all key-value filters match, node should be targeted",
+			nodeLabels:   map[string]string{"k1": "v1", "k2": "v2"},
+			annotations:  map[string]string{ServiceAnnotationLoadBalancerTargetNodeLabels: "k1=v1,k2=v2"},
+			nodeTargeted: true,
+		},
+		{
+			name:         "when all just-key filter match, node should be targeted",
+			nodeLabels:   map[string]string{"k1": "v1", "k2": "v2"},
+			annotations:  map[string]string{ServiceAnnotationLoadBalancerTargetNodeLabels: "k1,k2"},
+			nodeTargeted: true,
+		},
+		{
+			name:         "when some filters do not match, node should not be targeted",
+			nodeLabels:   map[string]string{"k1": "v1"},
+			annotations:  map[string]string{ServiceAnnotationLoadBalancerTargetNodeLabels: "k1=v1,k2"},
+			nodeTargeted: false,
+		},
+		{
+			name:         "when no filter matches, node should not be targeted",
+			nodeLabels:   map[string]string{"k1": "v1", "k2": "v2"},
+			annotations:  map[string]string{ServiceAnnotationLoadBalancerTargetNodeLabels: "k3=v3"},
+			nodeTargeted: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			node := &v1.Node{}
+			node.Labels = test.nodeLabels
+
+			nodes := []*v1.Node{node}
+			targetNodes := filterTargetNodes(nodes, test.annotations)
+
+			if test.nodeTargeted {
+				assert.Equal(t, nodes, targetNodes)
+			} else {
+				assert.Empty(t, targetNodes)
 			}
 		})
 	}
