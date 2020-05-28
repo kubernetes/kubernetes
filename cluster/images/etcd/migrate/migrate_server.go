@@ -102,7 +102,7 @@ func (r *EtcdMigrateServer) Stop() error {
 	if err != nil {
 		return fmt.Errorf("error sending SIGINT to etcd for graceful shutdown: %v", err)
 	}
-	const gracefulWait := time.Minute * 2
+	const gracefulWait = time.Minute * 2
 	stopped := make(chan bool)
 	go func() {
 		select {
