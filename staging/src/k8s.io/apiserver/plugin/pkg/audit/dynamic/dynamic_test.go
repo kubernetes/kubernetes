@@ -239,14 +239,10 @@ func TestDynamic(t *testing.T) {
 			d.Shutdown()
 			successChan <- struct{}{}
 		}()
-		for {
-			select {
-			case <-time.After(1 * time.Second):
-				t.Error("shutdown timed out")
-				return
-			case <-successChan:
-				return
-			}
+		select {
+		case <-time.After(1 * time.Second):
+			t.Error("shutdown timed out")
+		case <-successChan:
 		}
 	})
 	require.True(t, success) // propagate failure
