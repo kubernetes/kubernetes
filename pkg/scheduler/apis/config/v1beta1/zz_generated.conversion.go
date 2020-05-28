@@ -622,6 +622,15 @@ func autoConvert_v1beta1_Plugins_To_config_Plugins(in *v1beta1.Plugins, out *con
 	} else {
 		out.Filter = nil
 	}
+	if in.PostFilter != nil {
+		in, out := &in.PostFilter, &out.PostFilter
+		*out = new(config.PluginSet)
+		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PostFilter = nil
+	}
 	if in.PreScore != nil {
 		in, out := &in.PreScore, &out.PreScore
 		*out = new(config.PluginSet)
@@ -729,6 +738,15 @@ func autoConvert_config_Plugins_To_v1beta1_Plugins(in *config.Plugins, out *v1be
 		}
 	} else {
 		out.Filter = nil
+	}
+	if in.PostFilter != nil {
+		in, out := &in.PostFilter, &out.PostFilter
+		*out = new(v1beta1.PluginSet)
+		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PostFilter = nil
 	}
 	if in.PreScore != nil {
 		in, out := &in.PreScore, &out.PreScore
