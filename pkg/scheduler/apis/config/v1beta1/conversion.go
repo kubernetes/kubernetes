@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package v1beta1
 
 import (
 	"fmt"
@@ -23,13 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 )
 
 var (
-	// pluginArgConversionScheme is a scheme with internal and v1alpha2 registered,
+	// pluginArgConversionScheme is a scheme with internal and v1beta1 registered,
 	// used for defaulting/converting typed PluginConfig Args.
 	// Access via getPluginArgConversionScheme()
 	pluginArgConversionScheme     *runtime.Scheme
@@ -46,11 +46,11 @@ func getPluginArgConversionScheme() *runtime.Scheme {
 	return pluginArgConversionScheme
 }
 
-func Convert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1alpha2.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := autoConvert_v1alpha2_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s); err != nil {
+func Convert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1beta1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s); err != nil {
 		return err
 	}
-	out.AlgorithmSource.Provider = pointer.StringPtr(v1alpha2.SchedulerDefaultProviderName)
+	out.AlgorithmSource.Provider = pointer.StringPtr(v1beta1.SchedulerDefaultProviderName)
 	return convertToInternalPluginConfigArgs(out)
 }
 
@@ -78,8 +78,8 @@ func convertToInternalPluginConfigArgs(out *config.KubeSchedulerConfiguration) e
 	return nil
 }
 
-func Convert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1alpha2.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := autoConvert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfiguration(in, out, s); err != nil {
+func Convert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1beta1.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfiguration(in, out, s); err != nil {
 		return err
 	}
 	return convertToExternalPluginConfigArgs(out)
@@ -87,7 +87,7 @@ func Convert_config_KubeSchedulerConfiguration_To_v1alpha2_KubeSchedulerConfigur
 
 // convertToExternalPluginConfigArgs converts PluginConfig#Args into
 // external (versioned) types using a scheme.
-func convertToExternalPluginConfigArgs(out *v1alpha2.KubeSchedulerConfiguration) error {
+func convertToExternalPluginConfigArgs(out *v1beta1.KubeSchedulerConfiguration) error {
 	scheme := getPluginArgConversionScheme()
 	for i := range out.Profiles {
 		for j := range out.Profiles[i].PluginConfig {

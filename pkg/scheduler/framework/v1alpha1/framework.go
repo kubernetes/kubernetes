@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -304,7 +304,7 @@ func getPluginArgsOrDefault(pluginConfig map[string]runtime.Object, name string)
 		return res, nil
 	}
 	// Use defaults from latest config API version.
-	gvk := v1alpha2.SchemeGroupVersion.WithKind(name + "Args")
+	gvk := v1beta1.SchemeGroupVersion.WithKind(name + "Args")
 	obj, _, err := configDecoder.Decode(nil, &gvk, nil)
 	if runtime.IsNotRegisteredError(err) {
 		// This plugin is out-of-tree or doesn't require configuration.

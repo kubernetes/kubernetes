@@ -802,7 +802,7 @@ function start_kubelet {
     if [ "${FAIL_SWAP_ON}" == "false" ]; then
         echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
     fi
-    
+
     if [[ "${REUSE_CERTS}" != true ]]; then
         # clear previous dynamic certs
         sudo rm -fr "/var/lib/kubelet/pki" "${CERT_DIR}/kubelet-rotated.kubeconfig"
@@ -863,7 +863,7 @@ function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
     cat <<EOF > /tmp/kube-scheduler.yaml
-apiVersion: kubescheduler.config.k8s.io/v1alpha2
+apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig

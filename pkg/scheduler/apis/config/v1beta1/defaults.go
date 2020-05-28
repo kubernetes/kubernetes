@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package v1beta1
 
 import (
 	"net"
@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	"k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 
@@ -31,7 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-var defaultResourceSpec = []v1alpha2.ResourceSpec{
+var defaultResourceSpec = []v1beta1.ResourceSpec{
 	{Name: string(v1.ResourceCPU), Weight: 1},
 	{Name: string(v1.ResourceMemory), Weight: 1},
 }
@@ -41,9 +41,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
-func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfiguration) {
+func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfiguration) {
 	if len(obj.Profiles) == 0 {
-		obj.Profiles = append(obj.Profiles, v1alpha2.KubeSchedulerProfile{})
+		obj.Profiles = append(obj.Profiles, v1beta1.KubeSchedulerProfile{})
 	}
 	// Only apply a default scheduler name when there is a single profile.
 	// Validation will ensure that every profile has a non-empty unique name.
@@ -115,10 +115,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 		obj.LeaderElection.ResourceLock = "endpointsleases"
 	}
 	if len(obj.LeaderElection.ResourceNamespace) == 0 {
-		obj.LeaderElection.ResourceNamespace = v1alpha2.SchedulerDefaultLockObjectNamespace
+		obj.LeaderElection.ResourceNamespace = v1beta1.SchedulerDefaultLockObjectNamespace
 	}
 	if len(obj.LeaderElection.ResourceName) == 0 {
-		obj.LeaderElection.ResourceName = v1alpha2.SchedulerDefaultLockObjectName
+		obj.LeaderElection.ResourceName = v1beta1.SchedulerDefaultLockObjectName
 	}
 
 	if len(obj.ClientConnection.ContentType) == 0 {
@@ -163,7 +163,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1alpha2.KubeSchedulerConfigura
 	}
 }
 
-func SetDefaults_InterPodAffinityArgs(obj *v1alpha2.InterPodAffinityArgs) {
+func SetDefaults_InterPodAffinityArgs(obj *v1beta1.InterPodAffinityArgs) {
 	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
 	// DeprecatedOptions#ApplyTo.
 	// Update that object if a new default field is added here.
@@ -172,28 +172,28 @@ func SetDefaults_InterPodAffinityArgs(obj *v1alpha2.InterPodAffinityArgs) {
 	}
 }
 
-func SetDefaults_NodeResourcesLeastAllocatedArgs(obj *v1alpha2.NodeResourcesLeastAllocatedArgs) {
+func SetDefaults_NodeResourcesLeastAllocatedArgs(obj *v1beta1.NodeResourcesLeastAllocatedArgs) {
 	if len(obj.Resources) == 0 {
 		// If no resources specified, used the default set.
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
 
-func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1alpha2.NodeResourcesMostAllocatedArgs) {
+func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1beta1.NodeResourcesMostAllocatedArgs) {
 	if len(obj.Resources) == 0 {
 		// If no resources specified, used the default set.
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
 
-func SetDefaults_RequestedToCapacityRatioArgs(obj *v1alpha2.RequestedToCapacityRatioArgs) {
+func SetDefaults_RequestedToCapacityRatioArgs(obj *v1beta1.RequestedToCapacityRatioArgs) {
 	if len(obj.Resources) == 0 {
 		// If no resources specified, used the default set.
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
 }
 
-func SetDefaults_VolumeBindingArgs(obj *v1alpha2.VolumeBindingArgs) {
+func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
 	}

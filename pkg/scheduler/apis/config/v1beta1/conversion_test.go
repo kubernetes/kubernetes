@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package v1beta1
 
 import (
 	"testing"
@@ -22,21 +22,21 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-scheduler/config/v1alpha2"
+	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 )
 
-func TestV1alpha2ToConfigKubeSchedulerConfigurationConversion(t *testing.T) {
+func TestV1beta1ToConfigKubeSchedulerConfigurationConversion(t *testing.T) {
 	cases := []struct {
 		name     string
-		config   v1alpha2.KubeSchedulerConfiguration
+		config   v1beta1.KubeSchedulerConfiguration
 		expected config.KubeSchedulerConfiguration
 	}{
 		{
-			name:     "default conversion v1alpha2 to config",
-			config:   v1alpha2.KubeSchedulerConfiguration{},
-			expected: config.KubeSchedulerConfiguration{AlgorithmSource: config.SchedulerAlgorithmSource{Provider: pointer.StringPtr(v1alpha2.SchedulerDefaultProviderName)}},
+			name:     "default conversion v1beta1 to config",
+			config:   v1beta1.KubeSchedulerConfiguration{},
+			expected: config.KubeSchedulerConfiguration{AlgorithmSource: config.SchedulerAlgorithmSource{Provider: pointer.StringPtr(v1beta1.SchedulerDefaultProviderName)}},
 		},
 	}
 
