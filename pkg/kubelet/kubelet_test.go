@@ -86,11 +86,6 @@ func init() {
 const (
 	testKubeletHostname = "127.0.0.1"
 	testKubeletHostIP   = "127.0.0.1"
-
-	// TODO(harry) any global place for these two?
-	// Reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
-	minImgSize int64 = 23 * 1024 * 1024
-	maxImgSize int64 = 1000 * 1024 * 1024
 )
 
 // fakeImageGCManager is a fake image gc manager for testing. It will return image
@@ -335,7 +330,6 @@ func newTestKubeletWithImageList(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
 		kubelet.recorder,
 	)
-	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(kubelet.statusManager, kubelet.recorder, kubelet.clock)

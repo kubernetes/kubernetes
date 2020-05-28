@@ -26,7 +26,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -125,9 +124,6 @@ import (
 const (
 	// Max amount of time to wait for the container runtime to come up.
 	maxWaitForContainerRuntime = 30 * time.Second
-
-	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
-	nodeStatusUpdateRetry = 5
 
 	// ContainerLogsDir is the location of container logs.
 	ContainerLogsDir = "/var/log/containers"
@@ -500,9 +496,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		rootDirectory:                           rootDirectory,
 		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
 		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
-		registerNode:                            registerNode,
-		registerWithTaints:                      registerWithTaints,
-		registerSchedulable:                     registerSchedulable,
 		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
 		serviceLister:                           serviceLister,
 		serviceHasSynced:                        serviceHasSynced,
@@ -513,11 +506,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cadvisor:                                kubeDeps.CAdvisorInterface,
 		cloud:                                   kubeDeps.Cloud,
 		externalCloudProvider:                   cloudprovider.IsExternal(cloudProvider),
-		providerID:                              providerID,
 		nodeRef:                                 nodeRef,
-		nodeLabels:                              nodeLabels,
 		nodeStatusUpdateFrequency:               kubeCfg.NodeStatusUpdateFrequency.Duration,
-		nodeStatusReportFrequency:               kubeCfg.NodeStatusReportFrequency.Duration,
 		os:                                      kubeDeps.OSInterface,
 		oomWatcher:                              oomWatcher,
 		cgroupsPerQOS:                           kubeCfg.CgroupsPerQOS,
@@ -533,9 +523,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		containerRuntimeName:                    containerRuntime,
 		redirectContainerStreaming:              crOptions.RedirectContainerStreaming,
 		nodeIP:                                  parsedNodeIP,
-		nodeIPValidator:                         validateNodeIP,
 		clock:                                   clock.RealClock{},
-		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), protocol),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
@@ -815,10 +803,34 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
 
-	// Generating the status funcs should be the last thing we do,
+	// Generating the status funcs defaultNodeStatusFuncs should be the last thing we do,
 	// since this relies on the rest of the Kubelet having been constructed.
-	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
-
+	klet.nodeStatusManager = NewNodeStatusManager(
+		klet.hostname,
+		klet.nodeName,
+		clock.RealClock{},
+		nodeLabels,
+		registerNode,
+		kubeDeps.KubeClient,
+		kubeDeps.HeartbeatClient,
+		providerID,
+		klet.externalCloudProvider,
+		klet.containerManager,
+		klet.volumeManager,
+		kubeDeps.Cloud,
+		registerSchedulable,
+		registerWithTaints,
+		kubeCfg.EnableControllerAttachDetach,
+		kubeDeps.OnHeartbeatFailure,
+		kubeCfg.NodeStatusUpdateFrequency.Duration,
+		kubeCfg.NodeStatusReportFrequency.Duration,
+		klet.keepTerminatedPodVolumes,
+		klet.GetNode,
+		klet.updateRuntimeUp,
+		klet.updatePodCIDR,
+		klet.setLastObservedNodeAddresses,
+		klet.defaultNodeStatusFuncs(),
+	)
 	return klet, nil
 }
 
@@ -873,15 +885,6 @@ type Kubelet struct {
 	// cAdvisor used for container information.
 	cadvisor cadvisor.Interface
 
-	// Set to true to have the node register itself with the apiserver.
-	registerNode bool
-	// List of taints to add to a node object when the kubelet registers itself.
-	registerWithTaints []api.Taint
-	// Set to true to have the node register itself as schedulable.
-	registerSchedulable bool
-	// for internal book keeping; access only from within registerWithApiserver
-	registrationCompleted bool
-
 	// dnsConfigurer is used for setting up DNS resolver configuration when launching pods.
 	dnsConfigurer *dns.Configurer
 
@@ -894,9 +897,6 @@ type Kubelet struct {
 	serviceHasSynced cache.InformerSynced
 	// nodeLister knows how to list nodes
 	nodeLister corelisters.NodeLister
-
-	// a list of node labels to register
-	nodeLabels map[string]string
 
 	// Last timestamp when runtime responded on ping.
 	// Mutex is used to protect this value.
@@ -941,6 +941,9 @@ type Kubelet struct {
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager status.Manager
+
+	// nodeStatusManager sync node status with apiserver.
+	nodeStatusManager *NodeStatusManager
 
 	// VolumeManager runs a set of asynchronous loops that figure out which
 	// volumes need to be attached/mounted/unmounted/detached based on the pods
@@ -991,17 +994,6 @@ type Kubelet struct {
 	//    status. Kubelet may fail to update node status reliably if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
-
-	// nodeStatusReportFrequency is the frequency that kubelet posts node
-	// status to master. It is only used when node lease feature is enabled.
-	nodeStatusReportFrequency time.Duration
-
-	// lastStatusReportTime is the time when node status was last reported.
-	lastStatusReportTime time.Time
-
-	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe.
-	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
-	syncNodeStatusMux sync.Mutex
 
 	// updatePodCIDRMux is a lock on updating pod CIDR, because this path is not thread-safe.
 	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
@@ -1071,18 +1063,9 @@ type Kubelet struct {
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
 
-	// use this function to validate the kubelet nodeIP
-	nodeIPValidator func(net.IP) error
-
-	// If non-nil, this is a unique identifier for the node in an external database, eg. cloudprovider
-	providerID string
-
 	// clock is an interface that provides time related functionality in a way that makes it
 	// easy to test the code.
 	clock clock.Clock
-
-	// handlers called during the tryUpdateNodeStatus cycle
-	setNodeStatusFuncs []func(*v1.Node) error
 
 	lastNodeUnschedulableLock sync.Mutex
 	// maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
@@ -1106,11 +1089,6 @@ type Kubelet struct {
 
 	// the number of allowed pods per core
 	podsPerCore int
-
-	// enableControllerAttachDetach indicates the Attach/Detach controller
-	// should manage attachment/detachment of volumes scheduled to this node,
-	// and disable kubelet from executing any attach/detach operations
-	enableControllerAttachDetach bool
 
 	// trigger deleting containers in a pod
 	containerDeletor *podContainerDeletor
@@ -1350,10 +1328,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
 
 	if kl.kubeClient != nil {
-		// Start syncing node status immediately, this may set up things the runtime needs to run.
-		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
-		go kl.fastStatusUpdateOnce()
-
+		// start syncing node status immediately, this may set up things the runtime needs to run.
+		go kl.nodeStatusManager.Run(wait.NeverStop)
 		// start syncing lease
 		go kl.nodeLeaseController.Run(wait.NeverStop)
 	}
@@ -2181,32 +2157,6 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 			removeAll = eviction.PodIsEvicted(syncedPod.Status) || (syncedPod.DeletionTimestamp != nil && notRunning(apiPodStatus.ContainerStatuses))
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
-	}
-}
-
-// fastStatusUpdateOnce starts a loop that checks the internal node indexer cache for when a CIDR
-// is applied  and tries to update pod CIDR immediately. After pod CIDR is updated it fires off
-// a runtime update and a node status update. Function returns after one successful node status update.
-// Function is executed only during Kubelet start which improves latency to ready node by updating
-// pod CIDR, runtime status and node statuses ASAP.
-func (kl *Kubelet) fastStatusUpdateOnce() {
-	for {
-		time.Sleep(100 * time.Millisecond)
-		node, err := kl.GetNode()
-		if err != nil {
-			klog.Errorf(err.Error())
-			continue
-		}
-		if len(node.Spec.PodCIDRs) != 0 {
-			podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
-			if _, err := kl.updatePodCIDR(podCIDRs); err != nil {
-				klog.Errorf("Pod CIDR update to %v failed %v", podCIDRs, err)
-				continue
-			}
-			kl.updateRuntimeUp()
-			kl.syncNodeStatus()
-			return
-		}
 	}
 }
 
