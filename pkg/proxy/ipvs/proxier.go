@@ -1104,8 +1104,7 @@ func (proxier *Proxier) syncProxyRules() {
 		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 		if err != nil {
 			klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
-		}
-		if err == nil && nodeAddrSet.Len() > 0 {
+		} else {
 			nodeAddresses = nodeAddrSet.List()
 			for _, address := range nodeAddresses {
 				if utilproxy.IsZeroCIDR(address) {
