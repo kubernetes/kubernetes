@@ -68,6 +68,22 @@ func (kl *Kubelet) syncNetworkUtil() {
 		klog.Errorf("Failed to ensure rule to drop packet marked by %v in %v chain %v: %v", KubeMarkDropChain, utiliptables.TableFilter, KubeFirewallChain, err)
 		return
 	}
+
+	// drop all non-local packets to localhost if they're not part of an existing
+	// forwarded connection. See #90259
+	if !kl.iptClient.IsIpv6() { // ipv6 doesn't have this issue
+		if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableFilter, KubeFirewallChain,
+			"-m", "comment", "--comment", "block incoming localnet connections",
+			"--dst", "127.0.0.0/8",
+			"!", "--src", "127.0.0.0/8",
+			"-m", "conntrack",
+			"!", "--ctstate", "RELATED,ESTABLISHED,DNAT",
+			"-j", "DROP"); err != nil {
+			klog.Errorf("Failed to ensure rule to drop invalid localhost packets in %v chain %v: %v", utiliptables.TableFilter, KubeFirewallChain, err)
+			return
+		}
+	}
+
 	if _, err := kl.iptClient.EnsureRule(utiliptables.Prepend, utiliptables.TableFilter, utiliptables.ChainOutput, "-j", string(KubeFirewallChain)); err != nil {
 		klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableFilter, utiliptables.ChainOutput, KubeFirewallChain, err)
 		return
