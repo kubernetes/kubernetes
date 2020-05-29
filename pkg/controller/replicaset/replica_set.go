@@ -216,15 +216,11 @@ func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.Repli
 	}
 
 	if klog.V(2).Enabled() {
-		var related string
-		if len(relatedRSs) > 0 {
-			var relatedNames []string
-			for _, r := range relatedRSs {
-				relatedNames = append(relatedNames, r.Name)
-			}
-			related = ": " + strings.Join(relatedNames, ", ")
+		var relatedNames []string
+		for _, r := range relatedRSs {
+			relatedNames = append(relatedNames, r.Name)
 		}
-		klog.Infof("Found %d related %vs for %v %s/%s%s", len(relatedRSs), rsc.Kind, rsc.Kind, rs.Namespace, rs.Name, related)
+		klog.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", relatedNames)
 	}
 
 	return relatedRSs
@@ -560,7 +556,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		// into a performance bottleneck. We should generate a UID for the pod
 		// beforehand and store it via ExpectCreations.
 		rsc.expectations.ExpectCreations(rsKey, diff)
-		klog.V(2).Infof("Too few replicas for %v %s/%s, need %d, creating %d", rsc.Kind, rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
+		klog.V(2).InfoS("Too few replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "creating", diff)
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 		// and double with each successful iteration in a kind of "slow start".
 		// This handles attempts to start large numbers of pods that would
@@ -596,7 +592,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
-		klog.V(2).Infof("Too many replicas for %v %s/%s, need %d, deleting %d", rsc.Kind, rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
+		klog.V(2).InfoS("Too many replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "deleting", diff)
 
 		relatedPods, err := rsc.getIndirectlyRelatedPods(rs)
 		utilruntime.HandleError(err)
