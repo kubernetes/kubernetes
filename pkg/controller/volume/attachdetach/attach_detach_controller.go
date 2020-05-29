@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -198,11 +199,8 @@ func NewAttachDetachController(
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
-	err := adc.podIndexer.AddIndexers(kcache.Indexers{
-		pvcKeyIndex: indexByPVCKey,
-	})
-	if err != nil {
-		klog.Warningf("adding indexer got %v", err)
+	if err := common.AddIndexerIfNotPresent(adc.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc); err != nil {
+		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
 	}
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
@@ -221,30 +219,6 @@ func NewAttachDetachController(
 	})
 
 	return adc, nil
-}
-
-const (
-	pvcKeyIndex string = "pvcKey"
-)
-
-// indexByPVCKey returns PVC keys for given pod. Note that the index is only
-// used for attaching, so we are only interested in active pods with nodeName
-// set.
-func indexByPVCKey(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return []string{}, nil
-	}
-	if len(pod.Spec.NodeName) == 0 || volumeutil.IsPodTerminated(pod, pod.Status) {
-		return []string{}, nil
-	}
-	keys := []string{}
-	for _, podVolume := range pod.Spec.Volumes {
-		if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
-		}
-	}
-	return keys, nil
 }
 
 type attachDetachController struct {
@@ -638,13 +612,17 @@ func (adc *attachDetachController) syncPVCByKey(key string) error {
 		return nil
 	}
 
-	objs, err := adc.podIndexer.ByIndex(pvcKeyIndex, key)
+	objs, err := adc.podIndexer.ByIndex(common.PodPVCIndex, key)
 	if err != nil {
 		return err
 	}
 	for _, obj := range objs {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
+			continue
+		}
+		// we are only interested in active pods with nodeName set
+		if len(pod.Spec.NodeName) == 0 || volumeutil.IsPodTerminated(pod, pod.Status) {
 			continue
 		}
 		volumeActionFlag := util.DetermineVolumeAction(
