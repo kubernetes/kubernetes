@@ -25,12 +25,9 @@ import (
 	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/controller"
 	mirroringmetrics "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 )
 
@@ -43,34 +40,31 @@ func TestReconcileEmpty(t *testing.T) {
 	namespace := "test"
 	endpoints, _ := newEndpointsAndEndpointMeta("foo", namespace)
 
-	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newReconciler(client, defaultMaxEndpointsPerSlice)
 	reconcileHelper(t, r, &endpoints, []*discovery.EndpointSlice{})
-	expectActions(t, client.Actions(), 1, "create", "endpointslices")
+	if len(client.Actions()) > 0 {
+		t.Errorf("Expected 0 additional client actions, got %d", len(client.Actions()))
+	}
 
 	slices := fetchEndpointSlices(t, client, namespace)
-	assert.Len(t, slices, 1, "Expected 1 endpoint slices")
+	if len(slices) > 0 {
+		t.Errorf("Expected 0 EndpointSlices, got %d", len(slices))
+	}
 
-	assert.Regexp(t, "^"+endpoints.Name, slices[0].Name)
-	assert.Equal(t, endpoints.Name, slices[0].Labels[discovery.LabelServiceName])
-	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
-	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
-	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "100")
-	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
+	expectMetrics(t, expectedMetrics{desiredSlices: 0, actualSlices: 0, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0})
+
+	// assert.Regexp(t, "^"+endpoints.Name, slices[0].Name)
+	// assert.Equal(t, endpoints.Name, slices[0].Labels[discovery.LabelServiceName])
+	// assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
+	// assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	// expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "100")
 }
 
 // Test Helpers
 
-func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *reconciler {
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	nodeInformer := informerFactory.Core().V1().Nodes()
-	indexer := nodeInformer.Informer().GetIndexer()
-	for _, node := range nodes {
-		indexer.Add(node)
-	}
-
+func newReconciler(client *fake.Clientset, maxEndpointsPerSlice int32) *reconciler {
 	return &reconciler{
 		client:               client,
-		nodeLister:           corelisters.NewNodeLister(indexer),
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
 		endpointSliceTracker: newEndpointSliceTracker(),
 		metricsCache:         mirroringmetrics.NewCache(maxEndpointsPerSlice),
@@ -133,6 +127,9 @@ func expectUnorderedSlicesWithTopLevelAttrs(t *testing.T, endpointSlices []disco
 
 func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, resource string) {
 	t.Helper()
+	if len(actions) < num {
+		t.Fatalf("Expected at least %d actions, got %d", num, len(actions))
+	}
 	for i := 0; i < num; i++ {
 		relativePos := len(actions) - i - 1
 		assert.Equal(t, verb, actions[relativePos].GetVerb(), "Expected action -%d verb to be %s", i, verb)

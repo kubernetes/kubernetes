@@ -6,7 +6,7 @@ go_library(
         "cache.go",
         "metrics.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/controller/endpointslice/metrics",
+    importpath = "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/util/endpoint:go_default_library",

@@ -29,7 +29,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	mirroringmetrics "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
@@ -38,7 +37,6 @@ import (
 // desired state
 type reconciler struct {
 	client               clientset.Interface
-	nodeLister           corelisters.NodeLister
 	maxEndpointsPerSlice int32
 	endpointSliceTracker *endpointSliceTracker
 	metricsCache         *mirroringmetrics.Cache
@@ -125,7 +123,6 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 		totalAdded += added
 		totalRemoved += removed
 
-		fmt.Printf("==============> %d <> %d <> %d", len(existingSlicesByPortMap[portMap]), len(pmSlicesToCreate), len(pmSlicesToDelete))
 		spMetrics.Set(portMap, mirroringmetrics.EfficiencyInfo{
 			Endpoints: numEndpoints,
 			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
@@ -150,16 +147,6 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 				slicesToDelete = append(slicesToDelete, existingSlice)
 			}
 		}
-	}
-
-	// When no endpoint slices would usually exist, we need to add a placeholder.
-	if len(existingSlices) == len(slicesToDelete) && len(slicesToCreate) < 1 {
-		placeholderSlice := newEndpointSlice(endpoints, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: addressType})
-		slicesToCreate = append(slicesToCreate, placeholderSlice)
-		spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), mirroringmetrics.EfficiencyInfo{
-			Endpoints: 0,
-			Slices:    1,
-		})
 	}
 
 	mirroringmetrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))

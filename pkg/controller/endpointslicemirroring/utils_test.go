@@ -94,27 +94,26 @@ func newClientset() *fake.Clientset {
 }
 
 func newEndpointsAndEndpointMeta(name, namespace string) (v1.Endpoints, endpointMeta) {
-	portNum := int32(80)
+	ports := []v1.EndpointPort{{
+		Port:     80,
+		Protocol: v1.ProtocolTCP,
+		Name:     name,
+	}}
 
-	svc := v1.Endpoints{
+	endpoints := v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Subsets: []v1.EndpointSubset{{
-			Ports: []v1.EndpointPort{{
-				Port:     portNum,
-				Protocol: v1.ProtocolTCP,
-				Name:     name,
-			}},
+			Ports: ports,
 		}},
 	}
 
 	addressType := discovery.AddressTypeIPv4
-	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
 		AddressType: addressType,
-		Ports:       []discovery.EndpointPort{{Name: &name, Port: &portNum, Protocol: &protocol}},
+		Ports:       epPortsToEpsPorts(ports),
 	}
 
-	return svc, endpointMeta
+	return endpoints, endpointMeta
 }
 
 func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, svc v1.Service) *discovery.EndpointSlice {

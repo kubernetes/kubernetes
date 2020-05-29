@@ -7,7 +7,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/controller/endpointslice/config",
+    importpath = "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config",
     visibility = ["//visibility:public"],
     deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
@@ -23,7 +23,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/controller/endpointslice/config/v1alpha1:all-srcs",
+        "//pkg/controller/endpointslicemirroring/config/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

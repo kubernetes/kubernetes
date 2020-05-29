@@ -10,7 +10,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1",
+    importpath = "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/endpointslice/config:go_default_library",
