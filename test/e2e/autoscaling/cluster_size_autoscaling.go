@@ -95,7 +95,6 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 	var c clientset.Interface
 	var nodeCount int
-	var coreCount int64
 	var memAllocatableMb int
 	var originalSizes map[string]int
 
@@ -118,11 +117,6 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
-		coreCount = 0
-		for _, node := range nodes.Items {
-			quantity := node.Status.Allocatable[v1.ResourceCPU]
-			coreCount += quantity.Value()
-		}
 		ginkgo.By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
 		framework.ExpectNotEqual(nodeCount, 0)
 		mem := nodes.Items[0].Status.Allocatable[v1.ResourceMemory]
