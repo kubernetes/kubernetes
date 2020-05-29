@@ -204,6 +204,7 @@ type pausePodConfig struct {
 	NodeName                          string
 	SchedulerName                     string
 	Priority                          *int32
+	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
 }
 
@@ -230,6 +231,7 @@ func initPausePod(conf *pausePodConfig) *v1.Pod {
 			NodeName:          conf.NodeName,
 			SchedulerName:     conf.SchedulerName,
 			Priority:          conf.Priority,
+			PreemptionPolicy:  conf.PreemptionPolicy,
 			PriorityClassName: conf.PriorityClassName,
 		},
 	}
@@ -398,6 +400,12 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
 }
 
+// waitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
+// an error if it does not scheduled within the given timeout.
+func waitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.Poll(100*time.Millisecond, timeout, podScheduled(cs, pod.Namespace, pod.Name))
+}
+
 // waitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
 func waitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
@@ -483,5 +491,20 @@ func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
 	if err := wait.Poll(time.Second, wait.ForeverTestTimeout,
 		noPodsInNamespace(cs, ns)); err != nil {
 		t.Errorf("error while waiting for pods in namespace %v: %v", ns, err)
+	}
+}
+
+// podScheduled returns true if a node is assigned to the given pod.
+func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		if pod.Spec.NodeName == "" {
+			return false, nil
+		}
+		return true, nil
 	}
 }

@@ -33,13 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -431,6 +434,87 @@ func TestPreemption(t *testing.T) {
 		// Cleanup
 		pods = append(pods, preemptor)
 		testutils.CleanupPods(cs, t, pods)
+	}
+}
+
+// TestNonPreemption tests NonPreempt option of PriorityClass of scheduler works as expected.
+func TestNonPreemption(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
+
+	var preemptNever = v1.PreemptNever
+	// Initialize scheduler.
+	testCtx := initTest(t, "non-preemption")
+	defer testutils.CleanupTest(t, testCtx)
+	cs := testCtx.ClientSet
+	tests := []struct {
+		name             string
+		PreemptionPolicy *v1.PreemptionPolicy
+	}{
+		{
+			name:             "pod preemption will happen",
+			PreemptionPolicy: nil,
+		},
+		{
+			name:             "pod preemption will not happen",
+			PreemptionPolicy: &preemptNever,
+		},
+	}
+	victim := initPausePod(&pausePodConfig{
+		Name:      "victim-pod",
+		Namespace: testCtx.NS.Name,
+		Priority:  &lowPriority,
+		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+		},
+	})
+
+	preemptor := initPausePod(&pausePodConfig{
+		Name:      "preemptor-pod",
+		Namespace: testCtx.NS.Name,
+		Priority:  &highPriority,
+		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+		},
+	})
+
+	// Create a node with some resources and a label.
+	nodeRes := &v1.ResourceList{
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+	}
+	_, err := createNode(testCtx.ClientSet, "node1", nodeRes)
+	if err != nil {
+		t.Fatalf("Error creating nodes: %v", err)
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer testutils.CleanupPods(cs, t, []*v1.Pod{preemptor, victim})
+			preemptor.Spec.PreemptionPolicy = test.PreemptionPolicy
+			victimPod, err := createPausePod(cs, victim)
+			if err != nil {
+				t.Fatalf("Error while creating victim: %v", err)
+			}
+			if err := waitForPodToScheduleWithTimeout(cs, victimPod, 5*time.Second); err != nil {
+				t.Fatalf("victim %v should be become scheduled", victimPod.Name)
+			}
+
+			preemptorPod, err := createPausePod(cs, preemptor)
+			if err != nil {
+				t.Fatalf("Error while creating preemptor: %v", err)
+			}
+
+			err = waitForNominatedNodeNameWithTimeout(cs, preemptorPod, 5*time.Second)
+			// test.PreemptionPolicy == nil means we expect the preemptor to be nominated.
+			expect := test.PreemptionPolicy == nil
+			// err == nil indicates the preemptor is indeed nominated.
+			got := err == nil
+			if got != expect {
+				t.Errorf("Expect preemptor to be nominated=%v, but got=%v", expect, got)
+			}
+		})
 	}
 }
 
