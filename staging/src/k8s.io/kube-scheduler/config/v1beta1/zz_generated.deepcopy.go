@@ -83,11 +83,6 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		*out = new(int32)
 		**out = **in
 	}
-	if in.BindTimeoutSeconds != nil {
-		in, out := &in.BindTimeoutSeconds, &out.BindTimeoutSeconds
-		*out = new(int64)
-		**out = **in
-	}
 	if in.PodInitialBackoffSeconds != nil {
 		in, out := &in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds
 		*out = new(int64)
