@@ -511,7 +511,7 @@ func (e *TokensController) hasReferencedToken(serviceAccount *v1.ServiceAccount)
 func (e *TokensController) secretUpdateNeeded(secret *v1.Secret) (bool, bool, bool, bool) {
 	caData := secret.Data[v1.ServiceAccountRootCAKey]
 	needsCA := len(e.rootCA) > 0 && !bytes.Equal(caData, e.rootCA)
-	needsServiceServingCA := len(e.serviceServingCA) > 0 && bytes.Compare(secret.Data[ServiceServingCASecretKey], e.serviceServingCA) != 0
+	needsServiceServingCA := bytes.Compare(secret.Data[ServiceServingCASecretKey], e.serviceServingCA) != 0
 
 	needsNamespace := len(secret.Data[v1.ServiceAccountNamespaceKey]) == 0
 
@@ -560,7 +560,11 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 		liveSecret.Data[v1.ServiceAccountRootCAKey] = e.rootCA
 	}
 	if needsServiceServingCA {
-		liveSecret.Data[ServiceServingCASecretKey] = e.serviceServingCA
+		if len(e.serviceServingCA) > 0 {
+			liveSecret.Data[ServiceServingCASecretKey] = e.serviceServingCA
+		} else {
+			delete(liveSecret.Data, ServiceServingCASecretKey)
+		}
 	}
 	// Set the namespace
 	if needsNamespace {
