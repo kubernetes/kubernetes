@@ -396,6 +396,17 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 }
 
+// AddUserFlags add "user" flag to local flags, then the user can see the usage of "user" flag in the help message
+func AddUserFlags(cmd *cobra.Command, usage string) {
+	localFlags := cmd.LocalFlags()
+	localFlags.StringArray("user", []string{}, usage)
+	// now the root command has defined persistent flags "user".
+	// you can see it through "kubectl option". the create clusterrole and rolebindding command cannot
+	// use the inherited "user" flag in order to maintain compatibility.
+	// so add "user" flag to Flags() again to overwrite inherited flags.
+	cmd.Flags().AddFlagSet(localFlags)
+}
+
 func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 	cmd.Flags().BoolVar(&options.EnableValidation, "validate", options.EnableValidation, "If true, use a schema to validate the input before sending it")
 }

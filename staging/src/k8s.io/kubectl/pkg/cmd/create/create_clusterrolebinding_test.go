@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	rbac "k8s.io/api/rbac/v1beta1"
@@ -121,6 +122,18 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	cmd.Run(cmd, []string{"fake-binding"})
 	if buf.String() != expectedOutput {
 		t.Errorf("TestCreateClusterRoleBinding: expected %v\n but got %v\n", expectedOutput, buf.String())
+	}
+}
+
+func TestCreateClusterRoleUsageContainsUserFlag(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateClusterRoleBinding(tf, ioStreams)
+	expected := "Usernames to bind to the clusterrole"
+	if !strings.Contains(cmd.UsageString(), expected) {
+		t.Errorf("TestUsageStringContainsUserFlag: expected contains %v\n but got %v\n", expected, cmd.UsageString())
 	}
 }
 

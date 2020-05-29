@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	rbac "k8s.io/api/rbac/v1"
@@ -118,6 +119,18 @@ func TestCreateRoleBinding(t *testing.T) {
 	cmd.Flags().Set("group", "fake-group")
 	cmd.Flags().Set("serviceaccount", "fake-namespace:fake-account")
 	cmd.Run(cmd, []string{"fake-binding"})
+}
+
+func TestCreateRoleBindingUsageContainsUserFlag(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateRoleBinding(tf, ioStreams)
+	expected := "Usernames to bind to the role"
+	if !strings.Contains(cmd.UsageString(), expected) {
+		t.Errorf("TestUsageStringContainsUserFlag: expected contains %v\n but got %v\n", expected, cmd.UsageString())
+	}
 }
 
 type RoleBindingRESTClient struct {
