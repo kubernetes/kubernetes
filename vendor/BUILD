@@ -265,6 +265,7 @@ filegroup(
         "//vendor/github.com/rubiojr/go-vhd/vhd:all-srcs",
         "//vendor/github.com/russross/blackfriday:all-srcs",
         "//vendor/github.com/satori/go.uuid:all-srcs",
+        "//vendor/github.com/seccomp/containers-golang:all-srcs",
         "//vendor/github.com/seccomp/libseccomp-golang:all-srcs",
         "//vendor/github.com/shurcooL/sanitized_anchor_name:all-srcs",
         "//vendor/github.com/sirupsen/logrus:all-srcs",

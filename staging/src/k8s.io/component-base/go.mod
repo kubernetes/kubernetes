@@ -5,7 +5,7 @@ module k8s.io/component-base
 go 1.14
 
 require (
-	github.com/blang/semver v3.5.0+incompatible
+	github.com/blang/semver v3.5.1+incompatible
 	github.com/go-logr/logr v0.2.0
 	github.com/google/go-cmp v0.4.0
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect

@@ -24,14 +24,21 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"path"
+	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/seccomp/containers-golang"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e_node/services"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -61,6 +68,32 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	}
 
 	return pod
+}
+
+type seccompProfile struct {
+	name    string
+	profile *seccomp.Seccomp
+}
+
+func newSeccompProfile(profile *seccomp.Seccomp) *seccompProfile {
+	return &seccompProfile{
+		name:    fmt.Sprintf("test-%v.json", string(uuid.NewUUID())),
+		profile: profile,
+	}
+}
+
+func (s *seccompProfile) toEchoStr(root string) (string, error) {
+	j, err := json.Marshal(s.profile)
+	if err != nil {
+		return "", errors.Wrap(err, "marshaling seccomp profile")
+	}
+	return fmt.Sprintf(
+		"echo '%s' > %s", j, path.Join(root, s.name),
+	), nil
+}
+
+func (s *seccompProfile) LocalhostName() string {
+	return "localhost/" + s.name
 }
 
 var _ = SIGDescribe("Security Context", func() {
@@ -144,6 +177,88 @@ var _ = SIGDescribe("Security Context", func() {
 
 	ginkgo.It("should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly]", func() {
 		testPodSELinuxLabeling(f, false, true)
+	})
+
+	addSeccompProfilesToNode := func(profiles []*seccompProfile) {
+		name := "seccomp-setup-" + string(uuid.NewUUID())
+		hostPathType := v1.HostPathDirectoryOrCreate
+		seccompProfileRoot := path.Join(services.KubeletRootDirectory, "seccomp")
+
+		args := []string{}
+		for _, profile := range profiles {
+			str, err := profile.toEchoStr(seccompProfileRoot)
+			framework.ExpectNoError(err)
+			args = append(args, str)
+		}
+
+		ds := &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   name,
+				Labels: map[string]string{"name": name},
+			},
+			Spec: appsv1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"name": "seccomp-setup",
+					},
+				},
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"name": "seccomp-setup"},
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "test-container",
+								Image: imageutils.GetE2EImage(imageutils.BusyBox),
+								VolumeMounts: []v1.VolumeMount{
+									{Name: "kubelet", MountPath: seccompProfileRoot},
+								},
+								Command: []string{
+									"sh", "-c", strings.Join(args, " && ") + " && sleep 6000",
+								},
+							},
+						},
+						Volumes: []v1.Volume{
+							{
+								Name: "kubelet",
+								VolumeSource: v1.VolumeSource{
+									HostPath: &v1.HostPathVolumeSource{
+										Path: seccompProfileRoot,
+										Type: &hostPathType,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		ns := f.Namespace.Name
+		_, err := f.ClientSet.AppsV1().DaemonSets(ns).Create(
+			context.Background(), ds, metav1.CreateOptions{},
+		)
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(e2epod.WaitForPodsRunningReady(
+			f.ClientSet, ns, 1, 0, framework.PollShortTimeout, nil,
+		))
+	}
+
+	ginkgo.It("should support seccomp localhost profile for a container [LinuxOnly]", func() {
+		profile := newSeccompProfile(&seccomp.Seccomp{
+			DefaultAction: seccomp.ActAllow,
+			Syscalls: []*seccomp.Syscall{
+				{Names: []string{"mkdir"}, Action: seccomp.ActErrno},
+			},
+		})
+		addSeccompProfilesToNode([]*seccompProfile{profile})
+
+		pod := scTestPod(false, false)
+		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = profile.LocalhostName()
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "mkdir test || true"}
+
+		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"Operation not permitted"})
 	})
 
 	ginkgo.It("should support seccomp alpha unconfined annotation on the container [Feature:Seccomp] [LinuxOnly]", func() {
