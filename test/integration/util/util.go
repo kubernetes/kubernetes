@@ -407,7 +407,6 @@ func InitTestSchedulerWithOptions(
 	if policy != nil {
 		opts = append(opts, scheduler.WithAlgorithmSource(CreateAlgorithmSourceFromPolicy(policy, testCtx.ClientSet)))
 	}
-	opts = append([]scheduler.Option{scheduler.WithBindTimeoutSeconds(600)}, opts...)
 	testCtx.Scheduler, err = scheduler.New(
 		testCtx.ClientSet,
 		testCtx.InformerFactory,

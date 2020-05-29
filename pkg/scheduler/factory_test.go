@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/tools/events"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	apicore "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -45,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -54,7 +52,6 @@ import (
 
 const (
 	disablePodPreemption             = false
-	bindTimeoutSeconds               = 600
 	podInitialBackoffDurationSeconds = 1
 	podMaxBackoffDurationSeconds     = 10
 	testSchedulerName                = "test-scheduler"
@@ -242,14 +239,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	prof := factory.profiles[0]
-	wantConfig := []schedulerapi.PluginConfig{
-		{
-			Name: volumebinding.Name,
-			Args: &config.VolumeBindingArgs{
-				BindTimeoutSeconds: bindTimeoutSeconds,
-			},
-		},
-	}
+	wantConfig := []schedulerapi.PluginConfig{}
 	if diff := cmp.Diff(wantConfig, prof.PluginConfig); diff != "" {
 		t.Errorf("wrong plugin config (-want, +got): %s", diff)
 	}
@@ -465,7 +455,6 @@ func newConfigFactoryWithFrameworkRegistry(
 		podInformer:              informerFactory.Core().V1().Pods(),
 		disablePreemption:        disablePodPreemption,
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-		bindTimeoutSeconds:       bindTimeoutSeconds,
 		podInitialBackoffSeconds: podInitialBackoffDurationSeconds,
 		podMaxBackoffSeconds:     podMaxBackoffDurationSeconds,
 		StopEverything:           stopCh,

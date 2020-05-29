@@ -478,7 +478,6 @@ profiles:
 				},
 			},
 			want: `apiVersion: kubescheduler.config.k8s.io/v1beta1
-bindTimeoutSeconds: 0
 clientConnection:
   acceptContentTypes: ""
   burst: 0

@@ -90,13 +90,6 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored.
 	PercentageOfNodesToScore int32
 
-	// BindTimeoutSeconds is the timeout in seconds in volume binding operation.
-	// Value must be non-negative integer. The value zero indicates no waiting.
-	// If this value is nil, the default value will be used.
-	// DEPRECATED: BindTimeoutSeconds in deprecated.
-	// TODO(#90958) Remove this and the versioned counterparts in future API versions.
-	BindTimeoutSeconds int64
-
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.
