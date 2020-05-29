@@ -270,7 +270,7 @@ function save-windows-logs-via-ssh() {
 
     export-windows-docker-event-log "${node}"
     export-windows-docker-images-list "${node}"
-    
+
     local remote_files=()
     for file in ${windows_node_logfiles[@]}; do
       remote_files+=( "${WINDOWS_LOGS_DIR}\\${file}" )

@@ -149,7 +149,7 @@ CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-${KUBE_CONTAINER_RUNTIME:-}}
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
-# Add path for things like running kubectl binary. 
+# Add path for things like running kubectl binary.
 PATH=$(dirname "${e2e_test}"):"${PATH}"
 export PATH
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
