@@ -19,12 +19,8 @@ package pod
 import (
 	"sync"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -120,20 +116,18 @@ type basicManager struct {
 	translationByUID map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
 
 	// basicManager is keeping secretManager and configMapManager up-to-date.
-	secretManager     secret.Manager
-	configMapManager  configmap.Manager
-	checkpointManager checkpointmanager.CheckpointManager
+	secretManager    secret.Manager
+	configMapManager configmap.Manager
 
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager, cpm checkpointmanager.CheckpointManager) Manager {
+func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager) Manager {
 	pm := &basicManager{}
 	pm.secretManager = secretManager
 	pm.configMapManager = configMapManager
-	pm.checkpointManager = cpm
 	pm.MirrorClient = client
 	pm.SetPods(nil)
 	return pm
@@ -161,11 +155,6 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.updatePodsInternal(pod)
-	if pm.checkpointManager != nil {
-		if err := checkpoint.WritePod(pm.checkpointManager, pod); err != nil {
-			klog.Errorf("Error writing checkpoint for pod: %v", pod.GetName())
-		}
-	}
 }
 
 func isPodInTerminatedState(pod *v1.Pod) bool {
@@ -243,11 +232,6 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	} else {
 		delete(pm.podByUID, kubetypes.ResolvedPodUID(pod.UID))
 		delete(pm.podByFullName, podFullName)
-	}
-	if pm.checkpointManager != nil {
-		if err := checkpoint.DeletePod(pm.checkpointManager, pod); err != nil {
-			klog.Errorf("Error deleting checkpoint for pod: %v", pod.GetName())
-		}
 	}
 }
 
