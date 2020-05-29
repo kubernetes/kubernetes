@@ -21,7 +21,6 @@ go_library(
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
         "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
-        "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/cache/debugger:go_default_library",
