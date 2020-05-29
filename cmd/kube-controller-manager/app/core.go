@@ -533,12 +533,16 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 }
 
 func startPVCProtectionController(ctx ControllerContext) (http.Handler, bool, error) {
-	go pvcprotection.NewPVCProtectionController(
+	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
-	).Run(1, ctx.Stop)
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
+	}
+	go pvcProtectionController.Run(1, ctx.Stop)
 	return nil, true, nil
 }
 

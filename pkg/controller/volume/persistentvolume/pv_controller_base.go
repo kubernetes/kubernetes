@@ -41,12 +41,12 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
-	"k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog/v2"
 )
@@ -134,10 +134,8 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
-	if err := controller.podIndexer.AddIndexers(cache.Indexers{
-		pvcKeyIndex: indexByPVCKey,
-	}); err != nil {
-		return nil, fmt.Errorf("Could not initialize PersistentVolume Controller: %v", err)
+	if err := common.AddIndexerIfNotPresent(controller.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc); err != nil {
+		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
 	}
 
 	csiTranslator := csitrans.New()
@@ -568,28 +566,6 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 }
 
 // Stateless functions
-
-const (
-	pvcKeyIndex string = "pvc-key-index"
-)
-
-// indexByPVCKey returns PVC keys for given pod
-func indexByPVCKey(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return []string{}, nil
-	}
-	if util.IsPodTerminated(pod, pod.Status) {
-		return []string{}, nil
-	}
-	keys := []string{}
-	for _, podVolume := range pod.Spec.Volumes {
-		if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
-		}
-	}
-	return keys, nil
-}
 
 func getClaimStatusForLogging(claim *v1.PersistentVolumeClaim) string {
 	bound := metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted)
