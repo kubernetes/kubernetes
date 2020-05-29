@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -126,6 +125,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 		totalAdded += added
 		totalRemoved += removed
 
+		fmt.Printf("==============> %d <> %d <> %d", len(existingSlicesByPortMap[portMap]), len(pmSlicesToCreate), len(pmSlicesToDelete))
 		spMetrics.Set(portMap, mirroringmetrics.EfficiencyInfo{
 			Endpoints: numEndpoints,
 			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),

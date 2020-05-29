@@ -17,26 +17,17 @@ limitations under the License.
 package endpointslice
 
 import (
-	"context"
 	"fmt"
-	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 // Most of the tests related to EndpointSlice allocation can be found in reconciler_test.go
@@ -76,14 +67,14 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
-	esController.serviceStore.Add(&v1.Service{
+	esController.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
-		},
+		Subsets: []v1.EndpointSubset{{
+			Ports: []v1.EndpointPort{{Port: 80}},
+		}},
 	})
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	err := esController.syncEndpoints(fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.Nil(t, err)
 	assert.Len(t, client.Actions(), 0)
 }

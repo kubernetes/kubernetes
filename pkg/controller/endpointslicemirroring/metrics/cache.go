@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"fmt"
 	"math"
 	"sync"
 
@@ -133,12 +134,16 @@ type metricsUpdate struct {
 // Must be called holding lock.
 func (c *Cache) desiredAndActualSlices() metricsUpdate {
 	mUpdate := metricsUpdate{}
-	for _, spCache := range c.cache {
-		for _, eInfo := range spCache.items {
+	for bar, spCache := range c.cache {
+		fmt.Printf("bar ==========> %v\n", bar)
+		for foo, eInfo := range spCache.items {
+			fmt.Printf("foo ==========> %v\n", foo)
+			fmt.Printf("eInfo ==========> %v\n", eInfo)
 			mUpdate.actual += eInfo.Slices
 			mUpdate.desired += numDesiredSlices(eInfo.Endpoints, int(c.maxEndpointsPerSlice))
 		}
 	}
+	fmt.Printf("mUpdate ==========> %v\n", mUpdate)
 	return mUpdate
 }
 
@@ -154,6 +159,7 @@ func (c *Cache) updateMetrics() {
 // numDesiredSlices calculates the number of EndpointSlices that would exist
 // with ideal endpoint distribution.
 func numDesiredSlices(numEndpoints, maxPerSlice int) int {
+	fmt.Printf("numDesiredSlices =========> %d <> %d\n", numEndpoints, maxPerSlice)
 	if numEndpoints <= maxPerSlice {
 		return 1
 	}
