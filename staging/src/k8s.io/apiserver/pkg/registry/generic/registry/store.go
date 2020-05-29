@@ -1006,12 +1006,19 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	if err != nil {
 		return nil, err
 	}
+	if len(items) == 0 {
+		// Nothing to delete, return now
+		return listObj, nil
+	}
 	// Spawn a number of goroutines, so that we can issue requests to storage
 	// in parallel to speed up deletion.
-	// TODO: Make this proportional to the number of items to delete, up to
+	// It is proportional to the number of items to delete, up to
 	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
 	// workers to delete 10 items).
 	workersNumber := e.DeleteCollectionWorkers
+	if workersNumber > len(items) {
+		workersNumber = len(items)
+	}
 	if workersNumber < 1 {
 		workersNumber = 1
 	}
