@@ -1078,6 +1078,10 @@ func typeToJSON(typeName string) string {
 		return "string"
 	case "v1.DeletionPropagation", "*v1.DeletionPropagation":
 		return "string"
+	case "v1.ResourceVersionMatch", "*v1.ResourceVersionMatch":
+		return "string"
+	case "v1.IncludeObjectPolicy", "*v1.IncludeObjectPolicy":
+		return "string"
 
 	// TODO: Fix these when go-restful supports a way to specify an array query param:
 	// https://github.com/emicklei/go-restful/issues/225

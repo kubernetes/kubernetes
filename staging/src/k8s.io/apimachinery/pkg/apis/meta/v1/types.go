@@ -355,14 +355,23 @@ type ListOptions struct {
 	// +optional
 	AllowWatchBookmarks bool `json:"allowWatchBookmarks,omitempty" protobuf:"varint,9,opt,name=allowWatchBookmarks"`
 
-	// When specified with a watch call, shows changes that occur after that particular version of a resource.
-	// Defaults to changes from the beginning of history.
-	// When specified for list:
-	// - if unset, then the result is returned from remote storage based on quorum-read flag;
-	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
-	// - if set to non zero, then the result is at least as fresh as given rv.
+	// resourceVersion sets a constraint on what resource versions a request may be served from.
+	// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+	// details.
+	//
+	// Defaults to unset
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
+
+	// resourceVersionMatch determines how resourceVersion is applied to list calls.
+	// It is highly recommended that resourceVersionMatch be set for list calls where
+	// resourceVersion is set
+	// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+	// details.
+	//
+	// Defaults to unset
+	// +optional
+	ResourceVersionMatch ResourceVersionMatch `json:"resourceVersionMatch,omitempty" protobuf:"bytes,10,opt,name=resourceVersionMatch,casttype=ResourceVersionMatch"`
 	// Timeout for the list/watch call.
 	// This limits the duration of the call, regardless of any activity or inactivity.
 	// +optional
@@ -402,6 +411,25 @@ type ListOptions struct {
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
 }
 
+// resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
+// may only be set if resourceVersion is also set.
+//
+// "NotOlderThan" matches data at least as new as the provided resourceVersion.
+// "Exact" matches data at the exact resourceVersion provided.
+//
+// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+// details.
+type ResourceVersionMatch string
+
+const (
+	// ResourceVersionMatchNotOlderThan matches data at least as new as the provided
+	// resourceVersion.
+	ResourceVersionMatchNotOlderThan ResourceVersionMatch = "NotOlderThan"
+	// ResourceVersionMatchExact matches data at the exact resourceVersion
+	// provided.
+	ResourceVersionMatchExact ResourceVersionMatch = "Exact"
+)
+
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -423,10 +451,12 @@ type ExportOptions struct {
 // GetOptions is the standard query options to the standard REST get call.
 type GetOptions struct {
 	TypeMeta `json:",inline"`
-	// When specified:
-	// - if unset, then the result is returned from remote storage based on quorum-read flag;
-	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
-	// - if set to non zero, then the result is at least as fresh as given rv.
+	// resourceVersion sets a constraint on what resource versions a request may be served from.
+	// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
+	// details.
+	//
+	// Defaults to unset
+	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,1,opt,name=resourceVersion"`
 	// +k8s:deprecated=includeUninitialized,protobuf=2
 }
