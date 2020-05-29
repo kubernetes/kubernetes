@@ -63,7 +63,11 @@ var _ Leases = &storageLeases{}
 // ListLeases retrieves a list of the current master IPs from storage
 func (s *storageLeases) ListLeases() ([]string, error) {
 	ipInfoList := &corev1.EndpointsList{}
-	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, "0", storage.Everything, ipInfoList); err != nil {
+	storageOpts := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+	}
+	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
 		return nil, err
 	}
 
