@@ -619,7 +619,7 @@ filename | sha512 hash
 * Services of type=LoadBalancer which have no endpoints will now immediately ICMP reject connections, rather than time out. ([#74394](https://github.com/kubernetes/kubernetes/pull/74394), [@thockin](https://github.com/thockin))
 * Fixes an error with stuck informers when an etcd watch receives update or delete events with missing data ([#76675](https://github.com/kubernetes/kubernetes/pull/76675), [@ryanmcnamara](https://github.com/ryanmcnamara))
 * Update Cluster Autoscaler to 1.13.4 ([#77065](https://github.com/kubernetes/kubernetes/pull/77065), [@losipiuk](https://github.com/losipiuk))
-    * https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.13.4 
+    * https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.13.4
     * https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.13.3
 * Add name validation for dynamic client methods in client-go ([#75072](https://github.com/kubernetes/kubernetes/pull/75072), [@lblackstone](https://github.com/lblackstone))
 * fix smb unmount issue on Windows ([#75087](https://github.com/kubernetes/kubernetes/pull/75087), [@andyzhangx](https://github.com/andyzhangx))
@@ -726,7 +726,7 @@ filename | sha512 hash
     *   reflector_short_watches_total
     *   reflector_watch_duration_seconds
     *   reflector_watches_total
-    * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable. 
+    * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable.
 
 
 

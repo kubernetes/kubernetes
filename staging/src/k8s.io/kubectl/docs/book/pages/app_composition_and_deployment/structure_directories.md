@@ -45,7 +45,7 @@ A Kustomize Base (e.g. `bases:`) provides shared Config that is customized by so
 
 The directory structure outlined in this chapter organizes Bases into a hierarchy as:
 `app-bases/environment-bases/cluster`
- 
+
 ## Workflow Example
 
 - Changes made to *env/cluster/* roll out to **only that specific env-cluster**
@@ -101,7 +101,7 @@ B-->SC: C deployed
 {% method %}
 
 Techniques:
- 
+
 - Each Layer adds a [namePrefix](../app_management/namespaces_and_names.md#setting-a-name-prefix-or-suffix-for-all-resources) and [commonLabels](../app_management/labels_and_annotations.md#setting-labels-for-all-resources).
 - Each Layer adds labels and annotations.
 - Each deployable target sets a [namespace](../app_management/namespaces_and_names.md#setting-the-namespace-for-all-resources).
@@ -133,7 +133,7 @@ tree
 │       ├── service.yaml
 │       └── statefulset.yaml
 ├── prod # Production
-│   ├── bases 
+│   ├── bases
 │   │   ├── kustomization.yaml # Uses bases: ["../../bases"]
 │   │   ├── backend
 │   │   │   └── deployment-patch.yaml # Production Env specific backend overrides
@@ -145,19 +145,19 @@ tree
 │   │   ├── kustomization.yaml # Uses bases: ["../bases"]
 │   │   └── backend
 │   │       └── deployment-patch.yaml # us-central cluster specific backend overrides
-│   ├── us-east 
+│   ├── us-east
 │   │   └── kustomization.yaml # Uses bases: ["../bases"]
-│   └── us-west 
+│   └── us-west
 │       └── kustomization.yaml # Uses bases: ["../bases"]
 ├── staging # Staging
-│   ├── bases 
+│   ├── bases
 │   │   ├── kustomization.yaml # Uses bases: ["../../bases"]
-│   └── us-west 
+│   └── us-west
 │       └── kustomization.yaml # Uses bases: ["../bases"]
 └── test # Test
-    ├── bases 
+    ├── bases
     │   ├── kustomization.yaml # Uses bases: ["../../bases"]
-    └── us-west 
+    └── us-west
         └── kustomization.yaml # Uses bases: ["../bases"]
 ```
 
@@ -165,7 +165,7 @@ tree
 
 {% panel style="warning", title="Applying Environment + Cluster" %}
 Though the directory structure contains the cluster in the path, this won't be used by
-Apply to determine the cluster context.  To Apply a specific cluster, add that cluster to the 
+Apply to determine the cluster context.  To Apply a specific cluster, add that cluster to the
 kubectl config`, and specify the corresponding context when running Apply.
 
 For more information see [Multi-Cluster](accessing_multiple_clusters.md).

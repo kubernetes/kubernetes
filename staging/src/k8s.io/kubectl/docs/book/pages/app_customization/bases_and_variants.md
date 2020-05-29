@@ -91,7 +91,7 @@ bases:
 # ../base/kustomization.yaml
 configMapGenerator:
 - name: my-java-server-env-vars
-  literals:	
+  literals:
   - JAVA_HOME=/opt/java/jdk
   - JAVA_TOOL_OPTIONS=-agentlib:hprof
 resources:

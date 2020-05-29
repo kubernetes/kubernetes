@@ -10,7 +10,7 @@
 * [Introduction](pages/app_management/introduction.md)
 * [Apply](pages/app_management/apply.md)
 * [Secrets and ConfigMaps](pages/app_management/secrets_and_configmaps.md)
-* [Container Images](pages/app_management/container_images.md)      
+* [Container Images](pages/app_management/container_images.md)
 * [Namespaces and Names](pages/app_management/namespaces_and_names.md)
 * [Labels and Annotations](pages/app_management/labels_and_annotations.md)
 * [Field Merge Semantics](pages/app_management/field_merge_semantics.md)

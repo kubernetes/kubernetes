@@ -604,7 +604,7 @@ filename | sha512 hash
     * try to only update vm if detach a non-existing disk when got <200, error> after detach disk operation
 * This adds some useful metrics around pending changes and last successful ([#78602](https://github.com/kubernetes/kubernetes/pull/78602), [@paulgmiller](https://github.com/paulgmiller))
     * sync time.
- 
+
     * The goal is for administrators to be able to alert on proxies that, for
     * whatever reason, are quite stale.
 * Fix a string comparison bug in IPVS graceful termination where UDP real servers are not deleted. ([#78999](https://github.com/kubernetes/kubernetes/pull/78999), [@andrewsykim](https://github.com/andrewsykim))
@@ -743,7 +743,7 @@ filename | sha512 hash
 * Fix issue in Portworx volume driver causing controller manager to crash ([#76341](https://github.com/kubernetes/kubernetes/pull/76341), [@harsh-px](https://github.com/harsh-px))
 * Fixes segmentation fault issue with Protobuf library when log entries are deeply nested. ([#77224](https://github.com/kubernetes/kubernetes/pull/77224), [@qingling128](https://github.com/qingling128))
 * Update Cluster Autoscaler to 1.14.2 ([#77064](https://github.com/kubernetes/kubernetes/pull/77064), [@losipiuk](https://github.com/losipiuk))
-    * https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.14.2 
+    * https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.14.2
     * https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.14.1
 * Fixes an error with stuck informers when an etcd watch receives update or delete events with missing data ([#76675](https://github.com/kubernetes/kubernetes/pull/76675), [@ryanmcnamara](https://github.com/ryanmcnamara))
 * [fluentd-gcp addon] Bump fluentd-gcp-scaler to v0.5.2 to pick up security fixes. ([#76762](https://github.com/kubernetes/kubernetes/pull/76762), [@serathius](https://github.com/serathius))
@@ -1103,7 +1103,7 @@ The memory-cached discovery client is moved from k8s.io/client-go/discovery/cach
 - `RuntimeClass` has been promoted to beta, and is enabled by default. ([#75003](https://github.com/kubernetes/kubernetes/pull/75003), [@tallclair](https://github.com/tallclair))
 - New "dry_run" metric label (indicating the value of the dryRun query parameter) has been added into the metrics:
   * apiserver_request_total
-  * apiserver_request_duration_seconds  
+  * apiserver_request_duration_seconds
 New "APPLY" value for the "verb" metric label which indicates a PATCH with "Content-Type: apply-patch+yaml". This value is experimental and will only be present if the ServerSideApply alpha feature is enabled. ([#74997](https://github.com/kubernetes/kubernetes/pull/74997), [@jennybuckley](https://github.com/jennybuckley))
 - GCE: bumped COS image version to `cos-beta-73-11647-64-0` ([#75149](https://github.com/kubernetes/kubernetes/pull/75149), [@yguo0905](https://github.com/yguo0905))
 - Added alpha support for ephemeral CSI inline volumes that are embedded in pod specs. ([#74086](https://github.com/kubernetes/kubernetes/pull/74086), [@vladimirvivien](https://github.com/vladimirvivien))
@@ -1453,7 +1453,7 @@ filename | sha512 hash
     * Introduce a RuntimeClass v1beta1 API. This new beta API renames `runtimeHandler` to `handler`, makes it a required field, and cuts out the spec (handler is a top-level field).
 * Transition CSINodeInfo and CSIDriver alpha CRDs to in-tree CSINode and CSIDriver core storage v1beta1 APIs. ([#74283](https://github.com/kubernetes/kubernetes/pull/74283), [@xing-yang](https://github.com/xing-yang))
     * ACTION REQUIRED: the alpha CRDs are no longer used and drivers will need to be updated to use the beta APIs.
-    * The support for `_` in the CSI driver name will be dropped as the CSI Spec does not allow that. 
+    * The support for `_` in the CSI driver name will be dropped as the CSI Spec does not allow that.
 
 ### Other notable changes
 
@@ -1484,7 +1484,7 @@ filename | sha512 hash
 * kube-apiserver now serves OpenAPI specs for registered CRDs with defined  ([#71192](https://github.com/kubernetes/kubernetes/pull/71192), [@roycaihw](https://github.com/roycaihw))
     * validation schemata as an alpha feature, to be enabled via the "CustomResourcePublishOpenAPI" feature gate. Kubectl will validate client-side using those. Note that in
     * future, client-side validation in 1.14 kubectl against a 1.15 cluster will reject
-    * unknown fields for CRDs with validation schema defined. 
+    * unknown fields for CRDs with validation schema defined.
 * Fix kubelet start failure issue on Azure Stack due to InstanceMetadata setting ([#74936](https://github.com/kubernetes/kubernetes/pull/74936), [@rjaini](https://github.com/rjaini))
 * add subcommand `kubectl create cronjob` ([#71651](https://github.com/kubernetes/kubernetes/pull/71651), [@Pingan2017](https://github.com/Pingan2017))
 * The CSIBlockVolume feature gate is now beta, and defaults to enabled. ([#74909](https://github.com/kubernetes/kubernetes/pull/74909), [@bswartz](https://github.com/bswartz))
@@ -1541,7 +1541,7 @@ filename | sha512 hash
     *   reflector_short_watches_total
     *   reflector_watch_duration_seconds
     *   reflector_watches_total
-    * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable. 
+    * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable.
 * Add a configuration field to shorten the timeout of validating/mutating admission webhook call. The timeout value must be between 1 and 30 seconds. Default to 30 seconds when unspecified.  ([#74562](https://github.com/kubernetes/kubernetes/pull/74562), [@roycaihw](https://github.com/roycaihw))
 * client-go: PortForwarder.GetPorts() now contain correct local port if no local port was initially specified when setting up the port forwarder ([#73676](https://github.com/kubernetes/kubernetes/pull/73676), [@martin-helmich](https://github.com/martin-helmich))
 * The examples in kubectl apply/get/delete are updated to support `-k` which uses a `kustomization.yaml` file. ([#74140](https://github.com/kubernetes/kubernetes/pull/74140), [@Liujingfang1](https://github.com/Liujingfang1))
@@ -1553,7 +1553,7 @@ filename | sha512 hash
 * Image garbage collection no longer fails for images with only one tag but more than one repository associated. ([#70647](https://github.com/kubernetes/kubernetes/pull/70647), [@corvus-ch](https://github.com/corvus-ch))
 * Fix liveness probe in fluentd-gcp cluster addon ([#74522](https://github.com/kubernetes/kubernetes/pull/74522), [@Pluies](https://github.com/Pluies))
 * The new test ``[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly] [Conformance]`` will validate the host entries set in the ``/etc/hosts`` file (pod's FQDN and hostname), which should be managed by Kubelet. ([#72729](https://github.com/kubernetes/kubernetes/pull/72729), [@bclau](https://github.com/bclau))
-    * The test has the tag ``[LinuxOnly]`` because individual files cannot be mounted in Windows Containers, which means that it cannot pass using Windows nodes. 
+    * The test has the tag ``[LinuxOnly]`` because individual files cannot be mounted in Windows Containers, which means that it cannot pass using Windows nodes.
 
 
 
@@ -1725,11 +1725,11 @@ filename | sha512 hash
     * Custom apiservers built with the latest apiserver library will have the 100MB limit on the body of resource requests as well. The limit can be altered via ServerRunOptions.MaxRequestBodyBytes.
     * The body size limit does not apply to subresources like pods/proxy that proxy request content to another server.
 * Kustomize is developed in its own repo https://github.com/kubernetes-sigs/kustomize ([#73033](https://github.com/kubernetes/kubernetes/pull/73033), [@Liujingfang1](https://github.com/Liujingfang1))
-    * This PR added a new subcommand `kustomize` in kubectl. 
+    * This PR added a new subcommand `kustomize` in kubectl.
     *   kubectl kustomize <somedir> has the same effect as kustomize build <somedir>
     * To build API resources from somedir with a kustomization.yaml file
     *    kubectl kustomize <somedir>
-    * This command can be piped to apply or delete 
+    * This command can be piped to apply or delete
     *    kubectl kustomize <somedir> | kubectl apply -f -
     *    kubectl kustomize <somedir> | kubectl delete -f -
 * kubeadm: all master components are now exclusively relying on the `PriorityClassName` pod spec for annotating them as cluster critical components. Since `scheduler.alpha.kubernetes.io/critical-pod` annotation is no longer supported by Kubernetes 1.14 this annotation is no longer added to master components. ([#73857](https://github.com/kubernetes/kubernetes/pull/73857), [@ereslibre](https://github.com/ereslibre))

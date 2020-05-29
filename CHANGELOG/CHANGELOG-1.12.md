@@ -295,7 +295,7 @@ filename | sha512 hash
 * specify azure file share name in azure file plugin ([#76988](https://github.com/kubernetes/kubernetes/pull/76988), [@andyzhangx](https://github.com/andyzhangx))
 * [metrics-server addon] Restore connecting to nodes via IP addresses ([#76819](https://github.com/kubernetes/kubernetes/pull/76819), [@serathius](https://github.com/serathius))
 * Update Cluster Autoscaler to 1.12.5 ([#77063](https://github.com/kubernetes/kubernetes/pull/77063), [@losipiuk](https://github.com/losipiuk))
-    *  - https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.12.5 
+    *  - https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.12.5
     *  - https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.12.4
 
 
@@ -451,7 +451,7 @@ filename | sha512 hash
     *   reflector_short_watches_total
     *   reflector_watch_duration_seconds
     *   reflector_watches_total
-    * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable. 
+    * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable.
 * Fix keymutex issues which may crash in some platforms. ([#74386](https://github.com/kubernetes/kubernetes/pull/74386), [@danielqsj](https://github.com/danielqsj))
 
 

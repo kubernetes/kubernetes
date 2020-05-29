@@ -137,7 +137,7 @@ kubectl get deployments,services
 
 {% endmethod %}
 
-  
+
 {% method %}
 ## List multiple Resource types by name
 

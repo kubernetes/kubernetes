@@ -3,7 +3,7 @@
 {% endpanel %}
 
 {% panel style="info", title="TL;DR" %}
-- Port Forward local connections to Pods running in a cluster 
+- Port Forward local connections to Pods running in a cluster
 {% endpanel %}
 
 # Port Forward

@@ -21,13 +21,13 @@ Examples:
 - Overriding the Names of Resources by supplying a Prefix or Suffix
 - Overriding Labels and Annotations
 - Running **multiple instances of the same White-Box Base** using the above techniques
- 
+
  {% panel style="info", title="Reference" %}
  - [namespace](../reference/kustomize.md#namespace)
  - [namePrefix](../reference/kustomize.md#nameprefix)
  - [nameSuffix](../reference/kustomize.md#namesuffix)
  {% endpanel %}
- 
+
 ## Customizing Resource Namespaces
 
 {% method %}
@@ -104,7 +104,7 @@ spec:
 ```
 
 {% endmethod %}
- 
+
 ## Customizing Resource Name Prefixes and Suffixes
 
 {% method %}

@@ -18,7 +18,7 @@ In practice, fields with no value should simply be  omitted from kustomization.y
 to reduce the content visible in configuration reviews.
 
 Example copied from the [kustomize repo](https://github.com/kubernetes-sigs/kustomize/tree/master/examples)
- 
+
  {% sample lang="yaml" %}
 ```yaml
 # ----------------------------------------------------
@@ -76,7 +76,7 @@ configMapGenerator:
   - application.properties
   - more.properties
 - name: my-java-server-env-vars
-  literals:	
+  literals:
   - JAVA_HOME=/opt/java/jdk
   - JAVA_TOOL_OPTIONS=-agentlib:hprof
 
@@ -221,14 +221,14 @@ crds:
 # object in a container's command line, and the name of a
 # k8s Secret object in a container's environment variable,
 # so that the following would work:
-# 
+#
 #   containers:
 #     - image: myimage
 #       command: ["start", "--host", "$(MY_SERVICE_NAME)"]
 #       env:
 #         - name: SECRET_TOKEN
 #           value: $(SOME_SECRET_NAME)
-# 
+#
 #
 # To do so, add an entry to `vars:` as follows:
 #
@@ -283,7 +283,7 @@ vars:
 
 # Images modify the name, tags and/or digest for images without creating patches.
 # E.g. Given this kubernetes Deployment fragment:
-# 
+#
 #  containers:
 #    - name: mypostgresdb
 #      image: postgres:8
@@ -295,7 +295,7 @@ vars:
 #      image: alpine:3.7
 #
 # one can change the `image` in the following ways:
-# 
+#
 # - `postgres:8` to `my-registry/my-postgres:v1`,
 # - nginx tag `1.7.9` to `1.8.0`,
 # - image name `my-demo-app` to `my-app`,
@@ -313,5 +313,5 @@ images:
   - name: alpine
     digest: sha256:24a0c4b4a4c0eb97a1aabb8e29f18e917d05abfe1b7a7c07857230879ce7d3d3
 ```
- 
+
  {% endmethod %}

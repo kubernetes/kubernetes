@@ -1588,11 +1588,11 @@ filename | sha512 hash
 - Fix the bug PIP's DNS is deleted if no DNS label service annotation isn't set. ([#87312](https://github.com/kubernetes/kubernetes/pull/87312), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 - Fix: set nil cache entry based on old cache ([#87591](https://github.com/kubernetes/kubernetes/pull/87591), [@aramase](https://github.com/aramase)) [SIG Cloud Provider]
 - Fixed a bug which could prevent a provider ID from ever being set for node if an error occurred determining the provider ID when the node was added. ([#87043](https://github.com/kubernetes/kubernetes/pull/87043), [@zjs](https://github.com/zjs)) [SIG Apps and Cloud Provider]
-- Fixed the following 
+- Fixed the following
   -  AWS Cloud Provider attempts to delete LoadBalancer security group it didn’t provision
   -  AWS Cloud Provider creates default LoadBalancer security group even if annotation [service.beta.kubernetes.io/aws-load-balancer-security-groups] is present ([#87206](https://github.com/kubernetes/kubernetes/pull/87206), [@bhagwat070919](https://github.com/bhagwat070919)) [SIG Cloud Provider]
 - Fixed two scheduler metrics (pending_pods and schedule_attempts_total) not being recorded ([#87692](https://github.com/kubernetes/kubernetes/pull/87692), [@everpeace](https://github.com/everpeace)) [SIG Scheduling]
-- Kubelet metrics have been changed to buckets. 
+- Kubelet metrics have been changed to buckets.
   For example the exec/{podNamespace}/{podID}/{containerName} is now just exec. ([#87913](https://github.com/kubernetes/kubernetes/pull/87913), [@cheftako](https://github.com/cheftako)) [SIG Node]
 - Pods that are considered for preemption and haven't started don't produce an error log. ([#87900](https://github.com/kubernetes/kubernetes/pull/87900), [@alculquicondor](https://github.com/alculquicondor)) [SIG Scheduling]
 - Reverted a kubectl azure auth module change where oidc claim spn: prefix was omitted resulting a breaking behavior with existing Azure AD OIDC enabled api-server ([#87507](https://github.com/kubernetes/kubernetes/pull/87507), [@weinong](https://github.com/weinong)) [SIG API Machinery, Auth and Cloud Provider]

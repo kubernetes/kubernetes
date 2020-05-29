@@ -28,7 +28,7 @@ Examples of Workloads:
 - [StatefulSets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 - [Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/)
 - [CronJobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/)
-- [DaemonSets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) 
+- [DaemonSets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)
 
 
 **Users work with Resource APIs by declaring them in files which are then Applied to a Kubernetes

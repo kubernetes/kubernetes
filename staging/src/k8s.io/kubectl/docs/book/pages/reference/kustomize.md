@@ -30,7 +30,7 @@
 | [nameSuffix](#namesuffix)                        | Transformer      | Add a suffix to the name of all Resources and References.                              | [Namespaces and Names](../app_management/namespaces_and_names.md#setting-a-name-prefix-or-suffix-for-all-resources)             |
 | [patchesJson6902](#patchesjson6902)              | Transformer      | Patch Resource Config using json patch.                                                | [Customizing Resource Fields](../app_customization/customizing_arbitrary_fields.md#customizing-arbitrary-fields-with-jsonpatch) |
 | [patchesStrategicMerge](#patchesstrategicmerge)  | Transformer      | Patch Resource Config using an overlay.                                                | [Customizing Resource Fields](../app_customization/customizing_arbitrary_fields.md#customizing-arbitrary-fields-with-overlays)  |
-| [resources](#resources)                          | Generator        | Add Raw Resource Configs.                                                              | [Apply](../app_management/apply.md#usage)                                                                                       | 
+| [resources](#resources)                          | Generator        | Add Raw Resource Configs.                                                              | [Apply](../app_management/apply.md#usage)                                                                                       |
 | [secretGenerator](#secretgenerator)              | Generator        | Generate Secret Resources.                                                             | [Secrets and ConfigMaps](../app_management/secrets_and_configmaps.md#secrets-from-files)                                        |
 | [vars](#vars)                                    | Transformer      | Substitute Resource Config field values into Pod Arguments.                            | [Config Reflection](../app_customization/config_reflection.md)                                                                  |
 
@@ -120,7 +120,7 @@ configMapGenerator:
 # generate a ConfigMap named my-java-server-env-vars-<some-hash> where each literal
 # in the list appears as a data entry (keyed by literal key).
 - name: my-java-server-env-vars
-  literals:	
+  literals:
   - JAVA_HOME=/opt/java/jdk
   - JAVA_TOOL_OPTIONS=-agentlib:hprof
 # generate a ConfigMap named my-system-env-<some-hash> where each key/value pair in the
@@ -295,7 +295,7 @@ Definitions:
 
 - *name*: portion of the `image` field value before the `:` - e.g. for `foo:v1` the name would be `foo`.
 - *tag*: portion of the `image` field value after the `:` - e.g. for `foo:v1` the name would be `v1`.
-- *digest*: alternative to tag for referencing an image. 
+- *digest*: alternative to tag for referencing an image.
 
 | Name          | Type    | Desc                                |
 | :------------ | :------ | :---------------------------------- |
@@ -354,7 +354,7 @@ Path field is a relative file path of a JSON patch file.  File contents can be e
  - op: replace
    path: /some/existing/path
    value: new value
-``` 
+```
 
 ##### Target
 
@@ -441,7 +441,7 @@ namespace: "my-app-namespace"
 
 {% method %}
 
-`namePrefix` sets a name prefix on all Resources.  `namePrefix`'s from bases will stack - 
+`namePrefix` sets a name prefix on all Resources.  `namePrefix`'s from bases will stack -
 e.g. if a `namePrefix` was set in a `base`, the new `namePrefix` will be pre-prended to the `namePrefix` in the
 `base`.
 
@@ -467,7 +467,7 @@ namePrefix: "my-app-name-prefix-"
 
 {% method %}
 
-`nameSuffix` sets a `nameSuffix` on all Resources.  `nameSuffix`'s from bases will stack - 
+`nameSuffix` sets a `nameSuffix` on all Resources.  `nameSuffix`'s from bases will stack -
 e.g. if a `nameSuffix` was set in a `base`, the new `nameSuffix` will be appended to the `nameSuffix` in the
 `base`.
 
@@ -496,7 +496,7 @@ nameSuffix: "-my-app-name-suffix"
 `vars` defines values that can be substituted into Pod container arguments and environment variables.
 This is necessary for wiring post-transformed fields into container arguments and environment variables.
 e.g. Services names may be transformed by `namePrefix` and containers may need to refer to Service names
-at runtime. 
+at runtime.
 
 Vars are similar to the Kubernetes [Downward API](https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/#use-container-fields-as-values-for-environment-variables)
 in that they allow Pods to reference information about the environment in which they are run.
@@ -652,7 +652,7 @@ commonLabels:
 - path: metadata/labels
   # create metadata.annotations if it doesn't exist
   create: true
-  
+
   # set labels at spec.selector for v1.Service types
 - path: spec/selector
   create: true
@@ -663,7 +663,7 @@ commonLabels:
 - path: spec/selector/matchLabels
   create: true
   kind: Deployment
-  
+
   # set labels at  spec...podAffinity...matchLabels for apps.Deployment types
 - path: spec/template/spec/affinity/podAffinity/preferredDuringSchedulingIgnoredDuringExecution/podAffinityTerm/labelSelector/matchLabels
   # do NOT create spec...podAffinity...matchLabels if it doesn't exist on the Deployment Resource Config
@@ -712,7 +712,7 @@ images:
 
 Specify `nameReference` in the **configuration file** for CRDs that reference other objects by name - e.g.
 Secrets, ConfigMaps, Services, etc.
- 
+
 `nameReference` registers for a given type, that **it is referenced by name from another type** - e.g.
 Secrets are referenced by Pods.
 

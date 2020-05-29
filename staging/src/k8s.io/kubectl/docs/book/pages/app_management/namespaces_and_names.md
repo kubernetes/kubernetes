@@ -31,7 +31,7 @@ See [Bases and Variations](../app_customization/bases_and_variants.md) for more 
 
 ## Setting the Namespace for all Resources
 
-Reference: 
+Reference:
 
 The Namespace for all namespaced Resources declared in the Resource Config may be set with `namespace`.
 This sets the namespace for both generated Resources (e.g. ConfigMaps and Secrets) and non-generated
@@ -176,7 +176,7 @@ spec:
 Resources such as Deployments and StatefulSets may reference other Resources such as
 ConfigMaps and Secrets in the Pod Spec.
 
-This sets a name prefix or suffix for both generated Resources (e.g. ConfigMaps 
+This sets a name prefix or suffix for both generated Resources (e.g. ConfigMaps
 and Secrets) and non-generated Resources.
 
 The namePrefix or nameSuffix that is applied is propagated to references to updated resources -
@@ -198,7 +198,7 @@ kind: Kustomization
 namePrefix: foo-
 configMapGenerator:
 - name: props
-  literals:	
+  literals:
   - BAR=baz
 resources:
 - deployment.yaml

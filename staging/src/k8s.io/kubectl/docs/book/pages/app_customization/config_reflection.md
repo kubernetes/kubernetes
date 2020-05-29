@@ -19,7 +19,7 @@ to where it is referenced in the PodSpec.
 
 {% panel style="info", title="Reference" %}
  - [vars](../reference/kustomize.md#var)
- {% endpanel %} 
+ {% endpanel %}
 
 ## Vars
 

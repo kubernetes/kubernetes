@@ -17,7 +17,7 @@ Routinely monitor the newly filed issues and triage them to make sure we identif
 Look for:
 
 - Requests for help
-  - Don't spend a lot of time on these, but answer and close them if it is easy  
+  - Don't spend a lot of time on these, but answer and close them if it is easy
 - Regressions and bugs
   - Find the root cause
   - Triage the severity

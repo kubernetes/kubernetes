@@ -19,7 +19,7 @@ This chapter contains advanced material that readers may want to skip and come b
 This page describes how Resource Config is merged with Resources or other Resource Config.  This
 may occur when:
 
-- Applying Resource Config updates to the live Resources in the cluster 
+- Applying Resource Config updates to the live Resources in the cluster
 - Defining Patches in the `kustomization.yaml` which are overlayed on `resources` and [bases](../app_customization/bases_and_variants.md)
 
 ### Applying Resource Config Updates

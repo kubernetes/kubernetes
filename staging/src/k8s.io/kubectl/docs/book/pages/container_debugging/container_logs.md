@@ -93,7 +93,7 @@ kubectl logs nginx-78f5d695bd-czm8z -p
 ---
 
 {% method %}
-## Selecting a Container in a Pod 
+## Selecting a Container in a Pod
 
 Print the logs from a specific container within a Pod.  This is necessary for Pods running multiple
 containers.

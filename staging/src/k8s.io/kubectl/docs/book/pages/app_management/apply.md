@@ -116,8 +116,8 @@ Any Resources that already exist and are declared in Resource Config when Apply 
 
 Any fields that have been added to the Resource Config will be set on the Resource.
 
-**Updated Fields** 
- 
+**Updated Fields**
+
 Any fields that contain different values for the fields specified locally in the Resource Config from what is
 in the Resource will be updated by merging the Resource Config into the live Resource.  See [merging](field_merge_semantics.md)
 for more details.

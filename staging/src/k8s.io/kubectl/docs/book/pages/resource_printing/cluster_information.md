@@ -68,7 +68,7 @@ kubectl cluster-info
 
 {% panel style="info", title="Kube Proxy" %}
 The URLs printed by `cluster-info` can be accessed at `127.0.0.1:8001` by
-running `kubectl proxy`. 
+running `kubectl proxy`.
 {% endpanel %}
 
 ## Nodes
@@ -86,11 +86,11 @@ kubectl top node
 ```
 
 ```bash
-  NAME                                 CPU(cores)   CPU%      MEMORY(bytes)   MEMORY%   
-  gke-dev-default-pool-e1e7bf6a-cc8b   37m          1%        571Mi           10%       
-  gke-dev-default-pool-e1e7bf6a-f0xh   103m         5%        1106Mi          19%       
-  gke-dev-default-pool-e1e7bf6a-jfq5   139m         7%        1252Mi          22%       
-  gke-dev-default-pool-e1e7bf6a-x37l   112m         5%        982Mi           17%  
+  NAME                                 CPU(cores)   CPU%      MEMORY(bytes)   MEMORY%
+  gke-dev-default-pool-e1e7bf6a-cc8b   37m          1%        571Mi           10%
+  gke-dev-default-pool-e1e7bf6a-f0xh   103m         5%        1106Mi          19%
+  gke-dev-default-pool-e1e7bf6a-jfq5   139m         7%        1252Mi          22%
+  gke-dev-default-pool-e1e7bf6a-x37l   112m         5%        982Mi           17%
 ```
 
 {% endmethod %}
@@ -198,4 +198,4 @@ FIELDS:
 
 {% endmethod %}
 
- 
+
