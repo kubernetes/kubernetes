@@ -64,13 +64,32 @@ func TestStrToUInt16(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		uIntFlags, err := TLSCipherSuites(test.flag)
+		uIntFlags, _, err := TLSCipherSuites(test.flag)
 		if reflect.DeepEqual(uIntFlags, test.expected) == false {
 			t.Errorf("%d: expected %+v, got %+v", i, test.expected, uIntFlags)
 		}
 		if test.expected_error && err == nil {
 			t.Errorf("%d: expecting error, got %+v", i, err)
 		}
+	}
+}
+
+func TestInsecureCiphersMatched(t *testing.T) {
+	testFlag := []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305"}
+	expectAll := []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305}
+	expectInsecure := []string{"TLS_RSA_WITH_RC4_128_SHA"}
+
+	actualAll, actualInsecure, err := TLSCipherSuites(testFlag)
+	if err != nil {
+		t.Errorf("expect no error, actual: %s", err)
+	}
+
+	if !reflect.DeepEqual(expectAll, actualAll) {
+		t.Errorf("expect all tls ciphers ids: %+v, actual: %+v", expectAll, actualAll)
+	}
+
+	if !reflect.DeepEqual(expectInsecure, actualInsecure) {
+		t.Errorf("expect insecure tls ciphers names: %+v, actual: %+v", expectInsecure, actualInsecure)
 	}
 }
 

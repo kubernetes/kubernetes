@@ -255,11 +255,17 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	}
 
 	if len(s.CipherSuites) != 0 {
-		cipherSuites, err := cliflag.TLSCipherSuites(s.CipherSuites)
+		cipherSuites, insecureCipherNames, err := cliflag.TLSCipherSuites(s.CipherSuites)
 		if err != nil {
 			return err
 		}
 		c.CipherSuites = cipherSuites
+
+		if len(insecureCipherNames) > 0 {
+			for _, cipherName := range insecureCipherNames {
+				klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
+			}
+		}
 	}
 
 	var err error
