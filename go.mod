@@ -467,6 +467,7 @@ replace (
 	k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
 	k8s.io/code-generator => ./staging/src/k8s.io/code-generator
 	k8s.io/component-base => ./staging/src/k8s.io/component-base
+	k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
