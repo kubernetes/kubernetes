@@ -261,10 +261,8 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 		}
 		c.CipherSuites = cipherSuites
 
-		if len(insecureCipherNames) > 0 {
-			for _, cipherName := range insecureCipherNames {
-				klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
-			}
+		for _, cipherName := range insecureCipherNames {
+			klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
 		}
 	}
 

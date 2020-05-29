@@ -1010,10 +1010,8 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 		return nil, err
 	}
 
-	if len(insecureCipherNames) > 0 {
-		for _, cipherName := range insecureCipherNames {
-			klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
-		}
+	for _, cipherName := range insecureCipherNames {
+		klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
 	}
 
 	minTLSVersion, err := cliflag.TLSVersion(kc.TLSMinVersion)
