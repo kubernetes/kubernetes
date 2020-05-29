@@ -17,7 +17,6 @@ limitations under the License.
 package network
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -3283,42 +3282,72 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 			framework.Failf("Service HealthCheck NodePort still present")
 		}
 
-		endpointNodeMap, err := jig.GetEndpointNodes()
+		epNodes, err := jig.ListNodesWithEndpoint()
 		framework.ExpectNoError(err)
-		noEndpointNodeMap := map[string][]string{}
-		for _, n := range nodes.Items {
-			if _, ok := endpointNodeMap[n.Name]; ok {
-				continue
+		// map from name of nodes with endpoint to internal ip
+		// it is assumed that there is only a single node with the endpoint
+		endpointNodeMap := make(map[string]string)
+		// map from name of nodes without endpoint to internal ip
+		noEndpointNodeMap := make(map[string]string)
+		for _, node := range epNodes {
+			ips := e2enode.GetAddresses(&node, v1.NodeInternalIP)
+			if len(ips) < 1 {
+				framework.Failf("No internal ip found for node %s", node.Name)
 			}
-			noEndpointNodeMap[n.Name] = e2enode.GetAddresses(&n, v1.NodeExternalIP)
+			endpointNodeMap[node.Name] = ips[0]
 		}
+		for _, n := range nodes.Items {
+			ips := e2enode.GetAddresses(&n, v1.NodeInternalIP)
+			if len(ips) < 1 {
+				framework.Failf("No internal ip found for node %s", n.Name)
+			}
+			if _, ok := endpointNodeMap[n.Name]; !ok {
+				noEndpointNodeMap[n.Name] = ips[0]
+			}
+		}
+		framework.ExpectNotEqual(len(endpointNodeMap), 0)
+		framework.ExpectNotEqual(len(noEndpointNodeMap), 0)
 
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
 		svcNodePort := int(svc.Spec.Ports[0].NodePort)
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		path := "/clientip"
+		dialCmd := "clientip"
+
+		config := e2enetwork.NewNetworkingTestConfig(f, false, false)
 
 		ginkgo.By(fmt.Sprintf("endpoints present on nodes %v, absent on nodes %v", endpointNodeMap, noEndpointNodeMap))
-		for nodeName, nodeIPs := range noEndpointNodeMap {
-			ginkgo.By(fmt.Sprintf("Checking %v (%v:%v%v) proxies to endpoints on another node", nodeName, nodeIPs[0], svcNodePort, path))
-			GetHTTPContent(nodeIPs[0], svcNodePort, e2eservice.KubeProxyLagTimeout, path)
+		for nodeName, nodeIP := range noEndpointNodeMap {
+			ginkgo.By(fmt.Sprintf("Checking %v (%v:%v/%v) proxies to endpoints on another node", nodeName, nodeIP[0], svcNodePort, dialCmd))
+			_, err := GetHTTPContentFromTestContainer(config, nodeIP, svcNodePort, e2eservice.KubeProxyLagTimeout, dialCmd)
+			framework.ExpectNoError(err, "Could not reach HTTP service through %v:%v/%v after %v", nodeIP, svcNodePort, dialCmd, e2eservice.KubeProxyLagTimeout)
 		}
 
-		for nodeName, nodeIPs := range endpointNodeMap {
-			ginkgo.By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIPs[0]))
-			var body bytes.Buffer
-			pollfn := func() (bool, error) {
-				result := e2enetwork.PokeHTTP(nodeIPs[0], healthCheckNodePort, "/healthz", nil)
-				if result.Code == 0 {
+		for nodeName, nodeIP := range endpointNodeMap {
+			ginkgo.By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIP))
+			var body string
+			pollFn := func() (bool, error) {
+				// we expect connection failure here, but not other errors
+
+				resp, err := config.GetResponseFromTestContainer(
+					"http",
+					"healthz",
+					nodeIP,
+					healthCheckNodePort)
+				if err != nil {
+					return false, nil
+				}
+				if len(resp.Errors) > 0 {
 					return true, nil
 				}
-				body.Reset()
-				body.Write(result.Body)
+				if len(resp.Responses) > 0 {
+					body = resp.Responses[0]
+				}
 				return false, nil
 			}
-			if pollErr := wait.PollImmediate(framework.Poll, e2eservice.TestTimeout, pollfn); pollErr != nil {
+			if pollErr := wait.PollImmediate(framework.Poll, e2eservice.TestTimeout, pollFn); pollErr != nil {
 				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. body %s",
-					nodeName, healthCheckNodePort, body.String())
+					nodeName, healthCheckNodePort, body)
 			}
 		}
 
