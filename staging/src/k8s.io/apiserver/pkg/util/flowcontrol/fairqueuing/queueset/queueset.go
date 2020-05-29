@@ -497,8 +497,7 @@ func (qs *queueSet) rejectOrEnqueueLocked(request *request) bool {
 func (qs *queueSet) enqueueLocked(request *request) {
 	queue := request.queue
 	if len(queue.requests) == 0 && queue.requestsExecuting == 0 {
-		// the queue’s virtual start time is set to the virtual time.
-		queue.virtualStart = qs.virtualTime
+		queue.SetVirtualStart(qs.virtualTime, qs.estimatedServiceTime)
 		if klog.V(6).Enabled() {
 			klog.Infof("QS(%s) at r=%s v=%.9fs: initialized queue %d virtual start time due to request %#+v %#+v", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), queue.virtualStart, queue.index, request.descr1, request.descr2)
 		}
@@ -571,8 +570,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	if klog.V(6).Enabled() {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: dispatching request %#+v %#+v from queue %d with virtual start time %.9fs, queue will have %d waiting & %d executing", qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.virtualTime, request.descr1, request.descr2, queue.index, queue.virtualStart, len(queue.requests), queue.requestsExecuting)
 	}
-	// When a request is dequeued for service -> qs.virtualStart += G
-	queue.virtualStart += qs.estimatedServiceTime
+	queue.SetVirtualStart(qs.virtualTime, qs.estimatedServiceTime)
 	request.decision.SetLocked(decisionExecute)
 	return ok
 }

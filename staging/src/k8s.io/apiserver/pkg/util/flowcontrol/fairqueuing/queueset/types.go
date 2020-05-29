@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
@@ -93,4 +94,12 @@ func (q *queue) GetVirtualFinish(J int, G float64) float64 {
 	// counting from J=1 for the head (eg: queue.requests[0] -> J=1) - J+1
 	jg := float64(J+1) * float64(G)
 	return jg + q.virtualStart
+}
+
+// SetVirtualStart syncs virtual start time by:
+// 	Si = MAX(R(t), Fi-1)
+// where "Fi-1"  is estimated by adding estimatedServiceTime to last virtual start
+// time of the queue.
+func (q *queue) SetVirtualStart(currentVirtualTime, estimatedServiceTime float64) {
+	q.virtualStart = math.Max(currentVirtualTime, q.virtualStart+estimatedServiceTime)
 }
