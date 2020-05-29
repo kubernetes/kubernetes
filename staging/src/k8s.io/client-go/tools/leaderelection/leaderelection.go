@@ -195,10 +195,11 @@ type LeaderElector struct {
 
 // Run starts the leader election loop
 func (le *LeaderElector) Run(ctx context.Context) {
+	defer runtime.HandleCrash()
 	defer func() {
-		runtime.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
+
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
