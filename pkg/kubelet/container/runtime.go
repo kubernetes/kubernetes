@@ -299,7 +299,6 @@ type PodStatus struct {
 	// Status of containers in the pod.
 	ContainerStatuses []*Status
 	// Status of the pod sandbox.
-	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
 }
 
