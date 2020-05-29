@@ -275,7 +275,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 						ch := make(chan []watch.Event)
 						go func() {
 							defer close(ch)
-							w, err := podClient.Watch(context.TODO(), metav1.ListOptions{
+							ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+							defer cancel()
+							w, err := podClient.Watch(ctx, metav1.ListOptions{
 								ResourceVersion: created.ResourceVersion,
 								FieldSelector:   fmt.Sprintf("metadata.name=%s", pod.Name),
 							})
