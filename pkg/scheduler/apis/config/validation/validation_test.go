@@ -28,7 +28,6 @@ import (
 )
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
-	testTimeout := int64(0)
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
@@ -59,7 +58,6 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		},
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		BindTimeoutSeconds:       testTimeout,
 		PercentageOfNodesToScore: 35,
 		Profiles: []config.KubeSchedulerProfile{
 			{
