@@ -18,6 +18,7 @@ package images
 
 import (
 	"fmt"
+	"time"
 
 	dockerref "github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
@@ -138,6 +139,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		return "", msg, ErrImagePullBackOff
 	}
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
+	startTime := time.Now()
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
@@ -151,7 +153,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 
 		return "", imagePullResult.err.Error(), ErrImagePull
 	}
-	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), klog.Info)
+	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v", container.Image, time.Since(startTime)), klog.Info)
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
 }
