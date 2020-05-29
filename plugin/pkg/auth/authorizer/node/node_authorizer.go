@@ -206,7 +206,7 @@ func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, att
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
-		klog.V(2).Infof("NODE DENY: %v", err)
+		klog.V(2).InfoS("NODE DENY", "err", err)
 		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
 	}
 	if !ok {
