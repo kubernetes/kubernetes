@@ -65,12 +65,6 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-type fakePodConditionUpdater struct{}
-
-func (fc fakePodConditionUpdater) update(pod *v1.Pod, podCondition *v1.PodCondition) error {
-	return nil
-}
-
 type fakePodPreemptor struct{}
 
 func (fp fakePodPreemptor) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
@@ -78,10 +72,6 @@ func (fp fakePodPreemptor) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
 }
 
 func (fp fakePodPreemptor) deletePod(pod *v1.Pod) error {
-	return nil
-}
-
-func (fp fakePodPreemptor) setNominatedNodeName(pod *v1.Pod, nomNodeName string) error {
 	return nil
 }
 
@@ -277,7 +267,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
-			expectError:      errors.New("plugin \"DefaultBinder\" failed to bind pod \"/foo\": binder"),
+			expectError:      errors.New("Binding rejected: plugin \"DefaultBinder\" failed to bind pod \"/foo\": binder"),
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
@@ -334,9 +324,9 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			}
 
 			s := &Scheduler{
-				SchedulerCache:      sCache,
-				Algorithm:           item.algo,
-				podConditionUpdater: fakePodConditionUpdater{},
+				SchedulerCache: sCache,
+				Algorithm:      item.algo,
+				client:         client,
 				Error: func(p *framework.QueuedPodInfo, err error) {
 					gotPod = p.Pod
 					gotError = err
@@ -828,9 +818,9 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		Error: func(p *framework.QueuedPodInfo, err error) {
 			errChan <- err
 		},
-		Profiles:            profiles,
-		podConditionUpdater: fakePodConditionUpdater{},
-		podPreemptor:        fakePodPreemptor{},
+		Profiles:     profiles,
+		client:       client,
+		podPreemptor: fakePodPreemptor{},
 	}
 
 	return sched, bindingChan, errChan
@@ -1316,7 +1306,7 @@ func TestInjectingPluginConfigForVolumeBinding(t *testing.T) {
 	}
 }
 
-func TestSetNominatedNodeName(t *testing.T) {
+func TestRemoveNominatedNodeName(t *testing.T) {
 	tests := []struct {
 		name                     string
 		currentNominatedNodeName string
@@ -1325,29 +1315,14 @@ func TestSetNominatedNodeName(t *testing.T) {
 		expectedPatchData        string
 	}{
 		{
-			name:                     "Should make patch request to set node name",
-			currentNominatedNodeName: "",
-			newNominatedNodeName:     "node1",
-			expectedPatchRequests:    1,
-			expectedPatchData:        `{"status":{"nominatedNodeName":"node1"}}`,
-		},
-		{
 			name:                     "Should make patch request to clear node name",
 			currentNominatedNodeName: "node1",
-			newNominatedNodeName:     "",
 			expectedPatchRequests:    1,
 			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
 		},
 		{
-			name:                     "Should not make patch request if nominated node is already set to the specified value",
-			currentNominatedNodeName: "node1",
-			newNominatedNodeName:     "node1",
-			expectedPatchRequests:    0,
-		},
-		{
 			name:                     "Should not make patch request if nominated node is already cleared",
 			currentNominatedNodeName: "",
-			newNominatedNodeName:     "",
 			expectedPatchRequests:    0,
 		},
 	}
@@ -1371,8 +1346,8 @@ func TestSetNominatedNodeName(t *testing.T) {
 			}
 
 			preemptor := &podPreemptorImpl{Client: cs}
-			if err := preemptor.setNominatedNodeName(pod, test.newNominatedNodeName); err != nil {
-				t.Fatalf("Error calling setNominatedNodeName: %v", err)
+			if err := preemptor.removeNominatedNodeName(pod); err != nil {
+				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
 			}
 
 			if actualPatchRequests != test.expectedPatchRequests {
@@ -1386,11 +1361,13 @@ func TestSetNominatedNodeName(t *testing.T) {
 	}
 }
 
-func TestUpdatePodCondition(t *testing.T) {
+func TestUpdatePod(t *testing.T) {
 	tests := []struct {
 		name                     string
 		currentPodConditions     []v1.PodCondition
 		newPodCondition          *v1.PodCondition
+		currentNominatedNodeName string
+		newNominatedNodeName     string
 		expectedPatchRequests    int
 		expectedPatchDataPattern string
 	}{
@@ -1478,7 +1455,7 @@ func TestUpdatePodCondition(t *testing.T) {
 			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
 		},
 		{
-			name: "Should not make patch request if pod condition already exists and is identical",
+			name: "Should not make patch request if pod condition already exists and is identical and nominated node name is not set",
 			currentPodConditions: []v1.PodCondition{
 				{
 					Type:               "currentType",
@@ -1497,7 +1474,32 @@ func TestUpdatePodCondition(t *testing.T) {
 				Reason:             "currentReason",
 				Message:            "currentMessage",
 			},
-			expectedPatchRequests: 0,
+			currentNominatedNodeName: "node1",
+			expectedPatchRequests:    0,
+		},
+		{
+			name: "Should make patch request if pod condition already exists and is identical but nominated node name is set and different",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "currentStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+				Reason:             "currentReason",
+				Message:            "currentMessage",
+			},
+			newNominatedNodeName:     "node1",
+			expectedPatchRequests:    1,
+			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
 		},
 	}
 	for _, test := range tests {
@@ -1516,16 +1518,18 @@ func TestUpdatePodCondition(t *testing.T) {
 
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     v1.PodStatus{Conditions: test.currentPodConditions},
+				Status: v1.PodStatus{
+					Conditions:        test.currentPodConditions,
+					NominatedNodeName: test.currentNominatedNodeName,
+				},
 			}
 
-			updater := &podConditionUpdaterImpl{Client: cs}
-			if err := updater.update(pod, test.newPodCondition); err != nil {
+			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatedNodeName); err != nil {
 				t.Fatalf("Error calling update: %v", err)
 			}
 
 			if actualPatchRequests != test.expectedPatchRequests {
-				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
+				t.Fatalf("Actual patch requests (%d) does not equal expected patch requests (%d), actual patch data: %v", actualPatchRequests, test.expectedPatchRequests, actualPatchData)
 			}
 
 			regex, err := regexp.Compile(test.expectedPatchDataPattern)
