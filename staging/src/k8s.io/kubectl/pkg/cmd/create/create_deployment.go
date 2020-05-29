@@ -48,6 +48,9 @@ var (
 	# Create a deployment with command
 	kubectl create deployment my-dep --image=busybox -- date
 
+	# Create a deployment named my-dep that runs the nginx image with 3 replicas.
+	kubectl create deployment my-dep --image=nginx --replicas=3
+
 	# Create a deployment named my-dep that runs the busybox image and expose port 5701.
 	kubectl create deployment my-dep --image=busybox --port=5701`))
 )
@@ -61,6 +64,7 @@ type CreateDeploymentOptions struct {
 	Name             string
 	Images           []string
 	Port             int32
+	Replicas         int32
 	Command          []string
 	Namespace        string
 	EnforceNamespace bool
@@ -76,6 +80,7 @@ type CreateDeploymentOptions struct {
 func NewCreateCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *CreateDeploymentOptions {
 	return &CreateDeploymentOptions{
 		Port:       -1,
+		Replicas:   1,
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
@@ -107,6 +112,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 	cmd.Flags().StringSliceVar(&o.Images, "image", o.Images, "Image names to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")
+	cmd.Flags().Int32VarP(&o.Replicas, "replicas", "r", o.Replicas, "Number of replicas to create. Default is 1.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	return cmd
@@ -196,7 +202,6 @@ func (o *CreateDeploymentOptions) Run() error {
 }
 
 func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
-	one := int32(1)
 	labels := map[string]string{"app": o.Name}
 	selector := metav1.LabelSelector{MatchLabels: labels}
 	namespace := ""
@@ -212,7 +217,7 @@ func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &one,
+			Replicas: &o.Replicas,
 			Selector: &selector,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
