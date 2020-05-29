@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/controller/volume/common:go_default_library",
         "//pkg/controller/volume/events:go_default_library",
         "//pkg/controller/volume/persistentvolume/metrics:go_default_library",
         "//pkg/controller/volume/persistentvolume/util:go_default_library",
