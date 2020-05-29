@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
@@ -57,13 +56,13 @@ var EvictionsRetry = wait.Backoff{
 	Jitter:   0.1,
 }
 
-func newEvictionStorage(store *genericregistry.Store, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) *EvictionREST {
+func newEvictionStorage(store rest.StandardStorage, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) *EvictionREST {
 	return &EvictionREST{store: store, podDisruptionBudgetClient: podDisruptionBudgetClient}
 }
 
 // EvictionREST implements the REST endpoint for evicting pods from nodes
 type EvictionREST struct {
-	store                     *genericregistry.Store
+	store                     rest.StandardStorage
 	podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter
 }
 
@@ -111,16 +110,10 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		return nil, errors.NewBadRequest("name in URL does not match name in Eviction object")
 	}
 
-	deletionOptions, err := propagateDryRun(eviction, options)
+	originalDeleteOptions, err := propagateDryRun(eviction, options)
 	if err != nil {
 		return nil, err
 	}
-
-	obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	pod := obj.(*api.Pod)
 
 	if createValidation != nil {
 		if err := createValidation(ctx, eviction.DeepCopyObject()); err != nil {
@@ -128,16 +121,64 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		}
 	}
 
-	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
-	// There is no need to check for pdb.
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+	var pod *api.Pod
+	deletedPod := false
+	// by default, retry conflict errors
+	shouldRetry := errors.IsConflict
+	if !resourceVersionIsUnset(originalDeleteOptions) {
+		// if the original options included a resourceVersion precondition, don't retry
+		shouldRetry = func(err error) bool { return false }
+	}
+
+	err = retry.OnError(EvictionsRetry, shouldRetry, func() error {
+		obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		pod = obj.(*api.Pod)
+
+		// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
+		// There is no need to check for pdb.
+		if !canIgnorePDB(pod) {
+			// Pod is not in a state where we can skip checking PDBs, exit the loop, and continue to PDB checks.
+			return nil
+		}
+
+		// the PDB can be ignored, so delete the pod
+		deletionOptions := originalDeleteOptions.DeepCopy()
+		// We should check if resourceVersion is already set by the requestor
+		// as it might be older than the pod we just fetched and should be
+		// honored.
+		if shouldEnforceResourceVersion(pod) && resourceVersionIsUnset(originalDeleteOptions) {
+			// Set deletionOptions.Preconditions.ResourceVersion to ensure we're not
+			// racing with another PDB-impacting process elsewhere.
+			if deletionOptions.Preconditions == nil {
+				deletionOptions.Preconditions = &metav1.Preconditions{}
+			}
+			deletionOptions.Preconditions.ResourceVersion = &pod.ResourceVersion
+		}
 		_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return &metav1.Status{
-			Status: metav1.StatusSuccess}, nil
+		deletedPod = true
+		return nil
+	})
+	switch {
+	case err != nil:
+		// this can happen in cases where the PDB can be ignored, but there was a problem issuing the pod delete:
+		// maybe we conflicted too many times or we didn't have permission or something else weird.
+		return nil, err
+
+	case deletedPod:
+		// this happens when we successfully deleted the pod.  In this case, we're done executing because we've evicted/deleted the pod
+		return &metav1.Status{Status: metav1.StatusSuccess}, nil
+
+	default:
+		// this happens when we didn't have an error and we didn't delete the pod. The only branch that happens on is when
+		// we cannot ignored the PDB for this pod, so this is the fall through case.
 	}
+
 	var rtStatus *metav1.Status
 	var pdbName string
 	err = func() error {
@@ -172,7 +213,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 			// If it was false already, or if it becomes false during the course of our retries,
 			// raise an error marked as a 429.
-			if err = r.checkAndDecrement(pod.Namespace, pod.Name, *pdb, dryrun.IsDryRun(deletionOptions.DryRun)); err != nil {
+			if err = r.checkAndDecrement(pod.Namespace, pod.Name, *pdb, dryrun.IsDryRun(originalDeleteOptions.DryRun)); err != nil {
 				refresh = true
 				return err
 			}
@@ -194,13 +235,36 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
+	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, originalDeleteOptions.DeepCopy())
 	if err != nil {
 		return nil, err
 	}
 
 	// Success!
 	return &metav1.Status{Status: metav1.StatusSuccess}, nil
+}
+
+// canIgnorePDB returns true for pod conditions that allow the pod to be deleted
+// without checking PDBs.
+func canIgnorePDB(pod *api.Pod) bool {
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodPending {
+		return true
+	}
+	return false
+}
+
+func shouldEnforceResourceVersion(pod *api.Pod) bool {
+	// We don't need to enforce ResourceVersion for terminal pods
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		return false
+	}
+	// Return true for all other pods to ensure we don't race against a pod becoming
+	// ready and violating PDBs.
+	return true
+}
+
+func resourceVersionIsUnset(options *metav1.DeleteOptions) bool {
+	return options.Preconditions == nil || options.Preconditions.ResourceVersion == nil
 }
 
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
