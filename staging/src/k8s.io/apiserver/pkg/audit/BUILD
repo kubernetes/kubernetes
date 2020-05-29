@@ -71,7 +71,6 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/audit/event:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/audit/policy:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/audit/util:all-srcs",
     ],
     tags = ["automanaged"],
 )

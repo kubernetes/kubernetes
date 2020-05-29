@@ -1102,7 +1102,6 @@ k8s.io/api/admissionregistration/v1beta1
 k8s.io/api/apps/v1
 k8s.io/api/apps/v1beta1
 k8s.io/api/apps/v1beta2
-k8s.io/api/auditregistration/v1alpha1
 k8s.io/api/authentication/v1
 k8s.io/api/authentication/v1beta1
 k8s.io/api/authorization/v1
@@ -1288,9 +1287,7 @@ k8s.io/apiserver/pkg/apis/config/validation
 k8s.io/apiserver/pkg/apis/example
 k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap
 k8s.io/apiserver/pkg/audit
-k8s.io/apiserver/pkg/audit/event
 k8s.io/apiserver/pkg/audit/policy
-k8s.io/apiserver/pkg/audit/util
 k8s.io/apiserver/pkg/authentication/authenticator
 k8s.io/apiserver/pkg/authentication/authenticatorfactory
 k8s.io/apiserver/pkg/authentication/group
@@ -1377,8 +1374,6 @@ k8s.io/apiserver/pkg/util/shufflesharding
 k8s.io/apiserver/pkg/util/webhook
 k8s.io/apiserver/pkg/util/wsstream
 k8s.io/apiserver/plugin/pkg/audit/buffered
-k8s.io/apiserver/plugin/pkg/audit/dynamic
-k8s.io/apiserver/plugin/pkg/audit/dynamic/enforced
 k8s.io/apiserver/plugin/pkg/audit/log
 k8s.io/apiserver/plugin/pkg/audit/truncate
 k8s.io/apiserver/plugin/pkg/audit/webhook
@@ -1415,8 +1410,6 @@ k8s.io/client-go/informers/apps
 k8s.io/client-go/informers/apps/v1
 k8s.io/client-go/informers/apps/v1beta1
 k8s.io/client-go/informers/apps/v1beta2
-k8s.io/client-go/informers/auditregistration
-k8s.io/client-go/informers/auditregistration/v1alpha1
 k8s.io/client-go/informers/autoscaling
 k8s.io/client-go/informers/autoscaling/v1
 k8s.io/client-go/informers/autoscaling/v2beta1
@@ -1477,8 +1470,6 @@ k8s.io/client-go/kubernetes/typed/apps/v1beta1
 k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake
 k8s.io/client-go/kubernetes/typed/apps/v1beta2
 k8s.io/client-go/kubernetes/typed/apps/v1beta2/fake
-k8s.io/client-go/kubernetes/typed/auditregistration/v1alpha1
-k8s.io/client-go/kubernetes/typed/auditregistration/v1alpha1/fake
 k8s.io/client-go/kubernetes/typed/authentication/v1
 k8s.io/client-go/kubernetes/typed/authentication/v1/fake
 k8s.io/client-go/kubernetes/typed/authentication/v1beta1
@@ -1552,7 +1543,6 @@ k8s.io/client-go/listers/admissionregistration/v1beta1
 k8s.io/client-go/listers/apps/v1
 k8s.io/client-go/listers/apps/v1beta1
 k8s.io/client-go/listers/apps/v1beta2
-k8s.io/client-go/listers/auditregistration/v1alpha1
 k8s.io/client-go/listers/autoscaling/v1
 k8s.io/client-go/listers/autoscaling/v2beta1
 k8s.io/client-go/listers/autoscaling/v2beta2

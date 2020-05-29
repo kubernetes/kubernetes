@@ -669,7 +669,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Deprecated},
 	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.DynamicAuditing:         {Default: false, PreRelease: featuregate.Alpha},
 	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.GA},

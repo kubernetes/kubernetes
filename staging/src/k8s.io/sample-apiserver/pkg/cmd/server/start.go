@@ -58,7 +58,6 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion),
-			genericoptions.NewProcessInfo("wardle-apiserver", "wardle"),
 		),
 
 		StdOut: out,

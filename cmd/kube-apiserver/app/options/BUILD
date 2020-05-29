@@ -60,7 +60,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/buffered:go_default_library",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/audit/dynamic:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/truncate:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
