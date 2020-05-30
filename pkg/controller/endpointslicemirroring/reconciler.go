@@ -110,7 +110,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 		}
 	}
 
-	spMetrics := mirroringmetrics.NewServicePortCache()
+	epMetrics := mirroringmetrics.NewEndpointPortCache()
 	totalAdded := 0
 	totalRemoved := 0
 
@@ -123,7 +123,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 		totalAdded += added
 		totalRemoved += removed
 
-		spMetrics.Set(portMap, mirroringmetrics.EfficiencyInfo{
+		epMetrics.Set(portMap, mirroringmetrics.EfficiencyInfo{
 			Endpoints: numEndpoints,
 			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
 		})
@@ -152,8 +152,8 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	mirroringmetrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))
 	mirroringmetrics.EndpointsRemovedPerSync.WithLabelValues().Observe(float64(totalRemoved))
 
-	serviceNN := types.NamespacedName{Name: endpoints.Name, Namespace: endpoints.Namespace}
-	r.metricsCache.UpdateServicePortCache(serviceNN, spMetrics)
+	endpointsNN := types.NamespacedName{Name: endpoints.Name, Namespace: endpoints.Namespace}
+	r.metricsCache.UpdateEndpointPortCache(endpointsNN, epMetrics)
 
 	return r.finalize(endpoints, slicesToCreate, slicesToUpdate, slicesToDelete)
 }
@@ -374,5 +374,5 @@ func (r *reconciler) reconcileByPortMapping(
 }
 
 func (r *reconciler) deleteEndpoints(namespace, name string) {
-	r.metricsCache.DeleteService(types.NamespacedName{Namespace: namespace, Name: name})
+	r.metricsCache.DeleteEndpoints(types.NamespacedName{Namespace: namespace, Name: name})
 }

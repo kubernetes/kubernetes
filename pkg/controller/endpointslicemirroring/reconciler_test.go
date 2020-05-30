@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,35 +30,83 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-base/metrics/testutil"
 	mirroringmetrics "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var defaultMaxEndpointsPerSlice = int32(100)
 
-// Even when there are no pods, we want to have a placeholder slice for each service
-func TestReconcileEmpty(t *testing.T) {
-	client := newClientset()
-	setupMetrics()
-	namespace := "test"
-	endpoints, _ := newEndpointsAndEndpointMeta("foo", namespace)
+// TestReconcile ensures that Endpoints are reconciled into corresponding
+// EndpointSlices with appropriate fields.
+func TestReconcile(t *testing.T) {
+	testCases := []struct {
+		testName               string
+		subsets                []corev1.EndpointSubset
+		existingEndpointSlices []*discovery.EndpointSlice
+		expectedNumSlices      int
+		expectedClientActions  int
+		expectedMetrics        expectedMetrics
+	}{{
+		testName:               "Endpoints with no subsets",
+		subsets:                []corev1.EndpointSubset{},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      0,
+		expectedClientActions:  0,
+		expectedMetrics:        expectedMetrics{},
+	}, {
+		testName: "Endpoints with no addresses",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      0,
+		expectedClientActions:  0,
+		expectedMetrics:        expectedMetrics{},
+	}, {
+		testName: "Endpoints with 1 subset, port, and address",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, numCreated: 1},
+	}}
 
-	r := newReconciler(client, defaultMaxEndpointsPerSlice)
-	reconcileHelper(t, r, &endpoints, []*discovery.EndpointSlice{})
-	if len(client.Actions()) > 0 {
-		t.Errorf("Expected 0 additional client actions, got %d", len(client.Actions()))
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
+			namespace := "test"
+			endpoints := corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace},
+				Subsets:    tc.subsets,
+			}
+
+			r := newReconciler(client, defaultMaxEndpointsPerSlice)
+			reconcileHelper(t, r, &endpoints, []*discovery.EndpointSlice{})
+			if len(client.Actions()) != tc.expectedClientActions {
+				t.Fatalf("Expected %d additional client actions, got %d", tc.expectedClientActions, len(client.Actions()))
+			}
+
+			expectMetrics(t, tc.expectedMetrics)
+
+			endpointSlices := fetchEndpointSlices(t, client, namespace)
+			expectEndpointSlices(t, tc.expectedNumSlices, endpoints, endpointSlices)
+		})
 	}
-
-	slices := fetchEndpointSlices(t, client, namespace)
-	if len(slices) > 0 {
-		t.Errorf("Expected 0 EndpointSlices, got %d", len(slices))
-	}
-
-	expectMetrics(t, expectedMetrics{desiredSlices: 0, actualSlices: 0, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0})
-
-	// assert.Regexp(t, "^"+endpoints.Name, slices[0].Name)
-	// assert.Equal(t, endpoints.Name, slices[0].Labels[discovery.LabelServiceName])
-	// assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
-	// assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
-	// expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "100")
 }
 
 // Test Helpers
@@ -68,6 +117,130 @@ func newReconciler(client *fake.Clientset, maxEndpointsPerSlice int32) *reconcil
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
 		endpointSliceTracker: newEndpointSliceTracker(),
 		metricsCache:         mirroringmetrics.NewCache(maxEndpointsPerSlice),
+	}
+}
+
+func expectEndpointSlices(t *testing.T, num int, endpoints corev1.Endpoints, endpointSlices []discovery.EndpointSlice) {
+	if len(endpointSlices) != num {
+		t.Fatalf("Expected %d EndpointSlices, got %d", num, len(endpointSlices))
+	}
+
+	for _, epSlice := range endpointSlices {
+		if !strings.HasPrefix(epSlice.Name, endpoints.Name) {
+			t.Errorf("Expected EndpointSlice name to start with %s, got %s", endpoints.Name, epSlice.Name)
+		}
+
+		serviceNameVal, ok := epSlice.Labels[discovery.LabelServiceName]
+		if !ok {
+			t.Errorf("Expected EndpointSlice to have %s label set", discovery.LabelServiceName)
+		}
+		if serviceNameVal != endpoints.Name {
+			t.Errorf("Expected EndpointSlice to have %s label set to %s, got %s", discovery.LabelServiceName, endpoints.Name, serviceNameVal)
+		}
+
+		// If we want to test multiple EndpointSlices per port combination this
+		// will need to be refactored.
+		matchingPortsFound := false
+		for _, epSubset := range endpoints.Subsets {
+			if portsMatch(epSubset.Ports, epSlice.Ports) {
+				matchingPortsFound = true
+				expectMatchingAddresses(t, epSubset, epSlice.Endpoints)
+				break
+			}
+		}
+
+		if !matchingPortsFound {
+			t.Fatalf("EndpointSlice ports don't match ports for any Endpoints subset: %#v", epSlice.Ports)
+		}
+	}
+}
+
+func portsMatch(epPorts []corev1.EndpointPort, epsPorts []discovery.EndpointPort) bool {
+	if len(epPorts) != len(epsPorts) {
+		return false
+	}
+
+	// This assumes EndpointSlice ports and Endpoints ports will always be share
+	// the same order. That's not necessarily a requiremen but has been true so
+	// far.
+	for i, epPort := range epPorts {
+		epsPort := epsPorts[i]
+		if epPort.Name != *epsPort.Name {
+			return false
+		}
+		if epPort.Port != *epsPort.Port {
+			return false
+		}
+		if epPort.Protocol != *epsPort.Protocol {
+			return false
+		}
+		if epPort.AppProtocol != epsPort.AppProtocol {
+			return false
+		}
+	}
+
+	return true
+}
+
+func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEndpoints []discovery.Endpoint) {
+	type addressInfo struct {
+		matched   bool
+		ready     bool
+		epAddress corev1.EndpointAddress
+	}
+
+	// This approach assumes that each IP is unique within an EndpointSubset.
+	expectedEndpoints := map[string]addressInfo{}
+
+	for _, address := range epSubset.Addresses {
+		expectedEndpoints[address.IP] = addressInfo{
+			ready:     true,
+			epAddress: address,
+		}
+	}
+
+	for _, address := range epSubset.NotReadyAddresses {
+		expectedEndpoints[address.IP] = addressInfo{
+			ready:     false,
+			epAddress: address,
+		}
+	}
+
+	if len(expectedEndpoints) != len(esEndpoints) {
+		t.Errorf("Expected %d endpoints, got %d", len(expectedEndpoints), len(esEndpoints))
+	}
+
+	for _, endpoint := range esEndpoints {
+		if len(endpoint.Addresses) != 1 {
+			t.Fatalf("Expected endpoint to have 1 address, got %d", len(endpoint.Addresses))
+		}
+		address := endpoint.Addresses[0]
+		expectedEndpoint, ok := expectedEndpoints[address]
+
+		if !ok {
+			t.Fatalf("EndpointSlice has endpoint with unexpected address: %s", address)
+		}
+
+		if expectedEndpoint.ready != *endpoint.Conditions.Ready {
+			t.Errorf("Expected ready to be %t, got %t", expectedEndpoint.ready, *endpoint.Conditions.Ready)
+		}
+
+		if endpoint.Hostname == nil {
+			if expectedEndpoint.epAddress.Hostname != "" {
+				t.Errorf("Expected hostname to be %s, got nil", expectedEndpoint.epAddress.Hostname)
+			}
+		} else if expectedEndpoint.epAddress.Hostname != *endpoint.Hostname {
+			t.Errorf("Expected hostname to be %s, got %s", expectedEndpoint.epAddress.Hostname, *endpoint.Hostname)
+		}
+
+		if expectedEndpoint.epAddress.NodeName != nil {
+			topologyHostname, ok := endpoint.Topology["kubernetes.io/hostname"]
+			if !ok {
+				t.Errorf("Expected topology[kubernetes.io/hostname] to be set")
+			} else if *expectedEndpoint.epAddress.NodeName != topologyHostname {
+				t.Errorf("Expected topology[kubernetes.io/hostname] to be %s, got %s", *expectedEndpoint.epAddress.NodeName, topologyHostname)
+			}
+		}
 	}
 }
 

@@ -33,27 +33,27 @@ func TestNumEndpointsAndSlices(t *testing.T) {
 	pmKey80443 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
 	pmKey80 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
 
-	spCacheEfficient := NewServicePortCache()
+	spCacheEfficient := NewEndpointPortCache()
 	spCacheEfficient.Set(pmKey80, EfficiencyInfo{Endpoints: 45, Slices: 1})
 	spCacheEfficient.Set(pmKey80443, EfficiencyInfo{Endpoints: 35, Slices: 1})
 
-	spCacheInefficient := NewServicePortCache()
+	spCacheInefficient := NewEndpointPortCache()
 	spCacheInefficient.Set(pmKey80, EfficiencyInfo{Endpoints: 12, Slices: 5})
 	spCacheInefficient.Set(pmKey80443, EfficiencyInfo{Endpoints: 18, Slices: 8})
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheInefficient)
+	c.UpdateEndpointPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheInefficient)
 	expectNumEndpointsAndSlices(t, c, 2, 13, 30)
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc2"}, spCacheEfficient)
+	c.UpdateEndpointPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc2"}, spCacheEfficient)
 	expectNumEndpointsAndSlices(t, c, 4, 15, 110)
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc3"}, spCacheInefficient)
+	c.UpdateEndpointPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc3"}, spCacheInefficient)
 	expectNumEndpointsAndSlices(t, c, 6, 28, 140)
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheEfficient)
+	c.UpdateEndpointPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheEfficient)
 	expectNumEndpointsAndSlices(t, c, 6, 17, 190)
 
-	c.DeleteService(types.NamespacedName{Namespace: "ns1", Name: "svc3"})
+	c.DeleteEndpoints(types.NamespacedName{Namespace: "ns1", Name: "svc3"})
 	expectNumEndpointsAndSlices(t, c, 4, 4, 160)
 }
 

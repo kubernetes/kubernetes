@@ -28,7 +28,7 @@ import (
 func NewCache(endpointsPerSlice int32) *Cache {
 	return &Cache{
 		maxEndpointsPerSlice: endpointsPerSlice,
-		cache:                map[types.NamespacedName]*ServicePortCache{},
+		cache:                map[types.NamespacedName]*EndpointPortCache{},
 	}
 }
 
@@ -44,15 +44,15 @@ type Cache struct {
 	// numEndpoints represents the total number of endpoints stored in
 	// EndpointSlices.
 	numEndpoints int
-	// cache stores a ServicePortCache grouped by NamespacedNames representing
+	// cache stores a EndpointPortCache grouped by NamespacedNames representing
 	// Services.
-	cache map[types.NamespacedName]*ServicePortCache
+	cache map[types.NamespacedName]*EndpointPortCache
 }
 
-// ServicePortCache tracks values for total numbers of desired endpoints as well
+// EndpointPortCache tracks values for total numbers of desired endpoints as well
 // as the efficiency of EndpointSlice endpoints distribution for each unique
 // Service Port combination.
-type ServicePortCache struct {
+type EndpointPortCache struct {
 	items map[endpointutil.PortMapKey]EfficiencyInfo
 }
 
@@ -64,22 +64,22 @@ type EfficiencyInfo struct {
 	Slices    int
 }
 
-// NewServicePortCache initializes and returns a new ServicePortCache.
-func NewServicePortCache() *ServicePortCache {
-	return &ServicePortCache{
+// NewEndpointPortCache initializes and returns a new EndpointPortCache.
+func NewEndpointPortCache() *EndpointPortCache {
+	return &EndpointPortCache{
 		items: map[endpointutil.PortMapKey]EfficiencyInfo{},
 	}
 }
 
-// Set updates the ServicePortCache to contain the provided EfficiencyInfo
+// Set updates the EndpointPortCache to contain the provided EfficiencyInfo
 // for the provided PortMapKey.
-func (spc *ServicePortCache) Set(pmKey endpointutil.PortMapKey, eInfo EfficiencyInfo) {
+func (spc *EndpointPortCache) Set(pmKey endpointutil.PortMapKey, eInfo EfficiencyInfo) {
 	spc.items[pmKey] = eInfo
 }
 
 // numEndpoints returns the total number of endpoints represented by a
-// ServicePortCache.
-func (spc *ServicePortCache) numEndpoints() int {
+// EndpointPortCache.
+func (spc *EndpointPortCache) numEndpoints() int {
 	num := 0
 	for _, eInfo := range spc.items {
 		num += eInfo.Endpoints
@@ -87,38 +87,38 @@ func (spc *ServicePortCache) numEndpoints() int {
 	return num
 }
 
-// UpdateServicePortCache updates a ServicePortCache in the global cache for a
+// UpdateEndpointPortCache updates a EndpointPortCache in the global cache for a
 // given Service and updates the corresponding metrics.
 // Parameters:
-// * serviceNN refers to a NamespacedName representing the Service.
-// * spCache refers to a ServicePortCache for the specified Service.
-func (c *Cache) UpdateServicePortCache(serviceNN types.NamespacedName, spCache *ServicePortCache) {
+// * endpointsNN refers to a NamespacedName representing the Endpoints resource.
+// * epCache refers to a EndpointPortCache for the specified Endpoints reosource.
+func (c *Cache) UpdateEndpointPortCache(endpointsNN types.NamespacedName, epCache *EndpointPortCache) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	prevNumEndpoints := 0
-	if existingSPCache, ok := c.cache[serviceNN]; ok {
-		prevNumEndpoints = existingSPCache.numEndpoints()
+	if existingEPCache, ok := c.cache[endpointsNN]; ok {
+		prevNumEndpoints = existingEPCache.numEndpoints()
 	}
 
-	currNumEndpoints := spCache.numEndpoints()
+	currNumEndpoints := epCache.numEndpoints()
 	// To keep numEndpoints up to date, add the difference between the number of
 	// endpoints in the provided spCache and any spCache it might be replacing.
 	c.numEndpoints = c.numEndpoints + currNumEndpoints - prevNumEndpoints
 
-	c.cache[serviceNN] = spCache
+	c.cache[endpointsNN] = epCache
 	c.updateMetrics()
 }
 
-// DeleteService removes references of a Service from the global cache and
-// updates the corresponding metrics.
-func (c *Cache) DeleteService(serviceNN types.NamespacedName) {
+// DeleteEndpoints removes references to an Endpoints resource from the global
+// cache and updates the corresponding metrics.
+func (c *Cache) DeleteEndpoints(endpointsNN types.NamespacedName) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if spCache, ok := c.cache[serviceNN]; ok {
+	if spCache, ok := c.cache[endpointsNN]; ok {
 		c.numEndpoints = c.numEndpoints - spCache.numEndpoints()
-		delete(c.cache, serviceNN)
+		delete(c.cache, endpointsNN)
 		c.updateMetrics()
 	}
 }

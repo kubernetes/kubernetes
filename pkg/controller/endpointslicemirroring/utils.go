@@ -89,19 +89,24 @@ func getEndpointSlicePrefix(serviceName string) string {
 // addressToEndpoint converts an address from an Endpoints resource to an
 // EndpointSlice endpoint.
 func addressToEndpoint(address corev1.EndpointAddress, ready bool) *discovery.Endpoint {
-	topology := map[string]string{}
-	if address.Hostname != "" {
-		topology["kubernetes.io/hostname"] = address.Hostname
-	}
-
-	return &discovery.Endpoint{
+	endpoint := &discovery.Endpoint{
 		Addresses: []string{address.IP},
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
 		},
-		Topology:  topology,
 		TargetRef: address.TargetRef,
 	}
+
+	if address.NodeName != nil {
+		endpoint.Topology = map[string]string{
+			"kubernetes.io/hostname": *address.NodeName,
+		}
+	}
+	if address.Hostname != "" {
+		endpoint.Hostname = &address.Hostname
+	}
+
+	return endpoint
 }
 
 // epPortsToEpsPorts converts ports from an Endpoints resource to ports for an

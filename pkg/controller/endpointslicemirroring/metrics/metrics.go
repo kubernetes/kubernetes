@@ -23,15 +23,16 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-// EndpointSliceSubsystem - subsystem name used for Endpoint Slices.
-const EndpointSliceSubsystem = "endpoint_slice_controller"
+// EndpointSliceMirroringSubsystem is the name of the subsystem used for
+// EndpointSliceMirroring controller.
+const EndpointSliceMirroringSubsystem = "endpoint_slice_mirroring_controller"
 
 var (
 	// EndpointsAddedPerSync tracks the number of endpoints added on each
 	// Service sync.
 	EndpointsAddedPerSync = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      EndpointSliceSubsystem,
+			Subsystem:      EndpointSliceMirroringSubsystem,
 			Name:           "endpoints_added_per_sync",
 			Help:           "Number of endpoints added on each Service sync",
 			StabilityLevel: metrics.ALPHA,
@@ -43,7 +44,7 @@ var (
 	// Service sync.
 	EndpointsRemovedPerSync = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      EndpointSliceSubsystem,
+			Subsystem:      EndpointSliceMirroringSubsystem,
 			Name:           "endpoints_removed_per_sync",
 			Help:           "Number of endpoints removed on each Service sync",
 			StabilityLevel: metrics.ALPHA,
@@ -54,7 +55,7 @@ var (
 	// EndpointsDesired tracks the total number of desired endpoints.
 	EndpointsDesired = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      EndpointSliceSubsystem,
+			Subsystem:      EndpointSliceMirroringSubsystem,
 			Name:           "endpoints_desired",
 			Help:           "Number of endpoints desired",
 			StabilityLevel: metrics.ALPHA,
@@ -64,7 +65,7 @@ var (
 	// NumEndpointSlices tracks the number of EndpointSlices in a cluster.
 	NumEndpointSlices = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      EndpointSliceSubsystem,
+			Subsystem:      EndpointSliceMirroringSubsystem,
 			Name:           "num_endpoint_slices",
 			Help:           "Number of EndpointSlices",
 			StabilityLevel: metrics.ALPHA,
@@ -75,7 +76,7 @@ var (
 	// exist with perfect endpoint allocation.
 	DesiredEndpointSlices = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
-			Subsystem:      EndpointSliceSubsystem,
+			Subsystem:      EndpointSliceMirroringSubsystem,
 			Name:           "desired_endpoint_slices",
 			Help:           "Number of EndpointSlices that would exist with perfect endpoint allocation",
 			StabilityLevel: metrics.ALPHA,
@@ -86,7 +87,7 @@ var (
 	// EndpointSliceChanges tracks the number of changes to Endpoint Slices.
 	EndpointSliceChanges = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem:      EndpointSliceSubsystem,
+			Subsystem:      EndpointSliceMirroringSubsystem,
 			Name:           "changes",
 			Help:           "Number of EndpointSlice changes",
 			StabilityLevel: metrics.ALPHA,
