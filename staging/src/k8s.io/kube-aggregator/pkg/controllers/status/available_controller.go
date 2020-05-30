@@ -285,7 +285,12 @@ func (c *AvailableConditionController) sync(key string) error {
 					results <- err
 					return
 				}
-				discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+				// render legacyAPIService health check path when it is delegated to a service
+				if apiService.Name == "v1." {
+					discoveryURL.Path = "/api/" + apiService.Spec.Version
+				} else {
+					discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+				}
 
 				errCh := make(chan error)
 				go func() {
