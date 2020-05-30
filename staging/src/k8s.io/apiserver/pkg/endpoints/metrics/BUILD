@@ -6,12 +6,6 @@ load(
     "go_test",
 )
 
-go_test(
-    name = "go_default_test",
-    srcs = ["metrics_test.go"],
-    embed = [":go_default_library"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
@@ -41,4 +35,10 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["metrics_test.go"],
+    embed = [":go_default_library"],
 )
