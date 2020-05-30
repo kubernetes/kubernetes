@@ -190,6 +190,9 @@ type Plugins struct {
 	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
 	Filter *PluginSet
 
+	// PostFilter is a list of plugins that are invoked after filtering phase, no matter whether filtering succeeds or not.
+	PostFilter *PluginSet
+
 	// PreScore is a list of plugins that are invoked before scoring.
 	PreScore *PluginSet
 
@@ -284,6 +287,7 @@ func (p *Plugins) Append(src *Plugins) {
 	p.QueueSort = appendPluginSet(p.QueueSort, src.QueueSort)
 	p.PreFilter = appendPluginSet(p.PreFilter, src.PreFilter)
 	p.Filter = appendPluginSet(p.Filter, src.Filter)
+	p.PostFilter = appendPluginSet(p.PostFilter, src.PostFilter)
 	p.PreScore = appendPluginSet(p.PreScore, src.PreScore)
 	p.Score = appendPluginSet(p.Score, src.Score)
 	p.Reserve = appendPluginSet(p.Reserve, src.Reserve)
@@ -303,6 +307,7 @@ func (p *Plugins) Apply(customPlugins *Plugins) {
 	p.QueueSort = mergePluginSets(p.QueueSort, customPlugins.QueueSort)
 	p.PreFilter = mergePluginSets(p.PreFilter, customPlugins.PreFilter)
 	p.Filter = mergePluginSets(p.Filter, customPlugins.Filter)
+	p.PostFilter = mergePluginSets(p.PostFilter, customPlugins.PostFilter)
 	p.PreScore = mergePluginSets(p.PreScore, customPlugins.PreScore)
 	p.Score = mergePluginSets(p.Score, customPlugins.Score)
 	p.Reserve = mergePluginSets(p.Reserve, customPlugins.Reserve)
