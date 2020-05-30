@@ -289,7 +289,11 @@ var _ = SIGDescribe("Pods Extended", func() {
 							}
 							for event := range w.ResultChan() {
 								events = append(events, event)
+								if event.Type == watch.Error {
+									framework.Logf("watch error seen for %s: %#v", pod.Name, event.Object)
+								}
 								if event.Type == watch.Deleted {
+									framework.Logf("watch delete seen for %s", pod.Name)
 									break
 								}
 							}
@@ -301,12 +305,20 @@ var _ = SIGDescribe("Pods Extended", func() {
 						err := podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 						framework.ExpectNoError(err, "failed to delete pod")
 
-						events, ok := <-ch
-						if !ok {
-							continue
-						}
-						if len(events) < 2 {
-							framework.Fail("only got a single event")
+						var (
+							events []watch.Event
+							ok     bool
+						)
+						select {
+						case events, ok = <-ch:
+							if !ok {
+								continue
+							}
+							if len(events) < 2 {
+								framework.Fail("only got a single event")
+							}
+						case <-time.After(5 * time.Minute):
+							framework.Failf("timed out waiting for watch events for %s", pod.Name)
 						}
 
 						end := time.Now()
@@ -381,8 +393,8 @@ var _ = SIGDescribe("Pods Extended", func() {
 							}
 						}
 						func() {
-							defer lock.Unlock()
 							lock.Lock()
+							defer lock.Unlock()
 
 							if eventErr != nil {
 								errs = append(errs, eventErr)
