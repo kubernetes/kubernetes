@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utiltesting "k8s.io/client-go/util/testing"
 )
@@ -148,6 +148,27 @@ func TestSecretForTLSGenerate(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name: "test-valid-tls-secret-with-ca",
+			params: map[string]interface{}{
+				"name": "foo",
+				"key":  validKeyPath,
+				"cert": validCertPath,
+				"ca":   validCertPath,
+			},
+			expected: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					v1.TLSCertKey:       []byte(rsaCertPEM),
+					v1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
+					v1.TLSCABundleKey:   []byte(rsaCertPEM),
+				},
+				Type: v1.SecretTypeTLS,
+			},
+			expectErr: false,
+		},
+		{
 			name: "test-valid-tls-secret-append-hash",
 			params: map[string]interface{}{
 				"name":        "foo",
@@ -181,6 +202,27 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				Data: map[string][]byte{
 					v1.TLSCertKey:       []byte("test"),
 					v1.TLSPrivateKeyKey: []byte("test"),
+				},
+				Type: v1.SecretTypeTLS,
+			},
+			expectErr: true,
+		},
+		{
+			name: "test-invalid-ca",
+			params: map[string]interface{}{
+				"name": "foo",
+				"key":  validKeyPath,
+				"cert": validCertPath,
+				"ca":   validKeyPath, // No valid certificates in this file.
+			},
+			expected: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					v1.TLSCertKey:       []byte("test"),
+					v1.TLSPrivateKeyKey: []byte("test"),
+					v1.TLSCABundleKey:   []byte("test"),
 				},
 				Type: v1.SecretTypeTLS,
 			},

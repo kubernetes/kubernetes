@@ -18,10 +18,13 @@ package versioned
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/util/hash"
@@ -35,6 +38,8 @@ type SecretForTLSGeneratorV1 struct {
 	Key string
 	// Cert is the path to the user's public key certificate.
 	Cert string
+	// CABundle is the (optional) path to the certificate bundle for the CA that issued the certificate.
+	CABundle string
 	// AppendHash; if true, derive a hash from the Secret and append it to the name
 	AppendHash bool
 }
@@ -72,6 +77,7 @@ func (s SecretForTLSGeneratorV1) Generate(genericParams map[string]interface{}) 
 	delegate.Name = params["name"]
 	delegate.Key = params["key"]
 	delegate.Cert = params["cert"]
+	delegate.CABundle = params["ca"]
 	return delegate.StructuredGenerate()
 }
 
@@ -90,8 +96,23 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	}
 
 	if _, err := tls.X509KeyPair(tlsCrt, tlsKey); err != nil {
-		return nil, fmt.Errorf("failed to load key pair %v", err)
+		return nil, fmt.Errorf("failed to load key pair: %w", err)
 	}
+
+	// The CA bundle key is optional but must contain at least
+	// one certificate if it is present.
+	var tlsCABundle []byte
+	if s.CABundle != "" {
+		tlsCABundle, err = readFile(s.CABundle)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := validateCABundle(tlsCABundle); err != nil {
+			return nil, fmt.Errorf("failed to load CA bundle: %w", err)
+		}
+	}
+
 	// TODO: Add more validation.
 	// 1. If the certificate contains intermediates, it is a valid chain.
 	// 2. Format etc.
@@ -100,8 +121,12 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	secret.Name = s.Name
 	secret.Type = v1.SecretTypeTLS
 	secret.Data = map[string][]byte{}
-	secret.Data[v1.TLSCertKey] = []byte(tlsCrt)
-	secret.Data[v1.TLSPrivateKeyKey] = []byte(tlsKey)
+	secret.Data[v1.TLSCertKey] = tlsCrt
+	secret.Data[v1.TLSPrivateKeyKey] = tlsKey
+	if tlsCABundle != nil {
+		secret.Data[v1.TLSCABundleKey] = tlsCABundle
+	}
+
 	if s.AppendHash {
 		h, err := hash.SecretHash(secret)
 		if err != nil {
@@ -121,12 +146,34 @@ func readFile(file string) ([]byte, error) {
 	return b, nil
 }
 
+// validateCABundle checks that the given bytes contain at least one PEM-formatted certificate.
+func validateCABundle(in []byte) error {
+	for {
+		var p *pem.Block
+		p, in = pem.Decode(in)
+		if p == nil {
+			break
+		}
+
+		if p.Type == "CERTIFICATE" {
+			if _, err := x509.ParseCertificate(p.Bytes); err != nil {
+				return err
+			}
+
+			return nil
+		}
+	}
+
+	return errors.New("no certificates present")
+}
+
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
 func (s SecretForTLSGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
 		{Name: "name", Required: true},
 		{Name: "key", Required: true},
 		{Name: "cert", Required: true},
+		{Name: "ca", Required: false},
 		{Name: "append-hash", Required: false},
 	}
 }

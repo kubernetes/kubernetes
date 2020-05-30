@@ -283,6 +283,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmdutil.AddGeneratorFlags(cmd, generateversioned.SecretForTLSV1GeneratorName)
 	cmd.Flags().String("cert", "", i18n.T("Path to PEM encoded public key certificate."))
 	cmd.Flags().String("key", "", i18n.T("Path to private key associated with given certificate."))
+	cmd.Flags().String("ca", "", i18n.T("Path to CA certificate bundle associated with given certificate."))
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
 	return cmd
@@ -308,6 +309,7 @@ func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 			Name:       name,
 			Key:        cmdutil.GetFlagString(cmd, "key"),
 			Cert:       cmdutil.GetFlagString(cmd, "cert"),
+			CABundle:   cmdutil.GetFlagString(cmd, "ca"),
 			AppendHash: cmdutil.GetFlagBool(cmd, "append-hash"),
 		}
 	default:

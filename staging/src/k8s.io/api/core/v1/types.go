@@ -5592,10 +5592,12 @@ const (
 	// TODO: Consider supporting different formats, specifying CA/destinationCA.
 	SecretTypeTLS SecretType = "kubernetes.io/tls"
 
-	// TLSCertKey is the key for tls certificates in a TLS secert.
+	// TLSCertKey is the key for TLS certificates in a TLS secret.
 	TLSCertKey = "tls.crt"
 	// TLSPrivateKeyKey is the key for the private key field in a TLS secret.
 	TLSPrivateKeyKey = "tls.key"
+	// TLSCABundleKey is the certificate bundle from the CA that issued the TLS certificate.
+	TLSCABundleKey = "ca.crt"
 	// SecretTypeBootstrapToken is used during the automated bootstrap process (first
 	// implemented by kubeadm). It stores tokens that are used to sign well known
 	// ConfigMaps. They are used for authn.
