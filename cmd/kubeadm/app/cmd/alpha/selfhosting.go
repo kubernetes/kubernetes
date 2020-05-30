@@ -136,6 +136,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 			waiter := apiclient.NewKubeWaiter(client, 2*time.Minute, os.Stdout)
 			return selfhosting.CreateSelfHostedControlPlane(constants.GetStaticPodDirectory(), constants.KubernetesDir, internalcfg, client, waiter, false, certsInSecrets)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	// Add flags to the command

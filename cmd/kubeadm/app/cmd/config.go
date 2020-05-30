@@ -140,6 +140,7 @@ func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesPr
 			}
 			return runConfigPrintActionDefaults(out, groups, configBytesProc)
 		},
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringSliceVar(&kinds, "component-configs", kinds,
 		fmt.Sprintf("A comma-separated list for component config API objects to print the default values for. Available values: %v. If this flag is not set, no component configs will be printed.", getSupportedComponentConfigKinds()))
@@ -295,6 +296,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			}
 			return nil
 		},
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&oldCfgPath, "old-config", "", "Path to the kubeadm config file that is using an old API version and should be converted. This flag is mandatory.")
 	cmd.Flags().StringVar(&newCfgPath, "new-config", "", "Path to the resulting equivalent kubeadm config file using the new API version. Optional, if not specified output will be sent to STDOUT.")
@@ -335,6 +337,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 
 			return RunConfigView(out, client)
 		},
+		Args: cobra.NoArgs,
 	}
 }
 
@@ -375,6 +378,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 			klog.V(1).Infof("[config] uploading configuration")
 			return uploadconfig.UploadConfiguration(internalcfg, client)
 		},
+		Args: cobra.NoArgs,
 	}
 	options.AddConfigFlag(cmd.Flags(), &cfgPath)
 	return cmd
@@ -429,6 +433,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			klog.V(1).Infof("[config] uploading configuration")
 			return uploadconfig.UploadConfiguration(internalcfg, client)
 		},
+		Args: cobra.NoArgs,
 	}
 	AddInitConfigFlags(cmd.PersistentFlags(), initCfg)
 	AddClusterConfigFlags(cmd.PersistentFlags(), clusterCfg, &featureGatesString)
@@ -487,6 +492,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			}
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
+		Args: cobra.NoArgs,
 	}
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalClusterCfg, &cfgPath, &featureGatesString)
 	cmdutil.AddCRISocketFlag(cmd.PersistentFlags(), &externalInitCfg.NodeRegistration.CRISocket)
@@ -556,6 +562,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 			return imagesList.Run(out, printer)
 		},
+		Args: cobra.NoArgs,
 	}
 	outputFlags.AddFlags(cmd)
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)
