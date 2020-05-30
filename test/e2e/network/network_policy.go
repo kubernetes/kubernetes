@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1739,9 +1741,48 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			})
 			cleanupServerPodAndService(f, podA, serviceA)
 		})
+		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]", func() {
+			ginkgo.By("getting the state of the sctp module on nodes")
+			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+			framework.ExpectNoError(err)
+			sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
 
+			ginkgo.By("Creating a network policy for the server which allows traffic only via SCTP on port 80.")
+			protocolSCTP := v1.ProtocolSCTP
+			policy := &networkingv1.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "allow-only-sctp-ingress-on-port-80",
+				},
+				Spec: networkingv1.NetworkPolicySpec{
+					// Apply to server
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"pod-name": podServerLabelSelector,
+						},
+					},
+					// Allow traffic only via SCTP on port 80 .
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{
+						Ports: []networkingv1.NetworkPolicyPort{{
+							Port:     &intstr.IntOrString{IntVal: 80},
+							Protocol: &protocolSCTP,
+						}},
+					}},
+				},
+			}
+			appliedPolicy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(context.TODO(), policy, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			defer cleanupNetworkPolicy(f, appliedPolicy)
+
+			ginkgo.By("Testing pods cannot connect on port 80 anymore when not using SCTP as protocol.")
+			testCannotConnect(f, f.Namespace, "client-a", service, 80)
+
+			ginkgo.By("validating sctp module is still not loaded")
+			sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+			if !sctpLoadedAtStart && sctpLoadedAtEnd {
+				framework.Failf("The state of the sctp module has changed due to the test case")
+			}
+		})
 	})
-
 })
 
 func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int) {

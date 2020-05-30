@@ -56,6 +56,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
@@ -3863,3 +3864,211 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 	}
 	return -1, fmt.Errorf("Failed to find kube-apiserver container in pod")
 }
+
+var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
+	f := framework.NewDefaultFramework("sctp")
+
+	var cs clientset.Interface
+
+	ginkgo.BeforeEach(func() {
+		cs = f.ClientSet
+	})
+
+	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints", func() {
+		serviceName := "sctp-endpoint-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("getting the state of the sctp module on nodes")
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		_, err = jig.CreateSCTPServiceWithPort(nil, 5060)
+		framework.ExpectNoError(err)
+		defer func() {
+			err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+		}()
+
+		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
+		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
+
+		ginkgo.By("validating endpoints do not exist yet")
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("creating a pod for the service")
+		names := map[string]bool{}
+
+		name1 := "pod1"
+
+		createPodOrFail(cs, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 5060, Protocol: v1.ProtocolSCTP}})
+		names[name1] = true
+		defer func() {
+			for name := range names {
+				err := cs.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
+			}
+		}()
+
+		ginkgo.By("validating endpoints exists")
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{name1: {5060}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("deleting the pod")
+		e2epod.DeletePodOrFail(cs, ns, name1)
+		delete(names, name1)
+		ginkgo.By("validating endpoints do not exist anymore")
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
+	})
+
+	ginkgo.It("should create a Pod with SCTP HostPort", func() {
+		ginkgo.By("checking whether kubenet is used")
+		node, err := e2enode.GetRandomReadySchedulableNode(cs)
+		framework.ExpectNoError(err)
+		hostExec := utils.NewHostExec(f)
+		defer hostExec.Cleanup()
+		cmd := "ps -C kubelet -o cmd= | grep kubenet"
+		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		err = hostExec.IssueCommand(cmd, node)
+		if err != nil {
+			e2eskipper.Skipf("Interrogation of kubenet usage failed on node %s", node.Name)
+		}
+		framework.Logf("kubenet is in use")
+
+		ginkgo.By("getting the state of the sctp module on the selected node")
+		nodes := &v1.NodeList{}
+		nodes.Items = append(nodes.Items, *node)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating a pod with hostport on the selected node")
+		podName := "hostport"
+
+		podSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: f.Namespace.Name,
+				Labels:    map[string]string{"app": "hostport-pod"},
+			},
+			Spec: v1.PodSpec{
+				NodeName: node.Name,
+				Containers: []v1.Container{
+					{
+						Name:  "hostport",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"pause"},
+						Ports: []v1.ContainerPort{
+							{
+								Protocol:      v1.ProtocolSCTP,
+								ContainerPort: 5060,
+								HostPort:      5060,
+							},
+						},
+						ImagePullPolicy: "IfNotPresent",
+					},
+				},
+			},
+		}
+
+		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
+		f.PodClient().CreateSync(podSpec)
+		defer func() {
+			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
+		}()
+
+		ginkgo.By("dumping iptables rules on the node")
+		cmd = "sudo iptables-save"
+		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		result, err := hostExec.IssueCommandWithResult(cmd, node)
+		if err != nil {
+			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		}
+
+		ginkgo.By("checking that iptables contains the necessary iptables rules")
+		found := false
+		for _, line := range strings.Split(result, "\n") {
+			if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			framework.Failf("iptables rules are not set for a pod with sctp hostport")
+		}
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
+	})
+	ginkgo.It("should create a ClusterIP Service with SCTP ports", func() {
+		ginkgo.By("checking that kube-proxy is in iptables mode")
+		if proxyMode, err := proxyMode(f); err != nil {
+			e2eskipper.Skipf("Couldn't detect KubeProxy mode - skip, %v", err)
+		} else if proxyMode != "iptables" {
+			e2eskipper.Skipf("The test doesn't work if kube-proxy is not in iptables mode")
+		}
+
+		serviceName := "sctp-clusterip"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("getting the state of the sctp module on nodes")
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		_, err = jig.CreateSCTPServiceWithPort(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolSCTP, Port: 5060}}
+		}, 5060)
+		framework.ExpectNoError(err)
+		defer func() {
+			err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+		}()
+
+		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
+		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
+
+		ginkgo.By("dumping iptables rules on a node")
+		hostExec := utils.NewHostExec(f)
+		defer hostExec.Cleanup()
+		node, err := e2enode.GetRandomReadySchedulableNode(cs)
+		framework.ExpectNoError(err)
+		cmd := "sudo iptables-save"
+		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+		result, err := hostExec.IssueCommandWithResult(cmd, node)
+		if err != nil {
+			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		}
+
+		ginkgo.By("checking that iptables contains the necessary iptables rules")
+		kubeService := false
+		for _, line := range strings.Split(result, "\n") {
+			if strings.Contains(line, "-A KUBE-SERVICES") && strings.Contains(line, "-p sctp") {
+				kubeService = true
+				break
+			}
+		}
+		if !kubeService {
+			framework.Failf("iptables rules are not set for a clusterip service with sctp ports")
+		}
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
+	})
+})
