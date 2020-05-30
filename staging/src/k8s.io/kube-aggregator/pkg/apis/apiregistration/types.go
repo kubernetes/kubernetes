@@ -60,6 +60,7 @@ type APIServiceSpec struct {
 	InsecureSkipTLSVerify bool
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
 	// If unspecified, system trust roots on the apiserver are used.
+	// +listType=atomic
 	// +optional
 	CABundle []byte
 
@@ -123,6 +124,8 @@ type APIServiceCondition struct {
 // APIServiceStatus contains derived information about an API server
 type APIServiceStatus struct {
 	// Current service state of apiService.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []APIServiceCondition
 }
 

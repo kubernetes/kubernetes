@@ -304,6 +304,7 @@ X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
     echo "Wrong generated openapi files changed after touching src file:"
     echo "  ${X:-(none)}" | tr '\n' ' '
@@ -348,6 +349,7 @@ X="$(newer openapi "${STAMP}")"
 if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 ./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
     echo "Wrong generated openapi files changed after updating violation files:"
     echo "  ${X:-(none)}" | tr '\n' ' '
