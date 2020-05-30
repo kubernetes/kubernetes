@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-scheduler/config/v1beta1"
@@ -108,8 +108,8 @@ profiles:
 						{
 							Name: "PodTopologySpread",
 							Args: &config.PodTopologySpreadArgs{
-								DefaultConstraints: []v1.TopologySpreadConstraint{
-									{MaxSkew: 1, TopologyKey: "zone", WhenUnsatisfiable: v1.ScheduleAnyway},
+								DefaultConstraints: []corev1.TopologySpreadConstraint{
+									{MaxSkew: 1, TopologyKey: "zone", WhenUnsatisfiable: corev1.ScheduleAnyway},
 								},
 							},
 						},
@@ -178,11 +178,25 @@ profiles:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       kind: InterPodAffinityArgs
 `),
-			wantErr: "decoding .profiles[0].pluginConfig[0]: args for plugin NodeLabel were not of type NodeLabelArgs.kubescheduler.config.k8s.io, got InterPodAffinityArgs.kubescheduler.config.k8s.io",
+			wantErr: `decoding .profiles[0].pluginConfig[0]: args for plugin NodeLabel were not of type NodeLabelArgs.kubescheduler.config.k8s.io, got InterPodAffinityArgs.kubescheduler.config.k8s.io`,
 		},
 		{
-			// TODO: do not replicate this case for v1beta1.
-			name: "v1beta1 case insensitive RequestedToCapacityRatioArgs",
+			name: "v1beta1 RequestedToCapacityRatioArgs shape encoding is strict",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+profiles:
+- pluginConfig:
+  - name: RequestedToCapacityRatio
+    args:
+      shape:
+      - Utilization: 1
+        Score: 2
+`),
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin RequestedToCapacityRatio: strict decoder error for {"shape":[{"Score":2,"Utilization":1}]}: v1beta1.RequestedToCapacityRatioArgs.Shape: []v1beta1.UtilizationShapePoint: v1beta1.UtilizationShapePoint.ReadObject: found unknown field: Score, error found in #10 byte of ...|:[{"Score":2,"Utiliz|..., bigger context ...|{"shape":[{"Score":2,"Utilization":1}]}|...`,
+		},
+		{
+			name: "v1beta1 RequestedToCapacityRatioArgs resources encoding is strict",
 			data: []byte(`
 apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
@@ -193,34 +207,11 @@ profiles:
       shape:
       - utilization: 1
         score: 2
-      - Utilization: 3
-        Score: 4
       resources:
-      - name: Upper
-        weight: 1
-      - Name: lower
-        weight: 2
+      - Name: 1
+        Weight: 2
 `),
-			wantProfiles: []config.KubeSchedulerProfile{
-				{
-					SchedulerName: "default-scheduler",
-					PluginConfig: []config.PluginConfig{
-						{
-							Name: "RequestedToCapacityRatio",
-							Args: &config.RequestedToCapacityRatioArgs{
-								Shape: []config.UtilizationShapePoint{
-									{Utilization: 1, Score: 2},
-									{Utilization: 3, Score: 4},
-								},
-								Resources: []config.ResourceSpec{
-									{Name: "Upper", Weight: 1},
-									{Name: "lower", Weight: 2},
-								},
-							},
-						},
-					},
-				},
-			},
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin RequestedToCapacityRatio: strict decoder error for {"resources":[{"Name":1,"Weight":2}],"shape":[{"score":2,"utilization":1}]}: v1beta1.RequestedToCapacityRatioArgs.Shape: []v1beta1.UtilizationShapePoint: Resources: []v1beta1.ResourceSpec: v1beta1.ResourceSpec.ReadObject: found unknown field: Name, error found in #10 byte of ...|":[{"Name":1,"Weight|..., bigger context ...|{"resources":[{"Name":1,"Weight":2}],"shape":[{"score":2,"utilization":|...`,
 		},
 		{
 			name: "out-of-tree plugin args",
@@ -311,7 +302,7 @@ profiles:
 			obj, gvk, err := decoder.Decode(tt.data, nil, nil)
 			if err != nil {
 				if tt.wantErr != err.Error() {
-					t.Fatalf("got err %v, want %v", err.Error(), tt.wantErr)
+					t.Fatalf("\ngot err:\n\t%v\nwant:\n\t%s", err, tt.wantErr)
 				}
 				return
 			}
@@ -367,7 +358,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 											{Utilization: 1, Score: 2},
 										},
 										Resources: []v1beta1.ResourceSpec{
-											{Name: "lower", Weight: 2},
+											{Name: "cpu", Weight: 2},
 										},
 									},
 								},
@@ -424,18 +415,18 @@ profiles:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       kind: RequestedToCapacityRatioArgs
       resources:
-      - Name: lower
-        Weight: 2
+      - name: cpu
+        weight: 2
       shape:
-      - Score: 2
-        Utilization: 1
+      - score: 2
+        utilization: 1
     name: RequestedToCapacityRatio
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       kind: NodeResourcesLeastAllocatedArgs
       resources:
-      - Name: mem
-        Weight: 2
+      - name: mem
+        weight: 2
     name: NodeResourcesLeastAllocated
   - args:
       foo: bar
@@ -512,8 +503,8 @@ profiles:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
       kind: NodeResourcesMostAllocatedArgs
       resources:
-      - Name: cpu
-        Weight: 1
+      - name: cpu
+        weight: 1
     name: NodeResourcesMostAllocated
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
