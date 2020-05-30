@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -52,15 +52,18 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
 	//Bad Path
-	badspec, err := getVolumeSpecFromGlobalMapPath("")
+	badspec, err := getVolumeSpecFromGlobalMapPath("", "")
 	if badspec != nil || err == nil {
 		t.Errorf("Expected not to get spec from GlobalMapPath but did")
 	}
 
 	// Good Path
-	spec, err := getVolumeSpecFromGlobalMapPath(expectedGlobalPath)
+	spec, err := getVolumeSpecFromGlobalMapPath("myVolume", expectedGlobalPath)
 	if spec == nil || err != nil {
 		t.Fatalf("Failed to get spec from GlobalMapPath: %v", err)
+	}
+	if spec.PersistentVolume.Name != "myVolume" {
+		t.Errorf("Invalid PV name from GlobalMapPath spec: %s", spec.PersistentVolume.Name)
 	}
 	if spec.PersistentVolume.Spec.Cinder.VolumeID != testVolName {
 		t.Errorf("Invalid volumeID from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.Cinder.VolumeID)
