@@ -1,0 +1,53 @@
+suite: apimachinery/webhook
+description: Base suite for webhooks
+behaviors:
+- id: apimachinery/webhook/discovery
+  description: The admissionregistration.k8s.io API group MUST exists in the /apis discovery document. The admissionregistration.k8s.io/v1 API group/version MUST exists in the /apis discovery document. The mutatingwebhookconfigurations and validatingwebhookconfigurations resources MUST exist in the /apis/admissionregistration.k8s.io/v1 discovery document.
+- id: apimachinery/webhook/admission/denycreatenoncompliant
+  description: Admissions webhook should deny the creation of non-compliant resources.
+- id: apimachinery/webhook/admission/denycreatehang
+  description: Admissions webhook should deny the creation of compliant resources that cause the webhook to hang.
+- id: apimachinery/webhook/admission/admitcreate
+  description: Admissions webhook should accept the creation of a a resource compliant with its admissions.
+- id: apimachinery/webhook/admission/denypatchnoncompliant
+  description: Admissions webhook should deny the PATCH operation on changing a compliant resource to a non-compliant one
+- id: apimachinery/webhook/admission/denyputnoncompliant
+  description: Admissions webhook should deny the PUT operation on changing a compliant resource to a non-compliant one
+- id: apimachinery/webhook/admission/admitcreatewhitelisted
+  description: Admissions webhook should accept the creation of a non-compliant resource within a whitelisted namespace
+- id: apimachinery/webhook/admission/denypodattach
+  description: Admissions webhook configured to deny connecting to a pod's attach subresource should deny pod attach attempts.
+- id: apimachinery/webhook/admission/deny-crd-operation
+  description: Admissions webhook configured to deny creation, update, and/or deletion of CRDs should deny those operations on CRDs.
+- id: apimachinery/webhook/admission/failclosed/deny
+  description: Misconfigured admission webhook with a failed closed policy and without CA bundle should deny all operations that require the admission webhook.
+- id: apimachinery/webhook/admission/mutation/basic
+  description: Mutating webhook configured to mutate a resource on operation should mutate the corresponding resource when the operation is applied.
+- id: apimachinery/webhook/admission/mutation/ordered
+  description: Webhooks may be reordered. If a webhook depends on the execution of another webhook, they must both execute.
+- id: apimachinery/webhook/admission/mutation/InitContainer
+  description: A mutating webhook that adds an InitContainer to pods must add the container when invoked and must initialize the InitContainer's terminationMessagePolicy to be the default.
+- id: apimachinery/webhook/admission/mutation/self
+  description: A mutating webhook must not be allowed to act on webhook configuration objects.
+- id: apimachinery/webhook/admission/mutation/basic-crd
+  description: A mutating webhook configured to mutate a custom resource must mutate it when invoked.
+- id: apimachinery/webhook/admission/mutation/pruning-crd
+  description: A mutating webhook configured to add fields to custom objects must have the fields pruned if they are not part of the CRD schema
+- id: apimachinery/webhook/admission/timeout/FailurePolicy/Ignore
+  description: A admission webhook that hits the timeout with FailurePolicy set to Ignore should not result in a failure
+- id: apimachinery/webhook/admission/timeout/FailurePolicy/Fail
+  description: A admission webhook that hits the timeout with FailurePolicy set to Fail should timeout
+- id: apimachinery/webhook/admission/timeout/pass
+  description: A admission webhook that succeeds before hitting the timeout should not cause any error
+- id: apimachinery/webhook/admission/timeout/empty
+  description: A admission webhook without the timeout parameter should use the default timeout value
+- id: apimachinery/webhook/admission/update/denyaccept
+  description: A admission webhook set to deny an operation and later patched to accept that operation should not deny the corresponding operation
+- id: apimachinery/webhook/admission/update/acceptdeny
+  description: A admission webhook set to accept an operation and later patched to deny that operation should deny the corresponding operation
+- id: apimachinery/webhook/admission/mutating/update/denyaccept
+  description: A mutating webhook set to deny an operation and later patched to accept that operation should not deny the corresponding operation
+- id: apimachinery/webhook/admission/mutating/update/acceptdeny
+  description: A mutating webhook set to accept an operation and later patched to deny that operation should deny the corresponding operation
+- id: apimachinery/webhook/admission/validating/label
+  description: Admission webhooks created with a label should be present when querying by the corresponding label selector.

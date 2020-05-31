@@ -45,6 +45,8 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 			Testname: Custom Resource Definition, watch
 			Description: Create a Custom Resource Definition. Attempt to watch it; the watch MUST observe create,
 			modify and delete events.
+			Behaviors:
+			- apimachinery/crd/watch
 		*/
 		framework.ConformanceIt("watch on custom resource definition objects", func() {
 

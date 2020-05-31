@@ -52,6 +52,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			Description: Create a API extension client and define a random custom resource definition.
 			Create the custom resource definition and then delete it. The creation and deletion MUST
 			be successful.
+			Behaviors:
+			- apimachinery/crd/create
+			- apimachinery/crd/delete
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
@@ -79,6 +82,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			a label selector; the list result MUST contain only the labeled custom resource definitions. Delete the labeled
 			custom resource definitions via delete collection; the delete MUST be successful and MUST delete only the
 			labeled custom resource definitions.
+			Behaviors:
+			- apimachinery/crd/label/list
+			- apimachinery/crd/label/deletecollection
 		*/
 		framework.ConformanceIt("listing custom resource definition objects works ", func() {
 			testListSize := 10
@@ -139,6 +145,8 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			Testname: Custom Resource Definition, status sub-resource
 			Description: Create a custom resource definition. Attempt to read, update and patch its status sub-resource;
 			all mutating sub-resource operations MUST be visible to subsequent reads.
+			Behaviors:
+			- apimachinery/crd/status/update
 		*/
 		framework.ConformanceIt("getting/updating/patching custom resource definition status sub-resource works ", func() {
 			config, err := framework.LoadConfig()
@@ -192,6 +200,8 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		Testname: Custom Resource Definition, discovery
 		Description: Fetch /apis, /apis/apiextensions.k8s.io, and /apis/apiextensions.k8s.io/v1 discovery documents,
 		and ensure they indicate CustomResourceDefinition apiextensions.k8s.io/v1 resources are available.
+		Behaviors:
+		- apimachinery/crd/discovery
 	*/
 	framework.ConformanceIt("should include custom resource definition resources in discovery documents", func() {
 		{
@@ -263,6 +273,10 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		Description: Create a custom resource definition without default. Create CR. Add default and read CR until
 		the default is applied. Create another CR. Remove default, add default for another field and read CR until
 		new field is defaulted, but old default stays.
+		Behaviors:
+		- apimachinery/crd/default/create
+		- apimachinery/crd/default/update
+		- apimachinery/crd/default/add
 	*/
 	framework.ConformanceIt("custom resource defaulting for requests and from storage works ", func() {
 		config, err := framework.LoadConfig()

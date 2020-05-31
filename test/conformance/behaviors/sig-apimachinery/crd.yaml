@@ -1,0 +1,27 @@
+suite: apimachinery/crd
+description: Base suite for CRDs
+behaviors:
+- id: apimachinery/crd/conversionwebhook/v2list
+  description: A v1 CRD must be readable as v2.
+- id: apimachinery/crd/conversionwebhook/homogeneous-v1v2
+  description: A CRD created at v1 with its storage type changed to v2 and a CRD created at v2 must both be able to be listed at v2.
+- id: apimachinery/crd/watch
+  description: Watch must be able to observe create, modify, and delete events on CRDs.
+- id: apimachinery/crd/create
+  description: Calling create on a CRD must create the CRD object.
+- id: apimachinery/crd/delete
+  description: Calling delete on a CRD must delete the CRD object.
+- id: apimachinery/crd/label/list
+  description: CRDs created with labels must be listed when the corresponding label selector is applied to a query.
+- id: apimachinery/crd/label/deletecollection
+  description: Delete Collection applied on CRDs with a labelSelector must delete all CRDs with the corresponding label.
+- id: apimachinery/crd/status/update
+  description: Updating a CRD's status sub-resource should be visible on subsequent reads.
+- id: apimachinery/crd/discovery
+  description: Fetch /apis, /apis/apiextensions.k8s.io, and /apis/apiextensions.k8s.io/v1 discovery documents, and ensure they indicate CustomResourceDefinition apiextensions.k8s.io/v1 resources are available.
+- id: apimachinery/crd/default/create
+  description: Creating a CRD with the schema defaulting a field to a value should have the value set.
+- id: apimachinery/crd/default/update
+  description: Changing the default for a field in the CRD schema should not change already created CRDs
+- id: apimachinery/crd/default/add
+  description: Adding a default for a field in the CRD schema should update existing CRD objects to use the new default for the particular field.

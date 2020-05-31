@@ -1,0 +1,19 @@
+suite: apimachinery/gc
+description: Base suite for GarbageCollector
+behaviors:
+- id: apimachinery/gc/rc/delete/propagationPolicy/Background
+  description: When deleting a replication controller with propagationPolicy set to Background, all pods created by the RC must be deleted as well. The RC must be deleted before the pods are deleted.
+- id: apimachinery/gc/rc/delete/propagationPolicy/Foreground
+  description: When deleting a replication controller with propagationPolicy set to Foreground, all pods created by the RC must be deleted as well. The RC must be deleted after the pods are deleted.
+- id: apimachinery/gc/rc/delete/propagationPolicy/Orphan
+  description: When deleting a replication controller with propagationPolicy set to Orphan, all pods created by the RC must be be orphaned.
+- id: apimachinery/gc/rc/delete/pod-multiple-owner
+  description: When deleting a replication controller, pods created by the RC must not be deleted if they have multiple owners.
+- id: apimachinery/gc/delete/dependency
+  description: Deleting a resource should delete all other resources it owns.
+- id: apimachinery/gc/delete/dependency-cycle
+  description: Deleting a resource with a cyclical dependency for owner references should not block the garbage collection.
+- id: apimachinery/gc/deployment/delete/propagationPolicy/Background
+  description: When deleting a deployment with propagationPolicy set to Background, all replicasets created by the deployment and all pods created by the replicasets must be deleted.
+- id: apimachinery/gc/deployment/delete/propagationPolicy/Orphan
+  description: When deleting a deployment with propagationPolicy set to Background, all replicasets created by the deployment and all pods created by the replicasets must orphaned.

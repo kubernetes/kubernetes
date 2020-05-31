@@ -1,0 +1,5 @@
+suite: apimachinery/aggregator
+description: Base suite for aggregator
+behaviors:
+- id: apimachinery/aggregator/sample-apiserver
+  description: The sample-apiserver code from 1.17 and compiled against 1.17 must work on the current Aggregator/API-Server.

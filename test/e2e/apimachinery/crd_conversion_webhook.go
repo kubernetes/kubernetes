@@ -143,6 +143,8 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		Testname: Custom Resource Definition Conversion Webhook, conversion custom resource
 		Description: Register a conversion webhook and a custom resource definition. Create a v1 custom
 		resource. Attempts to read it at v2 MUST succeed.
+		Behaviors:
+		- apimachinery/crd/conversionwebhook/v2list
 	*/
 	framework.ConformanceIt("should be able to convert from CR v1 to CR v2", func() {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
@@ -178,6 +180,9 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		Description: Register a conversion webhook and a custom resource definition. Create a custom resource stored at
 		v1. Change the custom resource definition storage to v2. Create a custom resource stored at v2. Attempt to list
 		the custom resources at v2; the list result MUST contain both custom resources at v2.
+		Behaviors:
+		- apimachinery/crd/conversionwebhook/homogeneous-v1v2
+
 	*/
 	framework.ConformanceIt("should be able to convert a non homogeneous list of CRs", func() {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {

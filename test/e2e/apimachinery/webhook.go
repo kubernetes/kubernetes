@@ -110,6 +110,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		The admissionregistration.k8s.io/v1 API group/version MUST exists in the /apis discovery document.
 		The mutatingwebhookconfigurations and validatingwebhookconfigurations resources MUST exist in the
 		/apis/admissionregistration.k8s.io/v1 discovery document.
+		Behaviors:
+		- apimachinery/webhook/discovery
 	*/
 	framework.ConformanceIt("should include webhook resources in discovery documents", func() {
 		{
@@ -190,6 +192,13 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		be denied. An attempt to create a pod that causes a webhook to hang MUST result in a webhook timeout error,
 		and the pod creation MUST be denied. An attempt to create a non-compliant configmap in a whitelisted
 		namespace based on the webhook namespace selector MUST be allowed.
+		Behaviors:
+		- apimachinery/webhook/admission/denycreatenoncompliant
+		- apimachinery/webhook/admission/denycreatehang
+		- apimachinery/webhook/admission/admitcreate
+		- apimachinery/webhook/admission/denypatchnoncompliant
+		- apimachinery/webhook/admission/denyputnoncompliant
+		- apimachinery/webhook/admission/admitcreatewhitelisted
 	*/
 	framework.ConformanceIt("should be able to deny pod and configmap creation", func() {
 		webhookCleanup := registerWebhook(f, f.UniqueName, certCtx, servicePort)
@@ -202,6 +211,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Testname: Admission webhook, deny attach
 		Description: Register an admission webhook configuration that denies connecting to a pod's attach sub-resource.
 		Attempts to attach MUST be denied.
+		Behaviors:
+		- apimachinery/webhook/admission/denypodattach
 	*/
 	framework.ConformanceIt("should be able to deny attaching pod", func() {
 		webhookCleanup := registerWebhookForAttachingPod(f, f.UniqueName, certCtx, servicePort)
@@ -214,6 +225,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Testname: Admission webhook, deny custom resource create and delete
 		Description: Register an admission webhook configuration that denies creation, update and deletion of
 		custom resources. Attempts to create, update and delete custom resources MUST be denied.
+		Behaviors:
+		- apimachinery/webhook/admission/deny-crd-operation
 	*/
 	framework.ConformanceIt("should be able to deny custom resource creation, update and deletion", func() {
 		testcrd, err := crd.CreateTestCRD(f)
@@ -232,6 +245,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Testname: Admission webhook, fail closed
 		Description: Register a webhook with a fail closed policy and without CA bundle so that it cannot be called.
 		Attempt operations that require the admission webhook; all MUST be denied.
+		Behaviors:
+		- apimachinery/webhook/admission/failclosed/deny
 	*/
 	framework.ConformanceIt("should unconditionally reject operations on fail closed webhook", func() {
 		webhookCleanup := registerFailClosedWebhook(f, f.UniqueName, certCtx, servicePort)
@@ -245,6 +260,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register a mutating webhook configuration with two webhooks that admit configmaps, one that
 		adds a data key if the configmap already has a specific key, and another that adds a key if the key added by
 		the first webhook is present. Attempt to create a config map; both keys MUST be added to the config map.
+		Behaviors:
+		- apimachinery/webhook/admission/mutation/ordered
 	*/
 	framework.ConformanceIt("should mutate configmap", func() {
 		webhookCleanup := registerMutatingWebhookForConfigMap(f, f.UniqueName, certCtx, servicePort)
@@ -257,6 +274,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Testname: Admission webhook, mutation with defaulting
 		Description: Register a mutating webhook that adds an InitContainer to pods. Attempt to create a pod;
 		the InitContainer MUST be added the TerminationMessagePolicy MUST be defaulted.
+		Behaviors:
+		- apimachinery/webhook/admission/mutation/InitContainer
 	*/
 	framework.ConformanceIt("should mutate pod and apply defaults after mutation", func() {
 		webhookCleanup := registerMutatingWebhookForPod(f, f.UniqueName, certCtx, servicePort)
@@ -270,6 +289,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register webhooks that mutate and deny deletion of webhook configuration objects. Attempt to create
 		and delete a webhook configuration object; both operations MUST be allowed and the webhook configuration object
 		MUST NOT be mutated the webhooks.
+		Behaviors:
+		- apimachinery/webhook/admission/mutation/self
 	*/
 	framework.ConformanceIt("should not be able to mutate or prevent deletion of webhook configuration objects", func() {
 		validatingWebhookCleanup := registerValidatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", certCtx, servicePort)
@@ -284,6 +305,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Testname: Admission webhook, mutate custom resource
 		Description: Register a webhook that mutates a custom resource. Attempt to create custom resource object;
 		the custom resource MUST be mutated.
+		Behaviors:
+		- apimachinery/webhook/admission/mutation/basic-crd
 	*/
 	framework.ConformanceIt("should mutate custom resource", func() {
 		testcrd, err := crd.CreateTestCRD(f)
@@ -301,6 +324,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Testname: Admission webhook, deny custom resource definition
 		Description: Register a webhook that denies custom resource definition create. Attempt to create a
 		custom resource definition; the create request MUST be denied.
+		Behaviors:
+		- apimachinery/webhook/admission/deny-crd-operation
 	*/
 	framework.ConformanceIt("should deny crd creation", func() {
 		crdWebhookCleanup := registerValidatingWebhookForCRD(f, f.UniqueName, certCtx, servicePort)
@@ -332,8 +357,10 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Release : v1.16
 		Testname: Admission webhook, mutate custom resource with pruning
 		Description: Register mutating webhooks that adds fields to custom objects. Register a custom resource definition
-		with a schema that includes only one of the data keys added by the webhooks. Attempt to a custom resource;
+		with a schema that includes only one of the data keys added by the webhooks. Attempt to create a custom resource;
 		the fields included in the schema MUST be present and field not included in the schema MUST NOT be present.
+		Behaviors:
+		- apimachinery/webhook/admission/mutation/pruning-crd
 	*/
 	framework.ConformanceIt("should mutate custom resource with pruning", func() {
 		const prune = true
@@ -374,6 +401,11 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		timeout if the configured webhook timeout is less than 5 seconds and failure policy is fail. Requests must not timeout if
 		the failure policy is ignore. Requests MUST NOT timeout if configured webhook timeout is 10 seconds (much longer
 		than the webhook wait duration).
+		Behaviors:
+		- apimachinery/webhook/admission/timeout/FailurePolicy/Ignore
+		- apimachinery/webhook/admission/timeout/FailurePolicy/Fail
+		- apimachinery/webhook/admission/timeout/pass
+		- apimachinery/webhook/admission/timeout/empty
 	*/
 	framework.ConformanceIt("should honor timeout", func() {
 		policyFail := admissionregistrationv1.Fail
@@ -406,6 +438,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register a validating admission webhook configuration. Update the webhook to not apply to the create
 		operation and attempt to create an object; the webhook MUST NOT deny the create. Patch the webhook to apply to the
 		create operation again and attempt to create an object; the webhook MUST deny the create.
+		Behaviors:
+		- apimachinery/webhook/admission/update/denyaccept
+		- apimachinery/webhook/admission/update/acceptdeny
 	*/
 	framework.ConformanceIt("patching/updating a validating webhook should work", func() {
 		client := f.ClientSet
@@ -501,6 +536,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register a mutating admission webhook configuration. Update the webhook to not apply to the create
 		operation and attempt to create an object; the webhook MUST NOT mutate the object. Patch the webhook to apply to the
 		create operation again and attempt to create an object; the webhook MUST mutate the object.
+		Behaviors:
+		- apimachinery/webhook/admission/mutating/update/denyaccept
+		- apimachinery/webhook/admission/mutating/update/acceptdeny
 	*/
 	framework.ConformanceIt("patching/updating a mutating webhook should work", func() {
 		client := f.ClientSet
@@ -575,6 +613,10 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		configurations matching the label; all the created webhook configurations MUST be present. Attempt to create an
 		object; the create MUST be denied. Attempt to remove the webhook configurations matching the label with deletecollection;
 		all webhook configurations MUST be deleted. Attempt to create an object; the create MUST NOT be denied.
+		Behaviors:
+		- apimachinery/webhook/admission/denycreatenoncompliant
+		- apimachinery/webhook/admission/validating/label
+		- apimachinery/webhook/admission/validating/delete
 	*/
 	framework.ConformanceIt("listing validating webhooks should work", func() {
 		testListSize := 10
@@ -649,6 +691,11 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		configurations matching the label; all the created webhook configurations MUST be present. Attempt to create an
 		object; the object MUST be mutated. Attempt to remove the webhook configurations matching the label with deletecollection;
 		all webhook configurations MUST be deleted. Attempt to create an object; the object MUST NOT be mutated.
+		Behaviors:
+		- apimachinery/webhook/admission/mutating/basic
+		- apimachinery/webhook/admission/mutating/label
+		- apimachinery/webhook/admission/mutating/delete
+
 	*/
 	framework.ConformanceIt("listing mutating webhooks should work", func() {
 		testListSize := 10

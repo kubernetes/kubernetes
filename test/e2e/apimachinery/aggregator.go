@@ -93,6 +93,8 @@ var _ = SIGDescribe("Aggregator", func() {
 		    Testname: aggregator-supports-the-sample-apiserver
 		    Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 			will work on the current Aggregator/API-Server.
+		    Behaviors:
+		    - apimachinery/aggregator/sample-apiserver
 	*/
 	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func() {
 		// Testing a 1.17 version of the sample-apiserver
