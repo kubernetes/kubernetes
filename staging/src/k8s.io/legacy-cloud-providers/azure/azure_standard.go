@@ -66,7 +66,9 @@ const (
 	nodeLabelRole  = "kubernetes.io/role"
 	nicFailedState = "Failed"
 
-	storageAccountNameMaxLength = 24
+	storageAccountNameMaxLength   = 24
+	frontendIPConfigNameMaxLength = 80
+	loadBalancerRuleNameMaxLength = 80
 )
 
 var errNotInVMSet = errors.New("vm is not in the vmset")
@@ -275,12 +277,21 @@ func getBackendPoolName(clusterName string, service *v1.Service) string {
 	return clusterName
 }
 
-func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protocol, port int32, subnetName *string) string {
+func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protocol, port int32) string {
 	prefix := az.getRulePrefix(service)
-	if subnetName == nil {
-		return fmt.Sprintf("%s-%s-%d", prefix, protocol, port)
+	ruleName := fmt.Sprintf("%s-%s-%d", prefix, protocol, port)
+	subnet := subnet(service)
+	if subnet == nil {
+		return ruleName
 	}
-	return fmt.Sprintf("%s-%s-%s-%d", prefix, *subnetName, protocol, port)
+
+	// Load balancer rule name must be less or equal to 80 characters, so excluding the hyphen two segments cannot exceed 79
+	subnetSegment := *subnet
+	if len(ruleName)+len(subnetSegment)+1 > loadBalancerRuleNameMaxLength {
+		subnetSegment = subnetSegment[:loadBalancerRuleNameMaxLength-len(ruleName)-1]
+	}
+
+	return fmt.Sprintf("%s-%s-%s-%d", prefix, subnetSegment, protocol, port)
 }
 
 func (az *Cloud) getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
@@ -318,10 +329,17 @@ func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, serv
 	return strings.HasPrefix(*fip.Name, baseName)
 }
 
-func (az *Cloud) getFrontendIPConfigName(service *v1.Service, subnetName *string) string {
+func (az *Cloud) getFrontendIPConfigName(service *v1.Service) string {
 	baseName := az.GetLoadBalancerName(context.TODO(), "", service)
+	subnetName := subnet(service)
 	if subnetName != nil {
-		return fmt.Sprintf("%s-%s", baseName, *subnetName)
+		ipcName := fmt.Sprintf("%s-%s", baseName, *subnetName)
+
+		// Azure lb front end configuration name must not exceed 80 characters
+		if len(ipcName) > frontendIPConfigNameMaxLength {
+			ipcName = ipcName[:frontendIPConfigNameMaxLength]
+		}
+		return ipcName
 	}
 	return baseName
 }

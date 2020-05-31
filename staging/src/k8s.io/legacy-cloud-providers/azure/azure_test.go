@@ -1240,14 +1240,14 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 		if len(svc.Spec.Ports) > 0 {
 			expectedFrontendIPCount++
 			expectedFrontendIP := ExpectedFrontendIPInfo{
-				Name:   az.getFrontendIPConfigName(&svc, subnet(&svc)),
+				Name:   az.getFrontendIPConfigName(&svc),
 				Subnet: subnet(&svc),
 			}
 			expectedFrontendIPs = append(expectedFrontendIPs, expectedFrontendIP)
 		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := az.getLoadBalancerRuleName(&svc, wantedRule.Protocol, wantedRule.Port, subnet(&svc))
+			wantedRuleName := az.getLoadBalancerRuleName(&svc, wantedRule.Protocol, wantedRule.Port)
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
