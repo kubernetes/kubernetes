@@ -272,7 +272,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 						// create the pod, capture the change events, then delete the pod
 						start := time.Now()
 						created := podClient.Create(pod)
-						ch := make(chan []watch.Event)
+						ch := make(chan []watch.Event, 1)
 						go func() {
 							defer close(ch)
 							w, err := podClient.Watch(context.TODO(), metav1.ListOptions{
