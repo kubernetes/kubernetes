@@ -182,7 +182,6 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		the custom resources at v2; the list result MUST contain both custom resources at v2.
 		Behaviors:
 		- apimachinery/crd/conversionwebhook/homogeneous-v1v2
-
 	*/
 	framework.ConformanceIt("should be able to convert a non homogeneous list of CRs", func() {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {

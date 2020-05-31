@@ -508,6 +508,10 @@
     an object; the object MUST NOT be mutated.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/mutating/basic
+  - apimachinery/webhook/admission/mutating/label
+  - apimachinery/webhook/admission/mutating/delete
 - testname: Admission webhook, list validating webhooks
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing
     validating webhooks should work [Conformance]'
@@ -519,6 +523,10 @@
     MUST NOT be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/denycreatenoncompliant
+  - apimachinery/webhook/admission/validating/label
+  - apimachinery/webhook/admission/validating/delete
 - testname: Admission webhook, update mutating webhook
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating
     a mutating webhook should work [Conformance]'
@@ -528,6 +536,9 @@
     again and attempt to create an object; the webhook MUST mutate the object.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/mutating/update/denyaccept
+  - apimachinery/webhook/admission/mutating/update/acceptdeny
 - testname: Admission webhook, update validating webhook
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating
     a validating webhook should work [Conformance]'
@@ -537,6 +548,9 @@
     and attempt to create an object; the webhook MUST deny the create.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/update/denyaccept
+  - apimachinery/webhook/admission/update/acceptdeny
 - testname: Admission webhook, deny attach
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     be able to deny attaching pod [Conformance]'
@@ -544,6 +558,8 @@
     to a pod's attach sub-resource. Attempts to attach MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/denypodattach
 - testname: Admission webhook, deny custom resource create and delete
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     be able to deny custom resource creation, update and deletion [Conformance]'
@@ -552,6 +568,8 @@
     resources MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/deny-crd-operation
 - testname: Admission webhook, deny create
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     be able to deny pod and configmap creation [Conformance]'
@@ -563,6 +581,13 @@
     in a whitelisted namespace based on the webhook namespace selector MUST be allowed.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/denycreatenoncompliant
+  - apimachinery/webhook/admission/denycreatehang
+  - apimachinery/webhook/admission/admitcreate
+  - apimachinery/webhook/admission/denypatchnoncompliant
+  - apimachinery/webhook/admission/denyputnoncompliant
+  - apimachinery/webhook/admission/admitcreatewhitelisted
 - testname: Admission webhook, deny custom resource definition
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     deny crd creation [Conformance]'
@@ -570,6 +595,8 @@
     to create a custom resource definition; the create request MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/deny-crd-operation
 - testname: Admission webhook, honor timeout
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     honor timeout [Conformance]'
@@ -581,6 +608,11 @@
     webhook timeout is 10 seconds (much longer than the webhook wait duration).
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/timeout/FailurePolicy/Ignore
+  - apimachinery/webhook/admission/timeout/FailurePolicy/Fail
+  - apimachinery/webhook/admission/timeout/pass
+  - apimachinery/webhook/admission/timeout/empty
 - testname: Admission webhook, discovery document
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     include webhook resources in discovery documents [Conformance]'
@@ -591,6 +623,8 @@
     discovery document.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/discovery
 - testname: Admission webhook, ordered mutation
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     mutate configmap [Conformance]'
@@ -600,6 +634,8 @@
     Attempt to create a config map; both keys MUST be added to the config map.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/mutation/ordered
 - testname: Admission webhook, mutate custom resource
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     mutate custom resource [Conformance]'
@@ -607,6 +643,8 @@
     custom resource object; the custom resource MUST be mutated.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/mutation/basic-crd
 - testname: Admission webhook, mutate custom resource with different stored version
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     mutate custom resource with different stored version [Conformance]'
@@ -622,11 +660,13 @@
     mutate custom resource with pruning [Conformance]'
   description: Register mutating webhooks that adds fields to custom objects. Register
     a custom resource definition with a schema that includes only one of the data
-    keys added by the webhooks. Attempt to a custom resource; the fields included
+    keys added by the webhooks. Attempt to create a custom resource; the fields included
     in the schema MUST be present and field not included in the schema MUST NOT be
     present.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/mutation/pruning-crd
 - testname: Admission webhook, mutation with defaulting
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     mutate pod and apply defaults after mutation [Conformance]'
@@ -635,6 +675,8 @@
     MUST be defaulted.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/mutation/InitContainer
 - testname: Admission webhook, admission control not allowed on webhook configuration
     objects
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
@@ -644,6 +686,8 @@
     MUST be allowed and the webhook configuration object MUST NOT be mutated the webhooks.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/mutation/self
 - testname: Admission webhook, fail closed
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     unconditionally reject operations on fail closed webhook [Conformance]'
@@ -652,6 +696,8 @@
     all MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+  behaviors:
+  - apimachinery/webhook/admission/failclosed/deny
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
     API Server using the current Aggregator [Conformance]'
@@ -659,6 +705,8 @@
     1.17 will work on the current Aggregator/API-Server.
   release: ""
   file: test/e2e/apimachinery/aggregator.go
+  behaviors:
+  - apimachinery/aggregator/sample-apiserver
 - testname: Custom Resource Definition Conversion Webhook, convert mixed version list
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
     should be able to convert a non homogeneous list of CRs [Conformance]'
@@ -668,6 +716,8 @@
     at v2; the list result MUST contain both custom resources at v2.
   release: v1.16
   file: test/e2e/apimachinery/crd_conversion_webhook.go
+  behaviors:
+  - apimachinery/crd/conversionwebhook/homogeneous-v1v2
 - testname: Custom Resource Definition Conversion Webhook, conversion custom resource
   codename: '[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin]
     should be able to convert from CR v1 to CR v2 [Conformance]'
@@ -675,6 +725,8 @@
     a v1 custom resource. Attempts to read it at v2 MUST succeed.
   release: v1.16
   file: test/e2e/apimachinery/crd_conversion_webhook.go
+  behaviors:
+  - apimachinery/crd/conversionwebhook/v2list
 - testname: Custom Resource Definition, watch
   codename: '[sig-api-machinery] CustomResourceDefinition Watch [Privileged:ClusterAdmin]
     CustomResourceDefinition Watch watch on custom resource definition objects [Conformance]'
@@ -682,6 +734,8 @@
     MUST observe create, modify and delete events.
   release: v1.16
   file: test/e2e/apimachinery/crd_watch.go
+  behaviors:
+  - apimachinery/crd/watch
 - testname: Custom Resource Definition, create
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     Simple CustomResourceDefinition creating/deleting custom resource definition objects
@@ -691,6 +745,9 @@
     MUST be successful.
   release: v1.9
   file: test/e2e/apimachinery/custom_resource_definition.go
+  behaviors:
+  - apimachinery/crd/create
+  - apimachinery/crd/delete
 - testname: Custom Resource Definition, status sub-resource
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     Simple CustomResourceDefinition getting/updating/patching custom resource definition
@@ -700,6 +757,8 @@
     to subsequent reads.
   release: v1.16
   file: test/e2e/apimachinery/custom_resource_definition.go
+  behaviors:
+  - apimachinery/crd/status/update
 - testname: Custom Resource Definition, list
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     Simple CustomResourceDefinition listing custom resource definition objects works  [Conformance]'
@@ -710,6 +769,9 @@
     custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/custom_resource_definition.go
+  behaviors:
+  - apimachinery/crd/label/list
+  - apimachinery/crd/label/deletecollection
 - testname: Custom Resource Definition, defaulting
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     custom resource defaulting for requests and from storage works  [Conformance]'
@@ -719,6 +781,10 @@
     default stays.
   release: v1.17
   file: test/e2e/apimachinery/custom_resource_definition.go
+  behaviors:
+  - apimachinery/crd/default/create
+  - apimachinery/crd/default/update
+  - apimachinery/crd/default/add
 - testname: Custom Resource Definition, discovery
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     should include custom resource definition resources in discovery documents [Conformance]'
@@ -727,6 +793,8 @@
     resources are available.
   release: v1.16
   file: test/e2e/apimachinery/custom_resource_definition.go
+  behaviors:
+  - apimachinery/crd/discovery
 - testname: Custom Resource OpenAPI Publish, stop serving version
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
     removes definition from spec when one version gets changed to not be served [Conformance]'
@@ -826,6 +894,8 @@
     also the Pods that belong to the deployments MUST be deleted.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+  behaviors:
+  - apimachinery/gc/deployment/delete/propagationPolicy/Background
 - testname: Garbage Collector, delete replication controller, propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete pods created by rc
     when not orphaning [Conformance]'
@@ -835,6 +905,8 @@
     RC to be deleted.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+  behaviors:
+  - apimachinery/gc/rc/delete/propagationPolicy/Background
 - testname: Garbage Collector, delete replication controller, after owned pods
   codename: '[sig-api-machinery] Garbage collector should keep the rc around until
     all its pods are deleted if the deleteOptions says so [Conformance]'
@@ -844,6 +916,8 @@
     Controller MUST cause pods created by that RC to be deleted before the RC is deleted.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+  behaviors:
+  - apimachinery/gc/rc/delete/propagationPolicy/Foreground
 - testname: Garbage Collector, dependency cycle
   codename: '[sig-api-machinery] Garbage collector should not be blocked by dependency
     circle [Conformance]'
@@ -852,6 +926,9 @@
     pod1 MUST delete all pods. The dependency cycle MUST not block the garbage collection.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+  behaviors:
+  - apimachinery/gc/delete/dependency
+  - apimachinery/gc/delete/dependency-cycle
 - testname: Garbage Collector, multiple owners
   codename: '[sig-api-machinery] Garbage collector should not delete dependents that
     have both valid owner and owner that''s waiting for dependents to be deleted [Conformance]'
@@ -864,6 +941,8 @@
     by multiple replication controllers.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+  behaviors:
+  - apimachinery/gc/rc/delete/pod-multiple-owner
 - testname: Garbage Collector, delete deployment, propagation policy orphan
   codename: '[sig-api-machinery] Garbage collector should orphan RS created by deployment
     when deleteOptions.PropagationPolicy is Orphan [Conformance]'
@@ -873,6 +952,8 @@
     also the Pods created by the deployments MUST be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+  behaviors:
+  - apimachinery/gc/deployment/delete/propagationPolicy/Orphan
 - testname: Garbage Collector, delete replication controller, propagation policy orphan
   codename: '[sig-api-machinery] Garbage collector should orphan pods created by rc
     if delete options say so [Conformance]'
@@ -882,6 +963,8 @@
     MUST cause pods created by that RC to be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+  behaviors:
+  - apimachinery/gc/rc/delete/propagationPolicy/Orphan
 - testname: namespace-deletion-removes-pods
   codename: '[sig-api-machinery] Namespaces [Serial] should ensure that all pods are
     removed when a namespace is deleted [Conformance]'

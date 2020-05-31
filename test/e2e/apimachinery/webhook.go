@@ -695,7 +695,6 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		- apimachinery/webhook/admission/mutating/basic
 		- apimachinery/webhook/admission/mutating/label
 		- apimachinery/webhook/admission/mutating/delete
-
 	*/
 	framework.ConformanceIt("listing mutating webhooks should work", func() {
 		testListSize := 10
