@@ -43,6 +43,8 @@ var _ = SIGDescribe("DNS", func() {
 		Release : v1.9
 		Testname: DNS, cluster
 		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via DNS.
+		Behaviors:
+		- network/dns/resolve/dns
 	*/
 	framework.ConformanceIt("should provide DNS for the cluster ", func() {
 		// All the names we need to be able to resolve.
@@ -130,6 +132,8 @@ var _ = SIGDescribe("DNS", func() {
 		Release : v1.9
 		Testname: DNS, services
 		Description: When a headless service is created, the service MUST be able to resolve all the required service endpoints. When the service is created, any pod in the same namespace must be able to resolve the service by all of the expected DNS names.
+		Behaviors:
+		- network/dns/resolve/etchosts
 	*/
 	framework.ConformanceIt("should provide DNS for services ", func() {
 		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
@@ -186,6 +190,8 @@ var _ = SIGDescribe("DNS", func() {
 		Testname: DNS, PQDN for services
 		Description: Create a headless service and normal service. Both the services MUST be able to resolve partial qualified DNS entries of their service endpoints by serving A records and SRV records.
 		[LinuxOnly]: As Windows currently does not support resolving PQDNs.
+		Behaviors:
+		- network/dns/resolve/pqdn
 	*/
 	framework.ConformanceIt("should resolve DNS of partial qualified names for services [LinuxOnly]", func() {
 		// Create a test headless service.

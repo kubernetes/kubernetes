@@ -711,6 +711,8 @@ var _ = SIGDescribe("Services", func() {
 		Release : v1.9
 		Testname: Kubernetes Service
 		Description: By default when a kubernetes cluster is running there MUST be a 'kubernetes' service running in the cluster.
+		Behaviors:
+		- network/service/default/kubernetes
 	*/
 	framework.ConformanceIt("should provide secure master service ", func() {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
@@ -721,6 +723,10 @@ var _ = SIGDescribe("Services", func() {
 		Release : v1.9
 		Testname: Service, endpoints
 		Description: Create a service with a endpoint without any Pods, the service MUST run and show empty endpoints. Add a pod to the service and the service MUST validate to show all the endpoints for the ports exposed by the Pod. Add another Pod then the list of all Ports exposed by both the Pods MUST be valid and have corresponding service endpoint. Once the second Pod is deleted then set of endpoint MUST be validated to show only ports from the first container that are exposed. Once both pods are deleted the endpoints from the service MUST be empty.
+		Behaviors:
+		- network/service/basic-create/selector
+		- network/service/update/podlabel/add
+		- network/service/update/podlabel/remove
 	*/
 	framework.ConformanceIt("should serve a basic endpoint from pods ", func() {
 		serviceName := "endpoint-test2"
@@ -774,6 +780,8 @@ var _ = SIGDescribe("Services", func() {
 		Release : v1.9
 		Testname: Service, endpoints with multiple ports
 		Description: Create a service with two ports but no Pods are added to the service yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first port, service MUST list one endpoint for the Pod on that port. Add another Pod to the second port, service MUST list both the endpoints. Delete the first Pod and the service MUST list only the endpoint to the second Pod. Delete the second Pod and the service must now have empty set of endpoints.
+		Behaviors:
+		- network/service/ports/multiple
 	*/
 	framework.ConformanceIt("should serve multiport endpoints from pods ", func() {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
@@ -1130,6 +1138,8 @@ var _ = SIGDescribe("Services", func() {
 		Description: Create a TCP NodePort service, and test reachability from a client Pod.
 		The client Pod MUST be able to access the NodePort service by service name and cluster
 		IP on the service port, and on nodes' internal and external IPs on the NodePort.
+		Behaviors:
+		- network/service/type/NodePort
 	*/
 	framework.ConformanceIt("should be able to create a functioning NodePort service", func() {
 		serviceName := "nodeport-test"
@@ -1599,6 +1609,9 @@ var _ = SIGDescribe("Services", func() {
 		Description: Create a service of type ExternalName, pointing to external DNS. ClusterIP MUST not be assigned to the service.
 		Update the service from ExternalName to ClusterIP by removing ExternalName entry, assigning port 80 as service port and TCP as protocol.
 		Service update MUST be successful by assigning ClusterIP to the service and it MUST be reachable over serviceName and ClusterIP on provided service port.
+		Behaviors:
+		- network/service/type/ExternalName
+		- network/service/type/ClusterIP/empty
 	*/
 	framework.ConformanceIt("should be able to change the type from ExternalName to ClusterIP", func() {
 		serviceName := "externalname-service"
@@ -1638,6 +1651,9 @@ var _ = SIGDescribe("Services", func() {
 		Update the service from ExternalName to NodePort, assigning port 80 as service port and, TCP as protocol.
 		service update MUST be successful by exposing service on every node's IP on dynamically assigned NodePort and, ClusterIP MUST be assigned to route service requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
+		Behaviors:
+		- network/service/type/ExternalName
+		- network/service/type/NodePort
 	*/
 	framework.ConformanceIt("should be able to change the type from ExternalName to NodePort", func() {
 		serviceName := "externalname-service"
@@ -1676,6 +1692,9 @@ var _ = SIGDescribe("Services", func() {
 		Description: Create a service of type ClusterIP. Service creation MUST be successful by assigning ClusterIP to the service.
 		Update service type from ClusterIP to ExternalName by setting CNAME entry as externalName. Service update MUST be successful and service MUST not has associated ClusterIP.
 		Service MUST be able to resolve to IP address by returning A records ensuring service is pointing to provided externalName.
+		Behaviors:
+		- network/service/type/ClusterIP/empty
+		- network/service/type/ExternalName
 	*/
 	framework.ConformanceIt("should be able to change the type from ClusterIP to ExternalName", func() {
 		serviceName := "clusterip-service"
@@ -1716,6 +1735,9 @@ var _ = SIGDescribe("Services", func() {
 		Description: Create a service of type NodePort. Service creation MUST be successful by exposing service on every node's IP on dynamically assigned NodePort and, ClusterIP MUST be assigned to route service requests.
 		Update the service type from NodePort to ExternalName by setting CNAME entry as externalName. Service update MUST be successful and, MUST not has ClusterIP associated with the service and, allocated NodePort MUST be released.
 		Service MUST be able to resolve to IP address by returning A records ensuring service is pointing to provided externalName.
+		Behaviors:
+		- network/service/type/NodePort
+		- network/service/type/ExternalName
 	*/
 	framework.ConformanceIt("should be able to change the type from NodePort to ExternalName", func() {
 		serviceName := "nodeport-service"
@@ -2364,6 +2386,9 @@ var _ = SIGDescribe("Services", func() {
 		Create another pod to make requests to the service. Service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
+		Behaviors:
+		- network/service/type/ClusterIP
+		- network/service/sessionAffinity/ClientIP
 	*/
 	framework.ConformanceIt("should have session affinity work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip")
@@ -2380,6 +2405,9 @@ var _ = SIGDescribe("Services", func() {
 		After timeout, requests MUST be served from different pods of the replica.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
+		Behaviors:
+		- network/service/type/ClusterIP
+		- network/service/sessionAffinity/ClientIP/timeout
 	*/
 	framework.ConformanceIt("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-timeout")
@@ -2396,6 +2424,9 @@ var _ = SIGDescribe("Services", func() {
 		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
+		Behaviors:
+		- network/service/type/ClusterIP
+		- network/service/sessionAffinity/None
 	*/
 	framework.ConformanceIt("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-transition")
@@ -2411,6 +2442,9 @@ var _ = SIGDescribe("Services", func() {
 		Create another pod to make requests to the service on node's IP and NodePort. Service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
+		Behaviors:
+		- network/service/type/NodePort
+		- network/service/sessionAffinity/ClientIP
 	*/
 	framework.ConformanceIt("should have session affinity work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport")
@@ -2428,6 +2462,9 @@ var _ = SIGDescribe("Services", func() {
 		After timeout, requests MUST be served from different pods of the replica.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
+		Behaviors:
+		- network/service/type/NodePort
+		- network/service/sessionAffinity/ClientIP/timeout
 	*/
 	framework.ConformanceIt("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-timeout")
@@ -2444,6 +2481,9 @@ var _ = SIGDescribe("Services", func() {
 		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
+		Behaviors:
+		- network/service/type/NodePort
+		- network/service/sessionAffinity/None
 	*/
 	framework.ConformanceIt("should be able to switch session affinity for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-transition")
@@ -2711,6 +2751,8 @@ var _ = SIGDescribe("Services", func() {
 	   Release : v1.18
 	   Testname: Find Kubernetes Service in default Namespace
 	   Description: List all Services in all Namespaces, response MUST include a Service named Kubernetes with the Namespace of default.
+	   Behaviors:
+	   - network/service/default/kubernetes
 	*/
 	framework.ConformanceIt("should find a service from listing all namespaces", func() {
 		ginkgo.By("fetching services")

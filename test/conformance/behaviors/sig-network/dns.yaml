@@ -1,0 +1,9 @@
+suite: network/dns
+description: Base suite for DNS
+behaviors:
+- id: network/dns/resolve/dns
+  description: A pod in the cluster must be able to resolve cluster DNS entries such as kubernetes.default via DNS.
+- id: network/dns/resolve/etchosts
+  description: A pod in the cluster must be able to resolve cluster DNS entries such as kubernetes.default via /etc/hosts/.
+- id: network/dns/resolve/pqdn
+  description: Partially qualified DNS entries must be resolvable by services in a cluster.

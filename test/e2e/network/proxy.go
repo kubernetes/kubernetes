@@ -81,6 +81,8 @@ var _ = SIGDescribe("Proxy", func() {
 			Release : v1.9
 			Testname: Proxy, logs service endpoint
 			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
+			Behaviors:
+			- network/common/proxy/basic
 		*/
 		framework.ConformanceIt("should proxy through a service and a pod ", func() {
 			start := time.Now()

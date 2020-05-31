@@ -1,0 +1,13 @@
+suite: network/common
+description: Base suite for Networking
+behaviors:
+- id: network/common/pod/http
+  description: Pod to pod networking should function over HTTP
+- id: network/common/pod/udp
+  description: Pod to pod networking should function over UDP
+- id: network/common/node/http
+  description: Node to pod networking should function over HTTP. hostNetwork must be enabled.
+- id: network/common/hode/udp
+  description: Node to pod networking should function over UDP. hostNetwork must be enabled.
+- id: network/common/proxy/basic
+  description: Proxy via the proxy subresource must be reachable
