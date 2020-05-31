@@ -1,4 +1,4 @@
-suite: replicaset
+suite: apps/replicaset
 description: Base suite for ReplicaSet
 behaviors:
 - id: apps/replicaset/basic-create

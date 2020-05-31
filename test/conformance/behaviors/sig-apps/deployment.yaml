@@ -1,4 +1,4 @@
-suite: deployment
+suite: apps/deployment
 description: Base suite for Deployment
 behaviors:
 - id: apps/deployment/strategy/rollingupdate

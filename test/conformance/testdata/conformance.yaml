@@ -1116,6 +1116,8 @@
     when they fail.
   release: ""
   file: test/e2e/apps/daemon_set.go
+  behaviors:
+  - apps/daemonset/revive-pod
 - testname: DaemonSet-Rollback
   codename: '[sig-apps] Daemon set [Serial] should rollback without unnecessary restarts
     [Conformance]'
@@ -1129,6 +1131,8 @@
     selection via label selectors.
   release: ""
   file: test/e2e/apps/daemon_set.go
+  behaviors:
+  - apps/daemonset/create-node-selector
 - testname: DaemonSet-Creation
   codename: '[sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance]'
   description: A conformant Kubernetes distribution MUST support the creation of DaemonSets.
@@ -1136,12 +1140,16 @@
     Pod.
   release: ""
   file: test/e2e/apps/daemon_set.go
+  behaviors:
+  - apps/daemonset/create
 - testname: DaemonSet-RollingUpdate
   codename: '[sig-apps] Daemon set [Serial] should update pod when spec was updated
     and update strategy is RollingUpdate [Conformance]'
   description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
   release: ""
   file: test/e2e/apps/daemon_set.go
+  behaviors:
+  - apps/daemonset/update-pod
 - testname: Deployment Recreate
   codename: '[sig-apps] Deployment RecreateDeployment should delete old pods and create
     new ones [Conformance]'
@@ -1149,6 +1157,8 @@
     Recreate strategy.
   release: ""
   file: test/e2e/apps/deployment.go
+  behaviors:
+  - apps/deployment/strategy/recreate
 - testname: Deployment RollingUpdate
   codename: '[sig-apps] Deployment RollingUpdateDeployment should delete old pods
     and create new ones [Conformance]'
@@ -1156,12 +1166,16 @@
     RollingUpdate strategy.
   release: ""
   file: test/e2e/apps/deployment.go
+  behaviors:
+  - apps/deployment/strategy/rollingupdate
 - testname: Deployment RevisionHistoryLimit
   codename: '[sig-apps] Deployment deployment should delete old replica sets [Conformance]'
   description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets
     based on the Deployment's `.spec.revisionHistoryLimit`.
   release: ""
   file: test/e2e/apps/deployment.go
+  behaviors:
+  - apps/deployment/revisionHistoryLimit
 - testname: Deployment Proportional Scaling
   codename: '[sig-apps] Deployment deployment should support proportional scaling
     [Conformance]'
@@ -1170,6 +1184,9 @@
     is scaled.
   release: ""
   file: test/e2e/apps/deployment.go
+  behaviors:
+  - apps/deployment/strategy/rollingupdate/update
+  - apps/deployment/strategy/rollingupdate/maxSurge
 - testname: Deployment Rollover
   codename: '[sig-apps] Deployment deployment should support rollover [Conformance]'
   description: A conformant Kubernetes distribution MUST support Deployment rollover,
@@ -1177,6 +1194,8 @@
     before the rollout finishes.
   release: ""
   file: test/e2e/apps/deployment.go
+  behaviors:
+  - apps/deployment/strategy/rollingupdate/rollover
 - testname: Jobs, orphan pods, re-adoption
   codename: '[sig-apps] Job should adopt matching orphans and release non-matching
     pods [Conformance]'
@@ -1185,12 +1204,18 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+  behaviors:
+  - apps/job/parallelism
+  - apps/job/orphan
+  - apps/job/updatePodLabel
 - testname: Jobs, active pods, graceful termination
   codename: '[sig-apps] Job should delete a job [Conformance]'
   description: Create a job. Ensure the active pods reflect paralellism in the namespace
     and delete the job. Job MUST be deleted successfully.
   release: v1.15
   file: test/e2e/apps/job.go
+  behaviors:
+  - apps/job/delete
 - testname: Jobs, completion after task failure
   codename: '[sig-apps] Job should run a job to completion when tasks sometimes fail
     and are locally restarted [Conformance]'
@@ -1198,6 +1223,8 @@
     the Job MUST execute to completion.
   release: v1.16
   file: test/e2e/apps/job.go
+  behaviors:
+  - apps/job/failure
 - testname: Replica Set, adopt matching pods and release non matching pods
   codename: '[sig-apps] ReplicaSet should adopt matching pods on creation and release
     no longer matching pods [Conformance]'
@@ -1208,6 +1235,9 @@
     owner references
   release: v1.13
   file: test/e2e/apps/replica_set.go
+  behaviors:
+  - apps/replicaset/label/adopt
+  - apps/replicaset/label/release
 - testname: Replica Set, run basic image
   codename: '[sig-apps] ReplicaSet should serve a basic image on each replica with
     a public image  [Conformance]'
@@ -1215,6 +1245,8 @@
     the Pod is running. Pod SHOULD send a valid response when queried.
   release: v1.9
   file: test/e2e/apps/replica_set.go
+  behaviors:
+  - apps/replicaset/basic-create
 - testname: Replication Controller, adopt matching pods
   codename: '[sig-apps] ReplicationController should adopt matching pods on creation
     [Conformance]'
@@ -1223,6 +1255,8 @@
     Pod or delete and replace it with a new Pod
   release: v1.13
   file: test/e2e/apps/rc.go
+  behaviors:
+  - apps/rc/label/adopt
 - testname: Replication Controller, release pods
   codename: '[sig-apps] ReplicationController should release no longer matching pods
     [Conformance]'
@@ -1231,6 +1265,8 @@
     the RC MUST release the Pod and update the Pod's owner references.
   release: v1.13
   file: test/e2e/apps/rc.go
+  behaviors:
+  - apps/rc/label/release
 - testname: Replication Controller, run basic image
   codename: '[sig-apps] ReplicationController should serve a basic image on each replica
     with a public image  [Conformance]'
@@ -1239,6 +1275,8 @@
     the service listening through TCP, UDP and HTTP.
   release: v1.9
   file: test/e2e/apps/rc.go
+  behaviors:
+  - apps/rc/basic-create
 - testname: Replication Controller, check for issues like exceeding allocated quota
   codename: '[sig-apps] ReplicationController should surface a failure condition on
     a common issue like exceeded quota [Conformance]'
@@ -1246,6 +1284,9 @@
     namespace quota. The creation MUST fail
   release: v1.15
   file: test/e2e/apps/rc.go
+  behaviors:
+  - apps/rc/quota/exceed
+  - apps/rc/quota/satisfy
 - testname: StatefulSet, Burst Scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]'
@@ -1254,6 +1295,8 @@
     dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
+  behaviors:
+  - apps/statefulset/podManagementPolicy/parallel
 - testname: StatefulSet, Scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     Scaling should happen in predictable order and halt if any stateful pod is unhealthy
@@ -1264,6 +1307,8 @@
     test does not depend on a preexisting default StorageClass or a dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
+  behaviors:
+  - apps/statefulset/create/scaling
 - testname: StatefulSet, Recreate Failed Pod
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     Should recreate evicted statefulset [Conformance]'
@@ -1272,6 +1317,8 @@
     depend on a preexisting default StorageClass or a dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
+  behaviors:
+  - apps/statefulset/evicted
 - testname: StatefulSet resource Replica scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     should have a working scale subresource [Conformance]'
@@ -1280,6 +1327,9 @@
     scale MUST be at two replicas.
   release: v1.16
   file: test/e2e/apps/statefulset.go
+  behaviors:
+  - apps/statefulset/basic-create
+  - apps/statefulset/basic-update
 - testname: StatefulSet, Rolling Update with Partition
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     should perform canary updates and phased rolling updates of template modifications
@@ -1290,6 +1340,8 @@
     This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
+  behaviors:
+  - apps/statefulset/strategy/rollingupdate/partition
 - testname: StatefulSet, Rolling Update
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     should perform rolling updates and roll backs of template modifications [Conformance]'
@@ -1301,6 +1353,9 @@
     StorageClass or a dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
+  behaviors:
+  - apps/statefulset/strategy/rollingupdate
+  - apps/statefulset/strategy/rollingupdate/rollback
 - testname: CertificateSigningRequest API
   codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
     CSR API operations [Conformance]'

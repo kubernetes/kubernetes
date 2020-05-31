@@ -1,4 +1,4 @@
-suite: job
+suite: apps/job
 description: Base suite for Jobs
 behaviors:
 - id: apps/job/cleanup

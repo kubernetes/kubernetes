@@ -1,13 +1,13 @@
-suite: daemonset
+suite: apps/daemonset
 description: Base suite for daemonsets
 behaviors:
 - id: apps/daemonset/create
-  description: When a DaemonSet is created, a daemon pod must be launched on every node in the cluster.
+  description: When a DaemonSet is created, a daemon pod MUST be launched on every node in the cluster.
 - id: apps/daemonset/create-node-selector
-  description: A DaemonSet's daemon pod should support node selection via label selectors. Daemon pods must only created on nodes matching the node selector.
+  description: A DaemonSet's daemon pod MUST support node selection via label selectors. Daemon pods MUST only created on schedulable nodes matching the node selector.
 - id: apps/daemonset/failed-pod
-  description: When a daemon pod fails, it must automatically be recreated.
+  description: When a DaemonSet pod fails, it MUST automatically be recreated.
 - id: apps/daemonset/update-pod
   description: When the DaemonSet's pod image is updated, all daemon pods images should be updated and running.
 - id: apps/daemonset/update-rollback
-  description: A DaemonSet must support rollback of updates.
+  description: A DaemonSet MUST support rollback of updates.

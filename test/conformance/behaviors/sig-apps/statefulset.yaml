@@ -1,4 +1,4 @@
-suite: statefulset
+suite: apps/statefulset
 description: Base suite for StatefulSet
 behaviors:
 - id: apps/statefulset/strategy/rollingupdate
