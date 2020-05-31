@@ -85,6 +85,8 @@ var _ = SIGDescribe("Deployment", func() {
 	/*
 	  Testname: Deployment RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with RollingUpdate strategy.
+	  Behaviors:
+	  - apps/deployment/strategy/rollingupdate
 	*/
 	framework.ConformanceIt("RollingUpdateDeployment should delete old pods and create new ones", func() {
 		testRollingUpdateDeployment(f)
@@ -92,6 +94,8 @@ var _ = SIGDescribe("Deployment", func() {
 	/*
 	  Testname: Deployment Recreate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with Recreate strategy.
+	  Behaviors:
+	  - apps/deployment/strategy/recreate
 	*/
 	framework.ConformanceIt("RecreateDeployment should delete old pods and create new ones", func() {
 		testRecreateDeployment(f)
@@ -100,6 +104,8 @@ var _ = SIGDescribe("Deployment", func() {
 	  Testname: Deployment RevisionHistoryLimit
 	  Description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets based on
 	  the Deployment's `.spec.revisionHistoryLimit`.
+	  Behaviors:
+	  - apps/deployment/revisionHistoryLimit
 	*/
 	framework.ConformanceIt("deployment should delete old replica sets", func() {
 		testDeploymentCleanUpPolicy(f)
@@ -109,6 +115,8 @@ var _ = SIGDescribe("Deployment", func() {
 	  Description: A conformant Kubernetes distribution MUST support Deployment rollover,
 	    i.e. allow arbitrary number of changes to desired state during rolling update
 	    before the rollout finishes.
+	  Behaviors:
+	  - apps/deployment/strategy/rollingupdate/rollover
 	*/
 	framework.ConformanceIt("deployment should support rollover", func() {
 		testRolloverDeployment(f)
@@ -124,6 +132,10 @@ var _ = SIGDescribe("Deployment", func() {
 	  Description: A conformant Kubernetes distribution MUST support Deployment
 	    proportional scaling, i.e. proportionally scale a Deployment's ReplicaSets
 	    when a Deployment is scaled.
+	  Behaviors:
+	  - apps/deployment/strategy/rollingupdate/update
+	  - apps/deployment/strategy/rollingupdate/maxSurge
+
 	*/
 	framework.ConformanceIt("deployment should support proportional scaling", func() {
 		testProportionalScalingDeployment(f)

@@ -96,6 +96,8 @@ var _ = SIGDescribe("Job", func() {
 		Testname: Jobs, completion after task failure
 		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
 		execute to completion.
+		Behaviors:
+		- apps/job/failure
 	*/
 	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
 		ginkgo.By("Creating a job")
@@ -151,6 +153,8 @@ var _ = SIGDescribe("Job", func() {
 		Release : v1.15
 		Testname: Jobs, active pods, graceful termination
 		Description: Create a job. Ensure the active pods reflect paralellism in the namespace and delete the job. Job MUST be deleted successfully.
+		Behaviors:
+		- apps/job/delete
 	*/
 	framework.ConformanceIt("should delete a job", func() {
 		ginkgo.By("Creating a job")
@@ -177,6 +181,10 @@ var _ = SIGDescribe("Job", func() {
 		Description: Create a parallel job. The number of Pods MUST equal the level of parallelism.
 		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.
 		Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
+		Behaviors:
+		- apps/job/parallelism
+		- apps/job/orphan
+		- apps/job/updatePodLabel
 	*/
 	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func() {
 		ginkgo.By("Creating a job")

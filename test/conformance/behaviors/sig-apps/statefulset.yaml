@@ -1,0 +1,19 @@
+suite: statefulset
+description: Base suite for StatefulSet
+behaviors:
+- id: apps/statefulset/strategy/rollingupdate
+  description: When a StatefulSet is created with the RollingUpdate strategy, a rollout should replace the pods one at a time.
+- id: apps/statefulset/strategy/rollingupdate/rollback
+  description: When a StatefulSet is created with the RollingUpdate strategy, setting the pod template to a previous version must trigger a rollback
+- id: apps/statefulset/strategy/rollingupdate/partition
+  description: When a StatefulSet is created with the RollingUpdate strategy and the partition field set, all pods with ordinal greater than or equal to the partition will be updated during a rollout. If pods are deleted, they must be restored without violating the partition.
+- id: apps/statefulset/create/scaling
+  description: StatefulSet must create pods in ascending order by ordinal index when scaling up, and delete Pods in descending order when scaling down. The scaling must pause if any pods belonging to the StatefulSet are unhealthy.
+- id: apps/statefulset/podManagementPolicy/parallel
+  description: When podManagementPolicy is set to parallel, scale ups will create pods in parallel to match the desired scale without waiting, and scale downs will delete all pods at once.
+- id: apps/statefulset/evicted
+  description: When a Pod managed by a StatefulSet goes into a Failed state (Eg evicted/ejected), the StatefulSet must delete and recreate the Pod.
+- id: apps/statefulset/basic-create
+  description: When a StatefulSet is created, it must have a scale subresource.
+- id: apps/statefulset/basic-update
+  description: When a StatefulSet is updated by updating the scale subresource, the replicas in the spec must be updated to match the new number.

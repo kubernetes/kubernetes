@@ -1,0 +1,13 @@
+suite: job
+description: Base suite for Jobs
+behaviors:
+- id: apps/job/cleanup
+  description: Pods associated with a job must be removed once the job is deleted.
+- id: apps/job/delete
+  description: Deleting an active job should result in graceful termination.
+- id: apps/job/parallelism
+  description: Creating a job with a specific level of parallelism must result in that number of pods running.
+- id: apps/job/orphan
+  description: Orphaned pods from a job must be reclaimed by the job.
+- id: apps/job/updatePodLabel
+  description: Updating the label of a pod belonging to a job should result in the pod being released from the job.

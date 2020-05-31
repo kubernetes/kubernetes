@@ -1,0 +1,13 @@
+suite: rc
+description: Base suite for ReplicaController
+behaviors:
+- id: apps/rc/basic-create
+  description: When a ReplicaController is created with a pod template, a Pod must be created
+- id: apps/rc/quota/exceed
+  description: When a ReplicaController is created with the number of pods exceeding the namespace quota, the creation must fail
+- id: apps/rc/quota/satisfy
+  description: When a ReplicaController is created with the number of pods under the namespace quota, the creation must succeed
+- id: apps/rc/label/adopt
+  description: When a Pod not managed by a ReplicaController has their label matched by the ReplicaController's label selector, it must be adopted by the ReplicaController.
+- id: apps/rc/label/release
+  description: When a pod created by a ReplicaController no longer has their labels matching with the corresponding RS label selector, the ReplicaController must release the Pod and update the Pod's owner references.

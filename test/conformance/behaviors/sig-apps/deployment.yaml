@@ -1,0 +1,15 @@
+suite: deployment
+description: Base suite for Deployment
+behaviors:
+- id: apps/deployment/strategy/rollingupdate
+  description: When a Deployment is created with the RollingUpdate strategy, a rollout should delete the old pods and create new pods together
+- id: apps/deployment/strategy/recreate
+  description: When a Deployment is created with the Recreate strategy, a rollout should delete the old pods and then create the new pods.
+- id: apps/deployment/revisionHistoryLimit
+  description: When a Deployment is created with a set revisionHistoryLimit, old ReplicaSets must be cleaned up when the number is exceeded
+- id: apps/deployment/strategy/rollingupdate/rollover
+  description: An arbitrary number of changes must be allowed to the desired state of the Deployment during a rolling update before the rollout finishes.
+- id: apps/deployment/strategy/rollingupdate/update
+  description: When a Deployment created with the RollingUpdate strategy is updated (scaled) in the middle of a rollout, each ReplicaSet should be scaled proportionally
+- id: apps/deployment/strategy/rollingupdate/maxSurge
+  description: A Deployment should not have more than the desired number of pods plus the maxSurge count number of pods scheduled

@@ -1,0 +1,9 @@
+suite: replicaset
+description: Base suite for ReplicaSet
+behaviors:
+- id: apps/replicaset/basic-create
+  description: When a ReplicaSet is created with a Pod and single Container, the Pod should be running and healthy.
+- id: apps/replicaset/label/adopt
+  description: When a Pod not managed by a ReplicaSet has their label matched by the ReplicaSet's label selector, it must be adopted by the ReplicaSet.
+- id: apps/replicaset/label/release
+  description: When a pod created by a ReplicaSet no longer has their labels matching with the corresponding RS label selector, the ReplicaSet must release the Pod and update the Pod's owner references.

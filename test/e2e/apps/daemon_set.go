@@ -149,6 +149,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Testname: DaemonSet-Creation
 	  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
 	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
+	  Behaviors:
+	  - apps/daemonset/create
 	*/
 	framework.ConformanceIt("should run and stop simple daemon", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
@@ -176,6 +178,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Testname: DaemonSet-NodeSelection
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
 	  selectors.
+	  Behaviors:
+	  - apps/daemonset/create-node-selector
 	*/
 	framework.ConformanceIt("should run and stop complex daemon", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
@@ -273,8 +277,10 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
-	  Testname: DaemonSet-FailedPodCreation
-	  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
+		Testname: DaemonSet-FailedPodCreation
+		Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
+		Behaviors:
+		- apps/daemonset/revive-pod
 	*/
 	framework.ConformanceIt("should retry creating failed daemon pods", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
@@ -354,6 +360,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	/*
 	  Testname: DaemonSet-RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
+	  Behaviors:
+	  - apps/daemonset/update-pod
 	*/
 	framework.ConformanceIt("should update pod when spec was updated and update strategy is RollingUpdate", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
@@ -411,6 +419,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Testname: DaemonSet-Rollback
 	  Description: A conformant Kubernetes distribution MUST support automated, minimally disruptive
 	  rollback of updates to a DaemonSet.
+	  Behaviors:
+	  apps/daemonset/update-rollback
 	*/
 	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
 		schedulableNodes, err := e2enode.GetReadySchedulableNodes(c)
