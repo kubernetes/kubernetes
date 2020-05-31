@@ -1628,7 +1628,7 @@ func TestGetServiceLoadBalancerStatus(t *testing.T) {
 		},
 		{
 			desc: "getServiceLoadBalancerStatus shall return nil if lb.FrontendIPConfigurations.name != " +
-				"az.getFrontendIPConfigName(service, subnet(service))",
+				"az.getFrontendIPConfigName(service)",
 			service: &internalService,
 			lb:      &lb3,
 		},
