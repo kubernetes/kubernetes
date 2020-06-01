@@ -92,13 +92,20 @@ export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
 # KUBELET_TEST_ARGS are extra arguments passed to kubelet.
 export KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
-CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
-export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
-CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
-LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
-if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
-export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
-export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+
+# Default container runtime
+export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
+
+# Set default values with override
+if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
+  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/docker.sock}
+  export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-docker}
+  export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
+elif [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+  export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+  export CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
+  export LOG_DUMP_SYSTEMD_SERVICES=${LOG_DUMP_SYSTEMD_SERVICES:-containerd}
+  export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
 fi
 
 # Ability to inject custom versions (Ubuntu OS images ONLY)
