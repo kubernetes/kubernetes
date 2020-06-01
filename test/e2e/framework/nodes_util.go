@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onsi/ginkgo"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -199,6 +201,7 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 	for _, node := range nodes {
 		node := node
 		go func() {
+			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
 			Logf("Stopping docker and kubelet on %q to simulate failure", node.Name)

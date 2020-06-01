@@ -593,6 +593,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			var orderErr error
 			wg.Add(1)
 			go func() {
+				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
 				expectedOrder := []string{ssName + "-0", ssName + "-1", ssName + "-2"}
@@ -644,6 +645,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Verify that statuful set will be scaled down in order.
 			wg.Add(1)
 			go func() {
+				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
 				expectedOrder := []string{ssName + "-2", ssName + "-1", ssName + "-0"}

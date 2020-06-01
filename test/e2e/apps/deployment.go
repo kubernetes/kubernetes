@@ -372,6 +372,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	w, err := c.CoreV1().Pods(ns).Watch(context.TODO(), options)
 	framework.ExpectNoError(err)
 	go func() {
+		defer ginkgo.GinkgoRecover()
 		// There should be only one pod being created, which is the pod with the agnhost image.
 		// The old RS shouldn't create new pod when deployment controller adding pod template hash label to its selector.
 		numPodCreation := 1
