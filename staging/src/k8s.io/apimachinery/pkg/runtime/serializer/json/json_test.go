@@ -424,6 +424,34 @@ func TestDecode(t *testing.T) {
 	}
 }
 
+func TestCustomNumberExtension(t *testing.T) {
+	api := json.CaseSensitiveJsonIterator()
+
+	testCases := []struct {
+		data           string
+		expectedObject map[string]interface{}
+	}{{
+		data: `{"i641": 11, "i642": 12.0, "f64": 13.1}`,
+		expectedObject: map[string]interface{}{
+			"i641": int64(11),
+			"i642": int64(12),
+			"f64":  float64(13.1),
+		},
+	}}
+
+	for i, test := range testCases {
+		actualObject := map[string]interface{}{}
+		err := api.Unmarshal([]byte(test.data), &actualObject)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if !reflect.DeepEqual(test.expectedObject, actualObject) {
+			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.expectedObject, actualObject))
+		}
+	}
+}
+
 func TestCacheableObject(t *testing.T) {
 	gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "MockCacheableObject"}
 	creater := &mockCreater{obj: &runtimetesting.MockCacheableObject{}}

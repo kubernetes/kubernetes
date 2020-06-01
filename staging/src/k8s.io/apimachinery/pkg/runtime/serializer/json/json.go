@@ -19,6 +19,7 @@ package json
 import (
 	"encoding/json"
 	"io"
+	"math"
 	"strconv"
 	"unsafe"
 
@@ -128,14 +129,13 @@ func (customNumberDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
 	case jsoniter.NumberValue:
 		var number jsoniter.Number
 		iter.ReadVal(&number)
-		i64, err := strconv.ParseInt(string(number), 10, 64)
-		if err == nil {
-			*(*interface{})(ptr) = i64
-			return
-		}
 		f64, err := strconv.ParseFloat(string(number), 64)
 		if err == nil {
-			*(*interface{})(ptr) = f64
+			if math.Floor(f64) == f64 {
+				*(*interface{})(ptr) = int64(f64)
+			} else {
+				*(*interface{})(ptr) = f64
+			}
 			return
 		}
 		iter.ReportError("DecodeNumber", err.Error())
