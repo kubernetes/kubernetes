@@ -1378,32 +1378,34 @@
               ]
             }
           }
-        ]
+        ],
+        "setHostnameAsFQDN": true
       }
     },
     "updateStrategy": {
+      "type": "))e×鄞閆N钮Ǒ",
       "rollingUpdate": {
         "maxUnavailable": 2
       }
     },
-    "minReadySeconds": 997447044,
-    "revisionHistoryLimit": 989524452
+    "minReadySeconds": -1521312599,
+    "revisionHistoryLimit": 554881301
   },
   "status": {
-    "currentNumberScheduled": 1606858231,
-    "numberMisscheduled": 1791868025,
-    "desiredNumberScheduled": -793692762,
-    "numberReady": -1152625369,
-    "observedGeneration": 3839991706170762113,
-    "updatedNumberScheduled": -1292943463,
-    "numberAvailable": -1734448297,
-    "numberUnavailable": -1757575936,
-    "collisionCount": 129237050,
+    "currentNumberScheduled": 687719923,
+    "numberMisscheduled": -1777921334,
+    "desiredNumberScheduled": -2022058870,
+    "numberReady": 283054026,
+    "observedGeneration": 9202522069332337259,
+    "updatedNumberScheduled": -691360969,
+    "numberAvailable": 1090884237,
+    "numberUnavailable": -1303432952,
+    "collisionCount": -434531243,
     "conditions": [
       {
-        "type": "{ɦ!f親ʚ«Ǥ栌Ə侷ŧĞö",
-        "status": "2ț",
-        "lastTransitionTime": "2733-02-09T15:36:31Z",
+        "type": "",
+        "status": "B/ü橚2ț}¹旛坷硂",
+        "lastTransitionTime": "2776-12-09T00:48:05Z",
         "reason": "433",
         "message": "434"
       }

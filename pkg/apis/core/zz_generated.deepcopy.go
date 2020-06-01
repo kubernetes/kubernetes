@@ -3798,6 +3798,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = make([]LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
+	if in.SetHostnameAsFQDN != nil {
+		in, out := &in.SetHostnameAsFQDN, &out.SetHostnameAsFQDN
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(Affinity)

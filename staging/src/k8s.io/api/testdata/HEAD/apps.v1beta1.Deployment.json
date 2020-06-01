@@ -1371,40 +1371,41 @@
               ]
             }
           }
-        ]
+        ],
+        "setHostnameAsFQDN": false
       }
     },
     "strategy": {
-      "type": "荥ơ'禧ǵŊ)TiD¢ƿ媴h5",
+      "type": "ơ'禧ǵŊ)TiD¢ƿ媴h5ƅȸȓɻ",
       "rollingUpdate": {
         "maxUnavailable": 2,
         "maxSurge": 3
       }
     },
-    "minReadySeconds": 212061711,
-    "revisionHistoryLimit": -1092090658,
+    "minReadySeconds": 696654600,
+    "revisionHistoryLimit": 407742062,
     "rollbackTo": {
-      "revision": -318895959020904110
+      "revision": -455484136992029462
     },
-    "progressDeadlineSeconds": 1109758199
+    "progressDeadlineSeconds": -1450995995
   },
   "status": {
-    "observedGeneration": 1751238822830387407,
-    "replicas": -106050665,
-    "updatedReplicas": -929473748,
-    "readyReplicas": -1450995995,
-    "availableReplicas": 740158871,
-    "unavailableReplicas": -449319810,
+    "observedGeneration": 3883700826410970519,
+    "replicas": -449319810,
+    "updatedReplicas": 2063260600,
+    "readyReplicas": -729742317,
+    "availableReplicas": 294718341,
+    "unavailableReplicas": 867742020,
     "conditions": [
       {
-        "type": "",
-        "status": "'ƈoIǢ龞瞯å",
-        "lastUpdateTime": "2469-07-10T03:20:34Z",
-        "lastTransitionTime": "1970-05-16T01:44:00Z",
+        "type": "昞财Î嘝zʄ!ć惍Bi攵\u0026ý\"ʀ",
+        "status": "",
+        "lastUpdateTime": "2042-08-25T05:10:04Z",
+        "lastTransitionTime": "2097-04-15T07:29:40Z",
         "reason": "426",
         "message": "427"
       }
     ],
-    "collisionCount": 571778293
+    "collisionCount": -2071091268
   }
 }

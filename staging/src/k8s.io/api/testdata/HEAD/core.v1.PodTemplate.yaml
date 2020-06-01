@@ -713,6 +713,7 @@ template:
         runAsUserName: "357"
     serviceAccount: "349"
     serviceAccountName: "348"
+    setHostnameAsFQDN: true
     shareProcessNamespace: false
     subdomain: "362"
     terminationGracePeriodSeconds: -1689173322096612726

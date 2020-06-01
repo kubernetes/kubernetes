@@ -1425,14 +1425,15 @@
                   ]
                 }
               }
-            ]
+            ],
+            "setHostnameAsFQDN": false
           }
         },
-        "ttlSecondsAfterFinished": -1754419098
+        "ttlSecondsAfterFinished": 1530007970
       }
     },
-    "successfulJobsHistoryLimit": -2099726885,
-    "failedJobsHistoryLimit": 163538560
+    "successfulJobsHistoryLimit": -928976522,
+    "failedJobsHistoryLimit": 1092856739
   },
   "status": {
     "active": [
@@ -1440,7 +1441,7 @@
         "kind": "447",
         "namespace": "448",
         "name": "449",
-        "uid": "ɦ?鮻ȧH僠 \u0026G",
+        "uid": "?鮻ȧH僠 \u0026G凒罹ń賎Ȍű孖站",
         "apiVersion": "450",
         "resourceVersion": "451",
         "fieldPath": "452"
