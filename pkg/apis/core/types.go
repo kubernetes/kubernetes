@@ -2693,6 +2693,12 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string
+	// If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default).
+	// In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
+	// In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN.
+	// If a pod does not have FQDN, this has no effect.
+	// +optional
+	SetHostnameAsFQDN *bool
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity
