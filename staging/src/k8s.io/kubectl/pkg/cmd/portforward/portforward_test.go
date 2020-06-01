@@ -838,3 +838,117 @@ func TestConvertPodNamedPortToNumber(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckUDPPort(t *testing.T) {
+	tests := []struct {
+		name        string
+		pod         *corev1.Pod
+		service     *corev1.Service
+		ports       []string
+		expectError bool
+	}{
+		{
+			name: "forward to a UDP port in a Pod",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{Protocol: corev1.ProtocolUDP, ContainerPort: 53},
+							},
+						},
+					},
+				},
+			},
+			ports:       []string{"53"},
+			expectError: true,
+		},
+		{
+			name: "forward to a named UDP port in a Pod",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{Protocol: corev1.ProtocolUDP, ContainerPort: 53, Name: "dns"},
+							},
+						},
+					},
+				},
+			},
+			ports:       []string{"dns"},
+			expectError: true,
+		},
+		{
+			name: "Pod has ports with both TCP and UDP protocol",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{Protocol: corev1.ProtocolUDP, ContainerPort: 53},
+								{Protocol: corev1.ProtocolTCP, ContainerPort: 53},
+							},
+						},
+					},
+				},
+			},
+			ports: []string{":53"},
+		},
+
+		{
+			name: "forward to a UDP port in a Service",
+			service: &corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{Protocol: corev1.ProtocolUDP, Port: 53},
+					},
+				},
+			},
+			ports:       []string{"53"},
+			expectError: true,
+		},
+		{
+			name: "forward to a named UDP port in a Service",
+			service: &corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{Protocol: corev1.ProtocolUDP, Port: 53, Name: "dns"},
+					},
+				},
+			},
+			ports:       []string{"10053:dns"},
+			expectError: true,
+		},
+		{
+			name: "Service has ports with both TCP and UDP protocol",
+			service: &corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{Protocol: corev1.ProtocolUDP, Port: 53},
+						{Protocol: corev1.ProtocolTCP, Port: 53},
+					},
+				},
+			},
+			ports: []string{"53"},
+		},
+	}
+	for _, tc := range tests {
+		var err error
+		if tc.pod != nil {
+			err = checkUDPPortInPod(tc.ports, tc.pod)
+		} else if tc.service != nil {
+			err = checkUDPPortInService(tc.ports, tc.service)
+		}
+		if err != nil {
+			if tc.expectError {
+				continue
+			}
+			t.Errorf("%v: unexpected error: %v", tc.name, err)
+			continue
+		}
+		if tc.expectError {
+			t.Errorf("%v: unexpected success", tc.name)
+		}
+	}
+}
