@@ -1423,10 +1423,11 @@
                 ]
               }
             }
-          ]
+          ],
+          "setHostnameAsFQDN": true
         }
       },
-      "ttlSecondsAfterFinished": -1746367307
+      "ttlSecondsAfterFinished": -82488142
     }
   }
 }

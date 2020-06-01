@@ -714,6 +714,7 @@ spec:
           runAsUserName: "365"
       serviceAccount: "357"
       serviceAccountName: "356"
+      setHostnameAsFQDN: false
       shareProcessNamespace: true
       subdomain: "370"
       terminationGracePeriodSeconds: -860974700141841896
@@ -933,14 +934,14 @@ spec:
           storagePolicyName: "99"
           volumePath: "97"
 status:
-  availableReplicas: -1438616392
+  availableReplicas: -1126236716
   conditions:
   - lastTransitionTime: "2129-09-06T04:28:43Z"
     message: "430"
     reason: "429"
     status: oǰ'źĄ栧焷蜪sÛ°
-    type: 獰Ĉ癯頯aɴí(Ȟ9"
-  fullyLabeledReplicas: 189301373
-  observedGeneration: 7696803627798560212
-  readyReplicas: -1235733921
-  replicas: -580887468
+    type: Ĉ癯頯aɴí(Ȟ9"
+  fullyLabeledReplicas: -1235733921
+  observedGeneration: -817442683106980570
+  readyReplicas: -1438616392
+  replicas: 189301373

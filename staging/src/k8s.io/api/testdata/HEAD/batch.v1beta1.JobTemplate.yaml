@@ -757,6 +757,7 @@ template:
             runAsUserName: "379"
         serviceAccount: "371"
         serviceAccountName: "370"
+        setHostnameAsFQDN: true
         shareProcessNamespace: true
         subdomain: "384"
         terminationGracePeriodSeconds: -3123571459188372202
@@ -977,4 +978,4 @@ template:
             storagePolicyID: "121"
             storagePolicyName: "120"
             volumePath: "118"
-    ttlSecondsAfterFinished: -1746367307
+    ttlSecondsAfterFinished: -82488142

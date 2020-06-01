@@ -3551,6 +3551,14 @@ message PodSpec {
   // +listMapKey=topologyKey
   // +listMapKey=whenUnsatisfiable
   repeated TopologySpreadConstraint topologySpreadConstraints = 33;
+
+  // If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default).
+  // In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
+  // In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN.
+  // If a pod does not have FQDN, this has no effect.
+  // Default to false.
+  // +optional
+  optional bool setHostnameAsFQDN = 35;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

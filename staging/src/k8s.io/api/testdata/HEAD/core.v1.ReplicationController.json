@@ -1362,19 +1362,20 @@
               ]
             }
           }
-        ]
+        ],
+        "setHostnameAsFQDN": false
       }
     }
   },
   "status": {
-    "replicas": -580887468,
-    "fullyLabeledReplicas": 189301373,
-    "readyReplicas": -1235733921,
-    "availableReplicas": -1438616392,
-    "observedGeneration": 7696803627798560212,
+    "replicas": 189301373,
+    "fullyLabeledReplicas": -1235733921,
+    "readyReplicas": -1438616392,
+    "availableReplicas": -1126236716,
+    "observedGeneration": -817442683106980570,
     "conditions": [
       {
-        "type": "獰Ĉ癯頯aɴí(Ȟ9\"",
+        "type": "Ĉ癯頯aɴí(Ȟ9\"",
         "status": "oǰ'źĄ栧焷蜪sÛ°",
         "lastTransitionTime": "2129-09-06T04:28:43Z",
         "reason": "429",
