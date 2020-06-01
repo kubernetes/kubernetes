@@ -438,6 +438,12 @@ func dropDisabledFields(
 		// does not specify any values for these fields.
 		podSpec.PreemptionPolicy = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SetHostnameAsFQDN) && !setHostnameAsFQDNInUse(oldPodSpec) {
+		// Set SetHostnameAsFQDN to nil only if feature is disabled and it is not used
+		podSpec.SetHostnameAsFQDN = nil
+	}
+
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
@@ -719,4 +725,12 @@ func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
 		return true
 	}
 	return false
+}
+
+// setHostnameAsFQDNInUse returns true if any pod's spec defines setHostnameAsFQDN field.
+func setHostnameAsFQDNInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil || podSpec.SetHostnameAsFQDN == nil {
+		return false
+	}
+	return *podSpec.SetHostnameAsFQDN
 }
