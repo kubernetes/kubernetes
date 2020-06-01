@@ -34,11 +34,13 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates/authority"
 )
 
+// CSRSigningController holds the structure of certificate controller and dynamic certificate reloader
 type CSRSigningController struct {
 	certificateController *certificates.CertificateController
 	dynamicCertReloader   dynamiccertificates.ControllerRunner
 }
 
+// NewKubeletServingCSRSigningController creates new certificate controller for kubelet-serving
 func NewKubeletServingCSRSigningController(
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
@@ -48,6 +50,7 @@ func NewKubeletServingCSRSigningController(
 	return NewCSRSigningController("csrsigning-kubelet-serving", capi.KubeletServingSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
+// NewKubeletClientCSRSigningController creates new certificate controller for kubelet-client
 func NewKubeletClientCSRSigningController(
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
@@ -57,6 +60,7 @@ func NewKubeletClientCSRSigningController(
 	return NewCSRSigningController("csrsigning-kubelet-client", capi.KubeAPIServerClientKubeletSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
+// NewKubeAPIServerClientCSRSigningController creates new certificate controller for kube-apiserver-client
 func NewKubeAPIServerClientCSRSigningController(
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
@@ -66,6 +70,7 @@ func NewKubeAPIServerClientCSRSigningController(
 	return NewCSRSigningController("csrsigning-kube-apiserver-client", capi.KubeAPIServerClientSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
+// NewLegacyUnknownCSRSigningController creates new certificate controller for legacy-unknown
 func NewLegacyUnknownCSRSigningController(
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
@@ -75,6 +80,7 @@ func NewLegacyUnknownCSRSigningController(
 	return NewCSRSigningController("csrsigning-legacy-unknown", capi.LegacyUnknownSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
+// NewCSRSigningController creates new certificate controller for signing purposes
 func NewCSRSigningController(
 	controllerName string,
 	signerName string,

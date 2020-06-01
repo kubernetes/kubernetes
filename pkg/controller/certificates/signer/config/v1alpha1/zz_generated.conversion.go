@@ -46,12 +46,12 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddConversionFunc((*config.CSRSigningControllerConfiguration)(nil), (*v1alpha1.CSRSigningControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(a.(*config.CSRSigningControllerConfiguration), b.(*v1alpha1.CSRSigningControllerConfiguration), scope)
+		return ConvertConfigCSRSigningControllerConfigurationToV1alpha1CSRSigningControllerConfiguration(a.(*config.CSRSigningControllerConfiguration), b.(*v1alpha1.CSRSigningControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*v1alpha1.CSRSigningControllerConfiguration)(nil), (*config.CSRSigningControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_CSRSigningControllerConfiguration_To_config_CSRSigningControllerConfiguration(a.(*v1alpha1.CSRSigningControllerConfiguration), b.(*config.CSRSigningControllerConfiguration), scope)
+		return ConvertV1alpha1CSRSigningControllerConfigurationToConfigCSRSigningControllerConfiguration(a.(*v1alpha1.CSRSigningControllerConfiguration), b.(*config.CSRSigningControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
