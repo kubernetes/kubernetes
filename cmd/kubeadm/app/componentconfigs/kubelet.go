@@ -125,6 +125,10 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		clusterDNS = dnsIP.String()
 	}
 
+	if kc.config.EnableHTTPS == false {
+		kc.config.EnableHTTPS = true
+	}
+
 	if kc.config.ClusterDNS == nil {
 		kc.config.ClusterDNS = []string{clusterDNS}
 	} else if len(kc.config.ClusterDNS) != 1 || kc.config.ClusterDNS[0] != clusterDNS {

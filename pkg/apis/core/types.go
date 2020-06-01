@@ -3801,8 +3801,8 @@ type DaemonEndpoint struct {
 
 	// Port number of the given endpoint.
 	Port int32
-	// Url Scheme
-	Scheme string
+	// EnableHTTPs specifies whether the traffic to kubelet should be encrypted.
+	EnableHTTPS bool
 }
 
 // NodeDaemonEndpoints lists ports opened by daemons running on the Node.

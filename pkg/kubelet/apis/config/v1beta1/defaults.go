@@ -64,7 +64,6 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
 	}
-	obj.EnableHTTPS = true
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
 	}

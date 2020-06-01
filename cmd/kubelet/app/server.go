@@ -590,7 +590,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 		}
 	}
 
-	if kubeDeps.Auth == nil {
+	if kubeDeps.Auth == nil && s.EnableHTTPS {
 		auth, runAuthenticatorCAReload, err := BuildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err

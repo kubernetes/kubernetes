@@ -406,14 +406,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		MaxPerPodContainer: int(maxPerPodContainerCount),
 		MaxContainers:      int(maxContainerCount),
 	}
-	endPointScheme := "http"
-	if kubeCfg.EnableHTTPS {
-		endPointScheme = "https"
-	}
+
 	daemonEndpoints := &v1.NodeDaemonEndpoints{
 		KubeletEndpoint: v1.DaemonEndpoint{
-			Port:   kubeCfg.Port,
-			Scheme: endPointScheme,
+			Port:        kubeCfg.Port,
+			EnableHTTPS: kubeCfg.EnableHTTPS,
 		},
 	}
 

@@ -3088,7 +3088,7 @@ func Convert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerStatus
 
 func autoConvert_v1_DaemonEndpoint_To_core_DaemonEndpoint(in *v1.DaemonEndpoint, out *core.DaemonEndpoint, s conversion.Scope) error {
 	out.Port = in.Port
-	out.Scheme = in.Scheme
+	out.EnableHTTPS = in.EnableHTTPS
 	return nil
 }
 
@@ -3099,7 +3099,7 @@ func Convert_v1_DaemonEndpoint_To_core_DaemonEndpoint(in *v1.DaemonEndpoint, out
 
 func autoConvert_core_DaemonEndpoint_To_v1_DaemonEndpoint(in *core.DaemonEndpoint, out *v1.DaemonEndpoint, s conversion.Scope) error {
 	out.Port = in.Port
-	out.Scheme = in.Scheme
+	out.EnableHTTPS = in.EnableHTTPS
 	return nil
 }
 

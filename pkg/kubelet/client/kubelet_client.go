@@ -224,9 +224,13 @@ func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeNa
 	if port <= 0 {
 		port = k.defaultPort
 	}
+	scheme := "http"
+	if node.Status.DaemonEndpoints.KubeletEndpoint.EnableHTTPS {
+		scheme = "https"
+	}
 
 	return &ConnectionInfo{
-		Scheme:                         k.scheme,
+		Scheme:                         scheme,
 		Hostname:                       host,
 		Port:                           strconv.Itoa(port),
 		Transport:                      k.transport,
