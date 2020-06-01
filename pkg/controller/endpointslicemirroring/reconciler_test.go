@@ -83,6 +83,81 @@ func TestReconcile(t *testing.T) {
 		expectedNumSlices:      1,
 		expectedClientActions:  1,
 		expectedMetrics:        expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, numCreated: 1},
+	}, {
+		testName: "Endpoints with 1 subset, 2 ports, and 2 addresses",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}, {
+				Name:     "https",
+				Port:     443,
+				Protocol: corev1.ProtocolUDP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.0.0.2",
+				Hostname: "pod-2",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 2, addedPerSync: 2, numCreated: 1},
+	}, {
+		testName: "Endpoints with 2 subsets, multiple ports and addresses",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}, {
+				Name:     "https",
+				Port:     443,
+				Protocol: corev1.ProtocolUDP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.0.0.2",
+				Hostname: "pod-2",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}},
+		}, {
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     3000,
+				Protocol: corev1.ProtocolTCP,
+			}, {
+				Name:     "https",
+				Port:     3001,
+				Protocol: corev1.ProtocolUDP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.1.1",
+				Hostname: "pod-11",
+				NodeName: utilpointer.StringPtr("node-1"),
+			}, {
+				IP:       "10.0.1.2",
+				Hostname: "pod-12",
+				NodeName: utilpointer.StringPtr("node-2"),
+			}, {
+				IP:       "10.0.1.3",
+				Hostname: "pod-13",
+				NodeName: utilpointer.StringPtr("node-3"),
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      2,
+		expectedClientActions:  2,
+		expectedMetrics:        expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 5, addedPerSync: 5, numCreated: 2},
 	}}
 
 	for _, tc := range testCases {
@@ -160,11 +235,19 @@ func portsMatch(epPorts []corev1.EndpointPort, epsPorts []discovery.EndpointPort
 		return false
 	}
 
-	// This assumes EndpointSlice ports and Endpoints ports will always be share
-	// the same order. That's not necessarily a requiremen but has been true so
-	// far.
-	for i, epPort := range epPorts {
-		epsPort := epsPorts[i]
+	portsToBeMatched := map[int32]corev1.EndpointPort{}
+
+	for _, epPort := range epPorts {
+		portsToBeMatched[epPort.Port] = epPort
+	}
+
+	for _, epsPort := range epsPorts {
+		epPort, ok := portsToBeMatched[*epsPort.Port]
+		if !ok {
+			return false
+		}
+		delete(portsToBeMatched, *epsPort.Port)
+
 		if epPort.Name != *epsPort.Name {
 			return false
 		}

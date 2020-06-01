@@ -78,7 +78,7 @@ func newEndpointSlice(endpoints *corev1.Endpoints, endpointMeta *endpointMeta) *
 
 // getEndpointSlicePrefix returns a suitable prefix for an EndpointSlice name.
 func getEndpointSlicePrefix(serviceName string) string {
-	// use the dash (if the name isn't too long) to make the pod name a bit prettier
+	// use the dash (if the name isn't too long) to make the name a bit prettier.
 	prefix := fmt.Sprintf("%s-", serviceName)
 	if len(validation.ValidateEndpointSliceName(prefix, true)) != 0 {
 		prefix = serviceName
@@ -114,14 +114,14 @@ func addressToEndpoint(address corev1.EndpointAddress, ready bool) *discovery.En
 func epPortsToEpsPorts(epPorts []corev1.EndpointPort) []discovery.EndpointPort {
 	epsPorts := []discovery.EndpointPort{}
 	for _, epPort := range epPorts {
+		epp := epPort.DeepCopy()
 		epsPorts = append(epsPorts, discovery.EndpointPort{
-			Name:        &epPort.Name,
-			Port:        &epPort.Port,
-			Protocol:    &epPort.Protocol,
-			AppProtocol: epPort.AppProtocol,
+			Name:        &epp.Name,
+			Port:        &epp.Port,
+			Protocol:    &epp.Protocol,
+			AppProtocol: epp.AppProtocol,
 		})
 	}
-
 	return epsPorts
 }
 
@@ -170,11 +170,10 @@ func getSliceToFill(endpointSlices []*discovery.EndpointSlice, numEndpoints, max
 // getEndpointSliceFromDeleteAction parses an EndpointSlice from a delete action.
 func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice {
 	if endpointSlice, ok := obj.(*discovery.EndpointSlice); ok {
-		// Enqueue all the services that the pod used to be a member of.
-		// This is the same thing we do when we add a pod.
 		return endpointSlice
 	}
-	// If we reached here it means the pod was deleted but its final state is unrecorded.
+	// If we reached here it means the EndpointSlice was deleted but its final
+	// state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))

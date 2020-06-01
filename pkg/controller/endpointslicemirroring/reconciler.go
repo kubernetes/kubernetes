@@ -49,14 +49,13 @@ type endpointMeta struct {
 	AddressType discovery.AddressType    `json:"addressType" protobuf:"bytes,3,rep,name=addressType"`
 }
 
-// reconcile takes a set of pods currently matching a service selector and
-// compares them with the endpoints already present in any existing endpoint
-// slices for the given service. It creates, updates, or deletes endpoint slices
-// to ensure the desired set of pods are represented by endpoint slices.
+// reconcile takes an Endpoints resource and ensures that corresponding
+// EndpointSlices exist. It creates, updates, or deletes EndpointSlices to
+// ensure the desired set of addresses are represented by EndpointSlices.
 func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*discovery.EndpointSlice) error {
 	addressType := discovery.AddressTypeIPv4
 
-	// TODO(robscott): fix this
+	// TODO(robscott): handle dual stack
 	if false {
 		addressType = discovery.AddressTypeIPv6
 	}

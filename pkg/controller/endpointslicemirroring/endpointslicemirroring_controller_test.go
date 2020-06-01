@@ -65,16 +65,16 @@ func newController(nodeNames []string, batchPeriod time.Duration) (*fake.Clients
 // Ensure SyncEndpoints works with an empty Endpoints resource.
 func TestSyncEndpointsEmpty(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	serviceName := "testing-1"
+	endpointsName := "testing-1"
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
 	esController.endpointsStore.Add(&v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: endpointsName, Namespace: ns},
 		Subsets: []v1.EndpointSubset{{
 			Ports: []v1.EndpointPort{{Port: 80}},
 		}},
 	})
 
-	err := esController.syncEndpoints(fmt.Sprintf("%s/%s", ns, serviceName))
+	err := esController.syncEndpoints(fmt.Sprintf("%s/%s", ns, endpointsName))
 	assert.Nil(t, err)
 	assert.Len(t, client.Actions(), 0)
 }

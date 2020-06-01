@@ -45,25 +45,26 @@ import (
 )
 
 const (
-	// maxRetries is the number of times a service will be retried before it is
-	// dropped out of the queue. Any sync error, such as a failure to create or
-	// update an EndpointSlice could trigger a retry. With the current
-	// rate-limiter in use (1s*2^(numRetries-1)) the following numbers represent
-	// the sequence of delays between successive queuings of a service.
+	// maxRetries is the number of times an Endpoints resource will be retried
+	// before it is dropped out of the queue. Any sync error, such as a failure
+	// to create or update an EndpointSlice could trigger a retry. With the
+	// current rate-limiter in use (1s*2^(numRetries-1)) the following numbers
+	// represent the sequence of delays between successive queuings of an
+	// Endpoints resource.
 	//
 	// 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 512s, 1000s (max)
 	maxRetries = 15
 
 	// endpointSliceChangeMinSyncDelay indicates the mininum delay before
-	// queuing a syncService call after an EndpointSlice changes. If
+	// queuing a syncEndpoints call after an EndpointSlice changes. If
 	// endpointUpdatesBatchPeriod is greater than this value, it will be used
 	// instead. This helps batch processing of changes to multiple
 	// EndpointSlices.
 	endpointSliceChangeMinSyncDelay = 1 * time.Second
 
-	// defaultSyncBackOff is the default backoff period for syncService calls.
+	// defaultSyncBackOff is the default backoff period for syncEndpoints calls.
 	defaultSyncBackOff = 1 * time.Second
-	// maxSyncBackOff is the max backoff period for syncService calls.
+	// maxSyncBackOff is the max backoff period for syncEndpoints calls.
 	maxSyncBackOff = 100 * time.Second
 
 	// controllerName is a unique value used with LabelManagedBy to indicated
@@ -93,10 +94,9 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 		client: client,
 		// This is similar to the DefaultControllerRateLimiter, just with a
 		// significantly higher default backoff (1s vs 5ms). This controller
-		// processes events that can require significant EndpointSlice changes,
-		// such as an update to a Service or Deployment. A more significant
-		// rate limit back off here helps ensure that the Controller does not
-		// overwhelm the API Server.
+		// processes events that can require significant EndpointSlice changes.
+		// A more significant rate limit back off here helps ensure that the
+		// Controller does not overwhelm the API Server.
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
 			workqueue.NewItemExponentialFailureRateLimiter(defaultSyncBackOff, maxSyncBackOff),
 			// 10 qps, 100 bucket size. This is only for retry speed and its
@@ -165,31 +165,31 @@ type Controller struct {
 	// injection for testing.
 	endpointSlicesSynced cache.InformerSynced
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
-	// resource versions expected for each Service. It can help determine if a
-	// cached EndpointSlice is out of date.
+	// resource versions expected for each Endpoints resource. It can help
+	// determine if a cached EndpointSlice is out of date.
 	endpointSliceTracker *endpointSliceTracker
 
 	// reconciler is an util used to reconcile EndpointSlice changes.
 	reconciler *reconciler
 
-	// Services that need to be updated. A channel is inappropriate here,
-	// because it allows services with lots of pods to be serviced much
-	// more often than services with few pods; it also would cause a
-	// service that's inserted multiple times to be processed more than
-	// necessary.
+	// Endpoints that need to be updated. A channel is inappropriate here,
+	// because it allows Endpoints with lots of addresses to be serviced much
+	// more often than Endpoints with few addresses; it also would cause an
+	// Endpoints resource that's inserted multiple times to be processed more
+	// than necessary.
 	queue workqueue.RateLimitingInterface
 
 	// maxEndpointsPerSlice references the maximum number of endpoints that
 	// should be added to an EndpointSlice
 	maxEndpointsPerSlice int32
 
-	// workerLoopPeriod is the time between worker runs. The workers
-	// process the queue of service and pod changes
+	// workerLoopPeriod is the time between worker runs. The workers process the
+	// queue of changes to Endpoints resources.
 	workerLoopPeriod time.Duration
 
-	// endpointUpdatesBatchPeriod is an artificial delay added to all service
-	// syncs triggered by pod changes. This can be used to reduce overall number
-	// of all EndpointSlice updates.
+	// endpointUpdatesBatchPeriod is an artificial delay added to all Endpoints
+	// syncs triggered by EndpointSlice changes. This can be used to reduce
+	// overall number of all EndpointSlice updates.
 	endpointUpdatesBatchPeriod time.Duration
 }
 
@@ -289,14 +289,14 @@ func (c *Controller) syncEndpoints(key string) error {
 		// Since we're getting stuff from a local cache, it is basically
 		// impossible to get this error.
 		c.eventRecorder.Eventf(endpoints, v1.EventTypeWarning, "FailedToListEndpointSlices",
-			"Error listing EndpointSlices for Service %s/%s: %v", endpoints.Namespace, endpoints.Name, err)
+			"Error listing EndpointSlices for Endpoints %s/%s: %v", endpoints.Namespace, endpoints.Name, err)
 		return err
 	}
 
 	err = c.reconciler.reconcile(endpoints, endpointSlices)
 	if err != nil {
 		c.eventRecorder.Eventf(endpoints, v1.EventTypeWarning, "FailedToUpdateEndpointSlices",
-			"Error updating EndpointSlices for Service %s/%s: %v", endpoints.Namespace, endpoints.Name, err)
+			"Error updating EndpointSlices for Endpoints %s/%s: %v", endpoints.Namespace, endpoints.Name, err)
 		return err
 	}
 
@@ -314,9 +314,9 @@ func (c *Controller) onEndpointsUpdate(obj interface{}) {
 	c.queue.Add(key)
 }
 
-// onEndpointSliceAdd queues a sync for the relevant Service for a sync if the
-// EndpointSlice resource version does not match the expected version in the
-// endpointSliceTracker.
+// onEndpointSliceAdd queues a sync for the relevant Endpoints resource for a
+// sync if the EndpointSlice resource version does not match the expected
+// version in the endpointSliceTracker.
 func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil {
@@ -328,10 +328,10 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 	}
 }
 
-// onEndpointSliceUpdate queues a sync for the relevant Service for a sync if
-// the EndpointSlice resource version does not match the expected version in the
-// endpointSliceTracker or the managed-by value of the EndpointSlice has changed
-// from or to this controller.
+// onEndpointSliceUpdate queues a sync for the relevant Endpoints resource for a
+// sync if the EndpointSlice resource version does not match the expected
+// version in the endpointSliceTracker or the managed-by value of the
+// EndpointSlice has changed from or to this controller.
 func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
 	prevEndpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice := obj.(*discovery.EndpointSlice)
@@ -344,9 +344,9 @@ func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
 	}
 }
 
-// onEndpointSliceDelete queues a sync for the relevant Service for a sync if the
-// EndpointSlice resource version does not match the expected version in the
-// endpointSliceTracker.
+// onEndpointSliceDelete queues a sync for the relevant Endpoints resource for a
+// sync if the EndpointSlice resource version does not match the expected
+// version in the endpointSliceTracker.
 func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 	endpointSlice := getEndpointSliceFromDeleteAction(obj)
 	if endpointSlice != nil && managedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
@@ -354,8 +354,8 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 	}
 }
 
-// queueServiceForEndpointSlice attempts to queue the corresponding Service for
-// the provided EndpointSlice.
+// queueEndpointsForEndpointSlice attempts to queue the corresponding Endpoints
+// resource for the provided EndpointSlice.
 func (c *Controller) queueEndpointsForEndpointSlice(endpointSlice *discovery.EndpointSlice) {
 	key, err := endpointsControllerKey(endpointSlice)
 	if err != nil {
