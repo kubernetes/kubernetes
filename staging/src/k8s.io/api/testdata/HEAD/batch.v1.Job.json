@@ -1375,24 +1375,25 @@
               ]
             }
           }
-        ]
+        ],
+        "hostnameFQDN": true
       }
     },
-    "ttlSecondsAfterFinished": -596285123
+    "ttlSecondsAfterFinished": -1370389893
   },
   "status": {
     "conditions": [
       {
-        "type": "續-ÚŜĂwǐ擨^幸$Ż料",
-        "status": "色苆试揯遐e",
-        "lastProbeTime": "2947-08-17T19:40:02Z",
-        "lastTransitionTime": "2374-06-16T11:34:18Z",
+        "type": "柀",
+        "status": "ÚŜĂw",
+        "lastProbeTime": "2025-10-27T15:10:33Z",
+        "lastTransitionTime": "2591-06-03T19:42:43Z",
         "reason": "430",
         "message": "431"
       }
     ],
-    "active": 1921346963,
-    "succeeded": 135144999,
-    "failed": 1357487443
+    "active": 765285030,
+    "succeeded": 1637698893,
+    "failed": -847700108
   }
 }

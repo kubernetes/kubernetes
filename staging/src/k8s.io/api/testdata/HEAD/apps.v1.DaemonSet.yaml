@@ -30,8 +30,8 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 997447044
-  revisionHistoryLimit: 989524452
+  minReadySeconds: -1152625369
+  revisionHistoryLimit: 67329694
   selector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0
@@ -514,6 +514,7 @@ spec:
         ip: "418"
       hostNetwork: true
       hostname: "373"
+      hostnameFQDN: true
       imagePullSecrets:
       - name: "372"
       initContainers:
@@ -947,19 +948,20 @@ spec:
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 2
+    type: (ɹre芖
 status:
-  collisionCount: 129237050
+  collisionCount: -1539366293
   conditions:
-  - lastTransitionTime: "2733-02-09T15:36:31Z"
+  - lastTransitionTime: "2725-12-21T19:53:00Z"
     message: "434"
     reason: "433"
-    status: 2ț
-    type: '{ɦ!f親ʚ«Ǥ栌Ə侷ŧĞö'
-  currentNumberScheduled: 1606858231
-  desiredNumberScheduled: -793692762
-  numberAvailable: -1734448297
-  numberMisscheduled: 1791868025
-  numberReady: -1152625369
-  numberUnavailable: -1757575936
-  observedGeneration: 3839991706170762113
-  updatedNumberScheduled: -1292943463
+    status: Ə侷ŧĞöZ
+    type: Efê
+  currentNumberScheduled: 1689648303
+  desiredNumberScheduled: -1521312599
+  numberAvailable: -1974537638
+  numberMisscheduled: -1121580186
+  numberReady: 129237050
+  numberUnavailable: 426382215
+  observedGeneration: 2383197042979853364
+  updatedNumberScheduled: 796653404

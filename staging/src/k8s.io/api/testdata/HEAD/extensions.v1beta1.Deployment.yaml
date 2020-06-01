@@ -30,12 +30,13 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 212061711
-  progressDeadlineSeconds: 1109758199
+  minReadySeconds: -1707056814
+  paused: true
+  progressDeadlineSeconds: 1660081568
   replicas: 896585016
-  revisionHistoryLimit: -1092090658
+  revisionHistoryLimit: 1109758199
   rollbackTo:
-    revision: -318895959020904110
+    revision: 9087245870095518615
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -46,7 +47,7 @@ spec:
     rollingUpdate:
       maxSurge: 3
       maxUnavailable: 2
-    type: 荥ơ'禧ǵŊ)TiD¢ƿ媴h5
+    type: 餍4Y鳲Jɡj瓇ɽ丿YƄZZ塖bʘL
   template:
     metadata:
       annotations:
@@ -516,6 +517,7 @@ spec:
         ip: "411"
       hostNetwork: true
       hostname: "366"
+      hostnameFQDN: true
       imagePullSecrets:
       - name: "365"
       initContainers:
@@ -947,17 +949,17 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: 740158871
-  collisionCount: 571778293
+  availableReplicas: -918184784
+  collisionCount: -405534860
   conditions:
-  - lastTransitionTime: "1970-05-16T01:44:00Z"
-    lastUpdateTime: "2469-07-10T03:20:34Z"
+  - lastTransitionTime: "2213-01-30T13:10:03Z"
+    lastUpdateTime: "2572-07-01T01:01:51Z"
     message: "427"
     reason: "426"
-    status: '''ƈoIǢ龞瞯å'
-    type: ""
-  observedGeneration: 1751238822830387407
-  readyReplicas: -1450995995
-  replicas: -106050665
-  unavailableReplicas: -449319810
-  updatedReplicas: -929473748
+    status: ć惍Bi攵&
+    type: IǢ龞瞯å檳ė
+  observedGeneration: -6231980344247734957
+  readyReplicas: -655315199
+  replicas: -1245696932
+  unavailableReplicas: -317599859
+  updatedReplicas: -1512660030

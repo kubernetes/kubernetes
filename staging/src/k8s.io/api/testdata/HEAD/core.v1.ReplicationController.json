@@ -1367,16 +1367,16 @@
     }
   },
   "status": {
-    "replicas": -580887468,
-    "fullyLabeledReplicas": 189301373,
-    "readyReplicas": -1235733921,
-    "availableReplicas": -1438616392,
-    "observedGeneration": 7696803627798560212,
+    "replicas": -314040472,
+    "fullyLabeledReplicas": 450920824,
+    "readyReplicas": 288987348,
+    "availableReplicas": 1792051742,
+    "observedGeneration": -4837149858669798347,
     "conditions": [
       {
-        "type": "獰Ĉ癯頯aɴí(Ȟ9\"",
-        "status": "oǰ'źĄ栧焷蜪sÛ°",
-        "lastTransitionTime": "2129-09-06T04:28:43Z",
+        "type": "鲅峣/vɟ擅",
+        "status": "(Ȟ9\"忕(",
+        "lastTransitionTime": "2294-12-05T12:29:05Z",
         "reason": "429",
         "message": "430"
       }

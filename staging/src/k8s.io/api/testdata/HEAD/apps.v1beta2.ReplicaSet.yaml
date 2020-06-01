@@ -512,6 +512,7 @@ spec:
         ip: "419"
       hostPID: true
       hostname: "374"
+      hostnameFQDN: true
       imagePullSecrets:
       - name: "373"
       initContainers:
@@ -941,14 +942,14 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: -928976522
+  availableReplicas: 163538560
   conditions:
-  - lastTransitionTime: "2233-10-15T01:58:37Z"
+  - lastTransitionTime: "2531-06-21T14:15:35Z"
     message: "435"
     reason: "434"
-    status: ű孖站畦f黹ʩ鹸ɷ
-    type: 暁×軓鼐嵱宯ÙQ阉(闒ƈƳ
-  fullyLabeledReplicas: 1893057016
-  observedGeneration: 702392770146794584
-  readyReplicas: -2099726885
-  replicas: -1165029050
+    status: Ù蝌
+    type: ?鮻ȧH僠 &G凒罹ń賎Ȍű孖站
+  fullyLabeledReplicas: 1530007970
+  observedGeneration: -4222410144633082973
+  readyReplicas: -1915115520
+  replicas: -1754419098
