@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 
@@ -191,6 +192,10 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 				addr = u.Host
 			}
 			return delegateDialer(ctx, network, addr)
+		}
+		// Avoid using proxy for accessing services
+		cfg.Proxy = func(*http.Request) (*url.URL, error) {
+			return nil, nil
 		}
 
 		return complete(cfg)
