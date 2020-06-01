@@ -24,6 +24,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 function convert-manifest-params {
   # A helper function to convert the manifest args from a string to a list of
@@ -2921,7 +2922,14 @@ function main() {
   if [[ "${container_runtime}" == "docker" ]]; then
     assemble-docker-flags
   elif [[ "${container_runtime}" == "containerd" ]]; then
+    # stop docker if it is present
+    systemctl stop docker || true
     setup-containerd
+    echo "=================================="
+    /usr/bin/containerd config dump || true
+    echo "=================================="
+    cat /etc/containerd/config.toml
+    echo "=================================="
   fi
   start-kubelet
 

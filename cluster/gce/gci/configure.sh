@@ -22,6 +22,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 ### Hardcoded constants
 DEFAULT_CNI_VERSION="v0.8.6"
@@ -74,6 +75,9 @@ else:
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
+    echo "=========================="
+    cat "${tmp_kube_env}"
+    echo "=========================="
     rm -f "${tmp_kube_env}"
   )
 }
