@@ -235,6 +235,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			for i := 0; i < workers; i++ {
 				wg.Add(1)
 				go func(i int) {
+					defer ginkgo.GinkgoRecover()
 					defer wg.Done()
 					for retries := 0; retries < pods; retries++ {
 						name := fmt.Sprintf("pod-submit-status-%d-%d", i, retries)
@@ -274,6 +275,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 						created := podClient.Create(pod)
 						ch := make(chan []watch.Event)
 						go func() {
+							defer ginkgo.GinkgoRecover()
 							defer close(ch)
 							w, err := podClient.Watch(context.TODO(), metav1.ListOptions{
 								ResourceVersion: created.ResourceVersion,
