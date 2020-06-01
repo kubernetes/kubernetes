@@ -52,6 +52,10 @@ var _ = SIGDescribe("LimitRange", func() {
 		Release : v1.18
 		Testname: LimitRange, resources
 		Description: Creating a Limitrange and verifying the creation of Limitrange, updating the Limitrange and validating the Limitrange. Creating Pods with resources and validate the pod resources are applied to the Limitrange
+		Behaviors:
+		- scheduling/limitrange/basic-create
+		- scheduling/limitrange/basic-update
+		- scheduling/limitrange/basic-delete
 	*/
 	framework.ConformanceIt("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
 		ginkgo.By("Creating a LimitRange")

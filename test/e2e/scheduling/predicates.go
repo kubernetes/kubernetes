@@ -321,6 +321,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Release : v1.9
 		Testname: Scheduler, resource limits
 		Description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
+		Behaviors:
+		- scheduling/framework/predicates/basic
 	*/
 	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
 		WaitForStableCluster(cs, masterNodes)
@@ -431,6 +433,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Release : v1.9
 		Testname: Scheduler, node selector not matching
 		Description: Create a Pod with a NodeSelector set to a value that does not match a node in the cluster. Since there are no nodes matching the criteria the Pod MUST not be scheduled.
+		Behaviors:
+		- scheduling/framework/predicates/nodeSelector/invalid
 	*/
 	framework.ConformanceIt("validates that NodeSelector is respected if not matching ", func() {
 		ginkgo.By("Trying to schedule Pod with nonempty NodeSelector.")
@@ -454,6 +458,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Release : v1.9
 		Testname: Scheduler, node selector matching
 		Description: Create a label on the node {k: v}. Then create a Pod with a NodeSelector set to {k: v}. Check to see if the Pod is scheduled. When the NodeSelector matches then Pod MUST be scheduled on that node.
+		Behaviors:
+		- scheduling/framework/predicates/nodeSelector/invalid
 	*/
 	framework.ConformanceIt("validates that NodeSelector is respected if matching ", func() {
 		nodeName := GetNodeThatCanRunPod(f)
@@ -659,6 +665,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
 		Description: Pods with the same HostPort value MUST be able to be scheduled to the same node
 		if the HostIP or Protocol is different.
+		Behaviors:
+		- scheduling/framework/predicates/HostPort/same
 	*/
 	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol", func() {
 
@@ -692,6 +700,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Testname: Scheduling, HostPort and Protocol match, HostIPs different but one is default HostIP (0.0.0.0)
 		Description: Pods with the same HostPort and Protocol, but different HostIPs, MUST NOT schedule to the
 		same node if one of those IPs is the default HostIP of 0.0.0.0, which represents all IPs on the host.
+		Behaviors:
+		- scheduling/framework/predicates/HostPort/allIPs
 	*/
 	framework.ConformanceIt("validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP", func() {
 		nodeName := GetNodeThatCanRunPod(f)

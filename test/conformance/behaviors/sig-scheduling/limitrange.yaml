@@ -1,0 +1,9 @@
+suite: scheduling/limitrange
+description: Base suite for LimitRange
+behaviors:
+- id: scheduling/limitrange/basic-create
+  description: When a LimitRange is created, pods with no resource requirements must have the default resource requirements applied.
+- id: scheduling/limitrange/basic-update
+  description: When a LimitRange is updated, the new constraints must be enforced.
+- id: scheduling/limitrange/basic-delete
+  description: When a LimitRange is deleted, creating new pods should not enforce any resource limitations.

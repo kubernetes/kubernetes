@@ -1,0 +1,15 @@
+suite: scheduling/framework
+description: Base suite for Scheduling Framework
+behaviors:
+- id: scheduling/framework/predicates/basic
+  description: Scheduling Pods must fail if the resource requests exceed Machine capacity.
+- id: scheduling/framework/predicates/nodeSelector/invalid
+  description: Create a Pod with a NodeSelector set to a value that does not match a node in the cluster. Since there are no nodes matching the criteria the Pod MUST not be scheduled.
+- id: scheduling/framework/predicates/nodeSelector/valid
+  description: Creating a pod with a nodeSelector matching a particular node must result in the Pod scheduled onto that node.
+- id: scheduling/framework/predicates/HostPort/same
+  description: Pods with the same HostPort value MUST be able to be scheduled to the same node if the HostIP or Protocol is different.
+- id: scheduling/framework/predicates/HostPort/allIPs
+  description: If a Pod is scheduled with the default HostIP of 0.0.0.0 (representing all IPs on the host) then no other Pod should be schedulable on any HostIP with the same HostPort and Protocol on the same node.
+- id: scheduling/framework/preemption/priority
+  description: Given a ReplicaSet with different levels of priority, pods must be created in order of priority.
