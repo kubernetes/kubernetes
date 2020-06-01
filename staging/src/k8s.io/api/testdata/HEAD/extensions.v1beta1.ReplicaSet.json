@@ -1378,21 +1378,22 @@
               ]
             }
           }
-        ]
+        ],
+        "hostnameFQDN": true
       }
     }
   },
   "status": {
-    "replicas": -1165029050,
-    "fullyLabeledReplicas": 1893057016,
-    "readyReplicas": -2099726885,
-    "availableReplicas": -928976522,
-    "observedGeneration": 702392770146794584,
+    "replicas": -1754419098,
+    "fullyLabeledReplicas": 1530007970,
+    "readyReplicas": -1915115520,
+    "availableReplicas": 163538560,
+    "observedGeneration": -4222410144633082973,
     "conditions": [
       {
-        "type": "暁×軓鼐嵱宯ÙQ阉(闒ƈƳ",
-        "status": "ű孖站畦f黹ʩ鹸ɷ",
-        "lastTransitionTime": "2233-10-15T01:58:37Z",
+        "type": "?鮻ȧH僠 \u0026G凒罹ń賎Ȍű孖站",
+        "status": "Ù蝌",
+        "lastTransitionTime": "2531-06-21T14:15:35Z",
         "reason": "434",
         "message": "435"
       }

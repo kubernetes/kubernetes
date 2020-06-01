@@ -933,14 +933,14 @@ spec:
           storagePolicyName: "99"
           volumePath: "97"
 status:
-  availableReplicas: -1438616392
+  availableReplicas: 1792051742
   conditions:
-  - lastTransitionTime: "2129-09-06T04:28:43Z"
+  - lastTransitionTime: "2294-12-05T12:29:05Z"
     message: "430"
     reason: "429"
-    status: oǰ'źĄ栧焷蜪sÛ°
-    type: 獰Ĉ癯頯aɴí(Ȟ9"
-  fullyLabeledReplicas: 189301373
-  observedGeneration: 7696803627798560212
-  readyReplicas: -1235733921
-  replicas: -580887468
+    status: (Ȟ9"忕(
+    type: 鲅峣/vɟ擅
+  fullyLabeledReplicas: 450920824
+  observedGeneration: -4837149858669798347
+  readyReplicas: 288987348
+  replicas: -314040472

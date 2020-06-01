@@ -1378,32 +1378,34 @@
               ]
             }
           }
-        ]
+        ],
+        "hostnameFQDN": true
       }
     },
     "updateStrategy": {
+      "type": "(ɹre芖",
       "rollingUpdate": {
         "maxUnavailable": 2
       }
     },
-    "minReadySeconds": 997447044,
-    "revisionHistoryLimit": 989524452
+    "minReadySeconds": -1152625369,
+    "revisionHistoryLimit": 67329694
   },
   "status": {
-    "currentNumberScheduled": 1606858231,
-    "numberMisscheduled": 1791868025,
-    "desiredNumberScheduled": -793692762,
-    "numberReady": -1152625369,
-    "observedGeneration": 3839991706170762113,
-    "updatedNumberScheduled": -1292943463,
-    "numberAvailable": -1734448297,
-    "numberUnavailable": -1757575936,
-    "collisionCount": 129237050,
+    "currentNumberScheduled": 1689648303,
+    "numberMisscheduled": -1121580186,
+    "desiredNumberScheduled": -1521312599,
+    "numberReady": 129237050,
+    "observedGeneration": 2383197042979853364,
+    "updatedNumberScheduled": 796653404,
+    "numberAvailable": -1974537638,
+    "numberUnavailable": 426382215,
+    "collisionCount": -1539366293,
     "conditions": [
       {
-        "type": "{ɦ!f親ʚ«Ǥ栌Ə侷ŧĞö",
-        "status": "2ț",
-        "lastTransitionTime": "2733-02-09T15:36:31Z",
+        "type": "Efê",
+        "status": "Ə侷ŧĞöZ",
+        "lastTransitionTime": "2725-12-21T19:53:00Z",
         "reason": "433",
         "message": "434"
       }

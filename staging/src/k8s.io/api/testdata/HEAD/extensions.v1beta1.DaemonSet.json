@@ -1378,33 +1378,35 @@
               ]
             }
           }
-        ]
+        ],
+        "hostnameFQDN": true
       }
     },
     "updateStrategy": {
+      "type": "(ɹre芖",
       "rollingUpdate": {
         "maxUnavailable": 2
       }
     },
-    "minReadySeconds": 997447044,
-    "templateGeneration": 117144906028254972,
-    "revisionHistoryLimit": 1606858231
+    "minReadySeconds": -1152625369,
+    "templateGeneration": 3839991706170762113,
+    "revisionHistoryLimit": 1689648303
   },
   "status": {
-    "currentNumberScheduled": 1791868025,
-    "numberMisscheduled": -793692762,
-    "desiredNumberScheduled": -1152625369,
-    "numberReady": -1832836223,
-    "observedGeneration": 289178836781711257,
-    "updatedNumberScheduled": -1734448297,
-    "numberAvailable": -1757575936,
-    "numberUnavailable": -1151395185,
-    "collisionCount": 2022921268,
+    "currentNumberScheduled": -1121580186,
+    "numberMisscheduled": -1521312599,
+    "desiredNumberScheduled": 129237050,
+    "numberReady": 2022921268,
+    "observedGeneration": 2953734578889291612,
+    "updatedNumberScheduled": -1974537638,
+    "numberAvailable": 426382215,
+    "numberUnavailable": 2142629136,
+    "collisionCount": -691360969,
     "conditions": [
       {
-        "type": "ɦ!",
-        "status": "(XEfê澙凋B/ü橚2ț",
-        "lastTransitionTime": "2733-02-09T15:36:31Z",
+        "type": "fê澙凋B/ü橚2ț}¹旛坷硂鋡浤ɖ",
+        "status": "爅M骧渡胛2Le鹄ǖ",
+        "lastTransitionTime": "2476-04-19T11:27:22Z",
         "reason": "433",
         "message": "434"
       }
