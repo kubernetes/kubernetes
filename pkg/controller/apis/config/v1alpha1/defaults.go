@@ -51,7 +51,8 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration) {
+// SetDefaultsKubeControllerManagerConfiguration overrides the defaults with recommended default options
+func SetDefaultsKubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration) {
 	if obj.DeprecatedController.RegisterRetryCount == 0 {
 		obj.DeprecatedController.RegisterRetryCount = 10
 	}
@@ -111,6 +112,7 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	persistentvolumeconfigv1alpha1.RecommendedDefaultPersistentVolumeBinderControllerConfiguration(&obj.PersistentVolumeBinderController)
 }
 
+// RecommendedDefaultGenericControllerManagerConfiguration overrides the defaults with recommended default options
 func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.GenericControllerManagerConfiguration) {
 	zero := metav1.Duration{}
 	if obj.Address == "" {
@@ -135,7 +137,8 @@ func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrcon
 	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 }
 
-func SetDefaults_KubeCloudSharedConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeCloudSharedConfiguration) {
+// SetDefaultsKubeCloudSharedConfiguration overrides the defaults with recommended default options
+func SetDefaultsKubeCloudSharedConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeCloudSharedConfiguration) {
 	zero := metav1.Duration{}
 	if obj.NodeMonitorPeriod == zero {
 		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}

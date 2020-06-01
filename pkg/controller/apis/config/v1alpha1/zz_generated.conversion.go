@@ -100,22 +100,22 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddConversionFunc((*config.GenericControllerManagerConfiguration)(nil), (*v1alpha1.GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(a.(*config.GenericControllerManagerConfiguration), b.(*v1alpha1.GenericControllerManagerConfiguration), scope)
+		return ConvertConfigGenericControllerManagerConfigurationToV1alpha1GenericControllerManagerConfiguration(a.(*config.GenericControllerManagerConfiguration), b.(*v1alpha1.GenericControllerManagerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*config.KubeCloudSharedConfiguration)(nil), (*v1alpha1.KubeCloudSharedConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(a.(*config.KubeCloudSharedConfiguration), b.(*v1alpha1.KubeCloudSharedConfiguration), scope)
+		return ConvertConfigKubeCloudSharedConfigurationToV1alpha1KubeCloudSharedConfiguration(a.(*config.KubeCloudSharedConfiguration), b.(*v1alpha1.KubeCloudSharedConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*v1alpha1.GenericControllerManagerConfiguration)(nil), (*config.GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(a.(*v1alpha1.GenericControllerManagerConfiguration), b.(*config.GenericControllerManagerConfiguration), scope)
+		return ConvertV1alpha1GenericControllerManagerConfigurationToConfigGenericControllerManagerConfiguration(a.(*v1alpha1.GenericControllerManagerConfiguration), b.(*config.GenericControllerManagerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*v1alpha1.KubeCloudSharedConfiguration)(nil), (*config.KubeCloudSharedConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudSharedConfiguration(a.(*v1alpha1.KubeCloudSharedConfiguration), b.(*config.KubeCloudSharedConfiguration), scope)
+		return ConvertV1alpha1KubeCloudSharedConfigurationToConfigKubeCloudSharedConfiguration(a.(*v1alpha1.KubeCloudSharedConfiguration), b.(*config.KubeCloudSharedConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -267,10 +267,10 @@ func autoConvert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudShared
 }
 
 func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeControllerManagerConfiguration(in *v1alpha1.KubeControllerManagerConfiguration, out *config.KubeControllerManagerConfiguration, s conversion.Scope) error {
-	if err := Convert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(&in.Generic, &out.Generic, s); err != nil {
+	if err := ConvertV1alpha1GenericControllerManagerConfigurationToConfigGenericControllerManagerConfiguration(&in.Generic, &out.Generic, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
+	if err := ConvertV1alpha1KubeCloudSharedConfigurationToConfigKubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
 	if err := attachdetachconfigv1alpha1.Convert_v1alpha1_AttachDetachControllerConfiguration_To_config_AttachDetachControllerConfiguration(&in.AttachDetachController, &out.AttachDetachController, s); err != nil {
@@ -348,10 +348,10 @@ func Convert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeControlle
 }
 
 func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration(in *config.KubeControllerManagerConfiguration, out *v1alpha1.KubeControllerManagerConfiguration, s conversion.Scope) error {
-	if err := Convert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(&in.Generic, &out.Generic, s); err != nil {
+	if err := ConvertConfigGenericControllerManagerConfigurationToV1alpha1GenericControllerManagerConfiguration(&in.Generic, &out.Generic, s); err != nil {
 		return err
 	}
-	if err := Convert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
+	if err := ConvertConfigKubeCloudSharedConfigurationToV1alpha1KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
 	if err := attachdetachconfigv1alpha1.Convert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(&in.AttachDetachController, &out.AttachDetachController, s); err != nil {

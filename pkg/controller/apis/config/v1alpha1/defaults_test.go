@@ -29,7 +29,7 @@ import (
 
 func TestKubeControllerDefaultsRoundTrip(t *testing.T) {
 	ks1 := &kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration{}
-	SetDefaults_KubeControllerManagerConfiguration(ks1)
+	SetDefaultsKubeControllerManagerConfiguration(ks1)
 	cm, err := convertObjToConfigMap("KubeControllerManagerConfiguration", ks1)
 	if err != nil {
 		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
