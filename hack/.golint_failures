@@ -172,6 +172,7 @@ pkg/registry/scheduling/rest
 pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
+pkg/scheduler/apis/config/v1
 pkg/scheduler/apis/config/v1beta1
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
