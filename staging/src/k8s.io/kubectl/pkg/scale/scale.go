@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	scaleclient "k8s.io/client-go/scale"
 )
@@ -136,7 +137,21 @@ func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 		return updatedScale.ResourceVersion, nil
 	}
 
-	patch := []byte(fmt.Sprintf(`{"spec":{"replicas":%d}}`, newSize))
+	// objectForReplicas is used for encoding scale patch
+	type objectForReplicas struct {
+		Replicas uint `json:"replicas"`
+	}
+	// objectForSpec is used for encoding scale patch
+	type objectForSpec struct {
+		Spec objectForReplicas `json:"spec"`
+	}
+	spec := objectForSpec{
+		Spec: objectForReplicas{Replicas: newSize},
+	}
+	patch, err := json.Marshal(&spec)
+	if err != nil {
+		return "", err
+	}
 	patchOptions := metav1.PatchOptions{}
 	if dryRun {
 		patchOptions.DryRun = []string{metav1.DryRunAll}
