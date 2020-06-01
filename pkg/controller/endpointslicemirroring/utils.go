@@ -18,6 +18,8 @@ package endpointslice
 
 import (
 	"fmt"
+	"net"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -27,13 +29,36 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
-	utilnet "k8s.io/utils/net"
+	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
 
-// isIPv6Service returns true if the Service uses IPv6 addresses.
-func isIPv6Service(service *corev1.Service) bool {
-	// IPFamily is not guaranteed to be set, even in an IPv6 only cluster.
-	return (service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol) || utilnet.IsIPv6String(service.Spec.ClusterIP)
+// addrTypePortMapKey is used to uniquely identify groups of endpoint ports and
+// address types.
+type addrTypePortMapKey string
+
+// newAddrTypePortMapKey generates a PortMapKey from endpoint ports.
+func newAddrTypePortMapKey(endpointPorts []discovery.EndpointPort, addrType discovery.AddressType) addrTypePortMapKey {
+	pmk := fmt.Sprintf("%s-%s", addrType, endpointutil.NewPortMapKey(endpointPorts))
+	return addrTypePortMapKey(pmk)
+}
+
+func (pk addrTypePortMapKey) addressType() discovery.AddressType {
+	if strings.HasPrefix(string(pk), string(discovery.AddressTypeIPv6)) {
+		return discovery.AddressTypeIPv6
+	}
+	return discovery.AddressTypeIPv4
+}
+
+func getAddressType(address string) *discovery.AddressType {
+	ip := net.ParseIP(address)
+	if ip == nil {
+		return nil
+	}
+	addressType := discovery.AddressTypeIPv4
+	if ip.To4() != nil {
+		addressType = discovery.AddressTypeIPv6
+	}
+	return &addressType
 }
 
 // endpointsEqualBeyondHash returns true if endpoints have equal attributes
@@ -56,8 +81,8 @@ func endpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
 }
 
 // newEndpointSlice returns an EndpointSlice generated from an Endpoints
-// resource and endpointMeta.
-func newEndpointSlice(endpoints *corev1.Endpoints, endpointMeta *endpointMeta) *discovery.EndpointSlice {
+// resource, ports, and address type.
+func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPort, addrType discovery.AddressType) *discovery.EndpointSlice {
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Endpoints"}
 	ownerRef := metav1.NewControllerRef(endpoints, gvk)
 	return &discovery.EndpointSlice{
@@ -70,8 +95,8 @@ func newEndpointSlice(endpoints *corev1.Endpoints, endpointMeta *endpointMeta) *
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       endpoints.Namespace,
 		},
-		Ports:       endpointMeta.Ports,
-		AddressType: endpointMeta.AddressType,
+		Ports:       ports,
+		AddressType: addrType,
 		Endpoints:   []discovery.Endpoint{},
 	}
 }

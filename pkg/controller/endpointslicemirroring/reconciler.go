@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	mirroringmetrics "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
@@ -42,70 +43,70 @@ type reconciler struct {
 	metricsCache         *mirroringmetrics.Cache
 }
 
-// endpointMeta includes the attributes we group slices on, this type helps with
-// that logic in reconciler
-type endpointMeta struct {
-	Ports       []discovery.EndpointPort `json:"ports" protobuf:"bytes,2,rep,name=ports"`
-	AddressType discovery.AddressType    `json:"addressType" protobuf:"bytes,3,rep,name=addressType"`
-}
-
 // reconcile takes an Endpoints resource and ensures that corresponding
 // EndpointSlices exist. It creates, updates, or deletes EndpointSlices to
 // ensure the desired set of addresses are represented by EndpointSlices.
 func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*discovery.EndpointSlice) error {
-	addressType := discovery.AddressTypeIPv4
-
-	// TODO(robscott): handle dual stack
-	if false {
-		addressType = discovery.AddressTypeIPv6
-	}
-
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
 	slicesToDelete := []*discovery.EndpointSlice{}
 
 	// Build data structures for existing state.
-	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
+	existingSlicesByKey := map[addrTypePortMapKey][]*discovery.EndpointSlice{}
 	numExistingEndpoints := 0
 	for _, existingSlice := range existingSlices {
-		if existingSlice.AddressType == addressType {
-			epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
-			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
-			numExistingEndpoints += len(existingSlice.Endpoints)
-		} else {
-			slicesToDelete = append(slicesToDelete, existingSlice)
-		}
+		epHash := newAddrTypePortMapKey(existingSlice.Ports, existingSlice.AddressType)
+		existingSlicesByKey[epHash] = append(existingSlicesByKey[epHash], existingSlice)
+		numExistingEndpoints += len(existingSlice.Endpoints)
 	}
 
 	// Build data structures for desired state.
-	desiredMetaByPortMap := map[endpointutil.PortMapKey]*endpointMeta{}
-	desiredEndpointsByPortMap := map[endpointutil.PortMapKey]endpointSet{}
+	desiredPortsByKey := map[addrTypePortMapKey][]discovery.EndpointPort{}
+	desiredEndpointsByKey := map[addrTypePortMapKey]endpointSet{}
 	numDesiredEndpoints := 0
 
 	for _, subset := range endpoints.Subsets {
 		endpointPorts := epPortsToEpsPorts(subset.Ports)
-		epHash := endpointutil.NewPortMapKey(endpointPorts)
-		if _, ok := desiredEndpointsByPortMap[epHash]; !ok {
-			desiredEndpointsByPortMap[epHash] = endpointSet{}
+		v4Hash := newAddrTypePortMapKey(endpointPorts, discovery.AddressTypeIPv4)
+		v6Hash := newAddrTypePortMapKey(endpointPorts, discovery.AddressTypeIPv6)
+		if _, ok := desiredEndpointsByKey[v4Hash]; !ok {
+			desiredEndpointsByKey[v4Hash] = endpointSet{}
+		}
+		if _, ok := desiredEndpointsByKey[v6Hash]; !ok {
+			desiredEndpointsByKey[v6Hash] = endpointSet{}
 		}
 
-		if _, ok := desiredMetaByPortMap[epHash]; !ok {
-			desiredMetaByPortMap[epHash] = &endpointMeta{
-				AddressType: addressType,
-				Ports:       endpointPorts,
-			}
-		}
+		desiredPortsByKey[v4Hash] = endpointPorts
+		desiredPortsByKey[v6Hash] = endpointPorts
 
 		for _, address := range subset.Addresses {
 			endpoint := addressToEndpoint(address, true)
-			desiredEndpointsByPortMap[epHash].Insert(endpoint)
-			numDesiredEndpoints++
+			addrType := getAddressType(address.IP)
+			if addrType == nil {
+				klog.Warningf("Address in %s/%s Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice: %s", endpoints.Namespace, endpoints.Name, address.IP)
+			} else {
+				epHash := v4Hash
+				if *addrType == discovery.AddressTypeIPv6 {
+					epHash = v6Hash
+				}
+				desiredEndpointsByKey[epHash].Insert(endpoint)
+				numDesiredEndpoints++
+			}
 		}
 
 		for _, address := range subset.NotReadyAddresses {
 			endpoint := addressToEndpoint(address, false)
-			desiredEndpointsByPortMap[epHash].Insert(endpoint)
-			numDesiredEndpoints++
+			addrType := getAddressType(address.IP)
+			if addrType == nil {
+				klog.Warningf("Address in %s/%s Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice: %s", endpoints.Namespace, endpoints.Name, address.IP)
+			} else {
+				epHash := v4Hash
+				if *addrType == discovery.AddressTypeIPv6 {
+					epHash = v6Hash
+				}
+				desiredEndpointsByKey[epHash].Insert(endpoint)
+				numDesiredEndpoints++
+			}
 		}
 	}
 
@@ -114,17 +115,17 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	totalRemoved := 0
 
 	// Determine changes necessary for each group of slices by port map.
-	for portMap, desiredEndpoints := range desiredEndpointsByPortMap {
+	for portKey, desiredEndpoints := range desiredEndpointsByKey {
 		numEndpoints := len(desiredEndpoints)
 		pmSlicesToCreate, pmSlicesToUpdate, pmSlicesToDelete, added, removed := r.reconcileByPortMapping(
-			endpoints, existingSlicesByPortMap[portMap], desiredEndpoints, desiredMetaByPortMap[portMap])
+			endpoints, existingSlicesByKey[portKey], desiredEndpoints, desiredPortsByKey[portKey], portKey.addressType())
 
 		totalAdded += added
 		totalRemoved += removed
 
-		epMetrics.Set(portMap, mirroringmetrics.EfficiencyInfo{
+		epMetrics.Set(endpointutil.PortMapKey(portKey), mirroringmetrics.EfficiencyInfo{
 			Endpoints: numEndpoints,
-			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
+			Slices:    len(existingSlicesByKey[portKey]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
 		})
 
 		if len(pmSlicesToCreate) > 0 {
@@ -140,8 +141,8 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 
 	// If there are unique sets of ports that are no longer desired, mark
 	// the corresponding endpoint slices for deletion.
-	for portMap, existingSlices := range existingSlicesByPortMap {
-		if _, ok := desiredEndpointsByPortMap[portMap]; !ok {
+	for portKey, existingSlices := range existingSlicesByKey {
+		if _, ok := desiredEndpointsByKey[portKey]; !ok {
 			for _, existingSlice := range existingSlices {
 				slicesToDelete = append(slicesToDelete, existingSlice)
 			}
@@ -240,7 +241,8 @@ func (r *reconciler) reconcileByPortMapping(
 	endpoints *corev1.Endpoints,
 	existingSlices []*discovery.EndpointSlice,
 	desiredSet endpointSet,
-	endpointMeta *endpointMeta,
+	endpointPorts []discovery.EndpointPort,
+	addressType discovery.AddressType,
 ) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*discovery.EndpointSlice, int, int) {
 	slicesByName := map[string]*discovery.EndpointSlice{}
 	sliceNamesUnchanged := sets.String{}
@@ -334,7 +336,7 @@ func (r *reconciler) reconcileByPortMapping(
 
 		// If we didn't find a sliceToFill, generate a new empty one.
 		if sliceToFill == nil {
-			sliceToFill = newEndpointSlice(endpoints, endpointMeta)
+			sliceToFill = newEndpointSlice(endpoints, endpointPorts, addressType)
 		} else {
 			// deep copy required to modify this slice.
 			sliceToFill = sliceToFill.DeepCopy()

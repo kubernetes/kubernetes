@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
+	"net"
 	"sort"
 
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -93,4 +94,33 @@ func (s endpointSet) PopAny() (*discovery.Endpoint, bool) {
 // Len returns the size of the set.
 func (s endpointSet) Len() int {
 	return len(s)
+}
+
+type endpointSetByAddressType map[discovery.AddressType]endpointSet
+
+func newEndpointSetByAddressType() *endpointSetByAddressType {
+	return &endpointSetByAddressType{
+		discovery.AddressTypeIPv4: endpointSet{},
+		discovery.AddressTypeIPv6: endpointSet{},
+	}
+}
+
+// Insert adds items to the set.
+func (s endpointSetByAddressType) Insert(endpoint *discovery.Endpoint) bool {
+	if len(endpoint.Addresses) < 1 {
+		return false
+	}
+	address := endpoint.Addresses[0]
+	ip := net.ParseIP(address)
+	if ip == nil {
+		return false
+	}
+	addressType := discovery.AddressTypeIPv4
+	if ip.To4() == nil {
+		addressType = discovery.AddressTypeIPv6
+	}
+
+	s[addressType].Insert(endpoint)
+
+	return true
 }

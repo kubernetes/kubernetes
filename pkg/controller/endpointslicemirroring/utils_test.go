@@ -32,13 +32,12 @@ import (
 )
 
 func TestNewEndpointSlice(t *testing.T) {
-	ipAddressType := discovery.AddressTypeIPv4
 	portName := "foo"
 	protocol := v1.ProtocolTCP
-	endpointMeta := endpointMeta{
-		Ports:       []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}},
-		AddressType: ipAddressType,
-	}
+
+	ports := []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}}
+	addrType := discovery.AddressTypeIPv4
+
 	endpoints := v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Subsets: []v1.EndpointSubset{{
@@ -59,11 +58,11 @@ func TestNewEndpointSlice(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       endpoints.Namespace,
 		},
-		Ports:       endpointMeta.Ports,
-		AddressType: endpointMeta.AddressType,
+		Ports:       ports,
+		AddressType: addrType,
 		Endpoints:   []discovery.Endpoint{},
 	}
-	generatedSlice := newEndpointSlice(&endpoints, &endpointMeta)
+	generatedSlice := newEndpointSlice(&endpoints, ports, addrType)
 
 	assert.EqualValues(t, expectedSlice, *generatedSlice)
 }
@@ -91,39 +90,4 @@ func newClientset() *fake.Clientset {
 	}))
 
 	return client
-}
-
-func newEndpointsAndEndpointMeta(name, namespace string) (v1.Endpoints, endpointMeta) {
-	ports := []v1.EndpointPort{{
-		Port:     80,
-		Protocol: v1.ProtocolTCP,
-		Name:     name,
-	}}
-
-	endpoints := v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-		Subsets: []v1.EndpointSubset{{
-			Ports: ports,
-		}},
-	}
-
-	addressType := discovery.AddressTypeIPv4
-	endpointMeta := endpointMeta{
-		AddressType: addressType,
-		Ports:       epPortsToEpsPorts(ports),
-	}
-
-	return endpoints, endpointMeta
-}
-
-func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, svc v1.Service) *discovery.EndpointSlice {
-	return &discovery.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%d", svc.Name, n),
-			Namespace: namespace,
-		},
-		Ports:       endpointMeta.Ports,
-		AddressType: endpointMeta.AddressType,
-		Endpoints:   []discovery.Endpoint{},
-	}
 }
