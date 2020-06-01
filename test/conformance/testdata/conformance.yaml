@@ -1870,12 +1870,18 @@
     validate the pod resources are applied to the Limitrange
   release: v1.18
   file: test/e2e/scheduling/limit_range.go
+  behaviors:
+  - scheduling/limitrange/basic-create
+  - scheduling/limitrange/basic-update
+  - scheduling/limitrange/basic-delete
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
     of pods that are allowed to run  [Conformance]'
   description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
   release: v1.9
   file: test/e2e/scheduling/predicates.go
+  behaviors:
+  - scheduling/framework/predicates/basic
 - testname: Scheduler, node selector matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
     is respected if matching  [Conformance]'
@@ -1884,6 +1890,8 @@
     then Pod MUST be scheduled on that node.'
   release: v1.9
   file: test/e2e/scheduling/predicates.go
+  behaviors:
+  - scheduling/framework/predicates/nodeSelector/invalid
 - testname: Scheduler, node selector not matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
     is respected if not matching  [Conformance]'
@@ -1892,6 +1900,8 @@
     MUST not be scheduled.
   release: v1.9
   file: test/e2e/scheduling/predicates.go
+  behaviors:
+  - scheduling/framework/predicates/nodeSelector/invalid
 - testname: Scheduling, HostPort and Protocol match, HostIPs different but one is
     default HostIP (0.0.0.0)
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that there exists
@@ -1902,6 +1912,8 @@
     which represents all IPs on the host.
   release: v1.16
   file: test/e2e/scheduling/predicates.go
+  behaviors:
+  - scheduling/framework/predicates/HostPort/allIPs
 - testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that there is
     no conflict between pods with same hostPort but different hostIP and protocol
@@ -1910,6 +1922,8 @@
     same node if the HostIP or Protocol is different.
   release: v1.16
   file: test/e2e/scheduling/predicates.go
+  behaviors:
+  - scheduling/framework/predicates/HostPort/same
 - testname: Pod preemption verification
   codename: '[sig-scheduling] SchedulerPreemption [Serial] PreemptionExecutionPath
     runs ReplicaSets to verify preemption running path [Conformance]'
@@ -1919,6 +1933,8 @@
     number of Replicas.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+  behaviors:
+  - scheduling/framework/preemption/priority
 - testname: ConfigMap Volume, text data, binary data
   codename: '[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance]
     [Conformance]'
