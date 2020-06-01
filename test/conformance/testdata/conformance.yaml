@@ -1539,12 +1539,16 @@
     names.
   release: v1.9
   file: test/e2e/network/dns.go
+  behaviors:
+  - network/dns/resolve/etchosts
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide DNS for the cluster  [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
     entries such as kubernetes.default via DNS.
   release: v1.9
   file: test/e2e/network/dns.go
+  behaviors:
+  - network/dns/resolve/dns
 - testname: DNS, PQDN for services
   codename: '[sig-network] DNS should resolve DNS of partial qualified names for services
     [LinuxOnly] [Conformance]'
@@ -1554,6 +1558,8 @@
     support resolving PQDNs.'
   release: v1.17
   file: test/e2e/network/dns.go
+  behaviors:
+  - network/dns/resolve/pqdn
 - testname: DNS, custom dnsConfig
   codename: '[sig-network] DNS should support configurable pod DNS nameservers [Conformance]'
   description: Create a Pod with DNSPolicy as None and custom DNS configuration, specifying
@@ -1594,6 +1600,8 @@
     max retry limit and MUST result in reporting unique hostnames.
   release: v1.9, v1.18
   file: test/e2e/common/networking.go
+  behaviors:
+  - network/common/pod/http
 - testname: Networking, intra pod udp
   codename: '[sig-network] Networking Granular Checks: Pods should function for intra-pod
     communication: udp [NodeConformance] [Conformance]'
@@ -1606,6 +1614,8 @@
     max retry limit and MUST result in reporting unique hostnames.
   release: v1.9, v1.18
   file: test/e2e/common/networking.go
+  behaviors:
+  - network/common/pod/udp
 - testname: Networking, intra pod http, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
     communication: http [LinuxOnly] [NodeConformance] [Conformance]'
@@ -1620,7 +1630,9 @@
     other platforms like Windows.
   release: v1.9
   file: test/e2e/common/networking.go
-- testname: Networking, intra pod http, from node
+  behaviors:
+  - network/common/node/http
+- testname: Networking, intra pod udp, from node
   codename: '[sig-network] Networking Granular Checks: Pods should function for node-pod
     communication: udp [LinuxOnly] [NodeConformance] [Conformance]'
   description: Create a hostexec pod that is capable of curl to netcat commands. Create
@@ -1634,12 +1646,16 @@
     other platforms like Windows.
   release: v1.9
   file: test/e2e/common/networking.go
+  behaviors:
+  - network/common/node/udp
 - testname: Proxy, logs service endpoint
   codename: '[sig-network] Proxy version v1 should proxy through a service and a pod  [Conformance]'
   description: Select any node in the cluster to invoke  /logs endpoint  using the
     /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
   release: v1.9
   file: test/e2e/network/proxy.go
+  behaviors:
+  - network/common/proxy/basic
 - testname: Service endpoint latency, thresholds
   codename: '[sig-network] Service endpoints latency should not be very high  [Conformance]'
   description: Run 100 iterations of create service with the Pod running the pause
@@ -1650,6 +1666,8 @@
     and 50s for the 90th percentile.
   release: v1.9
   file: test/e2e/network/service_latency.go
+  behaviors:
+  - network/service/latency
 - testname: Service, change type, ClusterIP to ExternalName
   codename: '[sig-network] Services should be able to change the type from ClusterIP
     to ExternalName [Conformance]'
@@ -1660,6 +1678,9 @@
     IP address by returning A records ensuring service is pointing to provided externalName.
   release: v1.16
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/ClusterIP/empty
+  - network/service/type/ExternalName
 - testname: Service, change type, ExternalName to ClusterIP
   codename: '[sig-network] Services should be able to change the type from ExternalName
     to ClusterIP [Conformance]'
@@ -1670,6 +1691,9 @@
     MUST be reachable over serviceName and ClusterIP on provided service port.
   release: v1.16
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/ExternalName
+  - network/service/type/ClusterIP/empty
 - testname: Service, change type, ExternalName to NodePort
   codename: '[sig-network] Services should be able to change the type from ExternalName
     to NodePort [Conformance]'
@@ -1682,6 +1706,9 @@
     over node's IP on NodePort.
   release: v1.16
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/ExternalName
+  - network/service/type/NodePort
 - testname: Service, change type, NodePort to ExternalName
   codename: '[sig-network] Services should be able to change the type from NodePort
     to ExternalName [Conformance]'
@@ -1694,6 +1721,9 @@
     A records ensuring service is pointing to provided externalName.
   release: v1.16
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/NodePort
+  - network/service/type/ExternalName
 - testname: Service, NodePort Service
   codename: '[sig-network] Services should be able to create a functioning NodePort
     service [Conformance]'
@@ -1703,6 +1733,8 @@
     the NodePort.
   release: v1.16
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/NodePort
 - testname: Service, NodePort type, session affinity to None
   codename: '[sig-network] Services should be able to switch session affinity for
     NodePort service [LinuxOnly] [Conformance]'
@@ -1721,6 +1753,9 @@
     does not support session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/NodePort
+  - network/service/sessionAffinity/None
 - testname: Service, ClusterIP type, session affinity to None
   codename: '[sig-network] Services should be able to switch session affinity for
     service with type clusterIP [LinuxOnly] [Conformance]'
@@ -1737,6 +1772,9 @@
     [LinuxOnly]: Windows does not support session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/ClusterIP
+  - network/service/sessionAffinity/None
 - testname: Find Kubernetes Service in default Namespace
   codename: '[sig-network] Services should find a service from listing all namespaces
     [Conformance]'
@@ -1744,6 +1782,8 @@
     named Kubernetes with the Namespace of default.
   release: v1.18
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/default/kubernetes
 - testname: Service, NodePort type, session affinity to ClientIP with timeout
   codename: '[sig-network] Services should have session affinity timeout work for
     NodePort service [LinuxOnly] [Conformance]'
@@ -1761,6 +1801,9 @@
     session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/NodePort
+  - network/service/sessionAffinity/ClientIP/timeout
 - testname: Service, ClusterIP type, session affinity to ClientIP with timeout
   codename: '[sig-network] Services should have session affinity timeout work for
     service with type clusterIP [LinuxOnly] [Conformance]'
@@ -1776,6 +1819,9 @@
     affinity.'
   release: v1.19
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/ClusterIP
+  - network/service/sessionAffinity/ClientIP/timeout
 - testname: Service, NodePort type, session affinity to ClientIP
   codename: '[sig-network] Services should have session affinity work for NodePort
     service [LinuxOnly] [Conformance]'
@@ -1791,6 +1837,9 @@
     does not support session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/NodePort
+  - network/service/sessionAffinity/ClientIP
 - testname: Service, ClusterIP type, session affinity to ClientIP
   codename: '[sig-network] Services should have session affinity work for service
     with type clusterIP [LinuxOnly] [Conformance]'
@@ -1804,12 +1853,17 @@
     Windows does not support session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/type/ClusterIP
+  - network/service/sessionAffinity/ClientIP
 - testname: Kubernetes Service
   codename: '[sig-network] Services should provide secure master service  [Conformance]'
   description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
     service running in the cluster.
   release: v1.9
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/default/kubernetes
 - testname: Service, endpoints
   codename: '[sig-network] Services should serve a basic endpoint from pods  [Conformance]'
   description: Create a service with a endpoint without any Pods, the service MUST
@@ -1821,6 +1875,10 @@
     pods are deleted the endpoints from the service MUST be empty.
   release: v1.9
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/basic-create/selector
+  - network/service/update/podlabel/add
+  - network/service/update/podlabel/remove
 - testname: Service, endpoints with multiple ports
   codename: '[sig-network] Services should serve multiport endpoints from pods  [Conformance]'
   description: Create a service with two ports but no Pods are added to the service
@@ -1831,6 +1889,8 @@
     Pod and the service must now have empty set of endpoints.
   release: v1.9
   file: test/e2e/network/service.go
+  behaviors:
+  - network/service/ports/multiple
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
     [Conformance]'
