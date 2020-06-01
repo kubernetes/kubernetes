@@ -28,7 +28,7 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 

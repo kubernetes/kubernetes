@@ -174,10 +174,10 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			expectLabels:      map[string]string{"x": "true", "fight": "false"},
 			expectInvocations: map[string]int{"/settrue": 2, "/setfalse": 2},
 			expectAuditPatchAnnotations: map[string]string{
-				"patch.webhook.admission.k8s.io/round_0_index_0": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "true"}]`),
-				"patch.webhook.admission.k8s.io/round_0_index_1": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "false"}]`),
-				"patch.webhook.admission.k8s.io/round_1_index_0": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "true"}]`),
-				"patch.webhook.admission.k8s.io/round_1_index_1": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "false"}]`),
+				"patch.webhook.admission.k8s.io/round_0_index_0": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", `[{"op": "add", "path": "/metadata/labels/fight", "value": "true"}]`),
+				"patch.webhook.admission.k8s.io/round_0_index_1": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", `[{"op": "add", "path": "/metadata/labels/fight", "value": "false"}]`),
+				"patch.webhook.admission.k8s.io/round_1_index_0": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", `[{"op": "add", "path": "/metadata/labels/fight", "value": "true"}]`),
+				"patch.webhook.admission.k8s.io/round_1_index_1": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", `[{"op": "add", "path": "/metadata/labels/fight", "value": "false"}]`),
 			},
 			expectAuditMutationAnnotations: map[string]string{
 				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", true),
@@ -571,9 +571,9 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 		case "/noop":
 			allow(w)
 		case "/settrue":
-			patch(w, `[{"op": "replace", "path": "/metadata/labels/fight", "value": "true"}]`)
+			patch(w, `[{"op": "add", "path": "/metadata/labels/fight", "value": "true"}]`)
 		case "/setfalse":
-			patch(w, `[{"op": "replace", "path": "/metadata/labels/fight", "value": "false"}]`)
+			patch(w, `[{"op": "add", "path": "/metadata/labels/fight", "value": "false"}]`)
 		case "/addlabel":
 			labels := pod.GetLabels()
 			if a, ok := labels["a"]; !ok || a != "true" {

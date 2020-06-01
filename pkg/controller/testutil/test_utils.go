@@ -45,7 +45,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 )
 
 var (

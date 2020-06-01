@@ -56,7 +56,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/evanphx/json-patch/v5:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

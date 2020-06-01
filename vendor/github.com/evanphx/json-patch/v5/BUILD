@@ -7,9 +7,10 @@ go_library(
         "merge.go",
         "patch.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/evanphx/json-patch",
-    importpath = "github.com/evanphx/json-patch",
+    importmap = "k8s.io/kubernetes/vendor/github.com/evanphx/json-patch/v5",
+    importpath = "github.com/evanphx/json-patch/v5",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(
@@ -21,10 +22,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/github.com/evanphx/json-patch/v5:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

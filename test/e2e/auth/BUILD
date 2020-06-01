@@ -54,7 +54,7 @@ go_library(
         "//test/e2e/framework/skipper:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
-        "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/evanphx/json-patch/v5:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
