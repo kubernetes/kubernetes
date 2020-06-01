@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -23,8 +23,6 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.8
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // Event is a report of an event somewhere in the cluster. It generally denotes some state change in the system.
 type Event struct {
@@ -96,19 +94,17 @@ type Event struct {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continuously for some time.
+// continuously for some time. How often to update the EventSeries is up to the event reporters.
+// The default event reporter in "k8s.io/client-go/tools/events/event_broadcaster.go" shows
+// how this struct is updated on heartbeats and can guide customized reporter implementations.
 type EventSeries struct {
 	// count is the number of occurrences in this series up to the last heartbeat time.
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`
 	// lastObservedTime is the time when last Event from the series was seen before last heartbeat.
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime" protobuf:"bytes,2,opt,name=lastObservedTime"`
-
-	// +k8s:deprecated=state,protobuf=3
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.8
-// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // EventList is a list of Event objects.
 type EventList struct {

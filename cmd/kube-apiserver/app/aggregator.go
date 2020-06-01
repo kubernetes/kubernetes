@@ -252,6 +252,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "extensions", Version: "v1beta1"}: {group: 17900, version: 1},
 	// to my knowledge, nothing below here collides
 	{Group: "apps", Version: "v1"}:                               {group: 17800, version: 15},
+	{Group: "events.k8s.io", Version: "v1"}:                      {group: 17750, version: 15},
 	{Group: "events.k8s.io", Version: "v1beta1"}:                 {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
 	{Group: "authentication.k8s.io", Version: "v1beta1"}:         {group: 17700, version: 9},
