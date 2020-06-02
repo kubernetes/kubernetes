@@ -421,7 +421,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	/*
 	   Testname: Projected service account token file ownership and permission.
 	   Description: Ensure that Projected Service Account Token is mounted with
-	               correct file ownership and permissino mounted. We test the
+	               correct file ownership and permission mounted. We test the
 	               following scenarios here.
 	   1. RunAsUser is set,
 	   2. FsGroup is set,
