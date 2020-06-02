@@ -210,7 +210,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		framework.RemoveCleanupAction(h.cleanupHandle)
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
 		// Delete the primary namespace but its okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
@@ -222,6 +221,12 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
 		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		// cleanup function has already ran and hence we don't need to run it again.
+		// We do this as very last action because in-case defer(or AfterEach) races
+		// with AfterSuite and test routine gets killed then this block still
+		// runs in AfterSuite
+		framework.RemoveCleanupAction(h.cleanupHandle)
+
 	}
 	h.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
 
@@ -404,7 +409,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		framework.RemoveCleanupAction(m.cleanupHandle)
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
 		// Delete the primary namespace but its okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
@@ -422,6 +426,12 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		tryFunc(cancelLogging)
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
 		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		// cleanup function has already ran and hence we don't need to run it again.
+		// We do this as very last action because in-case defer(or AfterEach) races
+		// with AfterSuite and test routine gets killed then this block still
+		// runs in AfterSuite
+		framework.RemoveCleanupAction(m.cleanupHandle)
+
 	}
 
 	m.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
@@ -560,7 +570,6 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		framework.RemoveCleanupAction(g.cleanupHandle)
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
 		// Delete the primary namespace but its okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
@@ -572,6 +581,12 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
 		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		// cleanup function has already ran and hence we don't need to run it again.
+		// We do this as very last action because in-case defer(or AfterEach) races
+		// with AfterSuite and test routine gets killed then this block still
+		// runs in AfterSuite
+		framework.RemoveCleanupAction(g.cleanupHandle)
+
 	}
 	g.cleanupHandle = framework.AddCleanupAction(cleanupFunc)
 
