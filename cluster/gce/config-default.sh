@@ -94,7 +94,7 @@ export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 export KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
 
 # Default container runtime
-CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
+export CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-containerd}
 
 # Set default values with override
 if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
