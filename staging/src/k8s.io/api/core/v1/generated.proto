@@ -678,10 +678,19 @@ message Container {
   repeated EnvVar env = 7;
 
   // Compute Resources required by this container.
-  // Cannot be updated.
-  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/ //TODO: Mutable - update doc
   // +optional
   optional ResourceRequirements resources = 8;
+
+  // Node compute resources allocated to the container.
+  // More info: TODO: update doc
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> resourcesAllocated = 23;
+
+  // Resources resize policy for the container.
+  // More info: TODO: update doc
+  // +optional
+  repeated ResizePolicy resizePolicy = 24;
 
   // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
@@ -928,6 +937,11 @@ message ContainerStatus {
   // Is always true when no startupProbe is defined.
   // +optional
   optional bool started = 9;
+
+  // Compute resource requests and limits applied to the container.
+  // More info: TODO: Update doc
+  // +optional
+  optional ResourceRequirements resources = 10;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1274,6 +1288,14 @@ message EphemeralContainerCommon {
   // already allocated to the pod.
   // +optional
   optional ResourceRequirements resources = 8;
+
+  // Node compute resources are not allocated for ephemeral containers, they use spare resources.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> resourcesAllocated = 23;
+
+  // Resources resize policy is not applicable to ephemeral containers.
+  // +optional
+  repeated ResizePolicy resizePolicy = 24;
 
   // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
@@ -4072,6 +4094,16 @@ message ReplicationControllerStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated ReplicationControllerCondition conditions = 6;
+}
+
+// ResizePolicy represents the resource resize policy for a single container.
+message ResizePolicy {
+  // Name of the resource type to which this resize policy applies.
+  // Supported values: cpu, memory.
+  optional string resourceName = 1;
+
+  // Container resize policy applicable to the above resource.
+  optional string policy = 2;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format

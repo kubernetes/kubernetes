@@ -334,7 +334,9 @@ var map_Container = map[string]string{
 	"ports":                    "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 	"envFrom":                  "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 	"env":                      "List of environment variables to set in the container. Cannot be updated.",
-	"resources":                "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
+	"resources":                "Compute Resources required by this container. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/ //TODO: Mutable - update doc",
+	"resourcesAllocated":       "Node compute resources allocated to the container. More info: TODO: update doc",
+	"resizePolicy":             "Resources resize policy for the container. More info: TODO: update doc",
 	"volumeMounts":             "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container.",
 	"livenessProbe":            "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
@@ -433,6 +435,7 @@ var map_ContainerStatus = map[string]string{
 	"imageID":      "ImageID of the container's image.",
 	"containerID":  "Container's ID in the format 'docker://<container_id>'.",
 	"started":      "Specifies whether the container has passed its startup probe. Initialized as false, becomes true after startupProbe is considered successful. Resets to false when the container is restarted, or if kubelet loses state temporarily. Is always true when no startupProbe is defined.",
+	"resources":    "Compute resource requests and limits applied to the container. More info: TODO: Update doc",
 }
 
 func (ContainerStatus) SwaggerDoc() map[string]string {
@@ -598,6 +601,8 @@ var map_EphemeralContainerCommon = map[string]string{
 	"envFrom":                  "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 	"env":                      "List of environment variables to set in the container. Cannot be updated.",
 	"resources":                "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
+	"resourcesAllocated":       "Node compute resources are not allocated for ephemeral containers, they use spare resources.",
+	"resizePolicy":             "Resources resize policy is not applicable to ephemeral containers.",
 	"volumeMounts":             "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container.",
 	"livenessProbe":            "Probes are not allowed for ephemeral containers.",
@@ -1882,6 +1887,16 @@ var map_ReplicationControllerStatus = map[string]string{
 
 func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerStatus
+}
+
+var map_ResizePolicy = map[string]string{
+	"":             "ResizePolicy represents the resource resize policy for a single container.",
+	"resourceName": "Name of the resource type to which this resize policy applies. Supported values: cpu, memory.",
+	"policy":       "Container resize policy applicable to the above resource.",
+}
+
+func (ResizePolicy) SwaggerDoc() map[string]string {
+	return map_ResizePolicy
 }
 
 var map_ResourceFieldSelector = map[string]string{
