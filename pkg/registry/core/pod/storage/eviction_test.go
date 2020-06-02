@@ -218,6 +218,7 @@ func TestEvictionIngorePDB(t *testing.T) {
 		podPhase            api.PodPhase
 		podName             string
 		expectedDeleteCount int
+		podTerminating      bool
 	}{
 		{
 			name: "pdbs No disruptions allowed, pod pending, first delete conflict, pod still pending, pod deleted successfully",
@@ -287,6 +288,19 @@ func TestEvictionIngorePDB(t *testing.T) {
 			podName:             "t5",
 			expectedDeleteCount: 1,
 		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod terminating",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t6", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(300)},
+			expectError:         false,
+			podName:             "t6",
+			expectedDeleteCount: 1,
+			podTerminating:      true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -302,6 +316,11 @@ func TestEvictionIngorePDB(t *testing.T) {
 			pod.Spec.NodeName = "foo"
 			if tc.podPhase != "" {
 				pod.Status.Phase = tc.podPhase
+			}
+
+			if tc.podTerminating {
+				currentTime := metav1.Now()
+				pod.ObjectMeta.DeletionTimestamp = &currentTime
 			}
 
 			client := fake.NewSimpleClientset(tc.pdbs...)
@@ -396,6 +415,10 @@ func (ms *mockStore) mutatorDeleteFunc(count int, options *metav1.DeleteOptions)
 	if ms.pod.Name == "t4" {
 		// Always return error for this pod
 		return nil, false, apierrors.NewConflict(resource("tests"), "2", errors.New("message"))
+	}
+	if ms.pod.Name == "t6" {
+		// This pod has a deletionTimestamp and should not raise conflict on delete
+		return nil, true, nil
 	}
 	if count == 1 {
 		// This is a hack to ensure that some test pods don't change phase
