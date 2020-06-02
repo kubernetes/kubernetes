@@ -126,7 +126,7 @@ filegroup(
         "//pkg/volume/testing:all-srcs",
         "//pkg/volume/util:all-srcs",
         "//pkg/volume/validation:all-srcs",
-        "//pkg/volume/vsphere_volume:all-srcs",
+        "//pkg/volume/vspherevolume:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

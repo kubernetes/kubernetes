@@ -1,5 +1,5 @@
 // +build !providerless
-// +build !linux,!windows
+// +build linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -17,10 +17,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vsphere_volume
+package vspherevolume
 
-import "errors"
+import (
+	"fmt"
+
+	"k8s.io/mount-utils"
+)
 
 func verifyDevicePath(path string) (string, error) {
-	return "", errors.New("unsupported")
+	if pathExists, err := mount.PathExists(path); err != nil {
+		return "", fmt.Errorf("Error checking if path exists: %v", err)
+	} else if pathExists {
+		return path, nil
+	}
+
+	return "", nil
 }

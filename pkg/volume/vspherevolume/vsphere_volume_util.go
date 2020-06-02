@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vsphere_volume
+package vspherevolume
 
 import (
 	"errors"
@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog/v2"
@@ -36,37 +36,35 @@ import (
 )
 
 const (
-	maxRetries         = 10
-	checkSleepDuration = time.Second
-	diskByIDPath       = "/dev/disk/by-id/"
-	diskSCSIPrefix     = "wwn-0x"
-	diskformat         = "diskformat"
-	datastore          = "datastore"
-	StoragePolicyName  = "storagepolicyname"
-
-	HostFailuresToTolerateCapability    = "hostfailurestotolerate"
-	ForceProvisioningCapability         = "forceprovisioning"
-	CacheReservationCapability          = "cachereservation"
-	DiskStripesCapability               = "diskstripes"
-	ObjectSpaceReservationCapability    = "objectspacereservation"
-	IopsLimitCapability                 = "iopslimit"
-	HostFailuresToTolerateCapabilityMin = 0
-	HostFailuresToTolerateCapabilityMax = 3
-	ForceProvisioningCapabilityMin      = 0
-	ForceProvisioningCapabilityMax      = 1
-	CacheReservationCapabilityMin       = 0
-	CacheReservationCapabilityMax       = 100
-	DiskStripesCapabilityMin            = 1
-	DiskStripesCapabilityMax            = 12
-	ObjectSpaceReservationCapabilityMin = 0
-	ObjectSpaceReservationCapabilityMax = 100
-	IopsLimitCapabilityMin              = 0
+	checkSleepDuration                  = time.Second
+	diskByIDPath                        = "/dev/disk/by-id/"
+	diskSCSIPrefix                      = "wwn-0x"
+	diskformat                          = "diskformat"
+	datastore                           = "datastore"
+	storagePolicyName                   = "storagepolicyname"
+	hostFailuresToTolerateCapability    = "hostfailurestotolerate"
+	forceProvisioningCapability         = "forceprovisioning"
+	cacheReservationCapability          = "cachereservation"
+	diskStripesCapability               = "diskstripes"
+	objectSpaceReservationCapability    = "objectspacereservation"
+	iopsLimitCapability                 = "iopslimit"
+	hostFailuresToTolerateCapabilityMin = 0
+	hostFailuresToTolerateCapabilityMax = 3
+	forceProvisioningCapabilityMin      = 0
+	forceProvisioningCapabilityMax      = 1
+	cacheReservationCapabilityMin       = 0
+	cacheReservationCapabilityMax       = 100
+	diskStripesCapabilityMin            = 1
+	diskStripesCapabilityMax            = 12
+	objectSpaceReservationCapabilityMin = 0
+	objectSpaceReservationCapabilityMax = 100
+	iopsLimitCapabilityMin              = 0
 )
 
-var ErrProbeVolume = errors.New("error scanning attached volumes")
-
+// VsphereDiskUtil is an empty struct for vSphere volume
 type VsphereDiskUtil struct{}
 
+// VolumeSpec has volume specifications
 type VolumeSpec struct {
 	Path              string
 	Size              int
@@ -111,12 +109,12 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner, selectedN
 		case volume.VolumeParameterFSType:
 			fstype = value
 			klog.V(4).Infof("Setting fstype as %q", fstype)
-		case StoragePolicyName:
+		case storagePolicyName:
 			volumeOptions.StoragePolicyName = value
 			klog.V(4).Infof("Setting StoragePolicyName as %q", volumeOptions.StoragePolicyName)
-		case HostFailuresToTolerateCapability, ForceProvisioningCapability,
-			CacheReservationCapability, DiskStripesCapability,
-			ObjectSpaceReservationCapability, IopsLimitCapability:
+		case hostFailuresToTolerateCapability, forceProvisioningCapability,
+			cacheReservationCapability, diskStripesCapability,
+			objectSpaceReservationCapability, iopsLimitCapability:
 			capabilityData, err := validateVSANCapability(strings.ToLower(parameter), value)
 			if err != nil {
 				return nil, err
@@ -204,52 +202,52 @@ func validateVSANCapability(capabilityName string, capabilityValue string) (stri
 		return "", fmt.Errorf("invalid value for %s. The capabilityValue: %s must be a valid integer value", capabilityName, capabilityValue)
 	}
 	switch strings.ToLower(capabilityName) {
-	case HostFailuresToTolerateCapability:
-		if capabilityIntVal >= HostFailuresToTolerateCapabilityMin && capabilityIntVal <= HostFailuresToTolerateCapabilityMax {
+	case hostFailuresToTolerateCapability:
+		if capabilityIntVal >= hostFailuresToTolerateCapabilityMin && capabilityIntVal <= hostFailuresToTolerateCapabilityMax {
 			capabilityData = " (\"hostFailuresToTolerate\" i" + capabilityValue + ")"
 		} else {
 			return "", fmt.Errorf(`invalid value for hostFailuresToTolerate.
-				The default value is %d, minimum value is %d and maximum value is %d`,
-				1, HostFailuresToTolerateCapabilityMin, HostFailuresToTolerateCapabilityMax)
+        The default value is %d, minimum value is %d and maximum value is %d`,
+				1, hostFailuresToTolerateCapabilityMin, hostFailuresToTolerateCapabilityMax)
 		}
-	case ForceProvisioningCapability:
-		if capabilityIntVal >= ForceProvisioningCapabilityMin && capabilityIntVal <= ForceProvisioningCapabilityMax {
+	case forceProvisioningCapability:
+		if capabilityIntVal >= forceProvisioningCapabilityMin && capabilityIntVal <= forceProvisioningCapabilityMax {
 			capabilityData = " (\"forceProvisioning\" i" + capabilityValue + ")"
 		} else {
 			return "", fmt.Errorf(`invalid value for forceProvisioning.
-				The value can be either %d or %d`,
-				ForceProvisioningCapabilityMin, ForceProvisioningCapabilityMax)
+        The value can be either %d or %d`,
+				forceProvisioningCapabilityMin, forceProvisioningCapabilityMax)
 		}
-	case CacheReservationCapability:
-		if capabilityIntVal >= CacheReservationCapabilityMin && capabilityIntVal <= CacheReservationCapabilityMax {
+	case cacheReservationCapability:
+		if capabilityIntVal >= cacheReservationCapabilityMin && capabilityIntVal <= cacheReservationCapabilityMax {
 			capabilityData = " (\"cacheReservation\" i" + strconv.Itoa(capabilityIntVal*10000) + ")"
 		} else {
 			return "", fmt.Errorf(`invalid value for cacheReservation.
-				The minimum percentage is %d and maximum percentage is %d`,
-				CacheReservationCapabilityMin, CacheReservationCapabilityMax)
+        The minimum percentage is %d and maximum percentage is %d`,
+				cacheReservationCapabilityMin, cacheReservationCapabilityMax)
 		}
-	case DiskStripesCapability:
-		if capabilityIntVal >= DiskStripesCapabilityMin && capabilityIntVal <= DiskStripesCapabilityMax {
+	case diskStripesCapability:
+		if capabilityIntVal >= diskStripesCapabilityMin && capabilityIntVal <= diskStripesCapabilityMax {
 			capabilityData = " (\"stripeWidth\" i" + capabilityValue + ")"
 		} else {
 			return "", fmt.Errorf(`invalid value for diskStripes.
-				The minimum value is %d and maximum value is %d`,
-				DiskStripesCapabilityMin, DiskStripesCapabilityMax)
+        The minimum value is %d and maximum value is %d`,
+				diskStripesCapabilityMin, diskStripesCapabilityMax)
 		}
-	case ObjectSpaceReservationCapability:
-		if capabilityIntVal >= ObjectSpaceReservationCapabilityMin && capabilityIntVal <= ObjectSpaceReservationCapabilityMax {
+	case objectSpaceReservationCapability:
+		if capabilityIntVal >= objectSpaceReservationCapabilityMin && capabilityIntVal <= objectSpaceReservationCapabilityMax {
 			capabilityData = " (\"proportionalCapacity\" i" + capabilityValue + ")"
 		} else {
 			return "", fmt.Errorf(`invalid value for ObjectSpaceReservation.
-				The minimum percentage is %d and maximum percentage is %d`,
-				ObjectSpaceReservationCapabilityMin, ObjectSpaceReservationCapabilityMax)
+        The minimum percentage is %d and maximum percentage is %d`,
+				objectSpaceReservationCapabilityMin, objectSpaceReservationCapabilityMax)
 		}
-	case IopsLimitCapability:
-		if capabilityIntVal >= IopsLimitCapabilityMin {
+	case iopsLimitCapability:
+		if capabilityIntVal >= iopsLimitCapabilityMin {
 			capabilityData = " (\"iopsLimit\" i" + capabilityValue + ")"
 		} else {
 			return "", fmt.Errorf(`invalid value for iopsLimit.
-				The value should be greater than %d`, IopsLimitCapabilityMin)
+        The value should be greater than %d`, iopsLimitCapabilityMin)
 		}
 	}
 	return capabilityData, nil

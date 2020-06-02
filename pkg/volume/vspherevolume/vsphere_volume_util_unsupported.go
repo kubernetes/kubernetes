@@ -1,3 +1,6 @@
+// +build !providerless
+// +build !linux,!windows
+
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -14,4 +17,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vsphere_volume
+package vspherevolume
+
+import "errors"
+
+func verifyDevicePath(path string) (string, error) {
+	return "", errors.New("unsupported")
+}

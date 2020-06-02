@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vsphere_volume
+package vspherevolume
 
 import (
 	"errors"
@@ -241,8 +241,8 @@ func (testcase *testcase) AttachDisk(diskName string, storagePolicyName string, 
 	if expected.diskName == "" && expected.nodeName == "" {
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
-		testcase.t.Errorf("Unexpected AttachDisk call!")
-		return "", errors.New("Unexpected AttachDisk call!")
+		testcase.t.Errorf("Unexpected AttachDisk call")
+		return "", errors.New("Unexpected AttachDisk call")
 	}
 
 	if expected.diskName != diskName {
@@ -266,8 +266,8 @@ func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) e
 	if expected.diskName == "" && expected.nodeName == "" {
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
-		testcase.t.Errorf("Unexpected DetachDisk call!")
-		return errors.New("Unexpected DetachDisk call!")
+		testcase.t.Errorf("Unexpected DetachDisk call")
+		return errors.New("Unexpected DetachDisk call")
 	}
 
 	if expected.diskName != diskName {
@@ -291,8 +291,8 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 	if expected.diskName == "" && expected.nodeName == "" {
 		// testcase.diskIsAttached looks uninitialized, test did not expect to
 		// call DiskIsAttached
-		testcase.t.Errorf("Unexpected DiskIsAttached call!")
-		return false, diskName, errors.New("Unexpected DiskIsAttached call!")
+		testcase.t.Errorf("Unexpected DiskIsAttached call")
+		return false, diskName, errors.New("Unexpected DiskIsAttached call")
 	}
 
 	if expected.diskName != diskName {
