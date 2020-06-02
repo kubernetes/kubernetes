@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/keymutex"
-	utilpath "k8s.io/utils/path"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -182,19 +181,10 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	// If current file is a symlink, then it is a mountpoint.
-	if stat.Mode()&os.ModeSymlink != 0 {
-		target, err := os.Readlink(file)
-		if err != nil {
-			return true, fmt.Errorf("readlink error: %v", err)
-		}
-		exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, target)
-		if err != nil {
-			return true, err
-		}
-		return !exists, nil
-	}
 
+	if stat.Mode()&os.ModeSymlink != 0 {
+		return false, err
+	}
 	return true, nil
 }
 
