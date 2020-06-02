@@ -1919,6 +1919,22 @@
     number of Replicas.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: Scheduler, Basic Preemption
+  codename: '[sig-scheduling] SchedulerPreemption [Serial] validates basic preemption
+    works [Conformance]'
+  description: When a higher priority pod is created and no node with enough resources
+    is found, the scheduler MUST preempt a lower priority pod and schedule the high
+    priority pod.
+  release: v1.19
+  file: test/e2e/scheduling/preemption.go
+- testname: Scheduler, Preemption for critical pod
+  codename: '[sig-scheduling] SchedulerPreemption [Serial] validates lower priority
+    pod preemption by critical pod [Conformance]'
+  description: When a critical pod is created and no node with enough resources is
+    found, the scheduler MUST preempt a lower priority pod to schedule the critical
+    pod.
+  release: v1.19
+  file: test/e2e/scheduling/preemption.go
 - testname: ConfigMap Volume, text data, binary data
   codename: '[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance]
     [Conformance]'
