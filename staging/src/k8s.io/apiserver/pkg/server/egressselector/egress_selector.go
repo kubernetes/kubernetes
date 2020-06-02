@@ -186,10 +186,14 @@ func (u *udsHTTPConnectConnector) connect() (proxier, error) {
 }
 
 type udsGRPCConnector struct {
-	udsName string
+	udsName    string
+	grpcTunnel client.Tunnel
 }
 
 func (u *udsGRPCConnector) connect() (proxier, error) {
+	if u.grpcTunnel != nil {
+		return &grpcProxier{tunnel: u.grpcTunnel}, nil
+	}
 	udsName := u.udsName
 	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 		c, err := net.Dial("unix", udsName)
@@ -199,10 +203,13 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 		return c, err
 	})
 
-	tunnel, err := client.CreateSingleUseGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
+	tunnel, err := client.CreateReusableGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
+
+	u.grpcTunnel = tunnel
+
 	return &grpcProxier{tunnel: tunnel}, nil
 }
 
@@ -221,6 +228,7 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 	if d.direct {
 		return directDialer
 	}
+
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		trace := utiltrace.New(fmt.Sprintf("Proxy via HTTP Connect over %s", d.options.transport), utiltrace.Field{Key: "address", Value: addr})
 		defer trace.LogIfLong(500 * time.Millisecond)
