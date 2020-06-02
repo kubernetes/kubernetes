@@ -12,7 +12,7 @@ spec:
   hostNetwork: true
   containers:
   - name: konnectivity-server-container
-    image: gcr.io/jying-gke-dev/proxy-server-amd64:aa16911ab5543e8bef57ea34e733ecf802efecb8
+    image: gcr.io/jying-gke-dev/proxy-server-amd64:b171d9e4da39829e5c2d63400dbe3896c0e8b4ec
     resources:
       requests:
         cpu: 25m
