@@ -28,88 +28,115 @@ import (
 // +genclient:method=UpdateApproval,verb=update,subresource=approval,input=k8s.io/api/certificates/v1.CertificateSigningRequest,result=k8s.io/api/certificates/v1.CertificateSigningRequest
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Describes a certificate signing request
+// CertificateSigningRequest objects provide a mechanism to obtain x509 certificates
+// by submitting a certificate signing request, and having it asynchronously approved and issued.
+//
+// Kubelets use this API to obtain:
+//  1. client certificates to authenticate to kube-apiserver (with the "kubernetes.io/kube-apiserver-client-kubelet" signerName).
+//  2. serving certificates for TLS endpoints kube-apiserver can connect to securely (with the "kubernetes.io/kubelet-serving" signerName).
+//
+// This API can be used to request client certificates to authenticate to kube-apiserver
+// (with the "kubernetes.io/kube-apiserver-client" signerName),
+// or to obtain certificates from custom non-Kubernetes signers.
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// The certificate request itself and any additional information.
-	// +optional
-	Spec CertificateSigningRequestSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	// spec contains the certificate request, and is immutable after creation.
+	// Only the request, signerName, and usages fields can be set on creation.
+	// Other fields are derived by Kubernetes and cannot be modified by users.
+	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Derived information about the request.
+	// status contains information about whether the request is approved or denied,
+	// and the certificate issued by the signer, or the failure condition indicating signer failure.
 	// +optional
 	Status CertificateSigningRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// This information is immutable after the request is created. Only the Request
-// and Usages fields can be set on creation, other fields are derived by
-// Kubernetes and cannot be modified by users.
+// CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpec struct {
-	// Base64-encoded PKCS#10 CSR data
+	// request contains an x509 certificate signing request encoded in a "CERTIFICATE REQUEST" PEM block.
+	// When serialized as JSON or YAML, the data is additionally base64-encoded.
 	// +listType=atomic
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
-	// Requested signer for the request. It is a qualified name in the form:
-	// `scope-hostname.io/name`.
-	// If empty, it will be defaulted:
-	//  1. If it's a kubelet client certificate, it is assigned
-	//     "kubernetes.io/kube-apiserver-client-kubelet".
-	//  2. If it's a kubelet serving certificate, it is assigned
-	//     "kubernetes.io/kubelet-serving".
-	//  3. Otherwise, it is assigned "kubernetes.io/legacy-unknown".
-	// Distribution of trust for signers happens out of band.
-	// You can select on this field using `spec.signerName`.
-	// +optional
-	SignerName *string `json:"signerName,omitempty" protobuf:"bytes,7,opt,name=signerName"`
+	// signerName indicates the requested signer, and is a qualified name.
+	//
+	// List/watch requests for CertificateSigningRequests can filter on this field using a "spec.signerName=NAME" fieldSelector.
+	//
+	// Well-known Kubernetes signers are:
+	//  1. "kubernetes.io/kube-apiserver-client": issues client certificates that can be used to authenticate to kube-apiserver.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  2. "kubernetes.io/kube-apiserver-client-kubelet": issues client certificates that kubelets use to authenticate to kube-apiserver.
+	//   Requests for this signer can be auto-approved by the "csrapproving" controller in kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  3. "kubernetes.io/kubelet-serving" issues serving certificates that kubelets use to serve TLS endpoints, which kube-apiserver can connect to securely.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//
+	// More details are available at https://k8s.io/docs/reference/access-authn-authz/certificate-signing-requests/#kubernetes-signers
+	//
+	// Custom signerNames can also be specified. The signer defines:
+	//  1. Trust distribution: how trust (CA bundles) are distributed.
+	//  2. Permitted subjects: and behavior when a disallowed subject is requested.
+	//  3. Required, permitted, or forbidden x509 extensions in the request (including whether subjectAltNames are allowed, which types, restrictions on allowed values) and behavior when a disallowed extension is requested.
+	//  4. Required, permitted, or forbidden key usages / extended key usages.
+	//  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
+	//  6. Whether or not requests for CA certificates are allowed.
+	SignerName string `json:"signerName" protobuf:"bytes,7,opt,name=signerName"`
 
-	// allowedUsages specifies a set of usage contexts the key will be
-	// valid for.
-	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	// usages specifies a set of key usages requested in the issued certificate.
+	//
+	// Requests for TLS client certificates typically request: "digital signature", "key encipherment", "client auth".
+	//
+	// Requests for TLS serving certificates typically request: "key encipherment", "digital signature", "server auth".
+	//
+	// Valid values are:
+	//  "signing", "digital signature", "content commitment",
+	//  "key encipherment", "key agreement", "data encipherment",
+	//  "cert sign", "crl sign", "encipher only", "decipher only", "any",
+	//  "server auth", "client auth",
+	//  "code signing", "email protection", "s/mime",
+	//  "ipsec end system", "ipsec tunnel", "ipsec user",
+	//  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
 	// +listType=atomic
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
-	// Information about the requesting user.
-	// See user.Info interface for details.
+	// username contains the name of the user that created the CertificateSigningRequest.
+	// Populated by the API server on creation and immutable.
 	// +optional
 	Username string `json:"username,omitempty" protobuf:"bytes,2,opt,name=username"`
-	// UID information about the requesting user.
-	// See user.Info interface for details.
+	// uid contains the uid of the user that created the CertificateSigningRequest.
+	// Populated by the API server on creation and immutable.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
-	// Group information about the requesting user.
-	// See user.Info interface for details.
+	// groups contains group membership of the user that created the CertificateSigningRequest.
+	// Populated by the API server on creation and immutable.
 	// +listType=atomic
 	// +optional
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
-	// Extra information about the requesting user.
-	// See user.Info interface for details.
+	// extra contains extra attributes of the user that created the CertificateSigningRequest.
+	// Populated by the API server on creation and immutable.
 	// +optional
 	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,6,rep,name=extra"`
 }
 
-// Built in signerName values that are honoured by kube-controller-manager.
-// None of these usages are related to ServiceAccount token secrets
-// `.data[ca.crt]` in any way.
+// Built in signerName values that are honored by kube-controller-manager.
 const (
-	// Signs certificates that will be honored as client-certs by the
-	// kube-apiserver. Never auto-approved by kube-controller-manager.
+	// "kubernetes.io/kube-apiserver-client" signer issues client certificates that can be used to authenticate to kube-apiserver.
+	// Never auto-approved by kube-controller-manager.
+	// Can be issued by the "csrsigning" controller in kube-controller-manager.
 	KubeAPIServerClientSignerName = "kubernetes.io/kube-apiserver-client"
 
-	// Signs client certificates that will be honored as client-certs by the
-	// kube-apiserver for a kubelet.
-	// May be auto-approved by kube-controller-manager.
+	// "kubernetes.io/kube-apiserver-client-kubelet" issues client certificates that kubelets use to authenticate to kube-apiserver.
+	// Can be auto-approved by the "csrapproving" controller in kube-controller-manager.
+	// Can be issued by the "csrsigning" controller in kube-controller-manager.
 	KubeAPIServerClientKubeletSignerName = "kubernetes.io/kube-apiserver-client-kubelet"
 
-	// Signs serving certificates that are honored as a valid kubelet serving
-	// certificate by the kube-apiserver, but has no other guarantees.
+	// "kubernetes.io/kubelet-serving" issues serving certificates that kubelets use to serve TLS endpoints,
+	// which kube-apiserver can connect to securely.
+	// Never auto-approved by kube-controller-manager.
+	// Can be issued by the "csrsigning" controller in kube-controller-manager.
 	KubeletServingSignerName = "kubernetes.io/kubelet-serving"
-
-	// Has no guarantees for trust at all. Some distributions may honor these
-	// as client certs, but that behavior is not standard kubernetes behavior.
-	LegacyUnknownSignerName = "kubernetes.io/legacy-unknown"
 )
 
 // ExtraValue masks the value so protobuf can generate
@@ -121,44 +148,88 @@ func (t ExtraValue) String() string {
 	return fmt.Sprintf("%v", []string(t))
 }
 
+// CertificateSigningRequestStatus contains conditions used to indicate
+// approved/denied/failed status of the request, and the issued certificate.
 type CertificateSigningRequestStatus struct {
-	// Conditions applied to the request, such as approval or denial.
+	// conditions applied to the request. Known conditions are "Approved", "Denied", and "Failed".
 	// +listType=map
 	// +listMapKey=type
 	// +optional
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
-	// If request was approved, the controller will place the issued certificate here.
+	// certificate is populated with an issued certificate by the signer after an Approved condition is present.
+	// This field is set via the /status subresource. Once populated, this field is immutable.
+	//
+	// If the certificate signing request is denied, a condition of type "Denied" is added and this field remains empty.
+	// If the signer cannot issue the certificate, a condition of type "Failed" is added and this field remains empty.
+	//
+	// Validation requirements:
+	//  1. certificate must contain one or more PEM blocks.
+	//  2. All PEM blocks must have the "CERTIFICATE" label, contain no headers, and the encoded data
+	//   must be a BER-encoded ASN.1 Certificate structure as described in section 4 of RFC5280.
+	//  3. Non-PEM content may appear before or after the "CERTIFICATE" PEM blocks and is unvalidated,
+	//   to allow for explanatory text as described in section 5.2 of RFC7468.
+	//
+	// If more than one PEM block is present, and the definition of the requested spec.signerName
+	// does not indicate otherwise, the first block is the issued certificate,
+	// and subsequent blocks should be treated as intermediate certificates and presented in TLS handshakes.
+	//
+	// The certificate is encoded in PEM format.
+	//
+	// When serialized as JSON or YAML, the data is additionally base64-encoded, so it consists of:
+	//
+	//     base64(
+	//     -----BEGIN CERTIFICATE-----
+	//     ...
+	//     -----END CERTIFICATE-----
+	//     )
+	//
 	// +listType=atomic
 	// +optional
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }
 
+// RequestConditionType is the type of a CertificateSigningRequestCondition
 type RequestConditionType string
 
-// These are the possible conditions for a certificate request.
+// Well-known condition types for certificate requests.
 const (
+	// Approved indicates the request was approved and should be issued by the signer.
 	CertificateApproved RequestConditionType = "Approved"
-	CertificateDenied   RequestConditionType = "Denied"
-	CertificateFailed   RequestConditionType = "Failed"
+	// Denied indicates the request was denied and should not be issued by the signer.
+	CertificateDenied RequestConditionType = "Denied"
+	// Failed indicates the signer failed to issue the certificate.
+	CertificateFailed RequestConditionType = "Failed"
 )
 
+// CertificateSigningRequestCondition describes a condition of a CertificateSigningRequest object
 type CertificateSigningRequestCondition struct {
-	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
+	// type of the condition. Known conditions are "Approved", "Denied", and "Failed".
+	//
+	// An "Approved" condition is added via the /approval subresource,
+	// indicating the request was approved and should be issued by the signer.
+	//
+	// A "Denied" condition is added via the /approval subresource,
+	// indicating the request was denied and should not be issued by the signer.
+	//
+	// A "Failed" condition is added via the /status subresource,
+	// indicating the signer failed to issue the certificate.
+	//
+	// Approved and Denied conditions are mutually exclusive.
+	// Approved, Denied, and Failed conditions cannot be removed once added.
+	//
+	// Only one condition of a given type is allowed.
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
-	// Defaults to "True".
-	// If unset, should be treated as "True".
-	// +optional
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,6,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
-	// brief reason for the request state
+	// reason indicates a brief reason for the request state
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
-	// human readable message with details about the request state
+	// message contains a human readable message with details about the request state
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
-	// timestamp for the last update to this condition
+	// lastUpdateTime is the time of the last update to this condition
 	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
 	// lastTransitionTime is the time the condition last transitioned from one status to another.
@@ -170,19 +241,22 @@ type CertificateSigningRequestCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CertificateSigningRequestList is a collection of CertificateSigningRequest objects
 type CertificateSigningRequestList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
+	// items is a collection of CertificateSigningRequest objects
 	Items []CertificateSigningRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// KeyUsages specifies valid usage contexts for keys.
+// KeyUsage specifies valid usage contexts for keys.
 // See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 //      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 type KeyUsage string
 
+// Valid key usages
 const (
 	UsageSigning           KeyUsage = "signing"
 	UsageDigitalSignature  KeyUsage = "digital signature"
