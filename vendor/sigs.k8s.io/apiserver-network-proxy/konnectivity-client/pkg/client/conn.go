@@ -34,6 +34,7 @@ const CloseTimeout = 10 * time.Second
 // over an established tunnel defined by a gRPC service ProxyService.
 type conn struct {
 	stream  client.ProxyService_ProxyClient
+	tunnel  *grpcTunnel
 	connID  int64
 	readCh  chan []byte
 	closeCh chan string
@@ -56,7 +57,9 @@ func (c *conn) Write(data []byte) (n int, err error) {
 
 	klog.V(6).Infof("[tracing] send req, type: %s", req.Type)
 
+	c.tunnel.streamLock.Lock()
 	err = c.stream.Send(req)
+	c.tunnel.streamLock.Unlock()
 	if err != nil {
 		return 0, err
 	}
@@ -124,9 +127,12 @@ func (c *conn) Close() error {
 
 	klog.V(6).Infof("[tracing] send req, type: %s", req.Type)
 
+	c.tunnel.streamLock.Lock()
 	if err := c.stream.Send(req); err != nil {
+		c.tunnel.streamLock.Unlock()
 		return err
 	}
+	c.tunnel.streamLock.Unlock()
 
 	select {
 	case errMsg := <-c.closeCh:

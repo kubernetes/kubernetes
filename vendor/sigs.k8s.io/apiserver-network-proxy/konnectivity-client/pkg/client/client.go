@@ -52,6 +52,7 @@ type grpcTunnel struct {
 	conns           map[int64]*conn
 	pendingDialLock sync.RWMutex
 	connsLock       sync.RWMutex
+	streamLock      sync.RWMutex
 	singleUse       bool
 	proxyConn       *grpc.ClientConn
 	stopCh          chan struct{}
@@ -109,6 +110,7 @@ func (t *grpcTunnel) serve() {
 	for {
 		pkt, err := t.stream.Recv()
 		if err == io.EOF {
+			klog.Warning("Warning: EOF, closing")
 			return
 		}
 		if err != nil || pkt == nil {
@@ -212,14 +214,16 @@ func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
 	}
 	klog.V(6).Infof("[tracing] send packet, type: %s", req.Type)
 
+	t.streamLock.Lock()
 	err := t.stream.Send(req)
+	t.streamLock.Unlock()
 	if err != nil {
 		return nil, err
 	}
 
 	klog.Info("DIAL_REQ sent to proxy server")
 
-	c := &conn{stream: t.stream}
+	c := &conn{stream: t.stream, tunnel: t}
 
 	select {
 	case res := <-resCh:

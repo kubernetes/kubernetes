@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -187,12 +188,15 @@ func (u *udsHTTPConnectConnector) connect() (proxier, error) {
 
 type udsGRPCConnector struct {
 	udsName    string
-	grpcTunnel client.Tunnel
+	grpcTunnel *client.Tunnel
+	grpcLock   sync.RWMutex
 }
 
 func (u *udsGRPCConnector) connect() (proxier, error) {
+	u.grpcLock.Lock()
+	defer u.grpcLock.Unlock()
 	if u.grpcTunnel != nil {
-		return &grpcProxier{tunnel: u.grpcTunnel}, nil
+		return &grpcProxier{tunnel: *u.grpcTunnel}, nil
 	}
 	udsName := u.udsName
 	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
@@ -203,12 +207,12 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 		return c, err
 	})
 
-	tunnel, err := client.CreateReusableGrpcTunnel(udsName, dialOption, grpc.WithInsecure())
+	tunnel, err := client.CreateReusableGrpcTunnel(udsName, dialOption, grpc.WithInsecure(), grpc.WithUserAgent("foo"))
 	if err != nil {
 		return nil, err
 	}
 
-	u.grpcTunnel = tunnel
+	u.grpcTunnel = &tunnel
 
 	return &grpcProxier{tunnel: tunnel}, nil
 }
