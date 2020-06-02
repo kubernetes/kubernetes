@@ -1313,13 +1313,14 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 //   resourceName        the name of the given resource
 //   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
 //   expectedWatchEvents array of events which are expected to occur
-//   scenario            the function to run
-func WatchEventSequenceVerifier(testContext context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event) {
-	initResource, err := dc.Resource(resourceType).Namespace(namespace).List(testContext, listOptions)
+//   scenario            the test itself
+//   retryCleanup             a function to run which ensures that there are no dangling resources upon test failure
+func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
+	initResource, err := dc.Resource(resourceType).Namespace(namespace).List(ctx, listOptions)
 	ExpectNoError(err, "Failed to fetch initial resource")
 	listWatcher := &cache.ListWatch{
 		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
-			return dc.Resource(resourceType).Namespace(namespace).Watch(testContext, listOptions)
+			return dc.Resource(resourceType).Namespace(namespace).Watch(ctx, listOptions)
 		},
 	}
 	resourceWatch, err := watchtools.NewRetryWatcher(initResource.GetResourceVersion(), listWatcher)
@@ -1337,7 +1338,7 @@ retriesLoop:
 		actualWatchEventsHasDelete := false
 		for watchEventIndex := range expectedWatchEvents {
 			foundExpectedWatchEvent := false
-			ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount must be greater than or equal to expected watch events amount")
+			ExpectEqual(len(expectedWatchEvents) <= len(actualWatchEvents), true, "Error: actual watch events amount (%d) must be greater than or equal to expected watch events amount (%d)", len(actualWatchEvents), len(expectedWatchEvents))
 			for actualWatchEventIndex := range actualWatchEvents {
 				if actualWatchEvents[watchEventIndex].Type == expectedWatchEvents[actualWatchEventIndex].Type {
 					foundExpectedWatchEvent = true
@@ -1351,15 +1352,14 @@ retriesLoop:
 			}
 			totalValidWatchEvents++
 		}
-		if actualWatchEventsHasDelete == false {
-			_ = dc.Resource(resourceType).Namespace(namespace).DeleteCollection(testContext, metav1.DeleteOptions{}, listOptions)
-		}
+		err := retryCleanup()
+		ExpectNoError(err, "Error occured when cleaning up resources")
 		if errs.Len() > 0 && try < retries {
 			fmt.Println("invariants violated:\n", strings.Join(errs.List(), "\n - "))
 			continue retriesLoop
 		}
 		ExpectEqual(errs.Len() > 0, false, strings.Join(errs.List(), "\n - "))
-		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%v) and expected watch events (%v)", totalValidWatchEvents, len(expectedWatchEvents))
+		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
 		break retriesLoop
 	}
 }
@@ -1371,7 +1371,7 @@ retriesLoop:
 // Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
 // Waits until context deadline or until context is canceled.
 //
-// the same as watchtools.UntilWithoutRetry, just without the closing of the watch
+// the same as watchtools.UntilWithoutRetry, just without the closing of the watch - as for the purpose of being paired with WatchEventSequenceVerifier, the watch is needed for continual watch event collection
 func WatchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...watchtools.ConditionFunc) (*watch.Event, error) {
 	ch := watcher.ResultChan()
 	var lastEvent *watch.Event
