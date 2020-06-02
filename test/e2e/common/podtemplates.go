@@ -141,38 +141,37 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 		framework.ExpectEqual(len(podTemplateList.Items), len(podTemplateNames), "looking for expected number of pod templates")
 
 		ginkgo.By("delete collection of pod templates")
-		// confirm that delete collection does remove all pod templates
+		// delete collection
 
-		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, deletePodTemplateCollection(f, "podtemplate-set=true"))
-		framework.ExpectNoError(err, "failed to delete collection")
+		framework.Logf("requesting DeleteCollection of pod templates")
+		err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "podtemplate-set=true"})
+		framework.ExpectNoError(err, "failed to delete all pod templates")
 
-		ginkgo.By("get a list of pod templates with a label in the current namespace")
-		// get list of pod templates
-		podTemplateList, err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "podtemplate-set=true",
-		})
-		framework.ExpectNoError(err, "failed to get a list of pod templates")
+		ginkgo.By("check that the list of pod templates matches the requested quantity")
 
-		framework.ExpectEqual(len(podTemplateList.Items), 0, "pod templates should all be deleted")
-
+		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, checkPodTemplateListQuantity(f, "podtemplate-set=true", 0))
+		framework.ExpectNoError(err, "failed to count required pod templates")
 	})
 
 })
 
-func deletePodTemplateCollection(f *framework.Framework, label string) func() (bool, error) {
+func checkPodTemplateListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
 	return func() (bool, error) {
 		var err error
 
-		framework.Logf("requesting DeleteCollection of pod templates")
+		framework.Logf("requesting list of pod templates to confirm quantity")
 
-		err = f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+		list, err := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: label})
 
 		if err != nil {
 			return false, err
-		} else {
-			return true, nil
 		}
 
+		if len(list.Items) != quantity {
+			return false, err
+		}
+		return true, nil
 	}
 }
