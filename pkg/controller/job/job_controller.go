@@ -55,7 +55,7 @@ const statusUpdateRetries = 3
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
 var (
-	// DefaultJobBackOff is the max backoff period, exported for the e2e test
+	// DefaultJobBackOff is the default backoff period, exported for the e2e test
 	DefaultJobBackOff = 10 * time.Second
 	// MaxJobBackOff is the max backoff period, exported for the e2e test
 	MaxJobBackOff = 360 * time.Second
