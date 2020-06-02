@@ -472,7 +472,7 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeapi.Co
 	return &status, nil
 }
 
-func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.ContainerResources) error {
 	r.Lock()
 	defer r.Unlock()
 

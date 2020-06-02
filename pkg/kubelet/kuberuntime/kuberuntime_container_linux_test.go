@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -363,6 +364,63 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 			got := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target)
 			if diff := cmp.Diff(tc.want, got.SecurityContext.NamespaceOptions); diff != "" {
 				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
+			}
+		})
+	}
+}
+
+func TestGenerateLinuxContainerResources(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "bar",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "busybox",
+				},
+			},
+		},
+	}
+
+	for _, tc := range []struct {
+		name     string
+		limits   v1.ResourceList
+		requests v1.ResourceList
+		expected *runtimeapi.LinuxContainerResources
+	}{
+		{
+			"requests & limits, cpu & memory, guaranteed qos",
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -998},
+		},
+		{
+			"requests & limits, cpu & memory, burstable qos",
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
+		},
+		{
+			"best-effort qos",
+			nil,
+			nil,
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
+		},
+		//TODO: more tests (enable CFS quota)
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{Limits: tc.limits, Requests: tc.requests}
+			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0])
+			if diff.ObjectDiff(resources, tc.expected) != "" {
+				t.Errorf("Test %s: expected resources %+v, but got %+v", tc.name, tc.expected, resources)
 			}
 		})
 	}

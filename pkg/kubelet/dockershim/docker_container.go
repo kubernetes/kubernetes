@@ -436,6 +436,19 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 		Labels:      labels,
 		Annotations: annotations,
 		LogPath:     r.Config.Labels[containerLogPathLabelKey],
+		Resources: &runtimeapi.ContainerResources{
+			R: &runtimeapi.ContainerResources_Linux{
+				Linux: &runtimeapi.LinuxContainerResources{
+					CpuPeriod:          r.ContainerJSONBase.HostConfig.Resources.CPUPeriod,
+					CpuQuota:           r.ContainerJSONBase.HostConfig.Resources.CPUQuota,
+					CpuShares:          r.ContainerJSONBase.HostConfig.Resources.CPUShares,
+					MemoryLimitInBytes: r.ContainerJSONBase.HostConfig.Resources.Memory,
+					OomScoreAdj:        int64(r.ContainerJSONBase.HostConfig.OomScoreAdj),
+					CpusetCpus:         r.ContainerJSONBase.HostConfig.Resources.CpusetCpus,
+					CpusetMems:         r.ContainerJSONBase.HostConfig.Resources.CpusetMems,
+				},
+			},
+		},
 	}
 	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
 }

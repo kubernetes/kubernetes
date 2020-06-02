@@ -939,6 +939,8 @@ message ContainerStatus {
     repeated Mount mounts = 14;
     // Log path of container.
     string log_path = 15;
+    // Resource limits configuration of the container.
+    ContainerResources resources = 16;
 }
 
 message ContainerStatusResponse {
@@ -951,11 +953,23 @@ message ContainerStatusResponse {
     map<string, string> info = 2;
 }
 
+// ContainerResources holds resource limits configuration for a container.
+message ContainerResources {
+    oneof r {
+        // Resource limits configuration specific to Linux container.
+        LinuxContainerResources linux = 1;
+        // Resource limits configuration specific to Windows container.
+        WindowsContainerResources windows = 2;
+    }
+}
+
 message UpdateContainerResourcesRequest {
     // ID of the container to update.
     string container_id = 1;
     // Resource configuration specific to Linux containers.
     LinuxContainerResources linux = 2;
+    // Resource configuration for the container.
+    ContainerResources resources = 3;
 }
 
 message UpdateContainerResourcesResponse {}

@@ -37,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -292,6 +293,21 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	return config, cleanupAction, nil
 }
 
+func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
+	//TODO: Call platform-specific generateContainerResources when windows support is added
+	linuxContainerResources := m.generateLinuxContainerResources(pod, container)
+	containerResources := runtimeapi.ContainerResources{
+		R: &runtimeapi.ContainerResources_Linux{
+			Linux: linuxContainerResources,
+		},
+	}
+	err := m.runtimeService.UpdateContainerResources(containerID.ID, &containerResources)
+	if err != nil {
+		klog.Errorf("Container %q UpdateContainerResources failed with error: %v", containerID.String(), err)
+	}
+	return err
+}
+
 // makeDevices generates container devices for kubelet runtime v1.
 func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeapi.Device {
 	devices := make([]*runtimeapi.Device, len(opts.Devices))
@@ -484,18 +500,45 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
+	var resourceLimits v1.ResourceList
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// If runtime reports cpu & memory limit info, add it to container status
+		statusResources := status.Resources.GetLinux()
+		if statusResources != nil {
+			var cpuLimit, memLimit *resource.Quantity
+			if statusResources.CpuPeriod > 0 {
+				milliCpu := quotaToMilliCPU(statusResources.CpuQuota, statusResources.CpuPeriod)
+				if milliCpu > 0 {
+					cpuLimit = resource.NewMilliQuantity(milliCpu, resource.DecimalSI)
+				}
+			}
+			if statusResources.MemoryLimitInBytes > 0 {
+				memLimit = resource.NewQuantity(statusResources.MemoryLimitInBytes, resource.BinarySI)
+			}
+			if cpuLimit != nil || memLimit != nil {
+				resourceLimits = make(v1.ResourceList)
+			}
+			if cpuLimit != nil {
+				resourceLimits[v1.ResourceCPU] = *cpuLimit
+			}
+			if memLimit != nil {
+				resourceLimits[v1.ResourceMemory] = *memLimit
+			}
+		}
+	}
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
 			ID:   status.Id,
 		},
-		Name:         labeledInfo.ContainerName,
-		Image:        status.Image.Image,
-		ImageID:      status.ImageRef,
-		Hash:         annotatedInfo.Hash,
-		RestartCount: annotatedInfo.RestartCount,
-		State:        toKubeContainerState(status.State),
-		CreatedAt:    time.Unix(0, status.CreatedAt),
+		Name:           labeledInfo.ContainerName,
+		Image:          status.Image.Image,
+		ImageID:        status.ImageRef,
+		Hash:           annotatedInfo.Hash,
+		RestartCount:   annotatedInfo.RestartCount,
+		State:          toKubeContainerState(status.State),
+		CreatedAt:      time.Unix(0, status.CreatedAt),
+		ResourceLimits: resourceLimits,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {

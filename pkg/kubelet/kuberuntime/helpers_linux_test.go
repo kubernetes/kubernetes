@@ -201,3 +201,43 @@ func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 		})
 	}
 }
+
+func TestQuotaToMilliCPU(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		quota    int64
+		period   int64
+		expected int64
+	}{
+		{
+			name:     "50m",
+			quota:    int64(5000),
+			period:   int64(100000),
+			expected: int64(50),
+		},
+		{
+			name:     "750m",
+			quota:    int64(75000),
+			period:   int64(100000),
+			expected: int64(750),
+		},
+		{
+			name:     "1000m",
+			quota:    int64(100000),
+			period:   int64(100000),
+			expected: int64(1000),
+		},
+		{
+			name:     "1500m",
+			quota:    int64(150000),
+			period:   int64(100000),
+			expected: int64(1500),
+		}} {
+		t.Run(tc.name, func(t *testing.T) {
+			milliCpu := quotaToMilliCPU(tc.quota, tc.period)
+			if milliCpu != tc.expected {
+				t.Errorf("Test %s: Input quota %v and period %v, expected milliCpu %v, but got %v", tc.name, tc.quota, tc.period, tc.expected, milliCpu)
+			}
+		})
+	}
+}
