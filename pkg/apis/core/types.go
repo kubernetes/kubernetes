@@ -2851,6 +2851,22 @@ type HostAlias struct {
 	Hostnames []string
 }
 
+// TopologyManagerPolicy defines the supported policies of Topology Manager
+type TopologyManagerPolicy string
+
+const (
+	NoneTopologyManagerPolicy TopologyManagerPolicy = "none"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
+	// pods with NUMA alignment of CPU and device resources.
+	BestEffortTopologyManagerPolicy TopologyManagerPolicy = "best-effort"
+	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with optimal NUMA node alignment for requested resources
+	RestrictedTopologyManagerPolicy TopologyManagerPolicy = "restricted"
+	// SingleNumaNodeTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	SingleNUMANodeTopologyManagerPolicy TopologyManagerPolicy = "single-numa-node"
+)
+
 // Sysctl defines a kernel parameter to be set
 type Sysctl struct {
 	// Name of a property to set

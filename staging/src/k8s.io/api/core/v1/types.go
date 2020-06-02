@@ -3220,6 +3220,22 @@ type HostAlias struct {
 // when volume is mounted.
 type PodFSGroupChangePolicy string
 
+// TopologyManagerPolicy defines the supported policies of Topology Manager
+type TopologyManagerPolicy string
+
+const (
+	NoneTopologyManagerPolicy TopologyManagerPolicy = "none"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
+	// pods with NUMA alignment of CPU and device resources.
+	BestEffortTopologyManagerPolicy TopologyManagerPolicy = "best-effort"
+	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with optimal NUMA node alignment for requested resources
+	RestrictedTopologyManagerPolicy TopologyManagerPolicy = "restricted"
+	// SingleNumaNodeTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	SingleNUMANodeTopologyManagerPolicy TopologyManagerPolicy = "single-numa-node"
+)
+
 const (
 	// FSGroupChangeOnRootMismatch indicates that volume's ownership and permissions will be changed
 	// only when permission and ownership of root directory does not match with expected
