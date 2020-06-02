@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -134,11 +135,18 @@ type RequestConditionType string
 const (
 	CertificateApproved RequestConditionType = "Approved"
 	CertificateDenied   RequestConditionType = "Denied"
+	CertificateFailed   RequestConditionType = "Failed"
 )
 
 type CertificateSigningRequestCondition struct {
-	// request approval state, currently Approved or Denied.
+	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
+	// Status of the condition, one of True, False, Unknown.
+	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// Defaults to "True".
+	// If unset, should be treated as "True".
+	// +optional
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,6,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// brief reason for the request state
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
@@ -148,6 +156,11 @@ type CertificateSigningRequestCondition struct {
 	// timestamp for the last update to this condition
 	// +optional
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
+	// lastTransitionTime is the time the condition last transitioned from one status to another.
+	// If unset, when a new condition type is added or an existing condition's status is changed,
+	// the server defaults this to the current time.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,5,opt,name=lastTransitionTime"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

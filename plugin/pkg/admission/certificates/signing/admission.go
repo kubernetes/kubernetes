@@ -24,10 +24,10 @@ import (
 
 	"k8s.io/klog/v2"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-
 	api "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/plugin/pkg/admission/certificates"
 )
@@ -73,10 +73,10 @@ func NewPlugin() *Plugin {
 
 var csrGroupResource = api.Resource("certificatesigningrequests")
 
-// Validate verifies that the requesting user has permission to approve
+// Validate verifies that the requesting user has permission to sign
 // CertificateSigningRequests for the specified signerName.
 func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	// Ignore all calls to anything other than 'certificatesigningrequests/approval'.
+	// Ignore all calls to anything other than 'certificatesigningrequests/status'.
 	// Ignore all operations other than UPDATE.
 	if a.GetSubresource() != "status" ||
 		a.GetResource().GroupResource() != csrGroupResource {
@@ -92,8 +92,8 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return admission.NewForbidden(a, fmt.Errorf("expected type CertificateSigningRequest, got: %T", a.GetObject()))
 	}
 
-	// only run if the status.certificate field has been changed
-	if reflect.DeepEqual(oldCSR.Status.Certificate, csr.Status.Certificate) {
+	// only run if the status.certificate or status.conditions field has been changed
+	if reflect.DeepEqual(oldCSR.Status.Certificate, csr.Status.Certificate) && apiequality.Semantic.DeepEqual(oldCSR.Status.Conditions, csr.Status.Conditions) {
 		return nil
 	}
 

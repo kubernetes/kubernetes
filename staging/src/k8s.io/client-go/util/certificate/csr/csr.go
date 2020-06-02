@@ -112,17 +112,24 @@ func WaitForCertificate(ctx context.Context, client certificatesclient.Certifica
 			if csr.UID != req.UID {
 				return false, fmt.Errorf("csr %q changed UIDs", csr.Name)
 			}
+			approved := false
 			for _, c := range csr.Status.Conditions {
 				if c.Type == certificates.CertificateDenied {
-					return false, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)
+					return false, fmt.Errorf("certificate signing request is denied, reason: %v, message: %v", c.Reason, c.Message)
+				}
+				if c.Type == certificates.CertificateFailed {
+					return false, fmt.Errorf("certificate signing request failed, reason: %v, message: %v", c.Reason, c.Message)
 				}
 				if c.Type == certificates.CertificateApproved {
-					if csr.Status.Certificate != nil {
-						klog.V(2).Infof("certificate signing request %s is issued", csr.Name)
-						return true, nil
-					}
-					klog.V(2).Infof("certificate signing request %s is approved, waiting to be issued", csr.Name)
+					approved = true
 				}
+			}
+			if approved {
+				if len(csr.Status.Certificate) > 0 {
+					klog.V(2).Infof("certificate signing request %s is issued", csr.Name)
+					return true, nil
+				}
+				klog.V(2).Infof("certificate signing request %s is approved, waiting to be issued", csr.Name)
 			}
 			return false, nil
 		},

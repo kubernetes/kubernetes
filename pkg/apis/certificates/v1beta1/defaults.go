@@ -18,10 +18,12 @@ package v1beta1
 
 import (
 	"crypto/x509"
+	"fmt"
 	"reflect"
 	"strings"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -38,6 +40,12 @@ func SetDefaults_CertificateSigningRequestSpec(obj *certificatesv1beta1.Certific
 	if obj.SignerName == nil {
 		signerName := DefaultSignerNameFromSpec(obj)
 		obj.SignerName = &signerName
+	}
+}
+
+func SetDefaults_CertificateSigningRequestCondition(obj *certificatesv1beta1.CertificateSigningRequestCondition) {
+	if len(obj.Status) == 0 {
+		obj.Status = v1.ConditionTrue
 	}
 }
 
@@ -59,18 +67,34 @@ func DefaultSignerNameFromSpec(obj *certificatesv1beta1.CertificateSigningReques
 	}
 }
 
+var (
+	organizationNotSystemNodesErr = fmt.Errorf("subject organization is not system:nodes")
+	commonNameNotSystemNode       = fmt.Errorf("subject common name does not begin with system:node:")
+	dnsOrIPSANRequiredErr         = fmt.Errorf("DNS or IP subjectAltName is required")
+	dnsSANNotAllowedErr           = fmt.Errorf("DNS subjectAltNames are not allowed")
+	emailSANNotAllowedErr         = fmt.Errorf("Email subjectAltNames are not allowed")
+	ipSANNotAllowedErr            = fmt.Errorf("IP subjectAltNames are not allowed")
+	uriSANNotAllowedErr           = fmt.Errorf("URI subjectAltNames are not allowed")
+)
+
 func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
+	return ValidateKubeletServingCSR(req, usages) == nil
+}
+func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
 	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
-		return false
+		return organizationNotSystemNodesErr
 	}
 
 	// at least one of dnsNames or ipAddresses must be specified
 	if len(req.DNSNames) == 0 && len(req.IPAddresses) == 0 {
-		return false
+		return dnsOrIPSANRequiredErr
 	}
 
-	if len(req.EmailAddresses) > 0 || len(req.URIs) > 0 {
-		return false
+	if len(req.EmailAddresses) > 0 {
+		return emailSANNotAllowedErr
+	}
+	if len(req.URIs) > 0 {
+		return uriSANNotAllowedErr
 	}
 
 	requiredUsages := []certificatesv1beta1.KeyUsage{
@@ -79,27 +103,39 @@ func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1be
 		certificatesv1beta1.UsageServerAuth,
 	}
 	if !equalUnsorted(requiredUsages, usages) {
-		return false
+		return fmt.Errorf("usages did not match %v", requiredUsages)
 	}
 
 	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
-		return false
+		return commonNameNotSystemNode
 	}
 
-	return true
+	return nil
 }
 
 func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
+	return ValidateKubeletClientCSR(req, usages) == nil
+}
+func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
 	if !reflect.DeepEqual([]string{"system:nodes"}, req.Subject.Organization) {
-		return false
+		return organizationNotSystemNodesErr
 	}
 
-	if len(req.DNSNames) > 0 || len(req.EmailAddresses) > 0 || len(req.IPAddresses) > 0 || len(req.URIs) > 0 {
-		return false
+	if len(req.DNSNames) > 0 {
+		return dnsSANNotAllowedErr
+	}
+	if len(req.EmailAddresses) > 0 {
+		return emailSANNotAllowedErr
+	}
+	if len(req.IPAddresses) > 0 {
+		return ipSANNotAllowedErr
+	}
+	if len(req.URIs) > 0 {
+		return uriSANNotAllowedErr
 	}
 
 	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
-		return false
+		return commonNameNotSystemNode
 	}
 
 	requiredUsages := []certificatesv1beta1.KeyUsage{
@@ -108,10 +144,10 @@ func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1bet
 		certificatesv1beta1.UsageClientAuth,
 	}
 	if !equalUnsorted(requiredUsages, usages) {
-		return false
+		return fmt.Errorf("usages did not match %v", requiredUsages)
 	}
 
-	return true
+	return nil
 }
 
 // equalUnsorted compares two []string for equality of contents regardless of
