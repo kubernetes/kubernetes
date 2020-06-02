@@ -35,6 +35,9 @@ type Tunnel interface {
 	// Dial connects to the address on the named network, similar to
 	// what net.Dial does. The only supported protocol is tcp.
 	Dial(protocol, address string) (net.Conn, error)
+
+	// Close closes a GRPC Tunnel
+	Close()
 }
 
 type dialResult struct {
@@ -49,13 +52,30 @@ type grpcTunnel struct {
 	conns           map[int64]*conn
 	pendingDialLock sync.RWMutex
 	connsLock       sync.RWMutex
+	singleUse       bool
+	proxyConn       *grpc.ClientConn
+	stopCh          chan struct{}
+	dialed          chan struct{}
+}
+
+// CreateReusableGrpcTunnel creates a Tunnel to dial to a remote server through a
+// gRPC based proxy service.
+// The Dial() method of the returned tunnel can be called multiple times.
+// The tunnel must be closed by calling Tunnel.Close()
+func CreateReusableGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
+	return createGRPCTunnel(false, address, opts...)
 }
 
 // CreateSingleUseGrpcTunnel creates a Tunnel to dial to a remote server through a
 // gRPC based proxy service.
 // Currently, a single tunnel supports a single connection, and the tunnel is closed when the connection is terminated
 // The Dial() method of the returned tunnel should only be called once
+// The tunnel will automatically close after the initial connection created by the Dial function is closed
 func CreateSingleUseGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
+	return createGRPCTunnel(true, address, opts...)
+}
+
+func createGRPCTunnel(singleUse bool, address string, opts ...grpc.DialOption) (Tunnel, error) {
 	c, err := grpc.Dial(address, opts...)
 	if err != nil {
 		return nil, err
@@ -72,15 +92,19 @@ func CreateSingleUseGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel,
 		stream:      stream,
 		pendingDial: make(map[int64]chan<- dialResult),
 		conns:       make(map[int64]*conn),
+		singleUse:   singleUse,
+		proxyConn:   c,
+		stopCh:      make(chan struct{}),
+		dialed:      make(chan struct{}),
 	}
 
-	go tunnel.serve(c)
+	go tunnel.serve()
 
 	return tunnel, nil
 }
 
-func (t *grpcTunnel) serve(c *grpc.ClientConn) {
-	defer c.Close()
+func (t *grpcTunnel) serve() {
+	defer t.proxyConn.Close()
 
 	for {
 		pkt, err := t.stream.Recv()
@@ -134,9 +158,16 @@ func (t *grpcTunnel) serve(c *grpc.ClientConn) {
 				t.connsLock.Lock()
 				delete(t.conns, resp.ConnectID)
 				t.connsLock.Unlock()
-				return
+				if t.singleUse {
+					t.Close()
+				}
 			}
 			klog.Warningf("connection id %d not recognized", resp.ConnectID)
+		}
+		select {
+		case <-t.stopCh:
+			return
+		default:
 		}
 	}
 }
@@ -144,6 +175,16 @@ func (t *grpcTunnel) serve(c *grpc.ClientConn) {
 // Dial connects to the address on the named network, similar to
 // what net.Dial does. The only supported protocol is tcp.
 func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
+	if t.singleUse {
+		select {
+		case <-t.dialed:
+			klog.Warningf("Dialing multiple times is not permitted on singleUse GRPC Tunnels")
+			return nil, errors.New("Dialing multiple times is not permitted on singleUse GRPC Tunnels")
+		default:
+			close(t.dialed)
+		}
+	}
+
 	if protocol != "tcp" {
 		return nil, errors.New("protocol not supported")
 	}
@@ -196,4 +237,8 @@ func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
 	}
 
 	return c, nil
+}
+
+func (t *grpcTunnel) Close() {
+	close(t.stopCh)
 }
