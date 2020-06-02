@@ -66,3 +66,8 @@ func (az *Cloud) DeleteFileShare(resourceGroup, accountName, shareName string) e
 func (az *Cloud) ResizeFileShare(resourceGroup, accountName, name string, sizeGiB int) error {
 	return az.resizeFileShare(resourceGroup, accountName, name, sizeGiB)
 }
+
+// GetFileShare gets a file share
+func (az *Cloud) GetFileShare(resourceGroupName, accountName, name string) (storage.FileShare, error) {
+	return az.getFileShare(resourceGroupName, accountName, name)
+}

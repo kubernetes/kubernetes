@@ -18,10 +18,15 @@ limitations under the License.
 
 package fileclient
 
+import (
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+)
+
 // Interface is the client interface for creating file shares, interface for test injection.
 // mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/fileclient/interface.go -package=mockfileclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/fileclient/mockfileclient/interface.go
 type Interface interface {
 	CreateFileShare(resourceGroupName, accountName, name string, sizeGiB int) error
 	DeleteFileShare(resourceGroupName, accountName, name string) error
 	ResizeFileShare(resourceGroupName, accountName, name string, sizeGiB int) error
+	GetFileShare(resourceGroupName, accountName, name string) (storage.FileShare, error)
 }
