@@ -31,6 +31,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -325,7 +326,7 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 	controllerSpec := newReplicationController(1)
 
 	err := podControl.DeletePod("namespace-name", "podName", controllerSpec)
-	assert.NoError(t, err, "unexpected error: %v", err)
+	assert.True(t, apierrors.IsNotFound(err))
 }
 
 func TestActivePodFiltering(t *testing.T) {
