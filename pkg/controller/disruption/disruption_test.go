@@ -571,50 +571,6 @@ func TestScaleResource(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, disruptionsAllowed, pods, replicas-maxUnavailable, replicas, map[string]metav1.Time{})
 }
 
-// Verify that multiple controllers doesn't allow the PDB to be set true.
-func TestMultipleControllers(t *testing.T) {
-	const podCount = 2
-
-	dc, ps := newFakeDisruptionController()
-
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("1%"))
-	add(t, dc.pdbStore, pdb)
-
-	pods := []*v1.Pod{}
-	for i := 0; i < podCount; i++ {
-		pod, _ := newPod(t, fmt.Sprintf("pod %d", i))
-		pods = append(pods, pod)
-		add(t, dc.podStore, pod)
-	}
-
-	dc.sync(pdbName)
-
-	// No controllers yet => no disruption allowed
-	ps.VerifyDisruptionAllowed(t, pdbName, 0)
-
-	rc, _ := newReplicationController(t, 1)
-	rc.Name = "rc 1"
-	for i := 0; i < podCount; i++ {
-		updatePodOwnerToRc(t, pods[i], rc)
-	}
-	add(t, dc.rcStore, rc)
-	dc.sync(pdbName)
-	// One RC and 200%>1% healthy => disruption allowed
-	ps.VerifyDisruptionAllowed(t, pdbName, 1)
-
-	rc, _ = newReplicationController(t, 1)
-	rc.Name = "rc 2"
-	for i := 0; i < podCount; i++ {
-		updatePodOwnerToRc(t, pods[i], rc)
-	}
-	add(t, dc.rcStore, rc)
-	dc.sync(pdbName)
-
-	// 100%>1% healthy BUT two RCs => no disruption allowed
-	// TODO: Find out if this assert is still needed
-	//ps.VerifyDisruptionAllowed(t, pdbName, 0)
-}
-
 func TestReplicationController(t *testing.T) {
 	// The budget in this test matches foo=bar, but the RC and its pods match
 	// {foo=bar, baz=quux}.  Later, when we add a rogue pod with only a foo=bar

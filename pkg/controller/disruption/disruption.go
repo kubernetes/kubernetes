@@ -636,9 +636,8 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 	// and each C_pi is the set of controllers controlling the pod pi
 
 	// k8s only defines what will happens when 0 or 1 controllers control a
-	// given pod.  We explicitly exclude the 0 controllers case here, and we
-	// report an error if we find a pod with more than 1 controller.  Thus in
-	// practice each C_pi is a set of exactly 1 controller.
+	// given pod.  We explicitly exclude the 0 controllers case here.
+	// Thus in practice each C_pi is a set of exactly 1 controller.
 
 	// A mapping from controllers to their scale.
 	controllerScale := map[types.UID]int32{}
