@@ -181,6 +181,11 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
 	}
+
+	// InPlacePodVerticalScaling
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("pods").RuleOrDie())
+	}
 	return nodePolicyRules
 }
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
@@ -200,6 +202,12 @@ func (p *Plugin) admitPod(nodeName string, a admission.Attributes) error {
 		}
 		return nil
 
+	case admission.Update:
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			return p.admitPodUpdate(nodeName, a)
+		}
+		fallthrough
+
 	default:
 		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q, node %q can only create and delete mirror pods", a.GetOperation(), nodeName))
 	}
@@ -271,6 +279,46 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 		}
 	}
 
+	return nil
+}
+
+func (p *Plugin) admitPodUpdate(nodeName string, a admission.Attributes) error {
+	// require a pod object
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	// only allow a node to update a pod bound to itself
+	if pod.Spec.NodeName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can only update pods with spec.nodeName set to itself", nodeName))
+	}
+
+	// Allow updates only to ResourcesAllocated field
+	oldPod, ok := a.GetOldObject().(*api.Pod)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	// Check to see if node is changing number of containers
+	if len(pod.Spec.Containers) != len(oldPod.Spec.Containers) {
+		return admission.NewForbidden(a, fmt.Errorf("node %q cannot change number of containers", nodeName))
+	}
+
+	oldPodCopy := oldPod.DeepCopy()
+	// Node can only update ResourcesAllocated field for CPU and memory
+	for i := range oldPodCopy.Spec.Containers {
+		if r, found := pod.Spec.Containers[i].ResourcesAllocated[api.ResourceCPU]; found {
+			oldPodCopy.Spec.Containers[i].ResourcesAllocated[api.ResourceCPU] = r.DeepCopy()
+		}
+		if r, found := pod.Spec.Containers[i].ResourcesAllocated[api.ResourceMemory]; found {
+			oldPodCopy.Spec.Containers[i].ResourcesAllocated[api.ResourceMemory] = r.DeepCopy()
+		}
+	}
+	if !reflect.DeepEqual(pod.Spec, oldPodCopy.Spec) {
+		// TODO: return mutable fields set instead of below
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation node %q is only allowed to update ResourcesAllocated field of the Pod's containers: %+v", nodeName, diff.ObjectReflectDiff(oldPod.Spec, pod.Spec)))
+	}
 	return nil
 }
 

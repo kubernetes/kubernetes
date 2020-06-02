@@ -444,6 +444,14 @@ func dropDisabledFields(
 		podSpec.SetHostnameAsFQDN = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
+		// Drop ResourcesAllocated and ResizePolicy fields. Don't drop updates to Resources field because
+		// template spec Resources field is mutable for certain controllers. Let ValidatePodUpdate handle it.
+		for i := range podSpec.Containers {
+			podSpec.Containers[i].ResourcesAllocated = nil
+			podSpec.Containers[i].ResizePolicy = nil
+		}
+	}
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
@@ -557,6 +565,22 @@ func overheadInUse(podSpec *api.PodSpec) bool {
 		return true
 	}
 	return false
+}
+
+// inPlacePodVerticalScalingInUse returns true if the pod spec is non-nil and has ResizePolicy or ResourcesAllocated set
+func inPlacePodVerticalScalingInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if (c.ResourcesAllocated != nil && len(c.ResourcesAllocated) > 0) || len(c.ResizePolicy) > 0 {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value

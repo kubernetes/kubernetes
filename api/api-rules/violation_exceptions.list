@@ -80,6 +80,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,Container,Args
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,Command
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,Env
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,EnvFrom
+API rule violation: list_type_missing,k8s.io/api/core/v1,Container,ResizePolicy
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,VolumeDevices
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,VolumeMounts
 API rule violation: list_type_missing,k8s.io/api/core/v1,ContainerImage,Names
@@ -94,6 +95,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommo
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Env
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,EnvFrom
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,Ports
+API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,ResizePolicy
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeDevices
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainerCommon,VolumeMounts
 API rule violation: list_type_missing,k8s.io/api/core/v1,EphemeralContainers,EphemeralContainers

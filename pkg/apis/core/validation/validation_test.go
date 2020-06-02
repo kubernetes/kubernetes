@@ -5510,10 +5510,102 @@ func TestValidatePullPolicy(t *testing.T) {
 	}
 }
 
-func getResourceLimits(cpu, memory string) core.ResourceList {
+func TestValidateResizePolicy(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	type T struct {
+		PolicyList  []core.ResizePolicy
+		ExpectError bool
+	}
+	testCases := map[string]T{
+		"ValidCPUandMemoryPolicies": {
+			[]core.ResizePolicy{
+				{ResourceName: "cpu", Policy: "NoRestart"},
+				{ResourceName: "memory", Policy: "RestartContainer"},
+			},
+			false,
+		},
+		"ValidCPUPolicy": {
+			[]core.ResizePolicy{
+				{ResourceName: "cpu", Policy: "RestartContainer"},
+			},
+			false,
+		},
+		"ValidMemoryPolicy": {
+			[]core.ResizePolicy{
+				{ResourceName: "memory", Policy: "NoRestart"},
+			},
+			false,
+		},
+		"NoPolicy": {
+			[]core.ResizePolicy{},
+			false,
+		},
+		"ValidCPUandInvalidMemoryPolicy": {
+			[]core.ResizePolicy{
+				{ResourceName: "cpu", Policy: "NoRestart"},
+				{ResourceName: "memory", Policy: "RestartContainerrr"},
+			},
+			true,
+		},
+		"ValidMemoryandInvalidCPUPolicy": {
+			[]core.ResizePolicy{
+				{ResourceName: "cpu", Policy: "NoRestarttt"},
+				{ResourceName: "memory", Policy: "RestartContainer"},
+			},
+			true,
+		},
+		"InvalidResourceNameValidPolicy": {
+			[]core.ResizePolicy{
+				{ResourceName: "cpuuu", Policy: "NoRestart"},
+			},
+			true,
+		},
+		"ValidResourceNameMissingPolicy": {
+			[]core.ResizePolicy{
+				{ResourceName: "memory", Policy: ""},
+			},
+			true,
+		},
+		"RepeatedPolicies": {
+			[]core.ResizePolicy{
+				{ResourceName: "cpu", Policy: "NoRestart"},
+				{ResourceName: "memory", Policy: "RestartContainer"},
+				{ResourceName: "cpu", Policy: "RestartContainer"},
+			},
+			true,
+		},
+	}
+	for k, v := range testCases {
+		errs := validateResizePolicy(v.PolicyList, field.NewPath("field"))
+		if !v.ExpectError && len(errs) > 0 {
+			t.Errorf("Testcase %s - expected success, got error: %+v", k, errs)
+		}
+		if v.ExpectError && len(errs) == 0 {
+			t.Errorf("Testcase %s - expected error, got success", k)
+		}
+	}
+}
+
+func getResourceLimits(resTypes ...string) core.ResourceList {
 	res := core.ResourceList{}
-	res[core.ResourceCPU] = resource.MustParse(cpu)
-	res[core.ResourceMemory] = resource.MustParse(memory)
+	switch len(resTypes) {
+	case 3:
+		if resTypes[2] != "" {
+			res[core.ResourceEphemeralStorage] = resource.MustParse(resTypes[2])
+		}
+		fallthrough
+	case 2:
+		if resTypes[1] != "" {
+			res[core.ResourceMemory] = resource.MustParse(resTypes[1])
+		}
+		fallthrough
+	case 1:
+		if resTypes[0] != "" {
+			res[core.ResourceCPU] = resource.MustParse(resTypes[0])
+		}
+		fallthrough
+	default:
+	}
 	return res
 }
 
@@ -8287,6 +8379,7 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 	var (
 		activeDeadlineSecondsZero     = int64(0)
 		activeDeadlineSecondsNegative = int64(-30)
@@ -8741,33 +8834,682 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
 						{
-							Image: "foo:V1",
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
 							Resources: core.ResourceRequirements{
-								Limits: getResourceLimits("100m", "0"),
+								Limits: getResourceLimits("200m", "0", "1Gi"),
 							},
 						},
 					},
 				},
 			},
 			core.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
 						{
-							Image: "foo:V2",
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
 							Resources: core.ResourceRequirements{
-								Limits: getResourceLimits("1000m", "0"),
+								Limits: getResourceLimits("100m", "0", "1Gi"),
 							},
 						},
 					},
 				},
 			},
-			"spec: Forbidden: pod updates may not change fields",
-			"cpu change",
+			"",
+			"cpu limit change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("100m", "200Mi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"memory limit change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("100m", "100Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("100m", "100Mi", "2Gi"),
+							},
+						},
+					},
+				},
+			},
+			"Forbidden: pod updates may not change fields other than",
+			"storage limit change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "0"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("200m", "0"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"cpu request change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("0", "200Mi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("0", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"memory request change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "0", "2Gi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "0", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			"Forbidden: pod updates may not change fields other than",
+			"storage request change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							ResourcesAllocated:       getResourceLimits("100m", "0"),
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							ResourcesAllocated:       getResourceLimits("200m", "0"),
+						},
+					},
+				},
+			},
+			"",
+			"cpu resource allocation change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							ResourcesAllocated:       getResourceLimits("0", "200Mi"),
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							ResourcesAllocated:       getResourceLimits("0", "100Mi"),
+						},
+					},
+				},
+			},
+			"",
+			"memory resource allocation change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							ResourcesAllocated:       getResourceLimits("100m", "0", "1Gi"),
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							ResourcesAllocated:       getResourceLimits("200m", "0", "2Gi"),
+						},
+					},
+				},
+			},
+			"Forbidden: pod updates may not change fields other than",
+			"storage resource allocation change",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "400Mi", "1Gi"),
+								Requests: getResourceLimits("200m", "400Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("100m", "100Mi", "1Gi"),
+								Requests: getResourceLimits("100m", "100Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"Pod QoS unchanged, guaranteed -> guaranteed",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi", "2Gi"),
+								Requests: getResourceLimits("100m", "100Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V1",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("400m", "400Mi", "2Gi"),
+								Requests: getResourceLimits("200m", "200Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"Pod QoS unchanged, burstable -> burstable",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"Pod QoS unchanged, burstable -> burstable, add limits",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"Pod QoS unchanged, burstable -> burstable, remove limits",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("400m", "", "1Gi"),
+								Requests: getResourceLimits("300m", "", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("200m", "500Mi", "1Gi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"Pod QoS unchanged, burstable -> burstable, add requests",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits: getResourceLimits("400m", "500Mi", "2Gi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "300Mi", "2Gi"),
+								Requests: getResourceLimits("100m", "200Mi"),
+							},
+						},
+					},
+				},
+			},
+			"",
+			"Pod QoS unchanged, burstable -> burstable, remove requests",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("100m", "100Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			"Pod QoS is immutable",
+			"Pod QoS change, guaranteed -> burstable",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("100m", "100Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			"Pod QoS is immutable",
+			"Pod QoS change, burstable -> guaranteed",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+						},
+					},
+				},
+			},
+			"Pod QoS is immutable",
+			"Pod QoS change, besteffort -> burstable",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+						},
+					},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:                     "container",
+							TerminationMessagePolicy: "File",
+							ImagePullPolicy:          "Always",
+							Image:                    "foo:V2",
+							Resources: core.ResourceRequirements{
+								Limits:   getResourceLimits("200m", "200Mi"),
+								Requests: getResourceLimits("100m", "100Mi"),
+							},
+						},
+					},
+				},
+			},
+			"Pod QoS is immutable",
+			"Pod QoS change, burstable -> besteffort",
 		},
 		{
 			core.Pod{
