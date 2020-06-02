@@ -25,14 +25,15 @@ import (
 	"fmt"
 	"time"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,20 +42,20 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Certificates API", func() {
+var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("certificates")
 
 	/*
 		Release: v1.19
 		Testname: CertificateSigningRequest API Client Certificate
 		Description:
-		- The certificatesigningrequests resource must accept a request for a certificate signed by kubernetes.io/kube-apiserver-client.
-		- The issued certificate must be valid as a client certificate used to authenticate to the kube-apiserver.
+		The certificatesigningrequests resource must accept a request for a certificate signed by kubernetes.io/kube-apiserver-client.
+		The issued certificate must be valid as a client certificate used to authenticate to the kube-apiserver.
 	*/
-	ginkgo.It("should support building a client with a CSR", func() {
+	framework.ConformanceIt("should support building a client with a CSR", func() {
 		const commonName = "tester-csr"
 
-		csrClient := f.ClientSet.CertificatesV1beta1().CertificateSigningRequests()
+		csrClient := f.ClientSet.CertificatesV1().CertificateSigningRequests()
 
 		pk, err := utils.NewPrivateKey()
 		framework.ExpectNoError(err)
@@ -68,19 +69,18 @@ var _ = SIGDescribe("Certificates API", func() {
 		csrb, err := cert.MakeCSR(pk, &pkix.Name{CommonName: commonName}, nil, nil)
 		framework.ExpectNoError(err)
 
-		apiserverClientSigner := certificatesv1beta1.KubeAPIServerClientSignerName
-		csrTemplate := &certificatesv1beta1.CertificateSigningRequest{
+		csrTemplate := &certificatesv1.CertificateSigningRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: commonName + "-",
 			},
-			Spec: certificatesv1beta1.CertificateSigningRequestSpec{
+			Spec: certificatesv1.CertificateSigningRequestSpec{
 				Request: csrb,
-				Usages: []certificatesv1beta1.KeyUsage{
-					certificatesv1beta1.UsageDigitalSignature,
-					certificatesv1beta1.UsageKeyEncipherment,
-					certificatesv1beta1.UsageClientAuth,
+				Usages: []certificatesv1.KeyUsage{
+					certificatesv1.UsageDigitalSignature,
+					certificatesv1.UsageKeyEncipherment,
+					certificatesv1.UsageClientAuth,
 				},
-				SignerName: &apiserverClientSigner,
+				SignerName: certificatesv1.KubeAPIServerClientSignerName,
 			},
 		}
 
@@ -121,14 +121,15 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		framework.Logf("approving CSR")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
-			csr.Status.Conditions = []certificatesv1beta1.CertificateSigningRequestCondition{
+			csr.Status.Conditions = []certificatesv1.CertificateSigningRequestCondition{
 				{
-					Type:    certificatesv1beta1.CertificateApproved,
+					Type:    certificatesv1.CertificateApproved,
+					Status:  v1.ConditionTrue,
 					Reason:  "E2E",
 					Message: "Set from an e2e test",
 				},
 			}
-			csr, err = csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+			csr, err = csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 			if err != nil {
 				csr, _ = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{})
 				framework.Logf("err updating approval: %v", err)
@@ -174,20 +175,20 @@ var _ = SIGDescribe("Certificates API", func() {
 		Release: v1.19
 		Testname: CertificateSigningRequest API
 		Description:
-		- The certificates.k8s.io API group MUST exists in the /apis discovery document.
-		- The certificates.k8s.io/v1beta1 API group/version MUST exist in the /apis/certificates.k8s.io discovery document.
-		- The certificatesigningrequests, certificatesigningrequests/approval, and certificatesigningrequests/status
-		  resources MUST exist in the /apis/certificates.k8s.io/v1beta1 discovery document.
-		- The certificatesigningrequests resource must support create, get, list, watch, update, patch, delete, and deletecollection.
-		- The certificatesigningrequests/approval resource must support get, update, patch.
-		- The certificatesigningrequests/status resource must support get, update, patch.
+		The certificates.k8s.io API group MUST exists in the /apis discovery document.
+		The certificates.k8s.io/v1 API group/version MUST exist in the /apis/certificates.k8s.io discovery document.
+		The certificatesigningrequests, certificatesigningrequests/approval, and certificatesigningrequests/status
+		  resources MUST exist in the /apis/certificates.k8s.io/v1 discovery document.
+		The certificatesigningrequests resource must support create, get, list, watch, update, patch, delete, and deletecollection.
+		The certificatesigningrequests/approval resource must support get, update, patch.
+		The certificatesigningrequests/status resource must support get, update, patch.
 	*/
-	ginkgo.It("should support CSR API operations [Privileged:ClusterAdmin]", func() {
+	framework.ConformanceIt("should support CSR API operations", func() {
 
 		// Setup
-		csrVersion := "v1beta1"
-		csrClient := f.ClientSet.CertificatesV1beta1().CertificateSigningRequests()
-		csrResource := certificatesv1beta1.SchemeGroupVersion.WithResource("certificatesigningrequests")
+		csrVersion := "v1"
+		csrClient := f.ClientSet.CertificatesV1().CertificateSigningRequests()
+		csrResource := certificatesv1.SchemeGroupVersion.WithResource("certificatesigningrequests")
 
 		pk, err := utils.NewPrivateKey()
 		framework.ExpectNoError(err)
@@ -201,12 +202,12 @@ var _ = SIGDescribe("Certificates API", func() {
 		framework.ExpectNoError(err)
 
 		signerName := "example.com/e2e-" + f.UniqueName
-		csrTemplate := &certificatesv1beta1.CertificateSigningRequest{
+		csrTemplate := &certificatesv1.CertificateSigningRequest{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-csr-"},
-			Spec: certificatesv1beta1.CertificateSigningRequestSpec{
+			Spec: certificatesv1.CertificateSigningRequestSpec{
 				Request:    csrData,
-				SignerName: &signerName,
-				Usages:     []certificatesv1beta1.KeyUsage{certificatesv1beta1.UsageDigitalSignature, certificatesv1beta1.UsageKeyEncipherment, certificatesv1beta1.UsageServerAuth},
+				SignerName: signerName,
+				Usages:     []certificatesv1.KeyUsage{certificatesv1.UsageDigitalSignature, certificatesv1.UsageKeyEncipherment, certificatesv1.UsageServerAuth},
 			},
 		}
 
@@ -218,7 +219,7 @@ var _ = SIGDescribe("Certificates API", func() {
 			framework.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
-				if group.Name == certificatesv1beta1.GroupName {
+				if group.Name == certificatesv1.GroupName {
 					for _, version := range group.Versions {
 						if version.Version == csrVersion {
 							found = true
@@ -247,7 +248,7 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		ginkgo.By("getting /apis/certificates.k8s.io/" + csrVersion)
 		{
-			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(certificatesv1beta1.SchemeGroupVersion.String())
+			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(certificatesv1.SchemeGroupVersion.String())
 			framework.ExpectNoError(err)
 			foundCSR, foundApproval, foundStatus := false, false, false
 			for _, resource := range resources.APIResources {
@@ -308,7 +309,7 @@ var _ = SIGDescribe("Certificates API", func() {
 			case evt, ok := <-csrWatch.ResultChan():
 				framework.ExpectEqual(ok, true, "watch channel should not close")
 				framework.ExpectEqual(evt.Type, watch.Modified)
-				watchedCSR, isCSR := evt.Object.(*certificatesv1beta1.CertificateSigningRequest)
+				watchedCSR, isCSR := evt.Object.(*certificatesv1.CertificateSigningRequest)
 				framework.ExpectEqual(isCSR, true, fmt.Sprintf("expected CSR, got %T", evt.Object))
 				if watchedCSR.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")
@@ -327,7 +328,7 @@ var _ = SIGDescribe("Certificates API", func() {
 		ginkgo.By("getting /approval")
 		gottenApproval, err := f.DynamicClient.Resource(csrResource).Get(context.TODO(), createdCSR.Name, metav1.GetOptions{}, "approval")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenApproval.GetObjectKind().GroupVersionKind(), certificatesv1beta1.SchemeGroupVersion.WithKind("CertificateSigningRequest"))
+		framework.ExpectEqual(gottenApproval.GetObjectKind().GroupVersionKind(), certificatesv1.SchemeGroupVersion.WithKind("CertificateSigningRequest"))
 		framework.ExpectEqual(gottenApproval.GetUID(), createdCSR.UID)
 
 		ginkgo.By("patching /approval")
@@ -341,22 +342,23 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		ginkgo.By("updating /approval")
 		approvalToUpdate := patchedApproval.DeepCopy()
-		approvalToUpdate.Status.Conditions = append(approvalToUpdate.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-			Type:    certificatesv1beta1.CertificateApproved,
+		approvalToUpdate.Status.Conditions = append(approvalToUpdate.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+			Type:    certificatesv1.CertificateApproved,
+			Status:  v1.ConditionTrue,
 			Reason:  "E2E",
 			Message: "Set from an e2e test",
 		})
-		updatedApproval, err := csrClient.UpdateApproval(context.TODO(), approvalToUpdate, metav1.UpdateOptions{})
+		updatedApproval, err := csrClient.UpdateApproval(context.TODO(), approvalToUpdate.Name, approvalToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(updatedApproval.Status.Conditions), 2, fmt.Sprintf("updated object should have the applied condition, got %#v", updatedApproval.Status.Conditions))
-		framework.ExpectEqual(updatedApproval.Status.Conditions[1].Type, certificatesv1beta1.CertificateApproved, fmt.Sprintf("updated object should have the approved condition, got %#v", updatedApproval.Status.Conditions))
+		framework.ExpectEqual(updatedApproval.Status.Conditions[1].Type, certificatesv1.CertificateApproved, fmt.Sprintf("updated object should have the approved condition, got %#v", updatedApproval.Status.Conditions))
 
 		// /status subresource operations
 
 		ginkgo.By("getting /status")
 		gottenStatus, err := f.DynamicClient.Resource(csrResource).Get(context.TODO(), createdCSR.Name, metav1.GetOptions{}, "status")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenStatus.GetObjectKind().GroupVersionKind(), certificatesv1beta1.SchemeGroupVersion.WithKind("CertificateSigningRequest"))
+		framework.ExpectEqual(gottenStatus.GetObjectKind().GroupVersionKind(), certificatesv1.SchemeGroupVersion.WithKind("CertificateSigningRequest"))
 		framework.ExpectEqual(gottenStatus.GetUID(), createdCSR.UID)
 
 		ginkgo.By("patching /status")
@@ -369,8 +371,9 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		ginkgo.By("updating /status")
 		statusToUpdate := patchedStatus.DeepCopy()
-		statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+		statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
 			Type:    "StatusUpdate",
+			Status:  v1.ConditionTrue,
 			Reason:  "E2E",
 			Message: "Set from an e2e test",
 		})

@@ -1301,6 +1301,27 @@
     StorageClass or a dynamic provisioner.
   release: v1.9
   file: test/e2e/apps/statefulset.go
+- testname: CertificateSigningRequest API
+  codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
+    CSR API operations [Conformance]'
+  description: ' The certificates.k8s.io API group MUST exists in the /apis discovery
+    document. The certificates.k8s.io/v1 API group/version MUST exist in the /apis/certificates.k8s.io
+    discovery document. The certificatesigningrequests, certificatesigningrequests/approval,
+    and certificatesigningrequests/status resources MUST exist in the /apis/certificates.k8s.io/v1
+    discovery document. The certificatesigningrequests resource must support create,
+    get, list, watch, update, patch, delete, and deletecollection. The certificatesigningrequests/approval
+    resource must support get, update, patch. The certificatesigningrequests/status
+    resource must support get, update, patch.'
+  release: v1.19
+  file: test/e2e/auth/certificates.go
+- testname: CertificateSigningRequest API Client Certificate
+  codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
+    building a client with a CSR [Conformance]'
+  description: ' The certificatesigningrequests resource must accept a request for
+    a certificate signed by kubernetes.io/kube-apiserver-client. The issued certificate
+    must be valid as a client certificate used to authenticate to the kube-apiserver.'
+  release: v1.19
+  file: test/e2e/auth/certificates.go
 - testname: Service account tokens auto mount optionally
   codename: '[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance]'
   description: Ensure that Service Account keys are mounted into the Pod only when
