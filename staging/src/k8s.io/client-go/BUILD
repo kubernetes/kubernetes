@@ -37,6 +37,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/batch/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/batch/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/batch/v2alpha1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/certificates/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/certificates/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/coordination/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/coordination/v1beta1:all-srcs",
