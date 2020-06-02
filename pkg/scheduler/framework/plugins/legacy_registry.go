@@ -213,7 +213,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 			NodeAffinityPriority:        1,
 			TaintTolerationPriority:     1,
 			ImageLocalityPriority:       1,
-			EvenPodsSpreadPriority:      1,
+			EvenPodsSpreadPriority:      2,
 		},
 
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
