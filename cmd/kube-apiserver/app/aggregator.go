@@ -263,6 +263,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v1"}:                              {group: 17400, version: 15},
 	{Group: "batch", Version: "v1beta1"}:                         {group: 17400, version: 9},
 	{Group: "batch", Version: "v2alpha1"}:                        {group: 17400, version: 9},
+	{Group: "certificates.k8s.io", Version: "v1"}:                {group: 17300, version: 15},
 	{Group: "certificates.k8s.io", Version: "v1beta1"}:           {group: 17300, version: 9},
 	{Group: "networking.k8s.io", Version: "v1"}:                  {group: 17200, version: 15},
 	{Group: "networking.k8s.io", Version: "v1beta1"}:             {group: 17200, version: 9},
