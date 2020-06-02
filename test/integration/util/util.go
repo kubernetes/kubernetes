@@ -219,9 +219,25 @@ func AddTaintToNode(cs clientset.Interface, nodeName string, taint v1.Taint) err
 	if err != nil {
 		return err
 	}
-	copy := node.DeepCopy()
-	copy.Spec.Taints = append(copy.Spec.Taints, taint)
-	_, err = cs.CoreV1().Nodes().Update(context.TODO(), copy, metav1.UpdateOptions{})
+	node.Spec.Taints = append(node.Spec.Taints, taint)
+	_, err = cs.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+	return err
+}
+
+// RemoveTaintOffNode removes a specific taint from a node
+func RemoveTaintOffNode(cs clientset.Interface, nodeName string, taint v1.Taint) error {
+	node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	var taints []v1.Taint
+	for _, t := range node.Spec.Taints {
+		if !t.MatchTaint(&taint) {
+			taints = append(taints, t)
+		}
+	}
+	node.Spec.Taints = taints
+	_, err = cs.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 	return err
 }
 

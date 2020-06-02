@@ -1051,8 +1051,35 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				Name: "pod-1",
 			},
 			update: func(cs kubernetes.Interface) error {
-				_, err := createNode(cs, "node-1", nil)
-				return err
+				_, err := createNode(cs, "node-added", nil)
+				if err != nil {
+					return fmt.Errorf("cannot create node: %v", err)
+				}
+				return nil
+			},
+		},
+		{
+			name: "node gets taint removed",
+			init: func(cs kubernetes.Interface) error {
+				node, err := createNode(cs, "node-tainted", nil)
+				if err != nil {
+					return fmt.Errorf("cannot create node: %v", err)
+				}
+				taint := v1.Taint{Key: "test", Value: "test", Effect: v1.TaintEffectNoSchedule}
+				if err := testutils.AddTaintToNode(cs, node.Name, taint); err != nil {
+					return fmt.Errorf("cannot add taint to node: %v", err)
+				}
+				return nil
+			},
+			pod: &pausePodConfig{
+				Name: "pod-1",
+			},
+			update: func(cs kubernetes.Interface) error {
+				taint := v1.Taint{Key: "test", Value: "test", Effect: v1.TaintEffectNoSchedule}
+				if err := testutils.RemoveTaintOffNode(cs, "node-tainted", taint); err != nil {
+					return fmt.Errorf("cannot remove taint off node: %v", err)
+				}
+				return nil
 			},
 		},
 		// TODO(#91111): Add more test cases.
@@ -1061,6 +1088,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			testCtx := initTest(t, "scheduler-informer")
 			defer testutils.CleanupTest(t, testCtx)
+
 			if tt.init != nil {
 				if err := tt.init(testCtx.ClientSet); err != nil {
 					t.Fatal(err)
