@@ -1224,18 +1224,22 @@ function Verify-WorkerServices {
   Log_Todo "run more verification commands."
 }
 
-# Downloads crictl.exe and installs it in $env:NODE_DIR.
+# Downloads the Windows crictl package and installs its contents (e.g.
+# crictl.exe) in $env:NODE_DIR.
 function DownloadAndInstall-Crictl {
   if (-not (ShouldWrite-File ${env:NODE_DIR}\crictl.exe)) {
     return
   }
-  $url = ('https://storage.googleapis.com/kubernetes-release/crictl/' +
-      'crictl-' + $CRICTL_VERSION + '-windows-amd64.exe')
+  $CRI_TOOLS_GCS_BUCKET = 'k8s-artifacts-cri-tools'
+  $url = ('https://storage.googleapis.com/' + $CRI_TOOLS_GCS_BUCKET +
+          '/release/' + $CRICTL_VERSION + '/crictl-' + $CRICTL_VERSION +
+          '-windows-amd64.tar.gz')
   MustDownload-File `
       -URLs $url `
-      -OutFile ${env:NODE_DIR}\crictl.exe `
+      -OutFile ${env:NODE_DIR}\crictl.tar.gz `
       -Hash $CRICTL_SHA256 `
       -Algorithm SHA256
+  tar xzvf ${env:NODE_DIR}\crictl.tar.gz -C ${env:NODE_DIR}
 }
 
 # Sets crictl configuration values.
