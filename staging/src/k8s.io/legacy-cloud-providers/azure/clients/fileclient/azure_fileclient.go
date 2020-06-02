@@ -89,3 +89,8 @@ func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, si
 
 	return nil
 }
+
+// GetFileShare gets a file share
+func (c *Client) GetFileShare(resourceGroupName, accountName, name string) (storage.FileShare, error) {
+	return c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name)
+}
