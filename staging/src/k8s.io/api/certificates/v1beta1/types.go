@@ -49,6 +49,7 @@ type CertificateSigningRequest struct {
 // Kubernetes and cannot be modified by users.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
+	// +listType=atomic
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// Requested signer for the request. It is a qualified name in the form:
@@ -68,6 +69,7 @@ type CertificateSigningRequestSpec struct {
 	// valid for.
 	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	// +listType=atomic
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// Information about the requesting user.
@@ -80,6 +82,7 @@ type CertificateSigningRequestSpec struct {
 	UID string `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid"`
 	// Group information about the requesting user.
 	// See user.Info interface for details.
+	// +listType=atomic
 	// +optional
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,4,rep,name=groups"`
 	// Extra information about the requesting user.
@@ -121,10 +124,13 @@ func (t ExtraValue) String() string {
 
 type CertificateSigningRequestStatus struct {
 	// Conditions applied to the request, such as approval or denial.
+	// +listType=map
+	// +listMapKey=type
 	// +optional
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
+	// +listType=atomic
 	// +optional
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }
