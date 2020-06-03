@@ -1296,7 +1296,7 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 //   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
 //   expectedWatchEvents array of events which are expected to occur
 //   scenario            the test itself
-//   retryCleanup             a function to run which ensures that there are no dangling resources upon test failure
+//   retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
 func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
 	initResource, err := dc.Resource(resourceType).Namespace(namespace).List(ctx, listOptions)
 	ExpectNoError(err, "Failed to fetch initial resource")
@@ -1335,7 +1335,7 @@ retriesLoop:
 			totalValidWatchEvents++
 		}
 		err := retryCleanup()
-		ExpectNoError(err, "Error occured when cleaning up resources")
+		ExpectNoError(err, "Error occurred when cleaning up resources")
 		if errs.Len() > 0 && try < retries {
 			fmt.Println("invariants violated:\n", strings.Join(errs.List(), "\n - "))
 			continue retriesLoop
