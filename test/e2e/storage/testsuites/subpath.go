@@ -235,7 +235,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		TestBasicSubpath(f, f.Namespace.Name, l.pod)
 	})
 
-	ginkgo.It("should fail if subpath directory is outside the volume [Slow]", func() {
+	ginkgo.It("should fail if subpath directory is outside the volume [Slow][LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
@@ -273,7 +273,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		testPodFailSubpath(f, l.pod, false)
 	})
 
-	ginkgo.It("should fail if subpath with backstepping is outside the volume [Slow]", func() {
+	ginkgo.It("should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
@@ -444,6 +444,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		// Change volume container to busybox so we can exec later
 		l.pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 		l.pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
+		l.pod.Spec.Containers[1].Args = nil
 
 		ginkgo.By(fmt.Sprintf("Creating pod %s", l.pod.Name))
 		removeUnusedContainers(l.pod)
@@ -615,8 +616,14 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 }
 
 func containerIsUnused(container *v1.Container) bool {
+<<<<<<< HEAD
 	// mountImage with nil Args does nothing. Leave everything else
 	return container.Image == mountImage && container.Args == nil
+=======
+	// mountImage with nil command and nil Args or with just "mounttest" as Args does nothing. Leave everything else
+	return container.Image == mountImage && container.Command == nil &&
+		(container.Args == nil || (len(container.Args) == 1 && container.Args[0] == "mounttest"))
+>>>>>>> Fix subPath tests for Windows
 }
 
 // removeUnusedContainers removes containers from a SubpathTestPod that aren't
@@ -824,9 +831,10 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 
 	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 	pod.Spec.Containers[0].Command = volume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[0].Args = nil
 	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 	pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
-
+	pod.Spec.Containers[1].Args = nil
 	hooks.AddLivenessProbe(pod, probeFilePath)
 
 	// Start pod
@@ -995,11 +1003,20 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	}
 
 	// Change to busybox
+<<<<<<< HEAD
 	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 	pod.Spec.Containers[0].Command = volume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 	pod.Spec.Containers[1].Command = volume.GenerateScriptCmd("sleep 100000")
 
+=======
+	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[0].Args = nil
+	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[1].Args = nil
+>>>>>>> Fix subPath tests for Windows
 	// If grace period is too short, then there is not enough time for the volume
 	// manager to cleanup the volumes
 	gracePeriod := int64(30)
