@@ -83,29 +83,53 @@ func (g *Cloud) ToInstanceReferences(zone string, instanceNames []string) (refs 
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (g *Cloud) NodeAddresses(_ context.Context, _ types.NodeName) ([]v1.NodeAddress, error) {
-	internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get internal IP: %v", err)
-	}
-	externalIP, err := metadata.Get("instance/network-interfaces/0/access-configs/0/external-ip")
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get external IP: %v", err)
-	}
-	addresses := []v1.NodeAddress{
-		{Type: v1.NodeInternalIP, Address: internalIP},
-		{Type: v1.NodeExternalIP, Address: externalIP},
+func (g *Cloud) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]v1.NodeAddress, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
+	defer cancel()
+
+	instanceName := string(nodeName)
+
+	if g.useMetadataServer {
+		// Use metadata server if possible
+		if g.isCurrentInstance(instanceName) {
+
+			internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
+			if err != nil {
+				return nil, fmt.Errorf("couldn't get internal IP: %v", err)
+			}
+			externalIP, err := metadata.Get("instance/network-interfaces/0/access-configs/0/external-ip")
+			if err != nil {
+				return nil, fmt.Errorf("couldn't get external IP: %v", err)
+			}
+			addresses := []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: internalIP},
+				{Type: v1.NodeExternalIP, Address: externalIP},
+			}
+
+			if internalDNSFull, err := metadata.Get("instance/hostname"); err != nil {
+				klog.Warningf("couldn't get full internal DNS name: %v", err)
+			} else {
+				addresses = append(addresses,
+					v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNSFull},
+					v1.NodeAddress{Type: v1.NodeHostName, Address: internalDNSFull},
+				)
+			}
+			return addresses, nil
+		}
 	}
 
-	if internalDNSFull, err := metadata.Get("instance/hostname"); err != nil {
-		klog.Warningf("couldn't get full internal DNS name: %v", err)
-	} else {
-		addresses = append(addresses,
-			v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNSFull},
-			v1.NodeAddress{Type: v1.NodeHostName, Address: internalDNSFull},
-		)
+	// Use GCE API
+	instanceObj, err := g.getInstanceByName(instanceName)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get instance details: %v", err)
 	}
-	return addresses, nil
+
+	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(instanceObj.Name), instanceObj.Zone))
+	if err != nil {
+		return []v1.NodeAddress{}, fmt.Errorf("error while querying for instance: %v", err)
+	}
+
+	return nodeAddressesFromInstance(instance)
 }
 
 // NodeAddressesByProviderID will not be called from the node that is requesting this ID.
