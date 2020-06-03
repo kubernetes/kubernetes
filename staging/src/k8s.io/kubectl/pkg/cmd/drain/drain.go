@@ -19,6 +19,7 @@ package drain
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -297,34 +298,48 @@ func (o *DrainCmdOptions) RunDrain() error {
 	}
 
 	drainedNodes := sets.NewString()
-	var fatal error
+	var deleteOrEvictErrors []error
+	var deleteOrEvictResultMutex sync.Mutex
+	var deleteOrEvictWaitGroup sync.WaitGroup
+	deleteOrEvictWaitGroup.Add(len(o.nodeInfos))
 
 	for _, info := range o.nodeInfos {
-		if err := o.deleteOrEvictPodsSimple(info); err == nil {
-			drainedNodes.Insert(info.Name)
-			printObj(info.Object, o.Out)
-		} else {
-			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
-			remainingNodes := []string{}
-			fatal = err
-			for _, remainingInfo := range o.nodeInfos {
-				if drainedNodes.Has(remainingInfo.Name) {
-					continue
-				}
-				remainingNodes = append(remainingNodes, remainingInfo.Name)
+		go func(info *resource.Info) {
+			err := o.deleteOrEvictPodsSimple(info)
+			deleteOrEvictResultMutex.Lock()
+			defer deleteOrEvictResultMutex.Unlock()
+
+			if err == nil {
+				drainedNodes.Insert(info.Name)
+				printObj(info.Object, o.Out)
+			} else {
+				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q\n\n", info.Name)
+				deleteOrEvictErrors = append(deleteOrEvictErrors, err)
 			}
 
-			if len(remainingNodes) > 0 {
-				fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
-				for _, nodeName := range remainingNodes {
-					fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
-				}
-			}
-			break
+			deleteOrEvictWaitGroup.Done()
+		}(info)
+	}
+
+	deleteOrEvictWaitGroup.Wait()
+	remainingNodes := []string{}
+	deleteOrEvictResultMutex.Lock()
+	defer deleteOrEvictResultMutex.Unlock()
+	for _, remainingInfo := range o.nodeInfos {
+		if drainedNodes.Has(remainingInfo.Name) {
+			continue
+		}
+		remainingNodes = append(remainingNodes, remainingInfo.Name)
+	}
+
+	if len(remainingNodes) > 0 {
+		fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
+		for _, nodeName := range remainingNodes {
+			fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
 		}
 	}
 
-	return fatal
+	return utilerrors.NewAggregate(deleteOrEvictErrors)
 }
 
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
