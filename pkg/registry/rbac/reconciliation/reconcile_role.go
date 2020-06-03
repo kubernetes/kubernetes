@@ -203,7 +203,8 @@ func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions 
 	switch {
 	case !removeExtraPermissions && len(result.MissingRules) > 0:
 		// add missing rules in the union case
-		result.Role.SetRules(append(result.Role.GetRules(), result.MissingRules...))
+		tmp := append([]rbacv1.PolicyRule{}, result.Role.GetRules()...)
+		result.Role.SetRules(append(tmp, result.MissingRules...))
 		result.Operation = ReconcileUpdate
 
 	case removeExtraPermissions && (len(result.MissingRules) > 0 || len(result.ExtraRules) > 0):
