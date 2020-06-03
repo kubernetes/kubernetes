@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -1041,16 +1042,16 @@ var (
 func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 	tests := []struct {
 		name   string
-		init   func(kubernetes.Interface) error
+		init   func(kubernetes.Interface, string) error
 		pod    *pausePodConfig
-		update func(kubernetes.Interface) error
+		update func(kubernetes.Interface, string) error
 	}{
 		{
 			name: "node gets added",
 			pod: &pausePodConfig{
 				Name: "pod-1",
 			},
-			update: func(cs kubernetes.Interface) error {
+			update: func(cs kubernetes.Interface, _ string) error {
 				_, err := createNode(cs, "node-added", nil)
 				if err != nil {
 					return fmt.Errorf("cannot create node: %v", err)
@@ -1060,7 +1061,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 		},
 		{
 			name: "node gets taint removed",
-			init: func(cs kubernetes.Interface) error {
+			init: func(cs kubernetes.Interface, _ string) error {
 				node, err := createNode(cs, "node-tainted", nil)
 				if err != nil {
 					return fmt.Errorf("cannot create node: %v", err)
@@ -1074,10 +1075,36 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			pod: &pausePodConfig{
 				Name: "pod-1",
 			},
-			update: func(cs kubernetes.Interface) error {
+			update: func(cs kubernetes.Interface, _ string) error {
 				taint := v1.Taint{Key: "test", Value: "test", Effect: v1.TaintEffectNoSchedule}
 				if err := testutils.RemoveTaintOffNode(cs, "node-tainted", taint); err != nil {
 					return fmt.Errorf("cannot remove taint off node: %v", err)
+				}
+				return nil
+			},
+		},
+		{
+			name: "other pod gets deleted",
+			init: func(cs kubernetes.Interface, ns string) error {
+				nodeResources := &v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(1, resource.DecimalSI),
+				}
+				_, err := createNode(cs, "node-scheduler-integration-test", nodeResources)
+				if err != nil {
+					return fmt.Errorf("cannot create node: %v", err)
+				}
+				_, err = createPausePod(cs, initPausePod(&pausePodConfig{Name: "pod-to-be-deleted", Namespace: ns}))
+				if err != nil {
+					return fmt.Errorf("cannot create pod: %v", err)
+				}
+				return nil
+			},
+			pod: &pausePodConfig{
+				Name: "pod-1",
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				if err := deletePod(cs, "pod-to-be-deleted", ns); err != nil {
+					return fmt.Errorf("cannot delete pod: %v", err)
 				}
 				return nil
 			},
@@ -1090,7 +1117,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			defer testutils.CleanupTest(t, testCtx)
 
 			if tt.init != nil {
-				if err := tt.init(testCtx.ClientSet); err != nil {
+				if err := tt.init(testCtx.ClientSet, testCtx.NS.Name); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -1102,7 +1129,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			if err := waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
 				t.Errorf("Pod %v got scheduled: %v", pod.Name, err)
 			}
-			if err := tt.update(testCtx.ClientSet); err != nil {
+			if err := tt.update(testCtx.ClientSet, testCtx.NS.Name); err != nil {
 				t.Fatal(err)
 			}
 			if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
