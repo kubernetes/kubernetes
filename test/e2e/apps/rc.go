@@ -377,6 +377,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
 
 			return actualWatchEvents
+		}, func () (err error) {
+			_ = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+			return err
 		})
 	})
 })
