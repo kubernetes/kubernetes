@@ -113,10 +113,12 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		}
 	}
 
-	if output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput(); err != nil {
+	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput()
+	if err != nil {
 		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, bindSource, target, string(output))
 		return err
 	}
+	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", bindSource, target, string(output))
 
 	return nil
 }
@@ -229,13 +231,14 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 	if err != nil {
 		return err
 	}
-	driverPath := volumeIds[0]
+	volumeID := volumeIds[0]
 	target = NormalizeWindowsPath(target)
-	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, driverPath, target)
-	if output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput(); err != nil {
-		klog.Errorf("mklink failed: %v, output: %q", err, string(output))
+	output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, volumeID).CombinedOutput()
+	if err != nil {
+		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, volumeID, err, string(output))
 		return err
 	}
+	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", volumeID, fstype, target, string(output))
 	return nil
 }
 
