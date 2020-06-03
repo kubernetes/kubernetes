@@ -365,6 +365,9 @@ const (
 	// KubeAPIServerAdvertiseAddressEndpointAnnotationKey is the annotation key on every apiserver pod,
 	// describing the API endpoint (advertise address and bind port of the api server)
 	KubeAPIServerAdvertiseAddressEndpointAnnotationKey = "kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint"
+	// ComponentConfigHashAnnotationKey holds the config map annotation key that kubeadm uses to store
+	// a SHA256 sum to check for user changes
+	ComponentConfigHashAnnotationKey = "kubeadm.kubernetes.io/component-config.hash"
 
 	// ControlPlaneTier is the value used in the tier label to identify control plane components
 	ControlPlaneTier = "control-plane"

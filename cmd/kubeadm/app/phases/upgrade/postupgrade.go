@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -44,7 +43,7 @@ import (
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -60,7 +59,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
-	if err := writeKubeletConfigFiles(client, cfg, newK8sVer, dryRun); err != nil {
+	if err := writeKubeletConfigFiles(client, cfg, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -204,7 +203,7 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfigurati
 	}, 10)
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
+func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
 	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
@@ -212,13 +211,8 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
-	if err := kubeletphase.DownloadConfig(client, newK8sVer, kubeletDir); err != nil {
-		// Tolerate the error being NotFound when dryrunning, as there is a pretty common scenario: the dryrun process
-		// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
-		// again.
-		if !(apierrors.IsNotFound(err) && dryRun) {
-			errs = append(errs, errors.Wrap(err, "error downloading kubelet configuration from the ConfigMap"))
-		}
+	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
+		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
 	}
 
 	if dryRun { // Print what contents would be written

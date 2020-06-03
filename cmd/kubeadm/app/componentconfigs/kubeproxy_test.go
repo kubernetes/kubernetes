@@ -17,6 +17,8 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -45,7 +47,15 @@ var kubeProxyMarshalCases = []struct {
 	{
 		name: "Empty config",
 		obj: &kubeProxyConfig{
-			config: kubeproxyconfig.KubeProxyConfiguration{},
+			configBase: configBase{
+				GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+			},
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeproxyconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeProxyConfiguration",
+				},
+			},
 		},
 		yaml: dedent.Dedent(`
 			apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -99,7 +109,14 @@ var kubeProxyMarshalCases = []struct {
 	{
 		name: "Non empty config",
 		obj: &kubeProxyConfig{
+			configBase: configBase{
+				GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+			},
 			config: kubeproxyconfig.KubeProxyConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeproxyconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeProxyConfiguration",
+				},
 				BindAddress:     "1.2.3.4",
 				EnableProfiling: true,
 			},
@@ -180,17 +197,17 @@ func TestKubeProxyUnmarshal(t *testing.T) {
 				t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 			}
 
-			got := &kubeProxyConfig{}
+			got := &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
+			}
 			if err = got.Unmarshal(gvkmap); err != nil {
 				t.Fatalf("unexpected failure of Unmarshal: %v", err)
 			}
 
-			expected := test.obj.DeepCopy().(*kubeProxyConfig)
-			expected.config.APIVersion = kubeProxyHandler.GroupVersion.String()
-			expected.config.Kind = "KubeProxyConfiguration"
-
-			if !reflect.DeepEqual(got, expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
+			if !reflect.DeepEqual(got, test.obj) {
+				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.obj, got)
 			}
 		})
 	}
@@ -296,10 +313,18 @@ func TestKubeProxyDefault(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := &kubeProxyConfig{}
+			// This is the same for all test cases so we set it here
+			expected := test.expected
+			expected.configBase.GroupVersion = kubeproxyconfig.SchemeGroupVersion
+
+			got := &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
+			}
 			got.Default(&test.clusterCfg, &test.endpoint, &kubeadmapi.NodeRegistrationOptions{})
-			if !reflect.DeepEqual(got, &test.expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, got)
+			if !reflect.DeepEqual(got, &expected) {
+				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
 			}
 		})
 	}
@@ -332,14 +357,6 @@ func runKubeProxyFromTest(t *testing.T, perform func(t *testing.T, in string) (k
 			expectErr: true,
 		},
 		{
-			name: "New kube-proxy version returns an error",
-			in: dedent.Dedent(`
-				apiVersion: kubeproxy.config.k8s.io/v1beta1
-				kind: KubeProxyConfiguration
-			`),
-			expectErr: true,
-		},
-		{
 			name: "Wrong kube-proxy kind returns an error",
 			in: dedent.Dedent(`
 				apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -356,6 +373,10 @@ func runKubeProxyFromTest(t *testing.T, perform func(t *testing.T, in string) (k
 				enableProfiling: true
 			`),
 			out: &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeProxyHandler.GroupVersion,
+					userSupplied: true,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeProxyHandler.GroupVersion.String(),
@@ -378,6 +399,10 @@ func runKubeProxyFromTest(t *testing.T, perform func(t *testing.T, in string) (k
 				enableProfiling: true
 			`),
 			out: &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeProxyHandler.GroupVersion,
+					userSupplied: true,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeProxyHandler.GroupVersion.String(),
@@ -411,8 +436,10 @@ func runKubeProxyFromTest(t *testing.T, perform func(t *testing.T, in string) (k
 						} else {
 							if test.out == nil {
 								t.Errorf("unexpected result: %v", got)
-							} else if !reflect.DeepEqual(test.out, got) {
-								t.Errorf("missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
+							} else {
+								if !reflect.DeepEqual(test.out, got) {
+									t.Errorf("missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
+								}
 							}
 						}
 					}
@@ -449,4 +476,65 @@ func TestKubeProxyFromCluster(t *testing.T) {
 
 		return kubeProxyHandler.FromCluster(client, &kubeadmapi.ClusterConfiguration{})
 	})
+}
+
+func TestGeneratedKubeProxyFromCluster(t *testing.T) {
+	testYAML := dedent.Dedent(`
+		apiVersion: kubeproxy.config.k8s.io/v1alpha1
+		kind: KubeProxyConfiguration
+		bindAddress: 1.2.3.4
+		enableProfiling: true
+	`)
+	testYAMLHash := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(testYAML)))
+	// The SHA256 sum of "The quick brown fox jumps over the lazy dog"
+	const mismatchHash = "sha256:d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"
+	tests := []struct {
+		name         string
+		hash         string
+		userSupplied bool
+	}{
+		{
+			name: "Matching hash means generated config",
+			hash: testYAMLHash,
+		},
+		{
+			name:         "Missmatching hash means user supplied config",
+			hash:         mismatchHash,
+			userSupplied: true,
+		},
+		{
+			name:         "No hash means user supplied config",
+			userSupplied: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configMap := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      constants.KubeProxyConfigMap,
+					Namespace: metav1.NamespaceSystem,
+				},
+				Data: map[string]string{
+					constants.KubeProxyConfigMapKey: testYAML,
+				},
+			}
+
+			if test.hash != "" {
+				configMap.Annotations = map[string]string{
+					constants.ComponentConfigHashAnnotationKey: test.hash,
+				}
+			}
+
+			client := clientsetfake.NewSimpleClientset(configMap)
+			cfg, err := kubeProxyHandler.FromCluster(client, &kubeadmapi.ClusterConfiguration{})
+			if err != nil {
+				t.Fatalf("unexpected failure of FromCluster: %v", err)
+			}
+
+			got := cfg.IsUserSupplied()
+			if got != test.userSupplied {
+				t.Fatalf("mismatch between expected and got:\n\tExpected: %t\n\tGot: %t", test.userSupplied, got)
+			}
+		})
+	}
 }

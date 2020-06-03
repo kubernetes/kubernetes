@@ -63,7 +63,11 @@ var kubeletHandler = handler{
 	GroupVersion: kubeletconfig.SchemeGroupVersion,
 	AddToScheme:  kubeletconfig.AddToScheme,
 	CreateEmpty: func() kubeadmapi.ComponentConfig {
-		return &kubeletConfig{}
+		return &kubeletConfig{
+			configBase: configBase{
+				GroupVersion: kubeletconfig.SchemeGroupVersion,
+			},
+		}
 	},
 	fromCluster: kubeletConfigFromCluster,
 }
@@ -81,21 +85,23 @@ func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, cluster
 
 // kubeletConfig implements the kubeadmapi.ComponentConfig interface for kubelet
 type kubeletConfig struct {
+	configBase
 	config kubeletconfig.KubeletConfiguration
 }
 
 func (kc *kubeletConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	result := &kubeletConfig{}
+	kc.configBase.DeepCopyInto(&result.configBase)
 	kc.config.DeepCopyInto(&result.config)
 	return result
 }
 
 func (kc *kubeletConfig) Marshal() ([]byte, error) {
-	return kubeletHandler.Marshal(&kc.config)
+	return kc.configBase.Marshal(&kc.config)
 }
 
 func (kc *kubeletConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
-	return kubeletHandler.Unmarshal(docmap, &kc.config)
+	return kc.configBase.Unmarshal(docmap, &kc.config)
 }
 
 func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint, nodeRegOpts *kubeadmapi.NodeRegistrationOptions) {
