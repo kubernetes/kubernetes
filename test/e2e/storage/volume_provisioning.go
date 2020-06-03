@@ -673,10 +673,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+
 			scName, scErr := e2epv.GetDefaultStorageClassName(c)
-			if scErr != nil {
-				framework.Failf(scErr.Error())
-			}
+			framework.ExpectNoError(scErr)
+
 			test := testsuites.StorageClassTest{
 				Name:      "default",
 				ClaimSize: "2Gi",
@@ -710,10 +710,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+
 			scName, scErr := e2epv.GetDefaultStorageClassName(c)
-			if scErr != nil {
-				framework.Failf(scErr.Error())
-			}
+			framework.ExpectNoError(scErr)
+
 			test := testsuites.StorageClassTest{
 				Name:      "default",
 				ClaimSize: "2Gi",
