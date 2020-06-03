@@ -234,10 +234,12 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 	scopes := []string{
 		"global",
 	}
+
 	if addrType == "-6" {
 		// IPv6 site scope ips will be deprecated later
 		append(scopes, "site")
 	}
+
 	for _, scope := range scopes {
 		// Try to retrieve ip inside container network namespace
 		output, err := execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
