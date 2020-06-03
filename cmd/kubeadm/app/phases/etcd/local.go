@@ -209,6 +209,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 				staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
 			},
 			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
+			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)
