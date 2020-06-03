@@ -18,6 +18,11 @@ package cpumanager
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -215,6 +220,68 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cset)
 }
 
+func isCPULoadBalancingShouldBeDisabled(pod *v1.Pod) bool {
+	// TODO: use constant for disable-cpu-load-balancing
+	value, ok := pod.Annotations["disable-cpu-load-balancing"]
+	if !ok {
+		return false
+	}
+
+	return value == "true"
+}
+
+func setCPUSLoadBalancing(cpus []int, enable bool) error {
+	for _, cpu := range cpus {
+		// TODO: use constant for /proc/sys/kernel/sched_domain/cpu
+		cpuSchedDomainDir := fmt.Sprintf("/proc/sys/kernel/sched_domain/cpu%d", cpu)
+		err := filepath.Walk(cpuSchedDomainDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				klog.Errorf("path %q does not exist: %v", path, err)
+				return err
+			}
+
+			if path == cpuSchedDomainDir {
+				return nil
+			}
+
+			if !strings.Contains(path, "flags") {
+				return nil
+			}
+
+			content, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			flags, err := strconv.Atoi(strings.Trim(string(content), "\n"))
+			if err != nil {
+				return err
+			}
+
+			var newContent string
+			if enable {
+				newContent = strconv.Itoa(flags | 1)
+			} else {
+				// we should set the LSB to 0 to disable the load balancing for the specified CPU
+				// in case of sched domain all flags can be represented by the binary number 111111111111111 that equals
+				// to 32767 in the decimal form
+				// see https://github.com/torvalds/linux/blob/0fe5f9ca223573167c4c4156903d751d2c8e160e/include/linux/sched/topology.h#L14
+				// for more information regarding the sched domain flags
+				newContent = strconv.Itoa(flags & 32766)
+			}
+
+			err = ioutil.WriteFile(path, []byte(newContent), 0644)
+			return err
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
 	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
 		klog.Infof("[cpumanager] static policy: Allocate (pod: %s, container: %s)", pod.Name, container.Name)
@@ -239,6 +306,19 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		s.SetCPUSet(string(pod.UID), container.Name, cpuset)
 		p.updateCPUsToReuse(pod, container, cpuset)
 
+		// disable CPU load balancing if demanded
+		if isCPULoadBalancingShouldBeDisabled(pod) {
+			if err := setCPUSLoadBalancing(cpuset.ToSlice(), false); err != nil {
+				klog.Errorf("[cpumanager] failed to disable CPU load balancing (pod: %s, container: %s, err: %v)", pod.Name, container.Name, err)
+
+				// try to enable back CPU's load balancing
+				if err := setCPUSLoadBalancing(cpuset.ToSlice(), true); err != nil {
+					klog.Errorf("[cpumanager] failed to enable CPU load balancing (pod: %s, container: %s, err: %v)", pod.Name, container.Name, err)
+				}
+				return err
+			}
+		}
+
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
 	return nil
@@ -250,6 +330,12 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 		s.Delete(podUID, containerName)
 		// Mutate the shared pool, adding released cpus.
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+
+		// enable CPU's load balancing back
+		if err := setCPUSLoadBalancing(toRelease.ToSlice(), true); err != nil {
+			klog.Errorf("[cpumanager] failed to enable CPU load balancing (pod: %s, container: %s, err: %v)", podUID, containerName, err)
+			return err
+		}
 	}
 	return nil
 }
