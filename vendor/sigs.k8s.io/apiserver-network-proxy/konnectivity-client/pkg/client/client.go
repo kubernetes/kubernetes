@@ -63,8 +63,8 @@ type grpcTunnel struct {
 // gRPC based proxy service.
 // The Dial() method of the returned tunnel can be called multiple times.
 // The tunnel must be closed by calling Tunnel.Close()
-func CreateReusableGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
-	return createGRPCTunnel(false, address, opts...)
+func CreateReusableGrpcTunnel(c *grpc.ClientConn, address string, opts ...grpc.DialOption) (Tunnel, error) {
+	return createGRPCTunnel(c, false, address, opts...)
 }
 
 // CreateSingleUseGrpcTunnel creates a Tunnel to dial to a remote server through a
@@ -72,15 +72,11 @@ func CreateReusableGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, 
 // Currently, a single tunnel supports a single connection, and the tunnel is closed when the connection is terminated
 // The Dial() method of the returned tunnel should only be called once
 // The tunnel will automatically close after the initial connection created by the Dial function is closed
-func CreateSingleUseGrpcTunnel(address string, opts ...grpc.DialOption) (Tunnel, error) {
-	return createGRPCTunnel(true, address, opts...)
+func CreateSingleUseGrpcTunnel(c *grpc.ClientConn, address string, opts ...grpc.DialOption) (Tunnel, error) {
+	return createGRPCTunnel(c, true, address, opts...)
 }
 
-func createGRPCTunnel(singleUse bool, address string, opts ...grpc.DialOption) (Tunnel, error) {
-	c, err := grpc.Dial(address, opts...)
-	if err != nil {
-		return nil, err
-	}
+func createGRPCTunnel(c *grpc.ClientConn, singleUse bool, address string, opts ...grpc.DialOption) (Tunnel, error) {
 
 	grpcClient := client.NewProxyServiceClient(c)
 
@@ -105,7 +101,7 @@ func createGRPCTunnel(singleUse bool, address string, opts ...grpc.DialOption) (
 }
 
 func (t *grpcTunnel) serve() {
-	defer t.proxyConn.Close()
+	// defer t.proxyConn.Close()
 
 	for {
 		pkt, err := t.stream.Recv()
@@ -166,11 +162,11 @@ func (t *grpcTunnel) serve() {
 			}
 			klog.Warningf("connection id %d not recognized", resp.ConnectID)
 		}
-		select {
-		case <-t.stopCh:
-			return
-		default:
-		}
+		// select {
+		// case <-t.stopCh:
+		// 	return
+		// default:
+		// }
 	}
 }
 
