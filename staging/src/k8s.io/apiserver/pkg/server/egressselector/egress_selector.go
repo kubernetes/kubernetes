@@ -206,7 +206,7 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 	})
 
 	if u.grpcConn == nil {
-		conn, err := grpc.Dial(udsName, grpc.WithInsecure(), grpc.WithUserAgent("foo"))
+		conn, err := grpc.Dial(udsName, dialOption, grpc.WithInsecure(), grpc.WithUserAgent("foo"))
 		if err != nil {
 			return nil, err
 		}
