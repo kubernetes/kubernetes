@@ -36,11 +36,6 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var (
-	// tests which use this appear to all pass within the given time
-	generalWatchTimeout = int64(60)
-)
-
 var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
@@ -288,6 +283,9 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 			framework.ExpectEqual(eventFound, true, "failed to find ConfigMap %v event", watch.Deleted)
 
 			return actualWatchEvents
+		}, func() (err error) {
+			_ = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-configmap-static=true"})
+			return err
 		})
 	})
 })
