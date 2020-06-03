@@ -813,6 +813,11 @@ func (proxier *Proxier) syncProxyRules() {
 	localAddrSet := utilnet.IPSet{}
 	localAddrSet.Insert(localAddrs...)
 
+	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+	if err != nil {
+		klog.Errorf("Failed to get node ip address matching nodeport cidrs %v, services with nodeport may not work as intended: %v", proxier.nodePortAddresses, err)
+	}
+
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
@@ -1199,14 +1204,12 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.NodePort() != 0 {
 			// Hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-			if err != nil {
-				klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
+			if len(nodeAddresses) == 0 {
 				continue
 			}
 
 			lps := make([]utilproxy.LocalPort, 0)
-			for address := range addresses {
+			for address := range nodeAddresses {
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
 					IP:          address,
@@ -1468,36 +1471,31 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodeports chain.  This needs to be after all
 	// other service portal rules.
-	addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-	if err != nil {
-		klog.Errorf("Failed to get node ip address matching nodeport cidr")
-	} else {
-		isIPv6 := proxier.iptables.IsIPv6()
-		for address := range addresses {
-			// TODO(thockin, m1093782566): If/when we have dual-stack support we will want to distinguish v4 from v6 zero-CIDRs.
-			if utilproxy.IsZeroCIDR(address) {
-				args = append(args[:0],
-					"-A", string(kubeServicesChain),
-					"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
-					"-m", "addrtype", "--dst-type", "LOCAL",
-					"-j", string(kubeNodePortsChain))
-				writeLine(proxier.natRules, args...)
-				// Nothing else matters after the zero CIDR.
-				break
-			}
-			// Ignore IP addresses with incorrect version
-			if isIPv6 && !utilnet.IsIPv6String(address) || !isIPv6 && utilnet.IsIPv6String(address) {
-				klog.Errorf("IP address %s has incorrect IP version", address)
-				continue
-			}
-			// create nodeport rules for each IP one by one
+	isIPv6 := proxier.iptables.IsIPv6()
+	for address := range nodeAddresses {
+		// TODO(thockin, m1093782566): If/when we have dual-stack support we will want to distinguish v4 from v6 zero-CIDRs.
+		if utilproxy.IsZeroCIDR(address) {
 			args = append(args[:0],
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
-				"-d", address,
+				"-m", "addrtype", "--dst-type", "LOCAL",
 				"-j", string(kubeNodePortsChain))
 			writeLine(proxier.natRules, args...)
+			// Nothing else matters after the zero CIDR.
+			break
 		}
+		// Ignore IP addresses with incorrect version
+		if isIPv6 && !utilnet.IsIPv6String(address) || !isIPv6 && utilnet.IsIPv6String(address) {
+			klog.Errorf("IP address %s has incorrect IP version", address)
+			continue
+		}
+		// create nodeport rules for each IP one by one
+		args = append(args[:0],
+			"-A", string(kubeServicesChain),
+			"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
+			"-d", address,
+			"-j", string(kubeNodePortsChain))
+		writeLine(proxier.natRules, args...)
 	}
 
 	// Drop the packets in INVALID state, which would potentially cause
