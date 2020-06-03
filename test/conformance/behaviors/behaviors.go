@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -67,6 +68,9 @@ func ValidateSuite(suite *Suite) error {
 	for _, b := range suite.Behaviors {
 		if _, ok := behaviorsByID[b.ID]; ok {
 			errs = append(errs, fmt.Errorf("Duplicate behavior ID: %s", b.ID))
+		}
+		if !strings.HasPrefix(b.ID, suite.Suite) {
+			errs = append(errs, fmt.Errorf("Invalid behavior ID: %s, must have suite name as prefix: %s", b.ID, suite.Suite))
 		}
 		behaviorsByID[b.ID] = true
 	}
