@@ -179,6 +179,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.CPUCFSQuotaPeriod == nil {
 		obj.CPUCFSQuotaPeriod = &metav1.Duration{Duration: 100 * time.Millisecond}
 	}
+	if obj.NodeStatusMaxImages == nil {
+		obj.NodeStatusMaxImages = utilpointer.Int32Ptr(50)
+	}
 	if obj.MaxOpenFiles == 0 {
 		obj.MaxOpenFiles = 1000000
 	}

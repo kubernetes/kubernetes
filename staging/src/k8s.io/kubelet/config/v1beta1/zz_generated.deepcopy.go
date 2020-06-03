@@ -190,6 +190,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.NodeStatusMaxImages != nil {
+		in, out := &in.NodeStatusMaxImages, &out.NodeStatusMaxImages
+		*out = new(int32)
+		**out = **in
+	}
 	if in.KubeAPIQPS != nil {
 		in, out := &in.KubeAPIQPS, &out.KubeAPIQPS
 		*out = new(int32)

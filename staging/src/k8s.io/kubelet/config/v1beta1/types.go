@@ -515,6 +515,13 @@ type KubeletConfiguration struct {
 	// Default: "100ms"
 	// +optional
 	CPUCFSQuotaPeriod *metav1.Duration `json:"cpuCFSQuotaPeriod,omitempty"`
+	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	// Note: If -1 is specified, no cap will be applied. If 0 is specified, no image is returned.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// different values can be reported on node status.
+	// Default: 50
+	// +optional
+	NodeStatusMaxImages *int32 `json:"nodeStatusMaxImages,omitempty"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may impact the ability of the Kubelet to interact with the node's filesystem.

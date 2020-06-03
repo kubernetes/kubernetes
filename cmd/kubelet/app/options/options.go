@@ -143,9 +143,6 @@ type KubeletFlags struct {
 	// bootstrapCheckpointPath is the path to the directory containing pod checkpoints to
 	// run on restore
 	BootstrapCheckpointPath string
-	// NodeStatusMaxImages caps the number of images reported in Node.Status.Images.
-	// This is an experimental, short-term flag to help with node scalability.
-	NodeStatusMaxImages int32
 
 	// DEPRECATED FLAGS
 	// minimumGCAge is the minimum age for a finished container before it is
@@ -198,7 +195,6 @@ func NewKubeletFlags() *KubeletFlags {
 		RegisterNode:                        true,
 		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
 		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
-		NodeStatusMaxImages:         50,
 		EnableCAdvisorJSONEndpoints: false,
 	}
 }
@@ -208,9 +204,6 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
 	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
-	}
-	if f.NodeStatusMaxImages < -1 {
-		return fmt.Errorf("invalid configuration: NodeStatusMaxImages (--node-status-max-images) must be -1 or greater")
 	}
 
 	unknownLabels := sets.NewString()
@@ -366,7 +359,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.StringVar(&f.LockFilePath, "lock-file", f.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.BoolVar(&f.ExitOnLockContention, "exit-on-lock-contention", f.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.StringVar(&f.BootstrapCheckpointPath, "bootstrap-checkpoint-path", f.BootstrapCheckpointPath, "<Warning: Alpha feature> Path to the directory where the checkpoints are stored")
-	fs.Int32Var(&f.NodeStatusMaxImages, "node-status-max-images", f.NodeStatusMaxImages, "<Warning: Alpha feature> The maximum number of images to report in Node.Status.Images. If -1 is specified, no cap will be applied.")
 
 	// DEPRECATED FLAGS
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")
@@ -522,6 +514,8 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Beta feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated. This flag can only be used with --container-runtime=remote.")
 	fs.Int32Var(&c.ContainerLogMaxFiles, "container-log-max-files", c.ContainerLogMaxFiles, "<Warning: Beta feature> Set the maximum number of container log files that can be present for a container. The number must be >= 2. This flag can only be used with --container-runtime=remote.")
 	fs.StringSliceVar(&c.AllowedUnsafeSysctls, "allowed-unsafe-sysctls", c.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
+
+	fs.Int32Var(&c.NodeStatusMaxImages, "node-status-max-images", c.NodeStatusMaxImages, "The maximum number of images to report in Node.Status.Images. If -1 is specified, no cap will be applied.")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.Int64Var(&c.MaxOpenFiles, "max-open-files", c.MaxOpenFiles, "Number of files that can be opened by Kubelet process.")
