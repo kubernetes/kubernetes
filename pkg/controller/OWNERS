@@ -5,8 +5,10 @@ approvers:
 - derekwaynecarr
 - mikedanese
 - janetkuo
+- sig-apps-approvers
 reviewers:
 - deads2k
 - cheftako
+- sig-apps-reviewers
 labels:
 - sig/apps
