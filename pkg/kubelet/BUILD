@@ -153,10 +153,15 @@ go_library(
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
-        "//vendor/k8s.io/utils/net:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/k8s.io/utils/net:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/k8s.io/utils/net:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/kubelet/winstats:go_default_library",
         ],
