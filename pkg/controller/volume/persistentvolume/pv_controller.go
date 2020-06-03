@@ -27,7 +27,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -157,6 +156,7 @@ type PersistentVolumeController struct {
 	classListerSynced  cache.InformerSynced
 	podLister          corelisters.PodLister
 	podListerSynced    cache.InformerSynced
+	podIndexer         cache.Indexer
 	NodeLister         corelisters.NodeLister
 	NodeListerSynced   cache.InformerSynced
 
@@ -296,6 +296,31 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	return nil
 }
 
+// emitEventForUnboundDelayBindingClaim generates informative event for claim
+// if it's in delay binding mode and not bound yet.
+func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(claim *v1.PersistentVolumeClaim) error {
+	reason := events.WaitForFirstConsumer
+	message := "waiting for first consumer to be created before binding"
+	podNames, err := ctrl.findNonScheduledPodsByPVC(claim)
+	if err != nil {
+		return err
+	}
+	if len(podNames) > 0 {
+		reason = events.WaitForPodScheduled
+		if len(podNames) > 1 {
+			// Although only one pod is taken into account in
+			// volume scheduling, more than one pods can reference
+			// the PVC at the same time. We can't know which pod is
+			// used in scheduling, all pods are included.
+			message = fmt.Sprintf("waiting for pods %s to be scheduled", strings.Join(podNames, ","))
+		} else {
+			message = fmt.Sprintf("waiting for pod %s to be scheduled", podNames[0])
+		}
+	}
+	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, reason, message)
+	return nil
+}
+
 // syncUnboundClaim is the main controller method to decide what to do with an
 // unbound claim.
 func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVolumeClaim) error {
@@ -320,7 +345,9 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			// OBSERVATION: pvc is "Pending", will retry
 			switch {
 			case delayBinding && !pvutil.IsDelayBindingProvisioning(claim):
-				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.WaitForFirstConsumer, "waiting for first consumer to be created before binding")
+				if err = ctrl.emitEventForUnboundDelayBindingClaim(claim); err != nil {
+					return err
+				}
 			case v1helper.GetPersistentVolumeClaimClass(claim) != "":
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
@@ -1294,30 +1321,53 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *v1.PersistentVo
 	return true, nil
 }
 
+func (ctrl *PersistentVolumeController) findPodsByPVCKey(key string) ([]*v1.Pod, error) {
+	pods := []*v1.Pod{}
+	objs, err := ctrl.podIndexer.ByIndex(pvcKeyIndex, key)
+	if err != nil {
+		return pods, err
+	}
+	for _, obj := range objs {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			continue
+		}
+		pods = append(pods, pod)
+	}
+	return pods, err
+}
+
 // isVolumeUsed returns list of pods that use given PV.
 func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([]string, bool, error) {
 	if pv.Spec.ClaimRef == nil {
 		return nil, false, nil
 	}
-	claimName := pv.Spec.ClaimRef.Name
-
 	podNames := sets.NewString()
-	pods, err := ctrl.podLister.Pods(pv.Spec.ClaimRef.Namespace).List(labels.Everything())
+	pvcKey := fmt.Sprintf("%s/%s", pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	pods, err := ctrl.findPodsByPVCKey(pvcKey)
 	if err != nil {
-		return nil, false, fmt.Errorf("error listing pods: %s", err)
+		return nil, false, fmt.Errorf("error finding pods by pvc %q: %s", pvcKey, err)
 	}
 	for _, pod := range pods {
-		if util.IsPodTerminated(pod, pod.Status) {
-			continue
-		}
-		for i := range pod.Spec.Volumes {
-			usedPV := &pod.Spec.Volumes[i]
-			if usedPV.PersistentVolumeClaim != nil && usedPV.PersistentVolumeClaim.ClaimName == claimName {
-				podNames.Insert(pod.Namespace + "/" + pod.Name)
-			}
-		}
+		podNames.Insert(pod.Namespace + "/" + pod.Name)
 	}
 	return podNames.List(), podNames.Len() != 0, nil
+}
+
+// findNonScheduledPodsByPVC returns list of non-scheduled pods that reference given PVC.
+func (ctrl *PersistentVolumeController) findNonScheduledPodsByPVC(pvc *v1.PersistentVolumeClaim) ([]string, error) {
+	pvcKey := fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name)
+	pods, err := ctrl.findPodsByPVCKey(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+	podNames := []string{}
+	for _, pod := range pods {
+		if len(pod.Spec.NodeName) == 0 {
+			podNames = append(podNames, pod.Name)
+		}
+	}
+	return podNames, nil
 }
 
 // doDeleteVolume finds appropriate delete plugin and deletes given volume, returning
