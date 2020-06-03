@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -80,7 +81,7 @@ func TestStore(t *testing.T) {
 	other := allocator.NewAllocationMap(100, "rangeSpecValue")
 
 	allocation := &api.RangeAllocation{}
-	if err := storage.storage.Get(context.TODO(), key(), "", allocation, false); err != nil {
+	if err := storage.storage.Get(context.TODO(), key(), apiserverstorage.GetOptions{}, allocation); err != nil {
 		t.Fatal(err)
 	}
 	if allocation.Range != "rangeSpecValue" {

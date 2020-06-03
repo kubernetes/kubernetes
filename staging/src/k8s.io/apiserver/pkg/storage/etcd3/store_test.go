@@ -168,7 +168,7 @@ func TestCreateWithTTL(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	w, err := store.Watch(ctx, key, out.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -191,7 +191,19 @@ func TestGet(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	// create an object to test
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, createdObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	// update the object once to allow get by exact resource version to be tested
+	updateObj := createdObj.DeepCopy()
+	updateObj.Annotations = map[string]string{"test-annotation": "1"}
+	storedObj := &example.Pod{}
+	err := store.GuaranteedUpdate(ctx, key, storedObj, true, nil,
+		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			ttl := uint64(1)
+			return updateObj, &ttl, nil
+		})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
 	// create an additional object to increment the resource version for pods above the resource version of the foo object
 	lastUpdatedObj := &example.Pod{}
 	if err := store.Create(ctx, "bar", &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, lastUpdatedObj, 0); err != nil {
@@ -201,6 +213,7 @@ func TestGet(t *testing.T) {
 	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
 	lastUpdatedCurrentRV, _ := strconv.Atoi(lastUpdatedObj.ResourceVersion)
 
+	// TODO(jpbetz): Add exact test cases
 	tests := []struct {
 		name              string
 		key               string
@@ -209,28 +222,34 @@ func TestGet(t *testing.T) {
 		expectRVTooLarge  bool
 		expectedOut       *example.Pod
 		rv                string
+		expectedRV        string
 	}{{ // test get on existing item
 		name:              "get existing",
 		key:               key,
 		ignoreNotFound:    false,
 		expectNotFoundErr: false,
 		expectedOut:       storedObj,
-	}, { // test get on existing item with minimum resource version set to 0
+	}, { // test get on existing item with resource version set to 0
 		name:        "resource version 0",
 		key:         key,
 		expectedOut: storedObj,
 		rv:          "0",
-	}, { // test get on existing item with minimum resource version set to current resource version of the object
-		name:        "current object resource version",
+	}, { // test get on existing item with resource version set to the resource version is was created on
+		name:        "object created resource version",
+		key:         key,
+		expectedOut: storedObj,
+		rv:          createdObj.ResourceVersion,
+	}, { // test get on existing item with resource version set to current resource version of the object
+		name:        "current object resource version, match=NotOlderThan",
 		key:         key,
 		expectedOut: storedObj,
 		rv:          fmt.Sprintf("%d", currentRV),
-	}, { // test get on existing item with minimum resource version set to latest pod resource version
+	}, { // test get on existing item with resource version set to latest pod resource version
 		name:        "latest resource version",
 		key:         key,
 		expectedOut: storedObj,
 		rv:          fmt.Sprintf("%d", lastUpdatedCurrentRV),
-	}, { // test get on existing item with minimum resource version set too high
+	}, { // test get on existing item with resource version set too high
 		name:             "too high resource version",
 		key:              key,
 		expectRVTooLarge: true,
@@ -251,7 +270,7 @@ func TestGet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := &example.Pod{}
-			err := store.Get(ctx, tt.key, tt.rv, out, tt.ignoreNotFound)
+			err := store.Get(ctx, tt.key, storage.GetOptions{IgnoreNotFound: tt.ignoreNotFound, ResourceVersion: tt.rv}, out)
 			if tt.expectNotFoundErr {
 				if err == nil || !storage.IsNotFound(err) {
 					t.Errorf("expecting not found error, but get: %v", err)
@@ -264,11 +283,16 @@ func TestGet(t *testing.T) {
 				}
 				return
 			}
+			if tt.expectedRV != "" {
+				if tt.expectedRV != out.ResourceVersion {
+					t.Errorf("expecting resource version want=%s, got=%s", tt.expectedRV, out.ResourceVersion)
+				}
+			}
 			if err != nil {
 				t.Fatalf("Get failed: %v", err)
 			}
 			if !reflect.DeepEqual(tt.expectedOut, out) {
-				t.Errorf("pod want=%#v, get=%#v", tt.expectedOut, out)
+				t.Errorf("pod want=\n%#v\nget=\n%#v", tt.expectedOut, out)
 			}
 		})
 	}
@@ -398,7 +422,7 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.PodList{}
-		err := store.GetToList(ctx, tt.key, tt.rv, tt.pred, out)
+		err := store.GetToList(ctx, tt.key, storage.ListOptions{ResourceVersion: tt.rv, Predicate: tt.pred}, out)
 
 		if tt.expectRVTooLarge {
 			if err == nil || !storage.IsTooLargeResourceVersion(err) {
@@ -587,7 +611,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	w, err := store.Watch(ctx, key, out.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -801,12 +825,12 @@ func TestTransformationFailure(t *testing.T) {
 
 	// List should fail
 	var got example.PodList
-	if err := store.List(ctx, "/", "", storage.Everything, &got); !storage.IsInternalError(err) {
+	if err := store.List(ctx, "/", storage.ListOptions{Predicate: storage.Everything}, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
 	// Get should fail
-	if err := store.Get(ctx, preset[1].key, "", &example.Pod{}, false); !storage.IsInternalError(err) {
+	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	// GuaranteedUpdate without suggestion should return an error
@@ -826,7 +850,7 @@ func TestTransformationFailure(t *testing.T) {
 	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil, storage.ValidateAllObjectFunc); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := store.Get(ctx, preset[1].key, "", &example.Pod{}, false); !storage.IsInternalError(err) {
+	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -894,7 +918,7 @@ func TestList(t *testing.T) {
 	}
 
 	list := &example.PodList{}
-	store.List(ctx, "/two-level", "0", storage.Everything, list)
+	store.List(ctx, "/two-level", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything}, list)
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
 	secondContinuation, err := encodeContinue("/two-level/2", "/two-level/", int64(continueRV))
 	if err != nil {
@@ -917,6 +941,7 @@ func TestList(t *testing.T) {
 		expectedRemainingItemCount *int64
 		expectError                bool
 		expectRVTooLarge           bool
+		expectRV                   string
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -950,14 +975,14 @@ func TestList(t *testing.T) {
 			expectedOut: []*example.Pod{preset[0].storedObj},
 		},
 		{
-			name:        "test List on existing key with minimum resource version set to 0",
+			name:        "test List on existing key with resource version set to 0",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 			rv:          "0",
 		},
 		{
-			name:        "test List on existing key with minimum resource version set to current resource version",
+			name:        "test List on existing key with resource version set to current resource version",
 			prefix:      "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
@@ -989,6 +1014,34 @@ func TestList(t *testing.T) {
 			expectedOut:                []*example.Pod{preset[1].storedObj},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+		},
+		{
+			name:   "test List with limit at current resource version",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         list.ResourceVersion,
+			expectRV:                   list.ResourceVersion,
+		},
+		{
+			name:   "test List with limit at resource version 0",
+			prefix: "/two-level/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectContinue:             true,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
+			rv:                         "0",
+			expectRV:                   list.ResourceVersion,
 		},
 		{
 			name:          "test List with limit when paging disabled",
@@ -1142,46 +1195,58 @@ func TestList(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if tt.pred.GetAttrs == nil {
-			tt.pred.GetAttrs = getAttrs
-		}
-
-		out := &example.PodList{}
-		var err error
-		if tt.disablePaging {
-			err = disablePagingStore.List(ctx, tt.prefix, tt.rv, tt.pred, out)
-		} else {
-			err = store.List(ctx, tt.prefix, tt.rv, tt.pred, out)
-		}
-		if tt.expectRVTooLarge {
-			if err == nil || !storage.IsTooLargeResourceVersion(err) {
-				t.Errorf("(%s): expecting resource version too high error, but get: %s", tt.name, err)
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.pred.GetAttrs == nil {
+				tt.pred.GetAttrs = getAttrs
 			}
-			continue
-		}
 
-		if (err != nil) != tt.expectError {
-			t.Errorf("(%s): List failed: %v", tt.name, err)
-		}
-		if err != nil {
-			continue
-		}
-		if (len(out.Continue) > 0) != tt.expectContinue {
-			t.Errorf("(%s): unexpected continue token: %q", tt.name, out.Continue)
-		}
-		if len(tt.expectedOut) != len(out.Items) {
-			t.Errorf("(%s): length of list want=%d, got=%d", tt.name, len(tt.expectedOut), len(out.Items))
-			continue
-		}
-		if e, a := tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount(); (e == nil) != (a == nil) || (e != nil && a != nil && *e != *a) {
-			t.Errorf("(%s): remainingItemCount want=%#v, got=%#v", tt.name, e, a)
-		}
-		for j, wantPod := range tt.expectedOut {
-			getPod := &out.Items[j]
-			if !reflect.DeepEqual(wantPod, getPod) {
-				t.Errorf("(%s): pod want=%#v, got=%#v", tt.name, wantPod, getPod)
+			out := &example.PodList{}
+			storageOpts := storage.ListOptions{ResourceVersion: tt.rv, Predicate: tt.pred}
+			var err error
+			if tt.disablePaging {
+				err = disablePagingStore.List(ctx, tt.prefix, storageOpts, out)
+			} else {
+				err = store.List(ctx, tt.prefix, storageOpts, out)
 			}
-		}
+			if tt.expectRVTooLarge {
+				if err == nil || !storage.IsTooLargeResourceVersion(err) {
+					t.Fatalf("expecting resource version too high error, but get: %s", err)
+				}
+				return
+			}
+
+			if err != nil {
+				if !tt.expectError {
+					t.Fatalf("List failed: %v", err)
+				}
+				return
+			}
+			if tt.expectError {
+				t.Fatalf("expected error but got none")
+			}
+			if (len(out.Continue) > 0) != tt.expectContinue {
+				t.Errorf("unexpected continue token: %q", out.Continue)
+			}
+
+			// If a client requests an exact resource version, it must be echoed back to them.
+			if tt.expectRV != "" {
+				if tt.expectRV != out.ResourceVersion {
+					t.Errorf("resourceVersion in list response want=%s, got=%s", tt.expectRV, out.ResourceVersion)
+				}
+			}
+			if len(tt.expectedOut) != len(out.Items) {
+				t.Fatalf("length of list want=%d, got=%d", len(tt.expectedOut), len(out.Items))
+			}
+			if e, a := tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount(); (e == nil) != (a == nil) || (e != nil && a != nil && *e != *a) {
+				t.Errorf("remainingItemCount want=%#v, got=%#v", e, a)
+			}
+			for j, wantPod := range tt.expectedOut {
+				getPod := &out.Items[j]
+				if !reflect.DeepEqual(wantPod, getPod) {
+					t.Errorf("pod want=%#v, got=%#v", wantPod, getPod)
+				}
+			}
+		})
 	}
 }
 
@@ -1249,7 +1314,7 @@ func TestListContinuation(t *testing.T) {
 			},
 		}
 	}
-	if err := store.List(ctx, "/", "0", pred(1, ""), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1271,7 +1336,7 @@ func TestListContinuation(t *testing.T) {
 
 	// no limit, should get two items
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", "0", pred(0, continueFromSecondItem), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1293,7 +1358,7 @@ func TestListContinuation(t *testing.T) {
 
 	// limit, should get two more pages
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", "0", pred(1, continueFromSecondItem), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromSecondItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1314,7 +1379,7 @@ func TestListContinuation(t *testing.T) {
 	continueFromThirdItem := out.Continue
 
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", "0", pred(1, continueFromThirdItem), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1406,7 +1471,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 			},
 		}
 	}
-	if err := store.List(ctx, "/", "0", pred(2, ""), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, "")}, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1435,7 +1500,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 	// but since there is only one item left, that is all we should get with no continueValue
 	// both read counters should be incremented for the singular calls they make in this case
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", "0", pred(2, cont), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, cont)}, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1514,7 +1579,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	out := &example.PodList{}
-	if err := store.List(ctx, "/", "0", pred(1, ""), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1555,7 +1620,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	// The old continue token should have expired
-	err = store.List(ctx, "/", "0", pred(0, continueFromSecondItem), out)
+	err = store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -1572,7 +1637,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", "0", pred(1, inconsistentContinueFromSecondItem), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, inconsistentContinueFromSecondItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1586,7 +1651,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 	continueFromThirdItem := out.Continue
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", "0", pred(1, continueFromThirdItem), out); err != nil {
+	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {

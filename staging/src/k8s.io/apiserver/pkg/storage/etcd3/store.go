@@ -63,7 +63,7 @@ var _ value.Context = authenticatedDataString("")
 
 type store struct {
 	client *clientv3.Client
-	// getOpts contains additional options that should be passed
+	// getOps contains additional options that should be passed
 	// to all Get() calls.
 	getOps        []clientv3.OpOption
 	codec         runtime.Codec
@@ -112,20 +112,21 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 // Get implements storage.Interface.Get.
-func (s *store) Get(ctx context.Context, key string, resourceVersion string, out runtime.Object, ignoreNotFound bool) error {
+func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
-	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+	callOpts := s.getOps
+	getResp, err := s.client.KV.Get(ctx, key, callOpts...)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
 	if err != nil {
 		return err
 	}
-	if err = s.ensureMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
+	if err = s.ensureMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
 		return err
 	}
 
 	if len(getResp.Kvs) == 0 {
-		if ignoreNotFound {
+		if opts.IgnoreNotFound {
 			return runtime.SetZeroValue(out)
 		}
 		return storage.NewKeyNotFoundError(key, 0)
@@ -379,7 +380,9 @@ func (s *store) GuaranteedUpdate(
 }
 
 // GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+func (s *store) GetToList(ctx context.Context, key string, listOpts storage.ListOptions, listObj runtime.Object) error {
+	resourceVersion := listOpts.ResourceVersion
+	pred := listOpts.Predicate
 	trace := utiltrace.New("GetToList etcd3",
 		utiltrace.Field{"key", key},
 		utiltrace.Field{"resourceVersion", resourceVersion},
@@ -510,7 +513,9 @@ func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 }
 
 // List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, key, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	resourceVersion := opts.ResourceVersion
+	pred := opts.Predicate
 	trace := utiltrace.New("List etcd3",
 		utiltrace.Field{"key", key},
 		utiltrace.Field{"resourceVersion", resourceVersion},
@@ -585,7 +590,6 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
 		options = append(options, clientv3.WithRange(rangeEnd))
-
 	default:
 		options = append(options, clientv3.WithPrefix())
 	}
@@ -709,22 +713,22 @@ func growSlice(v reflect.Value, maxCapacity int, sizes ...int) {
 }
 
 // Watch implements storage.Interface.Watch.
-func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, pred, false)
+func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	return s.watch(ctx, key, opts, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
-func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, pred, true)
+func (s *store) WatchList(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	return s.watch(ctx, key, opts, true)
 }
 
-func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionPredicate, recursive bool) (watch.Interface, error) {
-	rev, err := s.versioner.ParseResourceVersion(rv)
+func (s *store) watch(ctx context.Context, key string, opts storage.ListOptions, recursive bool) (watch.Interface, error) {
+	rev, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
 	}
 	key = path.Join(s.pathPrefix, key)
-	return s.watcher.Watch(ctx, key, int64(rev), recursive, pred)
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, opts.Predicate)
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
