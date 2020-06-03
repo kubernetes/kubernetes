@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -83,7 +83,7 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 	return nil, updateErr
 }
 
-func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) apps.ReplicaSetStatus {
+func calculateStatus(rs *apps.ReplicaSet, filteredPods []*corev1.Pod, manageReplicasErr error) apps.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replica set, the matching pods may have more
@@ -114,7 +114,7 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 		} else if diff > 0 {
 			reason = "FailedDelete"
 		}
-		cond := NewReplicaSetCondition(apps.ReplicaSetReplicaFailure, v1.ConditionTrue, reason, manageReplicasErr.Error())
+		cond := NewReplicaSetCondition(apps.ReplicaSetReplicaFailure, corev1.ConditionTrue, reason, manageReplicasErr.Error())
 		SetCondition(&newStatus, cond)
 	} else if manageReplicasErr == nil && failureCond != nil {
 		RemoveCondition(&newStatus, apps.ReplicaSetReplicaFailure)
@@ -128,7 +128,7 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 }
 
 // NewReplicaSetCondition creates a new replicaset condition.
-func NewReplicaSetCondition(condType apps.ReplicaSetConditionType, status v1.ConditionStatus, reason, msg string) apps.ReplicaSetCondition {
+func NewReplicaSetCondition(condType apps.ReplicaSetConditionType, status corev1.ConditionStatus, reason, msg string) apps.ReplicaSetCondition {
 	return apps.ReplicaSetCondition{
 		Type:               condType,
 		Status:             status,
@@ -155,8 +155,8 @@ func SetCondition(status *apps.ReplicaSetStatus, condition apps.ReplicaSetCondit
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
 	}
-	newConditions := filterOutCondition(status.Conditions, condition.Type)
-	status.Conditions = append(newConditions, condition)
+	status.Conditions = filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(status.Conditions, condition)
 }
 
 // RemoveCondition removes the condition with the provided type from the replicaset status.

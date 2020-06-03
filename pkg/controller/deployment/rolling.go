@@ -33,7 +33,9 @@ func (dc *DeploymentController) rolloutRolling(d *apps.Deployment, rsList []*app
 	if err != nil {
 		return err
 	}
-	allRSs := append(oldRSs, newRS)
+	tmpRS := make([]*apps.ReplicaSet, len(oldRSs))
+	copy(tmpRS, oldRSs)
+	allRSs := append(tmpRS, newRS)
 
 	// Scale up, if we can.
 	scaledUp, err := dc.reconcileNewReplicaSet(allRSs, newRS, d)
@@ -140,7 +142,9 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*apps.ReplicaSe
 	klog.V(4).Infof("Cleaned up unhealthy replicas from old RSes by %d", cleanupCount)
 
 	// Scale down old replica sets, need check maxUnavailable to ensure we can scale down
-	allRSs = append(oldRSs, newRS)
+	tmpRS := make([]*apps.ReplicaSet, len(oldRSs))
+	copy(tmpRS, oldRSs)
+	allRSs = append(tmpRS, newRS)
 	scaledDownCount, err := dc.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
 	if err != nil {
 		return false, nil

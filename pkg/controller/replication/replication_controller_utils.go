@@ -19,13 +19,13 @@ limitations under the License.
 package replication
 
 import (
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NewReplicationControllerCondition creates a new replication controller condition.
-func NewReplicationControllerCondition(condType v1.ReplicationControllerConditionType, status v1.ConditionStatus, reason, msg string) v1.ReplicationControllerCondition {
-	return v1.ReplicationControllerCondition{
+func NewReplicationControllerCondition(condType corev1.ReplicationControllerConditionType, status corev1.ConditionStatus, reason, msg string) corev1.ReplicationControllerCondition {
+	return corev1.ReplicationControllerCondition{
 		Type:               condType,
 		Status:             status,
 		LastTransitionTime: metav1.Now(),
@@ -35,7 +35,7 @@ func NewReplicationControllerCondition(condType v1.ReplicationControllerConditio
 }
 
 // GetCondition returns a replication controller condition with the provided type if it exists.
-func GetCondition(status v1.ReplicationControllerStatus, condType v1.ReplicationControllerConditionType) *v1.ReplicationControllerCondition {
+func GetCondition(status corev1.ReplicationControllerStatus, condType corev1.ReplicationControllerConditionType) *corev1.ReplicationControllerCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
@@ -46,23 +46,23 @@ func GetCondition(status v1.ReplicationControllerStatus, condType v1.Replication
 }
 
 // SetCondition adds/replaces the given condition in the replication controller status.
-func SetCondition(status *v1.ReplicationControllerStatus, condition v1.ReplicationControllerCondition) {
+func SetCondition(status *corev1.ReplicationControllerStatus, condition corev1.ReplicationControllerCondition) {
 	currentCond := GetCondition(*status, condition.Type)
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
 	}
-	newConditions := filterOutCondition(status.Conditions, condition.Type)
-	status.Conditions = append(newConditions, condition)
+	status.Conditions = filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(status.Conditions, condition)
 }
 
 // RemoveCondition removes the condition with the provided type from the replication controller status.
-func RemoveCondition(status *v1.ReplicationControllerStatus, condType v1.ReplicationControllerConditionType) {
+func RemoveCondition(status *corev1.ReplicationControllerStatus, condType corev1.ReplicationControllerConditionType) {
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
 // filterOutCondition returns a new slice of replication controller conditions without conditions with the provided type.
-func filterOutCondition(conditions []v1.ReplicationControllerCondition, condType v1.ReplicationControllerConditionType) []v1.ReplicationControllerCondition {
-	var newConditions []v1.ReplicationControllerCondition
+func filterOutCondition(conditions []corev1.ReplicationControllerCondition, condType corev1.ReplicationControllerConditionType) []corev1.ReplicationControllerCondition {
+	var newConditions []corev1.ReplicationControllerCondition
 	for _, c := range conditions {
 		if c.Type == condType {
 			continue

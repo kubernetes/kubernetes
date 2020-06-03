@@ -18,20 +18,22 @@ package deployment
 
 import (
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
-func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) error {
+func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID][]*corev1.Pod) error {
 	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down.
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
 	if err != nil {
 		return err
 	}
-	allRSs := append(oldRSs, newRS)
+	tmpRs := make([]*apps.ReplicaSet, len(oldRSs))
+	copy(tmpRs, oldRSs)
+	allRSs := append(tmpRs, newRS)
 	activeOldRSs := controller.FilterActiveReplicaSets(oldRSs)
 
 	// scale down old replica sets.
@@ -55,7 +57,7 @@ func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*ap
 		if err != nil {
 			return err
 		}
-		allRSs = append(oldRSs, newRS)
+		allRSs = append(append([]*apps.ReplicaSet{}, oldRSs...), newRS)
 	}
 
 	// scale up new replica set.
@@ -95,7 +97,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*app
 }
 
 // oldPodsRunning returns whether there are old pods running or any of the old ReplicaSets thinks that it runs pods.
-func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) bool {
+func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap map[types.UID][]*corev1.Pod) bool {
 	if oldPods := util.GetActualReplicaCountForReplicaSets(oldRSs); oldPods > 0 {
 		return true
 	}
@@ -106,10 +108,10 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 		}
 		for _, pod := range podList {
 			switch pod.Status.Phase {
-			case v1.PodFailed, v1.PodSucceeded:
+			case corev1.PodFailed, corev1.PodSucceeded:
 				// Don't count pods in terminal state.
 				continue
-			case v1.PodUnknown:
+			case corev1.PodUnknown:
 				// This happens in situation like when the node is temporarily disconnected from the cluster.
 				// If we can't be sure that the pod is not running, we have to count it.
 				return true

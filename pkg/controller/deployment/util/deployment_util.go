@@ -134,8 +134,8 @@ func SetDeploymentCondition(status *apps.DeploymentStatus, condition apps.Deploy
 	if currentCond != nil && currentCond.Status == condition.Status {
 		condition.LastTransitionTime = currentCond.LastTransitionTime
 	}
-	newConditions := filterOutCondition(status.Conditions, condition.Type)
-	status.Conditions = append(newConditions, condition)
+	status.Conditions = filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(status.Conditions, condition)
 }
 
 // RemoveDeploymentCondition removes the deployment condition with the provided type.
@@ -358,7 +358,7 @@ func FindActiveOrLatest(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) *apps
 	}
 
 	sort.Sort(sort.Reverse(controller.ReplicaSetsByCreationTimestamp(oldRSs)))
-	allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
+	allRSs := controller.FilterActiveReplicaSets(append(append([]*apps.ReplicaSet{}, oldRSs...), newRS))
 
 	switch len(allRSs) {
 	case 0:

@@ -24,7 +24,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -39,8 +39,9 @@ func (dc *DeploymentController) syncStatusOnly(d *apps.Deployment, rsList []*app
 	if err != nil {
 		return err
 	}
-
-	allRSs := append(oldRSs, newRS)
+	tmpRs := make([]*apps.ReplicaSet, len(oldRSs))
+	copy(tmpRs, oldRSs)
+	allRSs := append(tmpRs, newRS)
 	return dc.syncDeploymentStatus(allRSs, newRS, d)
 }
 
@@ -63,8 +64,9 @@ func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaS
 			return err
 		}
 	}
-
-	allRSs := append(oldRSs, newRS)
+	tmpRs := make([]*apps.ReplicaSet, len(oldRSs))
+	copy(tmpRs, oldRSs)
+	allRSs := append(tmpRs, newRS)
 	return dc.syncDeploymentStatus(allRSs, newRS, d)
 }
 
@@ -84,11 +86,11 @@ func (dc *DeploymentController) checkPausedConditions(d *apps.Deployment) error 
 
 	needsUpdate := false
 	if d.Spec.Paused && !pausedCondExists {
-		condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionUnknown, deploymentutil.PausedDeployReason, "Deployment is paused")
+		condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, corev1.ConditionUnknown, deploymentutil.PausedDeployReason, "Deployment is paused")
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 		needsUpdate = true
 	} else if !d.Spec.Paused && pausedCondExists {
-		condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionUnknown, deploymentutil.ResumedDeployReason, "Deployment is resumed")
+		condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, corev1.ConditionUnknown, deploymentutil.ResumedDeployReason, "Deployment is resumed")
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 		needsUpdate = true
 	}
@@ -166,7 +168,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		cond := deploymentutil.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
 		if deploymentutil.HasProgressDeadline(d) && cond == nil {
 			msg := fmt.Sprintf("Found new replica set %q", rsCopy.Name)
-			condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, deploymentutil.FoundNewRSReason, msg)
+			condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, corev1.ConditionTrue, deploymentutil.FoundNewRSReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 			needsUpdate = true
 		}
@@ -207,7 +209,9 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			Template:        newRSTemplate,
 		},
 	}
-	allRSs := append(oldRSs, &newRS)
+	tmpRs := make([]*apps.ReplicaSet, len(oldRSs))
+	copy(tmpRs, oldRSs)
+	allRSs := append(tmpRs, &newRS)
 	newReplicasCount, err := deploymentutil.NewRSNewReplicas(d, allRSs, &newRS)
 	if err != nil {
 		return nil, err
@@ -257,30 +261,30 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			klog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
 		}
 		return nil, err
-	case errors.HasStatusCause(err, v1.NamespaceTerminatingCause):
+	case errors.HasStatusCause(err, corev1.NamespaceTerminatingCause):
 		// if the namespace is terminating, all subsequent creates will fail and we can safely do nothing
 		return nil, err
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
 		if deploymentutil.HasProgressDeadline(d) {
-			cond := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
+			cond := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, corev1.ConditionFalse, deploymentutil.FailedRSCreateReason, msg)
 			deploymentutil.SetDeploymentCondition(&d.Status, *cond)
 			// We don't really care about this error at this point, since we have a bigger issue to report.
 			// TODO: Identify which errors are permanent and switch DeploymentIsFailed to take into account
 			// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
 			_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
 		}
-		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
+		dc.eventRecorder.Eventf(d, corev1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
 		return nil, err
 	}
 	if !alreadyExists && newReplicasCount > 0 {
-		dc.eventRecorder.Eventf(d, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
+		dc.eventRecorder.Eventf(d, corev1.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
 	}
 
 	needsUpdate := deploymentutil.SetDeploymentRevision(d, newRevision)
 	if !alreadyExists && deploymentutil.HasProgressDeadline(d) {
 		msg := fmt.Sprintf("Created new replica set %q", createdRS.Name)
-		condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, deploymentutil.NewReplicaSetReason, msg)
+		condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, corev1.ConditionTrue, deploymentutil.NewReplicaSetReason, msg)
 		deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 		needsUpdate = true
 	}
@@ -321,7 +325,7 @@ func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.R
 	// We need to proportionally scale all replica sets (new and old) in case of a
 	// rolling deployment.
 	if deploymentutil.IsRollingUpdate(deployment) {
-		allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
+		allRSs := controller.FilterActiveReplicaSets(append(append([]*apps.ReplicaSet{}, oldRSs...), newRS))
 		allRSsReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 
 		allowedSize := int32(0)
@@ -423,7 +427,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(context.TODO(), rsCopy, metav1.UpdateOptions{})
 		if err == nil && sizeNeedsUpdate {
 			scaled = true
-			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
+			dc.eventRecorder.Eventf(deployment, corev1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 		}
 	}
 	return scaled, rs, err
@@ -511,10 +515,10 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 	}
 
 	if availableReplicas >= *(deployment.Spec.Replicas)-deploymentutil.MaxUnavailable(*deployment) {
-		minAvailability := deploymentutil.NewDeploymentCondition(apps.DeploymentAvailable, v1.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
+		minAvailability := deploymentutil.NewDeploymentCondition(apps.DeploymentAvailable, corev1.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
 		deploymentutil.SetDeploymentCondition(&status, *minAvailability)
 	} else {
-		noMinAvailability := deploymentutil.NewDeploymentCondition(apps.DeploymentAvailable, v1.ConditionFalse, deploymentutil.MinimumReplicasUnavailable, "Deployment does not have minimum availability.")
+		noMinAvailability := deploymentutil.NewDeploymentCondition(apps.DeploymentAvailable, corev1.ConditionFalse, deploymentutil.MinimumReplicasUnavailable, "Deployment does not have minimum availability.")
 		deploymentutil.SetDeploymentCondition(&status, *noMinAvailability)
 	}
 
@@ -531,7 +535,7 @@ func (dc *DeploymentController) isScalingEvent(d *apps.Deployment, rsList []*app
 	if err != nil {
 		return false, err
 	}
-	allRSs := append(oldRSs, newRS)
+	allRSs := append(append([]*apps.ReplicaSet{}, oldRSs...), newRS)
 	for _, rs := range controller.FilterActiveReplicaSets(allRSs) {
 		desired, ok := deploymentutil.GetDesiredReplicasAnnotation(rs)
 		if !ok {
