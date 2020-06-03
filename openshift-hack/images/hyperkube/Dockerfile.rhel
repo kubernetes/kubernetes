@@ -1,0 +1,17 @@
+FROM registry.svc.ci.openshift.org/ocp/builder:golang-1.13 AS builder
+WORKDIR /go/src/github.com/openshift/origin
+COPY . .
+RUN for p in vendor/k8s.io/kubernetes/cmd/kube-apiserver vendor/k8s.io/kubernetes/cmd/kube-controller-manager \
+    vendor/k8s.io/kubernetes/cmd/kube-scheduler vendor/k8s.io/kubernetes/cmd/kubelet; do make build WHAT=$p; done && \
+    mkdir -p /tmp/build && \
+    cp images/hyperkube/hyperkube /tmp/build && \
+    cp /go/src/github.com/openshift/origin/_output/local/bin/linux/$(go env GOARCH)/{kube-apiserver,kube-controller-manager,kube-scheduler,kubelet} \
+    /tmp/build
+
+FROM registry.svc.ci.openshift.org/ocp/4.2:base
+RUN yum install -y --setopt=tsflags=nodocs --setopt=skip_missing_names_on_install=False iproute && yum clean all
+COPY --from=builder /tmp/build/* /usr/bin/
+LABEL io.k8s.display-name="OpenShift Kubernetes Server Commands" \
+      io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \
+      io.openshift.tags="openshift,hyperkube" \
+      io.openshift.build.versions="kubernetes=1.18.3"
