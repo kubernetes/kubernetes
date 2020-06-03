@@ -243,7 +243,7 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 	for _, scope := range scopes {
 		// Try to retrieve ip inside container network namespace
 		output, err := execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
-			"ip", "-o", addrType, "addr", "show", "dev", interfaceName, "scope", "global").CombinedOutput()
+			"ip", "-o", addrType, "addr", "show", "dev", interfaceName, "scope", scope).CombinedOutput()
 		if err != nil {
 			return nil, fmt.Errorf("Unexpected command output %s with error: %v", output, err)
 		}
