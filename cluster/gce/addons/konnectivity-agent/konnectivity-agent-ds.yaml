@@ -23,7 +23,7 @@ spec:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
       containers:
-        - image: gcr.io/jying-gke-dev/proxy-agent-amd64:aa16911ab5543e8bef57ea34e733ecf802efecb8
+        - image: gcr.io/jying-gke-dev/proxy-agent-amd64:88faeaa57f02f5976fd43f28961043abc4c00186
           name: konnectivity-agent
           command: ["/proxy-agent"]
           args: [
