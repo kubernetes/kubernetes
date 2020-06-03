@@ -490,12 +490,9 @@ function install-containerd-ubuntu {
 
   # Override to latest versions of containerd and runc
   systemctl stop containerd
-  if [[ ! -z "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    curl -fsSL "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}.linux-amd64.tar.gz" | tar --overwrite -xzv -C /usr/
-  fi
-  if [[ ! -z "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-    curl -fsSL "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.amd64" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
-  fi
+  CONTAINERD_BASE_URL="https://github.com/kind-ci/containerd-nightlies/releases/download/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION#v}"
+  curl -fsSL "${CONTAINERD_BASE_URL}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION#v}.linux-amd64.tar.gz" | tar --overwrite -xzv -C /usr/
+  curl -fsSL "${CONTAINERD_BASE_URL}/runc.amd64" --output /usr/sbin/runc && chmod 755 /usr/sbin/runc
   sudo systemctl start containerd
 }
 
