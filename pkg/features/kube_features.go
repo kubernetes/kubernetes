@@ -592,6 +592,13 @@ const (
 	//
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
+
+	// owner: @jsafrane
+	// alpha: v1.19
+	//
+	// Allows users to mount volumes directly with the right SELinux conext
+	// and skip recursive relabeling in container runtime.
+	SELinuxRelabelPolicy featuregate.Feature = "SELinuxRelabelPolicy"
 )
 
 func init() {
@@ -683,6 +690,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA}, // remove in 1.20
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: false, PreRelease: featuregate.Alpha},
+	SELinuxRelabelPolicy:                           {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
