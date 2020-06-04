@@ -313,7 +313,6 @@ func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error)
 // UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case
 // when the CA Cert is present but the CA Key is not.
 // This allows us to, e.g., skip generating certs or not start the csr signing controller.
-// In case we are using an external front-proxy CA, the function validates the certificates signed by front-proxy CA that should be provided by the user.
 func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
@@ -323,14 +322,6 @@ func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
 	if _, err := os.Stat(caKeyPath); !os.IsNotExist(err) {
 		return false, nil
-	}
-
-	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerCertAndKeyBaseName, "API server"}); err != nil {
-		return true, err
-	}
-
-	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName, "API server kubelet client"}); err != nil {
-		return true, err
 	}
 
 	return true, nil
