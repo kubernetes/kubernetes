@@ -375,13 +375,10 @@ func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodConditi
 	podCopy := pod.DeepCopy()
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
-	if !podutil.UpdatePodCondition(&podCopy.Status, condition) &&
-		(len(nominatedNode) == 0 || pod.Status.NominatedNodeName == nominatedNode) {
+	if !podutil.UpdatePodCondition(&podCopy.Status, condition) && pod.Status.NominatedNodeName == nominatedNode {
 		return nil
 	}
-	if nominatedNode != "" {
-		podCopy.Status.NominatedNodeName = nominatedNode
-	}
+	podCopy.Status.NominatedNodeName = nominatedNode
 	return patchPod(client, pod, podCopy)
 }
 

@@ -1334,7 +1334,7 @@ func TestUpdatePod(t *testing.T) {
 			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
 		},
 		{
-			name: "Should not make patch request if pod condition already exists and is identical and nominated node name is not set",
+			name: "Should make patch request if pod condition already exists and is identical but nominated node name is different",
 			currentPodConditions: []v1.PodCondition{
 				{
 					Type:               "currentType",
@@ -1354,7 +1354,7 @@ func TestUpdatePod(t *testing.T) {
 				Message:            "currentMessage",
 			},
 			currentNominatedNodeName: "node1",
-			expectedPatchRequests:    0,
+			expectedPatchRequests:    1,
 		},
 		{
 			name: "Should make patch request if pod condition already exists and is identical but nominated node name is set and different",
