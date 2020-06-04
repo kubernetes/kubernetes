@@ -28,7 +28,7 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/klog/v2 v2.0.0
+	k8s.io/klog/v2 v2.1.0
 	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66
 	sigs.k8s.io/yaml v1.2.0
 )
