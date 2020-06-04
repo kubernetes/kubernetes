@@ -232,16 +232,37 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		lbFlags |= hcn.LoadBalancerFlagsDSR
 	}
 
-	lb, err := hcn.AddLoadBalancer(
-		hnsEndpoints,
-		lbFlags,
-		lbPortMappingFlags,
-		sourceVip,
-		vips,
-		protocol,
-		internalPort,
-		externalPort,
-	)
+	lbDistributionType := hcn.LoadBalancerDistributionNone
+
+	if flags.sessionAffinity {
+		lbDistributionType = hcn.LoadBalancerDistributionSourceIP
+	}
+
+	loadBalancer := &hcn.HostComputeLoadBalancer{
+		SourceVIP: sourceVip,
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{
+				Protocol:         uint32(protocol),
+				InternalPort:     internalPort,
+				ExternalPort:     externalPort,
+				DistributionType: lbDistributionType,
+				Flags:            lbPortMappingFlags,
+			},
+		},
+		FrontendVIPs: vips,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		Flags: lbFlags,
+	}
+
+	for _, endpoint := range hnsEndpoints {
+		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, endpoint.Id)
+	}
+
+	lb, err := loadBalancer.Create()
+
 	if err != nil {
 		return nil, err
 	}

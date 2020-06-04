@@ -95,11 +95,12 @@ type loadBalancerInfo struct {
 }
 
 type loadBalancerFlags struct {
-	isILB          bool
-	isDSR          bool
-	localRoutedVIP bool
-	useMUX         bool
-	preserveDIP    bool
+	isILB           bool
+	isDSR           bool
+	localRoutedVIP  bool
+	useMUX          bool
+	preserveDIP     bool
+	sessionAffinity bool
 }
 
 // internal struct for string service information
@@ -488,11 +489,12 @@ type Proxier struct {
 	// precomputing some number of those and cache for future reuse.
 	precomputedProbabilities []string
 
-	hns       HostNetworkService
-	network   hnsNetworkInfo
-	sourceVip string
-	hostMac   string
-	isDSR     bool
+	hns               HostNetworkService
+	network           hnsNetworkInfo
+	sourceVip         string
+	hostMac           string
+	isDSR             bool
+	supportedFeatures hcn.SupportedFeatures
 }
 
 type localPort struct {
@@ -649,6 +651,7 @@ func NewProxier(
 		sourceVip:           sourceVip,
 		hostMac:             hostMac,
 		isDSR:               isDSR,
+		supportedFeatures:   supportedFeatures,
 	}
 
 	burstSyncs := 2
@@ -1226,9 +1229,15 @@ func (proxier *Proxier) syncProxyRules() {
 		if containsPublicIP || containsNodeIP {
 			sourceVip = proxier.nodeIP.String()
 		}
+
+		sessionAffinityClientIP := svcInfo.sessionAffinityType == v1.ServiceAffinityClientIP
+		if sessionAffinityClientIP && !proxier.supportedFeatures.SessionAffinity {
+			klog.Warningf("Session Affinity is not supported on this version of Windows.")
+		}
+
 		hnsLoadBalancer, err := hns.getLoadBalancer(
 			hnsEndpoints,
-			loadBalancerFlags{isDSR: proxier.isDSR},
+			loadBalancerFlags{isDSR: proxier.isDSR, sessionAffinity: sessionAffinityClientIP},
 			sourceVip,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
@@ -1253,7 +1262,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				nodePortEndpoints,
-				loadBalancerFlags{localRoutedVIP: true},
+				loadBalancerFlags{localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP},
 				sourceVip,
 				"",
 				Enum(svcInfo.protocol),
@@ -1274,7 +1283,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
 				hnsEndpoints,
-				loadBalancerFlags{},
+				loadBalancerFlags{sessionAffinity: sessionAffinityClientIP},
 				sourceVip,
 				externalIP.ip,
 				Enum(svcInfo.protocol),
@@ -1297,7 +1306,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				lbIngressEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP},
+				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP},
 				sourceVip,
 				lbIngressIP.ip,
 				Enum(svcInfo.protocol),
