@@ -666,6 +666,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
+					{Name: "VolumeBinding"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -773,6 +774,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
+					{Name: "VolumeBinding"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -892,6 +894,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
+					{Name: "VolumeBinding"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -1013,6 +1016,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
+					{Name: "VolumeBinding"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -1134,6 +1138,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
+					{Name: "VolumeBinding"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -1260,6 +1265,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
+					{Name: "VolumeBinding"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -1389,6 +1395,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "NodePorts"},
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
+			{Name: "VolumeBinding"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -1457,6 +1464,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "NodePorts"},
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
+					{Name: "VolumeBinding"},
 				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -1545,6 +1553,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			{Name: "NodePorts"},
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
+			{Name: "VolumeBinding"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -1740,6 +1749,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "NodePorts"},
 						{Name: "InterPodAffinity"},
 						{Name: "PodTopologySpread"},
+						{Name: "VolumeBinding"},
 					},
 				},
 				Filter: &config.PluginSet{
