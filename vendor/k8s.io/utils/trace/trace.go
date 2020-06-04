@@ -88,32 +88,27 @@ func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
 	endTime := time.Now()
 
 	totalTime := endTime.Sub(t.startTime)
-	buffer.WriteString(fmt.Sprintf("Trace[%d]: %q ", tracenum, t.name))
 	if len(t.fields) > 0 {
 		writeFields(&buffer, t.fields)
-		buffer.WriteString(" ")
 	}
-	buffer.WriteString(fmt.Sprintf("(started: %v) (total time: %v):\n", t.startTime, totalTime))
+	klog.InfoS("Trace", "tracenum", tracenum, "name", t.name, "keyvalues", buffer.String(), "starttime", t.startTime, "totaltime", totalTime)
 	lastStepTime := t.startTime
 	for _, step := range t.steps {
 		stepDuration := step.stepTime.Sub(lastStepTime)
 		if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
-			buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] ", tracenum, step.stepTime.Sub(t.startTime), stepDuration))
-			buffer.WriteString(step.msg)
+			buffer.Reset()
 			if len(step.fields) > 0 {
-				buffer.WriteString(" ")
 				writeFields(&buffer, step.fields)
 			}
-			buffer.WriteString("\n")
+			klog.InfoS("Trace", "tracenum", tracenum, "steptime", step.stepTime.Sub(t.startTime), "stepduration", stepDuration, "stepmsg", step.msg, "keyvalues", buffer.String())
 		}
 		lastStepTime = step.stepTime
 	}
 	stepDuration := endTime.Sub(lastStepTime)
 	if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
-		buffer.WriteString(fmt.Sprintf("Trace[%d]: [%v] [%v] END\n", tracenum, endTime.Sub(t.startTime), stepDuration))
+		klog.InfoS("Trace end", "tracenum", tracenum, "endtime", endTime.Sub(t.startTime), "stepduration", stepDuration)
 	}
 
-	klog.Info(buffer.String())
 }
 
 // LogIfLong is used to dump steps that took longer than its share
