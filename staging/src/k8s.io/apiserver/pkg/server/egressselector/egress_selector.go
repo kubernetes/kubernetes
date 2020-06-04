@@ -44,7 +44,7 @@ var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).Dial
 
 // EgressSelector is the map of network context type to context dialer, for network egress.
 type EgressSelector struct {
-	egressToDialer map[EgressType]utilnet.DialFunc
+	egressToDialer map[EgressType]func(string) utilnet.DialFunc
 }
 
 // EgressType is an indicator of which egress selection should be used for sending traffic.
@@ -102,8 +102,8 @@ func lookupServiceName(name string) (EgressType, error) {
 	return -1, fmt.Errorf("unrecognized service name %s", name)
 }
 
-func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn, error) {
-	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1")
+func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr, caller string) (net.Conn, error) {
+	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: %s\r\n\r\n", addr, "127.0.0.1", caller)
 	br := bufio.NewReader(proxyConn)
 	res, err := http.ReadResponse(br, nil)
 	if err != nil {
@@ -131,7 +131,7 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 
 type proxier interface {
 	// proxy returns a connection to addr.
-	proxy(addr string) (net.Conn, error)
+	proxy(addr, caller string) (net.Conn, error)
 }
 
 var _ proxier = &httpConnectProxier{}
@@ -141,8 +141,8 @@ type httpConnectProxier struct {
 	proxyAddress string
 }
 
-func (t *httpConnectProxier) proxy(addr string) (net.Conn, error) {
-	return tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
+func (t *httpConnectProxier) proxy(addr, caller string) (net.Conn, error) {
+	return tunnelHTTPConnect(t.conn, t.proxyAddress, addr, caller)
 }
 
 var _ proxier = &grpcProxier{}
@@ -151,8 +151,8 @@ type grpcProxier struct {
 	tunnel client.Tunnel
 }
 
-func (g *grpcProxier) proxy(addr string) (net.Conn, error) {
-	return g.tunnel.Dial("tcp", addr)
+func (g *grpcProxier) proxy(addr, caller string) (net.Conn, error) {
+	return g.tunnel.Dial("tcp", addr, caller)
 }
 
 type proxyServerConnector interface {
@@ -193,8 +193,6 @@ type udsGRPCConnector struct {
 }
 
 func (u *udsGRPCConnector) connect() (proxier, error) {
-	u.grpcLock.Lock()
-	defer u.grpcLock.Unlock()
 
 	udsName := u.udsName
 	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
@@ -205,6 +203,8 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 		return c, err
 	})
 
+	u.grpcLock.Lock()
+	defer u.grpcLock.Unlock()
 	if u.grpcConn == nil {
 		conn, err := grpc.Dial(udsName, dialOption, grpc.WithInsecure(), grpc.WithUserAgent("foo"))
 		if err != nil {
@@ -214,7 +214,7 @@ func (u *udsGRPCConnector) connect() (proxier, error) {
 		u.grpcConn = conn
 	}
 
-	tunnel, err := client.CreateReusableGrpcTunnel(u.grpcConn, udsName, dialOption, grpc.WithInsecure(), grpc.WithUserAgent("foo"))
+	tunnel, err := client.CreateSingleUseGrpcTunnel(u.grpcConn)
 	if err != nil {
 		return nil, err
 	}
@@ -233,27 +233,33 @@ type metricsOptions struct {
 	protocol  string
 }
 
-func (d *dialerCreator) createDialer() utilnet.DialFunc {
+func (d *dialerCreator) createDialerGenerator() func(string) utilnet.DialFunc {
 	if d.direct {
-		return directDialer
+
+		return func(caller string) utilnet.DialFunc {
+			return directDialer
+		}
 	}
 
-	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		trace := utiltrace.New(fmt.Sprintf("Proxy via HTTP Connect over %s", d.options.transport), utiltrace.Field{Key: "address", Value: addr})
-		defer trace.LogIfLong(500 * time.Millisecond)
-		start := egressmetrics.Metrics.Clock().Now()
-		proxier, err := d.connector.connect()
-		if err != nil {
-			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
-			return nil, err
+	return func(caller string) utilnet.DialFunc {
+
+		return func(ctx context.Context, network, addr string) (net.Conn, error) {
+			trace := utiltrace.New(fmt.Sprintf("Proxy via HTTP Connect over %s", d.options.transport), utiltrace.Field{Key: "address", Value: addr})
+			defer trace.LogIfLong(500 * time.Millisecond)
+			start := egressmetrics.Metrics.Clock().Now()
+			proxier, err := d.connector.connect()
+			if err != nil {
+				egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
+				return nil, err
+			}
+			conn, err := proxier.proxy(addr, caller)
+			if err != nil {
+				egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageProxy)
+				return nil, err
+			}
+			egressmetrics.Metrics.ObserveDialLatency(egressmetrics.Metrics.Clock().Now().Sub(start), d.options.protocol, d.options.transport)
+			return conn, nil
 		}
-		conn, err := proxier.proxy(addr)
-		if err != nil {
-			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageProxy)
-			return nil, err
-		}
-		egressmetrics.Metrics.ObserveDialLatency(egressmetrics.Metrics.Clock().Now().Sub(start), d.options.protocol, d.options.transport)
-		return conn, nil
 	}
 }
 
@@ -358,7 +364,7 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		return nil, nil
 	}
 	cs := &EgressSelector{
-		egressToDialer: make(map[EgressType]utilnet.DialFunc),
+		egressToDialer: make(map[EgressType]func(string) utilnet.DialFunc),
 	}
 	for _, service := range config.EgressSelections {
 		name, err := lookupServiceName(service.Name)
@@ -369,7 +375,7 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dialer for egressSelection %q: %v", name, err)
 		}
-		cs.egressToDialer[name] = dialerCreator.createDialer()
+		cs.egressToDialer[name] = dialerCreator.createDialerGenerator()
 	}
 	return cs, nil
 }
@@ -381,5 +387,5 @@ func (cs *EgressSelector) Lookup(networkContext NetworkContext) (utilnet.DialFun
 		// The round trip wrapper will over-ride the dialContext method appropriately
 		return nil, nil
 	}
-	return cs.egressToDialer[networkContext.EgressSelectionName], nil
+	return cs.egressToDialer[networkContext.EgressSelectionName]("test"), nil
 }
