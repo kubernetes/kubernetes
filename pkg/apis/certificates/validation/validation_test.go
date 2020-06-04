@@ -263,12 +263,53 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 			},
 			errs: field.ErrorList{},
 		},
+		"missing usages": {
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     []capi.KeyUsage{},
+					Request:    newCSRPEM(t),
+					SignerName: validSignerName,
+				},
+			},
+			errs: field.ErrorList{
+				field.Required(specPath.Child("usages"), "usages must be provided"),
+			},
+		},
+		"unknown and duplicate usages - v1beta1": {
+			gv: schema.GroupVersion{Group: capi.SchemeGroupVersion.Group, Version: "v1beta1"},
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     []capi.KeyUsage{"unknown", "unknown"},
+					Request:    newCSRPEM(t),
+					SignerName: validSignerName,
+				},
+			},
+			errs: field.ErrorList{},
+		},
+		"unknown and duplicate usages - v1": {
+			gv: schema.GroupVersion{Group: capi.SchemeGroupVersion.Group, Version: "v1"},
+			csr: capi.CertificateSigningRequest{
+				ObjectMeta: validObjectMeta,
+				Spec: capi.CertificateSigningRequestSpec{
+					Usages:     []capi.KeyUsage{"unknown", "unknown"},
+					Request:    newCSRPEM(t),
+					SignerName: validSignerName,
+				},
+			},
+			errs: field.ErrorList{
+				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()),
+				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()),
+				field.Duplicate(specPath.Child("usages").Index(1), capi.KeyUsage("unknown")),
+			},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			el := ValidateCertificateSigningRequestCreate(&test.csr, test.gv)
 			if !reflect.DeepEqual(el, test.errs) {
-				t.Errorf("returned and expected errors did not match - expected %v but got %v", test.errs.ToAggregate(), el.ToAggregate())
+				t.Errorf("returned and expected errors did not match - expected\n%v\nbut got\n%v", test.errs.ToAggregate(), el.ToAggregate())
 			}
 		})
 	}
@@ -331,6 +372,8 @@ func Test_getValidationOptions(t *testing.T) {
 				allowDuplicateConditionTypes: true,
 				allowEmptyConditionType:      true,
 				allowArbitraryCertificate:    true,
+				allowUnknownUsages:           true,
+				allowDuplicateUsages:         true,
 			},
 		},
 		{
@@ -352,6 +395,8 @@ func Test_getValidationOptions(t *testing.T) {
 				allowDuplicateConditionTypes: true,
 				allowEmptyConditionType:      true,
 				allowArbitraryCertificate:    true,
+				allowUnknownUsages:           true,
+				allowDuplicateUsages:         true,
 			},
 		},
 		{
@@ -422,6 +467,22 @@ func Test_getValidationOptions(t *testing.T) {
 			}},
 			want: certificateValidationOptions{
 				allowArbitraryCertificate: true,
+			},
+		},
+		{
+			name:    "v1 compatible update, existing unknown usages",
+			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
+			oldCSR:  &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{Usages: []capi.KeyUsage{"unknown"}}},
+			want: certificateValidationOptions{
+				allowUnknownUsages: true,
+			},
+		},
+		{
+			name:    "v1 compatible update, existing duplicate usages",
+			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
+			oldCSR:  &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{Usages: []capi.KeyUsage{"any", "any"}}},
+			want: certificateValidationOptions{
+				allowDuplicateUsages: true,
 			},
 		},
 	}
@@ -586,6 +647,19 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 			name:   "finalizer change with invalid status",
 			newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{Certificate: invalidCertificateNoPEM}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{Certificate: invalidCertificateNoPEM}},
+		},
+		{
+			name: "finalizer change with duplicate and unknown usages",
+			newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: capi.CertificateSigningRequestSpec{
+				Usages:     []capi.KeyUsage{"unknown", "unknown"},
+				Request:    newCSRPEM(t),
+				SignerName: validSignerName,
+			}},
+			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: capi.CertificateSigningRequestSpec{
+				Usages:     []capi.KeyUsage{"unknown", "unknown"},
+				Request:    newCSRPEM(t),
+				SignerName: validSignerName,
+			}},
 		},
 		{
 			name: "add Approved condition",
