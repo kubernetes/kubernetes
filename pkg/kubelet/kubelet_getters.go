@@ -170,7 +170,7 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 	for _, p := range pods {
 		if kubelettypes.IsStaticPod(p) {
 			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
-				klog.V(2).Infof("status for pod %v updated to %v", p.Name, status)
+				klog.V(2).InfoS("Pod status updated", "pod", klog.KObj(p), "status", status.Phase)
 				p.Status = status
 			}
 		}
