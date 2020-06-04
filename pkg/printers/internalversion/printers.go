@@ -39,6 +39,7 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -514,6 +515,14 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(csiDriverColumnDefinitions, printCSIDriver)
 	h.TableHandler(csiDriverColumnDefinitions, printCSIDriverList)
+
+	csiStorageCapacityColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "StorageClassName", Type: "string", Description: storagev1alpha1.CSIStorageCapacity{}.SwaggerDoc()["storageClassName"]},
+		{Name: "Capacity", Type: "string", Description: storagev1alpha1.CSIStorageCapacity{}.SwaggerDoc()["capacity"]},
+	}
+	h.TableHandler(csiStorageCapacityColumnDefinitions, printCSIStorageCapacity)
+	h.TableHandler(csiStorageCapacityColumnDefinitions, printCSIStorageCapacityList)
 
 	mutatingWebhookColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -1365,6 +1374,32 @@ func printCSIDriverList(list *storage.CSIDriverList, options printers.GenerateOp
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printCSIDriver(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printCSIStorageCapacity(obj *storage.CSIStorageCapacity, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	capacity := "<unset>"
+	if obj.Capacity != nil {
+		capacity = obj.Capacity.String()
+	}
+
+	row.Cells = append(row.Cells, obj.Name, obj.StorageClassName, capacity)
+	return []metav1.TableRow{row}, nil
+}
+
+func printCSIStorageCapacityList(list *storage.CSIStorageCapacityList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printCSIStorageCapacity(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

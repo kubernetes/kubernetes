@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -455,6 +456,39 @@ func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *
 					string(storage.VolumeLifecycleEphemeral),
 				}))
 		}
+	}
+
+	return allErrs
+}
+
+// ValidateStorageCapacityName checks that a name is appropriate for a
+// CSIStorageCapacity object.
+var ValidateStorageCapacityName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidateCSIStorageCapacity validates a CSIStorageCapacity.
+func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&capacity.ObjectMeta, true, ValidateStorageCapacityName, field.NewPath("metadata"))
+	allErrs = append(allErrs, metav1validation.ValidateLabelSelector(capacity.NodeTopology, field.NewPath("nodeTopology"))...)
+	for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg))
+	}
+	if capacity.Capacity != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeQuantity(*capacity.Capacity, field.NewPath("capacity"))...)
+	}
+	return allErrs
+}
+
+// ValidateCSIStorageCapacityUpdate tests if an update to CSIStorageCapacity is valid.
+func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageCapacity) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&capacity.ObjectMeta, &oldCapacity.ObjectMeta, field.NewPath("metadata"))
+
+	// Input fields for CSI GetCapacity are immutable.
+	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
+	if !apiequality.Semantic.DeepEqual(capacity.NodeTopology, oldCapacity.NodeTopology) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("nodeTopology"), capacity.NodeTopology, "field is immutable"))
+	}
+	if capacity.StorageClassName != oldCapacity.StorageClassName {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable"))
 	}
 
 	return allErrs

@@ -294,7 +294,7 @@ const (
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
 
 	// owner: @pohly
-	// alpha: v1.18
+	// alpha: v1.19
 	//
 	// Enables tracking of available storage capacity that CSI drivers provide.
 	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
