@@ -596,11 +596,17 @@ const (
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
 	// owner: @javidiaz
+	// owner: @jsafrane
 	// alpha: v1.19
 	//
 	// Allow setting the Fully Qualified Domain Name (FQDN) in the hostname of a Pod. If a Pod does not
 	// have FQDN, this feature has no effect.
 	SetHostnameAsFQDN featuregate.Feature = "SetHostnameAsFQDN"
+	// owner: @jsafrane
+	// alpha: v1.19
+	// Allows users to mount volumes directly with the right SELinux conext
+	// and skip recursive relabeling in container runtime.
+	SELinuxRelabelPolicy featuregate.Feature = "SELinuxRelabelPolicy"
 )
 
 func init() {
@@ -693,6 +699,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: false, PreRelease: featuregate.Alpha},
 	SetHostnameAsFQDN:                              {Default: false, PreRelease: featuregate.Alpha},
+	SELinuxRelabelPolicy:                           {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
