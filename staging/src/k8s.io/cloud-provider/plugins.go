@@ -97,7 +97,6 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 	var err error
 
 	if name == "" {
-		klog.Info("No cloud provider specified.")
 		return nil, nil
 	}
 
