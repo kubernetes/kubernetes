@@ -308,6 +308,17 @@ type CSIDriverSpec struct {
 	// more modes may be added in the future.
 	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode
+
+	// seLinuxMountSupported specifies if the CSI driver supports "-o context"
+	// mount option (Alpha feature).
+	// When "true", Kubernetes may call NodeStage / NodePublish with "-o context=xyz" mount
+	// option for volumes of a pod with
+	// podSecurityContext.seLinuxRelabelPolicy ="OnVolumeMount".
+	// When "false", Kubernetes won't pass any special SELinux mount options to the driver.
+	// podSecurityContext.seLinuxRelabelPolicy "OnVolumeMount" is silently ignored.
+	// Default is "false".
+	// +optional
+	SELinuxMountSupported *bool
 }
 
 // VolumeLifecycleMode specifies how a CSI volume is used in Kubernetes.
