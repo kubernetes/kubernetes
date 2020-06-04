@@ -14866,7 +14866,6 @@ func TestAlphaVolumePVCDataSource(t *testing.T) {
 }
 
 func TestValidateTopologySpreadConstraints(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, true)()
 	testCases := []struct {
 		name        string
 		constraints []core.TopologySpreadConstraint
