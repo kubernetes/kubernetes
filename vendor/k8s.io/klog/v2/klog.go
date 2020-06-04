@@ -751,17 +751,27 @@ func (l *loggingT) printWithFileLine(s severity, logr logr.InfoLogger, file stri
 	l.output(s, logr, buf, file, line, alsoToStderr)
 }
 
-// printS if loggr is specified, no need to output with logging module. If
-// err arguments is specified, will call logr.Error, or output to errorLog severity
-func (l *loggingT) printS(err error, loggr logr.Logger, msg string, keysAndValues ...interface{}) {
+// if loggr is specified, will call loggr.Error, otherwise output with logging module.
+func (l *loggingT) errorS(err error, loggr logr.Logger, msg string, keysAndValues ...interface{}) {
 	if loggr != nil {
-		if err != nil {
-			loggr.Error(err, msg, keysAndValues)
-		} else {
-			loggr.Info(msg, keysAndValues)
-		}
+		loggr.Error(err, msg, keysAndValues)
 		return
 	}
+	l.printS(err, msg, keysAndValues...)
+}
+
+// if loggr is specified, will call loggr.Info, otherwise output with logging module.
+func (l *loggingT) infoS(loggr logr.InfoLogger, msg string, keysAndValues ...interface{}) {
+	if loggr != nil {
+		loggr.Info(msg, keysAndValues)
+		return
+	}
+	l.printS(nil, msg, keysAndValues...)
+}
+
+// printS is called from infoS and errorS if loggr is not specified.
+// if err arguments is specified, will output to errorLog severity
+func (l *loggingT) printS(err error, msg string, keysAndValues ...interface{}) {
 	b := &bytes.Buffer{}
 	b.WriteString(fmt.Sprintf("%q", msg))
 	if err != nil {
@@ -775,7 +785,7 @@ func (l *loggingT) printS(err error, loggr logr.Logger, msg string, keysAndValue
 	} else {
 		s = errorLog
 	}
-	l.printDepth(s, logging.logr, 1, b)
+	l.printDepth(s, logging.logr, 2, b)
 }
 
 const missingValue = "(MISSING)"
@@ -790,10 +800,16 @@ func kvListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
 			v = missingValue
 		}
 		b.WriteByte(' ')
-		if _, ok := v.(fmt.Stringer); ok {
+
+		switch v.(type) {
+		case string, error:
 			b.WriteString(fmt.Sprintf("%s=%q", k, v))
-		} else {
-			b.WriteString(fmt.Sprintf("%s=%#v", k, v))
+		default:
+			if _, ok := v.(fmt.Stringer); ok {
+				b.WriteString(fmt.Sprintf("%s=%q", k, v))
+			} else {
+				b.WriteString(fmt.Sprintf("%s=%+v", k, v))
+			}
 		}
 	}
 }
@@ -851,6 +867,14 @@ func SetOutputBySeverity(name string, w io.Writer) {
 		w: w,
 	}
 	logging.file[sev] = rb
+}
+
+// LogToStderr sets whether to log exclusively to stderr, bypassing outputs
+func LogToStderr(stderr bool) {
+	logging.mu.Lock()
+	defer logging.mu.Unlock()
+
+	logging.toStderr = stderr
 }
 
 // output writes the data to the log files and releases the buffer.
@@ -1228,9 +1252,10 @@ func newVerbose(level Level, b bool) Verbose {
 // not evaluate its arguments.
 //
 // Whether an individual call to V generates a log record depends on the setting of
-// the -v and --vmodule flags; both are off by default. If the level in the call to
-// V is at least the value of -v, or of -vmodule for the source file containing the
-// call, the V call will log.
+// the -v and -vmodule flags; both are off by default. The V call will log if its level
+// is less than or equal to the value of the -v flag, or alternatively if its level is
+// less than or equal to the value of the -vmodule pattern matching the source file
+// containing the call.
 func V(level Level) Verbose {
 	// This function tries hard to be cheap unless there's work to do.
 	// The fast path is two atomic loads and compares.
@@ -1295,11 +1320,7 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 // See the documentation of V for usage.
 func (v Verbose) InfoS(msg string, keysAndValues ...interface{}) {
 	if v.enabled {
-		if v.logr != nil {
-			v.logr.Info(msg, keysAndValues)
-			return
-		}
-		logging.printS(nil, nil, msg, keysAndValues...)
+		logging.infoS(v.logr, msg, keysAndValues)
 	}
 }
 
@@ -1336,7 +1357,7 @@ func Infof(format string, args ...interface{}) {
 // output:
 // >> I1025 00:15:15.525108       1 controller_utils.go:116] "Pod status updated" pod="kubedns" status="ready"
 func InfoS(msg string, keysAndValues ...interface{}) {
-	logging.printS(nil, logging.logr, msg, keysAndValues...)
+	logging.infoS(logging.logr, msg, keysAndValues...)
 }
 
 // Warning logs to the WARNING and INFO logs.
@@ -1397,7 +1418,7 @@ func Errorf(format string, args ...interface{}) {
 // output:
 // >> E1025 00:15:15.525108       1 controller_utils.go:114] "Failed to update pod status" err="timeout"
 func ErrorS(err error, msg string, keysAndValues ...interface{}) {
-	logging.printS(err, logging.logr, msg, keysAndValues...)
+	logging.errorS(err, logging.logr, msg, keysAndValues...)
 }
 
 // Fatal logs to the FATAL, ERROR, WARNING, and INFO logs,
