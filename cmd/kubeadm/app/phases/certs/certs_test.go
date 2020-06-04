@@ -531,7 +531,7 @@ func TestUsingExternalCA(t *testing.T) {
 			},
 			externalCAFunc: UsingExternalCA,
 			expected:       true,
-			expectedErr:    true,
+			expectedErr:    false,
 		},
 		{
 			name: "Test External CA, when ca.key missing",
