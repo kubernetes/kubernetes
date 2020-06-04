@@ -126,7 +126,7 @@ func NewAvailableConditionController(
 	if egressSelector != nil {
 		networkContext := egressselector.Cluster.AsNetworkContext()
 		var egressDialer utilnet.DialFunc
-		egressDialer, err := egressSelector.Lookup(networkContext)
+		egressDialer, err := egressSelector.Lookup(networkContext, "aggregator")
 		if err != nil {
 			return nil, err
 		}

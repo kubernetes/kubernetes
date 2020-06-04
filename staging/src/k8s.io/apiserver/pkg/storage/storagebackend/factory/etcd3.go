@@ -120,7 +120,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 	networkContext := egressselector.Etcd.AsNetworkContext()
 	var egressDialer utilnet.DialFunc
 	if c.EgressLookup != nil {
-		egressDialer, err = c.EgressLookup(networkContext)
+		egressDialer, err = c.EgressLookup(networkContext, "etcd")
 		if err != nil {
 			return nil, err
 		}

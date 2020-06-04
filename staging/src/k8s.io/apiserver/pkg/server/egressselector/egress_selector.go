@@ -69,7 +69,7 @@ type NetworkContext struct {
 }
 
 // Lookup is the interface to get the dialer function for the network context.
-type Lookup func(networkContext NetworkContext) (utilnet.DialFunc, error)
+type Lookup func(networkContext NetworkContext, caller string) (utilnet.DialFunc, error)
 
 // String returns the canonical string representation of the egress type
 func (s EgressType) String() string {
@@ -382,10 +382,10 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 
 // Lookup gets the dialer function for the network context.
 // This is configured for the Kubernetes API Server at startup.
-func (cs *EgressSelector) Lookup(networkContext NetworkContext) (utilnet.DialFunc, error) {
+func (cs *EgressSelector) Lookup(networkContext NetworkContext, caller string) (utilnet.DialFunc, error) {
 	if cs.egressToDialer == nil {
 		// The round trip wrapper will over-ride the dialContext method appropriately
 		return nil, nil
 	}
-	return cs.egressToDialer[networkContext.EgressSelectionName]("test"), nil
+	return cs.egressToDialer[networkContext.EgressSelectionName](caller), nil
 }
