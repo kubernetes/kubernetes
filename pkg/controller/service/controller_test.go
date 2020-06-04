@@ -363,6 +363,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				for _, call := range cloud.Calls {
 					if call == "create" {
 						createCallFound = true
+						break;
 					}
 				}
 				if !createCallFound {
@@ -387,6 +388,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				for _, call := range cloud.Calls {
 					if call == "delete" {
 						deleteCallFound = true
+						break;
 					}
 				}
 				if !deleteCallFound {
