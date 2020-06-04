@@ -22,8 +22,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 
@@ -191,5 +193,27 @@ func SetDefaults_RequestedToCapacityRatioArgs(obj *v1beta1.RequestedToCapacityRa
 func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
+	}
+}
+
+func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
+	if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+		// When feature is disabled, the default spreading is done by legacy
+		// DefaultPodTopologySpread plugin.
+		return
+	}
+	if obj.DefaultConstraints == nil {
+		obj.DefaultConstraints = []v1.TopologySpreadConstraint{
+			{
+				TopologyKey:       v1.LabelHostname,
+				WhenUnsatisfiable: v1.ScheduleAnyway,
+				MaxSkew:           3,
+			},
+			{
+				TopologyKey:       v1.LabelZoneFailureDomainStable,
+				WhenUnsatisfiable: v1.ScheduleAnyway,
+				MaxSkew:           5,
+			},
+		}
 	}
 }
