@@ -58,6 +58,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodeports.Name},
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
+				{Name: volumebinding.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{
@@ -154,6 +155,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodeports.Name},
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
+						{Name: volumebinding.Name},
 					},
 				},
 				Filter: &schedulerapi.PluginSet{
@@ -238,6 +240,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodeports.Name},
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
+						{Name: volumebinding.Name},
 					},
 				},
 				Filter: &schedulerapi.PluginSet{

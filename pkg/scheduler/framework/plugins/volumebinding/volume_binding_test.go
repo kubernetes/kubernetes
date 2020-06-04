@@ -104,7 +104,9 @@ func TestVolumeBinding(t *testing.T) {
 			p := &VolumeBinding{
 				Binder: fakeVolumeBinder,
 			}
-			gotStatus := p.Filter(context.Background(), nil, item.pod, nodeInfo)
+			state := framework.NewCycleState()
+			p.PreFilter(context.Background(), state, item.pod)
+			gotStatus := p.Filter(context.Background(), state, item.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, item.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, item.wantStatus)
 			}

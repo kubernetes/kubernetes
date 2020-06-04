@@ -156,6 +156,7 @@ profiles:
 			{Name: "NodePorts"},
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
+			{Name: "VolumeBinding"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -287,6 +288,7 @@ profiles:
 						{Name: "NodePorts"},
 						{Name: "PodTopologySpread"},
 						{Name: "InterPodAffinity"},
+						{Name: "VolumeBinding"},
 					},
 					"FilterPlugin": {
 						{Name: "NodeUnschedulable"},

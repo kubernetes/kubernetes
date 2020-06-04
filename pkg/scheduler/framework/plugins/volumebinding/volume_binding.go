@@ -18,6 +18,7 @@ package volumebinding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -35,14 +36,17 @@ const (
 	// DefaultBindTimeoutSeconds defines the default bind timeout in seconds
 	DefaultBindTimeoutSeconds = 600
 
-	allBoundStateKey framework.StateKey = "volumebinding:all-bound"
+	stateKey framework.StateKey = Name
 )
 
 type stateData struct {
-	allBound bool
+	skip         bool // set true if pod does not have PVCs
+	boundClaims  []*v1.PersistentVolumeClaim
+	claimsToBind []*v1.PersistentVolumeClaim
+	allBound     bool
 }
 
-func (d stateData) Clone() framework.StateData {
+func (d *stateData) Clone() framework.StateData {
 	return d
 }
 
@@ -58,6 +62,7 @@ type VolumeBinding struct {
 	Binder scheduling.SchedulerVolumeBinder
 }
 
+var _ framework.PreFilterPlugin = &VolumeBinding{}
 var _ framework.FilterPlugin = &VolumeBinding{}
 var _ framework.ReservePlugin = &VolumeBinding{}
 var _ framework.PreBindPlugin = &VolumeBinding{}
@@ -81,6 +86,48 @@ func podHasPVCs(pod *v1.Pod) bool {
 	return false
 }
 
+// PreFilter invoked at the prefilter extension point to check if pod has all
+// immediate PVCs bound. If not all immediate PVCs are bound, an
+// UnschedulableAndUnresolvable is returned.
+func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+	// If pod does not request any PVC, we don't need to do anything.
+	if !podHasPVCs(pod) {
+		state.Write(stateKey, &stateData{skip: true})
+		return nil
+	}
+	boundClaims, claimsToBind, unboundClaimsImmediate, err := pl.Binder.GetPodVolumes(pod)
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+	if len(unboundClaimsImmediate) > 0 {
+		// Return UnschedulableAndUnresolvable error if immediate claims are
+		// not bound. Pod will be moved to active/backoff queues once these
+		// claims are bound by PV controller.
+		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
+		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
+		return status
+	}
+	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind})
+	return nil
+}
+
+// PreFilterExtensions returns prefilter extensions, pod add and remove.
+func (pl *VolumeBinding) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
+}
+
+func getStateData(cs *framework.CycleState) (*stateData, error) {
+	state, err := cs.Read(stateKey)
+	if err != nil {
+		return nil, err
+	}
+	s, ok := state.(*stateData)
+	if !ok {
+		return nil, errors.New("unable to convert state into stateData")
+	}
+	return s, nil
+}
+
 // Filter invoked at the filter extension point.
 // It evaluates if a pod can fit due to the volumes it requests,
 // for both bound and unbound PVCs.
@@ -98,12 +145,17 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
-	// If pod does not request any PVC, we don't need to do anything.
-	if !podHasPVCs(pod) {
+
+	state, err := getStateData(cs)
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+
+	if state.skip {
 		return nil
 	}
 
-	reasons, err := pl.Binder.FindPodVolumes(pod, node)
+	reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node)
 
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
@@ -125,7 +177,7 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, 
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
-	cs.Write(allBoundStateKey, stateData{allBound: allBound})
+	cs.Write(stateKey, &stateData{allBound: allBound})
 	return nil
 }
 
@@ -135,13 +187,9 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, 
 // If binding errors, times out or gets undone, then an error will be returned to
 // retry scheduling.
 func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
-	state, err := cs.Read(allBoundStateKey)
+	s, err := getStateData(cs)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
-	}
-	s, ok := state.(stateData)
-	if !ok {
-		return framework.NewStatus(framework.Error, "unable to convert state into stateData")
 	}
 	if s.allBound {
 		// no need to bind volumes
