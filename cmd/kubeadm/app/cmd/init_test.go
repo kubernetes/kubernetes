@@ -22,8 +22,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const (
@@ -66,6 +70,11 @@ func TestNewInitData(t *testing.T) {
 		t.Fatalf("Unable to write file %q: %v", configFilePath, err)
 	}
 
+	// Create an External CA cert-dir
+	// One with a ca.crt but no ca.key
+	externalCaDir := testutil.SetupPkiDirWithCertificateAuthority(t, filepath.Join(tmpDir, "external-ca"))
+	require.NoError(t, os.Remove(filepath.Join(externalCaDir, kubeadmconstants.CAKeyName)))
+
 	testCases := []struct {
 		name        string
 		args        []string
@@ -76,6 +85,12 @@ func TestNewInitData(t *testing.T) {
 		// Init data passed using flags
 		{
 			name: "pass without any flag (use defaults)",
+		},
+		{
+			name: "--certs-dir with external CA and missing apiserver.crt",
+			flags: map[string]string{
+				options.CertificatesDir: externalCaDir,
+			},
 		},
 		{
 			name: "fail if unknown feature gates flag are passed",
