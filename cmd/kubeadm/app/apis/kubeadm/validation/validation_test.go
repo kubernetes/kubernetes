@@ -184,41 +184,48 @@ func TestValidateIPFromString(t *testing.T) {
 
 func TestValidateIPNetFromString(t *testing.T) {
 	var tests = []struct {
-		name           string
-		subnet         string
-		minaddrs       int64
-		checkDualStack bool
-		expected       bool
+		name               string
+		subnet             string
+		minaddrs           int64
+		checkDualStack     bool
+		checkServiceSubnet bool
+		expected           bool
 	}{
-		{"invalid missing CIDR", "", 0, false, false},
-		{"invalid  CIDR", "a", 0, false, false},
-		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false, false},
-		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false, false},
-		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false, false},
-		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false, false},
-		{"invalid multiple CIDR provided in a single stack cluster", "2001:db8::1/64,1.2.3.4/24", 0, false, false},
-		{"invalid multiple CIDR provided in a single stack cluster and one invalid subnet", "2001:db8::1/64,a", 0, false, false},
-		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false, false},
-		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false, false},
-		{"valid IPv4 CIDR", "10.0.0.16/12", 10, false, true},
-		{"valid IPv6 CIDR", "2001:db8::/98", 10, false, true},
+		{"invalid missing CIDR", "", 0, false, false, false},
+		{"invalid  CIDR", "a", 0, false, false, false},
+		{"invalid CIDR missing decimal points in IPv4 address and / mask", "1234", 0, false, false, false},
+		{"invalid CIDR use of letters instead of numbers and / mask", "abc", 0, false, false, false},
+		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4", 0, false, false, false},
+		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1", 0, false, false, false},
+		{"invalid multiple CIDR provided in a single stack cluster", "2001:db8::1/64,1.2.3.4/24", 0, false, false, false},
+		{"invalid multiple CIDR provided in a single stack cluster and one invalid subnet", "2001:db8::1/64,a", 0, false, false, false},
+		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29", 10, false, false, false},
+		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "2001:db8::/125", 10, false, false, false},
+		{"valid IPv4 CIDR", "10.0.0.16/12", 10, false, false, true},
+		{"valid IPv6 CIDR", "2001:db8::/98", 10, false, false, true},
 		// dual-stack:
-		{"invalid missing CIDR", "", 0, true, false},
-		{"valid dual-stack enabled but only an IPv4 CIDR specified", "10.0.0.16/12", 10, true, true},
-		{"valid dual-stack enabled but only an IPv6 CIDR specified", "2001:db8::/98", 10, true, true},
-		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4,2001:db8::/98", 0, true, false},
-		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1,10.0.0.16/12", 0, true, false},
-		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29,2001:db8::/98", 10, true, false},
-		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "10.0.0.16/12,2001:db8::/125", 10, true, false},
-		{"valid, but only IPv4 family addresses specified. IPv6 CIDR is necessary.", "10.0.0.16/12,192.168.0.0/16", 10, true, false},
-		{"valid, but only IPv6 family addresses specified. IPv4 CIDR is necessary.", "2001:db8::/98,2005:db8::/98", 10, true, false},
-		{"valid IPv4 and IPv6 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
-		{"valid IPv6 and IPv4 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, true},
-		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16", 10, true, false},
-		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16,a.b.c.d/24", 10, true, false},
+		{"invalid missing CIDR", "", 0, true, false, false},
+		{"valid dual-stack enabled but only an IPv4 CIDR specified", "10.0.0.16/12", 10, true, false, true},
+		{"valid dual-stack enabled but only an IPv6 CIDR specified", "2001:db8::/98", 10, true, false, true},
+		{"invalid IPv4 address provided instead of CIDR representation", "1.2.3.4,2001:db8::/98", 0, true, false, false},
+		{"invalid IPv6 address provided instead of CIDR representation", "2001:db8::1,10.0.0.16/12", 0, true, false, false},
+		{"valid, but IPv4 CIDR too small. At least 10 addresses needed", "10.0.0.16/29,2001:db8::/98", 10, true, false, false},
+		{"valid, but IPv6 CIDR too small. At least 10 addresses needed", "10.0.0.16/12,2001:db8::/125", 10, true, false, false},
+		{"valid, but only IPv4 family addresses specified. IPv6 CIDR is necessary.", "10.0.0.16/12,192.168.0.0/16", 10, true, false, false},
+		{"valid, but only IPv6 family addresses specified. IPv4 CIDR is necessary.", "2001:db8::/98,2005:db8::/98", 10, true, false, false},
+		{"valid IPv4 and IPv6 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, false, true},
+		{"valid IPv6 and IPv4 CIDR", "10.0.0.16/12,2001:db8::/98", 10, true, false, true},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16", 10, true, false, false},
+		{"invalid IPv6 and IPv4 CIDR with more than 2 subnets", "10.0.0.16/12,2001:db8::/98,192.168.0.0/16,a.b.c.d/24", 10, true, false, false},
+		{"valid IPv4 service subnet", "10.0.0.0/12", 10, false, true, true},
+		{"valid IPv6 service subnet", "2001:db8::/112", 10, false, true, true},
+		{"valid, but IPv4 service subnet is too large. Max bits used for service subnet must not exceed 20 bits", "10.0.0.0/11", 10, false, true, false},
+		{"valid, but IPv6 service subnet is is too large. Max bits used for service subnet must not exceed 20 bits", "2001:db8::/107", 10, false, true, false},
+		{"valid, but IPv4 service subnet is is too large. Max bits used for service subnet must not exceed 20 bits", "10.0.0.16/10,2001:db8::/118", 10, true, true, false},
+		{"valid, but IPv6 service subnet is is too large. Max bits used for service subnet must not exceed 20 bits", "10.0.0.16/12,2001:db8::/106", 10, true, true, false},
 	}
 	for _, rt := range tests {
-		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, rt.checkDualStack, nil)
+		actual := ValidateIPNetFromString(rt.subnet, rt.minaddrs, rt.checkDualStack, rt.checkServiceSubnet, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"%s test case failed :\n\texpected: %t\n\t  actual: %t\n\t  err(s): %v\n\t",
@@ -465,7 +472,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						},
 					},
 					Networking: kubeadm.Networking{
-						ServiceSubnet: "2001:db8::1/98",
+						ServiceSubnet: "2001:db8::1/112",
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir: "/some/other/cert/dir",

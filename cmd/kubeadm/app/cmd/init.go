@@ -223,7 +223,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfig
 func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, cfg.Networking.ServiceSubnet,
-		"Use alternative range of IP address for service VIPs.",
+		"Use alternative range of IP address for service VIPs. The largest supported service subnet is /12 for IPv4 and /112 for IPv6.",
 	)
 	flagSet.StringVar(
 		&cfg.Networking.PodSubnet, options.NetworkingPodSubnet, cfg.Networking.PodSubnet,

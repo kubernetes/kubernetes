@@ -192,7 +192,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	// TODO (khenidak) change documentation as we move IPv6DualStack feature from ALPHA to BETA
 	fs.StringVar(&s.ServiceClusterIPRanges, "service-cluster-ip-range", s.ServiceClusterIPRanges, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
-		"overlap with any IP ranges assigned to nodes or pods.")
+		"overlap with any IP ranges assigned to nodes or pods. The largest supported service subnet is /12 for IPv4 and /112 for IPv6.")
 
 	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
 		"A port range to reserve for services with NodePort visibility. "+

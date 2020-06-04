@@ -369,8 +369,20 @@ func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+func validateMaximumServiceSubnetSize(cidr *net.IPNet, maxCIDRBits int) error {
+	// Should be a small cidr due to how it is stored in etcd.
+	// bigger cidr (specially those offered by IPv6) will add no value
+	// significantly increase snapshotting time.
+	// NOTE: This is identical to validation performed in the apiserver.
+	var ones, bits = cidr.Mask.Size()
+	if bits-ones > maxCIDRBits {
+		return errors.Errorf("specified service subnet is too large; for %d-bit addresses, the mask must be >= %d", bits, bits-maxCIDRBits)
+	}
+	return nil
+}
+
 // ValidateIPNetFromString validates network portion of ip address
-func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool, fldPath *field.Path) field.ErrorList {
+func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack, isServiceSubnet bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
 	if err != nil {
@@ -399,6 +411,12 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 		if numAddresses < minAddrs {
 			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), "subnet is too small"))
 		}
+		if isServiceSubnet {
+			err := validateMaximumServiceSubnetSize(s, constants.MaximumBitsForServiceSubnet)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath, s.String(), err.Error()))
+			}
+		}
 	}
 	return allErrs
 }
@@ -414,10 +432,10 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
 
 	if len(c.Networking.ServiceSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, true, field.NewPath("serviceSubnet"))...)
 	}
 	if len(c.Networking.PodSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("podSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, false, field.NewPath("podSubnet"))...)
 	}
 	return allErrs
 }
