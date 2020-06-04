@@ -68,6 +68,9 @@ type testCase struct {
 	Nodes nodeCase
 	// configures pods in the cluster before running the tests
 	InitPods []podCase
+	// configures the test to now wait for init pods to schedule before creating
+	// test pods.
+	SkipWaitUntilInitPodsScheduled bool
 	// pods to be scheduled during the test.
 	PodsToSchedule podCase
 	// optional, feature gates to set before running the test
@@ -156,8 +159,10 @@ func perfScheduling(test testCase, b *testing.B) []DataItem {
 		}
 		total += p.Num
 	}
-	if err := waitNumPodsScheduled(b, total, podInformer, setupNamespace); err != nil {
-		b.Fatal(err)
+	if !test.SkipWaitUntilInitPodsScheduled {
+		if err := waitNumPodsScheduled(b, total, podInformer, setupNamespace); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// start benchmark
