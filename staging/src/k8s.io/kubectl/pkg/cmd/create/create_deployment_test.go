@@ -94,6 +94,37 @@ func TestCreateDeploymentWithPort(t *testing.T) {
 	}
 }
 
+func TestCreateDeploymentWithReplicas(t *testing.T) {
+	depName := "jonny-dep"
+	replicas := "3"
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{}
+
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateDeployment(tf, ioStreams)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "jsonpath={.spec.replicas}")
+	cmd.Flags().Set("replicas", replicas)
+	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
+	cmd.Run(cmd, []string{depName})
+	if buf.String() != replicas {
+		t.Errorf("expected output: %s, but got: %s", replicas, buf.String())
+	}
+}
+
 func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
