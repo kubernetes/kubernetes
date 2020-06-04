@@ -2806,6 +2806,23 @@ const (
 	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
 )
 
+// PodSELinuxRelabelPolicy holds policies that will be used for applying SELinux labels to a volume
+// when volume is mounted.
+type PodSELinuxRelabelPolicy string
+
+const (
+	// SELinuxRelabelOnVolumeMount indicates that, if supported by the storage backend, SELinux
+	// label will be assigned during mount of pod's volumes as a mount option. This can skip
+	// potentially long recursive SELinux label change performed by container runtime when starting
+	// a pod. As tradeoff, all pods that simultaneously access the volumes must run with the same
+	// SELinux context to be able to access data on them, even if they use just a subPath of them.
+	// For storage backends that do not support this policy, SELinuxRelabelAlwaysRelabel will be used.
+	SELinuxRelabelOnVolumeMount PodSELinuxRelabelPolicy = "OnVolumeMount"
+	// SELinuxRelabelAlwaysRelabel indicates that the files on all pod volumes will be recursively
+	// relabelled on pod startup. This is the default behavior.
+	SELinuxRelabelAlwaysRelabel PodSELinuxRelabelPolicy = "Always"
+)
+
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
@@ -2885,6 +2902,10 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// +optional
 	FSGroup *int64
+	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls (by the container runtime) might fail to launch.
+	// +optional
+	Sysctls []Sysctl
 	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
 	// before being exposed inside Pod. This field will only apply to
 	// volume types which support fsGroup based ownership(and permissions).
@@ -2893,10 +2914,16 @@ type PodSecurityContext struct {
 	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
 	// +optional
 	FSGroupChangePolicy *PodFSGroupChangePolicy
-	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
-	// sysctls (by the container runtime) might fail to launch.
-	// +optional
-	Sysctls []Sysctl
+	// Defines behavior of changing SELinux labels of the volume before being exposed inside Pod
+	// (Alpha feature).
+	// This field is ignored for Pod's volumes and/or for Linux installations that do not support
+	// SELinux.
+	// Valid values are "OnVolumeMount" and "Always". If not specified, "Always" is used.
+	// "Always" policy recursively changes SELinux labels on all files on all volumes used by the Pod.
+	// "OnVolumeMount" tries to mount volumes used by the Pod with the right context and skip recursive ownership
+	// change. Kubernetes may fall back to policy "Always" if a storage backed does not support this policy.
+	// + optional
+	SELinuxRelabelPolicy *PodSELinuxRelabelPolicy
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
