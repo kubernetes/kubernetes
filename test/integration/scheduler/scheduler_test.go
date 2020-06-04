@@ -134,7 +134,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "PodTopologySpread", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 2},
 					{Name: "ImageLocality", Weight: 1},
 					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
@@ -228,7 +228,7 @@ kind: Policy
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "PodTopologySpread", Weight: 1},
+					{Name: "PodTopologySpread", Weight: 2},
 					{Name: "ImageLocality", Weight: 1},
 					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
