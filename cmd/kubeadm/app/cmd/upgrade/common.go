@@ -46,37 +46,8 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsMandatory bool) (string, error) {
-	var userVersion string
-
-	// If the version is specified in config file, pick up that value.
-	if flags.cfgPath != "" {
-		// Note that cfg isn't preserved here, it's just an one-off to populate userVersion based on --config
-		cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
-		if err != nil {
-			return "", err
-		}
-
-		userVersion = cfg.KubernetesVersion
-	}
-
-	// the version arg is mandatory unless version is specified in the config file
-	if versionIsMandatory && userVersion == "" {
-		if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
-			return "", err
-		}
-	}
-
-	// If option was specified in both args and config file, args will overwrite the config file.
-	if len(args) == 1 {
-		userVersion = args[0]
-	}
-
-	return userVersion, nil
-}
-
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
+func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
@@ -90,10 +61,18 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	// Fetch the configuration from a file or ConfigMap and validate it
 	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
 
+	var newK8sVersion string
 	var cfg *kubeadmapi.InitConfiguration
+
 	if flags.cfgPath != "" {
 		klog.Warning("WARNING: Usage of the --config flag for reconfiguring the cluster during upgrade is not recommended!")
 		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
+
+		// Initialize newK8sVersion to the value in the ClusterConfiguration. This is done, so that users who use the --config option
+		// don't have to specify the Kubernetes version twice if they don't want to upgrade, but just change a setting.
+		if err != nil {
+			newK8sVersion = cfg.KubernetesVersion
+		}
 	} else {
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
 	}
@@ -131,8 +110,16 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
-	// If a new k8s version should be set, apply the change before printing the config
-	if len(newK8sVersion) != 0 {
+	// The version arg is mandatory, during upgrade apply, unless it's specified in the config file
+	if upgradeApply && newK8sVersion == "" {
+		if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	// If option was specified in both args and config file, args will overwrite the config file.
+	if len(args) == 1 {
+		newK8sVersion = args[0]
 		cfg.KubernetesVersion = newK8sVersion
 	}
 
