@@ -19,6 +19,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 
@@ -92,14 +94,34 @@ func IsPodSecurityPolicyEnabled(kubeClient clientset.Interface) bool {
 		psps, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
-			isPSPEnabled = false
-		} else if psps == nil || len(psps.Items) == 0 {
-			Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
-			isPSPEnabled = false
-		} else {
-			Logf("Found PodSecurityPolicies; assuming PodSecurityPolicy is enabled.")
-			isPSPEnabled = true
+			return
 		}
+		if psps == nil || len(psps.Items) == 0 {
+			Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
+			return
+		}
+		Logf("Found PodSecurityPolicies; testing pod creation to see if PodSecurityPolicy is enabled")
+		testPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "psp-test-pod-"},
+			Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "test", Image: imageutils.GetPauseImageName()}}},
+		}
+		dryRunPod, err := kubeClient.CoreV1().Pods("kube-system").Create(context.TODO(), testPod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+		if err != nil {
+			if strings.Contains(err.Error(), "PodSecurityPolicy") {
+				Logf("PodSecurityPolicy error creating dryrun pod; assuming PodSecurityPolicy is enabled: %v", err)
+				isPSPEnabled = true
+			} else {
+				Logf("Error creating dryrun pod; assuming PodSecurityPolicy is disabled: %v", err)
+			}
+			return
+		}
+		pspAnnotation, pspAnnotationExists := dryRunPod.Annotations["kubernetes.io/psp"]
+		if !pspAnnotationExists {
+			Logf("No PSP annotation exists on dry run pod; assuming PodSecurityPolicy is disabled")
+			return
+		}
+		Logf("PSP annotation exists on dry run pod: %q; assuming PodSecurityPolicy is enabled", pspAnnotation)
+		isPSPEnabled = true
 	})
 	return isPSPEnabled
 }
