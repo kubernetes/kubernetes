@@ -50,7 +50,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -910,7 +909,7 @@ func updateDialer(clientConfig *restclient.Config) (func(), error) {
 // if no certificate is available, or the most recent clientConfig (which is assumed to point to the cert that the manager will
 // write out).
 func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, certDir string, nodeName types.NodeName) (certificate.Manager, error) {
-	newClientFn := func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
+	newClientsetFn := func(current *tls.Certificate) (clientset.Interface, error) {
 		// If we have a valid certificate, use that to fetch CSRs. Otherwise use the bootstrap
 		// credentials. In the future it would be desirable to change the behavior of bootstrap
 		// to always fall back to the external bootstrap credentials when such credentials are
@@ -919,11 +918,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 		if current != nil {
 			config = clientConfig
 		}
-		client, err := clientset.NewForConfig(config)
-		if err != nil {
-			return nil, err
-		}
-		return client.CertificatesV1beta1().CertificateSigningRequests(), nil
+		return clientset.NewForConfig(config)
 	}
 
 	return kubeletcertificate.NewKubeletClientCertificateManager(
@@ -938,7 +933,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 
 		clientConfig.CertFile,
 		clientConfig.KeyFile,
-		newClientFn,
+		newClientsetFn,
 	)
 }
 
