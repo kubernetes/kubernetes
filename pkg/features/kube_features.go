@@ -293,6 +293,13 @@ const (
 	// Enables CSI Inline volumes support for pods
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
 
+	// owner: @alculquicondor
+	// alpha: v1.19
+	//
+	// Enables the use of PodTopologySpread scheduling plugin to do default
+	// spreading and disables legacy DefaultPodTopologySpread plugin.
+	DefaultPodTopologySpread featuregate.Feature = "DefaultPodTopologySpread"
+
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta:  v1.14
@@ -660,6 +667,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA}, // remove in 1.20
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
+	DefaultPodTopologySpread:                       {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
