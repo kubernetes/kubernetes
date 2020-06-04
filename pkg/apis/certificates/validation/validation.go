@@ -239,7 +239,7 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 		case c.Status == "":
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("status"), ""))
 		case !allowedStatusValues.Has(string(c.Status)):
-			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("status"), c.Status, trueConditionTypes.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("status"), c.Status, allowedStatusValues.List()))
 		}
 
 		if !opts.allowBothApprovedAndDenied {
