@@ -207,11 +207,11 @@ func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, att
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
 		klog.V(2).InfoS("NODE DENY", "err", err)
-		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %s and this object", nodeName), nil
 	}
 	if !ok {
-		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %s and this object", nodeName), nil
 	}
 	return authorizer.DecisionAllow, "", nil
 }
@@ -232,11 +232,11 @@ func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vert
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
 		klog.V(2).Infof("NODE DENY: %v", err)
-		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %s and this object", nodeName), nil
 	}
 	if !ok {
-		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %q and this object", nodeName), nil
+		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node %s and this object", nodeName), nil
 	}
 	return authorizer.DecisionAllow, "", nil
 }
@@ -305,12 +305,12 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 
 	nodeVertex, exists := r.graph.getVertex_rlocked(nodeVertexType, "", nodeName)
 	if !exists {
-		return false, fmt.Errorf("unknown node %q cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("unknown node %s cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
 	startingVertex, exists := r.graph.getVertex_rlocked(startingType, startingNamespace, startingName)
 	if !exists {
-		return false, fmt.Errorf("node %q cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("node %s cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
 	// Fast check to see if we know of a destination edge
