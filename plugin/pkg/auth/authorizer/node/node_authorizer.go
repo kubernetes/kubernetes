@@ -342,7 +342,7 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 		return found
 	})
 	if !found {
-		return false, fmt.Errorf("node %q cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("node %s cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 	return true, nil
 }
