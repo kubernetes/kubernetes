@@ -1665,72 +1665,83 @@ func TestCSIDriverValidation(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	seLinuxMountSupported := true
+	seLinuxMountNotSupported := false
 	successCases := []storage.CSIDriver{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// driver name: dot only
 			ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi.driver"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// driver name: dash only
 			ObjectMeta: metav1.ObjectMeta{Name: "io-kubernetes-storage-csi-driver"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// driver name: numbers
 			ObjectMeta: metav1.ObjectMeta{Name: "1csi2driver3"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// driver name: dot and dash
 			ObjectMeta: metav1.ObjectMeta{Name: "io.kubernetes.storage.csi-driver"},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,
 				},
@@ -1739,8 +1750,9 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecycleEphemeral,
 				},
@@ -1749,8 +1761,9 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecycleEphemeral,
 					storage.VolumeLifecyclePersistent,
@@ -1760,13 +1773,31 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecycleEphemeral,
 					storage.VolumeLifecyclePersistent,
 					storage.VolumeLifecycleEphemeral,
 				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountNotSupported,
+			},
+		},
+		{
+			// SELinuxMountSupported not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: nil,
 			},
 		},
 	}
@@ -1780,39 +1811,44 @@ func TestCSIDriverValidation(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: invalidName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: longName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// AttachRequired not set
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: nil,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        nil,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// AttachRequired not set
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: nil,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        nil,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// invalid mode
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					"no-such-mode",
 				},
@@ -1835,11 +1871,14 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	seLinuxMountSupported := true
+	seLinuxMountNotSupported := false
 	old := storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired: &attachNotRequired,
-			PodInfoOnMount: &notPodInfoOnMount,
+			AttachRequired:        &attachNotRequired,
+			PodInfoOnMount:        &notPodInfoOnMount,
+			SELinuxMountSupported: &seLinuxMountSupported,
 			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 				storage.VolumeLifecycleEphemeral,
 				storage.VolumeLifecyclePersistent,
@@ -1860,39 +1899,44 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: invalidName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachRequired,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        &attachRequired,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: longName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// AttachRequired not set
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: nil,
-				PodInfoOnMount: &podInfoOnMount,
+				AttachRequired:        nil,
+				PodInfoOnMount:        &podInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// AttachRequired not set
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: nil,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        nil,
+				SELinuxMountSupported: &seLinuxMountSupported,
 			},
 		},
 		{
 			// invalid mode
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					"no-such-mode",
 				},
@@ -1902,11 +1946,30 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 			// different modes
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountSupported,
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 					storage.VolumeLifecycleEphemeral,
 				},
+			},
+		},
+		{
+			// SELinuxMountSupported not set
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: nil,
+			},
+		},
+		{
+			// SELinuxMountSupported changed
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:        &attachNotRequired,
+				PodInfoOnMount:        &notPodInfoOnMount,
+				SELinuxMountSupported: &seLinuxMountNotSupported,
 			},
 		},
 	}

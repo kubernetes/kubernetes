@@ -32,13 +32,16 @@ import (
 func getValidCSIDriver(name string) *storage.CSIDriver {
 	attachRequired := true
 	podInfoOnMount := true
+	seLinuxMountSupported := false
+
 	return &storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired: &attachRequired,
-			PodInfoOnMount: &podInfoOnMount,
+			AttachRequired:        &attachRequired,
+			PodInfoOnMount:        &podInfoOnMount,
+			SELinuxMountSupported: &seLinuxMountSupported,
 		},
 	}
 }
@@ -87,13 +90,15 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 
 	attachRequired := true
 	podInfoOnMount := true
+	seLinuxMountSupported := true
 	csiDriver := &storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired: &attachRequired,
-			PodInfoOnMount: &podInfoOnMount,
+			AttachRequired:        &attachRequired,
+			PodInfoOnMount:        &podInfoOnMount,
+			SELinuxMountSupported: &seLinuxMountSupported,
 			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 				storage.VolumeLifecyclePersistent,
 			},
@@ -101,23 +106,46 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		withInline bool
+		name              string
+		withInline        bool
+		withSELinuxPolicy bool
 	}{
 		{
-			name:       "inline enabled",
-			withInline: true,
+			name:              "inline enabled",
+			withInline:        true,
+			withSELinuxPolicy: true,
 		},
 		{
-			name:       "inline disabled",
-			withInline: false,
+			name:              "inline disabled",
+			withInline:        false,
+			withSELinuxPolicy: true,
+		},
+		{
+			name:              "SELinux enabled",
+			withInline:        true,
+			withSELinuxPolicy: true,
+		},
+		{
+			name:              "SELinux disabled",
+			withInline:        true,
+			withSELinuxPolicy: false,
+		},
+		{
+			name:              "seLinuxPolicy disabled",
+			withSELinuxPolicy: false,
+		},
+		{
+			name:              "seLinuxPolicy enabled",
+			withSELinuxPolicy: true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.withInline)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxRelabelPolicy, test.withSELinuxPolicy)()
 
+			csiDriver := csiDriver.DeepCopy()
 			Strategy.PrepareForCreate(ctx, csiDriver)
 			errs := Strategy.Validate(ctx, csiDriver)
 			if len(errs) != 0 {
@@ -125,11 +153,20 @@ func TestCSIDriverPrepareForCreate(t *testing.T) {
 			}
 			if test.withInline {
 				if len(csiDriver.Spec.VolumeLifecycleModes) != 1 {
-					t.Errorf("VolumeLifecycleModes modified: %v", csiDriver.Spec)
+					t.Errorf("VolumeLifecycleModes modified: %+v", csiDriver.Spec)
 				}
 			} else {
 				if len(csiDriver.Spec.VolumeLifecycleModes) != 0 {
-					t.Errorf("VolumeLifecycleModes not stripped: %v", csiDriver.Spec)
+					t.Errorf("VolumeLifecycleModes not stripped: %+v", csiDriver.Spec)
+				}
+			}
+			if test.withSELinuxPolicy {
+				if csiDriver.Spec.SELinuxMountSupported == nil {
+					t.Errorf("SELinuxMountSupported modified: %+v", csiDriver.Spec)
+				}
+			} else {
+				if csiDriver.Spec.SELinuxMountSupported != nil {
+					t.Errorf("SELinuxMountSupported not stripped: %+v", csiDriver.Spec)
 				}
 			}
 		})
@@ -182,7 +219,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	resultPersistent := []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent}
 	resultEphemeral := []storage.VolumeLifecycleMode{storage.VolumeLifecycleEphemeral}
 
-	tests := []struct {
+	inlineTests := []struct {
 		name                      string
 		old, update               *storage.CSIDriver
 		withInline, withoutInline []storage.VolumeLifecycleMode
@@ -217,8 +254,8 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 		},
 	}
 
-	runAll := func(t *testing.T, withInline bool) {
-		for _, test := range tests {
+	runInlineTests := func(t *testing.T, withInline bool) {
+		for _, test := range inlineTests {
 			t.Run(test.name, func(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, withInline)()
 
@@ -234,10 +271,107 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	}
 
 	t.Run("with inline volumes", func(t *testing.T) {
-		runAll(t, true)
+		runInlineTests(t, true)
 	})
 	t.Run("without inline volumes", func(t *testing.T) {
-		runAll(t, false)
+		runInlineTests(t, false)
+	})
+
+	bTrue := true
+	bFalse := false
+	driverWithSELinuxTrue := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:        &attachRequired,
+			PodInfoOnMount:        &podInfoOnMount,
+			SELinuxMountSupported: &bTrue,
+		},
+	}
+	driverWithSELinuxFalse := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:        &attachRequired,
+			PodInfoOnMount:        &podInfoOnMount,
+			SELinuxMountSupported: &bFalse,
+		},
+	}
+	driverWithoutSELinux := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:        &attachRequired,
+			PodInfoOnMount:        &podInfoOnMount,
+			SELinuxMountSupported: nil,
+		},
+	}
+	seLinuxTests := []struct {
+		name                        string
+		old, update                 *storage.CSIDriver
+		withSELinux, withoutSELinux *bool
+	}{
+		{
+			name:           "before: no seLinux, update: no seLinux",
+			old:            driverWithoutSELinux,
+			update:         driverWithoutSELinux,
+			withSELinux:    nil,
+			withoutSELinux: nil,
+		},
+		{
+			name:           "before: no seLinux, update: with seLinux",
+			old:            driverWithoutSELinux,
+			update:         driverWithSELinuxTrue,
+			withSELinux:    &bTrue,
+			withoutSELinux: nil,
+		},
+		{
+			name:           "before: no seLinux, update: with seLinux false",
+			old:            driverWithoutSELinux,
+			update:         driverWithSELinuxFalse,
+			withSELinux:    &bFalse,
+			withoutSELinux: nil,
+		},
+		{
+			name:           "before: SELinux true, update: nil",
+			old:            driverWithSELinuxTrue,
+			update:         driverWithoutSELinux,
+			withSELinux:    nil,
+			withoutSELinux: nil,
+		},
+		{
+			name:           "before: SELinux true, update: false",
+			old:            driverWithSELinuxTrue,
+			update:         driverWithSELinuxFalse,
+			withSELinux:    &bFalse,
+			withoutSELinux: &bFalse,
+		},
+	}
+
+	runSELinuxTests := func(t *testing.T, withSELinux bool) {
+		for _, test := range seLinuxTests {
+			t.Run(test.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxRelabelPolicy, withSELinux)()
+
+				csiDriver := test.update.DeepCopy()
+				Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
+				if withSELinux {
+					require.Equal(t, csiDriver.Spec.SELinuxMountSupported, test.withSELinux)
+				} else {
+					require.Equal(t, csiDriver.Spec.SELinuxMountSupported, test.withoutSELinux)
+				}
+			})
+		}
+	}
+
+	t.Run("with SELinuxMountSupported", func(t *testing.T) {
+		runSELinuxTests(t, true)
+	})
+	t.Run("without SELinuxMountSupported", func(t *testing.T) {
+		runSELinuxTests(t, false)
 	})
 }
 
@@ -246,6 +380,8 @@ func TestCSIDriverValidation(t *testing.T) {
 	notAttachRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	seLinuxMountSupported := true
+	seLinuxMountNotSupported := true
 
 	tests := []struct {
 		name        string
@@ -258,27 +394,29 @@ func TestCSIDriverValidation(t *testing.T) {
 			false,
 		},
 		{
-			"true PodInfoOnMount and AttachRequired",
+			"true PodInfoOnMount, AttachRequired and SELinuxMountSupported",
 			&storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired: &attachRequired,
-					PodInfoOnMount: &podInfoOnMount,
+					AttachRequired:        &attachRequired,
+					PodInfoOnMount:        &podInfoOnMount,
+					SELinuxMountSupported: &seLinuxMountSupported,
 				},
 			},
 			false,
 		},
 		{
-			"false PodInfoOnMount and AttachRequired",
+			"false PodInfoOnMount, AttachRequired and SELinuxMountSupported",
 			&storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired: &notAttachRequired,
-					PodInfoOnMount: &notPodInfoOnMount,
+					AttachRequired:        &notAttachRequired,
+					PodInfoOnMount:        &notPodInfoOnMount,
+					SELinuxMountSupported: &seLinuxMountNotSupported,
 				},
 			},
 			false,
@@ -290,8 +428,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "*foo#",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired: &attachRequired,
-					PodInfoOnMount: &podInfoOnMount,
+					AttachRequired:        &attachRequired,
+					PodInfoOnMount:        &podInfoOnMount,
+					SELinuxMountSupported: &seLinuxMountSupported,
 				},
 			},
 			true,
@@ -303,8 +442,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired: &attachRequired,
-					PodInfoOnMount: &podInfoOnMount,
+					AttachRequired:        &attachRequired,
+					PodInfoOnMount:        &podInfoOnMount,
+					SELinuxMountSupported: &seLinuxMountSupported,
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecycleMode("no-such-mode"),
 					},
@@ -319,8 +459,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired: &attachRequired,
-					PodInfoOnMount: &podInfoOnMount,
+					AttachRequired:        &attachRequired,
+					PodInfoOnMount:        &podInfoOnMount,
+					SELinuxMountSupported: &seLinuxMountSupported,
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecyclePersistent,
 					},
@@ -335,8 +476,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired: &attachRequired,
-					PodInfoOnMount: &podInfoOnMount,
+					AttachRequired:        &attachRequired,
+					PodInfoOnMount:        &podInfoOnMount,
+					SELinuxMountSupported: &seLinuxMountSupported,
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecycleEphemeral,
 					},
@@ -351,8 +493,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired: &attachRequired,
-					PodInfoOnMount: &podInfoOnMount,
+					AttachRequired:        &attachRequired,
+					PodInfoOnMount:        &podInfoOnMount,
+					SELinuxMountSupported: &seLinuxMountSupported,
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecyclePersistent,
 						storage.VolumeLifecycleEphemeral,

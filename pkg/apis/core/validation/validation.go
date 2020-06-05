@@ -2829,6 +2829,35 @@ func validateFSGroupChangePolicy(fsGroupPolicy *core.PodFSGroupChangePolicy, fld
 	return allErrors
 }
 
+var validSELinuxRelabelPolicies = sets.NewString(string(core.SELinuxRelabelAlwaysRelabel), string(core.SELinuxRelabelOnVolumeMount))
+
+func validateSELinuxRelabelPolicy(seLinuxRelabelPolicy *core.PodSELinuxRelabelPolicy, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if !validSELinuxRelabelPolicies.Has(string(*seLinuxRelabelPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath, seLinuxRelabelPolicy, validSELinuxRelabelPolicies.List()))
+	}
+	return allErrors
+}
+
+func validatePodSELinuxOptions(seLinuxOpts *core.SELinuxOptions, seLinuxRelabelPolicy *core.PodSELinuxRelabelPolicy, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	if seLinuxRelabelPolicy != nil && *seLinuxRelabelPolicy == core.SELinuxRelabelOnVolumeMount {
+		// With SELinuxRelabelOnVolumeMount, at least seLinuxOptions.Level must be set
+		if seLinuxOpts == nil {
+			msg := fmt.Sprintf("must be provided when `seLinuxRelabelPolicy` is %s", *seLinuxRelabelPolicy)
+			allErrors = append(allErrors, field.Required(fldPath, msg))
+		} else {
+			if seLinuxOpts.Level == "" {
+				levelPath := fldPath.Child("level")
+				msg := fmt.Sprintf("must be provided when `seLinuxRelabelPolicy` is %s", *seLinuxRelabelPolicy)
+				allErrors = append(allErrors, field.Required(levelPath, msg))
+			}
+		}
+	}
+	return allErrors
+}
+
 const (
 	// Limits on various DNS parameters. These are derived from
 	// restrictions in Linux libc name resolution handling.
@@ -3683,6 +3712,12 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 		if securityContext.FSGroupChangePolicy != nil {
 			allErrs = append(allErrs, validateFSGroupChangePolicy(securityContext.FSGroupChangePolicy, fldPath.Child("fsGroupChangePolicy"))...)
 		}
+
+		if securityContext.SELinuxRelabelPolicy != nil {
+			allErrs = append(allErrs, validateSELinuxRelabelPolicy(securityContext.SELinuxRelabelPolicy, fldPath.Child("seLinuxRelabelPolicy"))...)
+		}
+
+		allErrs = append(allErrs, validatePodSELinuxOptions(securityContext.SELinuxOptions, securityContext.SELinuxRelabelPolicy, fldPath.Child("seLinuxOptions"))...)
 
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	}
