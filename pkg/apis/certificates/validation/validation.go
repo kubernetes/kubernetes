@@ -74,6 +74,10 @@ type certificateValidationOptions struct {
 	allowEmptyConditionType bool
 	// allow arbitrary content in status.certificate
 	allowArbitraryCertificate bool
+	// allow usages values outside the known set
+	allowUnknownUsages bool
+	// allow duplicate usages values
+	allowDuplicateUsages bool
 }
 
 // validateCSR validates the signature and formatting of a base64-wrapped,
@@ -140,6 +144,34 @@ func ValidateCertificateSigningRequestCreate(csr *certificates.CertificateSignin
 	return validateCertificateSigningRequest(csr, opts)
 }
 
+var (
+	allValidUsages = sets.NewString(
+		string(certificates.UsageSigning),
+		string(certificates.UsageDigitalSignature),
+		string(certificates.UsageContentCommitment),
+		string(certificates.UsageKeyEncipherment),
+		string(certificates.UsageKeyAgreement),
+		string(certificates.UsageDataEncipherment),
+		string(certificates.UsageCertSign),
+		string(certificates.UsageCRLSign),
+		string(certificates.UsageEncipherOnly),
+		string(certificates.UsageDecipherOnly),
+		string(certificates.UsageAny),
+		string(certificates.UsageServerAuth),
+		string(certificates.UsageClientAuth),
+		string(certificates.UsageCodeSigning),
+		string(certificates.UsageEmailProtection),
+		string(certificates.UsageSMIME),
+		string(certificates.UsageIPsecEndSystem),
+		string(certificates.UsageIPsecTunnel),
+		string(certificates.UsageIPsecUser),
+		string(certificates.UsageTimestamping),
+		string(certificates.UsageOCSPSigning),
+		string(certificates.UsageMicrosoftSGC),
+		string(certificates.UsageNetscapeSGC),
+	)
+)
+
 func validateCertificateSigningRequest(csr *certificates.CertificateSigningRequest, opts certificateValidationOptions) field.ErrorList {
 	isNamespaced := false
 	allErrs := apivalidation.ValidateObjectMeta(&csr.ObjectMeta, isNamespaced, ValidateCertificateRequestName, field.NewPath("metadata"))
@@ -151,6 +183,22 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	}
 	if len(csr.Spec.Usages) == 0 {
 		allErrs = append(allErrs, field.Required(specPath.Child("usages"), "usages must be provided"))
+	}
+	if !opts.allowUnknownUsages {
+		for i, usage := range csr.Spec.Usages {
+			if !allValidUsages.Has(string(usage)) {
+				allErrs = append(allErrs, field.NotSupported(specPath.Child("usages").Index(i), usage, allValidUsages.List()))
+			}
+		}
+	}
+	if !opts.allowDuplicateUsages {
+		seen := make(map[certificates.KeyUsage]bool, len(csr.Spec.Usages))
+		for i, usage := range csr.Spec.Usages {
+			if seen[usage] {
+				allErrs = append(allErrs, field.Duplicate(specPath.Child("usages").Index(i), usage))
+			}
+			seen[usage] = true
+		}
 	}
 	if !opts.allowLegacySignerName && csr.Spec.SignerName == certificates.LegacyUnknownSignerName {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
@@ -191,7 +239,7 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 		case c.Status == "":
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("status"), ""))
 		case !allowedStatusValues.Has(string(c.Status)):
-			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("status"), c.Status, trueConditionTypes.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("status"), c.Status, allowedStatusValues.List()))
 		}
 
 		if !opts.allowBothApprovedAndDenied {
@@ -377,6 +425,8 @@ func getValidationOptions(version schema.GroupVersion, newCSR, oldCSR *certifica
 		allowDuplicateConditionTypes: allowDuplicateConditionTypes(version, oldCSR),
 		allowEmptyConditionType:      allowEmptyConditionType(version, oldCSR),
 		allowArbitraryCertificate:    allowArbitraryCertificate(version, newCSR, oldCSR),
+		allowDuplicateUsages:         allowDuplicateUsages(version, oldCSR),
+		allowUnknownUsages:           allowUnknownUsages(version, oldCSR),
 	}
 }
 
@@ -464,4 +514,46 @@ func allowArbitraryCertificate(version schema.GroupVersion, newCSR, oldCSR *cert
 	default:
 		return false
 	}
+}
+
+func allowUnknownUsages(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+	switch {
+	case version == certificatesv1beta1.SchemeGroupVersion:
+		return true // compatibility with v1beta1
+	case oldCSR != nil && hasUnknownUsage(oldCSR.Spec.Usages):
+		return true // compatibility with existing data
+	default:
+		return false
+	}
+}
+
+func hasUnknownUsage(usages []certificates.KeyUsage) bool {
+	for _, usage := range usages {
+		if !allValidUsages.Has(string(usage)) {
+			return true
+		}
+	}
+	return false
+}
+
+func allowDuplicateUsages(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+	switch {
+	case version == certificatesv1beta1.SchemeGroupVersion:
+		return true // compatibility with v1beta1
+	case oldCSR != nil && hasDuplicateUsage(oldCSR.Spec.Usages):
+		return true // compatibility with existing data
+	default:
+		return false
+	}
+}
+
+func hasDuplicateUsage(usages []certificates.KeyUsage) bool {
+	seen := make(map[certificates.KeyUsage]bool, len(usages))
+	for _, usage := range usages {
+		if seen[usage] {
+			return true
+		}
+		seen[usage] = true
+	}
+	return false
 }

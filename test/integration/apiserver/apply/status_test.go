@@ -55,6 +55,7 @@ var statusData = map[schema.GroupVersionResource]string{
 	gvr("storage.k8s.io", "v1", "volumeattachments"):                    `{"status": {"attached": true}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                    `{"status": {"currentHealthy": 5}}`,
 	gvr("certificates.k8s.io", "v1beta1", "certificatesigningrequests"): `{"status": {"conditions": [{"type": "MyStatus"}]}}`,
+	gvr("certificates.k8s.io", "v1", "certificatesigningrequests"):      `{"status": {"conditions": [{"type": "MyStatus", "status": "True"}]}}`,
 }
 
 const statusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"true"}]}}`
