@@ -83,6 +83,10 @@ func createTestContainer(ID string, state kubecontainer.ContainerState) *kubecon
 	}
 }
 
+func generateData(ID string) string {
+	return fmt.Sprintf("%s://%s", testContainerRuntimeType, ID)
+}
+
 type sortableEvents []*PodLifecycleEvent
 
 func (a sortableEvents) Len() int      { return len(a) }
@@ -126,9 +130,9 @@ func TestRelisting(t *testing.T) {
 	pleg.relist()
 	// Report every running/exited container if we see them for the first time.
 	expected := []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerStarted, Data: "c2"},
-		{ID: "4567", Type: ContainerDied, Data: "c1"},
-		{ID: "1234", Type: ContainerDied, Data: "c1"},
+		{ID: "1234", Type: ContainerStarted, Data: generateData("c2")},
+		{ID: "4567", Type: ContainerDied, Data: generateData("c1")},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c1")},
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
@@ -156,11 +160,11 @@ func TestRelisting(t *testing.T) {
 	pleg.relist()
 	// Only report containers that transitioned to running or exited status.
 	expected = []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
-		{ID: "1234", Type: ContainerDied, Data: "c2"},
-		{ID: "1234", Type: ContainerStarted, Data: "c3"},
-		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
-		{ID: "4567", Type: ContainerStarted, Data: "c4"},
+		{ID: "1234", Type: ContainerRemoved, Data: generateData("c1")},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c2")},
+		{ID: "1234", Type: ContainerStarted, Data: generateData("c3")},
+		{ID: "4567", Type: ContainerRemoved, Data: generateData("c1")},
+		{ID: "4567", Type: ContainerStarted, Data: generateData("c4")},
 	}
 
 	actual = getEventsFromChannel(ch)
@@ -192,9 +196,9 @@ func TestEventChannelFull(t *testing.T) {
 	pleg.relist()
 	// Report every running/exited container if we see them for the first time.
 	expected := []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerStarted, Data: "c2"},
-		{ID: "4567", Type: ContainerDied, Data: "c1"},
-		{ID: "1234", Type: ContainerDied, Data: "c1"},
+		{ID: "1234", Type: ContainerStarted, Data: generateData("c2")},
+		{ID: "4567", Type: ContainerDied, Data: generateData("c1")},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c1")},
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
@@ -216,11 +220,11 @@ func TestEventChannelFull(t *testing.T) {
 	}
 	pleg.relist()
 	allEvents := []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
-		{ID: "1234", Type: ContainerDied, Data: "c2"},
-		{ID: "1234", Type: ContainerStarted, Data: "c3"},
-		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
-		{ID: "4567", Type: ContainerStarted, Data: "c4"},
+		{ID: "1234", Type: ContainerRemoved, Data: generateData("c1")},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c2")},
+		{ID: "1234", Type: ContainerStarted, Data: generateData("c3")},
+		{ID: "4567", Type: ContainerRemoved, Data: generateData("c1")},
+		{ID: "4567", Type: ContainerStarted, Data: generateData("c4")},
 	}
 	// event channel is full, discard events
 	actual = getEventsFromChannel(ch)
@@ -271,9 +275,9 @@ func testReportMissingContainers(t *testing.T, numRelists int) {
 	}
 	pleg.relist()
 	expected := []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerDied, Data: "c2"},
-		{ID: "1234", Type: ContainerRemoved, Data: "c2"},
-		{ID: "1234", Type: ContainerRemoved, Data: "c3"},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c2")},
+		{ID: "1234", Type: ContainerRemoved, Data: generateData("c2")},
+		{ID: "1234", Type: ContainerRemoved, Data: generateData("c3")},
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
@@ -302,8 +306,8 @@ func testReportMissingPods(t *testing.T, numRelists int) {
 	runtime.AllPodList = []*containertest.FakePod{}
 	pleg.relist()
 	expected := []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerDied, Data: "c2"},
-		{ID: "1234", Type: ContainerRemoved, Data: "c2"},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c2")},
+		{ID: "1234", Type: ContainerRemoved, Data: generateData("c2")},
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
@@ -338,7 +342,7 @@ func createTestPodsStatusesAndEvents(num int) ([]*kubecontainer.Pod, []*kubecont
 			ID:                id,
 			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
 		}
-		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
+		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: generateData(container.ID.ID)}
 		pods = append(pods, pod)
 		statuses = append(statuses, status)
 		events = append(events, event)
@@ -461,7 +465,7 @@ func TestRelistWithReinspection(t *testing.T) {
 	}
 	runtimeMock.On("GetPodStatus", podID, "", "").Return(goodStatus, nil).Once()
 
-	goodEvent := &PodLifecycleEvent{ID: podID, Type: ContainerStarted, Data: infraContainer.ID.ID}
+	goodEvent := &PodLifecycleEvent{ID: podID, Type: ContainerStarted, Data: generateData(infraContainer.ID.ID)}
 
 	// listing 1 - everything ok, infra container set up for pod
 	pleg.relist()
@@ -535,9 +539,9 @@ func TestRelistingWithSandboxes(t *testing.T) {
 	pleg.relist()
 	// Report every running/exited container if we see them for the first time.
 	expected := []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerStarted, Data: "c2"},
-		{ID: "4567", Type: ContainerDied, Data: "c1"},
-		{ID: "1234", Type: ContainerDied, Data: "c1"},
+		{ID: "1234", Type: ContainerStarted, Data: generateData("c2")},
+		{ID: "4567", Type: ContainerDied, Data: generateData("c1")},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c1")},
 	}
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
@@ -565,11 +569,11 @@ func TestRelistingWithSandboxes(t *testing.T) {
 	pleg.relist()
 	// Only report containers that transitioned to running or exited status.
 	expected = []*PodLifecycleEvent{
-		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
-		{ID: "1234", Type: ContainerDied, Data: "c2"},
-		{ID: "1234", Type: ContainerStarted, Data: "c3"},
-		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
-		{ID: "4567", Type: ContainerStarted, Data: "c4"},
+		{ID: "1234", Type: ContainerRemoved, Data: generateData("c1")},
+		{ID: "1234", Type: ContainerDied, Data: generateData("c2")},
+		{ID: "1234", Type: ContainerStarted, Data: generateData("c3")},
+		{ID: "4567", Type: ContainerRemoved, Data: generateData("c1")},
+		{ID: "4567", Type: ContainerStarted, Data: generateData("c4")},
 	}
 
 	actual = getEventsFromChannel(ch)
@@ -609,7 +613,7 @@ func TestRelistIPChange(t *testing.T) {
 			IPs:               tc.podIPs,
 			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: cState}},
 		}
-		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: container.ID.ID}
+		event := &PodLifecycleEvent{ID: pod.ID, Type: ContainerStarted, Data: generateData(container.ID.ID)}
 
 		runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
 		runtimeMock.On("GetPodStatus", pod.ID, "", "").Return(status, nil).Once()
@@ -631,7 +635,7 @@ func TestRelistIPChange(t *testing.T) {
 			ID:                id,
 			ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
 		}
-		event = &PodLifecycleEvent{ID: pod.ID, Type: ContainerDied, Data: container.ID.ID}
+		event = &PodLifecycleEvent{ID: pod.ID, Type: ContainerDied, Data: generateData(container.ID.ID)}
 		runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
 		runtimeMock.On("GetPodStatus", pod.ID, "", "").Return(status, nil).Once()
 

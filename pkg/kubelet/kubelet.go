@@ -1889,7 +1889,10 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 
 		if e.Type == pleg.ContainerDied {
 			if containerID, ok := e.Data.(string); ok {
-				kl.cleanUpContainersInPod(e.ID, containerID)
+				cid := kubecontainer.ParseContainerID(containerID)
+				kl.cleanUpContainersInPod(e.ID, cid.ID)
+				// Update pod's conditions(Ready and ContainersReady) immediately.
+				kl.statusManager.SetContainerReadiness(e.ID, cid, false)
 			}
 		}
 	case <-syncCh:

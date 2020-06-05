@@ -339,7 +339,7 @@ func computeEvents(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.Contain
 	}
 	oldState := getContainerState(oldPod, cid)
 	newState := getContainerState(newPod, cid)
-	return generateEvents(pid, cid.ID, oldState, newState)
+	return generateEvents(pid, cid.String(), oldState, newState)
 }
 
 func (g *GenericPLEG) cacheEnabled() bool {
