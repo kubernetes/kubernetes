@@ -54,3 +54,15 @@ function create-certs {
   export KUBELET_CERT_BASE64
   export KUBELET_KEY_BASE64
 }
+
+# Must ensure that the following ENV vars are set
+function detect-master {
+        if [[ -z "${MASTER_IP:-}" ]]; then
+                echo "Set 'MASTER_IP' to the instance assigned to be the Kubernetes master" 1>&2
+                exit 1
+        fi
+        KUBE_MASTER_IP=${MASTER_IP}
+        echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP:-}" 1>&2
+        echo "KUBE_MASTER: ${KUBE_MASTER:-}" 1>&2
+}
+

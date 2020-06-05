@@ -107,17 +107,19 @@ function create-kube-hollow-node-resources {
   # Create addon pods.
   # Heapster.
   mkdir -p "${RESOURCE_DIRECTORY}/addons"
-  sed "s@{{MASTER_IP}}@${MASTER_IP}@g" "${RESOURCE_DIRECTORY}/heapster_template.json" > "${RESOURCE_DIRECTORY}/addons/heapster.json"
-  metrics_mem_per_node=4
-  metrics_mem=$((200 + metrics_mem_per_node*NUM_NODES))
-  sed -i'' -e "s@{{METRICS_MEM}}@${metrics_mem}@g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
-  metrics_cpu_per_node_numerator=${NUM_NODES}
-  metrics_cpu_per_node_denominator=2
-  metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denominator))
-  sed -i'' -e "s@{{METRICS_CPU}}@${metrics_cpu}@g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
-  eventer_mem_per_node=500
-  eventer_mem=$((200 * 1024 + eventer_mem_per_node*NUM_NODES))
-  sed -i'' -e "s@{{EVENTER_MEM}}@${eventer_mem}@g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+  if [[ "${ENABLE_KUBEMARK_HEAPSTER:-true}" == "true" ]]; then
+    sed "s@{{MASTER_IP}}@${MASTER_IP}@g" "${RESOURCE_DIRECTORY}/heapster_template.json" > "${RESOURCE_DIRECTORY}/addons/heapster.json"
+    metrics_mem_per_node=4
+    metrics_mem=$((200 + metrics_mem_per_node*NUM_NODES))
+    sed -i'' -e "s@{{METRICS_MEM}}@${metrics_mem}@g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+    metrics_cpu_per_node_numerator=${NUM_NODES}
+    metrics_cpu_per_node_denominator=2
+    metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denominator))
+    sed -i'' -e "s@{{METRICS_CPU}}@${metrics_cpu}@g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+    eventer_mem_per_node=500
+    eventer_mem=$((200 * 1024 + eventer_mem_per_node*NUM_NODES))
+    sed -i'' -e "s@{{EVENTER_MEM}}@${eventer_mem}@g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+  fi
 
   # Cluster Autoscaler.
   if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
@@ -140,7 +142,10 @@ function create-kube-hollow-node-resources {
     sed "s@{{dns_domain}}@${KUBE_DNS_DOMAIN}@g" "${RESOURCE_DIRECTORY}/kube_dns_template.yaml" > "${RESOURCE_DIRECTORY}/addons/kube_dns.yaml"
   fi
 
-  "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
+  if [ "$(ls -A "${RESOURCE_DIRECTORY}"/addons)" ]; then
+    "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
+  fi
+
 
   # Create the replication controller for hollow-nodes.
   # We allow to override the NUM_REPLICAS when running Cluster Autoscaler.
