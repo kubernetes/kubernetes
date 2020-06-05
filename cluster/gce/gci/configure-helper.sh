@@ -1898,7 +1898,7 @@ function start-kube-controller-manager {
     params+=" --flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   fi
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
-    params+=" --experimental-cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
+    params+=" --cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
   fi
   # Disable using HPA metrics REST clients if metrics-server isn't enabled,
   # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
