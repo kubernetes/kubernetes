@@ -53,7 +53,6 @@ const (
 	eventFreshDuration = 75 * time.Second
 
 	// defaultLowerBoundCapacity is a default value for event cache capacity's lower bound.
-	// 100 is minimum in NewHeuristicWatchCacheSizes.
 	// TODO: Figure out, to what value we can decreased it.
 	defaultLowerBoundCapacity = 100
 
