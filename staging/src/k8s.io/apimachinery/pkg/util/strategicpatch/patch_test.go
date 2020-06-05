@@ -375,6 +375,27 @@ testCases:
       $patch: replace
     modified:
       other: a
+  - description: de-duplicate entries in a merging list
+    original:
+      mergingList:
+        - name: 1
+        - name: 1
+        - name: 2
+          value: a
+        - name: 3
+        - name: 3
+    twoWay:
+      mergingList:
+        - name: 1
+          $patch: delete
+        - name: 3
+          $patch: delete
+    modified:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: a
+        - name: 3
   - description: delete all duplicate entries in a merging list
     original:
       mergingList:
@@ -387,6 +408,10 @@ testCases:
     twoWay:
       mergingList:
         - name: 1
+          $patch: delete
+        - name: 1
+          $patch: delete
+        - name: 3
           $patch: delete
         - name: 3
           $patch: delete
@@ -1617,8 +1642,72 @@ mergingList:
     other: b
 `),
 		},
+  },
+{
+		Description: "de-duplicate field in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 1
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+mergingList:
+  - $patch: delete
+    name: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+  - name: 1
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+mergingList:
+  - $patch: delete
+    name: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+`),
+		},
 	},
-	{
+{
+  Description: "delete duplicate field in merging list",
+  StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+    Original: []byte(`
+mergingList:
+- name: 1
+- name: 1
+`),
+    TwoWay: []byte(`
+mergingList: {}
+`),
+    Modified: []byte(`
+mergingList: {}
+`),
+    Current: []byte(`
+mergingList:
+- name: 1
+- name: 1
+`),
+    ThreeWay: []byte(`
+mergingList: {}
+`),
+    Result: []byte(`
+mergingList: {}
+`),
+  },
+},
+{
 		Description: "add an item that already exists in current object in merging list",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`

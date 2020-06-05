@@ -1478,7 +1478,7 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 				mergeValue, ok := typedV[mergeKey]
 				if ok {
 					var err error
-					original, err = deleteMatchingEntries(original, mergeKey, mergeValue)
+					original, err = deleteMatchingEntry(original, mergeKey, mergeValue)
 					if err != nil {
 						return nil, nil, err
 					}
@@ -1501,17 +1501,14 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 	return original, patchWithoutSpecialElements, nil
 }
 
-// delete all matching entries (based on merge key) from a merging list
-func deleteMatchingEntries(original []interface{}, mergeKey string, mergeValue interface{}) ([]interface{}, error) {
-	for {
-		_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
-		if err != nil {
-			return nil, err
-		}
+// delete matching entry (based on merge key) from a merging list
+func deleteMatchingEntry(original []interface{}, mergeKey string, mergeValue interface{}) ([]interface{}, error) {
+	_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+	if err != nil {
+		return nil, err
+	}
 
-		if !found {
-			break
-		}
+	if found {
 		// Delete the element at originalKey.
 		original = append(original[:originalKey], original[originalKey+1:]...)
 	}
