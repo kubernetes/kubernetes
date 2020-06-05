@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
@@ -85,8 +84,6 @@ type Configurator struct {
 
 	// percentageOfNodesToScore specifies percentage of all nodes to score in each scheduling cycle.
 	percentageOfNodesToScore int32
-
-	bindTimeoutSeconds int64
 
 	podInitialBackoffSeconds int64
 
@@ -212,26 +209,6 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}, nil
 }
 
-func maybeAppendVolumeBindingArgs(plugins *schedulerapi.Plugins, pcs []schedulerapi.PluginConfig, config schedulerapi.PluginConfig) []schedulerapi.PluginConfig {
-	enabled := false
-	for _, p := range plugins.PreBind.Enabled {
-		if p.Name == volumebinding.Name {
-			enabled = true
-		}
-	}
-	if !enabled {
-		// skip if VolumeBinding is not enabled
-		return pcs
-	}
-	// append if not exist
-	for _, pc := range pcs {
-		if pc.Name == config.Name {
-			return pcs
-		}
-	}
-	return append(pcs, config)
-}
-
 // createFromProvider creates a scheduler from the name of a registered algorithm provider.
 func (c *Configurator) createFromProvider(providerName string) (*Scheduler, error) {
 	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
@@ -247,12 +224,6 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 		plugins.Append(defaultPlugins)
 		plugins.Apply(prof.Plugins)
 		prof.Plugins = plugins
-		prof.PluginConfig = maybeAppendVolumeBindingArgs(prof.Plugins, prof.PluginConfig, schedulerapi.PluginConfig{
-			Name: volumebinding.Name,
-			Args: &schedulerapi.VolumeBindingArgs{
-				BindTimeoutSeconds: c.bindTimeoutSeconds,
-			},
-		})
 	}
 	return c.create()
 }
@@ -348,12 +319,6 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 		// PluginConfig is ignored when using Policy.
 		prof.PluginConfig = defPluginConfig
-		prof.PluginConfig = maybeAppendVolumeBindingArgs(prof.Plugins, prof.PluginConfig, schedulerapi.PluginConfig{
-			Name: volumebinding.Name,
-			Args: &schedulerapi.VolumeBindingArgs{
-				BindTimeoutSeconds: c.bindTimeoutSeconds,
-			},
-		})
 	}
 
 	return c.create()

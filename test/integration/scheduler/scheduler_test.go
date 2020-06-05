@@ -274,8 +274,6 @@ priorities: []
 		stopCh := make(chan struct{})
 		eventBroadcaster.StartRecordingToSink(stopCh)
 
-		defaultBindTimeout := int64(30)
-
 		sched, err := scheduler.New(clientSet,
 			informerFactory,
 			scheduler.NewPodInformer(clientSet, 0),
@@ -289,7 +287,17 @@ priorities: []
 					},
 				},
 			}),
-			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
+			scheduler.WithProfiles(kubeschedulerconfig.KubeSchedulerProfile{
+				SchedulerName: v1.DefaultSchedulerName,
+				PluginConfig: []kubeschedulerconfig.PluginConfig{
+					{
+						Name: "VolumeBinding",
+						Args: &kubeschedulerconfig.VolumeBindingArgs{
+							BindTimeoutSeconds: 30,
+						},
+					},
+				},
+			}),
 		)
 		if err != nil {
 			t.Fatalf("couldn't make scheduler config for test %d: %v", i, err)
@@ -320,8 +328,6 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	stopCh := make(chan struct{})
 	eventBroadcaster.StartRecordingToSink(stopCh)
 
-	defaultBindTimeout := int64(30)
-
 	_, err := scheduler.New(clientSet,
 		informerFactory,
 		scheduler.NewPodInformer(clientSet, 0),
@@ -335,7 +341,18 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 				},
 			},
 		}),
-		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))
+		scheduler.WithProfiles(kubeschedulerconfig.KubeSchedulerProfile{
+			SchedulerName: v1.DefaultSchedulerName,
+			PluginConfig: []kubeschedulerconfig.PluginConfig{
+				{
+					Name: "VolumeBinding",
+					Args: &kubeschedulerconfig.VolumeBindingArgs{
+						BindTimeoutSeconds: 30,
+					},
+				},
+			},
+		}),
+	)
 
 	if err == nil {
 		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")

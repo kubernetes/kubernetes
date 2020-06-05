@@ -1616,15 +1616,6 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 		"PostBindPlugin":  {{Name: "VolumeBinding"}},
 	}
 
-	defaultPluginConfigs := []config.PluginConfig{
-		{
-			Name: "VolumeBinding",
-			Args: &config.VolumeBindingArgs{
-				BindTimeoutSeconds: 600,
-			},
-		},
-	}
-
 	testcases := []struct {
 		name             string
 		plugins          config.Plugins
@@ -1635,7 +1626,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 		{
 			name:             "default plugins",
 			wantPlugins:      defaultPlugins,
-			wantPluginConfig: defaultPluginConfigs,
+			wantPluginConfig: nil,
 		},
 		{
 			name:        "default plugins with customized plugin config",
@@ -1966,7 +1957,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				"BindPlugin":      {{Name: "DefaultBinder"}},
 				"PostBindPlugin":  {{Name: "VolumeBinding"}},
 			},
-			wantPluginConfig: defaultPluginConfigs,
+			wantPluginConfig: nil,
 		},
 	}
 	for _, tc := range testcases {
