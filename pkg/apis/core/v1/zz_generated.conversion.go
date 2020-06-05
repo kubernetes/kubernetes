@@ -5940,6 +5940,7 @@ func autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecu
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	out.Sysctls = *(*[]core.Sysctl)(unsafe.Pointer(&in.Sysctls))
 	out.FSGroupChangePolicy = (*core.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
+	out.SELinuxRelabelPolicy = (*core.PodSELinuxRelabelPolicy)(unsafe.Pointer(in.SELinuxRelabelPolicy))
 	return nil
 }
 
@@ -5962,6 +5963,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	out.FSGroupChangePolicy = (*v1.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	out.Sysctls = *(*[]v1.Sysctl)(unsafe.Pointer(&in.Sysctls))
+	out.SELinuxRelabelPolicy = (*v1.PodSELinuxRelabelPolicy)(unsafe.Pointer(in.SELinuxRelabelPolicy))
 	return nil
 }
 
