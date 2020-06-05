@@ -83,7 +83,7 @@ const (
 	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
 	SlowStartInitialBatchSize = 1
 )
-const deletePriorityPodAnnotationKey = "controller.alpha.kubernetes.io/delete-priority"
+const deletePriorityPodAnnotationKey = "controller.kubernetes.io/delete-priority"
 
 var UpdateTaintBackoff = wait.Backoff{
 	Steps:    5,
@@ -748,8 +748,8 @@ func (s ActivePods) Len() int      { return len(s) }
 func (s ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s ActivePods) Less(i, j int) bool {
-	//0. controller.alpha.kubernetes.io/delete-priority=1 < controller.alpha.kubernetes.io/delete-priority=0
-	//If pod has annotation controller.alpha.kubernetes.io/delete-priority the larger is small
+	//0. controller.kubernetes.io/delete-priority=1 < controller.kubernetes.io/delete-priority=0
+	//If pod has annotation controller.kubernetes.io/delete-priority the larger is small
 	if s[i].Annotations[deletePriorityPodAnnotationKey] != s[j].Annotations[deletePriorityPodAnnotationKey] {
 		s1, err1 := strconv.Atoi(s[i].Annotations[deletePriorityPodAnnotationKey])
 		s2, err2 := strconv.Atoi(s[j].Annotations[deletePriorityPodAnnotationKey])
