@@ -247,6 +247,12 @@ type Attacher interface {
 	WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error)
 }
 
+// DeviceMountOptions provides more easily extensible arguments to DeviceMounter
+type DeviceMountOptions struct {
+	SELinuxOptions       *v1.SELinuxOptions
+	SELinuxRelabelPolicy *v1.PodSELinuxRelabelPolicy
+}
+
 // DeviceMounter can mount a block volume to a global path.
 type DeviceMounter interface {
 	// GetDeviceMountPath returns a path where the device should
@@ -261,7 +267,7 @@ type DeviceMounter interface {
 	//   - TransientOperationFailure
 	//   - UncertainProgressError
 	//   - Error of any other type should be considered a final error
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
+	MountDevice(spec *Spec, devicePath string, deviceMountPath string, deviceMountOptions DeviceMountOptions) error
 }
 
 type BulkVolumeVerifier interface {

@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/kubernetes/pkg/volume"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -1231,7 +1232,7 @@ func (fv *FakeVolume) mountDeviceInternal(spec *Spec, devicePath string, deviceM
 	return nil
 }
 
-func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string) error {
+func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string, opts volume.DeviceMountOptions) error {
 	return fv.mountDeviceInternal(spec, devicePath, deviceMountPath)
 }
 

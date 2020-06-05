@@ -585,7 +585,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			err = volumeDeviceMounter.MountDevice(
 				volumeToMount.VolumeSpec,
 				devicePath,
-				deviceMountPath)
+				deviceMountPath,
+				// TODO(jsafrane): fill from pod
+				volume.DeviceMountOptions{})
 			if err != nil {
 				og.checkForFailedMount(volumeToMount, err)
 				og.markDeviceErrorState(volumeToMount, devicePath, deviceMountPath, err, actualStateOfWorld)
