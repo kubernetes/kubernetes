@@ -1487,7 +1487,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 	}
 
 	// Make the latest container status comes first.
-	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByAttempt(podStatus.ContainerStatuses)))
 	// Set container statuses according to the statuses seen in pod status
 	containerSeen := map[string]int{}
 	for _, cStatus := range podStatus.ContainerStatuses {

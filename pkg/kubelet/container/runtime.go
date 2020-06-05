@@ -312,6 +312,8 @@ type ContainerStatus struct {
 	// Message written by the container before exiting (stored in
 	// TerminationMessagePath).
 	Message string
+	// Attempt number of creating container for the pod.
+	Attempt uint32
 }
 
 // FindContainerStatusByName returns container status in the pod status with the given name.
@@ -610,13 +612,16 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 // completely optional settings.
 type Option func(Runtime)
 
-// Sort the container statuses by creation time.
-type SortContainerStatusesByCreationTime []*ContainerStatus
+// Sort the container statuses by attempt.
+type SortContainerStatusesByAttempt []*ContainerStatus
 
-func (s SortContainerStatusesByCreationTime) Len() int      { return len(s) }
-func (s SortContainerStatusesByCreationTime) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s SortContainerStatusesByCreationTime) Less(i, j int) bool {
-	return s[i].CreatedAt.Before(s[j].CreatedAt)
+func (s SortContainerStatusesByAttempt) Len() int      { return len(s) }
+func (s SortContainerStatusesByAttempt) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortContainerStatusesByAttempt) Less(i, j int) bool {
+	if s[i].Attempt == s[j].Attempt {
+		return s[i].CreatedAt.Before(s[j].CreatedAt)
+	}
+	return s[i].Attempt < s[j].Attempt
 }
 
 const (
