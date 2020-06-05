@@ -44,6 +44,7 @@ const (
 	preFilter                                 = "PreFilter"
 	preFilterExtensionAddPod                  = "PreFilterExtensionAddPod"
 	preFilterExtensionRemovePod               = "PreFilterExtensionRemovePod"
+	postFilter                                = "PostFilter"
 	preScore                                  = "PreScore"
 	score                                     = "Score"
 	scoreExtensionNormalize                   = "ScoreExtensionNormalize"
@@ -67,6 +68,7 @@ type framework struct {
 	queueSortPlugins      []QueueSortPlugin
 	preFilterPlugins      []PreFilterPlugin
 	filterPlugins         []FilterPlugin
+	postFilterPlugins     []PostFilterPlugin
 	preScorePlugins       []PreScorePlugin
 	scorePlugins          []ScorePlugin
 	reservePlugins        []ReservePlugin
@@ -103,6 +105,7 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 	return []extensionPoint{
 		{plugins.PreFilter, &f.preFilterPlugins},
 		{plugins.Filter, &f.filterPlugins},
+		{plugins.PostFilter, &f.postFilterPlugins},
 		{plugins.Reserve, &f.reservePlugins},
 		{plugins.PreScore, &f.preScorePlugins},
 		{plugins.Score, &f.scorePlugins},
@@ -506,6 +509,33 @@ func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state 
 	status := pl.Filter(ctx, state, pod, nodeInfo)
 	f.metricsRecorder.observePluginDurationAsync(Filter, pl.Name(), status, metrics.SinceInSeconds(startTime))
 	return status
+}
+
+// RunPostFilterPlugins runs the set of configured PostFilter plugins until the first
+// Success or Error is met, otherwise continues to execute all plugins.
+func (f *framework) RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status) {
+	statuses := make(PluginToStatus)
+	for _, pl := range f.postFilterPlugins {
+		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
+		if s.IsSuccess() {
+			return r, s
+		} else if !s.IsUnschedulable() {
+			// Any status other than Success or Unschedulable is Error.
+			return nil, NewStatus(Error, s.Message())
+		}
+		statuses[pl.Name()] = s
+	}
+	return nil, statuses.Merge()
+}
+
+func (f *framework) runPostFilterPlugin(ctx context.Context, pl PostFilterPlugin, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status) {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
+	}
+	startTime := time.Now()
+	r, s := pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
+	f.metricsRecorder.observePluginDurationAsync(postFilter, pl.Name(), s, metrics.SinceInSeconds(startTime))
+	return r, s
 }
 
 // RunPreScorePlugins runs the set of configured pre-score plugins. If any
@@ -956,4 +986,9 @@ func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plu
 		find(e.plugins)
 	}
 	return pgMap
+}
+
+// PreemptHandle returns the internal preemptHandle object.
+func (f *framework) PreemptHandle() PreemptHandle {
+	return f.preemptHandle
 }

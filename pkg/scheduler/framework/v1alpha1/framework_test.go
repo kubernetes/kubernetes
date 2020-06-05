@@ -169,6 +169,10 @@ func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod
 	return NewStatus(Code(pl.inj.FilterStatus), "injected filter status")
 }
 
+func (pl *TestPlugin) PostFilter(_ context.Context, _ *CycleState, _ *v1.Pod, _ NodeToStatusMap) (*PostFilterResult, *Status) {
+	return nil, NewStatus(Code(pl.inj.PostFilterStatus), "injected status")
+}
+
 func (pl *TestPlugin) PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status {
 	return NewStatus(Code(pl.inj.PreScoreStatus), "injected status")
 }
@@ -1000,7 +1004,6 @@ func TestFilterPlugins(t *testing.T) {
 					name: "TestPlugin1",
 					inj:  injectedResult{FilterStatus: int(UnschedulableAndUnresolvable)},
 				},
-
 				{
 					name: "TestPlugin2",
 					inj:  injectedResult{FilterStatus: int(Unschedulable)},
@@ -1047,6 +1050,84 @@ func TestFilterPlugins(t *testing.T) {
 				t.Errorf("wrong status map. got: %+v, want: %+v", gotStatusMap, tt.wantStatusMap)
 			}
 
+		})
+	}
+}
+
+func TestPostFilterPlugins(t *testing.T) {
+	tests := []struct {
+		name       string
+		plugins    []*TestPlugin
+		wantStatus *Status
+	}{
+		{
+			name: "a single plugin makes a Pod schedulable",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PostFilterStatus: int(Success)},
+				},
+			},
+			wantStatus: NewStatus(Success, "injected status"),
+		},
+		{
+			name: "plugin1 failed to make a Pod schedulable, followed by plugin2 which makes the Pod schedulable",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PostFilterStatus: int(Unschedulable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PostFilterStatus: int(Success)},
+				},
+			},
+			wantStatus: NewStatus(Success, "injected status"),
+		},
+		{
+			name: "plugin1 makes a Pod schedulable, followed by plugin2 which cannot make the Pod schedulable",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PostFilterStatus: int(Success)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PostFilterStatus: int(Unschedulable)},
+				},
+			},
+			wantStatus: NewStatus(Success, "injected status"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := Registry{}
+			cfgPls := &config.Plugins{PostFilter: &config.PluginSet{}}
+			for _, pl := range tt.plugins {
+				// register all plugins
+				tmpPl := pl
+				if err := registry.Register(pl.name,
+					func(_ runtime.Object, _ FrameworkHandle) (Plugin, error) {
+						return tmpPl, nil
+					}); err != nil {
+					t.Fatalf("fail to register postFilter plugin (%s)", pl.name)
+				}
+				// append plugins to filter pluginset
+				cfgPls.PostFilter.Enabled = append(
+					cfgPls.PostFilter.Enabled,
+					config.Plugin{Name: pl.name},
+				)
+			}
+
+			f, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs)
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+			_, gotStatus := f.RunPostFilterPlugins(context.TODO(), nil, pod, nil)
+			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
+				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
+			}
 		})
 	}
 }
@@ -1932,6 +2013,7 @@ type injectedResult struct {
 	PreFilterAddPodStatus    int   `json:"preFilterAddPodStatus,omitempty"`
 	PreFilterRemovePodStatus int   `json:"preFilterRemovePodStatus,omitempty"`
 	FilterStatus             int   `json:"filterStatus,omitempty"`
+	PostFilterStatus         int   `json:"postFilterStatus,omitempty"`
 	PreScoreStatus           int   `json:"preScoreStatus,omitempty"`
 	ReserveStatus            int   `json:"reserveStatus,omitempty"`
 	PreBindStatus            int   `json:"preBindStatus,omitempty"`

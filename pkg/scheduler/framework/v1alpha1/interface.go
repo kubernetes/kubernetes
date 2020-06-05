@@ -273,6 +273,23 @@ type FilterPlugin interface {
 	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
 }
 
+// PostFilterPlugin is an interface for PostFilter plugins. These plugins are called
+// after a pod cannot be scheduled.
+type PostFilterPlugin interface {
+	Plugin
+	// PostFilter is called by the scheduling framework.
+	// A PostFilter plugin should return one of the following statuses:
+	// - Unschedulable: the plugin gets executed successfully but the pod cannot be made schedulable.
+	// - Success: the plugin gets executed successfully and the pod can be made schedulable.
+	// - Error: the plugin aborts due to some internal error.
+	//
+	// Informational plugins should be configured ahead of other ones, and always return Unschedulable status.
+	// Optionally, a non-nil PostFilterResult may be returned along with a Success status. For example,
+	// a preemption plugin may choose to return nominatedNodeName, so that framework can reuse that to update the
+	// preemptor pod's .spec.status.nominatedNodeName field.
+	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
+}
+
 // PreScorePlugin is an interface for Pre-score plugin. Pre-score is an
 // informational extension point. Plugins will be called with a list of nodes
 // that passed the filtering phase. A plugin may use this data to update internal
@@ -398,6 +415,12 @@ type Framework interface {
 	// schedule the target pod.
 	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) PluginToStatus
 
+	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
+	// PostFilter plugins can either be informational, in which case should be configured
+	// to execute first and return Unschedulable status, or ones that try to change the
+	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
+	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
+
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
@@ -490,6 +513,14 @@ type FrameworkHandle interface {
 	ClientSet() clientset.Interface
 
 	SharedInformerFactory() informers.SharedInformerFactory
+
+	// TODO: unroll the wrapped interfaces to FrameworkHandle.
+	PreemptHandle() PreemptHandle
+}
+
+// PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
+type PostFilterResult struct {
+	NominatedNodeName string
 }
 
 // PreemptHandle incorporates all needed logic to run preemption logic.

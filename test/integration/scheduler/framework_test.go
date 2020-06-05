@@ -55,6 +55,14 @@ type ScoreWithNormalizePlugin struct {
 type FilterPlugin struct {
 	numFilterCalled int
 	failFilter      bool
+	rejectFilter    bool
+}
+
+type PostFilterPlugin struct {
+	fh                  framework.FrameworkHandle
+	numPostFilterCalled int
+	failPostFilter      bool
+	rejectPostFilter    bool
 }
 
 type ReservePlugin struct {
@@ -110,6 +118,7 @@ type PermitPlugin struct {
 
 const (
 	prefilterPluginName          = "prefilter-plugin"
+	postfilterPluginName         = "postfilter-plugin"
 	scorePluginName              = "score-plugin"
 	scoreWithNormalizePluginName = "score-with-normalize-plugin"
 	filterPluginName             = "filter-plugin"
@@ -122,6 +131,7 @@ const (
 )
 
 var _ framework.PreFilterPlugin = &PreFilterPlugin{}
+var _ framework.PostFilterPlugin = &PostFilterPlugin{}
 var _ framework.ScorePlugin = &ScorePlugin{}
 var _ framework.FilterPlugin = &FilterPlugin{}
 var _ framework.ScorePlugin = &ScorePlugin{}
@@ -137,6 +147,14 @@ var _ framework.PermitPlugin = &PermitPlugin{}
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) framework.PluginFactory {
 	return func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
+		return plugin, nil
+	}
+}
+
+// newPlugin returns a plugin factory with specified Plugin.
+func newPostFilterPlugin(plugin *PostFilterPlugin) framework.PluginFactory {
+	return func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
+		plugin.fh = fh
 		return plugin, nil
 	}
 }
@@ -218,6 +236,9 @@ func (fp *FilterPlugin) Filter(ctx context.Context, state *framework.CycleState,
 
 	if fp.failFilter {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+	if fp.rejectFilter {
+		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 
 	return nil
@@ -363,6 +384,30 @@ func (pp *PreFilterPlugin) reset() {
 	pp.numPreFilterCalled = 0
 	pp.failPreFilter = false
 	pp.rejectPreFilter = false
+}
+
+// Name returns name of the plugin.
+func (pp *PostFilterPlugin) Name() string {
+	return postfilterPluginName
+}
+
+func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+	pp.numPostFilterCalled++
+	nodeInfos, err := pp.fh.SnapshotSharedLister().NodeInfos().List()
+	if err != nil {
+		return nil, framework.NewStatus(framework.Error, err.Error())
+	}
+	ph := pp.fh.PreemptHandle()
+	for _, nodeInfo := range nodeInfos {
+		ph.RunFilterPlugins(ctx, state, pod, nodeInfo)
+	}
+	if pp.failPostFilter {
+		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+	if pp.rejectPostFilter {
+		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
+	}
+	return nil, framework.NewStatus(framework.Success, fmt.Sprintf("make room for pod %v to be schedulable", pod.Name))
 }
 
 // Name returns name of the plugin.
@@ -528,6 +573,108 @@ func TestPreFilterPlugin(t *testing.T) {
 
 		preFilterPlugin.reset()
 		testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
+	}
+}
+
+// TestPostFilterPlugin tests invocation of postfilter plugins.
+func TestPostFilterPlugin(t *testing.T) {
+	numNodes := 1
+	tests := []struct {
+		name                      string
+		rejectFilter              bool
+		rejectPostFilter          bool
+		expectFilterNumCalled     int
+		expectPostFilterNumCalled int
+	}{
+		{
+			name:                      "Filter passed",
+			rejectFilter:              false,
+			rejectPostFilter:          false,
+			expectFilterNumCalled:     numNodes,
+			expectPostFilterNumCalled: 0,
+		},
+		{
+			name:             "Filter failed and PostFilter passed",
+			rejectFilter:     true,
+			rejectPostFilter: false,
+			// TODO: change to <numNodes * 2> when the hard-coded preemption logic is removed.
+			expectFilterNumCalled:     numNodes * 3,
+			expectPostFilterNumCalled: 1,
+		},
+		{
+			name:             "Filter failed and PostFilter failed",
+			rejectFilter:     true,
+			rejectPostFilter: true,
+			// TODO: change to <numNodes * 2> when the hard-coded preemption logic is removed.
+			expectFilterNumCalled:     numNodes * 3,
+			expectPostFilterNumCalled: 1,
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a plugin registry for testing. Register a combination of filter and postFilter plugin.
+			var (
+				filterPlugin     = &FilterPlugin{}
+				postFilterPlugin = &PostFilterPlugin{}
+			)
+			filterPlugin.rejectFilter = tt.rejectFilter
+			postFilterPlugin.rejectPostFilter = tt.rejectPostFilter
+			registry := framework.Registry{
+				filterPluginName:     newPlugin(filterPlugin),
+				postfilterPluginName: newPostFilterPlugin(postFilterPlugin),
+			}
+
+			// Setup plugins for testing.
+			prof := schedulerconfig.KubeSchedulerProfile{
+				SchedulerName: v1.DefaultSchedulerName,
+				Plugins: &schedulerconfig.Plugins{
+					Filter: &schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{Name: filterPluginName},
+						},
+					},
+					PostFilter: &schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{Name: postfilterPluginName},
+						},
+					},
+				},
+			}
+
+			// Create the master and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(
+				t,
+				testutils.InitTestMaster(t, fmt.Sprintf("postfilter%v-", i), nil),
+				numNodes,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+			)
+			defer testutils.CleanupTest(t, testCtx)
+
+			// Create a best effort pod.
+			pod, err := createPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
+			if err != nil {
+				t.Errorf("Error while creating a test pod: %v", err)
+			}
+
+			if tt.rejectFilter {
+				if err = wait.Poll(10*time.Millisecond, 10*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Didn't expect the pod to be scheduled.")
+				}
+			} else {
+				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+					t.Errorf("Expected the pod to be scheduled. error: %v", err)
+				}
+			}
+
+			if filterPlugin.numFilterCalled != tt.expectFilterNumCalled {
+				t.Errorf("Expected the filter plugin to be called %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
+			}
+			if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
+				t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
+			}
+		})
 	}
 }
 
