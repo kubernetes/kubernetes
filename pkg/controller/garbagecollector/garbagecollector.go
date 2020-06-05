@@ -76,7 +76,6 @@ type GarbageCollector struct {
 func NewGarbageCollector(
 	metadataClient metadata.Interface,
 	mapper resettableRESTMapper,
-	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers controller.InformerFactory,
 	informersStarted <-chan struct{},
@@ -91,7 +90,7 @@ func NewGarbageCollector(
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
-	gb := &GraphBuilder{
+	gc.dependencyGraphBuilder = &GraphBuilder{
 		metadataClient:   metadataClient,
 		informersStarted: informersStarted,
 		restMapper:       mapper,
@@ -105,10 +104,6 @@ func NewGarbageCollector(
 		sharedInformers:  sharedInformers,
 		ignoredResources: ignoredResources,
 	}
-	if err := gb.syncMonitors(deletableResources); err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to sync all monitors: %v", err))
-	}
-	gc.dependencyGraphBuilder = gb
 
 	return gc, nil
 }
