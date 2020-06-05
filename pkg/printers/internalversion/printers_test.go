@@ -886,39 +886,171 @@ func TestPrintNodeInternalIP(t *testing.T) {
 }
 
 func TestPrintIngress(t *testing.T) {
-	ingress := networking.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "test1",
-			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-		},
-		Spec: networking.IngressSpec{
-			IngressClassName: utilpointer.StringPtr("foo"),
-			Backend: &networking.IngressBackend{
-				ServiceName: "svc",
-				ServicePort: intstr.FromInt(93),
+	testCases := []struct {
+		name     string
+		ingress  networking.Ingress
+		expected []metav1.TableRow
+	}{{
+		name: "HTTP and HTTPS ports",
+		ingress: networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test1",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 			},
-		},
-		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
-					{
-						IP:       "2.3.4.5",
-						Hostname: "localhost.localdomain",
+			Spec: networking.IngressSpec{
+				IngressClassName: utilpointer.StringPtr("foo"),
+				Backend: &networking.IngressBackend{
+					ServiceName: "svc",
+					ServicePort: intstr.FromInt(93),
+				},
+				TLS: []networking.IngressTLS{{}},
+			},
+			Status: networking.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP:       "2.3.4.5",
+							Hostname: "localhost.localdomain",
+						},
 					},
 				},
 			},
 		},
-	}
-	// Columns: Name, Hosts, Address, Ports, Age
-	expected := []metav1.TableRow{{Cells: []interface{}{"test1", "foo", "*", "2.3.4.5", "80", "10y"}}}
+		// Columns: Name, Hosts, Address, Ports, Age
+		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "foo", "*", "2.3.4.5", "80, 443", "10y"}}},
+	}, {
+		name: "HTTP and HTTPS ports with HTTP explicitly allowed",
+		ingress: networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test1",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				Annotations: map[string]string{
+					"kubernetes.io/ingress.allow-http": "true",
+				},
+			},
+			Spec: networking.IngressSpec{
+				IngressClassName: utilpointer.StringPtr("foo"),
+				Backend: &networking.IngressBackend{
+					ServiceName: "svc",
+					ServicePort: intstr.FromInt(93),
+				},
+				TLS: []networking.IngressTLS{{}},
+			},
+			Status: networking.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP:       "2.3.4.5",
+							Hostname: "localhost.localdomain",
+						},
+					},
+				},
+			},
+		},
+		// Columns: Name, Hosts, Address, Ports, Age
+		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "foo", "*", "2.3.4.5", "80, 443", "10y"}}},
+	}, {
+		name: "HTTP port only",
+		ingress: networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test1",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+			},
+			Spec: networking.IngressSpec{
+				IngressClassName: utilpointer.StringPtr("foo"),
+				Backend: &networking.IngressBackend{
+					ServiceName: "svc",
+					ServicePort: intstr.FromInt(93),
+				},
+			},
+			Status: networking.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP:       "2.3.4.5",
+							Hostname: "localhost.localdomain",
+						},
+					},
+				},
+			},
+		},
+		// Columns: Name, Hosts, Address, Ports, Age
+		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "foo", "*", "2.3.4.5", "80", "10y"}}},
+	}, {
+		name: "HTTPS port only",
+		ingress: networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test1",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				Annotations: map[string]string{
+					"kubernetes.io/ingress.allow-http": "false",
+				},
+			},
+			Spec: networking.IngressSpec{
+				IngressClassName: utilpointer.StringPtr("foo"),
+				Backend: &networking.IngressBackend{
+					ServiceName: "svc",
+					ServicePort: intstr.FromInt(93),
+				},
+				TLS: []networking.IngressTLS{{}},
+			},
+			Status: networking.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP:       "2.3.4.5",
+							Hostname: "localhost.localdomain",
+						},
+					},
+				},
+			},
+		},
+		// Columns: Name, Hosts, Address, Ports, Age
+		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "foo", "*", "2.3.4.5", "443", "10y"}}},
+	}, {
+		name: "Neither HTTP nor HTTPS ports",
+		ingress: networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "test1",
+				CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				Annotations: map[string]string{
+					"kubernetes.io/ingress.allow-http": "false",
+				},
+			},
+			Spec: networking.IngressSpec{
+				IngressClassName: utilpointer.StringPtr("foo"),
+				Backend: &networking.IngressBackend{
+					ServiceName: "svc",
+					ServicePort: intstr.FromInt(93),
+				},
+			},
+			Status: networking.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{
+							IP:       "2.3.4.5",
+							Hostname: "localhost.localdomain",
+						},
+					},
+				},
+			},
+		},
+		// Columns: Name, Hosts, Address, Ports, Age
+		expected: []metav1.TableRow{{Cells: []interface{}{"test1", "foo", "*", "2.3.4.5", "", "10y"}}},
+	}}
 
-	rows, err := printIngress(&ingress, printers.GenerateOptions{})
-	if err != nil {
-		t.Fatalf("Error generating table rows for Ingress: %#v", err)
-	}
-	rows[0].Object.Object = nil
-	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expected, rows))
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+
+			rows, err := printIngress(&testCase.ingress, printers.GenerateOptions{})
+			if err != nil {
+				t.Fatalf("Error generating table rows for Ingress: %#v", err)
+			}
+			rows[0].Object.Object = nil
+			if !reflect.DeepEqual(testCase.expected, rows) {
+				t.Errorf("mismatch: %s", diff.ObjectReflectDiff(testCase.expected, rows))
+			}
+		})
 	}
 }
 

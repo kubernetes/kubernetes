@@ -1154,11 +1154,26 @@ func formatHosts(rules []networking.IngressRule) string {
 	return ret
 }
 
-func formatPorts(tls []networking.IngressTLS) string {
-	if len(tls) != 0 {
-		return "80, 443"
+func formatPorts(obj *networking.Ingress) string {
+	allowHTTP := true
+	if annotationValue, exists := obj.Annotations["kubernetes.io/ingress.allow-http"]; exists {
+		allowHTTP, _ = strconv.ParseBool(annotationValue)
 	}
-	return "80"
+
+	if len(obj.Spec.TLS) != 0 {
+		if allowHTTP {
+			return "80, 443"
+		}
+		return "443"
+	}
+
+	if allowHTTP {
+		return "80"
+	}
+
+	// This should not happen, but if ingress is improperly configured, it could occur if TLS is not set,
+	// and the kubernetes.io/ingress.allow-http annotation is explicitly set to false
+	return ""
 }
 
 func printIngress(obj *networking.Ingress, options printers.GenerateOptions) ([]metav1.TableRow, error) {
@@ -1171,7 +1186,7 @@ func printIngress(obj *networking.Ingress, options printers.GenerateOptions) ([]
 	}
 	hosts := formatHosts(obj.Spec.Rules)
 	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
-	ports := formatPorts(obj.Spec.TLS)
+	ports := formatPorts(obj)
 	createTime := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, className, hosts, address, ports, createTime)
 	return []metav1.TableRow{row}, nil
