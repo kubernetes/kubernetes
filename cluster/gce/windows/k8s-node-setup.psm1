@@ -241,6 +241,8 @@ function Set-EnvironmentVars {
     "CNI_CONFIG_DIR" = ${kube_env}['CNI_CONFIG_DIR']
     "WINDOWS_CNI_STORAGE_PATH" = ${kube_env}['WINDOWS_CNI_STORAGE_PATH']
     "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
+    "CSI_PROXY_STORAGE_PATH" = ${kube_env}['CSI_PROXY_STORAGE_PATH']
+    "CSI_PROXY_VERSION" = ${kube_env}['CSI_PROXY_VERSION']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
     "KUBELET_CONFIG" = ${kube_env}['KUBELET_CONFIG_FILE']
@@ -371,6 +373,33 @@ function DownloadAndInstall-KubernetesBinaries {
 
   # Clean up the temporary directory
   Remove-Item -Force -Recurse $tmp_dir
+}
+
+# Downloads the csi-proxy binaries from kube-env's CSI_PROXY_STORAGE_PATH and
+# CSI_PROXY_VERSION, and then puts them in a subdirectory of $env:NODE_DIR. 
+# Note: for now the installation is skipped for non-test clusters. Will be
+# installed for all cluster after tests pass.
+# Required ${kube_env} keys:
+#   CSI_PROXY_STORAGE_PATH and CSI_PROXY_VERSION
+function DownloadAndInstall-CSIProxyBinaries {
+  if (Test-IsTestCluster $kube_env) {
+    if (ShouldWrite-File ${env:NODE_DIR}\csi-proxy.exe) {
+      $tmp_dir = 'C:\k8s_tmp'
+      New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+      $filename = 'csi-proxy.exe'
+      $urls = "${env:CSI_PROXY_STORAGE_PATH}/${env:CSI_PROXY_VERSION}/$filename"
+      MustDownload-File -OutFile $tmp_dir\$filename -URLs $urls
+      Move-Item -Force $tmp_dir\$filename ${env:NODE_DIR}\$filename
+      # Clean up the temporary directory
+      Remove-Item -Force -Recurse $tmp_dir
+    }
+  }
+}
+
+# TODO(jingxu97): Make csi-proxy.exe as a service similar to kubelet.exe
+function Start-CSIProxy {
+  Log-Output 'Starting CSI Proxy'
+  Start-Process "${env:NODE_DIR}\csi-proxy.exe"
 }
 
 # TODO(pjh): this is copied from
@@ -912,6 +941,15 @@ function Configure-GcePdTools {
 '$modulePath = "K8S_DIR\GetGcePdName.dll"
 Unblock-File $modulePath
 Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
+
+  if (Test-IsTestCluster $kube_env) {
+    if (ShouldWrite-File ${env:K8S_DIR}\diskutil.exe) {
+      # The source code of this executable file is https://github.com/kubernetes-sigs/sig-windows-tools/blob/master/cmd/diskutil/diskutil.c
+      MustDownload-File -OutFile ${env:K8S_DIR}\diskutil.exe `
+        -URLs "https://ddebroywin1.s3-us-west-2.amazonaws.com/diskutil.exe"
+    }
+    Copy-Item ${env:K8S_DIR}\diskutil.exe -Destination "C:\Windows\system32"
+  }
 }
 
 # Setup cni network. This function supports both Docker and containerd.
