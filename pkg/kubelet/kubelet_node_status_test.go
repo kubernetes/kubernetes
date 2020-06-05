@@ -1694,6 +1694,255 @@ func TestUpdateDefaultLabels(t *testing.T) {
 	}
 }
 
+func TestReconcileHugePageResource(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	hugePageResourceName64Ki := v1.ResourceName("hugepages-64Ki")
+	hugePageResourceName2Mi := v1.ResourceName("hugepages-2Mi")
+	hugePageResourceName1Gi := v1.ResourceName("hugepages-1Gi")
+
+	cases := []struct {
+		name         string
+		testKubelet  *TestKubelet
+		initialNode  *v1.Node
+		existingNode *v1.Node
+		expectedNode *v1.Node
+		needsUpdate  bool
+	}{
+		{
+			name:        "no update needed when all huge page resources are similar",
+			testKubelet: testKubelet,
+			needsUpdate: false,
+			initialNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+						hugePageResourceName64Ki:    *resource.NewQuantity(0, resource.BinarySI),
+					},
+				},
+			},
+		}, {
+			name:        "update needed when new huge page resources is supported",
+			testKubelet: testKubelet,
+			needsUpdate: true,
+			initialNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     resource.MustParse("100Mi"),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+				},
+			},
+		}, {
+			name:        "update needed when huge page resource quantity has changed",
+			testKubelet: testKubelet,
+			needsUpdate: true,
+			initialNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
+					},
+				},
+			},
+		}, {
+			name:        "update needed when a huge page resources is no longer supported",
+			testKubelet: testKubelet,
+			needsUpdate: true,
+			initialNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName2Mi:     *resource.NewQuantity(0, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("2Gi"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(T *testing.T) {
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
+			needsUpdate := kubelet.reconcileHugePageResource(tc.initialNode, tc.existingNode)
+			assert.Equal(t, tc.needsUpdate, needsUpdate, tc.name)
+			assert.Equal(t, tc.expectedNode, tc.existingNode, tc.name)
+		})
+	}
+
+}
 func TestReconcileExtendedResource(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used

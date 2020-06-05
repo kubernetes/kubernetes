@@ -373,16 +373,32 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 }
 
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func restartKubelet() {
+func findRunningKubletServiceName() string {
 	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	framework.ExpectNotEqual(len(matches), 0)
-	kube := matches[0]
-	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
-	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
+	framework.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
+	kubeletServiceName := matches[0]
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
+	return kubeletServiceName
+}
+
+func restartKubelet() {
+	kubeletServiceName := findRunningKubletServiceName()
+	stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+}
+
+// stopKubelet will kill the running kubelet, and returns a func that will restart the process again
+func stopKubelet() func() {
+	kubeletServiceName := findRunningKubletServiceName()
+	stdout, err := exec.Command("sudo", "systemctl", "kill", kubeletServiceName).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
+	return func() {
+		stdout, err := exec.Command("sudo", "systemctl", "start", kubeletServiceName).CombinedOutput()
+		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+	}
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {
