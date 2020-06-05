@@ -103,6 +103,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = make([]VolumeLifecycleMode, len(*in))
 		copy(*out, *in)
 	}
+	if in.SELinuxMountSupported != nil {
+		in, out := &in.SELinuxMountSupported, &out.SELinuxMountSupported
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

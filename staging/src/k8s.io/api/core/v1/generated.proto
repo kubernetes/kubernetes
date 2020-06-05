@@ -3293,6 +3293,17 @@ message PodSecurityContext {
   // Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
   // +optional
   optional string fsGroupChangePolicy = 9;
+
+  // Defines behavior of changing SELinux labels of the volume before being exposed inside Pod
+  // (Alpha feature).
+  // This field is ignored for Pod's volumes and/or for Linux installations that do not support
+  // SELinux.
+  // Valid values are "OnVolumeMount" and "Always". If not specified, "Always" is used.
+  // "Always" policy recursively changes SELinux labels on all files on all volumes used by the Pod.
+  // "OnVolumeMount" tries to mount volumes used by the Pod with the right context and skip recursive ownership
+  // change. Kubernetes may fall back to policy "Always" if a storage backed does not support this policy.
+  // + optional
+  optional string seLinuxRelabelPolicy = 10;
 }
 
 // Describes the class of pods that should avoid this node.

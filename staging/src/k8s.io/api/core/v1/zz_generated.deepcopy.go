@@ -3694,6 +3694,11 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 		*out = new(PodFSGroupChangePolicy)
 		**out = **in
 	}
+	if in.SELinuxRelabelPolicy != nil {
+		in, out := &in.SELinuxRelabelPolicy, &out.SELinuxRelabelPolicy
+		*out = new(PodSELinuxRelabelPolicy)
+		**out = **in
+	}
 	return
 }
 

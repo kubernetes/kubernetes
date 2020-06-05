@@ -32,5 +32,6 @@ metadata:
 spec:
   attachRequired: false
   podInfoOnMount: false
+  seLinuxMountSupported: true
   volumeLifecycleModes:
   - r鯹)晿<o,c鮽ort昍řČ扷5ƗǸ
