@@ -49,6 +49,10 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 		csiDriver := obj.(*storage.CSIDriver)
 		csiDriver.Spec.VolumeLifecycleModes = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
+		csiDriver := obj.(*storage.CSIDriver)
+		csiDriver.Spec.SELinuxMountSupported = nil
+	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -76,6 +80,11 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		newCSIDriver := obj.(*storage.CSIDriver)
 		newCSIDriver.Spec.VolumeLifecycleModes = nil
+	}
+	if old.(*storage.CSIDriver).Spec.SELinuxMountSupported == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
+		newCSIDriver := obj.(*storage.CSIDriver)
+		newCSIDriver.Spec.SELinuxMountSupported = nil
 	}
 }
 

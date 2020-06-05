@@ -19,7 +19,7 @@ package pod
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -417,6 +417,7 @@ func dropDisabledFields(
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
 	dropDisabledFSGroupFields(podSpec, oldPodSpec)
+	dropDisabledSELinuxFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
@@ -483,6 +484,16 @@ func dropDisabledFSGroupFields(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
+func dropDisabledSELinuxFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) && !seLinuxRelabelPolicyInUse(oldPodSpec) {
+		// if oldPodSpec had no SELinuxRelabelPolicy set then we should prevent new pod from having this field
+		// if SELinuxRelabelPolicy feature is disabled
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.SELinuxRelabelPolicy = nil
+		}
+	}
+}
+
 // dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
 // This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
 func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
@@ -506,6 +517,17 @@ func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
 	}
 	securityContext := podSpec.SecurityContext
 	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
+		return true
+	}
+	return false
+}
+
+func seLinuxRelabelPolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	securityContext := podSpec.SecurityContext
+	if securityContext != nil && securityContext.SELinuxRelabelPolicy != nil {
 		return true
 	}
 	return false

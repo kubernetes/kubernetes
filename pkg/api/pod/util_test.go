@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -1728,6 +1728,108 @@ func TestDropEphemeralContainers(t *testing.T) {
 						// new pod should not have subpaths
 						if !reflect.DeepEqual(newPod, podWithoutEphemeralContainers()) {
 							t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutEphemeralContainers()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropSELinuxRelabelPolicy(t *testing.T) {
+	policyMount := api.SELinuxRelabelOnVolumeMount
+	policyAlways := api.SELinuxRelabelAlwaysRelabel
+
+	podWithRelabelPolicyMount := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SELinuxRelabelPolicy: &policyMount,
+				},
+			},
+		}
+	}
+	podWithRelabelPolicyAlways := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SELinuxRelabelPolicy: &policyAlways,
+				},
+			},
+		}
+	}
+
+	podWithoutRelabelPolicy := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SELinuxRelabelPolicy: nil,
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description             string
+		hasSELinuxRelabelPolicy bool
+		pod                     func() *api.Pod
+	}{
+		{
+			description:             "has policy Mount",
+			hasSELinuxRelabelPolicy: true,
+			pod:                     podWithRelabelPolicyMount,
+		},
+		{
+			description:             "has policy Always",
+			hasSELinuxRelabelPolicy: true,
+			pod:                     podWithRelabelPolicyAlways,
+		},
+		{
+			description:             "is nil",
+			hasSELinuxRelabelPolicy: false,
+			pod:                     podWithoutRelabelPolicy,
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasSELinuxRelabelPolicy, oldPod := oldPodInfo.hasSELinuxRelabelPolicy, oldPodInfo.pod()
+				newPodHasSELinuxRelabelPolicy, newPod := newPodInfo.hasSELinuxRelabelPolicy, newPodInfo.pod()
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxRelabelPolicy, enabled)()
+
+					oldPodSpec := &oldPod.Spec
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasSELinuxRelabelPolicy:
+						// new pod should not be changed if the feature is enabled, or if the old pod had no SELinuxRelabelPolicy
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasSELinuxRelabelPolicy:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have subpaths
+						if !reflect.DeepEqual(newPod, podWithoutRelabelPolicy()) {
+							t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutRelabelPolicy()))
 						}
 					default:
 						// new pod should not need to be changed
