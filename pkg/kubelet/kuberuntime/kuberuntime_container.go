@@ -477,7 +477,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 		statuses[i] = cStatus
 	}
 
-	sort.Sort(containerStatusByCreated(statuses))
+	sort.Sort(containerStatusByAttempt(statuses))
 	return statuses, nil
 }
 
@@ -496,6 +496,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		RestartCount: annotatedInfo.RestartCount,
 		State:        toKubeContainerState(status.State),
 		CreatedAt:    time.Unix(0, status.CreatedAt),
+		Attempt:      status.Metadata.Attempt,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
