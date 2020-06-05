@@ -273,6 +273,13 @@ func (g *genericScheduler) Preempt(ctx context.Context, prof *profile.Profile, s
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		return "", nil, []*v1.Pod{pod}, nil
 	}
+	if klog.V(5).Enabled() {
+		var sample []string
+		for i := 0; i < 10 && i < len(potentialNodes); i++ {
+			sample = append(sample, potentialNodes[i].Node().Name)
+		}
+		klog.Infof("%v potential nodes for preemption, first %v are: %v", len(potentialNodes), len(sample), sample)
+	}
 	var pdbs []*policy.PodDisruptionBudget
 	if g.pdbLister != nil {
 		pdbs, err = g.pdbLister.List(labels.Everything())
@@ -1042,7 +1049,6 @@ func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, fitErr *FitError
 		if fitErr.FilteredNodesStatuses[name].Code() == framework.UnschedulableAndUnresolvable {
 			continue
 		}
-		klog.V(3).Infof("Node %v is a potential node for preemption.", name)
 		potentialNodes = append(potentialNodes, node)
 	}
 	return potentialNodes
