@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -90,49 +91,61 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 		return err
 	}
 
-	err = apiclient.CreateOrMutateConfigMap(client, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.KubeadmConfigConfigMap,
-			Namespace: metav1.NamespaceSystem,
-		},
-		Data: map[string]string{
-			kubeadmconstants.ClusterConfigurationConfigMapKey: string(clusterConfigurationYaml),
-			kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
-		},
-	}, func(cm *v1.ConfigMap) error {
-		// Upgrade will call to UploadConfiguration with a modified KubernetesVersion reflecting the new
-		// Kubernetes version. In that case, the mutation path will take place.
-		cm.Data[kubeadmconstants.ClusterConfigurationConfigMapKey] = string(clusterConfigurationYaml)
-		// Mutate the ClusterStatus now
-		return mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
-			// Handle a nil APIEndpoints map. Should only happen if someone manually
-			// interacted with the ConfigMap.
-			if cs.APIEndpoints == nil {
-				return errors.Errorf("APIEndpoints from ConfigMap %q in the %q Namespace is nil",
-					kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			}
-			cs.APIEndpoints[cfg.NodeRegistration.Name] = cfg.LocalAPIEndpoint
-			return nil
+	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout, func() (bool, error) {
+		err = apiclient.CreateOrMutateConfigMap(client, &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      kubeadmconstants.KubeadmConfigConfigMap,
+				Namespace: metav1.NamespaceSystem,
+			},
+			Data: map[string]string{
+				kubeadmconstants.ClusterConfigurationConfigMapKey: string(clusterConfigurationYaml),
+				kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
+			},
+		}, func(cm *v1.ConfigMap) error {
+			// Upgrade will call to UploadConfiguration with a modified KubernetesVersion reflecting the new
+			// Kubernetes version. In that case, the mutation path will take place.
+			cm.Data[kubeadmconstants.ClusterConfigurationConfigMapKey] = string(clusterConfigurationYaml)
+			// Mutate the ClusterStatus now
+			return mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
+				// Handle a nil APIEndpoints map. Should only happen if someone manually
+				// interacted with the ConfigMap.
+				if cs.APIEndpoints == nil {
+					return errors.Errorf("APIEndpoints from ConfigMap %q in the %q Namespace is nil",
+						kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+				}
+				cs.APIEndpoints[cfg.NodeRegistration.Name] = cfg.LocalAPIEndpoint
+				return nil
+			})
 		})
+		if err != nil {
+			return false, err
+		}
+		return true, nil
 	})
 	if err != nil {
 		return err
 	}
 
 	// Ensure that the NodesKubeadmConfigClusterRoleName exists
-	err = apiclient.CreateOrUpdateRole(client, &rbac.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      NodesKubeadmConfigClusterRoleName,
-			Namespace: metav1.NamespaceSystem,
-		},
-		Rules: []rbac.PolicyRule{
-			{
-				Verbs:         []string{"get"},
-				APIGroups:     []string{""},
-				Resources:     []string{"configmaps"},
-				ResourceNames: []string{kubeadmconstants.KubeadmConfigConfigMap},
+	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout, func() (bool, error) {
+		err = apiclient.CreateOrUpdateRole(client, &rbac.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      NodesKubeadmConfigClusterRoleName,
+				Namespace: metav1.NamespaceSystem,
 			},
-		},
+			Rules: []rbac.PolicyRule{
+				{
+					Verbs:         []string{"get"},
+					APIGroups:     []string{""},
+					Resources:     []string{"configmaps"},
+					ResourceNames: []string{kubeadmconstants.KubeadmConfigConfigMap},
+				},
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+		return true, nil
 	})
 	if err != nil {
 		return err
@@ -141,26 +154,32 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	// Binds the NodesKubeadmConfigClusterRoleName to all the bootstrap tokens
 	// that are members of the system:bootstrappers:kubeadm:default-node-token group
 	// and to all nodes
-	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      NodesKubeadmConfigClusterRoleName,
-			Namespace: metav1.NamespaceSystem,
-		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: rbac.GroupName,
-			Kind:     "Role",
-			Name:     NodesKubeadmConfigClusterRoleName,
-		},
-		Subjects: []rbac.Subject{
-			{
-				Kind: rbac.GroupKind,
-				Name: kubeadmconstants.NodeBootstrapTokenAuthGroup,
+	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout, func() (bool, error) {
+		apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      NodesKubeadmConfigClusterRoleName,
+				Namespace: metav1.NamespaceSystem,
 			},
-			{
-				Kind: rbac.GroupKind,
-				Name: kubeadmconstants.NodesGroup,
+			RoleRef: rbac.RoleRef{
+				APIGroup: rbac.GroupName,
+				Kind:     "Role",
+				Name:     NodesKubeadmConfigClusterRoleName,
 			},
-		},
+			Subjects: []rbac.Subject{
+				{
+					Kind: rbac.GroupKind,
+					Name: kubeadmconstants.NodeBootstrapTokenAuthGroup,
+				},
+				{
+					Kind: rbac.GroupKind,
+					Name: kubeadmconstants.NodesGroup,
+				},
+			},
+		})
+		if err != nil {
+			return false, err
+		}
+		return true, nil
 	})
 }
 

@@ -177,6 +177,10 @@ const (
 
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
+	// APICallWithWriteTimeout specifies how long kubeadm should wait for api calls with at least one write
+	APICallWithWriteTimeout = 40 * time.Second
+	// APICallWithReadTimeout specifies how long kubeadm should wait for api calls with only reads
+	APICallWithReadTimeout = 15 * time.Second
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the control-plane when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
 	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the control-plane before timing out
