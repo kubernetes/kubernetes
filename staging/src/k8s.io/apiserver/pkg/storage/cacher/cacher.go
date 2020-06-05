@@ -60,11 +60,6 @@ const (
 
 // Config contains the configuration for a given Cache.
 type Config struct {
-	// Maximum size of the history cached in memory.
-	//
-	// DEPRECATED: Cache capacity is dynamic and this field is no longer used.
-	CacheCapacity int
-
 	// An underlying storage.Interface.
 	Storage storage.Interface
 

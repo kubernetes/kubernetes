@@ -105,15 +105,14 @@ func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServ
 	return server, storage
 }
 
-func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage.Versioner, error) {
-	return newTestCacherWithClock(s, cap, clock.RealClock{})
+func newTestCacher(s storage.Interface) (*cacherstorage.Cacher, storage.Versioner, error) {
+	return newTestCacherWithClock(s, clock.RealClock{})
 }
 
-func newTestCacherWithClock(s storage.Interface, cap int, clock clock.Clock) (*cacherstorage.Cacher, storage.Versioner, error) {
+func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstorage.Cacher, storage.Versioner, error) {
 	prefix := "pods"
 	v := etcd3.APIObjectVersioner{}
 	config := cacherstorage.Config{
-		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      v,
 		ResourcePrefix: prefix,
@@ -160,7 +159,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 func TestGet(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -194,7 +193,7 @@ func TestGet(t *testing.T) {
 func TestGetToList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -253,7 +252,7 @@ func TestGetToList(t *testing.T) {
 func TestList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -339,7 +338,7 @@ func TestList(t *testing.T) {
 func TestTooLargeResourceVersionList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, v, err := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -406,7 +405,7 @@ func TestWatch(t *testing.T) {
 	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
 	defer server.Terminate(t)
 	fakeClock := clock.NewFakeClock(time.Now())
-	cacher, _, err := newTestCacherWithClock(etcdStorage, watchCacheDefaultCapacity, fakeClock)
+	cacher, _, err := newTestCacherWithClock(etcdStorage, fakeClock)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -493,7 +492,7 @@ func TestWatch(t *testing.T) {
 func TestWatcherTimeout(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -538,7 +537,7 @@ func TestWatcherTimeout(t *testing.T) {
 func TestFiltering(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -603,7 +602,7 @@ func TestFiltering(t *testing.T) {
 func TestStartingResourceVersion(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, v, err := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -668,7 +667,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 
 	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
 
-	cacher, v, err := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -725,7 +724,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 func TestRandomWatchDeliver(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, v, err := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -858,7 +857,7 @@ func TestWatchDispatchBookmarkEvents(t *testing.T) {
 
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, v, err := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
@@ -923,7 +922,7 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, v, err := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
