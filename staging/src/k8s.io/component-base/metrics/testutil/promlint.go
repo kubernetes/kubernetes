@@ -47,11 +47,7 @@ var exceptionMetrics = []string{
 	"authentication_attempts",
 	"get_token_count",
 	"get_token_fail_count",
-	"kubernetes_build_info",
 	"node_collector_evictions_number",
-
-	// kube-proxy
-	"kubernetes_build_info",
 
 	// kubelet-resource-v1alpha1
 	"container_cpu_usage_seconds_total",
