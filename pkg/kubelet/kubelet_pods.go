@@ -149,13 +149,20 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 
 		relabelVolume := false
-		// If the volume supports SELinux and it has not been
-		// relabeled already and it is not a read-only volume,
-		// relabel it and mark it as labeled
-		if vol.Mounter.GetAttributes().Managed && vol.Mounter.GetAttributes().SupportsSELinux && !vol.SELinuxLabeled {
+		attributes := vol.Mounter.GetAttributes()
+		switch {
+		case utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) && attributes.Managed && attributes.SupportsSELinuxRelabelPolicy:
+			// If the volume was mounted with the correct label, no relabel is necessary.
+			vol.SELinuxLabeled = true
+			relabelVolume = false
+		case attributes.Managed && attributes.SupportsSELinux && !vol.SELinuxLabeled:
+			// If the volume supports SELinux and it has not been
+			// relabeled already and it is not a read-only volume,
+			// relabel it and mark it as labeled.
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
+
 		hostPath, err := volumeutil.GetPath(vol.Mounter)
 		if err != nil {
 			return nil, cleanupAction, err

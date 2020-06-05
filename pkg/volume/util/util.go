@@ -26,7 +26,10 @@ import (
 	"runtime"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/selinux"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
@@ -701,4 +704,25 @@ func IsMultiAttachAllowed(volumeSpec *volume.Spec) bool {
 
 	// we don't know if it's supported or not and let the attacher fail later in cases it's not supported
 	return true
+}
+
+// AddSELinuxMountOptions adds SELinux mount options to given list
+func AddSELinuxMountOptions(opts []string, selinuxOptions *v1.SELinuxOptions, policy *v1.PodSELinuxRelabelPolicy) ([]string, error) {
+	if !selinux.SELinuxEnabled() {
+		return opts, nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxRelabelPolicy) {
+		return opts, nil
+	}
+	if policy == nil || *policy == v1.SELinuxRelabelAlwaysRelabel {
+		return opts, nil
+	}
+
+	label, err := selinux.GetSELinuxLabelString(selinuxOptions.User, selinuxOptions.Role, selinuxOptions.Type, selinuxOptions.Level)
+	if err != nil {
+		return opts, err
+	}
+	opt := fmt.Sprintf("context=%s", label)
+	return JoinMountOptions([]string{opt}, opts), nil
 }

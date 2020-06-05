@@ -349,9 +349,10 @@ var _ volume.Mounter = &awsElasticBlockStoreMounter{}
 
 func (b *awsElasticBlockStoreMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: true,
+		ReadOnly:                     b.readOnly,
+		Managed:                      !b.readOnly,
+		SupportsSELinux:              true,
+		SupportsSELinuxRelabelPolicy: true,
 	}
 }
 
@@ -399,6 +400,10 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, mounterArgs volume.Mou
 		options = append(options, "ro")
 	}
 	mountOptions := util.JoinMountOptions(options, b.mountOptions)
+	mountOptions, err = util.AddSELinuxMountOptions(mountOptions, mounterArgs.SELinuxOptions, mounterArgs.SELinuxRelabelPolicy)
+	if err != nil {
+		return err
+	}
 	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)

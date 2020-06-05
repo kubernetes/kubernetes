@@ -543,6 +543,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		var fsGroup *int64
 		var fsGroupChangePolicy *v1.PodFSGroupChangePolicy
+		var seLinuxOptions *v1.SELinuxOptions
+		var seLinuxRelabelPolicy *v1.PodSELinuxRelabelPolicy
 		if podSc := volumeToMount.Pod.Spec.SecurityContext; podSc != nil {
 			if podSc.FSGroup != nil {
 				fsGroup = podSc.FSGroup
@@ -550,6 +552,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			if podSc.FSGroupChangePolicy != nil {
 				fsGroupChangePolicy = podSc.FSGroupChangePolicy
 			}
+			seLinuxOptions = podSc.SELinuxOptions
+			seLinuxRelabelPolicy = podSc.SELinuxRelabelPolicy
 		}
 
 		devicePath := volumeToMount.DevicePath
@@ -581,13 +585,16 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumeToMount.GenerateError("MountVolume.GetDeviceMountPath failed", err)
 			}
 
+			deviceMountOpts := volume.DeviceMountOptions{
+				SELinuxOptions:       seLinuxOptions,
+				SELinuxRelabelPolicy: seLinuxRelabelPolicy,
+			}
 			// Mount device to global mount path
 			err = volumeDeviceMounter.MountDevice(
 				volumeToMount.VolumeSpec,
 				devicePath,
 				deviceMountPath,
-				// TODO(jsafrane): fill from pod
-				volume.DeviceMountOptions{})
+				deviceMountOpts)
 			if err != nil {
 				og.checkForFailedMount(volumeToMount, err)
 				og.markDeviceErrorState(volumeToMount, devicePath, deviceMountPath, err, actualStateOfWorld)
@@ -629,10 +636,12 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		// Execute mount
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
-			FsUser:              ioutil.FsUserFrom(volumeToMount.Pod),
-			FsGroup:             fsGroup,
-			DesiredSize:         volumeToMount.DesiredSizeLimit,
-			FSGroupChangePolicy: fsGroupChangePolicy,
+			FsUser:               ioutil.FsUserFrom(volumeToMount.Pod),
+			FsGroup:              fsGroup,
+			DesiredSize:          volumeToMount.DesiredSizeLimit,
+			FSGroupChangePolicy:  fsGroupChangePolicy,
+			SELinuxOptions:       seLinuxOptions,
+			SELinuxRelabelPolicy: seLinuxRelabelPolicy,
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{

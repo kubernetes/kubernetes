@@ -96,9 +96,10 @@ type Metrics struct {
 
 // Attributes represents the attributes of this mounter.
 type Attributes struct {
-	ReadOnly        bool
-	Managed         bool
-	SupportsSELinux bool
+	ReadOnly                     bool
+	Managed                      bool
+	SupportsSELinux              bool
+	SupportsSELinuxRelabelPolicy bool
 }
 
 // MounterArgs provides more easily extensible arguments to Mounter
@@ -106,10 +107,12 @@ type MounterArgs struct {
 	// When FsUser is set, the ownership of the volume will be modified to be
 	// owned and writable by FsUser. Otherwise, there is no side effects.
 	// Currently only supported with projected service account tokens.
-	FsUser              *int64
-	FsGroup             *int64
-	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
-	DesiredSize         *resource.Quantity
+	FsUser               *int64
+	FsGroup              *int64
+	FSGroupChangePolicy  *v1.PodFSGroupChangePolicy
+	DesiredSize          *resource.Quantity
+	SELinuxOptions       *v1.SELinuxOptions
+	SELinuxRelabelPolicy *v1.PodSELinuxRelabelPolicy
 }
 
 // Mounter interface provides methods to set up/mount the volume.
