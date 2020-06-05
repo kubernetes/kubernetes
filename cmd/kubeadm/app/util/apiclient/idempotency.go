@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -57,54 +56,29 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 }
 
 // CreateOrMutateConfigMap tries to create the ConfigMap provided as cm. If the resource exists already, the latest version will be fetched from
-// the cluster and mutator callback will be called on it, then an Update of the mutated ConfigMap will be performed. This function is resilient
-// to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
-// taking place)
+// the cluster and mutator callback will be called on it, then an Update of the mutated ConfigMap will be performed.
 func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutator ConfigMapMutator) error {
-	var lastError error
-	err := wait.ExponentialBackoff(wait.Backoff{
-		Steps:    20,
-		Duration: 500 * time.Millisecond,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() (bool, error) {
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
-			lastError = err
-			if apierrors.IsAlreadyExists(err) {
-				lastError = MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
-				return lastError == nil, nil
-			}
-			return false, nil
+	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
 		}
-		return true, nil
-	})
-	if err == nil {
-		return nil
+		return err
 	}
-	return lastError
+	return nil
 }
 
 // MutateConfigMap takes a ConfigMap Object Meta (namespace and name), retrieves the resource from the server and tries to mutate it
-// by calling to the mutator callback, then an Update of the mutated ConfigMap will be performed. This function is resilient
-// to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
-// taking place).
+// by calling to the mutator callback, then an Update of the mutated ConfigMap will be performed.
 func MutateConfigMap(client clientset.Interface, meta metav1.ObjectMeta, mutator ConfigMapMutator) error {
-	return clientsetretry.RetryOnConflict(wait.Backoff{
-		Steps:    20,
-		Duration: 500 * time.Millisecond,
-		Factor:   1.0,
-		Jitter:   0.1,
-	}, func() error {
-		configMap, err := client.CoreV1().ConfigMaps(meta.Namespace).Get(context.TODO(), meta.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if err = mutator(configMap); err != nil {
-			return errors.Wrap(err, "unable to mutate ConfigMap")
-		}
-		_, err = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	configMap, err := client.CoreV1().ConfigMaps(meta.Namespace).Get(context.TODO(), meta.Name, metav1.GetOptions{})
+	if err != nil {
 		return err
-	})
+	}
+	if err = mutator(configMap); err != nil {
+		return errors.Wrap(err, "unable to mutate ConfigMap")
+	}
+	_, err = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	return err
 }
 
 // CreateOrRetainConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.

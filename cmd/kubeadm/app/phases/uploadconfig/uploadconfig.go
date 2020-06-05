@@ -45,21 +45,27 @@ func ResetClusterStatusForNode(nodeName string, client clientset.Interface) erro
 	fmt.Printf("[reset] Removing info for node %q from the ConfigMap %q in the %q Namespace\n",
 		nodeName, kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
-	return apiclient.MutateConfigMap(client, metav1.ObjectMeta{
-		Name:      kubeadmconstants.KubeadmConfigConfigMap,
-		Namespace: metav1.NamespaceSystem,
-	}, func(cm *v1.ConfigMap) error {
-		return mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
-			// Handle a nil APIEndpoints map. Should only happen if someone manually
-			// interacted with the ConfigMap.
-			if cs.APIEndpoints == nil {
-				return errors.Errorf("APIEndpoints from ConfigMap %q in the %q Namespace is nil",
-					kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			}
-			klog.V(2).Infof("Removing APIEndpoint for Node %q", nodeName)
-			delete(cs.APIEndpoints, nodeName)
-			return nil
+	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout, func() (bool, error) {
+		err := apiclient.MutateConfigMap(client, metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
+			Namespace: metav1.NamespaceSystem,
+		}, func(cm *v1.ConfigMap) error {
+			return mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
+				// Handle a nil APIEndpoints map. Should only happen if someone manually
+				// interacted with the ConfigMap.
+				if cs.APIEndpoints == nil {
+					return errors.Errorf("APIEndpoints from ConfigMap %q in the %q Namespace is nil",
+						kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+				}
+				klog.V(2).Infof("Removing APIEndpoint for Node %q", nodeName)
+				delete(cs.APIEndpoints, nodeName)
+				return nil
+			})
 		})
+		if err != nil {
+			return false, err
+		}
+		return true, nil
 	})
 }
 
@@ -92,7 +98,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	}
 
 	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout, func() (bool, error) {
-		err = apiclient.CreateOrMutateConfigMap(client, &v1.ConfigMap{
+		err := apiclient.CreateOrMutateConfigMap(client, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      kubeadmconstants.KubeadmConfigConfigMap,
 				Namespace: metav1.NamespaceSystem,
@@ -128,7 +134,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 
 	// Ensure that the NodesKubeadmConfigClusterRoleName exists
 	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout, func() (bool, error) {
-		err = apiclient.CreateOrUpdateRole(client, &rbac.Role{
+		err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      NodesKubeadmConfigClusterRoleName,
 				Namespace: metav1.NamespaceSystem,
