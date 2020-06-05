@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -636,5 +637,135 @@ func TestHashContainer(t *testing.T) {
 
 		hashVal := HashContainer(&container)
 		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
+	}
+}
+
+func TestHashContainerWithResources(t *testing.T) {
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	mem100M := resource.MustParse("100Mi")
+	mem200M := resource.MustParse("200Mi")
+	cpuPolicyNoRestart := v1.ResizePolicy{ResourceName: v1.ResourceCPU, Policy: v1.NoRestart}
+	memPolicyNoRestart := v1.ResizePolicy{ResourceName: v1.ResourceMemory, Policy: v1.NoRestart}
+	cpuPolicyRestart := v1.ResizePolicy{ResourceName: v1.ResourceCPU, Policy: v1.RestartContainer}
+	memPolicyRestart := v1.ResizePolicy{ResourceName: v1.ResourceMemory, Policy: v1.RestartContainer}
+
+	tests := []struct {
+		container    *v1.Container
+		scalingFg    bool
+		expectedHash uint64
+	}{
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyRestart, memPolicyNoRestart},
+			},
+			false,
+			0xcc86c8c,
+		},
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyNoRestart, memPolicyRestart},
+			},
+			false,
+			0x812c49fc,
+		},
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyRestart, memPolicyNoRestart},
+			},
+			false,
+			0x155dd25c,
+		},
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyNoRestart, memPolicyRestart},
+			},
+			false,
+			0x6a1b424c,
+		},
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyRestart, memPolicyNoRestart},
+			},
+			true,
+			0x5a457c02,
+		},
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyNoRestart, memPolicyRestart},
+			},
+			true,
+			0xe9209ca2,
+		},
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyRestart, memPolicyNoRestart},
+			},
+			true,
+			0x5a457c02,
+		},
+		{
+			&v1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+				},
+				ResizePolicy: []v1.ResizePolicy{cpuPolicyNoRestart, memPolicyRestart},
+			},
+			true,
+			0xe9209ca2,
+		},
+	}
+
+	for i, tt := range tests {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.scalingFg)
+		containerCopy := tt.container.DeepCopy()
+		hash := HashContainer(tt.container)
+		assert.Equal(t, tt.expectedHash, hash, "[%d]", i)
+		assert.Equal(t, containerCopy, tt.container, "[%d]", i)
 	}
 }

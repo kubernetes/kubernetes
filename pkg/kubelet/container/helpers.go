@@ -28,9 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -102,6 +104,16 @@ func HashContainer(container *v1.Container) uint64 {
 	hash := fnv.New32a()
 	// Omit nil or empty field when calculating hash value
 	// Please see https://github.com/kubernetes/kubernetes/issues/53644
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		cResources := container.Resources
+		cResourcesAllocated := container.ResourcesAllocated
+		container.Resources = v1.ResourceRequirements{}
+		container.ResourcesAllocated = nil
+		defer func() {
+			container.Resources = cResources
+			container.ResourcesAllocated = cResourcesAllocated
+		}()
+	}
 	containerJSON, _ := json.Marshal(container)
 	hashutil.DeepHashObject(hash, containerJSON)
 	return uint64(hash.Sum32())

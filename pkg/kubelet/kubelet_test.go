@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	coretesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -1845,6 +1846,134 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
+}
+
+func TestHandlePodResourcesResize(t *testing.T) {
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	cpu1500m := resource.MustParse("1500m")
+	cpu2500m := resource.MustParse("2500m")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+	mem1500M := resource.MustParse("1500Mi")
+	mem2500M := resource.MustParse("2500Mi")
+
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			}}},
+	}
+	kubelet.nodeLister = testNodeLister{nodes: nodes}
+
+	testPod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "1111",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+			},
+		},
+	}
+	testPod2 := testPod1.DeepCopy()
+	testPod2.UID = "2222"
+	testPod2.Name = "pod2"
+	testPod2.Namespace = "ns2"
+	testPod3 := testPod1.DeepCopy()
+	testPod3.UID = "3333"
+	testPod3.Name = "pod3"
+	testPod3.Namespace = "ns2"
+
+	testKubelet.fakeKubeClient = fake.NewSimpleClientset(testPod1, testPod2, testPod3)
+	kubelet.kubeClient = testKubelet.fakeKubeClient
+	kubelet.podManager.AddPod(testPod1)
+	kubelet.podManager.AddPod(testPod2)
+	kubelet.podManager.AddPod(testPod3)
+	defer testKubelet.fakeKubeClient.ClearActions()
+	defer kubelet.podManager.DeletePod(testPod3)
+	defer kubelet.podManager.DeletePod(testPod2)
+	defer kubelet.podManager.DeletePod(testPod1)
+
+	tests := []struct {
+		pod                 *v1.Pod
+		newRequests         v1.ResourceList
+		expectPatch         bool
+		expectedAllocations v1.ResourceList
+	}{
+		{
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectPatch:         true,
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+		},
+		{
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
+			expectPatch:         true,
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
+		},
+		{
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
+			expectPatch:         true,
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
+		},
+		{
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu2500m, v1.ResourceMemory: mem2500M},
+			expectPatch:         false,
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+		},
+		{
+			pod:                 testPod2,
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2500M},
+			expectPatch:         false,
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+		},
+		//TODO: more tests
+	}
+
+	for i, tt := range tests {
+		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
+		tt.pod.Spec.Containers[0].ResourcesAllocated = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
+		kubelet.handlePodResourcesResize(tt.pod)
+		actions := testKubelet.fakeKubeClient.Actions()
+		if tt.expectPatch {
+			if len(actions) != 1 {
+				t.Fatalf("[test %d]: unexpected action count %d, expected 1", i, len(actions))
+			}
+			a := actions[0]
+			if a.GetVerb() != "patch" || a.GetResource().Resource != "pods" || a.GetNamespace() != tt.pod.Namespace {
+				t.Fatalf("[test %d]:unexpected action, got: %+v", i, a)
+			}
+			pa := a.(coretesting.PatchAction)
+			if pa.GetName() != tt.pod.Name {
+				t.Fatalf("[test %d]: unexpected action, got: pod %s, patch '%s', expecting pod %s.", i, pa.GetName(), string(pa.GetPatch()), tt.pod.Name)
+			}
+			assert.Equal(t, tt.expectedAllocations, tt.pod.Spec.Containers[0].ResourcesAllocated, "test %d", i)
+		} else {
+			if len(actions) > 0 {
+				t.Fatalf("[test %d]: unexpected action count %d, expected 0", i, len(actions))
+			}
+		}
+		testKubelet.fakeKubeClient.ClearActions()
+	}
 }
 
 // testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.

@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"math"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -629,7 +631,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.CPUCFSQuotaPeriod,
 		kubeDeps.RemoteRuntimeService,
 		kubeDeps.RemoteImageService,
-		kubeDeps.ContainerManager.InternalContainerLifecycle(),
+		kubeDeps.ContainerManager,
 		kubeDeps.dockerLegacyService,
 		klet.runtimeClassManager,
 	)
@@ -1159,6 +1161,9 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// Mutex to serialize new pod admission and existing pod resizing
+	podResizeMutex sync.Mutex
 }
 
 // setupDataDirs creates:
@@ -1618,6 +1623,12 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if !kl.podIsTerminated(pod) {
+			kl.handlePodResourcesResize(pod)
+		}
+	}
+
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
@@ -1635,6 +1646,59 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	return nil
+}
+
+func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string) {
+	var otherActivePods []*v1.Pod
+	kl.podResizeMutex.Lock()
+	defer kl.podResizeMutex.Unlock()
+	activePods := kl.GetActivePods()
+	for _, p := range activePods {
+		if p.UID != pod.UID {
+			otherActivePods = append(otherActivePods, p)
+		}
+	}
+	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, pod); !ok {
+		// Log reason and return. Let the next sync iteration retry the resize
+		klog.V(2).Infof("Pod '%s' resize cannot be accommodated. Reason: '%s' Message: '%s'", pod.Name, failReason, failMessage)
+		return false, ""
+	}
+
+	var containersPatchData string
+	for _, container := range pod.Spec.Containers {
+		var resourcesPatchData string
+		for rName, rQuantity := range container.Resources.Requests {
+			container.ResourcesAllocated[rName] = rQuantity
+			resourcesPatchData += fmt.Sprintf(`"%s":"%s",`, rName, rQuantity.String())
+		}
+		resourcesPatchData = strings.TrimRight(resourcesPatchData, ",")
+		containersPatchData += fmt.Sprintf(`{"name":"%s","resourcesAllocated":{%s}},`, container.Name, resourcesPatchData)
+	}
+	containersPatchData = strings.TrimRight(containersPatchData, ",")
+	patchData := fmt.Sprintf(`{"spec":{"containers":[%s]}}`, containersPatchData)
+	return true, patchData
+}
+
+func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
+	podResized := false
+	for _, container := range pod.Spec.Containers {
+		if len(diff.ObjectDiff(container.ResourcesAllocated, container.Resources.Requests)) > 0 {
+			podResized = true
+			break
+		}
+	}
+	if !podResized {
+		return
+	}
+
+	if fit, patchData := kl.canResizePod(pod); fit {
+		// TODO: go routine for Patch
+		_, patchError := kl.kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(patchData), metav1.PatchOptions{})
+		if patchError != nil {
+			klog.Errorf("Failed to patch ResourcesAllocated values for pod %s: %+v\n", pod.Name, patchError)
+		}
+	}
+	return
 }
 
 // Get pods which should be resynchronized. Currently, the following pod should be resynchronized:
@@ -1981,6 +2045,8 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	kl.podResizeMutex.Lock()
+	defer kl.podResizeMutex.Unlock()
 	for _, pod := range pods {
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
@@ -2002,10 +2068,26 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			// pods that are alive.
 			activePods := kl.filterOutTerminatedPods(existingPods)
 
-			// Check if we can admit the pod; if not, reject it.
-			if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
-				kl.rejectPod(pod, reason, message)
-				continue
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				// To handle kubelet restarts, test pod admissibility with ResourcesAllocated values (cpu & memory)
+				podCopy := pod.DeepCopy()
+				for _, c := range podCopy.Spec.Containers {
+					if c.Resources.Requests != nil {
+						c.Resources.Requests[v1.ResourceCPU] = c.ResourcesAllocated[v1.ResourceCPU]
+						c.Resources.Requests[v1.ResourceMemory] = c.ResourcesAllocated[v1.ResourceMemory]
+					}
+				}
+				// Check if we can admit the pod; if not, reject it.
+				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
+					kl.rejectPod(pod, reason, message)
+					continue
+				}
+			} else {
+				// Check if we can admit the pod; if not, reject it.
+				if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+					kl.rejectPod(pod, reason, message)
+					continue
+				}
 			}
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
