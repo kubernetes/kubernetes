@@ -16,7 +16,6 @@ filegroup(
         "abac-authz-policy.jsonl",
         "cluster-autoscaler.manifest",
         "etcd.manifest",
-        "etcd-empty-dir-cleanup.yaml",
         "glbc.manifest",
         "konnectivity-server.yaml",
         "kube-addon-manager.yaml",
