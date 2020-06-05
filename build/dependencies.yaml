@@ -50,12 +50,8 @@ dependencies:
       match: etcd_docker_tag|etcd_version
     - path: build/workspace.bzl
       match: ETCD_VERSION
-    - path: cluster/gce/manifests/etcd-empty-dir-cleanup.yaml
-      match: k8s.gcr.io/etcd-empty-dir-cleanup
     - path: cluster/gce/upgrade-aliases.sh
       match: ETCD_IMAGE|ETCD_VERSION
-    - path: cluster/images/etcd-empty-dir-cleanup/Makefile
-      match: ETCD_VERSION|TAG
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
     - path: cluster/images/etcd/migrate-if-needed.sh
@@ -100,8 +96,6 @@ dependencies:
       match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
-    - path: cluster/images/etcd-empty-dir-cleanup/Dockerfile
-      match: us\.gcr\.io\/k8s-artifacts-prod\/build-image\/debian-base:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-iptables"
     version: 12.1.0
