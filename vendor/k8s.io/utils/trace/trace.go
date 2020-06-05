@@ -44,6 +44,25 @@ func writeFields(b *bytes.Buffer, l []Field) {
 	}
 }
 
+func logTraceArgs(traceNum int32, trace *Trace, totalTime time.Duration) []interface{} {
+	result := make([]interface{}, 0, 2*len(trace.fields)+8)
+	result = append(result, "traceNum", traceNum, "traceName", trace.name)
+	for _, field := range trace.fields {
+		result = append(result, field.Key, field.Value)
+	}
+	result = append(result, "startTime", trace.startTime, "totalTime", totalTime)
+	return result
+}
+
+func logStepArgs(traceNum int32, step traceStep, stepTime time.Duration, stepDuration time.Duration) []interface{} {
+	result := make([]interface{}, 0, 2*len(step.fields)+8)
+	result = append(result, "traceNum", traceNum, "stepTime", stepTime, "stepDuration", stepDuration, "stepMsg", step.msg)
+	for _, field := range step.fields {
+		result = append(result, field.Key, field.Value)
+	}
+	return result
+}
+
 type traceStep struct {
 	stepTime time.Time
 	msg      string
@@ -83,30 +102,22 @@ func (t *Trace) Log() {
 }
 
 func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
-	var buffer bytes.Buffer
 	tracenum := rand.Int31()
 	endTime := time.Now()
 
 	totalTime := endTime.Sub(t.startTime)
-	if len(t.fields) > 0 {
-		writeFields(&buffer, t.fields)
-	}
-	klog.InfoS("Trace", "tracenum", tracenum, "name", t.name, "keyvalues", buffer.String(), "starttime", t.startTime, "totaltime", totalTime)
+	klog.InfoS("Trace start", logTraceArgs(tracenum, t, totalTime)...)
 	lastStepTime := t.startTime
 	for _, step := range t.steps {
 		stepDuration := step.stepTime.Sub(lastStepTime)
 		if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
-			buffer.Reset()
-			if len(step.fields) > 0 {
-				writeFields(&buffer, step.fields)
-			}
-			klog.InfoS("Trace", "tracenum", tracenum, "steptime", step.stepTime.Sub(t.startTime), "stepduration", stepDuration, "stepmsg", step.msg, "keyvalues", buffer.String())
+			klog.InfoS("Trace step", logStepArgs(tracenum, step, step.stepTime.Sub(t.startTime), stepDuration)...)
 		}
 		lastStepTime = step.stepTime
 	}
 	stepDuration := endTime.Sub(lastStepTime)
 	if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
-		klog.InfoS("Trace end", "tracenum", tracenum, "endtime", endTime.Sub(t.startTime), "stepduration", stepDuration)
+		klog.InfoS("Trace end", "traceNum", tracenum, "endTime", endTime.Sub(t.startTime), "stepDuration", stepDuration)
 	}
 
 }
