@@ -46,6 +46,29 @@ func TestIsKnownSystemPriorityClass(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "not a known system priority class",
+			pc: &v1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "unknown",
+				},
+				Value:       scheduling.SystemCriticalPriority,
+				Description: "Used for system critical pods that must run in the cluster, but can be moved to another node if necessary.",
+			},
+			expected: false,
+		},
+		{
+			name: "global default changed",
+			pc: &v1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: scheduling.SystemClusterCritical,
+				},
+				GlobalDefault: true,
+				Value:         scheduling.SystemCriticalPriority,
+				Description:   "Used for system critical pods that must run in the cluster, but can be moved to another node if necessary.",
+			},
+			expected: false,
+		},
 	}
 
 	for _, test := range tests {
