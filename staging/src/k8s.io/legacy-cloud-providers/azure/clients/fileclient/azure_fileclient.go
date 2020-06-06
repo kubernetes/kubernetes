@@ -78,7 +78,7 @@ func (c *Client) DeleteFileShare(resourceGroupName, accountName, name string) er
 func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, sizeGiB int) error {
 	quota := int32(sizeGiB)
 
-	share, err := c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name)
+	share, err := c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name, storage.Stats)
 	if err != nil {
 		return fmt.Errorf("failed to get file share(%s), : %v", name, err)
 	}
@@ -102,5 +102,5 @@ func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, si
 
 // GetFileShare gets a file share
 func (c *Client) GetFileShare(resourceGroupName, accountName, name string) (storage.FileShare, error) {
-	return c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name)
+	return c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name, storage.Stats)
 }
