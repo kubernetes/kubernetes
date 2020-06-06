@@ -1070,7 +1070,7 @@ func splitSubresource(path string) (string, string, error) {
 
 // GetArticleForNoun returns the article needed for the given noun.
 func GetArticleForNoun(noun string, padding string) string {
-	if noun[len(noun)-2:] != "ss" && noun[len(noun)-1:] == "s" {
+	if !strings.HasSuffix(noun, "ss") && strings.HasSuffix(noun, "s") {
 		// Plurals don't have an article.
 		// Don't catch words like class
 		return fmt.Sprintf("%v", padding)
