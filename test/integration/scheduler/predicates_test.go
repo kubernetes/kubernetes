@@ -67,14 +67,15 @@ func TestInterPodAffinity(t *testing.T) {
 	podLabel2 := map[string]string{"security": "S1"}
 
 	tests := []struct {
+		name      string
 		pod       *v1.Pod
 		pods      []*v1.Pod
 		node      *v1.Node
 		fits      bool
 		errorType string
-		test      string
 	}{
 		{
+			name: "validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -104,9 +105,9 @@ func TestInterPodAffinity(t *testing.T) {
 			node:      nodes[0],
 			fits:      false,
 			errorType: "invalidPod",
-			test:      "validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid",
 		},
 		{
+			name: "validates that Inter-pod-Affinity is respected if not matching",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -136,9 +137,9 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node: nodes[0],
 			fits: false,
-			test: "validates that Inter-pod-Affinity is respected if not matching",
 		},
 		{
+			name: "validates that InterPodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using In operator that matches the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -179,9 +180,9 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node: nodes[0],
 			fits: true,
-			test: "validates that InterPodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using In operator that matches the existing pod",
 		},
 		{
+			name: "validates that InterPodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using not in operator in labelSelector that matches the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -217,9 +218,9 @@ func TestInterPodAffinity(t *testing.T) {
 					Labels: podLabel}}},
 			node: nodes[0],
 			fits: true,
-			test: "validates that InterPodAffinity is respected if matching. requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using not in operator in labelSelector that matches the existing pod",
 		},
 		{
+			name: "validates that inter-pod-affinity is respected when pods have different Namespaces",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -256,9 +257,9 @@ func TestInterPodAffinity(t *testing.T) {
 					Labels: podLabel, Namespace: "ns"}}},
 			node: nodes[0],
 			fits: false,
-			test: "validates that inter-pod-affinity is respected when pods have different Namespaces",
 		},
 		{
+			name: "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -293,9 +294,9 @@ func TestInterPodAffinity(t *testing.T) {
 				Labels: podLabel}}},
 			node: nodes[0],
 			fits: false,
-			test: "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
 		},
 		{
+			name: "validates that InterPodAffinity is respected if matching with multiple affinities in multiple RequiredDuringSchedulingIgnoredDuringExecution ",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -347,9 +348,9 @@ func TestInterPodAffinity(t *testing.T) {
 				Labels: podLabel}}},
 			node: nodes[0],
 			fits: true,
-			test: "validates that InterPodAffinity is respected if matching with multiple affinities in multiple RequiredDuringSchedulingIgnoredDuringExecution ",
 		},
 		{
+			name: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression items doesn't match.",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
@@ -401,9 +402,9 @@ func TestInterPodAffinity(t *testing.T) {
 				Labels: podLabel}}},
 			node: nodes[0],
 			fits: false,
-			test: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression items doesn't match.",
 		},
 		{
+			name: "validates that InterPod Affinity and AntiAffinity is respected if matching",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -454,9 +455,9 @@ func TestInterPodAffinity(t *testing.T) {
 				Labels: podLabel}}},
 			node: nodes[0],
 			fits: true,
-			test: "validates that InterPod Affinity and AntiAffinity is respected if matching",
 		},
 		{
+			name: "satisfies the PodAffinity and PodAntiAffinity and PodAntiAffinity symmetry with the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -531,9 +532,9 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node: nodes[0],
 			fits: true,
-			test: "satisfies the PodAffinity and PodAntiAffinity and PodAntiAffinity symmetry with the existing pod",
 		},
 		{
+			name: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -584,9 +585,9 @@ func TestInterPodAffinity(t *testing.T) {
 				Labels: podLabel}}},
 			node: nodes[0],
 			fits: false,
-			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
 		},
 		{
+			name: "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -661,9 +662,9 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node: nodes[0],
 			fits: false,
-			test: "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with the existing pod",
 		},
 		{
+			name: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -698,9 +699,9 @@ func TestInterPodAffinity(t *testing.T) {
 				Labels: podLabel}}},
 			node: nodes[0],
 			fits: false,
-			test: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
 		},
 		{
+			name: "Verify that PodAntiAffinity of an existing pod is respected when PodAntiAffinity symmetry is not satisfied with the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -738,9 +739,9 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node: nodes[0],
 			fits: false,
-			test: "Verify that PodAntiAffinity of an existing pod is respected when PodAntiAffinity symmetry is not satisfied with the existing pod",
 		},
 		{
+			name: "Verify that PodAntiAffinity from existing pod is respected when pod statisfies PodAntiAffinity symmetry with the existing pod",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fake-name",
@@ -778,9 +779,9 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node: nodes[0],
 			fits: true,
-			test: "Verify that PodAntiAffinity from existing pod is respected when pod statisfies PodAntiAffinity symmetry with the existing pod",
 		},
 		{
+			name: "nodes[0] and nodes[1] have same topologyKey and label value. nodes[0] has an existing pod that matches the inter pod affinity rule. The new pod can not be scheduled onto either of the two nodes.",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "fake-name2"},
 				Spec: v1.PodSpec{
@@ -812,67 +813,68 @@ func TestInterPodAffinity(t *testing.T) {
 					NodeName:   nodes[0].Name}, ObjectMeta: metav1.ObjectMeta{Name: "fakename", Labels: map[string]string{"foo": "abc"}}},
 			},
 			fits: false,
-			test: "nodes[0] and nodes[1] have same topologyKey and label value. nodes[0] has an existing pod that matches the inter pod affinity rule. The new pod can not be scheduled onto either of the two nodes.",
 		},
 	}
 
 	for _, test := range tests {
-		for _, pod := range test.pods {
-			var nsName string
-			if pod.Namespace != "" {
-				nsName = pod.Namespace
-			} else {
-				nsName = testCtx.NS.Name
+		t.Run(test.name, func(t *testing.T) {
+			for _, pod := range test.pods {
+				var nsName string
+				if pod.Namespace != "" {
+					nsName = pod.Namespace
+				} else {
+					nsName = testCtx.NS.Name
+				}
+				createdPod, err := cs.CoreV1().Pods(nsName).Create(context.TODO(), pod, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Error while creating pod: %v", err)
+				}
+				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+				if err != nil {
+					t.Errorf("Error while creating pod: %v", err)
+				}
 			}
-			createdPod, err := cs.CoreV1().Pods(nsName).Create(context.TODO(), pod, metav1.CreateOptions{})
+			testPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(context.TODO(), test.pod, metav1.CreateOptions{})
 			if err != nil {
-				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
+				if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
+					t.Fatalf("Error while creating pod: %v", err)
+				}
 			}
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
-			if err != nil {
-				t.Errorf("Test Failed: error, %v, while waiting for pod during test, %v", err, test)
-			}
-		}
-		testPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(context.TODO(), test.pod, metav1.CreateOptions{})
-		if err != nil {
-			if !(test.errorType == "invalidPod" && apierrors.IsInvalid(err)) {
-				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
-			}
-		}
 
-		if test.fits {
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
-		} else {
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
-		}
-		if err != nil {
-			t.Errorf("Test Failed: %v, err %v, test.fits %v", test.test, err, test.fits)
-		}
-
-		err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(context.TODO(), test.pod.Name, *metav1.NewDeleteOptions(0))
-		if err != nil {
-			t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
-		}
-		err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodDeleted(cs, testCtx.NS.Name, test.pod.Name))
-		if err != nil {
-			t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
-		}
-		for _, pod := range test.pods {
-			var nsName string
-			if pod.Namespace != "" {
-				nsName = pod.Namespace
+			if test.fits {
+				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, testPod.Namespace, testPod.Name))
 			} else {
-				nsName = testCtx.NS.Name
+				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podUnschedulable(cs, testPod.Namespace, testPod.Name))
 			}
-			err = cs.CoreV1().Pods(nsName).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
-				t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
+				t.Errorf("Error while trying to fit a pod: %v", err)
 			}
-			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodDeleted(cs, nsName, pod.Name))
+
+			err = cs.CoreV1().Pods(testCtx.NS.Name).Delete(context.TODO(), test.pod.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
-				t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
+				t.Errorf("Error while deleting pod: %v", err)
 			}
-		}
+			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodDeleted(cs, testCtx.NS.Name, test.pod.Name))
+			if err != nil {
+				t.Errorf("Error while waiting for pod to get deleted: %v", err)
+			}
+			for _, pod := range test.pods {
+				var nsName string
+				if pod.Namespace != "" {
+					nsName = pod.Namespace
+				} else {
+					nsName = testCtx.NS.Name
+				}
+				err = cs.CoreV1().Pods(nsName).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
+				if err != nil {
+					t.Errorf("Error while deleting pod: %v", err)
+				}
+				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodDeleted(cs, nsName, pod.Name))
+				if err != nil {
+					t.Errorf("Error while waiting for pod to get deleted: %v", err)
+				}
+			}
+		})
 	}
 }
 
@@ -1005,16 +1007,16 @@ func TestEvenPodsSpreadPredicate(t *testing.T) {
 			for _, pod := range tt.existingPods {
 				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 				if err != nil {
-					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
+					t.Fatalf("Error while creating pod during test: %v", err)
 				}
 				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
-					t.Errorf("Test Failed: error while waiting for pod during test: %v", err)
+					t.Errorf("Error while waiting for pod during test: %v", err)
 				}
 			}
 			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(context.TODO(), tt.incomingPod, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsInvalid(err) {
-				t.Fatalf("Test Failed: error while creating pod during test: %v", err)
+				t.Fatalf("Error while creating pod during test: %v", err)
 			}
 
 			if tt.fits {
