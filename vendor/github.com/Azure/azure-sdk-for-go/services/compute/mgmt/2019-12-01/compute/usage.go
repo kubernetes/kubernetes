@@ -92,7 +92,7 @@ func (client UsageClient) ListPreparer(ctx context.Context, location string) (*h
 		"subscriptionId": autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-07-01"
+	const APIVersion = "2019-12-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
