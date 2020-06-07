@@ -480,7 +480,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectNotFound(t, deleteNode2MirrorPod(node1Client))
 	expectNotFound(t, createNode2MirrorPodEviction(node1Client))
 	expectForbidden(t, createNode2(node1Client))
-	expectForbidden(t, updateNode2Status(node1Client))
+	expectNotFound(t, updateNode2Status(node1Client))
 	expectForbidden(t, deleteNode2(node1Client))
 
 	// related object requests from node2 fail
@@ -500,6 +500,8 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, updateNode2Status(node2Client))
 	// self deletion is not allowed
 	expectForbidden(t, deleteNode2(node2Client))
+	// modification of another node's status is not allowed
+	expectForbidden(t, updateNode2Status(node1Client))
 	// clean up node2
 	expectAllowed(t, deleteNode2(superuserClient))
 
