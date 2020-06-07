@@ -696,6 +696,11 @@ spec:
       priorityClassName: "421"
       readinessGates:
       - conditionType: Ɏ嵄箲Ů埞瞔ɏÊ锒e躜ƕ
+      resources:
+        limits:
+          蒿¶篧: "956"
+        requests:
+          ɦ?鮻ȧH僠 &G: "510"
       restartPolicy: ɘɢ鬍熖B芭花ª瘡
       runtimeClassName: "426"
       schedulerName: "416"
@@ -721,7 +726,6 @@ spec:
           runAsUserName: "370"
       serviceAccount: "362"
       serviceAccountName: "361"
-      shareBurstableLimits: false
       shareProcessNamespace: true
       subdomain: "375"
       terminationGracePeriodSeconds: 2666412258966278206
@@ -942,14 +946,14 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: -983106472
+  availableReplicas: 220233254
   conditions:
-  - lastTransitionTime: "2376-03-18T02:40:44Z"
+  - lastTransitionTime: "2511-08-18T11:42:44Z"
     message: "435"
     reason: "434"
-    status: 站畦f黹ʩ鹸ɷLȋ
-    type: ×軓鼐嵱宯ÙQ阉(闒ƈƳ萎Ŋ
-  fullyLabeledReplicas: -2099726885
-  observedGeneration: 4693783954739913971
-  readyReplicas: -928976522
-  replicas: 1893057016
+    status: pg稠氦ŅsƄƜk菪隃尳芛
+    type: <eÙ蝌铀íÅė 宣a(炛帵(
+  fullyLabeledReplicas: 1109599076
+  observedGeneration: -374845317106540673
+  readyReplicas: 523183979
+  replicas: 714174700

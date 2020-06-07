@@ -30,12 +30,12 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 696654600
-  progressDeadlineSeconds: -1450995995
+  minReadySeconds: 1589114945
+  progressDeadlineSeconds: 571778293
   replicas: 896585016
-  revisionHistoryLimit: 407742062
+  revisionHistoryLimit: 819687796
   rollbackTo:
-    revision: -455484136992029462
+    revision: 5766870532913544769
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -46,7 +46,7 @@ spec:
     rollingUpdate:
       maxSurge: 3
       maxUnavailable: 2
-    type: ơ'禧ǵŊ)TiD¢ƿ媴h5ƅȸȓɻ
+    type: 牿咸Ǻ潑鶋洅啶'ƈoI
   template:
     metadata:
       annotations:
@@ -701,6 +701,11 @@ spec:
       priorityClassName: "413"
       readinessGates:
       - conditionType: 梑ʀŖ鱓;鹡鑓侅闍ŏŃŋŏ}ŀ姳
+      resources:
+        limits:
+          餍4Y鳲Jɡj瓇ɽ丿YƄZZ塖bʘL: "190"
+        requests:
+          "N": "805"
       restartPolicy: T[
       runtimeClassName: "418"
       schedulerName: "408"
@@ -726,7 +731,6 @@ spec:
           runAsUserName: "362"
       serviceAccount: "354"
       serviceAccountName: "353"
-      shareBurstableLimits: false
       shareProcessNamespace: false
       subdomain: "367"
       terminationGracePeriodSeconds: -2738603156841903595
@@ -948,17 +952,17 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: 294718341
-  collisionCount: -2071091268
+  availableReplicas: -198274145
+  collisionCount: 817401849
   conditions:
-  - lastTransitionTime: "2097-04-15T07:29:40Z"
-    lastUpdateTime: "2042-08-25T05:10:04Z"
+  - lastTransitionTime: "2593-10-13T21:35:07Z"
+    lastUpdateTime: "2325-08-21T03:16:07Z"
     message: "427"
     reason: "426"
-    status: ""
-    type: 昞财Î嘝zʄ!ć惍Bi攵&ý"ʀ
-  observedGeneration: 3883700826410970519
-  readyReplicas: -729742317
-  replicas: -449319810
-  unavailableReplicas: 867742020
-  updatedReplicas: 2063260600
+    status: T蘈ý筞X銲tHǽ÷閂抰^窄
+    type: '"ʀ废査Z綶ĀRġ磸蛕ʟ?ȊJ赟'
+  observedGeneration: 3379135651172718272
+  readyReplicas: 349829120
+  replicas: -416969112
+  unavailableReplicas: -182172578
+  updatedReplicas: -660104553

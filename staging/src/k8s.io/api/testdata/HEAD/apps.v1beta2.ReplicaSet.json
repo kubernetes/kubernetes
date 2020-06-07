@@ -1379,21 +1379,28 @@
             }
           }
         ],
-        "shareBurstableLimits": false
+        "resources": {
+          "limits": {
+            "蒿¶篧": "956"
+          },
+          "requests": {
+            "ɦ?鮻ȧH僠 \u0026G": "510"
+          }
+        }
       }
     }
   },
   "status": {
-    "replicas": 1893057016,
-    "fullyLabeledReplicas": -2099726885,
-    "readyReplicas": -928976522,
-    "availableReplicas": -983106472,
-    "observedGeneration": 4693783954739913971,
+    "replicas": 714174700,
+    "fullyLabeledReplicas": 1109599076,
+    "readyReplicas": 523183979,
+    "availableReplicas": 220233254,
+    "observedGeneration": -374845317106540673,
     "conditions": [
       {
-        "type": "×軓鼐嵱宯ÙQ阉(闒ƈƳ萎Ŋ",
-        "status": "站畦f黹ʩ鹸ɷLȋ",
-        "lastTransitionTime": "2376-03-18T02:40:44Z",
+        "type": "\u003ceÙ蝌铀íÅė 宣a(炛帵(",
+        "status": "pg稠氦ŅsƄƜk菪隃尳芛",
+        "lastTransitionTime": "2511-08-18T11:42:44Z",
         "reason": "434",
         "message": "435"
       }

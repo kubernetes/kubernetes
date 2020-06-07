@@ -697,6 +697,11 @@ spec:
       priorityClassName: "417"
       readinessGates:
       - conditionType: 沷¾!蘋`翾
+      resources:
+        limits:
+          儉ɩ柀: "219"
+        requests:
+          ŜĂ: "951"
       restartPolicy: 媁荭gw忊
       runtimeClassName: "422"
       schedulerName: "412"
@@ -722,7 +727,6 @@ spec:
           runAsUserName: "366"
       serviceAccount: "358"
       serviceAccountName: "357"
-      shareBurstableLimits: false
       shareProcessNamespace: false
       subdomain: "371"
       terminationGracePeriodSeconds: -4333562938396485230
@@ -940,15 +944,15 @@ spec:
           storagePolicyID: "104"
           storagePolicyName: "103"
           volumePath: "101"
-  ttlSecondsAfterFinished: -95236670
+  ttlSecondsAfterFinished: 210919376
 status:
-  active: -68737405
+  active: 1409661280
   conditions:
-  - lastProbeTime: "2740-10-14T09:28:06Z"
-    lastTransitionTime: "2133-04-18T01:37:37Z"
+  - lastProbeTime: "2903-05-25T18:09:43Z"
+    lastTransitionTime: "2083-09-27T20:25:06Z"
     message: "431"
     reason: "430"
-    status: 试揯遐e4'ď曕椐敛n
-    type: -ÚŜĂwǐ擨^幸$Ż料ȭz
-  failed: 315828133
-  succeeded: -150478704
+    status: 椐
+    type: ^幸$Ż料ȭzV镜籬ƽ(ŝ湥ĺ
+  failed: -68737405
+  succeeded: -503403530

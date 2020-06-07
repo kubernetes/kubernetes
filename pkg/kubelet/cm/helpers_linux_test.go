@@ -55,7 +55,7 @@ func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequir
 func TestResourceConfigForPod(t *testing.T) {
 	defaultQuotaPeriod := uint64(100 * time.Millisecond / time.Microsecond)
 	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)
-
+	podLevelMemoryQuantity := resource.MustParse("300Mi")
 	minShares := uint64(MinShares)
 	burstableShares := MilliCPUToShares(100)
 	memoryQuantity := resource.MustParse("200Mi")
@@ -65,9 +65,12 @@ func TestResourceConfigForPod(t *testing.T) {
 	guaranteedShares := MilliCPUToShares(100)
 	guaranteedQuota := MilliCPUToQuota(100, int64(defaultQuotaPeriod))
 	guaranteedTunedQuota := MilliCPUToQuota(100, int64(tunedQuotaPeriod))
+	guaranteedPodLevelQuota := MilliCPUToQuota(300, int64(defaultQuotaPeriod))
+	guaranteedPodLevelShares := MilliCPUToShares(300)
 	memoryQuantity = resource.MustParse("100Mi")
 	cpuNoLimit := int64(-1)
 	guaranteedMemory := memoryQuantity.Value()
+	podLevelMemoryLimit := podLevelMemoryQuantity.Value()
 	testCases := map[string]struct {
 		pod              *v1.Pod
 		expected         *ResourceConfig
@@ -192,7 +195,25 @@ func TestResourceConfigForPod(t *testing.T) {
 			quotaPeriod:      tunedQuotaPeriod,
 			expected:         &ResourceConfig{CpuShares: &burstablePartialShares},
 		},
-		"burstable-with-shared-limits": {
+		"guaranteed-with-pod-level-limits": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+						},
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+						},
+					},
+					Resources: getResourceRequirements(getResourceList("", ""), getResourceList("300m", "300Mi")),
+				},
+			},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
+			expected:         &ResourceConfig{CpuShares: &guaranteedPodLevelShares, CpuQuota: &guaranteedPodLevelQuota, CpuPeriod: &defaultQuotaPeriod, Memory: &podLevelMemoryLimit},
+		},
+		"burstable-with-pod-level-limits": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -203,12 +224,12 @@ func TestResourceConfigForPod(t *testing.T) {
 							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("", "")),
 						},
 					},
-					ShareBurstableLimits: func() *bool { t := true; return &t }(),
+					Resources: getResourceRequirements(getResourceList("", ""), getResourceList("300m", "300Mi")),
 				},
 			},
 			enforceCPULimits: false,
 			quotaPeriod:      tunedQuotaPeriod,
-			expected:         &ResourceConfig{CpuShares: &burstablePartialShares, CpuQuota: &cpuNoLimit, CpuPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
+			expected:         &ResourceConfig{CpuShares: &guaranteedPodLevelShares, CpuQuota: &cpuNoLimit, CpuPeriod: &tunedQuotaPeriod, Memory: &podLevelMemoryLimit},
 		},
 		"guaranteed": {
 			pod: &v1.Pod{
@@ -273,13 +294,13 @@ func TestResourceConfigForPod(t *testing.T) {
 		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod)
 
 		if !reflect.DeepEqual(actual.CpuPeriod, testCase.expected.CpuPeriod) {
-			t.Errorf("unexpected result, test: %v, cpu period not as expected", testName)
+			t.Errorf("unexpected result, test: %v, cpu period not as expected. Got %d, expected %d", testName, *actual.CpuPeriod, *testCase.expected.CpuPeriod)
 		}
 		if !reflect.DeepEqual(actual.CpuQuota, testCase.expected.CpuQuota) {
-			t.Errorf("unexpected result, test: %v, cpu quota not as expected", testName)
+			t.Errorf("unexpected result, test: %v, cpu quota not as expected.", testName)
 		}
 		if !reflect.DeepEqual(actual.CpuShares, testCase.expected.CpuShares) {
-			t.Errorf("unexpected result, test: %v, cpu shares not as expected", testName)
+			t.Errorf("unexpected result, test: %v, cpu shares not as expected. Got %d, expected %d", testName, *actual.CpuShares, *testCase.expected.CpuShares)
 		}
 		if !reflect.DeepEqual(actual.Memory, testCase.expected.Memory) {
 			t.Errorf("unexpected result, test: %v, memory not as expected", testName)

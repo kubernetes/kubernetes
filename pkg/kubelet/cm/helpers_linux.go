@@ -128,6 +128,9 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 
 	// convert to CFS values
 	cpuShares := MilliCPUToShares(cpuRequests)
+	if !pod.Spec.Resources.Limits.Cpu().IsZero() {
+		cpuShares = MilliCPUToShares(cpuLimits)
+	}
 	cpuQuota := MilliCPUToQuota(cpuLimits, int64(cpuPeriod))
 
 	// track if limits were applied for each resource.
@@ -150,10 +153,6 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 				hugePageLimits[k] = v
 			}
 		}
-	}
-	if pod.Spec.ShareBurstableLimits != nil && *pod.Spec.ShareBurstableLimits {
-		cpuLimitsDeclared = true
-		memoryLimitsDeclared = true
 	}
 
 	// quota is not capped when cfs quota is disabled
@@ -183,6 +182,13 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 	default:
 		shares := uint64(MinShares)
 		result.CpuShares = &shares
+	}
+	if !pod.Spec.Resources.Limits.Cpu().IsZero() {
+		result.CpuQuota = &cpuQuota
+		result.CpuPeriod = &cpuPeriod
+	}
+	if !pod.Spec.Resources.Limits.Memory().IsZero() {
+		result.Memory = &memoryLimits
 	}
 	result.HugePageLimit = hugePageLimits
 	return result

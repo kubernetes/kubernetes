@@ -1362,7 +1362,14 @@
           }
         }
       ],
-      "shareBurstableLimits": true
+      "resources": {
+        "limits": {
+          "稃": "58"
+        },
+        "requests": {
+          "ė[BN柌ë娒汙查o": "884"
+        }
+      }
     }
   }
 }

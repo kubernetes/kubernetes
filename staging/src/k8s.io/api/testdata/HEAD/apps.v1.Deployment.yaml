@@ -30,10 +30,10 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 696654600
-  progressDeadlineSeconds: 902022378
+  minReadySeconds: 1589114945
+  progressDeadlineSeconds: 200982081
   replicas: 896585016
-  revisionHistoryLimit: 407742062
+  revisionHistoryLimit: 819687796
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -44,7 +44,7 @@ spec:
     rollingUpdate:
       maxSurge: 3
       maxUnavailable: 2
-    type: ơ'禧ǵŊ)TiD¢ƿ媴h5ƅȸȓɻ
+    type: 牿咸Ǻ潑鶋洅啶'ƈoI
   template:
     metadata:
       annotations:
@@ -699,6 +699,11 @@ spec:
       priorityClassName: "413"
       readinessGates:
       - conditionType: 梑ʀŖ鱓;鹡鑓侅闍ŏŃŋŏ}ŀ姳
+      resources:
+        limits:
+          餍4Y鳲Jɡj瓇ɽ丿YƄZZ塖bʘL: "190"
+        requests:
+          "N": "805"
       restartPolicy: T[
       runtimeClassName: "418"
       schedulerName: "408"
@@ -724,7 +729,6 @@ spec:
           runAsUserName: "362"
       serviceAccount: "354"
       serviceAccountName: "353"
-      shareBurstableLimits: false
       shareProcessNamespace: false
       subdomain: "367"
       terminationGracePeriodSeconds: -2738603156841903595
@@ -946,17 +950,17 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: -655315199
-  collisionCount: -1914221188
+  availableReplicas: -2111453451
+  collisionCount: -1948074211
   conditions:
-  - lastTransitionTime: "2196-03-13T21:02:11Z"
-    lastUpdateTime: "2631-04-27T22:00:28Z"
+  - lastTransitionTime: "2437-03-08T01:57:58Z"
+    lastUpdateTime: "2066-05-21T04:59:32Z"
     message: "427"
     reason: "426"
-    status: 査Z綶ĀRġ磸
-    type: oIǢ龞瞯å檳ė>c緍k¢茤Ƣǟ½灶
-  observedGeneration: -3992059348490463840
-  readyReplicas: -1512660030
-  replicas: 904244563
-  unavailableReplicas: -918184784
-  updatedReplicas: -1245696932
+    status: l5ɜ
+    type: Ƣǟ½灶du汎mō6µɑ`ȗ<8^翜T
+  observedGeneration: -7221805218736600531
+  readyReplicas: 1371918588
+  replicas: 786766328
+  unavailableReplicas: 1055244418
+  updatedReplicas: -1977467928

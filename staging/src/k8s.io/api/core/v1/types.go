@@ -3055,12 +3055,11 @@ type PodSpec struct {
 	// +listMapKey=topologyKey
 	// +listMapKey=whenUnsatisfiable
 	TopologySpreadConstraints []TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty" patchStrategy:"merge" patchMergeKey:"topologyKey" protobuf:"bytes,33,opt,name=topologySpreadConstraints"`
-	// ShareBurstableLimits sets the pod cgroup to the sum of the resource limits for all of its containers.
-	// This only has an effect in case the pod's QoS level is Burstable. It allows defining resource limits on the pod
-	// level without having to determine the limits on all of the containers in the pod.
-	// If not specified, the default is false.
+	// Compute Resources required by this pod. Only limits are considered on the pod level.
+	// Cannot be updated.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
 	// +optional
-	ShareBurstableLimits *bool `json:"shareBurstableLimits,omitempty" protobuf:"varint,35,opt,name=shareBurstableLimits"`
+	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,35,opt,name=resources"`
 }
 
 type UnsatisfiableConstraintAction string

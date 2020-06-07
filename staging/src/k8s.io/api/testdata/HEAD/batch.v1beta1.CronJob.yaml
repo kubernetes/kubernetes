@@ -31,7 +31,7 @@ metadata:
   uid: "7"
 spec:
   concurrencyPolicy: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
-  failedJobsHistoryLimit: 1092856739
+  failedJobsHistoryLimit: -87275477
   jobTemplate:
     metadata:
       annotations:
@@ -732,6 +732,11 @@ spec:
           priorityClassName: "434"
           readinessGates:
           - conditionType: Ɏ嵄箲Ů埞瞔ɏÊ锒e躜ƕ
+          resources:
+            limits:
+              蒿¶篧: "956"
+            requests:
+              ɦ?鮻ȧH僠 &G: "510"
           restartPolicy: ɘɢ鬍熖B芭花ª瘡
           runtimeClassName: "439"
           schedulerName: "429"
@@ -757,7 +762,6 @@ spec:
               runAsUserName: "383"
           serviceAccount: "375"
           serviceAccountName: "374"
-          shareBurstableLimits: false
           shareProcessNamespace: true
           subdomain: "388"
           terminationGracePeriodSeconds: 2666412258966278206
@@ -977,10 +981,10 @@ spec:
               storagePolicyID: "122"
               storagePolicyName: "121"
               volumePath: "119"
-      ttlSecondsAfterFinished: 1530007970
+      ttlSecondsAfterFinished: -1376495682
   schedule: "19"
   startingDeadlineSeconds: -2555947251840004808
-  successfulJobsHistoryLimit: -928976522
+  successfulJobsHistoryLimit: 523183979
   suspend: true
 status:
   active:
@@ -990,4 +994,4 @@ status:
     name: "449"
     namespace: "448"
     resourceVersion: "451"
-    uid: ?鮻ȧH僠 &G凒罹ń賎Ȍű孖站
+    uid: 孖站畦f黹

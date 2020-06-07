@@ -55,7 +55,8 @@ func maxResourceList(list, new v1.ResourceList) {
 }
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
-// containers of the pod. If PodOverhead feature is enabled, pod overhead is added to the
+// containers of the pod. If pod-level limits are defined, they override the summed
+// resources. If PodOverhead feature is enabled, pod overhead is added to the
 // total container resource requests and to the total container limits which have a
 // non-zero quantity.
 func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
@@ -68,6 +69,13 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	for _, container := range pod.Spec.InitContainers {
 		maxResourceList(reqs, container.Resources.Requests)
 		maxResourceList(limits, container.Resources.Limits)
+	}
+	// Override the calculated limits with pod-level limits if they are defined
+	if !pod.Spec.Resources.Limits.Cpu().IsZero() {
+		limits[v1.ResourceCPU] = pod.Spec.Resources.Limits.Cpu().DeepCopy()
+	}
+	if !pod.Spec.Resources.Limits.Memory().IsZero() {
+		limits[v1.ResourceMemory] = pod.Spec.Resources.Limits.Memory().DeepCopy()
 	}
 
 	// if PodOverhead feature is supported, add overhead for running a pod

@@ -688,6 +688,11 @@ template:
     priorityClassName: "408"
     readinessGates:
     - conditionType: ųŎ群E牬庘颮6(|ǖû
+    resources:
+      limits:
+        稃: "58"
+      requests:
+        ė[BN柌ë娒汙查o: "884"
     restartPolicy: 倗S晒嶗UÐ_ƮA攤/ɸɎ R§耶
     runtimeClassName: "413"
     schedulerName: "403"
@@ -713,7 +718,6 @@ template:
         runAsUserName: "357"
     serviceAccount: "349"
     serviceAccountName: "348"
-    shareBurstableLimits: true
     shareProcessNamespace: false
     subdomain: "362"
     terminationGracePeriodSeconds: -1689173322096612726

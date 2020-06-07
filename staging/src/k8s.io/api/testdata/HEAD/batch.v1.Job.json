@@ -1376,24 +1376,31 @@
             }
           }
         ],
-        "shareBurstableLimits": false
+        "resources": {
+          "limits": {
+            "儉ɩ柀": "219"
+          },
+          "requests": {
+            "ŜĂ": "951"
+          }
+        }
       }
     },
-    "ttlSecondsAfterFinished": -95236670
+    "ttlSecondsAfterFinished": 210919376
   },
   "status": {
     "conditions": [
       {
-        "type": "-ÚŜĂwǐ擨^幸$Ż料ȭz",
-        "status": "试揯遐e4'ď曕椐敛n",
-        "lastProbeTime": "2740-10-14T09:28:06Z",
-        "lastTransitionTime": "2133-04-18T01:37:37Z",
+        "type": "^幸$Ż料ȭzV镜籬ƽ(ŝ湥ĺ",
+        "status": "椐",
+        "lastProbeTime": "2903-05-25T18:09:43Z",
+        "lastTransitionTime": "2083-09-27T20:25:06Z",
         "reason": "430",
         "message": "431"
       }
     ],
-    "active": -68737405,
-    "succeeded": -150478704,
-    "failed": 315828133
+    "active": 1409661280,
+    "succeeded": -503403530,
+    "failed": -68737405
   }
 }

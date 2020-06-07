@@ -1372,37 +1372,44 @@
             }
           }
         ],
-        "shareBurstableLimits": false
+        "resources": {
+          "limits": {
+            "餍4Y鳲Jɡj瓇ɽ丿YƄZZ塖bʘL": "190"
+          },
+          "requests": {
+            "N": "805"
+          }
+        }
       }
     },
     "strategy": {
-      "type": "ơ'禧ǵŊ)TiD¢ƿ媴h5ƅȸȓɻ",
+      "type": "牿咸Ǻ潑鶋洅啶'ƈoI",
       "rollingUpdate": {
         "maxUnavailable": 2,
         "maxSurge": 3
       }
     },
-    "minReadySeconds": 696654600,
-    "revisionHistoryLimit": 407742062,
-    "progressDeadlineSeconds": 902022378
+    "minReadySeconds": 1589114945,
+    "revisionHistoryLimit": 819687796,
+    "progressDeadlineSeconds": 200982081
   },
   "status": {
-    "observedGeneration": -3992059348490463840,
-    "replicas": 904244563,
-    "updatedReplicas": -1245696932,
-    "readyReplicas": -1512660030,
-    "availableReplicas": -655315199,
-    "unavailableReplicas": -918184784,
+    "observedGeneration": -7221805218736600531,
+    "replicas": 786766328,
+    "updatedReplicas": -1977467928,
+    "readyReplicas": 1371918588,
+    "availableReplicas": -2111453451,
+    "unavailableReplicas": 1055244418,
     "conditions": [
       {
-        "type": "oIǢ龞瞯å檳ė\u003ec緍k¢茤Ƣǟ½灶",
-        "status": "査Z綶ĀRġ磸",
-        "lastUpdateTime": "2631-04-27T22:00:28Z",
-        "lastTransitionTime": "2196-03-13T21:02:11Z",
+        "type": "Ƣǟ½灶du汎mō6µɑ`ȗ\u003c8^翜T",
+        "status": "l5ɜ",
+        "lastUpdateTime": "2066-05-21T04:59:32Z",
+        "lastTransitionTime": "2437-03-08T01:57:58Z",
         "reason": "426",
         "message": "427"
       }
     ],
-    "collisionCount": -1914221188
+    "collisionCount": -1948074211
   }
 }

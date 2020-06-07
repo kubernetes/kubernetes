@@ -30,8 +30,8 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: -1521312599
-  revisionHistoryLimit: 687719923
+  minReadySeconds: 129237050
+  revisionHistoryLimit: -1777921334
   selector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0
@@ -700,6 +700,11 @@ spec:
       priorityClassName: "420"
       readinessGates:
       - conditionType: mō6µɑ`ȗ<8^翜
+      resources:
+        limits:
+          (ɹre芖: "229"
+        requests:
+          N钮Ǒ: "676"
       restartPolicy: ɭɪǹ0衷,
       runtimeClassName: "425"
       schedulerName: "415"
@@ -725,7 +730,6 @@ spec:
           runAsUserName: "369"
       serviceAccount: "361"
       serviceAccountName: "360"
-      shareBurstableLimits: true
       shareProcessNamespace: true
       subdomain: "374"
       terminationGracePeriodSeconds: -3039830979334099524
@@ -945,24 +949,23 @@ spec:
           storagePolicyID: "104"
           storagePolicyName: "103"
           volumePath: "101"
-  templateGeneration: -4945204664217632710
+  templateGeneration: 2383197042979853364
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 2
-    type: ))e×鄞閆N钮Ǒ
 status:
-  collisionCount: -1494643176
+  collisionCount: -1928716714
   conditions:
-  - lastTransitionTime: "2770-06-01T22:44:21Z"
+  - lastTransitionTime: "2409-11-29T06:11:30Z"
     message: "434"
     reason: "433"
-    status: 浤ɖ緖焿熣$ɒ割婻漛Ǒ僕ʨƌɦ
-    type: ŧĞöZÕW肤 遞Ȼ棉
-  currentNumberScheduled: -1777921334
-  desiredNumberScheduled: 283054026
-  numberAvailable: -1303432952
-  numberMisscheduled: -2022058870
-  numberReady: -1539366293
-  numberUnavailable: -1708016772
-  observedGeneration: 5773395124214737719
-  updatedNumberScheduled: 1090884237
+    status: ü橚2ț}¹旛坷硂鋡浤ɖ緖焿熣$ɒ割
+    type: ""
+  currentNumberScheduled: -2022058870
+  desiredNumberScheduled: -1539366293
+  numberAvailable: -1708016772
+  numberMisscheduled: 283054026
+  numberReady: -691360969
+  numberUnavailable: 977191736
+  observedGeneration: 6603203423427203725
+  updatedNumberScheduled: -1303432952

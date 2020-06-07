@@ -1372,7 +1372,14 @@
             }
           }
         ],
-        "shareBurstableLimits": false
+        "resources": {
+          "limits": {
+            "餍4Y鳲Jɡj瓇ɽ丿YƄZZ塖bʘL": "190"
+          },
+          "requests": {
+            "N": "805"
+          }
+        }
       }
     },
     "volumeClaimTemplates": [
@@ -1382,11 +1389,11 @@
           "generateName": "427",
           "namespace": "428",
           "selfLink": "429",
-          "uid": "瞯å檳ė\u003ec緍",
-          "resourceVersion": "8774564298362452033",
-          "generation": -4846338476256404591,
+          "uid": "8^翜T蘈ý筞X銲tH",
+          "resourceVersion": "10225226674638494958",
+          "generation": -3943573618670105723,
           "creationTimestamp": null,
-          "deletionGracePeriodSeconds": 6041236524714316269,
+          "deletionGracePeriodSeconds": -1759934669082507400,
           "labels": {
             "431": "432"
           },
@@ -1398,7 +1405,7 @@
               "apiVersion": "435",
               "kind": "436",
               "name": "437",
-              "uid": "ƄZ",
+              "uid": "Î嘝zʄ!ć惍Bi攵\u0026ý",
               "controller": false,
               "blockOwnerDeletion": false
             }
@@ -1410,7 +1417,7 @@
           "managedFields": [
             {
               "manager": "440",
-              "operation": "ʘLD宊獟¡鯩WɓDɏ挭跡Ƅ抄",
+              "operation": "査Z綶ĀRġ磸",
               "apiVersion": "441",
               "fieldsType": "442"
             }
@@ -1418,30 +1425,30 @@
         },
         "spec": {
           "accessModes": [
-            "Ƣǟ½灶du汎mō6µɑ`ȗ\u003c8^翜T"
+            "抰"
           ],
           "selector": {
             "matchLabels": {
-              "d-m._fN._k8__._ep21": "6_A_090ERG2nV.__p_Y-.2__a_dWU_VF"
+              "k407--m-dc---6-q-q0o90--g-09--d5ez1----b69x90/h--m._fN._k8__._ep2P.B._A_090ERG2nV.__p_Y-.2__a_dWU_VF": "11---.-o7.pJ-4-1WV.-__05._LsuH"
             },
             "matchExpressions": [
               {
-                "key": "oq0o90--g-09--d5ez1----b69x98--7g0e6-x5-7-a6434---7i-f-d014/6.T",
+                "key": "8",
                 "operator": "DoesNotExist"
               }
             ]
           },
           "resources": {
             "limits": {
-              "蒸CƅR8ɷ|恫f籽": "139"
+              "籽š莾簏ì淵歔": "449"
             },
             "requests": {
-              "": "380"
+              "_夦Ŕ": "11"
             }
           },
           "volumeName": "449",
           "storageClassName": "450",
-          "volumeMode": "ì淵歔",
+          "volumeMode": "媈",
           "dataSource": {
             "apiGroup": "451",
             "kind": "452",
@@ -1449,19 +1456,19 @@
           }
         },
         "status": {
-          "phase": "d,",
+          "phase": "曰n夬",
           "accessModes": [
-            ";蛡媈U"
+            ":BŐ埑Ô*ɾWȖ韝ƉşʁO^:犾"
           ],
           "capacity": {
-            "n夬Ǉ:BŐ埑Ô*ɾWȖ韝ƉşʁO^:": "847"
+            "纾SȞ+½剎惃ȳTʬ戱PRɄɝ": "129"
           },
           "conditions": [
             {
-              "type": "Ɍ蚊ơ鎊t潑",
-              "status": "惃ȳTʬ戱P",
-              "lastProbeTime": "2237-12-11T16:15:26Z",
-              "lastTransitionTime": "2926-09-20T14:30:14Z",
+              "type": "ɼ橈\"",
+              "status": "Ĵ3Q蠯0ƍ\\溮Ŀ",
+              "lastProbeTime": "2076-10-30T02:30:05Z",
+              "lastTransitionTime": "2136-06-08T15:20:47Z",
               "reason": "454",
               "message": "455"
             }
@@ -1470,29 +1477,29 @@
       }
     ],
     "serviceName": "456",
-    "podManagementPolicy": "冒ƖƦɼ橈\"Ĩ媻ʪǆ澆",
+    "podManagementPolicy": "ǒ",
     "updateStrategy": {
-      "type": "ƍ\\溮Ŀ傜NZ!šZ_",
+      "type": "!šZ_Z喣JȶZy傦ɵǊ\"M!轅諑",
       "rollingUpdate": {
-        "partition": -1774432721
+        "partition": 750444429
       }
     },
-    "revisionHistoryLimit": 51542630
+    "revisionHistoryLimit": -1496313238
   },
   "status": {
-    "observedGeneration": -2780555863272013359,
-    "replicas": -1607291056,
-    "readyReplicas": 1591188280,
-    "currentReplicas": 1562316216,
-    "updatedReplicas": -292741450,
+    "observedGeneration": -7485777298552599101,
+    "replicas": 237606658,
+    "readyReplicas": -1986476721,
+    "currentReplicas": -144697117,
+    "updatedReplicas": -1746367307,
     "currentRevision": "457",
     "updateRevision": "458",
-    "collisionCount": 1615616035,
+    "collisionCount": -1857496730,
     "conditions": [
       {
-        "type": "Ď眊:YĹ爩í鬯濴VǕ癶L浼",
-        "status": "@p$ÖTő净湅oĒ弦}C嚰s9",
-        "lastTransitionTime": "2668-07-22T09:34:16Z",
+        "type": "h嫨炛ʭŞÜ4w}ĶƲ86",
+        "status": "嚰s9咲ǲ讱ȕ齐疅檎ǽ曖sƖTƫ雮",
+        "lastTransitionTime": "2240-11-22T08:35:54Z",
         "reason": "459",
         "message": "460"
       }
