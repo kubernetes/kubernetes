@@ -1316,20 +1316,22 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 //   scenario            the test itself
 //   retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
 func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
-	initResource, err := dc.Resource(resourceType).Namespace(namespace).List(ctx, listOptions)
-	ExpectNoError(err, "Failed to fetch initial resource")
 	listWatcher := &cache.ListWatch{
 		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
 			return dc.Resource(resourceType).Namespace(namespace).Watch(ctx, listOptions)
 		},
 	}
-	resourceWatch, err := watchtools.NewRetryWatcher(initResource.GetResourceVersion(), listWatcher)
-	ExpectNoError(err, "Failed to create a resource watch of %v in namespace %v", resourceType.Resource, namespace)
 
 	// NOTE value of 3 retries seems to make sense
 	retries := 3
 retriesLoop:
 	for try := 1; try <= retries; try++ {
+		initResource, err := dc.Resource(resourceType).Namespace(namespace).List(ctx, listOptions)
+		ExpectNoError(err, "Failed to fetch initial resource")
+
+		resourceWatch, err := watchtools.NewRetryWatcher(initResource.GetResourceVersion(), listWatcher)
+		ExpectNoError(err, "Failed to create a resource watch of %v in namespace %v", resourceType.Resource, namespace)
+
 		// NOTE the test may need access to the events to see what's going on, such as a change in status
 		actualWatchEvents := scenario(resourceWatch)
 		errs := sets.NewString()
@@ -1352,7 +1354,7 @@ retriesLoop:
 			}
 			totalValidWatchEvents++
 		}
-		err := retryCleanup()
+		err = retryCleanup()
 		ExpectNoError(err, "Error occurred when cleaning up resources")
 		if errs.Len() > 0 && try < retries {
 			fmt.Println("invariants violated:\n", strings.Join(errs.List(), "\n - "))
