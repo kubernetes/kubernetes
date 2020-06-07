@@ -132,6 +132,7 @@ var (
 	kubeletConfigurationPathFieldPaths = sets.NewString(
 		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
+		"LockFilePath",
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
 		"ResolverConfig",
@@ -177,6 +178,7 @@ var (
 		"EvictionPressureTransitionPeriod.Duration",
 		"EvictionSoft[*]",
 		"EvictionSoftGracePeriod[*]",
+		"ExitOnLockContention",
 		"FailSwapOn",
 		"FeatureGates[*]",
 		"FileCheckFrequency.Duration",

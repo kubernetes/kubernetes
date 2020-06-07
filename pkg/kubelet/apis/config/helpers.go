@@ -23,6 +23,7 @@ func KubeletConfigurationPathRefs(kc *KubeletConfiguration) []*string {
 	paths := []*string{}
 	paths = append(paths, &kc.StaticPodPath)
 	paths = append(paths, &kc.Authentication.X509.ClientCAFile)
+	paths = append(paths, &kc.LockFilePath)
 	paths = append(paths, &kc.TLSCertFile)
 	paths = append(paths, &kc.TLSPrivateKeyFile)
 	paths = append(paths, &kc.ResolverConfig)

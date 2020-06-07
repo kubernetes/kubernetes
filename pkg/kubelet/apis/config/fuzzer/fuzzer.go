@@ -52,6 +52,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.EventRecordQPS = 5
 			obj.EnableControllerAttachDetach = true
 			obj.EnableDebuggingHandlers = true
+			obj.ExitOnLockContention = true
 			obj.FileCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
 			obj.HealthzBindAddress = "127.0.0.1"
 			obj.HealthzPort = 10248
@@ -60,6 +61,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageGCHighThresholdPercent = 85
 			obj.ImageGCLowThresholdPercent = 80
 			obj.KernelMemcgNotification = false
+			obj.LockFilePath = "/var/lib/kubelet/lock"
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
 			obj.PodPidsLimit = -1

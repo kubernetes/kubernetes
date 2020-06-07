@@ -824,6 +824,23 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	ShutdownGracePeriodCriticalPods metav1.Duration `json:"shutdownGracePeriodCriticalPods,omitempty"`
+	// lockFilePath is the path that kubelet will use to as a lock file.
+	// It uses this file as a lock to synchronize with other kubelet processes
+	// that may be running.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the ability of the Kubelet to interact with other Kubelet instances.
+	// Default: ""
+	// +optional
+	LockFilePath string `json:"lockFilePath,omitempty"`
+	// exitOnLockContention is a flag that signifies to the kubelet that it is running
+	// in "bootstrap" mode. This requires that 'LockFilePath' has been set.
+	// This will cause the kubelet to listen to inotify events on the lock file,
+	// releasing it and exiting when another process tries to open that file.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the ability of the Kubelet to interact with other Kubelet instances.
+	// Default: false
+	// +optional
+	ExitOnLockContention bool `json:"exitOnLockContention,omitempty"`
 }
 
 type KubeletAuthorizationMode string

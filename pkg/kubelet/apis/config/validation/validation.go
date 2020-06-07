@@ -192,6 +192,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 			allErrors = append(allErrors, fmt.Errorf("unable to parse reservedSystemCPUs (--reserved-cpus), error: %v", err))
 		}
 	}
+	if kc.ExitOnLockContention && kc.LockFilePath == "" {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cannot exit on lock contention with no lock file specified"))
+	}
 
 	if err := validateKubeletOSConfiguration(kc); err != nil {
 		allErrors = append(allErrors, err)
