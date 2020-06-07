@@ -353,13 +353,12 @@ type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enable
 func KnownControllers() []string {
 	ret := sets.StringKeySet(NewControllerInitializers(IncludeCloudLoops))
 
-	// add "special" controllers that aren't initialized normally.  These controllers cannot be initialized
-	// using a normal function.  The only known special case is the SA token controller which *must* be started
-	// first to ensure that the SA tokens for future controllers will exist.  Think very carefully before adding
-	// to this list.
-	ret.Insert(
-		saTokenControllerName,
-	)
+	// add "special" controllers that aren't initialized normally. These
+	// controllers cannot be initialized using a normal function. The only
+	// known special case is the SA token controller which *must* be started
+	// first to ensure that the SA tokens for future controllers will exist.
+	// Think very carefully before adding to this list.
+	ret.Insert(saTokenControllerName)
 
 	return ret.List()
 }
