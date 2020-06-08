@@ -44,43 +44,49 @@ func createLogDirs() {
 }
 
 var (
-	pid      = os.Getpid()
-	program  = filepath.Base(os.Args[0])
-	host     = "unknownhost"
-	userName = "unknownuser"
+	pid          = os.Getpid()
+	program      = filepath.Base(os.Args[0])
+	host         = "unknownhost"
+	userName     = "unknownuser"
+	userNameOnce sync.Once
 )
 
 func init() {
-	h, err := os.Hostname()
-	if err == nil {
+	if h, err := os.Hostname(); err == nil {
 		host = shortHostname(h)
 	}
+}
 
-	// On Windows, the Go 'user' package requires netapi32.dll.
-	// This affects Windows Nano Server:
-	//   https://github.com/golang/go/issues/21867
-	// Fallback to using environment variables.
-	if runtime.GOOS == "windows" {
-		u := os.Getenv("USERNAME")
-		if len(u) == 0 {
-			return
-		}
-		// Sanitize the USERNAME since it may contain filepath separators.
-		u = strings.Replace(u, `\`, "_", -1)
+func getUserName() string {
+	userNameOnce.Do(func() {
+		// On Windows, the Go 'user' package requires netapi32.dll.
+		// This affects Windows Nano Server:
+		//   https://github.com/golang/go/issues/21867
+		// Fallback to using environment variables.
+		if runtime.GOOS == "windows" {
+			u := os.Getenv("USERNAME")
+			if len(u) == 0 {
+				return
+			}
+			// Sanitize the USERNAME since it may contain filepath separators.
+			u = strings.Replace(u, `\`, "_", -1)
 
-		// user.Current().Username normally produces something like 'USERDOMAIN\USERNAME'
-		d := os.Getenv("USERDOMAIN")
-		if len(d) != 0 {
-			userName = d + "_" + u
+			// user.Current().Username normally produces something like 'USERDOMAIN\USERNAME'
+			d := os.Getenv("USERDOMAIN")
+			if len(d) != 0 {
+				userName = d + "_" + u
+			} else {
+				userName = u
+			}
 		} else {
-			userName = u
+			current, err := user.Current()
+			if err == nil {
+				userName = current.Username
+			}
 		}
-	} else {
-		current, err := user.Current()
-		if err == nil {
-			userName = current.Username
-		}
-	}
+	})
+
+	return userName
 }
 
 // shortHostname returns its argument, truncating at the first period.
@@ -98,7 +104,7 @@ func logName(tag string, t time.Time) (name, link string) {
 	name = fmt.Sprintf("%s.%s.%s.log.%s.%04d%02d%02d-%02d%02d%02d.%d",
 		program,
 		host,
-		userName,
+		getUserName(),
 		tag,
 		t.Year(),
 		t.Month(),
