@@ -1216,6 +1216,8 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+    - repository: component-base
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/cloud-provider
@@ -1280,6 +1282,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: cloud-provider
+      branch: master
+    - repository: component-base
       branch: master
   - source:
       branch: release-1.15
