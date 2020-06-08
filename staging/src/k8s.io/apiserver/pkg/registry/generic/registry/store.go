@@ -1017,11 +1017,8 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	// DeleteCollectionWorkers (it doesn't make much sense to spawn 16
 	// workers to delete 10 items).
 	workersNumber := e.DeleteCollectionWorkers
-	if workersNumber > len(items) {
-		workersNumber = len(items)
-	}
-	if workersNumber < 1 {
-		workersNumber = 1
+	if((workersNumber < 1) || (workersNumber > len(items)){
+		return nil, err
 	}
 	wg := sync.WaitGroup{}
 	toProcess := make(chan int, 2*workersNumber)
