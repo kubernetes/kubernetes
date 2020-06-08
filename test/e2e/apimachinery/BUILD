@@ -17,6 +17,7 @@ go_library(
         "custom_resource_definition.go",
         "discovery.go",
         "etcd_failure.go",
+        "events.go",
         "framework.go",
         "garbage_collector.go",
         "generated_clientset.go",

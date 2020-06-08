@@ -816,7 +816,7 @@
     new message, the check MUST have the update message. The event is deleted and
     MUST NOT show up when listing all events.
   release: v1.19
-  file: test/e2e/framework/events/events.go
+  file: test/e2e/apimachinery/events.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
     when not orphaning [Conformance]'
