@@ -557,6 +557,18 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 		return nil, fmt.Errorf("nil pod.spec.enableServiceLinks encountered, cannot construct envvars")
 	}
 
+	// If the pod originates from the kube-api, when we know that the kube-apiserver is responding and the kubelet's credentials are valid.
+	// Knowing this, it is reasonable to wait until the service lister has synchronized at least once before attempting to build
+	// a service env var map.  This doesn't present the race below from happening entirely, but it does prevent the "obvious"
+	// failure case of services simply not having completed a list operation that can reasonably be expected to succeed.
+	// One common case this prevents is a kubelet restart reading pods before services and some pod not having the
+	// KUBERNETES_SERVICE_HOST injected because we didn't wait a short time for services to sync before proceeding.
+	// The KUBERNETES_SERVICE_HOST link is special because it is unconditionally injected into pods and is read by the
+	// in-cluster-config for pod clients
+	if !kubetypes.IsStaticPod(pod) && !kl.serviceHasSynced() {
+		return nil, fmt.Errorf("services have not yet been read at least once, cannot construct envvars")
+	}
+
 	var result []kubecontainer.EnvVar
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
 	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
