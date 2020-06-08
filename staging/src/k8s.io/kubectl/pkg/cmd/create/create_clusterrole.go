@@ -28,6 +28,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -199,6 +201,10 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 				},
 			},
 		}
+	}
+
+	if err := util.CreateOrUpdateAnnotation(c.CreateAnnotation, clusterRole, scheme.DefaultJSONEncoder()); err != nil {
+		return err
 	}
 
 	// Create ClusterRole.
