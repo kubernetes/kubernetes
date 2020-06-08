@@ -30,7 +30,6 @@ import (
 // Action is a function to be performed by the system.
 type Action func() error
 
-
 // WaitTimeoutForEvent waits the given timeout duration for an event to occur.
 func WaitTimeoutForEvent(c clientset.Interface, namespace, eventSelector, msg string, timeout time.Duration) error {
 	interval := 2 * time.Second
