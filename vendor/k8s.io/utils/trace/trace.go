@@ -106,18 +106,18 @@ func (t *Trace) logWithStepThreshold(stepThreshold time.Duration) {
 	endTime := time.Now()
 
 	totalTime := endTime.Sub(t.startTime)
-	klog.InfoS("Trace start", logTraceArgs(tracenum, t, totalTime)...)
+	klog.InfoS("Trace", logTraceArgs(tracenum, t, totalTime)...)
 	lastStepTime := t.startTime
 	for _, step := range t.steps {
 		stepDuration := step.stepTime.Sub(lastStepTime)
 		if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
-			klog.InfoS("Trace step", logStepArgs(tracenum, step, step.stepTime.Sub(t.startTime), stepDuration)...)
+			klog.InfoS("Trace", logStepArgs(tracenum, step, step.stepTime.Sub(t.startTime), stepDuration)...)
 		}
 		lastStepTime = step.stepTime
 	}
 	stepDuration := endTime.Sub(lastStepTime)
 	if stepThreshold == 0 || stepDuration > stepThreshold || klog.V(4).Enabled() {
-		klog.InfoS("Trace end", "traceNum", tracenum, "endTime", endTime.Sub(t.startTime), "stepDuration", stepDuration)
+		klog.InfoS("Trace", "traceNum", tracenum, "endTime", endTime.Sub(t.startTime), "stepDuration", stepDuration)
 	}
 
 }
