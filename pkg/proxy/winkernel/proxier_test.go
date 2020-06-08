@@ -321,6 +321,27 @@ func TestNoopEndpointSlice(t *testing.T) {
 	p.OnEndpointSlicesSynced()
 }
 
+func TestFindRemoteSubnetProviderAddress(t *testing.T) {
+	networkInfo, _ := newFakeHNS().getNetworkByName("TestNetwork")
+	pa := networkInfo.findRemoteSubnetProviderAddress(providerAddress)
+
+	if pa != providerAddress {
+		t.Errorf("%v does not match %v", pa, providerAddress)
+	}
+
+	pa = networkInfo.findRemoteSubnetProviderAddress(epIpAddressRemote)
+
+	if pa != providerAddress {
+		t.Errorf("%v does not match %v", pa, providerAddress)
+	}
+
+	pa = networkInfo.findRemoteSubnetProviderAddress(serviceVip)
+
+	if len(pa) != 0 {
+		t.Errorf("Provider address is not empty as expected")
+	}
+}
+
 func makeNSN(namespace, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
 }
