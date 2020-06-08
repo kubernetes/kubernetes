@@ -72,6 +72,7 @@ filegroup(
         "//vendor/github.com/containernetworking/cni/libcni:all-srcs",
         "//vendor/github.com/containernetworking/cni/pkg/invoke:all-srcs",
         "//vendor/github.com/containernetworking/cni/pkg/types:all-srcs",
+        "//vendor/github.com/containernetworking/cni/pkg/utils:all-srcs",
         "//vendor/github.com/containernetworking/cni/pkg/version:all-srcs",
         "//vendor/github.com/coredns/corefile-migration/migration:all-srcs",
         "//vendor/github.com/coreos/go-oidc:all-srcs",
