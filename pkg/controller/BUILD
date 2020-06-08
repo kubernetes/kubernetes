@@ -136,6 +136,7 @@ filegroup(
         "//pkg/controller/util/node:all-srcs",
         "//pkg/controller/volume/attachdetach:all-srcs",
         "//pkg/controller/volume/common:all-srcs",
+        "//pkg/controller/volume/ephemeral:all-srcs",
         "//pkg/controller/volume/events:all-srcs",
         "//pkg/controller/volume/expand:all-srcs",
         "//pkg/controller/volume/persistentvolume:all-srcs",

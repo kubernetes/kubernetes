@@ -146,7 +146,7 @@ func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionF
 	}
 }
 
-func TestPVCProtectionController(t *testing.T) {
+func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnabled bool) {
 	pvcGVR := schema.GroupVersionResource{
 		Group:    v1.GroupName,
 		Version:  "v1",
@@ -430,7 +430,7 @@ func TestPVCProtectionController(t *testing.T) {
 		podInformer := informers.Core().V1().Pods()
 
 		// Create the controller
-		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, client, test.storageObjectInUseProtectionEnabled)
+		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, client, test.storageObjectInUseProtectionEnabled, genericEphemeralVolumeFeatureEnabled)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -517,4 +517,9 @@ func TestPVCProtectionController(t *testing.T) {
 		}
 
 	}
+}
+
+func TestPVCProtectionController(t *testing.T) {
+	t.Run("with-GenericEphemeralVolume", func(t *testing.T) { testPVCProtectionController(t, true) })
+	t.Run("without-GenericEphemeralVolume", func(t *testing.T) { testPVCProtectionController(t, false) })
 }
