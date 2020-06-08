@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -217,6 +219,22 @@ func isFailed(pod *v1.Pod) bool {
 // isTerminating returns true if pod's DeletionTimestamp has been set
 func isTerminating(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
+}
+
+// isTimedOut returns true if pod is Terminating but DeletionGracePeriodSeconds is expired
+func isTimedOut(pod *v1.Pod) bool {
+	if !isTerminating(pod) {
+		return false
+	}
+	rc := clock.RealClock{}
+	now := rc.Now()
+	deletionTime := pod.DeletionTimestamp.Time
+	gracePeriod := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
+	if now.After(deletionTime.Add(gracePeriod)) {
+		return true
+	}
+
+	return false
 }
 
 // isHealthy returns true if pod is running and ready and has not been terminated

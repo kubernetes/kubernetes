@@ -293,7 +293,21 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.CollisionCount = new(int32)
 	*status.CollisionCount = collisionCount
 
-	replicaCount := int(*set.Spec.Replicas)
+	// Count pods which timed out
+	timedout := 0
+	for i := range pods {
+		if isTimedOut(pods[i]) {
+			timedout++
+		}
+	}
+	if timedout > 0 {
+		klog.V(4).Infof("StatefulSet %s/%s has %d timed out Pods",
+			set.Namespace,
+			set.Name,
+			timedout)
+	}
+
+	replicaCount := int(*set.Spec.Replicas) + timedout
 	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < set.Spec.Replicas
 	replicas := make([]*v1.Pod, replicaCount)
 	// slice that will contain all Pods such that set.Spec.Replicas <= getOrdinal(pod)
@@ -304,6 +318,21 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
+		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount {
+			// if the ordinal of the pod is within the range of the current number of replicas,
+			// insert it at the indirection of its ordinal
+			replicas[ord] = pods[i]
+
+		} else if ord >= replicaCount {
+			// if the ordinal is greater than the number of replicas add it to the condemned list
+			condemned = append(condemned, pods[i])
+		}
+		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
+
+		// do not count pods which timed out
+		if isTimedOut(pods[i]) {
+			continue
+		}
 		status.Replicas++
 
 		// count the number of running and ready replicas
@@ -320,17 +349,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				status.UpdatedReplicas++
 			}
 		}
-
-		if ord := getOrdinal(pods[i]); 0 <= ord && ord < replicaCount {
-			// if the ordinal of the pod is within the range of the current number of replicas,
-			// insert it at the indirection of its ordinal
-			replicas[ord] = pods[i]
-
-		} else if ord >= replicaCount {
-			// if the ordinal is greater than the number of replicas add it to the condemned list
-			condemned = append(condemned, pods[i])
-		}
-		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
 	}
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
@@ -349,6 +367,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// find the first unhealthy Pod
 	for i := range replicas {
+		if isTimedOut(replicas[i]) {
+			continue
+		}
 		if !isHealthy(replicas[i]) {
 			unhealthy++
 			if ord := getOrdinal(replicas[i]); ord < firstUnhealthyOrdinal {
@@ -359,6 +380,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	for i := range condemned {
+		if isTimedOut(condemned[i]) {
+			continue
+		}
 		if !isHealthy(condemned[i]) {
 			unhealthy++
 			if ord := getOrdinal(condemned[i]); ord < firstUnhealthyOrdinal {
@@ -386,6 +410,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
+		if isTimedOut(replicas[i]) {
+			continue
+		}
 		// delete and recreate failed pods
 		if isFailed(replicas[i]) {
 			ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
