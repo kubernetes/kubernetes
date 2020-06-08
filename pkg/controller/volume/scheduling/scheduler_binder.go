@@ -256,8 +256,6 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 
 	// Check PV node affinity on bound volumes
 	if len(boundClaims) > 0 {
-		// TODO if node affinity does not match, we should
-		// UnschedulableAndUnresolvable error back to scheduler framework
 		boundVolumesSatisfied, err = b.checkBoundClaims(boundClaims, node, podName)
 		if err != nil {
 			return nil, err
