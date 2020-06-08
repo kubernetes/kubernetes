@@ -1972,12 +1972,21 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		oldSize := oldPvc.Spec.Resources.Requests["storage"]
 		newSize := newPvc.Spec.Resources.Requests["storage"]
 
+		statusSize := oldPvc.Status.Capacity["storage"]
+
 		if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
 			specDiff := diff.ObjectDiff(newPvcClone.Spec, oldPvcClone.Spec)
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
 		}
+
 		if newSize.Cmp(oldSize) < 0 {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
+			permitShrink := utilfeature.DefaultFeatureGate.Enabled(features.RecoverExpansionFailure)
+			if permitShrink && newSize.Cmp(statusSize) < 0 {
+				permitShrink = false
+			}
+			if !permitShrink {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
+			}
 		}
 
 	} else {

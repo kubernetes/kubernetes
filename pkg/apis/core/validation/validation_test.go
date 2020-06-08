@@ -1470,11 +1470,63 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			},
 		})
 
+	validClaimShrinkInitial := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("15G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	validPVCShrink := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	invalidPVCShrink := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("3G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		oldClaim          *core.PersistentVolumeClaim
-		newClaim          *core.PersistentVolumeClaim
-		enableResize      bool
+		isExpectedFailure          bool
+		oldClaim                   *core.PersistentVolumeClaim
+		newClaim                   *core.PersistentVolumeClaim
+		enableResize               bool
+		enableRecoverFromExpansion bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
@@ -1602,6 +1654,33 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          unboundSizeUpdate,
 			enableResize:      true,
 		},
+		"valid-expand-shrink-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validPVCShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"invalid-expand-shrink-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   invalidPVCShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-recover-disabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validPVCShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: false,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-resize-disabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validPVCShrink,
+			enableResize:               false,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
 		"valid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
@@ -1644,6 +1723,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverExpansionFailure, scenario.enableRecoverFromExpansion)()
+
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)

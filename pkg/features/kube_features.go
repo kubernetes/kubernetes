@@ -602,6 +602,11 @@ const (
 	// Allow setting the Fully Qualified Domain Name (FQDN) in the hostname of a Pod. If a Pod does not
 	// have FQDN, this feature has no effect.
 	SetHostnameAsFQDN featuregate.Feature = "SetHostnameAsFQDN"
+	// owner: @gnufied
+	// alpha: v1.19
+	//
+	// Allow users to recover from expansion failure
+	RecoverExpansionFailure featuregate.Feature = "RecoverExpansionFailure"
 )
 
 func init() {
@@ -626,6 +631,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:               {Default: true, PreRelease: featuregate.Beta},
+	RecoverExpansionFailure:        {Default: false, PreRelease: featuregate.Alpha},
 	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
