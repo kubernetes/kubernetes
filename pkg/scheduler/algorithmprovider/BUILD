@@ -11,7 +11,6 @@ go_library(
     srcs = ["registry.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithmprovider",
     deps = [
-        "//pkg/features:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",
@@ -30,8 +29,6 @@ go_library(
         "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
         "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -40,7 +37,6 @@ go_test(
     srcs = ["registry_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/features:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",
@@ -59,8 +55,6 @@ go_test(
         "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
         "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )

@@ -193,12 +193,6 @@ const (
 	// Postpone deletion of a PV or a PVC when they are being used
 	StorageObjectInUseProtection featuregate.Feature = "StorageObjectInUseProtection"
 
-	// owner: @aveshagarwal
-	// alpha: v1.9
-	//
-	// Enable resource limits priority function
-	ResourceLimitsPriorityFunction featuregate.Feature = "ResourceLimitsPriorityFunction"
-
 	// owner: @m1093782566
 	// GA: v1.11
 	//
@@ -611,7 +605,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
-	ResourceLimitsPriorityFunction: {Default: false, PreRelease: featuregate.Alpha},
 	SupportIPVSProxyMode:           {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.Beta},
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.Beta},
