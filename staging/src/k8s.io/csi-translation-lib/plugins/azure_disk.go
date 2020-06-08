@@ -169,8 +169,8 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		csiSource.ReadOnly = *azureSource.ReadOnly
 	}
 
-	pv.Spec.PersistentVolumeSource.AzureDisk = nil
-	pv.Spec.PersistentVolumeSource.CSI = csiSource
+	pv.Spec.AzureDisk = nil
+	pv.Spec.CSI = csiSource
 
 	return pv, nil
 }

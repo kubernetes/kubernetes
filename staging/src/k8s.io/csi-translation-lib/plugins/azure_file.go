@@ -142,8 +142,8 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		csiSource.NodeStageSecretRef.Namespace = *azureSource.SecretNamespace
 	}
 
-	pv.Spec.PersistentVolumeSource.AzureFile = nil
-	pv.Spec.PersistentVolumeSource.CSI = csiSource
+	pv.Spec.AzureFile = nil
+	pv.Spec.CSI = csiSource
 
 	return pv, nil
 }
