@@ -33,6 +33,7 @@ import (
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -69,6 +70,7 @@ type CreateDeploymentOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 	FieldManager     string
+	CreateAnnotation bool
 
 	Client         appsv1client.AppsV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -143,6 +145,8 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 		return err
 	}
 
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
 		return err
@@ -179,6 +183,10 @@ func (o *CreateDeploymentOptions) Validate() error {
 // Run performs the execution of 'create deployment' sub command
 func (o *CreateDeploymentOptions) Run() error {
 	deploy := o.createDeployment()
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, deploy, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
 
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}

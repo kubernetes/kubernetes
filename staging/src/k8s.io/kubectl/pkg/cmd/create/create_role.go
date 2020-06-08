@@ -34,6 +34,7 @@ import (
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -136,6 +137,7 @@ type CreateRoleOptions struct {
 	Mapper           meta.RESTMapper
 	PrintObj         func(obj runtime.Object) error
 	FieldManager     string
+	CreateAnnotation bool
 
 	genericclioptions.IOStreams
 }
@@ -254,6 +256,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	}
 	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -355,6 +358,10 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 	role.Rules = rules
 	if o.EnforceNamespace {
 		role.Namespace = o.Namespace
+	}
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, role, scheme.DefaultJSONEncoder()); err != nil {
+		return err
 	}
 
 	// Create role.
