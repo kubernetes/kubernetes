@@ -1709,7 +1709,8 @@ function start-etcd-servers {
 # Replaces the variables in the konnectivity-server manifest file with the real values, and then
 # copy the file to the manifest dir
 # $1: value for variable "agent_port"
-# $2: value for bariable "admin_port"
+# $2: value for variable "health_port"
+# $3: value for variable "admin_port"
 function prepare-konnectivity-server-manifest {
   local -r temp_file="/tmp/konnectivity-server.yaml"
   params=()
@@ -1731,7 +1732,8 @@ function prepare-konnectivity-server-manifest {
 
   params+=("--server-port=0")
   params+=("--agent-port=$1")
-  params+=("--admin-port=$2")
+  params+=("--health-port=$2")
+  params+=("--admin-port=$3")
   params+=("--agent-namespace=kube-system")
   params+=("--agent-service-account=konnectivity-agent")
   params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
@@ -1742,7 +1744,8 @@ function prepare-konnectivity-server-manifest {
   done
   sed -i -e "s@{{ *konnectivity_args *}}@${konnectivity_args}@g" "${temp_file}"
   sed -i -e "s@{{ *agent_port *}}@$1@g" "${temp_file}"
-  sed -i -e "s@{{ *admin_port *}}@$2@g" "${temp_file}"
+  sed -i -e "s@{{ *health_port *}}@$2@g" "${temp_file}"
+  sed -i -e "s@{{ *admin_port *}}@$3@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@30@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
 }
@@ -1753,7 +1756,7 @@ function prepare-konnectivity-server-manifest {
 function start-konnectivity-server {
   echo "Start konnectivity server pods"
   prepare-log-file /var/log/konnectivity-server.log
-  prepare-konnectivity-server-manifest "8132" "8133"
+  prepare-konnectivity-server-manifest "8132" "8133" "8134"
 }
 
 # Calculates the following variables based on env variables, which will be used
