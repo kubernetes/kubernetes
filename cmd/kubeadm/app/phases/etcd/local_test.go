@@ -29,9 +29,9 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestGetEtcdPodSpec(t *testing.T) {

@@ -40,12 +40,12 @@ import (
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const (

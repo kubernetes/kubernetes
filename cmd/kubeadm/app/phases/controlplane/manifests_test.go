@@ -33,8 +33,8 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const (

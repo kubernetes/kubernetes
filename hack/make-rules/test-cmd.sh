@@ -121,7 +121,7 @@ __EOF__
 # 2) $WHAT is not empty and kubeadm is part of $WHAT
 WHAT=${WHAT:-}
 if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
-  kube::log::status "Running kubeadm tests"  
+  kube::log::status "Running kubeadm tests"
 
   # build kubeadm
   make all -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
@@ -129,7 +129,7 @@ if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
   export KUBEADM_PATH="${KUBEADM_PATH:=$(kube::realpath "${KUBE_ROOT}")/_output/local/go/bin/kubeadm}"
   # invoke the tests
   make -C "${KUBE_ROOT}" test \
-    WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd
+    WHAT=k8s.io/kubernetes/test/cmd/kubeadm
 
   # if we ONLY want to run kubeadm, then exit here.
   if [[ ${WHAT} == "kubeadm" ]]; then

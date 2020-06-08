@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 )
 
 func TestComponentResources(t *testing.T) {

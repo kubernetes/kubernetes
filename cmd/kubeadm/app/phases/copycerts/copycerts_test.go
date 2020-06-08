@@ -34,8 +34,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestGetDataFromInitConfig(t *testing.T) {

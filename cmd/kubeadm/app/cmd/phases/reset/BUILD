@@ -57,7 +57,7 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
-        "//cmd/kubeadm/test:go_default_library",
+        "//cmd/kubeadm/app/testing:go_default_library",
         "//vendor/github.com/lithammer/dedent:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",

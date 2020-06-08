@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
+	testresources "k8s.io/kubernetes/cmd/kubeadm/app/testing/resources"
 )
 
 var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()

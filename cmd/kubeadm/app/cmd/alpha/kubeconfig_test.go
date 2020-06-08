@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
+	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/app/testing/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
 
 func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {

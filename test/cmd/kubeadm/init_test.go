@@ -27,8 +27,8 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func runKubeadmInit(args ...string) (string, string, int, error) {

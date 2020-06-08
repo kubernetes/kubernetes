@@ -24,7 +24,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 )
 
 const (

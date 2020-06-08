@@ -7,7 +7,7 @@ go_library(
         "configmap.go",
         "pods.go",
     ],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/test/resources",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/testing/resources",
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

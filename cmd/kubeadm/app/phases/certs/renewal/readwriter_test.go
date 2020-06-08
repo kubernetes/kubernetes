@@ -28,9 +28,9 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestPKICertificateReadWriter(t *testing.T) {

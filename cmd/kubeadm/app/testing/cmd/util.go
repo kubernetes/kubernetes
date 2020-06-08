@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,41 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeadm
+package testing
 
 import (
-	"bytes"
-	"os"
-	"os/exec"
-	"testing"
-
-	"github.com/pkg/errors"
-
 	"github.com/spf13/cobra"
+	"testing"
 )
-
-// Forked from test/e2e/framework because the e2e framework is quite bloated
-// for our purposes here, and modified to remove undesired logging.
-
-func runCmdNoWrap(command string, args ...string) (string, string, int, error) {
-	var bout, berr bytes.Buffer
-	cmd := exec.Command(command, args...)
-	cmd.Stdout = &bout
-	cmd.Stderr = &berr
-	err := cmd.Run()
-	stdout, stderr := bout.String(), berr.String()
-	return stdout, stderr, cmd.ProcessState.ExitCode(), err
-}
-
-// RunCmd is a utility function for kubeadm testing that executes a specified command
-func RunCmd(command string, args ...string) (string, string, int, error) {
-	stdout, stderr, retcode, err := runCmdNoWrap(command, args...)
-	if err != nil {
-		return stdout, stderr, retcode, errors.Wrapf(err, "error running %s %v; \nretcode %d, \nstdout %q, \nstderr %q, \ngot error",
-			command, args, retcode, stdout, stderr)
-	}
-	return stdout, stderr, retcode, nil
-}
 
 // RunSubCommand is a utility function for kubeadm testing that executes a Cobra sub command
 func RunSubCommand(t *testing.T, subCmds []*cobra.Command, command string, args ...string) {
@@ -79,14 +50,4 @@ func getSubCommand(t *testing.T, subCmds []*cobra.Command, name string) *cobra.C
 	t.Fatalf("Unable to find sub command %s", name)
 
 	return nil
-}
-
-// getKubeadmPath returns the contents of the environment variable KUBEADM_PATH
-// or panics if it's empty
-func getKubeadmPath() string {
-	kubeadmPath := os.Getenv("KUBEADM_PATH")
-	if len(kubeadmPath) == 0 {
-		panic("the environment variable KUBEADM_PATH must point to the kubeadm binary path")
-	}
-	return kubeadmPath
 }

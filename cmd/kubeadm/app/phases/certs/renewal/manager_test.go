@@ -28,9 +28,9 @@ import (
 
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 var (

@@ -52,6 +52,7 @@ filegroup(
         "//cmd/kubeadm/app/phases/upgrade:all-srcs",
         "//cmd/kubeadm/app/phases/uploadconfig:all-srcs",
         "//cmd/kubeadm/app/preflight:all-srcs",
+        "//cmd/kubeadm/app/testing:all-srcs",
         "//cmd/kubeadm/app/util:all-srcs",
     ],
     tags = ["automanaged"],

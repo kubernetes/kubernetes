@@ -30,9 +30,9 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
+	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/app/testing/cmd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 
 func TestCommandsGenerated(t *testing.T) {

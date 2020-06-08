@@ -33,11 +33,11 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/app/testing"
+	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/app/testing/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
 
 func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {

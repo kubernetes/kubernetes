@@ -30,7 +30,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
+	testresources "k8s.io/kubernetes/cmd/kubeadm/app/testing/resources"
 )
 
 func testGetURL(t *testing.T, getURLFunc func(*kubeadmapi.APIEndpoint) string, port int) {
