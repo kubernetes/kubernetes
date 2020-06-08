@@ -31,7 +31,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -1318,34 +1317,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
 			}},
-		},
-		{
-			name: "enable alpha feature ResourceLimitsPriorityFunction",
-			JSON: `{
-		  "kind": "Policy",
-		  "apiVersion": "v1",
-		  "predicates": [],
-		  "priorities": [
-			{"name": "ResourceLimitsPriority",   "weight": 2}
-		  ]
-		}`,
-			featureGates: map[featuregate.Feature]bool{
-				features.ResourceLimitsPriorityFunction: true,
-			},
-			wantPlugins: map[string][]config.Plugin{
-				"QueueSortPlugin": {{Name: "PrioritySort"}},
-				"PreScorePlugin": {
-					{Name: "NodeResourceLimits"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-				},
-				"ScorePlugin": {
-					{Name: "NodeResourceLimits", Weight: 2},
-				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
-			},
 		},
 	}
 	for _, tc := range testcases {

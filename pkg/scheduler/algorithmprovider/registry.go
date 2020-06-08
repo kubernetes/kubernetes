@@ -20,9 +20,6 @@ import (
 	"sort"
 	"strings"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
@@ -52,10 +49,7 @@ type Registry map[string]*schedulerapi.Plugins
 // NewRegistry returns an algorithm provider registry instance.
 func NewRegistry() Registry {
 	defaultConfig := getDefaultConfig()
-	applyFeatureGates(defaultConfig)
-
 	caConfig := getClusterAutoscalerConfig()
-	applyFeatureGates(caConfig)
 
 	return Registry{
 		schedulerapi.SchedulerDefaultProviderName: defaultConfig,
@@ -169,15 +163,4 @@ func getClusterAutoscalerConfig() *schedulerapi.Plugins {
 		}
 	}
 	return caConfig
-}
-
-func applyFeatureGates(config *schedulerapi.Plugins) {
-	// Prioritizes nodes that satisfy pod's resource limits
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
-		klog.Infof("Registering resourcelimits priority function")
-		s := schedulerapi.Plugin{Name: noderesources.ResourceLimitsName}
-		config.PreScore.Enabled = append(config.PreScore.Enabled, s)
-		s = schedulerapi.Plugin{Name: noderesources.ResourceLimitsName, Weight: 1}
-		config.Score.Enabled = append(config.Score.Enabled, s)
-	}
 }

@@ -13,7 +13,6 @@ go_test(
         "extender_test.go",
         "framework_test.go",
         "main_test.go",
-        "plugins_test.go",
         "predicates_test.go",
         "preemption_test.go",
         "priorities_test.go",
