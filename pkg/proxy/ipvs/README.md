@@ -62,7 +62,7 @@ IPVS proxier will fall back on IPTABLES in the following scenarios.
 
 **1. kube-proxy starts with --masquerade-all=true**
 
-If kube-proxy starts with `--masquerade-all=true`, IPVS proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what IPTABLES proxier. Suppose kube-proxy have flag `--masquerade-all=true` specified, then the IPTABLES installed by IPVS proxier should be like what is shown below.
+If kube-proxy starts with `--masquerade-all=true`, IPVS proxier will masquerade all traffic accessing service Cluster IP, which behaves the same as what IPTABLES proxier. Suppose kube-proxy has flag `--masquerade-all=true` specified, then the IPTABLES installed by IPVS proxier should be like what is shown below.
 
 ```shell
 # iptables -t nat -nL
@@ -133,7 +133,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-CLU
 For loadBalancer type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-LOAD-BALANCER`.
 Specially when service's  `LoadBalancerSourceRanges` is specified or specified `externalTrafficPolicy=local`,
 IPVS proxier will create ipset sets `KUBE-LOAD-BALANCER-LOCAL`/`KUBE-LOAD-BALANCER-FW`/`KUBE-LOAD-BALANCER-SOURCE-CIDR`
-and install IPTABLES accordingly, which should looks like what is shown below.
+and install IPTABLES accordingly, which should look like what is shown below.
 
 ```shell
 # iptables -t nat -nL
@@ -184,7 +184,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOA
 
 For NodePort type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-NODE-PORT-TCP/KUBE-NODE-PORT-UDP`.
 When specified `externalTrafficPolicy=local`, IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TCP/KUBE-NODE-PORT-LOCAL-UDP`
-and install IPTABLES accordingly, which should looks like what is shown below.
+and install IPTABLES accordingly, which should look like what is shown below.
 
 Suppose service with TCP type nodePort.
 
@@ -223,7 +223,7 @@ KUBE-NODE-PORT  all  --  0.0.0.0/0            0.0.0.0/0            match-set KUB
 **5. Service with externalIPs specified**
 
 For service with `externalIPs` specified, IPVS proxier will install IPTABLES with match of ipset `KUBE-EXTERNAL-IP`,
-Suppose we have service with `externalIPs` specified, IPTABLES rules should looks like what is shown below.
+Suppose we have service with `externalIPs` specified, IPTABLES rules should look like what is shown below.
 
 ```shell
 Chain PREROUTING (policy ACCEPT)
