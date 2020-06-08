@@ -18,10 +18,8 @@ package plugins
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -75,8 +73,6 @@ const (
 	// ImageLocalityPriority defines the name of prioritizer function that prioritizes nodes that have images
 	// requested by the pod present.
 	ImageLocalityPriority = "ImageLocalityPriority"
-	// ResourceLimitsPriority defines the nodes of prioritizer function ResourceLimitsPriority.
-	ResourceLimitsPriority = "ResourceLimitsPriority"
 	// EvenPodsSpreadPriority defines the name of prioritizer function that prioritizes nodes
 	// which have pods and labels matching the incoming pod's topologySpreadConstraints.
 	EvenPodsSpreadPriority = "EvenPodsSpreadPriority"
@@ -441,21 +437,6 @@ func NewLegacyRegistry() *LegacyRegistry {
 			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
 			return
 		})
-
-	// ResourceLimits is the last feature to be supported as predicate/priority.
-	// TODO: Remove this check once it graduates to GA.
-	// Prioritizes nodes that satisfy pod's resource limits.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
-		klog.Infof("Registering resourcelimits priority function")
-
-		registry.registerPriorityConfigProducer(ResourceLimitsPriority,
-			func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-				plugins.PreScore = appendToPluginSet(plugins.PreScore, noderesources.ResourceLimitsName, nil)
-				plugins.Score = appendToPluginSet(plugins.Score, noderesources.ResourceLimitsName, &args.Weight)
-				return
-			})
-		registry.DefaultPriorities[ResourceLimitsPriority] = 1
-	}
 
 	return registry
 }
