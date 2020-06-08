@@ -1422,7 +1422,9 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 		// We want the IPs to end up in order by interface (in particular, we want eth0's
 		// IPs first), but macs isn't necessarily sorted in that order so we have to
 		// explicitly order by device-number (device-number == the "0" in "eth0").
-		macIPs := make(map[int]string)
+
+		var macIDs []string
+		macDevNum := make(map[string]int)
 		for _, macID := range strings.Split(macs, "\n") {
 			if macID == "" {
 				continue
@@ -1437,18 +1439,22 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 				klog.Warningf("Bad device-number %q for interface %s\n", numStr, macID)
 				continue
 			}
+			macIDs = append(macIDs, macID)
+			macDevNum[macID] = num
+		}
+
+		// Sort macIDs by interface device-number
+		sort.Slice(macIDs, func(i, j int) bool {
+			return macDevNum[macIDs[i]] < macDevNum[macIDs[j]]
+		})
+
+		for _, macID := range macIDs {
 			ipPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
-			macIPs[num], err = c.metadata.GetMetadata(ipPath)
+			internalIPs, err := c.metadata.GetMetadata(ipPath)
 			if err != nil {
 				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", ipPath, err)
 			}
-		}
 
-		for i := 0; i < len(macIPs); i++ {
-			internalIPs := macIPs[i]
-			if internalIPs == "" {
-				continue
-			}
 			for _, internalIP := range strings.Split(internalIPs, "\n") {
 				if internalIP == "" {
 					continue
