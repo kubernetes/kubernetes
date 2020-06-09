@@ -302,6 +302,12 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		mountOptions = appendDefaultMountOptions(mountOptions, mounterArgs.FsGroup)
 	}
 
+	// Early exit if mount succeeded
+	err = b.mounter.MountSensitive(source, dir, "cifs", mountOptions, sensitiveMountOptions)
+	if err == nil {
+		return nil
+	}
+
 	mountComplete := false
 	err = wait.Poll(5*time.Second, 10*time.Minute, func() (bool, error) {
 		err := b.mounter.MountSensitive(source, dir, "cifs", mountOptions, sensitiveMountOptions)
