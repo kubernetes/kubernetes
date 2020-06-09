@@ -104,6 +104,13 @@ func (o MarshalOptions) Format(m proto.Message) string {
 // MarshalOptions. Do not depend on the output being stable. It may change over
 // time across different versions of the program.
 func (o MarshalOptions) Marshal(m proto.Message) ([]byte, error) {
+	return o.marshal(m)
+}
+
+// marshal is a centralized function that all marshal operations go through.
+// For profiling purposes, avoid changing the name of this function or
+// introducing other code paths for marshal that do not go through this.
+func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 	if o.Multiline && o.Indent == "" {
 		o.Indent = defaultIndent
 	}

@@ -443,7 +443,7 @@ replace (
 	google.golang.org/appengine => google.golang.org/appengine v1.6.5
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba
 	google.golang.org/grpc => google.golang.org/grpc v1.27.0
-	google.golang.org/protobuf => google.golang.org/protobuf v1.23.0
+	google.golang.org/protobuf => google.golang.org/protobuf v1.24.0
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/cheggaaa/pb.v1 => gopkg.in/cheggaaa/pb.v1 v1.0.25
