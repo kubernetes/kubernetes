@@ -446,6 +446,7 @@ filegroup(
         "//vendor/google.golang.org/protobuf/types/descriptorpb:all-srcs",
         "//vendor/google.golang.org/protobuf/types/known/anypb:all-srcs",
         "//vendor/google.golang.org/protobuf/types/known/durationpb:all-srcs",
+        "//vendor/google.golang.org/protobuf/types/known/fieldmaskpb:all-srcs",
         "//vendor/google.golang.org/protobuf/types/known/timestamppb:all-srcs",
         "//vendor/google.golang.org/protobuf/types/known/wrapperspb:all-srcs",
         "//vendor/google.golang.org/protobuf/types/pluginpb:all-srcs",

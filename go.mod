@@ -441,7 +441,7 @@ replace (
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 	google.golang.org/api => google.golang.org/api v0.15.1
 	google.golang.org/appengine => google.golang.org/appengine v1.6.5
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 	google.golang.org/grpc => google.golang.org/grpc v1.27.0
 	google.golang.org/protobuf => google.golang.org/protobuf v1.24.0
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
