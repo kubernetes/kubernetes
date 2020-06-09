@@ -4,6 +4,7 @@ package cgroups
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	units "github.com/docker/go-units"
@@ -28,6 +28,8 @@ const (
 var (
 	isUnifiedOnce sync.Once
 	isUnified     bool
+
+	errUnified = errors.New("not implemented for cgroup v2 unified hierarchy")
 )
 
 // HugePageSizeUnitList is a list of the units used by the linux kernel when
@@ -40,8 +42,8 @@ var HugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
 func IsCgroup2UnifiedMode() bool {
 	isUnifiedOnce.Do(func() {
-		var st syscall.Statfs_t
-		if err := syscall.Statfs(unifiedMountpoint, &st); err != nil {
+		var st unix.Statfs_t
+		if err := unix.Statfs(unifiedMountpoint, &st); err != nil {
 			panic("cannot statfs cgroup root")
 		}
 		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
@@ -122,21 +124,6 @@ func isSubsystemAvailable(subsystem string) bool {
 	}
 	_, avail := cgroups[subsystem]
 	return avail
-}
-
-func GetClosestMountpointAncestor(dir, mountinfo string) string {
-	deepestMountPoint := ""
-	for _, mountInfoEntry := range strings.Split(mountinfo, "\n") {
-		mountInfoParts := strings.Fields(mountInfoEntry)
-		if len(mountInfoParts) < 5 {
-			continue
-		}
-		mountPoint := mountInfoParts[4]
-		if strings.HasPrefix(mountPoint, deepestMountPoint) && strings.HasPrefix(dir, mountPoint) {
-			deepestMountPoint = mountPoint
-		}
-	}
-	return deepestMountPoint
 }
 
 func FindCgroupMountpointDir() (string, error) {
@@ -307,6 +294,9 @@ func GetAllSubsystems() ([]string, error) {
 
 // GetOwnCgroup returns the relative path to the cgroup docker is running in.
 func GetOwnCgroup(subsystem string) (string, error) {
+	if IsCgroup2UnifiedMode() {
+		return "", errUnified
+	}
 	cgroups, err := ParseCgroupFile("/proc/self/cgroup")
 	if err != nil {
 		return "", err
@@ -325,6 +315,9 @@ func GetOwnCgroupPath(subsystem string) (string, error) {
 }
 
 func GetInitCgroup(subsystem string) (string, error) {
+	if IsCgroup2UnifiedMode() {
+		return "", errUnified
+	}
 	cgroups, err := ParseCgroupFile("/proc/1/cgroup")
 	if err != nil {
 		return "", err
@@ -358,8 +351,8 @@ func getCgroupPathHelper(subsystem, cgroup string) (string, error) {
 	return filepath.Join(mnt, relCgroup), nil
 }
 
-func readProcsFile(dir string) ([]int, error) {
-	f, err := os.Open(filepath.Join(dir, CgroupProcesses))
+func readProcsFile(file string) ([]int, error) {
+	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
@@ -514,8 +507,8 @@ func getHugePageSizeFromFilenames(fileNames []string) ([]string, error) {
 }
 
 // GetPids returns all pids, that were added to cgroup at path.
-func GetPids(path string) ([]int, error) {
-	return readProcsFile(path)
+func GetPids(dir string) ([]int, error) {
+	return readProcsFile(filepath.Join(dir, CgroupProcesses))
 }
 
 // GetAllPids returns all pids, that were added to cgroup at path and to all its
@@ -524,14 +517,13 @@ func GetAllPids(path string) ([]int, error) {
 	var pids []int
 	// collect pids from all sub-cgroups
 	err := filepath.Walk(path, func(p string, info os.FileInfo, iErr error) error {
-		dir, file := filepath.Split(p)
-		if file != CgroupProcesses {
-			return nil
-		}
 		if iErr != nil {
 			return iErr
 		}
-		cPids, err := readProcsFile(dir)
+		if info.IsDir() || info.Name() != CgroupProcesses {
+			return nil
+		}
+		cPids, err := readProcsFile(p)
 		if err != nil {
 			return err
 		}
@@ -568,7 +560,7 @@ func WriteCgroupProc(dir string, pid int) error {
 
 		// EINVAL might mean that the task being added to cgroup.procs is in state
 		// TASK_NEW. We should attempt to do so again.
-		if isEINVAL(err) {
+		if errors.Is(err, unix.EINVAL) {
 			time.Sleep(30 * time.Millisecond)
 			continue
 		}
@@ -578,11 +570,68 @@ func WriteCgroupProc(dir string, pid int) error {
 	return err
 }
 
-func isEINVAL(err error) bool {
-	switch err := err.(type) {
-	case *os.PathError:
-		return err.Err == unix.EINVAL
-	default:
-		return false
+// Since the OCI spec is designed for cgroup v1, in some cases
+// there is need to convert from the cgroup v1 configuration to cgroup v2
+// the formula for BlkIOWeight is y = (1 + (x - 10) * 9999 / 990)
+// convert linearly from [10-1000] to [1-10000]
+func ConvertBlkIOToCgroupV2Value(blkIoWeight uint16) uint64 {
+	if blkIoWeight == 0 {
+		return 0
 	}
+	return uint64(1 + (uint64(blkIoWeight)-10)*9999/990)
+}
+
+// Since the OCI spec is designed for cgroup v1, in some cases
+// there is need to convert from the cgroup v1 configuration to cgroup v2
+// the formula for cpuShares is y = (1 + ((x - 2) * 9999) / 262142)
+// convert from [2-262144] to [1-10000]
+// 262144 comes from Linux kernel definition "#define MAX_SHARES (1UL << 18)"
+func ConvertCPUSharesToCgroupV2Value(cpuShares uint64) uint64 {
+	if cpuShares == 0 {
+		return 0
+	}
+	return (1 + ((cpuShares-2)*9999)/262142)
+}
+
+// ConvertCPUQuotaCPUPeriodToCgroupV2Value generates cpu.max string.
+func ConvertCPUQuotaCPUPeriodToCgroupV2Value(quota int64, period uint64) string {
+	if quota <= 0 && period == 0 {
+		return ""
+	}
+	if period == 0 {
+		// This default value is documented in https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
+		period = 100000
+	}
+	if quota <= 0 {
+		return fmt.Sprintf("max %d", period)
+	}
+	return fmt.Sprintf("%d %d", quota, period)
+}
+
+// ConvertMemorySwapToCgroupV2Value converts MemorySwap value from OCI spec
+// for use by cgroup v2 drivers. A conversion is needed since Resources.MemorySwap
+// is defined as memory+swap combined, while in cgroup v2 swap is a separate value.
+func ConvertMemorySwapToCgroupV2Value(memorySwap, memory int64) (int64, error) {
+	// for compatibility with cgroup1 controller, set swap to unlimited in
+	// case the memory is set to unlimited, and swap is not explicitly set,
+	// treating the request as "set both memory and swap to unlimited".
+	if memory == -1 && memorySwap == 0 {
+		return -1, nil
+	}
+	if memorySwap == -1 || memorySwap == 0 {
+		// -1 is "max", 0 is "unset", so treat as is
+		return memorySwap, nil
+	}
+	// sanity checks
+	if memory == 0 || memory == -1 {
+		return 0, errors.New("unable to set swap limit without memory limit")
+	}
+	if memory < 0 {
+		return 0, fmt.Errorf("invalid memory value: %d", memory)
+	}
+	if memorySwap < memory {
+		return 0, errors.New("memory+swap limit should be >= memory limit")
+	}
+
+	return memorySwap - memory, nil
 }

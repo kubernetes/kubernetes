@@ -11,15 +11,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"syscall" // only for Signal
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	"github.com/opencontainers/runc/libcontainer/logs"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/utils"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -68,6 +69,7 @@ type setnsProcess struct {
 	fds             []string
 	process         *Process
 	bootstrapData   io.Reader
+	initProcessPid  int
 }
 
 func (p *setnsProcess) startTime() (uint64, error) {
@@ -76,7 +78,7 @@ func (p *setnsProcess) startTime() (uint64, error) {
 }
 
 func (p *setnsProcess) signal(sig os.Signal) error {
-	s, ok := sig.(syscall.Signal)
+	s, ok := sig.(unix.Signal)
 	if !ok {
 		return errors.New("os: unsupported signal type")
 	}
@@ -102,7 +104,25 @@ func (p *setnsProcess) start() (err error) {
 	}
 	if len(p.cgroupPaths) > 0 {
 		if err := cgroups.EnterPid(p.cgroupPaths, p.pid()); err != nil && !p.rootlessCgroups {
-			return newSystemErrorWithCausef(err, "adding pid %d to cgroups", p.pid())
+			// On cgroup v2 + nesting + domain controllers, EnterPid may fail with EBUSY.
+			// https://github.com/opencontainers/runc/issues/2356#issuecomment-621277643
+			// Try to join the cgroup of InitProcessPid.
+			if cgroups.IsCgroup2UnifiedMode() {
+				initProcCgroupFile := fmt.Sprintf("/proc/%d/cgroup", p.initProcessPid)
+				initCg, initCgErr := cgroups.ParseCgroupFile(initProcCgroupFile)
+				if initCgErr == nil {
+					if initCgPath, ok := initCg[""]; ok {
+						initCgDirpath := filepath.Join(fs2.UnifiedMountpoint, initCgPath)
+						logrus.Debugf("adding pid %d to cgroups %v failed (%v), attempting to join %q (obtained from %s)",
+							p.pid(), p.cgroupPaths, err, initCg, initCgDirpath)
+						// NOTE: initCgDirPath is not guaranteed to exist because we didn't pause the container.
+						err = cgroups.WriteCgroupProc(initCgDirpath, p.pid())
+					}
+				}
+			}
+			if err != nil {
+				return newSystemErrorWithCausef(err, "adding pid %d to cgroups", p.pid())
+			}
 		}
 	}
 	if p.intelRdtPath != "" {
@@ -132,7 +152,7 @@ func (p *setnsProcess) start() (err error) {
 			// This shouldn't happen.
 			panic("unexpected procHooks in setns")
 		default:
-			return newSystemError(fmt.Errorf("invalid JSON payload from child"))
+			return newSystemError(errors.New("invalid JSON payload from child"))
 		}
 	})
 
@@ -279,7 +299,7 @@ func (p *initProcess) waitForChildExit(childPid int) error {
 	return nil
 }
 
-func (p *initProcess) start() error {
+func (p *initProcess) start() (retErr error) {
 	defer p.messageSockPair.parent.Close()
 	err := p.cmd.Start()
 	p.process.ops = p
@@ -290,6 +310,15 @@ func (p *initProcess) start() error {
 		p.process.ops = nil
 		return newSystemErrorWithCause(err, "starting init process command")
 	}
+	defer func() {
+		if retErr != nil {
+			p.manager.Destroy()
+			if p.intelRdtManager != nil {
+				p.intelRdtManager.Destroy()
+			}
+		}
+	}()
+
 	// Do this before syncing with child so that no children can escape the
 	// cgroup. We don't need to worry about not doing this and not being root
 	// because we'd be using the rootless cgroup manager in that case.
@@ -301,16 +330,6 @@ func (p *initProcess) start() error {
 			return newSystemErrorWithCause(err, "applying Intel RDT configuration for process")
 		}
 	}
-	defer func() {
-		if err != nil {
-			// TODO: should not be the responsibility to call here
-			p.manager.Destroy()
-			if p.intelRdtManager != nil {
-				p.intelRdtManager.Destroy()
-			}
-		}
-	}()
-
 	if _, err := io.Copy(p.messageSockPair.parent, p.bootstrapData); err != nil {
 		return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 	}
@@ -349,15 +368,6 @@ func (p *initProcess) start() error {
 		return newSystemErrorWithCause(err, "waiting for our first child to exit")
 	}
 
-	defer func() {
-		if err != nil {
-			// TODO: should not be the responsibility to call here
-			p.manager.Destroy()
-			if p.intelRdtManager != nil {
-				p.intelRdtManager.Destroy()
-			}
-		}
-	}()
 	if err := p.createNetworkInterfaces(); err != nil {
 		return newSystemErrorWithCause(err, "creating network interfaces")
 	}
@@ -439,7 +449,7 @@ func (p *initProcess) start() error {
 			}
 			sentResume = true
 		default:
-			return newSystemError(fmt.Errorf("invalid JSON payload from child"))
+			return newSystemError(errors.New("invalid JSON payload from child"))
 		}
 
 		return nil
@@ -449,7 +459,7 @@ func (p *initProcess) start() error {
 		return newSystemErrorWithCause(ierr, "container init")
 	}
 	if p.config.Config.Namespaces.Contains(configs.NEWNS) && !sentResume {
-		return newSystemError(fmt.Errorf("could not synchronise after executing prestart hooks with container process"))
+		return newSystemError(errors.New("could not synchronise after executing prestart hooks with container process"))
 	}
 	if err := unix.Shutdown(int(p.messageSockPair.parent.Fd()), unix.SHUT_WR); err != nil {
 		return newSystemErrorWithCause(err, "shutting down init pipe")
@@ -516,7 +526,7 @@ func (p *initProcess) createNetworkInterfaces() error {
 }
 
 func (p *initProcess) signal(sig os.Signal) error {
-	s, ok := sig.(syscall.Signal)
+	s, ok := sig.(unix.Signal)
 	if !ok {
 		return errors.New("os: unsupported signal type")
 	}

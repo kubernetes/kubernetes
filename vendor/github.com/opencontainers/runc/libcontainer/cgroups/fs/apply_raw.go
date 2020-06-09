@@ -4,7 +4,6 @@ package fs
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -35,7 +34,7 @@ var (
 	HugePageSizes, _ = cgroups.GetHugePageSize()
 )
 
-var errSubsystemDoesNotExist = fmt.Errorf("cgroup: subsystem does not exist")
+var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")
 
 type subsystemSet []subsystem
 
@@ -61,11 +60,19 @@ type subsystem interface {
 	Set(path string, cgroup *configs.Cgroup) error
 }
 
-type Manager struct {
+type manager struct {
 	mu       sync.Mutex
-	Cgroups  *configs.Cgroup
-	Rootless bool // ignore permission-related errors
-	Paths    map[string]string
+	cgroups  *configs.Cgroup
+	rootless bool // ignore permission-related errors
+	paths    map[string]string
+}
+
+func NewManager(cg *configs.Cgroup, paths map[string]string, rootless bool) cgroups.Manager {
+	return &manager{
+		cgroups:  cg,
+		paths:    paths,
+		rootless: rootless,
+	}
 }
 
 // The absolute path to the root of the cgroup hierarchies.
@@ -110,43 +117,39 @@ func isIgnorableError(rootless bool, err error) bool {
 	if !rootless {
 		return false
 	}
+	// TODO: rm errors.Cause once we switch to %w everywhere
+	err = errors.Cause(err)
 	// Is it an ordinary EPERM?
-	if os.IsPermission(errors.Cause(err)) {
+	if errors.Is(err, os.ErrPermission) {
 		return true
 	}
-
-	// Try to handle other errnos.
-	var errno error
-	switch err := errors.Cause(err).(type) {
-	case *os.PathError:
-		errno = err.Err
-	case *os.LinkError:
-		errno = err.Err
-	case *os.SyscallError:
-		errno = err.Err
+	// Handle some specific syscall errors.
+	var errno unix.Errno
+	if errors.As(err, &errno) {
+		return errno == unix.EROFS || errno == unix.EPERM || errno == unix.EACCES
 	}
-	return errno == unix.EROFS || errno == unix.EPERM || errno == unix.EACCES
+	return false
 }
 
-func (m *Manager) getSubsystems() subsystemSet {
+func (m *manager) getSubsystems() subsystemSet {
 	return subsystemsLegacy
 }
 
-func (m *Manager) Apply(pid int) (err error) {
-	if m.Cgroups == nil {
+func (m *manager) Apply(pid int) (err error) {
+	if m.cgroups == nil {
 		return nil
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var c = m.Cgroups
+	var c = m.cgroups
 
-	d, err := getCgroupData(m.Cgroups, pid)
+	d, err := getCgroupData(m.cgroups, pid)
 	if err != nil {
 		return err
 	}
 
-	m.Paths = make(map[string]string)
+	m.paths = make(map[string]string)
 	if c.Paths != nil {
 		for name, path := range c.Paths {
 			_, err := d.path(name)
@@ -156,15 +159,12 @@ func (m *Manager) Apply(pid int) (err error) {
 				}
 				return err
 			}
-			m.Paths[name] = path
+			m.paths[name] = path
 		}
-		return cgroups.EnterPid(m.Paths, pid)
+		return cgroups.EnterPid(m.paths, pid)
 	}
 
 	for _, sys := range m.getSubsystems() {
-		// TODO: Apply should, ideally, be reentrant or be broken up into a separate
-		// create and join phase so that the cgroup hierarchy for a container can be
-		// created then join consists of writing the process pids to cgroup.procs
 		p, err := d.path(sys.Name())
 		if err != nil {
 			// The non-presence of the devices subsystem is
@@ -174,15 +174,15 @@ func (m *Manager) Apply(pid int) (err error) {
 			}
 			return err
 		}
-		m.Paths[sys.Name()] = p
+		m.paths[sys.Name()] = p
 
 		if err := sys.Apply(d); err != nil {
-			// In the case of rootless (including euid=0 in userns), where an explicit cgroup path hasn't
-			// been set, we don't bail on error in case of permission problems.
-			// Cases where limits have been set (and we couldn't create our own
-			// cgroup) are handled by Set.
-			if isIgnorableError(m.Rootless, err) && m.Cgroups.Path == "" {
-				delete(m.Paths, sys.Name())
+			// In the case of rootless (including euid=0 in userns), where an
+			// explicit cgroup path hasn't been set, we don't bail on error in
+			// case of permission problems. Cases where limits have been set
+			// (and we couldn't create our own cgroup) are handled by Set.
+			if isIgnorableError(m.rootless, err) && m.cgroups.Path == "" {
+				delete(m.paths, sys.Name())
 				continue
 			}
 			return err
@@ -192,35 +192,30 @@ func (m *Manager) Apply(pid int) (err error) {
 	return nil
 }
 
-func (m *Manager) Destroy() error {
-	if m.Cgroups == nil || m.Cgroups.Paths != nil {
+func (m *manager) Destroy() error {
+	if m.cgroups == nil || m.cgroups.Paths != nil {
 		return nil
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := cgroups.RemovePaths(m.Paths); err != nil {
+	if err := cgroups.RemovePaths(m.paths); err != nil {
 		return err
 	}
-	m.Paths = make(map[string]string)
+	m.paths = make(map[string]string)
 	return nil
 }
 
-func (m *Manager) GetPaths() map[string]string {
+func (m *manager) Path(subsys string) string {
 	m.mu.Lock()
-	paths := m.Paths
-	m.mu.Unlock()
-	return paths
+	defer m.mu.Unlock()
+	return m.paths[subsys]
 }
 
-func (m *Manager) GetUnifiedPath() (string, error) {
-	return "", errors.New("unified path is only supported when running in unified mode")
-}
-
-func (m *Manager) GetStats() (*cgroups.Stats, error) {
+func (m *manager) GetStats() (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
-	for name, path := range m.Paths {
+	for name, path := range m.paths {
 		sys, err := m.getSubsystems().Get(name)
 		if err == errSubsystemDoesNotExist || !cgroups.PathExists(path) {
 			continue
@@ -232,22 +227,23 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 	return stats, nil
 }
 
-func (m *Manager) Set(container *configs.Config) error {
+func (m *manager) Set(container *configs.Config) error {
 	if container.Cgroups == nil {
 		return nil
 	}
 
 	// If Paths are set, then we are just joining cgroups paths
 	// and there is no need to set any values.
-	if m.Cgroups != nil && m.Cgroups.Paths != nil {
+	if m.cgroups != nil && m.cgroups.Paths != nil {
 		return nil
 	}
 
-	paths := m.GetPaths()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, sys := range m.getSubsystems() {
-		path := paths[sys.Name()]
+		path := m.paths[sys.Name()]
 		if err := sys.Set(path, container.Cgroups); err != nil {
-			if m.Rootless && sys.Name() == "devices" {
+			if m.rootless && sys.Name() == "devices" {
 				continue
 			}
 			// When m.Rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
@@ -262,45 +258,41 @@ func (m *Manager) Set(container *configs.Config) error {
 		}
 	}
 
-	if m.Paths["cpu"] != "" {
-		if err := CheckCpushares(m.Paths["cpu"], container.Cgroups.Resources.CpuShares); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
-func (m *Manager) Freeze(state configs.FreezerState) error {
-	if m.Cgroups == nil {
+func (m *manager) Freeze(state configs.FreezerState) (Err error) {
+	path := m.GetPaths()["freezer"]
+	if m.cgroups == nil || path == "" {
 		return errors.New("cannot toggle freezer: cgroups not configured for container")
 	}
 
-	paths := m.GetPaths()
-	dir := paths["freezer"]
-	prevState := m.Cgroups.Resources.Freezer
-	m.Cgroups.Resources.Freezer = state
+	prevState := m.cgroups.Resources.Freezer
+	m.cgroups.Resources.Freezer = state
+	defer func() {
+		if Err != nil {
+			m.cgroups.Resources.Freezer = prevState
+		}
+	}()
+
 	freezer, err := m.getSubsystems().Get("freezer")
 	if err != nil {
 		return err
 	}
-	err = freezer.Set(dir, m.Cgroups)
-	if err != nil {
-		m.Cgroups.Resources.Freezer = prevState
+	if err := freezer.Set(path, m.cgroups); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *Manager) GetPids() ([]int, error) {
-	paths := m.GetPaths()
-	return cgroups.GetPids(paths["devices"])
+func (m *manager) GetPids() ([]int, error) {
+	return cgroups.GetPids(m.Path("devices"))
 }
 
-func (m *Manager) GetAllPids() ([]int, error) {
-	paths := m.GetPaths()
-	return cgroups.GetAllPids(paths["devices"])
+func (m *manager) GetAllPids() ([]int, error) {
+	return cgroups.GetAllPids(m.Path("devices"))
 }
 
 func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
@@ -310,7 +302,7 @@ func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
 	}
 
 	if (c.Name != "" || c.Parent != "") && c.Path != "" {
-		return nil, fmt.Errorf("cgroup: either Path or Name and Parent should be used")
+		return nil, errors.New("cgroup: either Path or Name and Parent should be used")
 	}
 
 	// XXX: Do not remove this code. Path safety is important! -- cyphar
@@ -379,33 +371,24 @@ func removePath(p string, err error) error {
 	return nil
 }
 
-func CheckCpushares(path string, c uint64) error {
-	var cpuShares uint64
-
-	if c == 0 {
-		return nil
-	}
-
-	fd, err := os.Open(filepath.Join(path, "cpu.shares"))
-	if err != nil {
-		return err
-	}
-	defer fd.Close()
-
-	_, err = fmt.Fscanf(fd, "%d", &cpuShares)
-	if err != nil && err != io.EOF {
-		return err
-	}
-
-	if c > cpuShares {
-		return fmt.Errorf("The maximum allowed cpu-shares is %d", cpuShares)
-	} else if c < cpuShares {
-		return fmt.Errorf("The minimum allowed cpu-shares is %d", cpuShares)
-	}
-
-	return nil
+func (m *manager) GetPaths() map[string]string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.paths
 }
 
-func (m *Manager) GetCgroups() (*configs.Cgroup, error) {
-	return m.Cgroups, nil
+func (m *manager) GetCgroups() (*configs.Cgroup, error) {
+	return m.cgroups, nil
+}
+
+func (m *manager) GetFreezerState() (configs.FreezerState, error) {
+	paths := m.GetPaths()
+	dir := paths["freezer"]
+	freezer, err := m.getSubsystems().Get("freezer")
+
+	// If the container doesn't have the freezer cgroup, say it's undefined.
+	if err != nil || dir == "" {
+		return configs.Undefined, nil
+	}
+	return freezer.(*FreezerGroup).GetState(dir)
 }

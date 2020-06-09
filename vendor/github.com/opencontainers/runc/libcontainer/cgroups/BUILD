@@ -37,6 +37,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/devices:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/ebpf:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:all-srcs",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs2:all-srcs",

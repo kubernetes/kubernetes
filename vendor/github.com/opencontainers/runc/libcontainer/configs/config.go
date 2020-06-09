@@ -70,9 +70,10 @@ type Arg struct {
 
 // Syscall is a rule to match a syscall in Seccomp
 type Syscall struct {
-	Name   string `json:"name"`
-	Action Action `json:"action"`
-	Args   []*Arg `json:"args"`
+	Name     string `json:"name"`
+	Action   Action `json:"action"`
+	ErrnoRet *uint  `json:"errnoRet"`
+	Args     []*Arg `json:"args"`
 }
 
 // TODO Windows. Many of these fields should be factored out into those parts

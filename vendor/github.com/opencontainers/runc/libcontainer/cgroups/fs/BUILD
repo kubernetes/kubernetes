@@ -25,7 +25,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/moby/sys/mountinfo:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/devices:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fscommon:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/system:go_default_library",
@@ -34,7 +36,9 @@ go_library(
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/moby/sys/mountinfo:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/devices:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fscommon:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/system:go_default_library",
