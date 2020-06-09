@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,7 @@ import (
 )
 
 func TestAdmission(t *testing.T) {
-	defaultClass1 := &networkingv1beta1.IngressClass{
+	defaultClass1 := &networkingv1.IngressClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "IngressClass",
 		},
@@ -46,7 +47,7 @@ func TestAdmission(t *testing.T) {
 			},
 		},
 	}
-	defaultClass2 := &networkingv1beta1.IngressClass{
+	defaultClass2 := &networkingv1.IngressClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default2",
 			Annotations: map[string]string{
@@ -55,7 +56,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 	// Class that has explicit default = false
-	classWithFalseDefault := &networkingv1beta1.IngressClass{
+	classWithFalseDefault := &networkingv1.IngressClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "IngressClass",
 		},
@@ -67,7 +68,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 	// Class with missing default annotation (=non-default)
-	classWithNoDefault := &networkingv1beta1.IngressClass{
+	classWithNoDefault := &networkingv1.IngressClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "IngressClass",
 		},
@@ -76,7 +77,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 	// Class with empty default annotation (=non-default)
-	classWithEmptyDefault := &networkingv1beta1.IngressClass{
+	classWithEmptyDefault := &networkingv1.IngressClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "IngressClass",
 		},
@@ -90,7 +91,7 @@ func TestAdmission(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		classes         []*networkingv1beta1.IngressClass
+		classes         []*networkingv1.IngressClass
 		classField      *string
 		classAnnotation *string
 		expectedClass   *string
@@ -98,7 +99,7 @@ func TestAdmission(t *testing.T) {
 	}{
 		{
 			name:            "no default, no modification of Ingress",
-			classes:         []*networkingv1beta1.IngressClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classes:         []*networkingv1.IngressClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: nil,
 			expectedClass:   nil,
@@ -106,7 +107,7 @@ func TestAdmission(t *testing.T) {
 		},
 		{
 			name:            "one default, modify Ingress with class=nil",
-			classes:         []*networkingv1beta1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: nil,
 			expectedClass:   utilpointer.StringPtr(defaultClass1.Name),
@@ -114,7 +115,7 @@ func TestAdmission(t *testing.T) {
 		},
 		{
 			name:            "one default, no modification of Ingress with class field=''",
-			classes:         []*networkingv1beta1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      utilpointer.StringPtr(""),
 			classAnnotation: nil,
 			expectedClass:   utilpointer.StringPtr(""),
@@ -122,7 +123,7 @@ func TestAdmission(t *testing.T) {
 		},
 		{
 			name:            "one default, no modification of Ingress with class field='foo'",
-			classes:         []*networkingv1beta1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      utilpointer.StringPtr("foo"),
 			classAnnotation: nil,
 			expectedClass:   utilpointer.StringPtr("foo"),
@@ -130,7 +131,7 @@ func TestAdmission(t *testing.T) {
 		},
 		{
 			name:            "one default, no modification of Ingress with class annotation='foo'",
-			classes:         []*networkingv1beta1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classes:         []*networkingv1.IngressClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: utilpointer.StringPtr("foo"),
 			expectedClass:   nil,
@@ -138,15 +139,15 @@ func TestAdmission(t *testing.T) {
 		},
 		{
 			name:            "two defaults, error with Ingress with class field=nil",
-			classes:         []*networkingv1beta1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classes:         []*networkingv1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: nil,
 			expectedClass:   nil,
-			expectedError:   errors.NewForbidden(networkingv1beta1.Resource("ingresses"), "testing", errors.NewInternalError(fmt.Errorf("2 default IngressClasses were found, only 1 allowed"))),
+			expectedError:   errors.NewForbidden(networkingv1.Resource("ingresses"), "testing", errors.NewInternalError(fmt.Errorf("2 default IngressClasses were found, only 1 allowed"))),
 		},
 		{
 			name:            "two defaults, no modification with Ingress with class field=''",
-			classes:         []*networkingv1beta1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classes:         []*networkingv1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      utilpointer.StringPtr(""),
 			classAnnotation: nil,
 			expectedClass:   utilpointer.StringPtr(""),
@@ -157,11 +158,10 @@ func TestAdmission(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			ctrl := newPlugin()
-			ctrl.defaultIngressClassEnabled = true
 			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 			ctrl.SetExternalKubeInformerFactory(informerFactory)
 			for _, c := range testCase.classes {
-				informerFactory.Networking().V1beta1().IngressClasses().Informer().GetStore().Add(c)
+				informerFactory.Networking().V1().IngressClasses().Informer().GetStore().Add(c)
 			}
 
 			ingress := &networking.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "testing", Namespace: "testing"}}
@@ -178,7 +178,7 @@ func TestAdmission(t *testing.T) {
 				api.Kind("Ingress").WithVersion("version"),
 				ingress.Namespace,
 				ingress.Name,
-				networkingv1beta1.Resource("ingresses").WithVersion("version"),
+				networkingv1.Resource("ingresses").WithVersion("version"),
 				"", // subresource
 				admission.Create,
 				&metav1.CreateOptions{},
