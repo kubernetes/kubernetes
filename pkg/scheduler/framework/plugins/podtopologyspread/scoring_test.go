@@ -233,7 +233,6 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		//    but node2 either i) doesn't have all required topologyKeys present, or ii) doesn't match
 		//    incoming pod's nodeSelector/nodeAffinity
 		{
-			// if there is only one candidate node, it should be scored to 10
 			name: "one constraint on node, no existing pods",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
@@ -248,7 +247,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			},
 		},
 		{
-			// if there is only one candidate node, it should be scored to 10
+			// if there is only one candidate node, it should be scored to 100
 			name: "one constraint on node, only one node is candidate",
 			pod: st.MakePod().Name("p").Label("foo", "").
 				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
