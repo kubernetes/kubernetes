@@ -15,13 +15,14 @@ steps:
     # /certs/.docker-1809/, /certs/.docker-1903/, /certs/.docker-1909/ folders, which will contain the files.
     args:
     - -c
-    - 'mkdir .docker/windows &&\
-       gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_ca-pem > .docker-windows/ca.pem &&\
-       gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_cert-pem > .docker-windows/cert.pem &&\
-       gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_key-pem > .docker-windows/key.pem &&\
-          cp -r .docker-windows /certs/.docker-1809 && \
-          cp -r .docker-windows /certs/.docker-1903 && \
-          cp -r .docker-windows /certs/.docker-1909'
+    - |
+      mkdir -p .docker-windows
+      gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_ca-pem > .docker-windows/ca.pem
+      gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_cert-pem > .docker-windows/cert.pem
+      gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_key-pem > .docker-windows/key.pem
+      cp -r .docker-windows /certs/.docker-1809
+      cp -r .docker-windows /certs/.docker-1903
+      cp -r .docker-windows /certs/.docker-1909
     volumes:
     - name: 'certs'
       path: '/certs'
