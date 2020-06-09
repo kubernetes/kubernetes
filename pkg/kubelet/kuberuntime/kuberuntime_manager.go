@@ -929,44 +929,44 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			klog.Errorf("Unable to get resource configuration for pod %s", pod.Name)
 			return
 		}
-		setPodCgroupLimit := func(rName v1.ResourceName) error {
+		setPodCgroupConfig := func(rName v1.ResourceName) error {
 			var err error
 			switch rName {
 			case v1.ResourceCPU:
-				err = pcm.SetPodCgroupCpuLimit(pod, podResources.CpuQuota, podResources.CpuPeriod, podResources.CpuShares)
+				err = pcm.SetPodCgroupCpuConfig(pod, podResources.CpuQuota, podResources.CpuPeriod, podResources.CpuShares)
 			case v1.ResourceMemory:
-				err = pcm.SetPodCgroupMemoryLimit(pod, *podResources.Memory)
+				err = pcm.SetPodCgroupMemoryConfig(pod, *podResources.Memory)
 			}
 			if err != nil {
-				klog.Errorf("Failed to set %s cgroup limit for pod %s failed: %v", rName, pod.Name, err)
+				klog.Errorf("Failed to set %s cgroup config for pod %s failed: %v", rName, pod.Name, err)
 			}
 			return err
 		}
-		// If resize results in net pod resource increase, set pod cgroup limits before resizing containers.
-		// If resize results in net pod resource decrease, set pod cgroup limits after resizing containers.
+		// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
+		// If resize results in net pod resource decrease, set pod cgroup config after resizing containers.
 		// If an error occurs at any point, abort. Let future syncpod iterations retry the unfinished stuff.
 		resizeContainers := func(rName v1.ResourceName, currPodCgLimit, newPodCgLimit int64) error {
 			var err error
 			if newPodCgLimit > currPodCgLimit {
-				if err = setPodCgroupLimit(rName); err != nil {
+				if err = setPodCgroupConfig(rName); err != nil {
 					return err
 				}
 			}
 			if len(podContainerChanges.ContainersToUpdate[rName]) > 0 {
-				if err = m.updateContainerLimits(pod, podStatus, rName, podContainerChanges.ContainersToUpdate[rName]); err != nil {
-					klog.Errorf("updateContainerLimits for pod %q resource %s failed: %v", format.Pod(pod), rName, err)
+				if err = m.updatePodContainerResources(pod, podStatus, rName, podContainerChanges.ContainersToUpdate[rName]); err != nil {
+					klog.Errorf("updatePodContainerResources for pod %q resource %s failed: %v", format.Pod(pod), rName, err)
 					return err
 				}
 			}
 			if newPodCgLimit < currPodCgLimit {
-				err = setPodCgroupLimit(rName)
+				err = setPodCgroupConfig(rName)
 			}
 			return err
 		}
 		if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || len(podContainerChanges.ContainersToRestart) > 0 {
-			currentPodMemoryLimit, err := pcm.GetPodCgroupMemoryLimit(pod)
+			currentPodMemoryLimit, err := pcm.GetPodCgroupMemoryConfig(pod)
 			if err != nil {
-				klog.Errorf("GetPodCgroupMemoryLimit for pod %s failed: %v", pod.Name, err)
+				klog.Errorf("GetPodCgroupMemoryConfig for pod %s failed: %v", pod.Name, err)
 				return
 			}
 			if errResize := resizeContainers(v1.ResourceMemory, int64(currentPodMemoryLimit), *podResources.Memory); errResize != nil {
@@ -974,9 +974,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			}
 		}
 		if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || len(podContainerChanges.ContainersToRestart) > 0 {
-			currentPodCpuQuota, _, _, err := pcm.GetPodCgroupCpuLimit(pod)
+			currentPodCpuQuota, _, _, err := pcm.GetPodCgroupCpuConfig(pod)
 			if err != nil {
-				klog.Errorf("GetPodCgroupCpuLimit for pod %s failed: %v", pod.Name, err)
+				klog.Errorf("GetPodCgroupCpuConfig for pod %s failed: %v", pod.Name, err)
 				return
 			}
 			if errResize := resizeContainers(v1.ResourceCPU, currentPodCpuQuota, *podResources.CpuQuota); errResize != nil {
@@ -991,15 +991,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	return
 }
 
-func (m *kubeGenericRuntimeManager) updateContainerLimits(pod *v1.Pod, podStatus *kubecontainer.PodStatus, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
-	var updatedLimitsMap map[kubecontainer.ContainerID]struct {
+func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, podStatus *kubecontainer.PodStatus, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
+	type updatedResourcesInfo struct {
 		cStatus *kubecontainer.Status
 		rLimits v1.ResourceList
+		rAllocs v1.ResourceList
 	}
-	updatedLimitsMap = make(map[kubecontainer.ContainerID]struct {
-		cStatus *kubecontainer.Status
-		rLimits v1.ResourceList
-	})
+	updatedResourcesMap := make(map[kubecontainer.ContainerID]updatedResourcesInfo)
 
 	for _, cInfo := range containersToUpdate {
 		if *cInfo.restart == true {
@@ -1007,8 +1005,10 @@ func (m *kubeGenericRuntimeManager) updateContainerLimits(pod *v1.Pod, podStatus
 		}
 		container := &pod.Spec.Containers[cInfo.specIndex]
 		specLimits := container.Resources.Limits
+		specAllocs := container.ResourcesAllocated
 		defer func() {
 			container.Resources.Limits = specLimits
+			container.ResourcesAllocated = specAllocs
 		}()
 		switch resourceName {
 		case v1.ResourceCPU:
@@ -1016,10 +1016,18 @@ func (m *kubeGenericRuntimeManager) updateContainerLimits(pod *v1.Pod, podStatus
 				v1.ResourceCPU:    *specLimits.Cpu(),
 				v1.ResourceMemory: *cInfo.apiContainerStatus.Resources.Limits.Memory(),
 			}
+			container.ResourcesAllocated = v1.ResourceList{
+				v1.ResourceCPU:    *specAllocs.Cpu(),
+				v1.ResourceMemory: *cInfo.apiContainerStatus.Resources.Requests.Memory(),
+			}
 		case v1.ResourceMemory:
 			container.Resources.Limits = v1.ResourceList{
 				v1.ResourceCPU:    *cInfo.apiContainerStatus.Resources.Limits.Cpu(),
 				v1.ResourceMemory: *specLimits.Memory(),
+			}
+			container.ResourcesAllocated = v1.ResourceList{
+				v1.ResourceCPU:    *cInfo.apiContainerStatus.Resources.Requests.Cpu(),
+				v1.ResourceMemory: *specAllocs.Memory(),
 			}
 		}
 		if err := m.updateContainerResources(pod, container, cInfo.kubeContainerStatus.ID); err != nil {
@@ -1027,33 +1035,36 @@ func (m *kubeGenericRuntimeManager) updateContainerLimits(pod *v1.Pod, podStatus
 			return err
 		}
 		cInfo.apiContainerStatus.Resources.Limits = container.Resources.Limits
-		// NOTE: Ideally, cpu and memory resource limits come from ContainerStatus CRI API query.
-		//       However, the runtime may not have implemented query support for currently configured limits.
-		//       If limits info isn't available via CRI, update pod cache status successfully updated spec limits.
+		// NOTE: Ideally, cpu and memory resources information come from ContainerStatus CRI API query.
+		//       However, the runtime may not have implemented query support for currently configured resources.
+		//       If this info isn't available via CRI, update pod cache status on successful updateContainerResources.
 		if container.Resources.Limits != nil {
-			updatedLimitsMap[cInfo.kubeContainerStatus.ID] = struct {
-				cStatus *kubecontainer.Status
-				rLimits v1.ResourceList
-			}{
-				cInfo.kubeContainerStatus,
-				container.Resources.Limits,
+			updatedResourcesMap[cInfo.kubeContainerStatus.ID] = updatedResourcesInfo{
+				cStatus: cInfo.kubeContainerStatus,
+				rLimits: container.Resources.Limits,
+				rAllocs: container.ResourcesAllocated,
 			}
 		}
 	}
 
-	if len(updatedLimitsMap) > 0 {
-		// Update pod cache runtime container status (cInfo.kubeContainerStatus) with resource limits from ContainerStatus CRI API
+	if len(updatedResourcesMap) > 0 {
+		// Update pod cache runtime container status (cInfo.kubeContainerStatus) with resources from ContainerStatus API.
 		newPodStatus, err := m.GetPodStatus(podStatus.ID, pod.Name, pod.Namespace)
 		if err != nil {
 			klog.Errorf("GetPodStatus failed for pod %q failed: %v", format.Pod(pod), err)
 			return err
 		}
 		for _, kubeContainerStatus := range newPodStatus.ContainerStatuses {
-			if updatedInfo, updated := updatedLimitsMap[kubeContainerStatus.ID]; updated {
-				if kubeContainerStatus.ResourceLimits != nil {
-					updatedInfo.cStatus.ResourceLimits = kubeContainerStatus.ResourceLimits
+			if updatedInfo, updated := updatedResourcesMap[kubeContainerStatus.ID]; updated {
+				if kubeContainerStatus.Resources.Limits != nil {
+					updatedInfo.cStatus.Resources.Limits = kubeContainerStatus.Resources.Limits
 				} else {
-					updatedInfo.cStatus.ResourceLimits = updatedInfo.rLimits.DeepCopy()
+					updatedInfo.cStatus.Resources.Limits = updatedInfo.rLimits.DeepCopy()
+				}
+				if kubeContainerStatus.Resources.Requests != nil {
+					updatedInfo.cStatus.Resources.Requests = kubeContainerStatus.Resources.Requests
+				} else {
+					updatedInfo.cStatus.Resources.Requests = updatedInfo.rAllocs.DeepCopy()
 				}
 			}
 		}

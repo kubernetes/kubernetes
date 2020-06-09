@@ -92,14 +92,14 @@ type CgroupManager interface {
 	ReduceCPULimits(cgroupName CgroupName) error
 	// GetResourceStats returns statistics of the specified cgroup as read from the cgroup fs.
 	GetResourceStats(name CgroupName) (*ResourceStats, error)
-	// GetCgroupMemoryLimit returns the memory limit of the specified cgroup as read from cgroup fs.
-	GetCgroupMemoryLimit(name CgroupName) (uint64, error)
-	// GetCgroupCpuLimit returns the cpu quota, cpu period, and cpu shares of the specified cgroup as read from cgroup fs.
-	GetCgroupCpuLimit(name CgroupName) (int64, uint64, uint64, error)
-	// SetCgroupMemoryLimit sets the memory limit of the specified cgroup.
-	SetCgroupMemoryLimit(name CgroupName, memoryLimit int64) error
-	// SetCgroupCpuLimit sets the cpu quota, cpu period, and cpu shares of the specified cgroup.
-	SetCgroupCpuLimit(name CgroupName, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error
+	// GetCgroupMemoryConfig returns the memory limit of the specified cgroup as read from cgroup fs.
+	GetCgroupMemoryConfig(name CgroupName) (uint64, error)
+	// GetCgroupCpuConfig returns the cpu quota, cpu period, and cpu shares of the specified cgroup as read from cgroup fs.
+	GetCgroupCpuConfig(name CgroupName) (int64, uint64, uint64, error)
+	// SetCgroupMemoryConfig sets the memory limit of the specified cgroup.
+	SetCgroupMemoryConfig(name CgroupName, memoryLimit int64) error
+	// SetCgroupCpuConfig sets the cpu quota, cpu period, and cpu shares of the specified cgroup.
+	SetCgroupCpuConfig(name CgroupName, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error
 }
 
 // QOSContainersInfo stores the names of containers per qos
@@ -137,14 +137,14 @@ type PodContainerManager interface {
 	IsPodCgroup(cgroupfs string) (bool, types.UID)
 
 	// Get value of memory.limit_in_bytes for the pod Cgroup
-	GetPodCgroupMemoryLimit(pod *v1.Pod) (uint64, error)
+	GetPodCgroupMemoryConfig(pod *v1.Pod) (uint64, error)
 
 	// Get values of cpu.cfs_quota_us, cpu.cfs_period_us, and cpu.shares for the pod Cgroup
-	GetPodCgroupCpuLimit(pod *v1.Pod) (int64, uint64, uint64, error)
+	GetPodCgroupCpuConfig(pod *v1.Pod) (int64, uint64, uint64, error)
 
 	// Set value of memory.limit_in_bytes for the pod Cgroup
-	SetPodCgroupMemoryLimit(pod *v1.Pod, memoryLimit int64) error
+	SetPodCgroupMemoryConfig(pod *v1.Pod, memoryLimit int64) error
 
 	// Set values of cpu.cfs_quota_us, cpu.cfs_period_us, and cpu.shares for the pod Cgroup
-	SetPodCgroupCpuLimit(pod *v1.Pod, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error
+	SetPodCgroupCpuConfig(pod *v1.Pod, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error
 }

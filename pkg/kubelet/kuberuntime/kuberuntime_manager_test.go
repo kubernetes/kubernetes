@@ -1743,7 +1743,7 @@ func TestUpdateContainerLimits(t *testing.T) {
 			// default resize policy when pod resize feature is enabled
 			pod.Spec.Containers[idx].Resources = tc.apiSpecResources[idx]
 			pod.Status.ContainerStatuses[idx].Resources = tc.apiStatusResources[idx]
-			kubeStatus.ContainerStatuses[idx].ResourceLimits = tc.kubeStatusResources[idx]
+			kubeStatus.ContainerStatuses[idx].Resources.Limits = tc.kubeStatusResources[idx]
 			kubeStatus.ContainerStatuses[idx].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
 			cInfo := containerToUpdateInfo{
 				specIndex:           idx,
@@ -1755,14 +1755,14 @@ func TestUpdateContainerLimits(t *testing.T) {
 
 		}
 		fakeRuntime.Called = []string{}
-		err := m.updateContainerLimits(pod, kubeStatus, tc.resourceName, containersToUpdate)
+		err := m.updatePodContainerResources(pod, kubeStatus, tc.resourceName, containersToUpdate)
 		assert.NoError(t, err, dsc)
 
 		if tc.invokeUpdateResources {
 			assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources", dsc)
 		}
 		for idx := range pod.Spec.Containers {
-			assert.Equal(t, tc.expectedKubeResources[idx], kubeStatus.ContainerStatuses[idx].ResourceLimits, dsc)
+			assert.Equal(t, tc.expectedKubeResources[idx], kubeStatus.ContainerStatuses[idx].Resources.Limits, dsc)
 		}
 	}
 }

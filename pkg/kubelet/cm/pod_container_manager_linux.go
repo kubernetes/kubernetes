@@ -126,24 +126,24 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	return cgroupName, cgroupfsName
 }
 
-func (m *podContainerManagerImpl) GetPodCgroupMemoryLimit(pod *v1.Pod) (uint64, error) {
+func (m *podContainerManagerImpl) GetPodCgroupMemoryConfig(pod *v1.Pod) (uint64, error) {
 	podCgroupName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.GetCgroupMemoryLimit(podCgroupName)
+	return m.cgroupManager.GetCgroupMemoryConfig(podCgroupName)
 }
 
-func (m *podContainerManagerImpl) GetPodCgroupCpuLimit(pod *v1.Pod) (int64, uint64, uint64, error) {
+func (m *podContainerManagerImpl) GetPodCgroupCpuConfig(pod *v1.Pod) (int64, uint64, uint64, error) {
 	podCgroupName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.GetCgroupCpuLimit(podCgroupName)
+	return m.cgroupManager.GetCgroupCpuConfig(podCgroupName)
 }
 
-func (m *podContainerManagerImpl) SetPodCgroupMemoryLimit(pod *v1.Pod, memoryLimit int64) error {
+func (m *podContainerManagerImpl) SetPodCgroupMemoryConfig(pod *v1.Pod, memoryLimit int64) error {
 	podCgroupName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.SetCgroupMemoryLimit(podCgroupName, memoryLimit)
+	return m.cgroupManager.SetCgroupMemoryConfig(podCgroupName, memoryLimit)
 }
 
-func (m *podContainerManagerImpl) SetPodCgroupCpuLimit(pod *v1.Pod, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error {
+func (m *podContainerManagerImpl) SetPodCgroupCpuConfig(pod *v1.Pod, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error {
 	podCgroupName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.SetCgroupCpuLimit(podCgroupName, cpuQuota, cpuPeriod, cpuShares)
+	return m.cgroupManager.SetCgroupCpuConfig(podCgroupName, cpuQuota, cpuPeriod, cpuShares)
 }
 
 // Kill one process ID
@@ -352,18 +352,18 @@ func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID)
 	return false, types.UID("")
 }
 
-func (m *podContainerManagerNoop) GetPodCgroupMemoryLimit(_ *v1.Pod) (uint64, error) {
+func (m *podContainerManagerNoop) GetPodCgroupMemoryConfig(_ *v1.Pod) (uint64, error) {
 	return 0, nil
 }
 
-func (m *podContainerManagerNoop) GetPodCgroupCpuLimit(_ *v1.Pod) (int64, uint64, uint64, error) {
+func (m *podContainerManagerNoop) GetPodCgroupCpuConfig(_ *v1.Pod) (int64, uint64, uint64, error) {
 	return 0, 0, 0, nil
 }
 
-func (m *podContainerManagerNoop) SetPodCgroupMemoryLimit(_ *v1.Pod, _ int64) error {
+func (m *podContainerManagerNoop) SetPodCgroupMemoryConfig(_ *v1.Pod, _ int64) error {
 	return nil
 }
 
-func (m *podContainerManagerNoop) SetPodCgroupCpuLimit(_ *v1.Pod, _ *int64, _, _ *uint64) error {
+func (m *podContainerManagerNoop) SetPodCgroupCpuConfig(_ *v1.Pod, _ *int64, _, _ *uint64) error {
 	return nil
 }

@@ -784,7 +784,7 @@ func (m *cgroupManagerImpl) GetResourceStats(name CgroupName) (*ResourceStats, e
 }
 
 // Get the memory limit in bytes applied to the cgroup
-func (m *cgroupManagerImpl) GetCgroupMemoryLimit(name CgroupName) (uint64, error) {
+func (m *cgroupManagerImpl) GetCgroupMemoryConfig(name CgroupName) (uint64, error) {
 	cgroupPaths := m.buildCgroupPaths(name)
 	stats, err := getStatsSupportedSubsystems(cgroupPaths)
 	if err != nil {
@@ -794,7 +794,7 @@ func (m *cgroupManagerImpl) GetCgroupMemoryLimit(name CgroupName) (uint64, error
 }
 
 // Get the cpu quota, cpu period, and cpu shares applied to the cgroup
-func (m *cgroupManagerImpl) GetCgroupCpuLimit(name CgroupName) (int64, uint64, uint64, error) {
+func (m *cgroupManagerImpl) GetCgroupCpuConfig(name CgroupName) (int64, uint64, uint64, error) {
 	cgroupPaths := m.buildCgroupPaths(name)
 	cgroupCpuPath, found := cgroupPaths["cpu"]
 	if !found {
@@ -820,7 +820,7 @@ func (m *cgroupManagerImpl) GetCgroupCpuLimit(name CgroupName) (int64, uint64, u
 }
 
 // Set the memory limit in bytes applied to the cgroup
-func (m *cgroupManagerImpl) SetCgroupMemoryLimit(name CgroupName, memoryLimit int64) error {
+func (m *cgroupManagerImpl) SetCgroupMemoryConfig(name CgroupName, memoryLimit int64) error {
 	cgroupPaths := m.buildCgroupPaths(name)
 	cgroupMemoryPath, found := cgroupPaths["memory"]
 	if !found {
@@ -834,7 +834,7 @@ func (m *cgroupManagerImpl) SetCgroupMemoryLimit(name CgroupName, memoryLimit in
 }
 
 // Set the cpu quota, cpu period, and cpu shares applied to the cgroup
-func (m *cgroupManagerImpl) SetCgroupCpuLimit(name CgroupName, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error {
+func (m *cgroupManagerImpl) SetCgroupCpuConfig(name CgroupName, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error {
 	var cpuQuotaStr, cpuPeriodStr, cpuSharesStr string
 	cgroupPaths := m.buildCgroupPaths(name)
 	cgroupCpuPath, found := cgroupPaths["cpu"]

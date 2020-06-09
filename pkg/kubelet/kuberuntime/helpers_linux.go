@@ -18,6 +18,10 @@ limitations under the License.
 
 package kuberuntime
 
+import (
+	"math"
+)
+
 const (
 	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
 	minShares     = 2
@@ -64,6 +68,15 @@ func milliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	}
 
 	return
+}
+
+// sharesToMilliCPU converts CpuShares (cpu.shares) to milli-CPU value
+func sharesToMilliCPU(shares int64) int64 {
+	milliCpu := int64(0)
+	if shares >= minShares {
+		milliCpu = int64(math.Ceil(float64(shares*milliCPUToCPU) / float64(sharesPerCPU)))
+	}
+	return milliCpu
 }
 
 // quotaToMilliCPU converts cpu.cfs_quota_us and cpu.cfs_period_us to milli-CPU value

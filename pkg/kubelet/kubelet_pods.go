@@ -1581,41 +1581,47 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			if status.State.Running != nil {
 				var requests, limits v1.ResourceList
+				// oldStatus should always exist if container state is running? TODO: Verify this.
+				oldStatus, oldStatusFound := oldStatuses[cName]
 				// Set initial limits from container's spec upon transition to Running state
 				// For cpu & memory, limits queried from runtime via CRI always supercedes spec.limit
 				// For ephemeral-storage, a running container's status.limit equals spec.limit
-				if containerResources[cName].Limits != nil {
-					// oldStatus should always exist if container state is running? TODO: Verify this.
-					oldStatus, oldStatusFound := oldStatuses[cName]
-					limits = make(v1.ResourceList)
-					determineResourceLimits := func(rName v1.ResourceName) {
-						if res, found := cStatus.ResourceLimits[rName]; found {
-							limits[rName] = res.DeepCopy()
-							return
-						}
-						if oldStatusFound {
-							if oldStatus.State.Running == nil || status.ContainerID != oldStatus.ContainerID {
-								if res, exists := containerResources[cName].Limits[rName]; exists {
-									limits[rName] = res.DeepCopy()
-								}
-							} else {
-								if oldStatus.Resources.Limits != nil {
-									if res, exists := oldStatus.Resources.Limits[rName]; exists {
-										limits[rName] = res.DeepCopy()
-									}
+				determineResource := func(rName v1.ResourceName, ctrStsRes, ctrRes, oldStsRes, resource v1.ResourceList) {
+					if res, found := ctrStsRes[rName]; found {
+						resource[rName] = res.DeepCopy()
+						return
+					}
+					if oldStatusFound {
+						if oldStatus.State.Running == nil || status.ContainerID != oldStatus.ContainerID {
+							if res, exists := ctrRes[rName]; exists {
+								resource[rName] = res.DeepCopy()
+							}
+						} else {
+							if oldStsRes != nil {
+								if res, exists := oldStsRes[rName]; exists {
+									resource[rName] = res.DeepCopy()
 								}
 							}
 						}
 					}
-					determineResourceLimits(v1.ResourceCPU)
-					determineResourceLimits(v1.ResourceMemory)
+				}
+				if containerResources[cName].Limits != nil {
+					limits = make(v1.ResourceList)
+					determineResource(v1.ResourceCPU, cStatus.Resources.Limits, containerResources[cName].Limits, oldStatus.Resources.Limits, limits)
+					determineResource(v1.ResourceMemory, cStatus.Resources.Limits, containerResources[cName].Limits, oldStatus.Resources.Limits, limits)
 					if ephemeralStorage, found := containerResources[cName].Limits[v1.ResourceEphemeralStorage]; found {
 						limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 					}
 				}
-				// A running container's status.requests always comes from spec.resourcesAllocated
 				if containerResources[cName].Allocations != nil {
-					requests = containerResources[cName].Allocations.DeepCopy()
+					requests = make(v1.ResourceList)
+					determineResource(v1.ResourceCPU, cStatus.Resources.Requests, containerResources[cName].Allocations, oldStatus.Resources.Requests, requests)
+					if memory, found := containerResources[cName].Allocations[v1.ResourceMemory]; found {
+						requests[v1.ResourceMemory] = memory.DeepCopy()
+					}
+					if ephemeralStorage, found := containerResources[cName].Allocations[v1.ResourceEphemeralStorage]; found {
+						requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
+					}
 				}
 				status.Resources = v1.ResourceRequirements{
 					Limits:   limits,

@@ -202,6 +202,44 @@ func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 	}
 }
 
+func TestSharesToMilliCPU(t *testing.T) {
+	knownMilliCpuToShares := map[int64]int64{
+		0:    2,
+		1:    2,
+		2:    2,
+		3:    3,
+		4:    4,
+		32:   32,
+		64:   65,
+		100:  102,
+		250:  256,
+		500:  512,
+		1000: 1024,
+		1500: 1536,
+		2000: 2048,
+	}
+
+	t.Run("sharesToMilliCPUTest", func(t *testing.T) {
+		var testMilliCpu int64
+		for testMilliCpu = 0; testMilliCpu <= 2000; testMilliCpu++ {
+			shares := milliCPUToShares(testMilliCpu)
+			if expectedShares, found := knownMilliCpuToShares[testMilliCpu]; found {
+				if shares != expectedShares {
+					t.Errorf("Test milliCPIToShares: Input milliCpu %v, expected shares %v, but got %v", testMilliCpu, expectedShares, shares)
+				}
+			}
+			expectedMilliCpu := testMilliCpu
+			if testMilliCpu < 2 {
+				expectedMilliCpu = 2
+			}
+			milliCpu := sharesToMilliCPU(shares)
+			if milliCpu != expectedMilliCpu {
+				t.Errorf("Test sharesToMilliCPU: Input shares %v, expected milliCpu %v, but got %v", shares, expectedMilliCpu, milliCpu)
+			}
+		}
+	})
+}
+
 func TestQuotaToMilliCPU(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

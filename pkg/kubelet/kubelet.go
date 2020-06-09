@@ -1624,7 +1624,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if !kl.podIsTerminated(pod) {
+		if !kl.podIsTerminated(pod) && !kubepod.IsStaticPod(pod) {
 			kl.handlePodResourcesResize(pod)
 		}
 	}
@@ -1692,7 +1692,6 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) {
 	}
 
 	if fit, patchData := kl.canResizePod(pod); fit {
-		// TODO: go routine for Patch
 		_, patchError := kl.kubeClient.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, []byte(patchData), metav1.PatchOptions{})
 		if patchError != nil {
 			klog.Errorf("Failed to patch ResourcesAllocated values for pod %s: %+v\n", pod.Name, patchError)
