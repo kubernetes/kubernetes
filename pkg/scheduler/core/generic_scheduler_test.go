@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/events"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -2021,16 +2023,13 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fitErr := FitError{
-				FilteredNodesStatuses: test.nodesStatuses,
-			}
 			var nodeInfos []*framework.NodeInfo
 			for _, n := range makeNodeList(nodeNames) {
 				ni := framework.NewNodeInfo()
 				ni.SetNode(n)
 				nodeInfos = append(nodeInfos, ni)
 			}
-			nodes := nodesWherePreemptionMightHelp(nodeInfos, &fitErr)
+			nodes := nodesWherePreemptionMightHelp(nodeInfos, test.nodesStatuses)
 			if len(test.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(test.expected), len(nodes), nodes)
 			}
@@ -2359,7 +2358,13 @@ func TestPreempt(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			apiObjs := mergeObjs(test.pod, test.pods)
+			client := clientsetfake.NewSimpleClientset(apiObjs...)
+			deletedPodNames := make(sets.String)
+			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				deletedPodNames.Insert(action.(clienttesting.DeleteAction).GetName())
+				return true, nil, nil
+			})
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 			stop := make(chan struct{})
@@ -2399,11 +2404,18 @@ func TestPreempt(t *testing.T) {
 			}
 
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			fwk, err := st.NewFramework(test.registerPlugins, framework.WithSnapshotSharedLister(snapshot))
+			fwk, err := st.NewFramework(
+				test.registerPlugins,
+				framework.WithClientSet(client),
+				framework.WithSnapshotSharedLister(snapshot),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
-			prof := &profile.Profile{Framework: fwk}
+			prof := &profile.Profile{
+				Framework: fwk,
+				Recorder:  &events.FakeRecorder{},
+			}
 
 			scheduler := NewGenericScheduler(
 				cache,
@@ -2425,7 +2437,7 @@ func TestPreempt(t *testing.T) {
 			if test.failedNodeToStatusMap != nil {
 				failedNodeToStatusMap = test.failedNodeToStatusMap
 			}
-			node, victims, _, err := scheduler.Preempt(context.Background(), prof, state, test.pod, error(&FitError{Pod: test.pod, FilteredNodesStatuses: failedNodeToStatusMap}))
+			node, err := scheduler.Preempt(context.Background(), prof, state, test.pod, failedNodeToStatusMap)
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
@@ -2435,31 +2447,39 @@ func TestPreempt(t *testing.T) {
 			if len(node) == 0 && len(test.expectedNode) != 0 {
 				t.Errorf("expected node: %v, got: nothing", test.expectedNode)
 			}
-			if len(victims) != len(test.expectedPods) {
-				t.Errorf("expected %v pods, got %v.", len(test.expectedPods), len(victims))
+			if len(deletedPodNames) != len(test.expectedPods) {
+				t.Errorf("expected %v pods, got %v.", len(test.expectedPods), len(deletedPodNames))
 			}
-			for _, victim := range victims {
+			for victimName := range deletedPodNames {
 				found := false
 				for _, expPod := range test.expectedPods {
-					if expPod == victim.Name {
+					if expPod == victimName {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("pod %v is not expected to be a victim.", victim.Name)
+					t.Fatalf("pod %v is not expected to be a victim.", victimName)
 				}
-				// Mark the victims for deletion and record the preemptor's nominated node name.
-				now := metav1.Now()
-				victim.DeletionTimestamp = &now
-				test.pod.Status.NominatedNodeName = node
 			}
+			test.pod.Status.NominatedNodeName = node
+			client.CoreV1().Pods(test.pod.Namespace).Update(context.TODO(), test.pod, metav1.UpdateOptions{})
+
+			// Manually set the deleted Pods' deletionTimestamp to non-nil.
+			for _, pod := range test.pods {
+				if deletedPodNames.Has(pod.Name) {
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					deletedPodNames.Delete(pod.Name)
+				}
+			}
+
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			node, victims, _, err = scheduler.Preempt(context.Background(), prof, state, test.pod, error(&FitError{Pod: test.pod, FilteredNodesStatuses: failedNodeToStatusMap}))
+			node, err = scheduler.Preempt(context.Background(), prof, state, test.pod, failedNodeToStatusMap)
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
-			if len(node) != 0 && len(victims) > 0 {
+			if len(node) != 0 && len(deletedPodNames) > 0 {
 				t.Errorf("didn't expect any more preemption. Node %v is selected for preemption.", node)
 			}
 			close(stop)
@@ -2575,4 +2595,15 @@ func nodesToNodeInfos(nodes []*v1.Node, snapshot *internalcache.Snapshot) ([]*fr
 		nodeInfos = append(nodeInfos, nodeInfo)
 	}
 	return nodeInfos, nil
+}
+
+func mergeObjs(pod *v1.Pod, pods []*v1.Pod) []runtime.Object {
+	var objs []runtime.Object
+	if pod != nil {
+		objs = append(objs, pod)
+	}
+	for i := range pods {
+		objs = append(objs, pods[i])
+	}
+	return objs
 }
