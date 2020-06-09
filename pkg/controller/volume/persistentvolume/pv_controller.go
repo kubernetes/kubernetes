@@ -303,8 +303,15 @@ func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(cla
 	message := "waiting for first consumer to be created before binding"
 	podNames, err := ctrl.findNonScheduledPodsByPVC(claim)
 	if err != nil {
+		fmt.Errorf("Error finding non scheduled pods by pvc: %v", err)
 		return err
 	}
+
+	if (0 == len(podNames)) {
+		fmt.Errorf("empty pod names finding non scheduled pods by pvc: %v", err)
+		return err
+	}
+
 	if len(podNames) > 0 {
 		reason = events.WaitForPodScheduled
 		if len(podNames) > 1 {
