@@ -21,17 +21,16 @@ import (
 	"fmt"
 	"io"
 
+	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
-	networkingv1beta1listers "k8s.io/client-go/listers/networking/v1beta1"
-	"k8s.io/component-base/featuregate"
+	networkingv1listers "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -50,10 +49,7 @@ func Register(plugins *admission.Plugins) {
 // classDefaulterPlugin holds state for and implements the admission plugin.
 type classDefaulterPlugin struct {
 	*admission.Handler
-	lister networkingv1beta1listers.IngressClassLister
-
-	inspectedFeatures          bool
-	defaultIngressClassEnabled bool
+	lister networkingv1listers.IngressClassLister
 }
 
 var _ admission.Interface = &classDefaulterPlugin{}
@@ -67,31 +63,16 @@ func newPlugin() *classDefaulterPlugin {
 	}
 }
 
-// InspectFeatureGates allows setting bools without taking a dep on a global variable
-func (a *classDefaulterPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	a.defaultIngressClassEnabled = featureGates.Enabled(features.DefaultIngressClass)
-	a.inspectedFeatures = true
-}
-
 // SetExternalKubeInformerFactory sets a lister and readyFunc for this
 // classDefaulterPlugin using the provided SharedInformerFactory.
 func (a *classDefaulterPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	if !a.defaultIngressClassEnabled {
-		return
-	}
-	informer := f.Networking().V1beta1().IngressClasses()
+	informer := f.Networking().V1().IngressClasses()
 	a.lister = informer.Lister()
 	a.SetReadyFunc(informer.Informer().HasSynced)
 }
 
 // ValidateInitialization ensures lister is set.
 func (a *classDefaulterPlugin) ValidateInitialization() error {
-	if !a.inspectedFeatures {
-		return fmt.Errorf("InspectFeatureGates was not called")
-	}
-	if !a.defaultIngressClassEnabled {
-		return nil
-	}
 	if a.lister == nil {
 		return fmt.Errorf("missing lister")
 	}
@@ -101,10 +82,7 @@ func (a *classDefaulterPlugin) ValidateInitialization() error {
 // Admit sets the default value of a Ingress's class if the user did not specify
 // a class.
 func (a *classDefaulterPlugin) Admit(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
-	if !a.defaultIngressClassEnabled {
-		return nil
-	}
-	if attr.GetResource().GroupResource() != networkingv1beta1.Resource("ingresses") {
+	if attr.GetResource().GroupResource() != networkingv1.Resource("ingresses") {
 		return nil
 	}
 
@@ -147,13 +125,13 @@ func (a *classDefaulterPlugin) Admit(ctx context.Context, attr admission.Attribu
 }
 
 // getDefaultClass returns the default IngressClass from the store, or nil.
-func getDefaultClass(lister networkingv1beta1listers.IngressClassLister) (*networkingv1beta1.IngressClass, error) {
+func getDefaultClass(lister networkingv1listers.IngressClassLister) (*networkingv1.IngressClass, error) {
 	list, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	defaultClasses := []*networkingv1beta1.IngressClass{}
+	defaultClasses := []*networkingv1.IngressClass{}
 	for _, class := range list {
 		if class.Annotations[networkingv1beta1.AnnotationIsDefaultIngressClass] == "true" {
 			defaultClasses = append(defaultClasses, class)
