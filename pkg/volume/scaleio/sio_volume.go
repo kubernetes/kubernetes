@@ -405,7 +405,7 @@ func (v *sioVolume) setSioMgr() error {
 			klog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
-		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(configData, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed to reset sio manager: %v", err))
@@ -444,8 +444,7 @@ func (v *sioVolume) resetSioMgr() error {
 			klog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
-
-		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(configData, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed to reset scaleio mgr: %v", err))
@@ -480,8 +479,7 @@ func (v *sioVolume) setSioMgrFromConfig() error {
 			klog.Error(log("failed to load secret: %v", err))
 			return err
 		}
-
-		mgr, err := newSioMgr(data, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(data, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed while setting scaleio mgr from config: %v", err))
@@ -516,8 +514,7 @@ func (v *sioVolume) setSioMgrFromSpec() error {
 			klog.Error(log("failed to load secret: %v", err))
 			return err
 		}
-
-		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(configData, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed to reset sio manager: %v", err))

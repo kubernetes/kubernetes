@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -119,6 +120,16 @@ func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) 
 	for _, host := range resp {
 		if err := isProxyableIP(host.IP); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// IsAllowedHost checks if the given IP host address is in a network in the denied list.
+func IsAllowedHost(host net.IP, denied []*net.IPNet) error {
+	for _, ipNet := range denied {
+		if ipNet.Contains(host) {
+			return ErrAddressNotAllowed
 		}
 	}
 	return nil
@@ -310,4 +321,58 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
 	}
 	return nil
+}
+
+// DialContext is a dial function matching the signature of net.Dialer.DialContext.
+type DialContext = func(context.Context, string, string) (net.Conn, error)
+
+// FilteredDialOptions configures how a DialContext is wrapped by NewFilteredDialContext.
+type FilteredDialOptions struct {
+	// DialHostIPDenylist restricts hosts from being dialed.
+	DialHostCIDRDenylist []*net.IPNet
+	// AllowLocalLoopback controls connections to local loopback hosts (as defined by
+	// IsProxyableIP).
+	AllowLocalLoopback bool
+}
+
+// NewFilteredDialContext returns a DialContext function that filters connections based on a FilteredDialOptions.
+func NewFilteredDialContext(wrapped DialContext, resolv Resolver, opts *FilteredDialOptions) DialContext {
+	if wrapped == nil {
+		wrapped = http.DefaultTransport.(*http.Transport).DialContext
+	}
+	if opts == nil {
+		// Do no filtering
+		return wrapped
+	}
+	if resolv == nil {
+		resolv = net.DefaultResolver
+	}
+	if len(opts.DialHostCIDRDenylist) == 0 && opts.AllowLocalLoopback {
+		// Do no filtering.
+		return wrapped
+	}
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		resp, err := resolv.LookupIPAddr(ctx, address)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(resp) == 0 {
+			return nil, ErrNoAddresses
+		}
+
+		for _, host := range resp {
+			if !opts.AllowLocalLoopback {
+				if err := isProxyableIP(host.IP); err != nil {
+					return nil, err
+				}
+			}
+			if opts.DialHostCIDRDenylist != nil {
+				if err := IsAllowedHost(host.IP, opts.DialHostCIDRDenylist); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return wrapped(ctx, network, address)
+	}
 }

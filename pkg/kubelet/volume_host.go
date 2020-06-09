@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -149,6 +150,11 @@ func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 
 func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
 	return kvh.kubelet.subpather
+}
+
+func (kvh *kubeletVolumeHost) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
+	// FilteredDial is not needed in the kubelet.
+	return nil
 }
 
 func (kvh *kubeletVolumeHost) GetHostUtil() hostutil.HostUtils {

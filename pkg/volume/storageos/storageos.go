@@ -110,7 +110,7 @@ func (plugin *storageosPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 		return nil, err
 	}
 
-	return plugin.newMounterInternal(spec, pod, apiCfg, &storageosUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod, apiCfg, &storageosUtil{host: plugin.host}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, apiCfg *storageosAPIConfig, manager storageosManager, mounter mount.Interface, exec utilexec.Interface) (volume.Mounter, error) {
@@ -142,7 +142,7 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 }
 
 func (plugin *storageosPlugin) NewUnmounter(pvName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(pvName, podUID, &storageosUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(pvName, podUID, &storageosUtil{host: plugin.host}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *storageosPlugin) newUnmounterInternal(pvName string, podUID types.UID, manager storageosManager, mounter mount.Interface, exec utilexec.Interface) (volume.Unmounter, error) {
@@ -194,7 +194,7 @@ func (plugin *storageosPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, er
 		return nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 
-	return plugin.newDeleterInternal(spec, apiCfg, &storageosUtil{})
+	return plugin.newDeleterInternal(spec, apiCfg, &storageosUtil{host: plugin.host})
 }
 
 func (plugin *storageosPlugin) newDeleterInternal(spec *volume.Spec, apiCfg *storageosAPIConfig, manager storageosManager) (volume.Deleter, error) {
@@ -215,7 +215,7 @@ func (plugin *storageosPlugin) newDeleterInternal(spec *volume.Spec, apiCfg *sto
 }
 
 func (plugin *storageosPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	return plugin.newProvisionerInternal(options, &storageosUtil{})
+	return plugin.newProvisionerInternal(options, &storageosUtil{host: plugin.host})
 }
 
 func (plugin *storageosPlugin) newProvisionerInternal(options volume.VolumeOptions, manager storageosManager) (volume.Provisioner, error) {

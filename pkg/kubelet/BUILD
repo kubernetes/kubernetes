@@ -98,6 +98,7 @@ go_library(
         "//pkg/kubelet/util/queue:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/sysctl:go_default_library",
         "//pkg/util/iptables:go_default_library",

@@ -9,6 +9,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller/volume/events:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/util:go_default_library",

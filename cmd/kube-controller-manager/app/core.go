@@ -43,6 +43,7 @@ import (
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -285,6 +286,12 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %v", err)
 	}
+	filteredDialOptions, err := options.ParseVolumeHostFilters(
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+	if err != nil {
+		return nil, true, err
+	}
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
 		SyncPeriod:                ctx.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
@@ -297,6 +304,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 		PodInformer:               ctx.InformerFactory.Core().V1().Pods(),
 		NodeInformer:              ctx.InformerFactory.Core().V1().Nodes(),
 		EnableDynamicProvisioning: ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
+		FilteredDialOptions:       filteredDialOptions,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
 	if volumeControllerErr != nil {
@@ -324,6 +332,13 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 		return nil, true, fmt.Errorf("failed to probe volume plugins when starting attach/detach controller: %v", err)
 	}
 
+	filteredDialOptions, err := options.ParseVolumeHostFilters(
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+	if err != nil {
+		return nil, true, err
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
@@ -340,6 +355,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 			attachdetach.DefaultTimerConfig,
+			filteredDialOptions,
 		)
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
@@ -355,6 +371,12 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
 		}
 		csiTranslator := csitrans.New()
+		filteredDialOptions, err := options.ParseVolumeHostFilters(
+			ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+			ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+		if err != nil {
+			return nil, true, err
+		}
 		expandController, expandControllerErr := expand.NewExpandController(
 			ctx.ClientBuilder.ClientOrDie("expand-controller"),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
@@ -363,7 +385,9 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.Cloud,
 			plugins,
 			csiTranslator,
-			csimigration.NewPluginManager(csiTranslator))
+			csimigration.NewPluginManager(csiTranslator),
+			filteredDialOptions,
+		)
 
 		if expandControllerErr != nil {
 			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
