@@ -42,7 +42,8 @@ type DrainCmdOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
-	Namespace string
+	Namespace     string
+	DisableCordon bool
 
 	drainer   *drain.Helper
 	nodeInfos []*resource.Info
@@ -192,6 +193,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().DurationVar(&o.drainer.Timeout, "timeout", o.drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
+	cmd.Flags().BoolVar(&o.DisableCordon, "disable-cordon", o.DisableCordon, "Not to cordon node before draining it")
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
 
@@ -287,8 +289,20 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 // RunDrain runs the 'drain' command
 func (o *DrainCmdOptions) RunDrain() error {
-	if err := o.RunCordonOrUncordon(true); err != nil {
-		return err
+	if !o.DisableCordon {
+		if err := o.RunCordonOrUncordon(true); err != nil {
+			return err
+		}
+	} else {
+		for _, info := range o.nodeInfos {
+			node, ok := info.Object.(*corev1.Node)
+			if !ok {
+				continue
+			}
+			if len(node.Spec.Taints) == 0 {
+				_, _ = fmt.Fprintf(o.ErrOut, "WARNING: you have disabled cordon, but node `%s` has no taints, other pods may be scheduled to this node during draining.\n", node.Name)
+			}
+		}
 	}
 
 	printObj, err := o.ToPrinter("drained")

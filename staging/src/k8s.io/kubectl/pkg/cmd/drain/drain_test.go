@@ -52,8 +52,11 @@ const (
 	DeleteMethod   = "Delete"
 )
 
-var node *corev1.Node
-var cordonedNode *corev1.Node
+var (
+	node          *corev1.Node
+	cordonedNode  *corev1.Node
+	nodeWithTaint *corev1.Node
+)
 
 func TestMain(m *testing.M) {
 	// Create a node.
@@ -68,6 +71,11 @@ func TestMain(m *testing.M) {
 	// A copy of the same node, but cordoned.
 	cordonedNode = node.DeepCopy()
 	cordonedNode.Spec.Unschedulable = true
+
+	nodeWithTaint = node.DeepCopy()
+	nodeWithTaint.Spec.Taints = []corev1.Taint{
+		{Key: "foo", Value: "bar", Effect: corev1.TaintEffectNoSchedule},
+	}
 	os.Exit(m.Run())
 }
 
@@ -619,6 +627,25 @@ func TestDrain(t *testing.T) {
 			expectWarning: "WARNING: ignoring DaemonSet-managed Pods: default/bar",
 			expectFatal:   false,
 			expectDelete:  false,
+		},
+		{
+			description:   "RS-managed pod on node without taints with --disable-cordon",
+			node:          node,
+			expected:      node,
+			pods:          []corev1.Pod{rsPod},
+			replicaSets:   []appsv1.ReplicaSet{rs},
+			args:          []string{"node", "--disable-cordon"},
+			expectWarning: "WARNING: you have disabled cordon, but node `node` has no taints, other pods may be scheduled to this node during draining.",
+			expectDelete:  true,
+		},
+		{
+			description:  "RS-managed pod on node with taints with --disable-cordon",
+			node:         nodeWithTaint,
+			expected:     nodeWithTaint,
+			pods:         []corev1.Pod{rsPod},
+			replicaSets:  []appsv1.ReplicaSet{rs},
+			args:         []string{"node", "--disable-cordon"},
+			expectDelete: true,
 		},
 		{
 			description:  "Job-managed pod with local storage",
