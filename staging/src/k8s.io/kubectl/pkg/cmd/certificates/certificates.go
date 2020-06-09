@@ -221,7 +221,7 @@ func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builde
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		ContinueOnError().
 		FilenameParam(false, &o.FilenameOptions).
-		ResourceNames("certificatesigningrequest", o.csrNames...).
+		ResourceNames("certificatesigningrequests.v1beta1.certificates.k8s.io", o.csrNames...).
 		RequireObject(true).
 		Flatten().
 		Latest().
@@ -231,7 +231,10 @@ func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builde
 			return err
 		}
 		for i := 0; ; i++ {
-			csr := info.Object.(*certificatesv1beta1.CertificateSigningRequest)
+			csr, ok := info.Object.(*certificatesv1beta1.CertificateSigningRequest)
+			if !ok {
+				return fmt.Errorf("can only handle certificates.k8s.io/v1beta1 certificate signing requests")
+			}
 			csr, hasCondition := modify(csr)
 			if !hasCondition || force {
 				csr, err = clientSet.CertificateSigningRequests().UpdateApproval(csr)
