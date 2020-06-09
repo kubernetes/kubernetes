@@ -121,6 +121,10 @@ type EventBroadcaster interface {
 	// function. The return value can be ignored or used to stop recording, if desired.
 	StartLogging(logf func(format string, args ...interface{})) watch.Interface
 
+	// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured
+	// logging function. The return value can be ignored or used to stop recording, if desired.
+	StartStructuredLogging(verbosity int) watch.Interface
+
 	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
 	// with the event source set to the given event source.
 	NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder
@@ -275,7 +279,16 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 func (e *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
 	return e.StartEventWatcher(
 		func(e *v1.Event) {
-			klog.InfoS("Event occurred", "object", klog.KRef(e.InvolvedObject.Namespace, e.InvolvedObject.Name), "kind", e.InvolvedObject.Kind, "apiVersion", e.InvolvedObject.APIVersion, "type", e.Type, "reason", e.Reason, "message", e.Message)
+			logf("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
+		})
+}
+
+// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured logging function.
+// The return value can be ignored or used to stop recording, if desired.
+func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity int) watch.Interface {
+	return e.StartEventWatcher(
+		func(e *v1.Event) {
+			klog.V(verbosity).InfoS("Event occurred", "object", klog.KRef(e.InvolvedObject.Namespace, e.InvolvedObject.Name), "kind", e.InvolvedObject.Kind, "apiVersion", e.InvolvedObject.APIVersion, "type", e.Type, "reason", e.Reason, "message", e.Message)
 		})
 }
 
