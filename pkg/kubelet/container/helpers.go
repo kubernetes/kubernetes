@@ -102,8 +102,8 @@ func HashContainer(container *v1.Container) uint64 {
 	hash := fnv.New32a()
 	// Omit nil or empty field when calculating hash value
 	// Please see https://github.com/kubernetes/kubernetes/issues/53644
-	containerJson, _ := json.Marshal(container)
-	hashutil.DeepHashObject(hash, containerJson)
+	containerJSON, _ := json.Marshal(container)
+	hashutil.DeepHashObject(hash, containerJSON)
 	return uint64(hash.Sum32())
 }
 
@@ -141,6 +141,7 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 	return command
 }
 
+// ExpandContainerVolumeMounts expands the subpath of the given VolumeMount by replacing variable references with the values of given EnvVar.
 func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, error) {
 
 	envmap := EnvVarsToMap(envs)
@@ -159,6 +160,7 @@ func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, e
 	return expanded, nil
 }
 
+// ExpandContainerCommandAndArgs expands the given Container's command by replacing variable references `with the values of given EnvVar.
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
 	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
 
@@ -177,7 +179,7 @@ func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (comm
 	return command, args
 }
 
-// Create an event recorder to record object's event except implicitly required container's, like infra container.
+// FilterEventRecorder creates an event recorder to record object's event except implicitly required container's, like infra container.
 func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
 	return &innerEventRecorder{
 		recorder: recorder,
@@ -220,11 +222,13 @@ func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, anno
 
 }
 
+// IsHostNetworkPod returns whether the host networking requested for the given Pod.
 // Pod must not be nil.
 func IsHostNetworkPod(pod *v1.Pod) bool {
 	return pod.Spec.HostNetwork
 }
 
+// ConvertPodStatusToRunningPod returns Pod given PodStatus and container runtime string.
 // TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
 func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {
 	runningPod := Pod{
