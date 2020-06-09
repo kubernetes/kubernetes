@@ -54,6 +54,11 @@ func (m *managedStruct) Times() map[string]*metav1.Time {
 	return m.times
 }
 
+// NewEmptyManaged creates an empty ManagedInterface.
+func NewEmptyManaged() ManagedInterface {
+	return NewManaged(fieldpath.ManagedFields{}, map[string]*metav1.Time{})
+}
+
 // NewManaged creates a ManagedInterface from a fieldpath.ManagedFields and the timestamps associated with each operation.
 func NewManaged(f fieldpath.ManagedFields, t map[string]*metav1.Time) ManagedInterface {
 	return &managedStruct{
