@@ -29,7 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
@@ -37,13 +37,13 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 
-	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 )
 
 func TestSigner(t *testing.T) {
 	clock := clock.FakeClock{}
 
-	s, err := newSigner(capi.LegacyUnknownSignerName, "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
+	s, err := newSigner("kubernetes.io/legacy-unknown", "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -337,7 +337,7 @@ func makeTestCSR(b csrBuilder) *capi.CertificateSigningRequest {
 		},
 	}
 	if b.signerName != "" {
-		csr.Spec.SignerName = &b.signerName
+		csr.Spec.SignerName = b.signerName
 	}
 	if b.approved {
 		csr.Status.Conditions = append(csr.Status.Conditions, capi.CertificateSigningRequestCondition{

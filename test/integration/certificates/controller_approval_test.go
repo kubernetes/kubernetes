@@ -101,7 +101,7 @@ func TestController_AutoApproval(t *testing.T) {
 			informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(s.ClientConfig, "certificatesigningrequest-informers")), time.Second)
 
 			// Register the controller
-			c := approver.NewCSRApprovingController(client, informers.Certificates().V1beta1().CertificateSigningRequests())
+			c := approver.NewCSRApprovingController(client, informers.Certificates().V1().CertificateSigningRequests())
 			// Start the controller & informers
 			stopCh := make(chan struct{})
 			defer close(stopCh)
@@ -159,7 +159,7 @@ const (
 
 func waitForCertificateRequestApproved(client kubernetes.Interface, name string) error {
 	if err := wait.Poll(interval, timeout, func() (bool, error) {
-		csr, err := client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
+		csr, err := client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
