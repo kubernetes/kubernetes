@@ -25,6 +25,7 @@ package credentials // import "google.golang.org/grpc/credentials"
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/golang/protobuf/proto"
@@ -50,6 +51,48 @@ type PerRPCCredentials interface {
 	RequireTransportSecurity() bool
 }
 
+// SecurityLevel defines the protection level on an established connection.
+//
+// This API is experimental.
+type SecurityLevel int
+
+const (
+	// NoSecurity indicates a connection is insecure.
+	// The zero SecurityLevel value is invalid for backward compatibility.
+	NoSecurity SecurityLevel = iota + 1
+	// IntegrityOnly indicates a connection only provides integrity protection.
+	IntegrityOnly
+	// PrivacyAndIntegrity indicates a connection provides both privacy and integrity protection.
+	PrivacyAndIntegrity
+)
+
+// String returns SecurityLevel in a string format.
+func (s SecurityLevel) String() string {
+	switch s {
+	case NoSecurity:
+		return "NoSecurity"
+	case IntegrityOnly:
+		return "IntegrityOnly"
+	case PrivacyAndIntegrity:
+		return "PrivacyAndIntegrity"
+	}
+	return fmt.Sprintf("invalid SecurityLevel: %v", int(s))
+}
+
+// CommonAuthInfo contains authenticated information common to AuthInfo implementations.
+// It should be embedded in a struct implementing AuthInfo to provide additional information
+// about the credentials.
+//
+// This API is experimental.
+type CommonAuthInfo struct {
+	SecurityLevel SecurityLevel
+}
+
+// GetCommonAuthInfo returns the pointer to CommonAuthInfo struct.
+func (c *CommonAuthInfo) GetCommonAuthInfo() *CommonAuthInfo {
+	return c
+}
+
 // ProtocolInfo provides information regarding the gRPC wire protocol version,
 // security protocol, security protocol version in use, server name, etc.
 type ProtocolInfo struct {
@@ -64,6 +107,8 @@ type ProtocolInfo struct {
 }
 
 // AuthInfo defines the common interface for the auth information the users are interested in.
+// A struct that implements AuthInfo should embed CommonAuthInfo by including additional
+// information about the credentials in it.
 type AuthInfo interface {
 	AuthType() string
 }
@@ -78,7 +123,8 @@ type TransportCredentials interface {
 	// ClientHandshake does the authentication handshake specified by the corresponding
 	// authentication protocol on rawConn for clients. It returns the authenticated
 	// connection and the corresponding auth information about the connection.
-	// Implementations must use the provided context to implement timely cancellation.
+	// The auth information should embed CommonAuthInfo to return additional information about
+	// the credentials. Implementations must use the provided context to implement timely cancellation.
 	// gRPC will try to reconnect if the error returned is a temporary error
 	// (io.EOF, context.DeadlineExceeded or err.Temporary() == true).
 	// If the returned error is a wrapper error, implementations should make sure that
@@ -88,7 +134,8 @@ type TransportCredentials interface {
 	ClientHandshake(context.Context, string, net.Conn) (net.Conn, AuthInfo, error)
 	// ServerHandshake does the authentication handshake for servers. It returns
 	// the authenticated connection and the corresponding auth information about
-	// the connection.
+	// the connection. The auth information should embed CommonAuthInfo to return additional information
+	// about the credentials.
 	//
 	// If the returned net.Conn is closed, it MUST close the net.Conn provided.
 	ServerHandshake(net.Conn) (net.Conn, AuthInfo, error)
@@ -127,6 +174,8 @@ type Bundle interface {
 type RequestInfo struct {
 	// The method passed to Invoke or NewStream for this RPC. (For proto methods, this has the format "/some.Service/Method")
 	Method string
+	// AuthInfo contains the information from a security handshake (TransportCredentials.ClientHandshake, TransportCredentials.ServerHandshake)
+	AuthInfo AuthInfo
 }
 
 // requestInfoKey is a struct to be used as the key when attaching a RequestInfo to a context object.
@@ -138,6 +187,32 @@ type requestInfoKey struct{}
 func RequestInfoFromContext(ctx context.Context) (ri RequestInfo, ok bool) {
 	ri, ok = ctx.Value(requestInfoKey{}).(RequestInfo)
 	return
+}
+
+// CheckSecurityLevel checks if a connection's security level is greater than or equal to the specified one.
+// It returns success if 1) the condition is satisified or 2) AuthInfo struct does not implement GetCommonAuthInfo() method
+// or 3) CommonAuthInfo.SecurityLevel has an invalid zero value. For 2) and 3), it is for the purpose of backward-compatibility.
+//
+// This API is experimental.
+func CheckSecurityLevel(ctx context.Context, level SecurityLevel) error {
+	type internalInfo interface {
+		GetCommonAuthInfo() *CommonAuthInfo
+	}
+	ri, _ := RequestInfoFromContext(ctx)
+	if ri.AuthInfo == nil {
+		return errors.New("unable to obtain SecurityLevel from context")
+	}
+	if ci, ok := ri.AuthInfo.(internalInfo); ok {
+		// CommonAuthInfo.SecurityLevel has an invalid value.
+		if ci.GetCommonAuthInfo().SecurityLevel == 0 {
+			return nil
+		}
+		if ci.GetCommonAuthInfo().SecurityLevel < level {
+			return fmt.Errorf("requires SecurityLevel %v; connection has %v", level, ci.GetCommonAuthInfo().SecurityLevel)
+		}
+	}
+	// The condition is satisfied or AuthInfo struct does not implement GetCommonAuthInfo() method.
+	return nil
 }
 
 func init() {

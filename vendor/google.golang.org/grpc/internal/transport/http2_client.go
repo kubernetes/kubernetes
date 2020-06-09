@@ -403,7 +403,8 @@ func (t *http2Client) getPeer() *peer.Peer {
 func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) ([]hpack.HeaderField, error) {
 	aud := t.createAudience(callHdr)
 	ri := credentials.RequestInfo{
-		Method: callHdr.Method,
+		Method:   callHdr.Method,
+		AuthInfo: t.authInfo,
 	}
 	ctxWithRequestInfo := internal.NewRequestInfoContext.(func(context.Context, credentials.RequestInfo) context.Context)(ctx, ri)
 	authData, err := t.getTrAuthData(ctxWithRequestInfo, aud)

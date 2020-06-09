@@ -81,7 +81,7 @@ fi
 
 # - Do not import math/rand for real library code.  Use internal/grpcrand for
 #   thread safety.
-git grep -l '"math/rand"' -- "*.go" 2>&1 | (! grep -v '^examples\|^stress\|grpcrand\|wrr_test')
+git grep -l '"math/rand"' -- "*.go" 2>&1 | (! grep -v '^examples\|^stress\|grpcrand\|^benchmark\|wrr_test')
 
 # - Ensure all ptypes proto packages are renamed when importing.
 (! git grep "\(import \|^\s*\)\"github.com/golang/protobuf/ptypes/" -- "*.go")
