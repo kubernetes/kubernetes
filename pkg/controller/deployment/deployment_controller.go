@@ -481,8 +481,13 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 		return
 	}
 
+	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
+	if keyErr != nil {
+		klog.ErrorS(err, "Failed to split meta namespace cache key", "key", key)
+	}
+
 	if dc.queue.NumRequeues(key) < maxRetries {
-		klog.V(2).Infof("Error syncing deployment %v: %v", key, err)
+		klog.V(2).InfoS("Error syncing deployment", "deployment", klog.KRef(ns, name), "err", err)
 		dc.queue.AddRateLimited(key)
 		return
 	}

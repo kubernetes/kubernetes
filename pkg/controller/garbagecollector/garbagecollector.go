@@ -406,7 +406,9 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 }
 
 func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
-	klog.V(2).Infof("processing item %s", item.identity)
+	klog.V(2).InfoS("Processing object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
+		"objectUID", item.identity.UID, "kind", item.identity.Kind)
+
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
 		klog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
@@ -519,7 +521,8 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 			// otherwise, default to background.
 			policy = metav1.DeletePropagationBackground
 		}
-		klog.V(2).Infof("delete object %s with propagation policy %s", item.identity, policy)
+		klog.V(2).InfoS("Deleting object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID, "kind", item.identity.Kind, "propagationPolicy", policy)
 		return gc.deleteObject(item.identity, &policy)
 	}
 }
