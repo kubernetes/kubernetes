@@ -605,8 +605,8 @@ const (
 	// owner: @gnufied
 	// alpha: v1.19
 	//
-	// Allow users to recover from expansion failure
-	RecoverExpansionFailure featuregate.Feature = "RecoverExpansionFailure"
+	// Allow users to recover from volume expansion failure
+	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
 )
 
 func init() {
@@ -631,7 +631,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:               {Default: true, PreRelease: featuregate.Beta},
-	RecoverExpansionFailure:        {Default: false, PreRelease: featuregate.Alpha},
+	RecoverVolumeExpansionFailure:  {Default: false, PreRelease: featuregate.Alpha},
 	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},

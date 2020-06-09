@@ -50,10 +50,12 @@ func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
+// It also populates AllocatedResources field of PVC with highest user requested size.
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
 
+	pvcutil.SetAllocatedResources(&pvc.Spec, nil)
 	pvcutil.DropDisabledFields(&pvc.Spec, nil)
 }
 
@@ -70,12 +72,14 @@ func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// PrepareForUpdate sets the Status field which is not allowed to be set by end users on update
+// PrepareForUpdate sets the Status field which is not allowed to be set by end users on update.
+// It also populates AllocatedResources field of PVC with highest user requested size.
 func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
 
+	pvcutil.SetAllocatedResources(&newPvc.Spec, &oldPvc.Spec)
 	pvcutil.DropDisabledFields(&newPvc.Spec, &oldPvc.Spec)
 }
 

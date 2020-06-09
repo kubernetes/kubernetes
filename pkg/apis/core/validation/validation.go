@@ -1966,7 +1966,13 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		// lets make sure storage values are same.
 		if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.Resources.Requests != nil {
-			newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"]
+			newPvcClone.Spec.Resources.Requests[core.ResourceStorage] = oldPvc.Spec.Resources.Requests[core.ResourceStorage]
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+			// set new PVC's allocatedResources to be old pvc allocatedResources so as
+			// even if they are nil validations could pass
+			newPvcClone.Spec.AllocatedResources = oldPvc.Spec.AllocatedResources
 		}
 
 		oldSize := oldPvc.Spec.Resources.Requests["storage"]
@@ -1979,13 +1985,33 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
 		}
 
+		var oldAllocatedSize resource.Quantity
+		var newAllocatedSize resource.Quantity
+
+		if oldPvc.Spec.AllocatedResources != nil {
+			oldAllocatedSize = oldPvc.Spec.AllocatedResources.Requests[core.ResourceStorage]
+		}
+		if newPvc.Spec.AllocatedResources != nil {
+			newAllocatedSize = newPvc.Spec.AllocatedResources.Requests[core.ResourceStorage]
+		}
+
+		// allocatedResources is only allowed to grow because kubernetes does not actually support shrinking volumes and hence
+		// allocatedResources is used for tracking quotas. This check is not inside feature gate because it should
+		// not matter. Even if feature gate is disabled, we do not expect this invariant to change.
+		if newAllocatedSize.Cmp(oldAllocatedSize) < 0 {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "allocatedResources", "requests", "storage"), "field can not be less than previous value"))
+		}
+
 		if newSize.Cmp(oldSize) < 0 {
-			permitShrink := utilfeature.DefaultFeatureGate.Enabled(features.RecoverExpansionFailure)
-			if permitShrink && newSize.Cmp(statusSize) < 0 {
-				permitShrink = false
-			}
-			if !permitShrink {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
 				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
+			} else {
+				// This validation permits reducing pvc requested size up to capacity recorded in pvc.status
+				// so that users can recover from volume expansion failure, but Kubernetes does not actually
+				// support volume shrinking
+				if newSize.Cmp(statusSize) < 0 {
+					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than Status.Capacity"))
+				}
 			}
 		}
 

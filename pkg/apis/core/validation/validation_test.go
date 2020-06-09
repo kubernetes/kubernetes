@@ -1521,6 +1521,72 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	})
 
+	validPVCWithAllocatedResources := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+		AllocatedResources: &core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	validPVCWithAllocatedResourcesUpdate := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+		AllocatedResources: &core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("15G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	invalidPVCWithAllocatedResourcesUpdate := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+		AllocatedResources: &core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("5G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure          bool
 		oldClaim                   *core.PersistentVolumeClaim
@@ -1681,6 +1747,33 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
+		"valid-expand-allocated-resources-resize-shrink-enabled": {
+			oldClaim:                   validPVCWithAllocatedResources,
+			newClaim:                   validPVCWithAllocatedResourcesUpdate,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"invalid-expand-allocated-resources-resize-shrink-enabled": {
+			oldClaim:                   validPVCWithAllocatedResources,
+			newClaim:                   invalidPVCWithAllocatedResourcesUpdate,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
+		"valid-expand-allocated-resources-resize-shrink-disabled": {
+			oldClaim:                   validPVCWithAllocatedResources,
+			newClaim:                   validPVCWithAllocatedResourcesUpdate,
+			enableResize:               false,
+			enableRecoverFromExpansion: false,
+			isExpectedFailure:          true,
+		},
+		"valid-expand-allocated-resources-resize-enabled-shrink-disable": {
+			oldClaim:                   validPVCWithAllocatedResources,
+			newClaim:                   validPVCWithAllocatedResourcesUpdate,
+			enableResize:               true,
+			enableRecoverFromExpansion: false,
+			isExpectedFailure:          true,
+		},
 		"valid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
@@ -1723,7 +1816,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverExpansionFailure, scenario.enableRecoverFromExpansion)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
 
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"

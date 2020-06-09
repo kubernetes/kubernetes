@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -290,5 +291,173 @@ func TestAnyDataSourceFilter(t *testing.T) {
 					testName, test.snapshotEnabled, test.anyEnabled, test.spec, test.want)
 			}
 		})
+	}
+}
+
+func TestDropAllocatedResources(t *testing.T) {
+	tests := []struct {
+		name     string
+		feature  bool
+		spec     *core.PersistentVolumeClaimSpec
+		oldSpec  *core.PersistentVolumeClaimSpec
+		expected *core.PersistentVolumeClaimSpec
+	}{
+		{
+			name:     "for:newPVC=hasfield,oldPVC=doesnot,featuregate=false; should drop field",
+			feature:  false,
+			spec:     withAllocatedResource("5G"),
+			oldSpec:  getPVCSpec(),
+			expected: getPVCSpec(),
+		},
+		{
+			name:     "for:newPVC=hasfield,oldPVC=doesnot,featuregate=true; should keep field",
+			feature:  true,
+			spec:     withAllocatedResource("5G"),
+			oldSpec:  getPVCSpec(),
+			expected: withAllocatedResource("5G"),
+		},
+		{
+			name:     "for:newPVC=hasfield,oldPVC=hasfield,featuregate=false; should keep field",
+			feature:  false,
+			spec:     withAllocatedResource("10G"),
+			oldSpec:  withAllocatedResource("5G"),
+			expected: withAllocatedResource("10G"),
+		},
+		{
+			name:     "for:newPVC=hasfield,oldPVC=nil,featuregate=false; should drop field",
+			feature:  false,
+			spec:     withAllocatedResource("5G"),
+			oldSpec:  nil,
+			expected: getPVCSpec(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.feature)()
+
+			DropDisabledFields(test.spec, test.oldSpec)
+
+			if !reflect.DeepEqual(*test.expected, *test.spec) {
+				t.Errorf("Unexpected change: %+v", diff.ObjectDiff(test.expected, test.spec))
+			}
+		})
+	}
+}
+
+func TestSetAllocatedResources(t *testing.T) {
+	tests := []struct {
+		name     string
+		feature  bool
+		spec     *core.PersistentVolumeClaimSpec
+		oldSpec  *core.PersistentVolumeClaimSpec
+		expected *core.PersistentVolumeClaimSpec
+	}{
+		{
+			name:     "feature:true; should default to requested size when creating new PVC",
+			feature:  true,
+			spec:     withResource(getPVCSpec(), "5G"),
+			oldSpec:  nil,
+			expected: withResource(withAllocatedResource("5G"), "5G"),
+		},
+		{
+			name:     "feature:true; should default to older allocated size if updated PVC is smaller",
+			feature:  true,
+			spec:     withResource(getPVCSpec(), "5G"),
+			oldSpec:  withResource(withAllocatedResource("10G"), "10G"),
+			expected: withResource(withAllocatedResource("10G"), "5G"),
+		},
+		{
+			name:     "feature:true; should default to higher allocated size if older allocated size is small",
+			feature:  true,
+			spec:     withResource(getPVCSpec(), "5G"),
+			oldSpec:  withResource(withAllocatedResource("4G"), "4G"),
+			expected: withResource(withAllocatedResource("5G"), "5G"),
+		},
+		{
+			name:     "feature:true; should default to older allocated size even if new allocated size is bigger",
+			feature:  true,
+			spec:     withResource(withAllocatedResource("30G"), "20G"),
+			oldSpec:  withResource(withAllocatedResource("20G"), "20G"),
+			expected: withResource(withAllocatedResource("20G"), "20G"),
+		},
+		{
+			name:     "feature:true; should default to older resource size if older resource size is bigger and old Allocatedresources is nil",
+			feature:  true,
+			spec:     withResource(withAllocatedResource("10G"), "20G"),
+			oldSpec:  withResource(getPVCSpec(), "40G"),
+			expected: withResource(withAllocatedResource("40G"), "20G"),
+		},
+		{
+			name:     "feature:true; should default to newer resource size if older resources size is smaller and old allocatedresources is nil",
+			feature:  true,
+			spec:     withResource(withAllocatedResource("10G"), "50G"),
+			oldSpec:  withResource(getPVCSpec(), "40G"),
+			expected: withResource(withAllocatedResource("50G"), "50G"),
+		},
+		{
+			name:     "feature:true, should default to older allocated size if older allocated size is bigger than old resource size",
+			feature:  true,
+			spec:     withResource(withAllocatedResource("10G"), "5G"),
+			oldSpec:  withResource(withAllocatedResource("20G"), "10G"),
+			expected: withResource(withAllocatedResource("20G"), "5G"),
+		},
+		{
+			name:     "feature:true; should default to new resource size if older resource size is smaller",
+			feature:  true,
+			spec:     withResource(withAllocatedResource("30G"), "30G"),
+			oldSpec:  withResource(withAllocatedResource("20G"), "20G"),
+			expected: withResource(withAllocatedResource("30G"), "30G"),
+		},
+		{
+			name:     "feature:true should default to higher allocated size even if updated pvc already had a allocated size",
+			feature:  true,
+			spec:     withResource(withAllocatedResource("10G"), "20G"),
+			oldSpec:  withResource(withAllocatedResource("10G"), "10G"),
+			expected: withResource(withAllocatedResource("20G"), "20G"),
+		},
+		{
+			name:     "feature:false; should not set allocatedSize when creating new PVC",
+			feature:  false,
+			spec:     withResource(getPVCSpec(), "5G"),
+			oldSpec:  nil,
+			expected: withResource(getPVCSpec(), "5G"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.feature)()
+
+			SetAllocatedResources(test.spec, test.oldSpec)
+
+			if !reflect.DeepEqual(*test.expected, *test.spec) {
+				t.Errorf("Unexpected change: %+v", diff.ObjectDiff(test.expected, test.spec))
+			}
+		})
+	}
+}
+
+func getPVCSpec() *core.PersistentVolumeClaimSpec {
+	return &core.PersistentVolumeClaimSpec{}
+}
+
+func withResource(s *core.PersistentVolumeClaimSpec, q string) *core.PersistentVolumeClaimSpec {
+	sc := s.DeepCopy()
+	sc.Resources = core.ResourceRequirements{
+		Requests: core.ResourceList{
+			core.ResourceStorage: resource.MustParse(q),
+		},
+	}
+	return sc
+}
+
+func withAllocatedResource(q string) *core.PersistentVolumeClaimSpec {
+	return &core.PersistentVolumeClaimSpec{
+		AllocatedResources: &core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse(q),
+			},
+		},
 	}
 }

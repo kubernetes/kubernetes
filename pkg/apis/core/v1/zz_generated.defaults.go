@@ -202,6 +202,10 @@ func SetObjectDefaults_PersistentVolumeClaim(in *v1.PersistentVolumeClaim) {
 	SetDefaults_PersistentVolumeClaim(in)
 	SetDefaults_ResourceList(&in.Spec.Resources.Limits)
 	SetDefaults_ResourceList(&in.Spec.Resources.Requests)
+	if in.Spec.AllocatedResources != nil {
+		SetDefaults_ResourceList(&in.Spec.AllocatedResources.Limits)
+		SetDefaults_ResourceList(&in.Spec.AllocatedResources.Requests)
+	}
 	SetDefaults_ResourceList(&in.Status.Capacity)
 }
 

@@ -2629,6 +2629,11 @@ message PersistentVolumeClaimSpec {
   // +optional
   optional ResourceRequirements resources = 2;
 
+  // AllocatedResources represents the resources that was requested to satisfy user
+  // request.
+  // +optional
+  optional ResourceRequirements allocatedResources = 8;
+
   // VolumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
   optional string volumeName = 3;

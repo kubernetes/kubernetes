@@ -405,6 +405,13 @@ type PersistentVolumeClaimSpec struct {
 	// Resources represents the minimum resources required
 	// +optional
 	Resources ResourceRequirements
+	// AllocatedResources represents the resources that was requested to satisfy user
+	// request. This field is not meant to be set by the user but is used for tracking
+	// volume quota.
+	// This field is alpha-level and is only honored by servers that enable the RecoverVolumeExpansionFailure feature.
+	//
+	// +optional
+	AllocatedResources *ResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
 	// claim. When set to non-empty value Selector is not evaluated
 	// +optional

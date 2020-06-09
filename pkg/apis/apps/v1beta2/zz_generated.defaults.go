@@ -865,6 +865,10 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 		v1.SetDefaults_PersistentVolumeClaim(a)
 		v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+		if a.Spec.AllocatedResources != nil {
+			v1.SetDefaults_ResourceList(&a.Spec.AllocatedResources.Limits)
+			v1.SetDefaults_ResourceList(&a.Spec.AllocatedResources.Requests)
+		}
 		v1.SetDefaults_ResourceList(&a.Status.Capacity)
 	}
 }

@@ -160,15 +160,40 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 	}
 
 	// charge for storage
-	if request, found := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; found {
-		result[corev1.ResourceRequestsStorage] = request
+	requestedStorage := p.getStorageUsage(pvc)
+	if requestedStorage != nil {
+		result[corev1.ResourceRequestsStorage] = *requestedStorage
 		// charge usage to the storage class (if present)
 		if len(storageClassRef) > 0 {
 			storageClassStorage := corev1.ResourceName(storageClassRef + storageClassSuffix + string(corev1.ResourceRequestsStorage))
-			result[storageClassStorage] = request
+			result[storageClassStorage] = *requestedStorage
 		}
 	}
+
 	return result, nil
+}
+
+func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resource.Quantity {
+	var result *resource.Quantity
+
+	if userRequest, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
+		result = &userRequest
+	}
+
+	// if AllocatedResources is not set we should default to user Request
+	// we are doing this regardless of feature-gate because in case admin disables the feature gate
+	// quota calculation would still reflect accurate value
+	if pvc.Spec.AllocatedResources == nil {
+		return result
+	}
+
+	// if AllocatedResources is set and is greater than user request, we should use it.
+	if allocatedRequest, ok := pvc.Spec.AllocatedResources.Requests[corev1.ResourceStorage]; ok {
+		if allocatedRequest.Cmp(*result) > 0 {
+			result = &allocatedRequest
+		}
+	}
+	return result
 }
 
 // UsageStats calculates aggregate usage for the object.

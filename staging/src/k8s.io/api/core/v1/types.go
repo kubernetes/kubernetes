@@ -450,6 +450,13 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	// AllocatedResources represents the resources that was requested to satisfy user
+	// request. This field is not meant to be set by the user but is used for tracking
+	// volume quota.
+	// This field is alpha-level and is only honored by servers that enable the RecoverVolumeExpansionFailure feature.
+	//
+	// +optional
+	AllocatedResources *ResourceRequirements `json:"allocatedResources,omitempty" protobuf:"bytes,8,opt,name=allocatedResources"`
 	// VolumeName is the binding reference to the PersistentVolume backing this claim.
 	// +optional
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
