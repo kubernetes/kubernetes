@@ -234,7 +234,7 @@ func (e *Entity) InsertOrMerge(options *EntityOptions) error {
 }
 
 func (e *Entity) buildPath() string {
-	return fmt.Sprintf("%s(PartitionKey='%s', RowKey='%s')", e.Table.buildPath(), e.PartitionKey, e.RowKey)
+	return fmt.Sprintf("%s(PartitionKey='%s',RowKey='%s')", e.Table.buildPath(), e.PartitionKey, e.RowKey)
 }
 
 // MarshalJSON is a custom marshaller for entity
