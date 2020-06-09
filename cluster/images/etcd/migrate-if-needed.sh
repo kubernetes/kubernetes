@@ -46,6 +46,7 @@ set -o nounset
 BUNDLED_VERSIONS="3.0.17, 3.1.12, 3.2.24, 3.3.17, 3.4.7"
 
 # shellcheck disable=SC2039
+# NOTE: Keep ETCD_NAME in sync with host_name in https://github.com/kubernetes/kubernetes/blob/2e7996e3e2712684bc73f0dec0200d64eec7fe40/cluster/gce/gci/configure-helper.sh#L1563
 ETCD_NAME="${ETCD_NAME:-etcd-${ETCD_HOSTNAME:-$(hostname -s)}}"
 if [ -z "${DATA_DIRECTORY:-}" ]; then
   echo "DATA_DIRECTORY variable unset - unexpected failure"

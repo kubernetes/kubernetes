@@ -41,7 +41,7 @@ type ClientRequestWriter interface {
 // add information to a swagger client request
 type ClientRequest interface {
 	SetHeaderParam(string, ...string) error
-	
+
 	GetHeaderParams() http.Header
 
 	SetQueryParam(string, ...string) error

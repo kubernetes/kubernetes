@@ -84,7 +84,7 @@ You may use one of several pre-defined schedules in place of a cron expression.
 
 Intervals
 
-You may also schedule a job to execute at fixed intervals, starting at the time it's added 
+You may also schedule a job to execute at fixed intervals, starting at the time it's added
 or cron is run. This is supported by formatting the cron spec like this:
 
     @every <duration>

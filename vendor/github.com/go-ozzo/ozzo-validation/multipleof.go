@@ -24,7 +24,6 @@ func (r *multipleOfRule) Error(message string) *multipleOfRule {
 	return r
 }
 
-
 func (r *multipleOfRule) Validate(value interface{}) error {
 
 	rv := reflect.ValueOf(r.threshold)

@@ -263,7 +263,7 @@ func makeUnion(extensions map[string]interface{}) (schema.Union, error) {
 				return schema.Union{}, fmt.Errorf(`"fields-to-discriminateBy"/%v: value must be a string, got: %#v`, field, value)
 			}
 			union.Fields = append(union.Fields, schema.UnionField{
-				FieldName:       field,
+				FieldName:          field,
 				DiscriminatorValue: discriminated,
 			})
 

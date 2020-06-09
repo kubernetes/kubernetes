@@ -1594,6 +1594,7 @@ function start-kube-proxy {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
+  # NOTE: Keep host_name here in sync with ETCD_NAME in https://github.com/kubernetes/kubernetes/blob/2e7996e3e2712684bc73f0dec0200d64eec7fe40/cluster/images/etcd/migrate-if-needed.sh#L46
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
   local host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
   local etcd_cluster=""

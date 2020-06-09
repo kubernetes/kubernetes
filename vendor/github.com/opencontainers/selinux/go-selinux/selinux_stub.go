@@ -101,7 +101,7 @@ SetTaskLabel sets the SELinux label for the current thread, or an error.
 This requires the dyntransition permission.
 */
 func SetTaskLabel(label string) error {
-        return nil
+	return nil
 }
 
 /*

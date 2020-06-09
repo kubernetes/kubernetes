@@ -420,10 +420,10 @@ func getEndToEndHeaders(respHeaders http.Header) []string {
 		"Keep-Alive":          struct{}{},
 		"Proxy-Authenticate":  struct{}{},
 		"Proxy-Authorization": struct{}{},
-		"Te":                struct{}{},
-		"Trailers":          struct{}{},
-		"Transfer-Encoding": struct{}{},
-		"Upgrade":           struct{}{},
+		"Te":                  struct{}{},
+		"Trailers":            struct{}{},
+		"Transfer-Encoding":   struct{}{},
+		"Upgrade":             struct{}{},
 	}
 
 	for _, extra := range strings.Split(respHeaders.Get("connection"), ",") {

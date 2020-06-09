@@ -26,7 +26,7 @@ import (
 
 const (
 	// TODO: Make this configurable.
-	ExtensionPrefix = "x-kubernetes-"
+	ExtensionPrefix   = "x-kubernetes-"
 	ExtensionV2Schema = ExtensionPrefix + "v2-schema"
 )
 

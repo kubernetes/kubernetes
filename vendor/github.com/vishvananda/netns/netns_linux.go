@@ -15,17 +15,17 @@ import (
 
 // SYS_SETNS syscall allows changing the namespace of the current process.
 var SYS_SETNS = map[string]uintptr{
-	"386":     346,
-	"amd64":   308,
-	"arm64":   268,
-	"arm":     375,
-	"mips":    4344,
-	"mipsle":  4344,
-	"mips64le":  4344,
-	"ppc64":   350,
-	"ppc64le": 350,
-	"riscv64": 268,
-	"s390x":   339,
+	"386":      346,
+	"amd64":    308,
+	"arm64":    268,
+	"arm":      375,
+	"mips":     4344,
+	"mipsle":   4344,
+	"mips64le": 4344,
+	"ppc64":    350,
+	"ppc64le":  350,
+	"riscv64":  268,
+	"s390x":    339,
 }[runtime.GOARCH]
 
 // Deprecated: use syscall pkg instead (go >= 1.5 needed).

@@ -13,12 +13,12 @@ import (
 
 // Error codes
 const (
-	ERROR_SUCCESS             = 0
-	ERROR_INVALID_FUNCTION    = 1
+	ERROR_SUCCESS          = 0
+	ERROR_INVALID_FUNCTION = 1
 )
 
 type (
-	HANDLE    uintptr
+	HANDLE uintptr
 )
 
 // PDH error codes, which can be returned by all Pdh* functions. Taken from mingw-w64 pdhmsg.h
