@@ -570,7 +570,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// No nodes available is counted as unschedulable rather than an error.
 			metrics.PodScheduleFailures.Inc()
 		} else {
-			klog.Errorf("error selecting node for pod: %v", err)
+			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			metrics.PodScheduleErrors.Inc()
 		}
 		sched.recordSchedulingFailure(prof, podInfo, err, v1.PodReasonUnschedulable, nominatedNode)
@@ -675,7 +675,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		} else {
 			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 			if klog.V(2).Enabled() {
-				klog.Infof("pod %v/%v is bound successfully on node %q, %d nodes evaluated, %d nodes were found feasible.", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
+				klog.InfoS("Successfully bound pod to node", "pod", klog.KObj(pod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
 			}
 
 			metrics.PodScheduleSuccesses.Inc()
