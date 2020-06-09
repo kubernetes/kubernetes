@@ -28,6 +28,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"context"
 
 	"k8s.io/klog"
 
@@ -282,34 +283,28 @@ func (s *server) kill() error {
 	}
 
 	// Attempt to shut down the process in a friendly manner before forcing it.
-	waitChan := make(chan error, 1)
 	go func() {
 		_, err := cmd.Process.Wait()
-		waitChan <- err
-		close(waitChan)
 	}()
 
 	const timeout = 10 * time.Second
 	for _, signal := range []string{"-TERM", "-KILL"} {
 		klog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
-		cmd := exec.Command("kill", signal, strconv.Itoa(pid))
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "kill", signal, strconv.Itoa(pid))
 		_, err := cmd.Output()
-		if err != nil {
-			klog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
+
+		if ctx.Err() == context.DeadlineExceeded {
+			klog.Errorf("Kill timed out for process %d (%s) with %s: %v", pid, name, signal, err)
 			continue
 		}
 
-		select {
-		case err := <-waitChan:
-			if err != nil {
-				return fmt.Errorf("error stopping %q: %v", name, err)
-			}
-			// Success!
-			return nil
-		case <-time.After(timeout):
-			// Continue.
+		if err != nil {
+			klog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
+		} else {
+			klog.V(2).Infof("Successfully killed process %d (%s) with %s", pid, name, signal)
+			return
 		}
 	}
-
-	return fmt.Errorf("unable to stop %q", name)
 }
