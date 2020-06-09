@@ -930,7 +930,7 @@ var statusesNoTracePred = httplog.StatusIsNot(
 
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred)
+	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred, nil)
 
 	// monitor http requests
 	var serverType string

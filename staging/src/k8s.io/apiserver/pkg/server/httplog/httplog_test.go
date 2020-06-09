@@ -63,7 +63,7 @@ func TestWithLogging(t *testing.T) {
 	}
 	var handler http.Handler
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	handler = WithLogging(WithLogging(handler, DefaultStacktracePred), DefaultStacktracePred)
+	handler = WithLogging(WithLogging(handler, DefaultStacktracePred, nil), DefaultStacktracePred, nil)
 
 	func() {
 		defer func() {
@@ -92,7 +92,7 @@ func TestLogOf(t *testing.T) {
 			}
 		})
 		if makeLogger {
-			handler = WithLogging(handler, DefaultStacktracePred)
+			handler = WithLogging(handler, DefaultStacktracePred, nil)
 			want = "*httplog.respLogger"
 		} else {
 			want = "*httplog.passthroughLogger"
@@ -120,7 +120,7 @@ func TestUnlogged(t *testing.T) {
 			}
 		})
 		if makeLogger {
-			handler = WithLogging(handler, DefaultStacktracePred)
+			handler = WithLogging(handler, DefaultStacktracePred, nil)
 		}
 
 		handler.ServeHTTP(origWriter, req)

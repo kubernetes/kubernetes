@@ -26,7 +26,7 @@ import (
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics (except in the special case of http.ErrAbortHandler panics, which suppress logging).
-func WithPanicRecovery(handler http.Handler) http.Handler {
+func WithPanicRecovery(handler http.Handler, isTerminating func() bool) http.Handler {
 	return withPanicRecovery(handler, func(w http.ResponseWriter, req *http.Request, err interface{}) {
 		if err == http.ErrAbortHandler {
 			// honor the http.ErrAbortHandler sentinel panic value:
@@ -37,11 +37,11 @@ func WithPanicRecovery(handler http.Handler) http.Handler {
 		}
 		http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
 		klog.Errorf("apiserver panic'd on %v %v", req.Method, req.RequestURI)
-	})
+	}, isTerminating)
 }
 
-func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{})) http.Handler {
-	handler = httplog.WithLogging(handler, httplog.DefaultStacktracePred)
+func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{}), isTerminating func() bool) http.Handler {
+	handler = httplog.WithLogging(handler, httplog.DefaultStacktracePred, isTerminating)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			crashHandler(w, req, err)
