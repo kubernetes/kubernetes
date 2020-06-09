@@ -449,7 +449,7 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, prof *p
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
 		nodeInfo := allNodes[(g.nextStartNodeIndex+i)%len(allNodes)]
-		fits, status, err := podPassesFiltersOnNode(ctx, prof, g.podNominator, state, pod, nodeInfo)
+		fits, status, err := PodPassesFiltersOnNode(ctx, prof, g.podNominator, state, pod, nodeInfo)
 		if err != nil {
 			errCh.SendErrorWithCancel(err, cancel)
 			return
@@ -552,7 +552,7 @@ func addNominatedPods(ctx context.Context, pr framework.PluginsRunner, nominator
 	return podsAdded, stateOut, nodeInfoOut, nil
 }
 
-// podPassesFiltersOnNode checks whether a node given by NodeInfo satisfies the
+// PodPassesFiltersOnNode checks whether a node given by NodeInfo satisfies the
 // filter plugins.
 // This function is called from two different places: Schedule and Preempt.
 // When it is called from Schedule, we want to test whether the pod is
@@ -562,7 +562,7 @@ func addNominatedPods(ctx context.Context, pr framework.PluginsRunner, nominator
 // and add the nominated pods. Removal of the victims is done by
 // SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
 // NodeInfo before calling this function.
-func podPassesFiltersOnNode(
+func PodPassesFiltersOnNode(
 	ctx context.Context,
 	pr framework.PluginsRunner,
 	nominator framework.PodNominator,
@@ -992,7 +992,7 @@ func selectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
-	if fits, _, err := podPassesFiltersOnNode(ctx, pr, nominator, state, pod, nodeInfo); !fits {
+	if fits, _, err := PodPassesFiltersOnNode(ctx, pr, nominator, state, pod, nodeInfo); !fits {
 		if err != nil {
 			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -1010,7 +1010,7 @@ func selectVictimsOnNode(
 		if err := addPod(p); err != nil {
 			return false, err
 		}
-		fits, _, _ := podPassesFiltersOnNode(ctx, pr, nominator, state, pod, nodeInfo)
+		fits, _, _ := PodPassesFiltersOnNode(ctx, pr, nominator, state, pod, nodeInfo)
 		if !fits {
 			if err := removePod(p); err != nil {
 				return false, err

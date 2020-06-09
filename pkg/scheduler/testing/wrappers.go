@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -237,6 +238,12 @@ func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	return p
 }
 
+// StartTime sets `t` as .status.startTime for the inner pod.
+func (p *PodWrapper) StartTime(t metav1.Time) *PodWrapper {
+	p.Status.StartTime = &t
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 
@@ -357,6 +364,26 @@ func (p *PodWrapper) Label(k, v string) *PodWrapper {
 	return p
 }
 
+// Req adds a new container to the inner pod with given cpu and mem requests.
+func (p *PodWrapper) Req(cpu, mem string) *PodWrapper {
+	if len(cpu) == 0 && len(mem) == 0 {
+		return p
+	}
+	res := v1.ResourceList{}
+	if len(cpu) != 0 {
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if len(mem) != 0 {
+		res[v1.ResourceMemory] = resource.MustParse(mem)
+	}
+	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Resources: v1.ResourceRequirements{
+			Requests: res,
+		},
+	})
+	return p
+}
+
 // NodeWrapper wraps a Node inside.
 type NodeWrapper struct{ v1.Node }
 
@@ -388,5 +415,21 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 		n.Labels = make(map[string]string)
 	}
 	n.Labels[k] = v
+	return n
+}
+
+// Capacity sets the inner pod's <.Status.Capacity> and <.Status.Allocatable>
+// according to given {cpu, mem, pods}.
+func (n *NodeWrapper) Capacity(cpu, mem string, pods int64) *NodeWrapper {
+	res := v1.ResourceList{
+		v1.ResourcePods: *resource.NewQuantity(pods, resource.DecimalSI),
+	}
+	if len(cpu) != 0 {
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if len(mem) != 0 {
+		res[v1.ResourceMemory] = resource.MustParse(mem)
+	}
+	n.Status.Capacity, n.Status.Allocatable = res, res
 	return n
 }

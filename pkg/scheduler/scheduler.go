@@ -558,8 +558,14 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				} else {
 					klog.V(5).Infof("Status after running PostFilter plugins for pod %v/%v: %v", pod.Namespace, pod.Name, status)
 				}
-				if status.IsSuccess() && result != nil {
-					nominatedNode = result.NominatedNodeName
+				if result != nil {
+					for _, victim := range result.Victims {
+						prof.Recorder.Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v", pod.Namespace, pod.Name, result.NominatedNodeName)
+					}
+					if status.IsSuccess() {
+						nominatedNode = result.NominatedNodeName
+						metrics.PreemptionVictims.Observe(float64(len(result.Victims)))
+					}
 				}
 			}
 			// Pod did not fit anywhere, so it is counted as a failure. If preemption

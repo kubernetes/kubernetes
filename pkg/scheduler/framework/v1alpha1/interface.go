@@ -520,7 +520,10 @@ type FrameworkHandle interface {
 
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
 type PostFilterResult struct {
+	// NominatedNodeName denotes which node the preemptor pod is nominated onto.
 	NominatedNodeName string
+	// Victims are only for logging (metric and events recorder) purpose.
+	Victims []*v1.Pod
 }
 
 // PreemptHandle incorporates all needed logic to run preemption logic.
