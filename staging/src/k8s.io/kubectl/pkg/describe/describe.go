@@ -4719,11 +4719,6 @@ var maxAnnotationLen = 140
 func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[string]string) {
 	w.Write(LEVEL_0, "%s:\t", title)
 
-	if len(annotations) == 0 {
-		w.WriteLine("<none>")
-		return
-	}
-
 	// to print labels in the sorted order
 	keys := make([]string, 0, len(annotations))
 	for key := range annotations {
@@ -4732,7 +4727,7 @@ func printAnnotationsMultiline(w PrefixWriter, title string, annotations map[str
 		}
 		keys = append(keys, key)
 	}
-	if len(annotations) == 0 {
+	if len(keys) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
