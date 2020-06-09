@@ -125,7 +125,7 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 			(disk.ManagedDisk != nil && diskURI != "" && strings.EqualFold(*disk.ManagedDisk.ID, diskURI)) {
 			// found the disk
 			klog.V(2).Infof("azureDisk - detach disk: name %q uri %q", diskName, diskURI)
-			disks = append(disks[:i], disks[i+1:]...)
+			disks[i].ToBeDetached = to.BoolPtr(true)
 			bFoundDisk = true
 			break
 		}
